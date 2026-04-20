@@ -646,7 +646,7 @@
         {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`Choose method to continue`}
+        {$t`Choose an authentication method to continue`}
       </p>
     </AuthWizard>
   </Dialog>

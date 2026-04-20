@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   findConfig,
   issuerMatches,
   extractIssuerTemplateClaims,
+  selectAuthScopes,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
@@ -10,6 +11,7 @@ import { backendCanisterConfig } from "$lib/globals";
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
     openid_configs: [],
+    oidc_configs: [],
   },
 }));
 
@@ -232,5 +234,32 @@ describe("findConfig", () => {
     expect(
       findConfig("https://no-such-issuer.example.com", []),
     ).toBeUndefined();
+  });
+});
+
+describe("selectAuthScopes", () => {
+  it("returns defaults when scopes_supported is undefined", () => {
+    expect(selectAuthScopes(undefined)).toEqual(["openid", "profile", "email"]);
+  });
+
+  it("returns intersection of defaults and advertised scopes", () => {
+    expect(selectAuthScopes(["openid", "email", "offline_access"])).toEqual([
+      "openid",
+      "email",
+    ]);
+  });
+
+  it("falls back to defaults when filter leaves empty list", () => {
+    // Without a fallback the `scope` query param sent to `/authorize` would be
+    // empty, which providers reject.
+    expect(selectAuthScopes(["custom_scope_one", "custom_scope_two"])).toEqual([
+      "openid",
+      "profile",
+      "email",
+    ]);
+  });
+
+  it("falls back to defaults when scopes_supported is empty", () => {
+    expect(selectAuthScopes([])).toEqual(["openid", "profile", "email"]);
   });
 });

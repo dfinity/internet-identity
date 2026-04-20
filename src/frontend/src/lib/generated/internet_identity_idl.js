@@ -109,6 +109,7 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
+  const DiscoverableOidcConfig = IDL.Record({ 'discovery_domain' : IDL.Text });
   const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -245,6 +246,12 @@ export const idlFactory = ({ IDL }) => {
     'creation_in_progress' : IDL.Null,
     'success' : IDL.Principal,
     'failed' : IDL.Text,
+  });
+  const OidcConfig = IDL.Record({
+    'openid_configuration' : IDL.Opt(IDL.Text),
+    'issuer' : IDL.Opt(IDL.Text),
+    'discovery_domain' : IDL.Text,
+    'client_id' : IDL.Opt(IDL.Text),
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -607,6 +614,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
+    'add_discoverable_oidc_config' : IDL.Func([DiscoverableOidcConfig], [], []),
     'add_tentative_device' : IDL.Func(
         [UserNumber, DeviceData],
         [AddTentativeDeviceResponse],
@@ -720,6 +728,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
+    'discovered_oidc_configs' : IDL.Func([], [IDL.Vec(OidcConfig)], ['query']),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),

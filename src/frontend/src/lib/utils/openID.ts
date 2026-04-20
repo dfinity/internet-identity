@@ -255,11 +255,12 @@ export const issuerMatches = (
 /**
  * Find the OpenID configuration for a given issuer.
  *
- * First, it tries to find a match in the generic OpenID configurations.
- * If no match is found, it falls back to the Google configuration if the issuer matches Google's issuer.
- *
  * Not relying in the feature flag ENABLE_GENERIC_OPEN_ID means that if we enable and then disable the feature flag,
  * afterwards, the users that used the generic OpenID configurations will still be able to log in.
+ *
+ * SSO providers registered in `oidc_configs` are not resolved here — the SSO
+ * flow synthesizes its own `OpenIdConfig` after the two-hop discovery in
+ * `ssoDiscovery.ts` and calls `continueWithOpenId` directly.
  *
  * @param issuer The issuer to find the configuration for.
  * @returns {OpenIdConfig | undefined} The configuration for the issuer.
@@ -271,6 +272,21 @@ export const findConfig = (
   backendCanisterConfig.openid_configs[0]?.find((config) =>
     issuerMatches(config.issuer, issuer, metadata),
   );
+
+/**
+ * Pick the subset of OIDC scopes we actually request from what the provider
+ * advertises. If nothing advertised (or the intersection is empty after
+ * filtering), fall back to the canonical defaults — sending an empty `scope`
+ * to the authorize endpoint would cause the request to fail.
+ */
+export const selectAuthScopes = (scopesSupported?: string[]): string[] => {
+  const defaults = ["openid", "profile", "email"];
+  if (scopesSupported === undefined) {
+    return defaults;
+  }
+  const filtered = scopesSupported.filter((s) => defaults.includes(s));
+  return filtered.length > 0 ? filtered : defaults;
+};
 
 /**
  * Request JWT token through FedCM with redirect in a popup as fallback

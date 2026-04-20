@@ -21,10 +21,17 @@ pub fn init_assets(config: &InternetIdentityInit) {
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
 pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
     // Required to make the synchronized config available to the II frontend canister.
-    // The synchronized config is the part of `InternetIdentityInit` that is needed for both the II backend and frontend.
+    // The synchronized config is the subset of state the frontend needs on page
+    // load. `openid_configs` comes from init args (they are set that way);
+    // `oidc_configs` is not in init args at all — SSO providers are managed via
+    // `add_discoverable_oidc_config` and live in persistent state.
+    let synchronized = InternetIdentitySynchronizedConfig {
+        openid_configs: config.openid_configs.clone(),
+        oidc_configs: state::persistent_state(|s| s.oidc_configs.clone()),
+    };
     let mut assets = vec![Asset {
         url_path: "/.config.did.bin".to_string(),
-        content: Encode!(&InternetIdentitySynchronizedConfig::from(config)).unwrap(),
+        content: Encode!(&synchronized).unwrap(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     }];

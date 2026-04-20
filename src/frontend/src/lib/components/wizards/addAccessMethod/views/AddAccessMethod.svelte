@@ -1,6 +1,7 @@
 <script lang="ts">
   import ShieldIllustration from "$lib/components/illustrations/ShieldIllustration.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
+  import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -18,6 +19,7 @@
   interface Props {
     linkOpenIdAccount: (config: OpenIdConfig) => Promise<"cancelled" | void>;
     continueWithPasskey: () => void;
+    signInWithSso: () => void;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
   }
@@ -25,6 +27,7 @@
   const {
     linkOpenIdAccount,
     continueWithPasskey,
+    signInWithSso,
     openIdCredentials = [],
     maxPasskeysReached,
   }: Props = $props();
@@ -111,6 +114,21 @@
           </Tooltip>
         </Tooltip>
       {/each}
+      <!--
+        SSO entry is always rendered alongside the named providers. The SSO
+        screen calls `add_discoverable_oidc_config` on submit; domains not on
+        the backend canary allowlist are rejected there.
+      -->
+      <Button
+        onclick={signInWithSso}
+        variant="secondary"
+        disabled={authenticatingProviderId !== undefined}
+        size="xl"
+        class="flex-1"
+        aria-label={$t`Sign in with SSO`}
+      >
+        <SsoIcon class="size-6" />
+      </Button>
     </div>
     <Tooltip
       label={$t`You have reached the maximum number of passkeys`}

@@ -76,9 +76,16 @@ fn should_coexist_with_openid_configs() {
     // Add OIDC config alongside existing openid_configs
     api::add_discoverable_oidc_config(&env, canister_id, example_oidc_config()).unwrap();
 
+    // `config()` reflects the init-arg-driven `openid_configs`.
     let result = api::config(&env, canister_id).unwrap();
     assert!(result.openid_configs.is_some());
-    assert!(result.oidc_configs.is_some());
+
+    // SSO providers are registered via `add_discoverable_oidc_config` and
+    // surfaced through `discovered_oidc_configs`, not through init-args
+    // round-trip.
+    let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
+    assert_eq!(discovered.len(), 1);
+    assert_eq!(discovered[0].discovery_domain, "dfinity.org");
 }
 
 /// Canary allowlist should reject any domain that isn't `dfinity.org`.

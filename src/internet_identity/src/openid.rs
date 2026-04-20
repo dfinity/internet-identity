@@ -1,3 +1,4 @@
+use crate::assets::init_assets;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
 use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
@@ -343,8 +344,22 @@ pub fn add_oidc_config(config: DiscoverableOidcConfig) {
         configs.push(config);
     });
 
+    // Re-certify `/.config.did.bin` so the frontend picks up the newly
+    // registered domain on next page load. Without this, the asset stays
+    // stuck at whatever `initialize()` encoded last, and the SSO UI won't
+    // know the domain exists until the canister is upgraded.
+    refresh_config_asset();
+
     #[cfg(not(test))]
     generic::init_discovery_timers();
+}
+
+/// Re-encode and re-certify `/.config.did.bin` from current persistent state.
+/// Call after any mutation that the frontend config reader should see.
+fn refresh_config_asset() {
+    let current = crate::config();
+    init_assets(&current);
+    update_root_hash();
 }
 
 fn add_oidc_config_internal(config: DiscoverableOidcConfig) {

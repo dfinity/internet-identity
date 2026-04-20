@@ -20,6 +20,12 @@ import { fromBase64 } from "./utils/utils";
 // direct dependencies between frontend and backend, as they may be deployed independently.
 //
 // Only compatibility between the two is guaranteed, not strict synchronization.
+const OpenIdEmailVerificationIDL = IDL.Variant({
+  Google: IDL.Null,
+  Unknown: IDL.Null,
+  Microsoft: IDL.Null,
+});
+
 const backendCanisterConfigIDL = IDL.Record({
   openid_configs: IDL.Opt(
     IDL.Vec(
@@ -29,19 +35,20 @@ const backendCanisterConfigIDL = IDL.Record({
         logo: IDL.Text,
         name: IDL.Text,
         fedcm_uri: IDL.Opt(IDL.Text),
-        email_verification: IDL.Opt(
-          IDL.Variant({
-            Google: IDL.Null,
-            Unknown: IDL.Null,
-            Microsoft: IDL.Null,
-          }),
-        ),
+        email_verification: IDL.Opt(OpenIdEmailVerificationIDL),
         issuer: IDL.Text,
         auth_scope: IDL.Vec(IDL.Text),
         client_id: IDL.Text,
       }),
     ),
   ),
+  // `oidc_configs` is deliberately omitted from the frontend decode — the
+  // backend still serves it in `InternetIdentitySynchronizedConfig` for any
+  // future consumer, but the current SSO flow is user-initiated: the SSO
+  // screen calls `add_discoverable_oidc_config` directly on submit and
+  // relies on the backend's canary allowlist as the gate, not a pre-baked
+  // FE-visible list. Candid is forward-compatible, so the extra wire field
+  // is ignored here.
 });
 
 // Types for above IDL definition
@@ -60,7 +67,9 @@ export interface OpenIdConfig {
   auth_scope: Array<string>;
   client_id: string;
 }
-export type BackendCanisterConfig = { openid_configs: [] | [OpenIdConfig[]] };
+export type BackendCanisterConfig = {
+  openid_configs: [] | [OpenIdConfig[]];
+};
 
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;
