@@ -978,7 +978,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("google verified email attributes should be present");
 
             pretty_assert_eq!(attrs.len(), 1);
@@ -1011,7 +1015,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("credential key should be present");
             pretty_assert_eq!(
                 attrs.len(),
@@ -1034,7 +1042,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("credential key should be present");
             pretty_assert_eq!(
                 attrs.len(),
@@ -1057,7 +1069,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("credential key should be present");
             pretty_assert_eq!(
                 attrs.len(),
@@ -1087,7 +1103,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("credential key should be present");
             pretty_assert_eq!(
                 attrs.len(),
@@ -1123,7 +1143,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("credential key should be present");
             pretty_assert_eq!(
                 attrs.len(),
@@ -1201,7 +1225,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(enterprise_iss, "enterprise-user".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    enterprise_iss,
+                    "enterprise-user".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("credential key should be present");
             pretty_assert_eq!(
                 attrs.len(),
@@ -1312,7 +1340,11 @@ mod tests {
             pretty_assert_eq!(result.len(), 2, "both credentials should be present");
 
             let google_attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("google attributes");
             pretty_assert_eq!(
                 attribute_pairs(google_attrs),
@@ -1370,7 +1402,11 @@ mod tests {
             assert!(requested.is_empty());
 
             let attrs = result
-                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string(), "test-client-id".to_string()))
+                .get(&(
+                    GOOGLE_ISSUER.to_string(),
+                    "google-user-123".to_string(),
+                    "test-client-id".to_string(),
+                ))
                 .expect("google attributes");
 
             pretty_assert_eq!(attrs.len(), 3, "all three attributes should be returned");

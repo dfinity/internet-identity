@@ -58,9 +58,15 @@ impl<'b, C> minicbor::Decode<'b, C> for StorableOpenIdCredentialKey {
                     aud: String::new(),
                 })
             }
-            minicbor::data::Type::Map | minicbor::data::Type::MapIndef => {
-                // New map format: {0: iss, 1: sub, 2: aud}
-                let len = d.map()?.unwrap_or(0);
+            minicbor::data::Type::Map => {
+                // New map format: {0: iss, 1: sub, 2: aud}.
+                // We only ever encode definite-length maps (`e.map(3)`), so the
+                // indefinite form is intentionally not supported here — `d.map()`
+                // returns `None` for indefinite maps, which would otherwise silently
+                // skip the loop body.
+                let len = d.map()?.ok_or_else(|| {
+                    minicbor::decode::Error::message("indefinite-length map is not supported")
+                })?;
                 let mut iss = None;
                 let mut sub = None;
                 let mut aud = None;
@@ -144,8 +150,7 @@ mod tests {
         encoder.str("https://accounts.google.com").unwrap();
         encoder.str("user123").unwrap();
 
-        let decoded =
-            StorableOpenIdCredentialKey::from_bytes(std::borrow::Cow::Borrowed(&buffer));
+        let decoded = StorableOpenIdCredentialKey::from_bytes(std::borrow::Cow::Borrowed(&buffer));
         assert_eq!(decoded.iss, "https://accounts.google.com");
         assert_eq!(decoded.sub, "user123");
         assert_eq!(decoded.aud, "");
@@ -172,7 +177,10 @@ mod tests {
             aud: "aud".to_string(),
         };
         let tuple: OpenIdCredentialKey = key.clone().into();
-        assert_eq!(tuple, ("iss".to_string(), "sub".to_string(), "aud".to_string()));
+        assert_eq!(
+            tuple,
+            ("iss".to_string(), "sub".to_string(), "aud".to_string())
+        );
         let back: StorableOpenIdCredentialKey = tuple.into();
         assert_eq!(key, back);
     }

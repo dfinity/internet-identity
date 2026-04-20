@@ -88,7 +88,7 @@ impl OpenIdCredential {
     }
 
     pub fn principal(&self, anchor_number: AnchorNumber) -> Principal {
-        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
+        let seed = calculate_delegation_seed(&self.key(), anchor_number);
         let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
         Principal::self_authenticating(public_key)
     }
@@ -101,7 +101,7 @@ impl OpenIdCredential {
         state::ensure_salt_set().await;
 
         let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
-        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
+        let seed = calculate_delegation_seed(&self.key(), anchor_number);
 
         state::signature_map_mut(|sigs| {
             add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
@@ -123,7 +123,7 @@ impl OpenIdCredential {
         state::assets_and_signatures(|certified_assets, sigs| {
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
-                seed: &calculate_delegation_seed(&self.aud, &self.key(), anchor_number),
+                seed: &calculate_delegation_seed(&self.key(), anchor_number),
                 message: &delegation_signature_msg(&session_key, expiration, None),
             };
 
@@ -480,24 +480,26 @@ pub fn replace_issuer_placeholders(template: &str, claims: &Vec<(String, String)
     result
 }
 
-/// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`
+/// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`.
+///
+/// All three key components (`iss`, `sub`, `aud`) participate in the seed so that the
+/// same user at the same provider with different OIDC clients derives distinct
+/// principals — this is the security property that makes SSO safe.
 ///
 /// # Arguments
 ///
-/// * `client_id`: The client id for which the `OpenIdCredential` was created
-/// * `(iss, sub, _aud)`: The key of the `OpenIdCredential` to create a `Hash` from
+/// * `(iss, sub, aud)`: The key of the `OpenIdCredential` to derive the `Hash` from
 /// * `anchor_number`: The anchor number the credential is assigned to
 #[allow(clippy::cast_possible_truncation)]
 fn calculate_delegation_seed(
-    client_id: &str,
-    (iss, sub, _aud): &OpenIdCredentialKey,
+    (iss, sub, aud): &OpenIdCredentialKey,
     anchor_number: AnchorNumber,
 ) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
-    blob.push(client_id.len() as u8);
-    blob.extend(client_id.bytes());
+    blob.push(aud.len() as u8);
+    blob.extend(aud.bytes());
 
     blob.push(iss.len() as u8);
     blob.extend(iss.bytes());
