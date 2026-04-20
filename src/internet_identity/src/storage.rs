@@ -250,6 +250,18 @@ impl Storable for BufferedEntryWrapper {
     const BOUND: Bound = Bound::Unbounded;
 }
 
+/// Outcome of one batch of the OpenID credential key migration.
+#[derive(Default, Debug)]
+pub struct MigrationBatchOutcome {
+    /// Number of legacy entries successfully upgraded to the new key format.
+    pub processed: u64,
+    /// `true` when all legacy entries have been drained — caller should stop
+    /// the interval timer.
+    pub is_done: bool,
+    /// Per-entry errors encountered this batch (e.g. orphan index entries).
+    pub errors: Vec<String>,
+}
+
 /// Data type responsible for managing anchor data in stable memory.
 pub struct Storage<M: Memory> {
     header: Header,
@@ -774,68 +786,107 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
-    /// Migrates OpenID credential keys from the legacy `(iss, sub)` format to the
-    /// new `(iss, sub, aud)` format.
+    /// Migrates one batch of OpenID credential keys from the legacy `(iss, sub)`
+    /// (CBOR array) format to the new `(iss, sub, aud)` (CBOR map) format.
     ///
-    /// Legacy keys (decoded with empty `aud`) are popped from the index, the `aud`
-    /// is resolved from the anchor's stored `StorableOpenIdCredential`, and the entry
-    /// is re-inserted with the complete key.
+    /// Each batch scans the index for up to `batch_size` keys where
+    /// `is_legacy()` is true, removes them, resolves `aud` from the backing
+    /// anchor's stored `StorableOpenIdCredential`, and re-inserts with the
+    /// complete 3-tuple key. The migration is done once a batch finds fewer
+    /// than `batch_size` legacy entries — i.e. there are no more to process.
     ///
-    /// This is safe to call multiple times (idempotent) — entries already in the new
-    /// format are re-inserted unchanged.
-    pub fn migrate_openid_credential_keys(&mut self) {
-        // Drain all entries via pop_first to avoid byte-level encoding mismatches
-        // when removing legacy (array-encoded) keys.
-        let mut entries: Vec<(StorableOpenIdCredentialKey, StorableAnchorNumberList)> = Vec::new();
-        while let Some((key, value)) = self.lookup_anchor_with_openid_credential_memory.pop_first()
-        {
-            entries.push((key, value));
+    /// We walk the index via `.iter()` (as opposed to `pop_first()`) because
+    /// that works regardless of how legacy vs new-format entries happen to
+    /// sort against each other in the stable `BTreeMap`'s byte ordering. That
+    /// matters even though raw legacy (CBOR array) bytes sort strictly before
+    /// any re-inserted new-format (CBOR map) entries in production: as the
+    /// migration progresses, new-format entries accumulate in the map, and
+    /// an iter-based scan can cleanly skip past them while still finding the
+    /// remaining legacy tail.
+    ///
+    /// Follows the batched-migration convention used by prior anchor
+    /// migrations (see [#3713](https://github.com/dfinity/internet-identity/pull/3713)):
+    /// the caller invokes this on an interval timer until `is_done` becomes
+    /// `true`, at which point the timer is cleared.
+    pub fn migrate_openid_credential_keys_batch(
+        &mut self,
+        batch_size: u64,
+    ) -> MigrationBatchOutcome {
+        let mut outcome = MigrationBatchOutcome::default();
+
+        if batch_size == 0 {
+            outcome.is_done = true;
+            return outcome;
         }
 
-        for (old_key, anchor_list) in entries {
-            if !old_key.is_legacy() {
-                // Already in new format, re-insert as-is
-                self.lookup_anchor_with_openid_credential_memory
-                    .insert(old_key, anchor_list);
-                continue;
-            }
+        // Phase 1: collect up to `batch_size` legacy keys via a read-only scan.
+        // `.take(batch_size)` caps work per batch; iteration order is the map's
+        // byte order, and in production legacy keys sit at the head, so this is
+        // effectively O(batch_size) there.
+        let legacy_keys: Vec<StorableOpenIdCredentialKey> = self
+            .lookup_anchor_with_openid_credential_memory
+            .iter()
+            .filter(|(k, _)| k.is_legacy())
+            .map(|(k, _)| k.clone())
+            .take(batch_size as usize)
+            .collect();
 
-            // Legacy key — look up aud from the anchor's stored credential
+        let collected = legacy_keys.len() as u64;
+
+        // Phase 2: remove + re-insert each legacy entry in the new format.
+        // Done after iteration ends so we don't alias the borrow.
+        for legacy_key in legacy_keys {
+            let Some(anchor_list) = self
+                .lookup_anchor_with_openid_credential_memory
+                .remove(&legacy_key)
+            else {
+                // Disappeared between phase 1 and 2 (concurrent mutation is
+                // not possible here, but defensively ignore).
+                continue;
+            };
+
             let anchor_numbers: Vec<AnchorNumber> = anchor_list.clone().into();
-            let mut resolved_aud = None;
-            if let Some(&anchor_number) = anchor_numbers.first() {
-                if let Some(storable_anchor) = self.stable_anchor_memory.get(&anchor_number) {
-                    if let Some(credential) = storable_anchor
+            let resolved_aud = anchor_numbers
+                .first()
+                .and_then(|anchor_number| self.stable_anchor_memory.get(anchor_number))
+                .and_then(|storable_anchor| {
+                    storable_anchor
                         .openid_credentials
                         .iter()
-                        .find(|c| c.iss == old_key.iss && c.sub == old_key.sub)
-                    {
-                        resolved_aud = Some(credential.aud.clone());
-                    }
+                        .find(|c| c.iss == legacy_key.iss && c.sub == legacy_key.sub)
+                        .map(|c| c.aud.clone())
+                });
+
+            match resolved_aud {
+                Some(aud) => {
+                    let new_key = StorableOpenIdCredentialKey {
+                        iss: legacy_key.iss,
+                        sub: legacy_key.sub,
+                        aud,
+                    };
+                    self.lookup_anchor_with_openid_credential_memory
+                        .insert(new_key, anchor_list);
+                    outcome.processed += 1;
+                }
+                None => {
+                    // Orphan index entry: no anchor/credential data to resolve
+                    // `aud` from. Drop it — the credential itself is already
+                    // gone from the anchor, so leaving the index pointer would
+                    // be useless, and re-inserting with empty aud would keep
+                    // `is_legacy()` true forever.
+                    let err = format!("orphan iss={} sub={}", legacy_key.iss, legacy_key.sub);
+                    ic_cdk::println!("WARNING: dropping orphan OpenID index entry: {err}");
+                    outcome.errors.push(err);
                 }
             }
-
-            if let Some(aud) = resolved_aud {
-                let new_key = StorableOpenIdCredentialKey {
-                    iss: old_key.iss,
-                    sub: old_key.sub,
-                    aud,
-                };
-                self.lookup_anchor_with_openid_credential_memory
-                    .insert(new_key, anchor_list);
-            } else {
-                // Could not resolve aud — re-insert with empty aud to avoid data loss.
-                // This entry will be resolved on the next upgrade attempt.
-                ic_cdk::println!(
-                    "WARNING: Could not resolve aud for OpenID credential key (iss={}, sub={}). \
-                     Re-inserting with empty aud for retry on next upgrade.",
-                    old_key.iss,
-                    old_key.sub
-                );
-                self.lookup_anchor_with_openid_credential_memory
-                    .insert(old_key, anchor_list);
-            }
         }
+
+        // A short batch means we've scanned past all legacy entries.
+        if collected < batch_size {
+            outcome.is_done = true;
+        }
+
+        outcome
     }
 
     pub fn lookup_anchor_with_recovery_phrase_principal(

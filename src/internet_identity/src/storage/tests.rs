@@ -1989,3 +1989,214 @@ fn test_anchor_storage_migration_round_trip() {
         );
     }
 }
+
+mod migrate_openid_credential_keys_batch_tests {
+    use super::*;
+    use crate::storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
+    use pretty_assertions::assert_eq;
+    use std::collections::HashMap;
+
+    /// Insert a legacy `[iss, sub]` index entry (CBOR array) directly into the
+    /// underlying `BTreeMap`, bypassing `StorableOpenIdCredentialKey`'s encoder
+    /// which only emits the new map form.
+    fn insert_legacy_entry<M: Memory + Clone>(
+        storage: &mut Storage<M>,
+        iss: &str,
+        sub: &str,
+        anchor_numbers: Vec<u64>,
+    ) {
+        use ic_stable_structures::Storable;
+
+        let mut buffer = Vec::new();
+        let mut encoder = minicbor::Encoder::new(&mut buffer);
+        encoder.array(2).unwrap();
+        encoder.str(iss).unwrap();
+        encoder.str(sub).unwrap();
+        let key = StorableOpenIdCredentialKey::from_bytes(std::borrow::Cow::Owned(buffer));
+
+        let value = crate::storage::storable::anchor_number_list::StorableAnchorNumberList::from(
+            anchor_numbers,
+        );
+        storage
+            .lookup_anchor_with_openid_credential_memory
+            .insert(key, value);
+    }
+
+    /// Write an anchor with a single OpenID credential so the migration can
+    /// resolve `aud`.
+    fn seed_anchor_with_credential<M: Memory + Clone>(
+        storage: &mut Storage<M>,
+        iss: &str,
+        sub: &str,
+        aud: &str,
+    ) -> u64 {
+        let mut anchor = storage.allocate_anchor(0).unwrap();
+        anchor
+            .add_openid_credential(OpenIdCredential {
+                iss: iss.to_string(),
+                sub: sub.to_string(),
+                aud: aud.to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::new(),
+            })
+            .unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+        anchor_number
+    }
+
+    #[test]
+    fn should_complete_on_empty_index() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let outcome = storage.migrate_openid_credential_keys_batch(2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.processed, 0);
+        assert!(outcome.errors.is_empty());
+    }
+
+    #[test]
+    fn should_upgrade_legacy_entry_and_complete() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor_number =
+            seed_anchor_with_credential(&mut storage, "https://iss", "sub-1", "aud-1");
+        insert_legacy_entry(&mut storage, "https://iss", "sub-1", vec![anchor_number]);
+
+        let outcome = storage.migrate_openid_credential_keys_batch(2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.processed, 1);
+        assert!(outcome.errors.is_empty());
+
+        // Upgraded entry is retrievable under the new 3-tuple key and the old
+        // 2-tuple form is gone.
+        let new_key = StorableOpenIdCredentialKey {
+            iss: "https://iss".to_string(),
+            sub: "sub-1".to_string(),
+            aud: "aud-1".to_string(),
+        };
+        assert!(storage
+            .lookup_anchor_with_openid_credential_memory
+            .get(&new_key)
+            .is_some());
+    }
+
+    #[test]
+    fn should_preserve_preexisting_new_format_entries() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+
+        // Pre-existing new-format entry written via the normal encoder.
+        let _already_migrated =
+            seed_anchor_with_credential(&mut storage, "https://iss-z", "sub-z", "aud-z");
+        let new_key = StorableOpenIdCredentialKey {
+            iss: "https://iss-z".to_string(),
+            sub: "sub-z".to_string(),
+            aud: "aud-z".to_string(),
+        };
+        storage.lookup_anchor_with_openid_credential_memory.insert(
+            new_key.clone(),
+            crate::storage::storable::anchor_number_list::StorableAnchorNumberList::from(vec![
+                1u64,
+            ]),
+        );
+
+        // Plus a legacy entry which sorts before it.
+        let anchor_number =
+            seed_anchor_with_credential(&mut storage, "https://iss-a", "sub-a", "aud-a");
+        insert_legacy_entry(&mut storage, "https://iss-a", "sub-a", vec![anchor_number]);
+
+        // A single batch should process the legacy entry, then encounter the
+        // new-format entry, put it back, and signal completion.
+        let outcome = storage.migrate_openid_credential_keys_batch(2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.processed, 1);
+
+        // Pre-existing new-format entry must still be present.
+        assert!(storage
+            .lookup_anchor_with_openid_credential_memory
+            .get(&new_key)
+            .is_some());
+    }
+
+    #[test]
+    fn should_split_work_across_batches() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+
+        // Seed five legacy entries. Index sort order is by CBOR bytes ≈ by iss.
+        let entries = [
+            ("https://iss-a", "s", "aud-a"),
+            ("https://iss-b", "s", "aud-b"),
+            ("https://iss-c", "s", "aud-c"),
+            ("https://iss-d", "s", "aud-d"),
+            ("https://iss-e", "s", "aud-e"),
+        ];
+        for (iss, sub, aud) in &entries {
+            let anchor_number = seed_anchor_with_credential(&mut storage, iss, sub, aud);
+            insert_legacy_entry(&mut storage, iss, sub, vec![anchor_number]);
+        }
+
+        // Batch size 2 → expect two full batches (2 processed each) then a
+        // third batch with the last one that signals completion.
+        let batch1 = storage.migrate_openid_credential_keys_batch(2);
+        assert!(!batch1.is_done);
+        assert_eq!(batch1.processed, 2);
+
+        let batch2 = storage.migrate_openid_credential_keys_batch(2);
+        assert!(!batch2.is_done);
+        assert_eq!(batch2.processed, 2);
+
+        let batch3 = storage.migrate_openid_credential_keys_batch(2);
+        assert!(batch3.is_done);
+        assert_eq!(batch3.processed, 1);
+
+        // All five upgraded entries are in the new format.
+        for (iss, sub, aud) in &entries {
+            let key = StorableOpenIdCredentialKey {
+                iss: iss.to_string(),
+                sub: sub.to_string(),
+                aud: aud.to_string(),
+            };
+            assert!(storage
+                .lookup_anchor_with_openid_credential_memory
+                .get(&key)
+                .is_some());
+        }
+    }
+
+    #[test]
+    fn should_drop_orphan_legacy_entry_with_error() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+
+        // Legacy entry that points to a nonexistent anchor — orphan.
+        insert_legacy_entry(&mut storage, "https://iss-x", "sub-x", vec![999]);
+
+        let outcome = storage.migrate_openid_credential_keys_batch(2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.processed, 0);
+        assert_eq!(outcome.errors.len(), 1);
+        // Orphan is gone — no infinite-loop risk on subsequent batches.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_openid_credential_memory
+                .iter()
+                .count(),
+            0
+        );
+    }
+
+    #[test]
+    fn should_be_idempotent_after_completion() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor_number = seed_anchor_with_credential(&mut storage, "https://iss", "sub", "aud");
+        insert_legacy_entry(&mut storage, "https://iss", "sub", vec![anchor_number]);
+
+        let first = storage.migrate_openid_credential_keys_batch(2_000);
+        assert!(first.is_done);
+        assert_eq!(first.processed, 1);
+
+        // Re-running: index has one new-format entry → first pop hits
+        // non-legacy, put-back, is_done.
+        let second = storage.migrate_openid_credential_keys_batch(2_000);
+        assert!(second.is_done);
+        assert_eq!(second.processed, 0);
+        assert!(second.errors.is_empty());
+    }
+}

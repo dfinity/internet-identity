@@ -13,6 +13,9 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk_timers::TimerId;
+use std::cell::RefCell;
+use std::time::Duration;
 
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -74,6 +77,95 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
+
+// ---- OpenID credential key migration (temporary, see PR #3784) ----
+//
+// The `OpenIdCredentialKey` type grew an `aud` field. Existing index entries
+// were written in the legacy `(iss, sub)` CBOR array shape and must be
+// upgraded to the new `(iss, sub, aud)` CBOR map shape. Upgrading all entries
+// synchronously in `post_upgrade` would blow the instruction limit on II's
+// production canister, so we batch the work via an interval timer using the
+// same convention as the prior anchor migration (#3713).
+
+/// How long to wait between migration batches.
+const OIDC_KEY_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
+
+/// Maximum number of index entries to upgrade per batch (= per ingress message).
+/// Matches the 2 000-anchor-per-batch convention used for previous migrations.
+const OIDC_KEY_MIGRATION_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    // TODO: Remove these after the data migration is complete.
+    static OIDC_KEY_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static OIDC_KEY_MIGRATION_PROCESSED: RefCell<u64> = const { RefCell::new(0) };
+    static OIDC_KEY_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static OIDC_KEY_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Temporary hidden endpoint: returns any orphan-entry errors encountered
+/// during the OpenID credential key migration.
+#[update(hidden = true)]
+fn list_oidc_key_migration_errors() -> Vec<String> {
+    OIDC_KEY_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
+}
+
+/// Temporary hidden endpoint: returns `(processed_entries, is_done)` so
+/// monitoring can track migration progress.
+#[query(hidden = true)]
+fn oidc_key_migration_status() -> (u64, bool) {
+    (
+        OIDC_KEY_MIGRATION_PROCESSED.with_borrow(|c| *c),
+        OIDC_KEY_MIGRATION_DONE.with_borrow(|d| *d),
+    )
+}
+
+/// Process one batch of the OpenID credential key migration. Bound to the
+/// interval timer set up in [`init_oidc_key_migration_timer`]; clears the
+/// timer once the migration signals completion.
+fn run_oidc_key_migration_batch() {
+    if OIDC_KEY_MIGRATION_DONE.with_borrow(|done| *done) {
+        return;
+    }
+
+    let outcome = state::storage_borrow_mut(|storage| {
+        storage.migrate_openid_credential_keys_batch(OIDC_KEY_MIGRATION_BATCH_SIZE)
+    });
+
+    OIDC_KEY_MIGRATION_PROCESSED.with_borrow_mut(|count| {
+        *count = count.saturating_add(outcome.processed);
+    });
+    if !outcome.errors.is_empty() {
+        OIDC_KEY_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
+    }
+
+    if outcome.is_done {
+        OIDC_KEY_MIGRATION_DONE.replace(true);
+        OIDC_KEY_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+            if let Some(timer_id) = id_slot.take() {
+                ic_cdk_timers::clear_timer(timer_id);
+            }
+        });
+        let processed = OIDC_KEY_MIGRATION_PROCESSED.with_borrow(|c| *c);
+        ic_cdk::println!(
+            "OpenID credential key migration COMPLETED ({processed} entries processed)."
+        );
+    }
+}
+
+/// Start the interval timer driving [`run_oidc_key_migration_batch`]. Safe to
+/// call from both `init` (the first batch will immediately see an empty index
+/// and mark the migration done) and `post_upgrade`.
+fn init_oidc_key_migration_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        OIDC_KEY_MIGRATION_BATCH_BACKOFF_SECONDS,
+        run_oidc_key_migration_batch,
+    );
+    OIDC_KEY_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
 
 #[update]
 async fn init_salt() {
@@ -620,12 +712,6 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
 
-    // Migrate OpenID credential keys from (iss, sub) to (iss, sub, aud) format.
-    // Safe to call on every upgrade — entries already in the new format are preserved.
-    state::storage_borrow_mut(|storage| {
-        storage.migrate_openid_credential_keys();
-    });
-
     initialize(maybe_arg);
 }
 
@@ -645,6 +731,11 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(oidc_configs) = config.oidc_configs {
         openid::setup_oidc(oidc_configs);
     }
+
+    // Kick off the OpenID credential key batch migration. Processes at most
+    // `OIDC_KEY_MIGRATION_BATCH_SIZE` entries per tick so each batch fits in
+    // one ingress message; timer self-clears once the migration signals done.
+    init_oidc_key_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
