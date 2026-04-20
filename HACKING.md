@@ -12,7 +12,7 @@ The build requires the following dependencies:
 - Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 - CMake
 - [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
-- Node.js v24+ (see `.nvmrc` for the exact version)
+- Node.js v24.x (see `.nvmrc` for the exact version)
 
 ## Running Locally
 
