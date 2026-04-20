@@ -5,9 +5,12 @@
     type Channel,
     type ChannelOptions,
     DelegationParamsCodec,
+    Icrc3AttributesParamsSchema,
     INVALID_PARAMS_ERROR_CODE,
   } from "$lib/utils/transport/utils";
   import { authorizationStore } from "$lib/stores/authorization.store";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { retryFor, throwCanisterError } from "$lib/utils/utils";
   import { z } from "zod";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -43,8 +46,80 @@
 
   const { options, children }: Props = $props();
 
+  /** Handle ICRC-3 attribute requests in the default (non-OpenID) flow.
+   *  Responds with only the implicit entries (nonce, origin, timestamp)
+   *  since the user did not authenticate via OpenID. */
+  const handleIcrc3AttributeRequests = (channel: Channel) => {
+    channel.addEventListener("request", async (request) => {
+      if (
+        request.id === undefined ||
+        request.method !== "ii-icrc3-attributes"
+      ) {
+        return;
+      }
+      const paramsResult = Icrc3AttributesParamsSchema.safeParse(
+        request.params,
+      );
+      if (!paramsResult.success) {
+        await channel.send({
+          jsonrpc: "2.0",
+          id: request.id,
+          error: {
+            code: INVALID_PARAMS_ERROR_CODE,
+            message: z.prettifyError(paramsResult.error),
+          },
+        });
+        return;
+      }
+      try {
+        // Wait for the user to authorize and authenticate first.
+        await new Promise<void>((resolve) => {
+          const unsub = authorizationStore.subscribe((value) => {
+            if (value !== undefined) {
+              queueMicrotask(() => unsub());
+              resolve();
+            }
+          });
+        });
+        const { identityNumber, actor } = $authenticatedStore;
+        const origin = $authorizationStore!.effectiveOrigin;
+        const { message } = await actor
+          .prepare_icrc3_attributes({
+            origin,
+            account_number: [],
+            identity_number: identityNumber,
+            attributes: [],
+            nonce: z.util.base64ToUint8Array(paramsResult.data.nonce),
+          })
+          .then(throwCanisterError);
+        const { signature } = await retryFor(5, () =>
+          actor
+            .get_icrc3_attributes({
+              origin,
+              account_number: [],
+              identity_number: identityNumber,
+              message,
+            })
+            .then(throwCanisterError),
+        );
+        await channel.send({
+          jsonrpc: "2.0",
+          id: request.id,
+          result: {
+            data: z.util.uint8ArrayToBase64(new Uint8Array(message)),
+            signature: z.util.uint8ArrayToBase64(new Uint8Array(signature)),
+          },
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  };
+
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
+      handleIcrc3AttributeRequests(channel);
+
       channel.addEventListener("request", async (request) => {
         if (
           request.id === undefined ||
