@@ -221,10 +221,23 @@ export const handleIcrc3Attributes =
     // Filter to implicit consent keys if the user authenticated via OpenID.
     // Non-OpenID users get an empty attribute list (only implicit entries).
     const configIssuer = getConfigIssuer(authenticated);
-    const attributeKeys =
+    const implicitKeys =
       configIssuer !== undefined
         ? filterImplicitConsentKeys(paramsResult.data.keys, configIssuer)
         : [];
+
+    // Filter to only keys that are actually available.
+    const available =
+      implicitKeys.length > 0
+        ? await authenticated.actor
+            .list_available_attributes({
+              identity_number: authenticated.identityNumber,
+              attributes: [implicitKeys],
+            })
+            .then(throwCanisterError)
+        : [];
+    const availableKeys = new Set(available.map(([key]) => key));
+    const attributeKeys = implicitKeys.filter((key) => availableKeys.has(key));
 
     try {
       const { message } = await authenticated.actor
