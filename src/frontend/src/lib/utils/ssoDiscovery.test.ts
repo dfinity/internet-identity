@@ -3,6 +3,7 @@ import {
   validateDomain,
   discoverSsoConfig,
   clearSsoDiscoveryCache,
+  DomainNotConfiguredError,
 } from "./ssoDiscovery";
 
 const DFINITY_II_CONFIG = {
@@ -119,6 +120,73 @@ describe("ssoDiscovery", () => {
 
       expect(first).toEqual(second);
       expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    // Each of these tests exhausts all 3 retry attempts on hop 1, so they
+    // wait through the full exponential backoff (2s + 4s = 6s). Bumped
+    // timeout accordingly. `mockImplementation` (not `mockResolvedValue`)
+    // so each retry gets a fresh Response — reusing one throws
+    // `Body has already been read` after the first `.json()`.
+    it("wraps HTTP 404 on hop 1 as DomainNotConfiguredError(http-error, 404)", async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+        Promise.resolve(
+          new Response("not found", {
+            status: 404,
+            headers: { "content-type": "text/html" },
+          }),
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toMatchObject({
+        name: "DomainNotConfiguredError",
+        reason: "http-error",
+        httpStatus: 404,
+      });
+    }, 10000);
+
+    it("wraps a 200 HTML response on hop 1 as DomainNotConfiguredError(invalid-response)", async () => {
+      // e.g. `dfinity.org` serves an SPA fallback with 200 + text/html for
+      // unknown `.well-known` paths — the hop-1 JSON parse throws
+      // `SyntaxError: Unexpected token '<'`, which we remap.
+      vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+        Promise.resolve(
+          new Response("<!DOCTYPE html><html>…</html>", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toMatchObject({
+        name: "DomainNotConfiguredError",
+        reason: "invalid-response",
+      });
+    }, 10000);
+
+    it("wraps a network failure on hop 1 as DomainNotConfiguredError(network)", async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+        Promise.reject(new TypeError("Failed to fetch")),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toMatchObject({
+        name: "DomainNotConfiguredError",
+        reason: "network",
+      });
+    }, 10000);
+
+    it("wraps a malformed-but-decoded ii-openid-configuration as invalid-response", async () => {
+      // JSON is fine, shape isn't — still "domain isn't correctly configured"
+      // as far as the user is concerned.
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify({ something_else: "yep" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toBeInstanceOf(
+        DomainNotConfiguredError,
+      );
     });
 
     it("rejects ii-openid-configuration missing client_id", async () => {

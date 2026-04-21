@@ -6,7 +6,11 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import { anonymousActor } from "$lib/globals";
-  import { validateDomain, discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import {
+    validateDomain,
+    discoverSsoConfig,
+    DomainNotConfiguredError,
+  } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
   import { t } from "$lib/stores/locale.store";
 
@@ -25,12 +29,32 @@
   let isSubmitting = $state(false);
 
   /**
-   * Map a backend/discovery error to a user-visible message. The backend's
-   * canary allowlist in `openid::generic::ALLOWED_DISCOVERY_DOMAINS` traps
-   * with a message containing "canary allowlist" when a domain isn't
-   * approved yet.
+   * Map a backend/discovery error to a user-visible message. Three cases
+   * we explicitly translate:
+   *
+   * 1. Canary-allowlist trap from the backend's `add_discoverable_oidc_config`
+   *    → the domain is well-formed but not yet approved by II admins.
+   * 2. {@link DomainNotConfiguredError} from hop-1 discovery → the domain
+   *    owner hasn't set up `/.well-known/ii-openid-configuration` (or it's
+   *    broken). We include the HTTP status when the failure was an HTTP
+   *    error, otherwise a generic reason.
+   * 3. Anything else → surface the raw message, which should only happen
+   *    for unexpected infrastructure failures.
    */
   const mapSubmitError = (e: unknown, domainInput: string): string => {
+    if (e instanceof DomainNotConfiguredError) {
+      // Reported errors the user can act on:
+      // - HTTP error: e.g. 404 when the path doesn't exist (most common).
+      // - invalid-response: 2xx but HTML / non-JSON body (SPA fallback).
+      // - network: DNS/TLS/timeout.
+      const detail =
+        e.reason === "http-error" && e.httpStatus !== undefined
+          ? $t`HTTP ${String(e.httpStatus)}`
+          : e.reason === "invalid-response"
+            ? $t`invalid response`
+            : $t`network error`;
+      return $t`This domain isn't correctly configured for Internet Identity (${detail}).`;
+    }
     if (e instanceof Error) {
       if (e.message.toLowerCase().includes("canary allowlist")) {
         return $t`SSO is not available for "${domainInput}" yet.`;

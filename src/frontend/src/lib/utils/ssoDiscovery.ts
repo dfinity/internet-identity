@@ -43,6 +43,29 @@ export interface SsoDiscoveryResult {
   discovery: OidcDiscoveryDocument;
 }
 
+/**
+ * Raised when hop 1 (`/.well-known/ii-openid-configuration` on the user's
+ * domain) fails in a way that signals the domain owner hasn't set up II
+ * integration — 404, non-JSON response, missing fields, or unreachable.
+ *
+ * Surfaced to the UI so we can show a single user-friendly message
+ * instead of leaking raw `fetch` / JSON parse errors.
+ */
+export class DomainNotConfiguredError extends Error {
+  constructor(
+    public readonly reason: "http-error" | "invalid-response" | "network",
+    public readonly httpStatus?: number,
+    detail?: string,
+  ) {
+    super(
+      detail !== undefined
+        ? `Domain not configured for II (${reason}): ${detail}`
+        : `Domain not configured for II (${reason})`,
+    );
+    this.name = "DomainNotConfiguredError";
+  }
+}
+
 /** Response shape of the `/.well-known/ii-openid-configuration` endpoint. */
 interface IIOpenIdConfiguration {
   client_id: string;
@@ -236,6 +259,50 @@ const validateProviderDiscovery = (
   };
 };
 
+/**
+ * Classify a raw error from hop 1 (`/.well-known/ii-openid-configuration`)
+ * into a {@link DomainNotConfiguredError} variant so the UI can surface a
+ * single friendly message.
+ *
+ * - `Fetch failed: <status> ...` from our {@link fetchWithRetry} → http-error
+ *   with the parsed status.
+ * - `SyntaxError` from `response.json()` → invalid-response (HTML served at
+ *   200 is the most common cause, e.g. a CMS that SPA-routes every path).
+ * - Anything else (timeouts, network failures, CORS, DNS) → network.
+ */
+const wrapHopOneError = (error: unknown): DomainNotConfiguredError => {
+  // Duck-type (not `instanceof Error`): jsdom errors thrown from
+  // `Response.json()` come from a separate realm, so `instanceof Error`
+  // against the main-realm `Error` returns false even for genuine
+  // SyntaxError instances. Reading `name`/`message` works across realms.
+  const name = errorName(error);
+  const message = errorMessage(error);
+  if (message !== undefined) {
+    const match = message.match(/^Fetch failed: (\d{3})\b/);
+    if (match !== null) {
+      return new DomainNotConfiguredError("http-error", parseInt(match[1], 10));
+    }
+  }
+  if (name === "SyntaxError") {
+    return new DomainNotConfiguredError("invalid-response");
+  }
+  return new DomainNotConfiguredError("network");
+};
+
+const errorName = (e: unknown): string | undefined =>
+  typeof e === "object" &&
+  e !== null &&
+  typeof (e as { name?: unknown }).name === "string"
+    ? (e as { name: string }).name
+    : undefined;
+
+const errorMessage = (e: unknown): string | undefined =>
+  typeof e === "object" &&
+  e !== null &&
+  typeof (e as { message?: unknown }).message === "string"
+    ? (e as { message: string }).message
+    : undefined;
+
 /** Fetch JSON with timeout, retries, and exponential backoff. */
 const fetchWithRetry = async (
   url: string,
@@ -335,12 +402,28 @@ export const discoverSsoConfig = async (
 
   try {
     // Hop 1: fetch /.well-known/ii-openid-configuration from the org domain.
+    // Raw fetch / JSON / validation errors are converted to
+    // DomainNotConfiguredError so the UI can show one friendly message
+    // regardless of how exactly the domain misbehaves.
     const iiConfigUrl = `https://${validatedDomain}/.well-known/ii-openid-configuration`;
-    const iiConfigData = await fetchWithRetry(
-      iiConfigUrl,
-      II_CONFIG_TIMEOUT_MS,
-    );
-    const iiConfig = validateIIConfig(iiConfigData);
+    let iiConfigData: unknown;
+    try {
+      iiConfigData = await fetchWithRetry(iiConfigUrl, II_CONFIG_TIMEOUT_MS);
+    } catch (error) {
+      throw wrapHopOneError(error);
+    }
+    let iiConfig: IIOpenIdConfiguration;
+    try {
+      iiConfig = validateIIConfig(iiConfigData);
+    } catch (error) {
+      // Response decoded but doesn't match the expected shape — from the
+      // user's perspective the domain still isn't correctly configured.
+      throw new DomainNotConfiguredError(
+        "invalid-response",
+        undefined,
+        error instanceof Error ? error.message : undefined,
+      );
+    }
 
     iiConfigCache.set(validatedDomain, {
       config: iiConfig,
@@ -385,4 +468,9 @@ export const clearSsoDiscoveryCache = (): void => {
   iiConfigCache.clear();
   providerCache.clear();
   lastFetchAttempt.clear();
+  // If a test timed out mid-fetch, the pending promise's `finally` may not
+  // have run yet and `activeFetches` could be stuck above 0, making the
+  // next test trip the MAX_CONCURRENT guard. Reset it so each test starts
+  // from a clean slate.
+  activeFetches = 0;
 };
