@@ -6,6 +6,7 @@
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import { t } from "$lib/stores/locale.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { pendingOpenIdIssuerStore } from "$lib/stores/authentication.store";
   import {
     DirectOpenIdEvents,
     directOpenIdFunnel,
@@ -51,6 +52,7 @@
       if (config === undefined) {
         return;
       }
+      pendingOpenIdIssuerStore.set(config.issuer);
       animateTransitions = true;
       triggerDropWaveAnimation();
 

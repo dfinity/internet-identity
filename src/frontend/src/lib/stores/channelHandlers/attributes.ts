@@ -6,29 +6,17 @@ import {
 } from "$lib/utils/transport/utils";
 import { frontendCanisterConfig } from "$lib/globals";
 import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
-import { findConfig } from "$lib/utils/openID";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
-  type Authenticated,
   authenticationStore,
+  pendingOpenIdIssuerStore,
 } from "$lib/stores/authentication.store";
 import { authorizedStore } from "$lib/stores/authorization.store";
 import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
-
-/**
- * Resolves the config issuer string from the current authentication state.
- * Returns `undefined` if the user did not authenticate via OpenID.
- */
-const getConfigIssuer = (authenticated: Authenticated): string | undefined => {
-  if (!("openid" in authenticated.authMethod)) {
-    return undefined;
-  }
-  const { iss, metadata } = authenticated.authMethod.openid;
-  return findConfig(iss, metadata)?.issuer;
-};
+import { get } from "svelte/store";
 
 /** Filters attribute keys to only those the user implicitly consents to. */
 const filterImplicitConsentKeys = (
@@ -79,15 +67,15 @@ export const handleLegacyAttributes =
       return;
     }
 
-    // Wait for the user to authorize before serving attributes.
-    await waitForStore(authorizedStore);
-
-    // Only OpenID users have attributes — bail if not OpenID.
-    const authenticated = await waitForStore(authenticationStore);
-    const configIssuer = getConfigIssuer(authenticated);
+    // Only OpenID flows have attributes — bail if not OpenID.
+    const configIssuer = get(pendingOpenIdIssuerStore);
     if (configIssuer === undefined) {
       return;
     }
+
+    // Wait for the user to authorize before serving attributes.
+    await waitForStore(authorizedStore);
+    const authenticated = await waitForStore(authenticationStore);
 
     // Validate the derivation origin if provided, same as delegation handler.
     const validationResult = await validateDerivationOrigin({
@@ -218,9 +206,9 @@ export const handleIcrc3Attributes =
       paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
     );
 
-    // Filter to implicit consent keys if the user authenticated via OpenID.
-    // Non-OpenID users get an empty attribute list (only implicit entries).
-    const configIssuer = getConfigIssuer(authenticated);
+    // Filter to implicit consent keys if this is an OpenID flow.
+    // Non-OpenID flows get an empty attribute list (only implicit entries).
+    const configIssuer = get(pendingOpenIdIssuerStore);
     const implicitKeys =
       configIssuer !== undefined
         ? filterImplicitConsentKeys(paramsResult.data.keys, configIssuer)
