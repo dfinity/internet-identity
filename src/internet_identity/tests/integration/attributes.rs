@@ -1330,7 +1330,8 @@ fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
     use serde_json::json;
     use sha2::{Digest, Sha256};
 
-    // Deterministic RSA keygen. 2048 bits matches Google's kid sizes. The seed is arbitrary.
+    // Deterministic RSA keygen. 2048 bits matches the RSA key size Google uses for its
+    // JWT signing keys. The seed is arbitrary.
     let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(0xDEAD_BEEF_CAFE_BABE_u64);
     let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate test RSA key");
     let public_key = RsaPublicKey::from(&private_key);
