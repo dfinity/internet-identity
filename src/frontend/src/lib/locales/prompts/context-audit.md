@@ -93,7 +93,7 @@ Run `npm run extract`, then `npm run format`. Existing translations for the now-
    - `<high-impact msgid>` → <N> distinct contexts (list them briefly)
    ```
 
-6. Add reviewers with `gh pr edit <number> --add-reviewer aterga`. Do not add language-specific reviewers here — context phrasing is language-agnostic; per-language translation PRs will come later via the check workflow.
+6. Add reviewers with `gh pr edit <number> --add-reviewer aterga,sea-snake`. Do not add language-specific reviewers here — context phrasing is language-agnostic; per-language translation PRs will come later via the check workflow.
 
 ## Important
 

@@ -72,16 +72,17 @@ For each language, do the following in an isolated git worktree:
 
 After opening each PR, run `gh pr edit <number> --add-reviewer <users>`.
 
-Always add `aterga` (required approval). Additionally, add the language-specific reviewer below if one is assigned and leave a comment tagging them:
+Always request review from `aterga` AND `sea-snake`. In addition, if the language has a language-specific reviewer from the mapping below, request review from them too and leave a comment tagging them:
 
 > @<user> this PR may already be merged by the time you see it, but if you spot any translation mistakes feel free to leave comments or suggestions here — they'll be picked up by AI in a future run. Besides specific fixes, broader feedback is also welcome (e.g., tone, terminology preferences, style guidelines) — these will be reviewed and applied across all future translations.
 
-Language-specific reviewers (in addition to `aterga`):
+Language-specific reviewers (in addition to `aterga` and `sea-snake`):
 
-- Dutch (`nl.po`) → `sea-snake`
 - Italian (`it.po`) → `AntonioVentilii`
 - French (`fr.po`) → `mducroux`
 - German (`de.po`) → `marc0olo`
+
+Dutch (`nl.po`) has no separate language-specific reviewer — `sea-snake` is already covered by the default pair.
 
 ## Important
 

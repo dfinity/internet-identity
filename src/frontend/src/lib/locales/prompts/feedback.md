@@ -101,7 +101,7 @@ For each broad comment, create one rule-proposal PR (branched from latest `main`
    Original comment: <quoted comment text>
    ```
 
-6. Request review from `sea-snake` with `gh pr edit <number> --add-reviewer sea-snake`. This triggers the existing Slack notification workflow.
+6. Request review from `aterga` and `sea-snake` with `gh pr edit <number> --add-reviewer aterga,sea-snake`. This triggers the existing Slack notification workflow.
 7. Reply to the original feedback comment with a link to the rule-proposal PR, e.g. "Proposed as a general rule in #<number>."
 
 Merging a rule-proposal PR signals approval and will trigger a sweep of existing translations.
