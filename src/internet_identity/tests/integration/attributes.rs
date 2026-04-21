@@ -1007,7 +1007,7 @@ fn icrc3_test_vectors() {
         ),
     ];
 
-    let mut json_vectors: Vec<String> = Vec::new();
+    let mut vectors_json: Vec<serde_json::Value> = Vec::new();
 
     for (label, nonce, attributes) in &vectors {
         let prepare_request = PrepareIcrc3AttributeRequest {
@@ -1061,35 +1061,85 @@ fn icrc3_test_vectors() {
 
         let icrc3_repr = format_icrc3_value(&icrc3_value);
 
-        // Emit a JSON object for this vector.
-        json_vectors.push(format!(
-            concat!(
-                "  {{\n",
-                "    \"label\": {:?},\n",
-                "    \"icrc3_value\": {:?},\n",
-                "    \"message_hex\": {:?},\n",
-                "    \"signed_message_hex\": {:?},\n",
-                "    \"certificate_cbor_hex\": {:?}\n",
-                "  }}",
-            ),
-            label,
-            icrc3_repr,
-            hex::encode(&prepare_response.message),
-            hex::encode(&signed_message),
-            hex::encode(&get_response.signature),
-        ));
+        vectors_json.push(serde_json::json!({
+            "label": label,
+            "icrc3_value": icrc3_repr,
+            "message_hex": hex::encode(&prepare_response.message),
+            "signed_message_hex": hex::encode(&signed_message),
+            "certificate_cbor_hex": hex::encode(&get_response.signature),
+        }));
     }
 
-    // Print full JSON to stdout so it can be captured.
-    println!(
-        "\n--- ICRC-3 TEST VECTORS (JSON) ---\n{{\n  \"canister_sig_pk_hex\": {:?},\n  \"root_key_hex\": {:?},\n  \"origin\": {:?},\n  \"issuer\": \"https://accounts.google.com\",\n  \"email\": {:?},\n  \"name\": {:?},\n  \"vectors\": [\n{}\n  ]\n}}\n--- END TEST VECTORS ---",
-        hex::encode(&canister_sig_key),
-        hex::encode(&root_key),
-        origin,
-        fake_email,
-        fake_name,
-        json_vectors.join(",\n"),
+    let snapshot = serde_json::json!({
+        "canister_sig_pk_hex": hex::encode(&canister_sig_key),
+        "root_key_hex": hex::encode(&root_key),
+        "origin": origin,
+        "issuer": "https://accounts.google.com",
+        "email": fake_email,
+        "name": fake_name,
+        "vectors": vectors_json,
+    });
+
+    // Serialize the full snapshot (including `certificate_cbor_hex`) with 4-space
+    // indentation and a trailing newline. The committed file contains a real
+    // certificate so readers have a runnable end-to-end example.
+    let generated = serialize_snapshot_pretty(&snapshot);
+
+    let snapshot_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/icrc3-test-vectors.json");
+
+    if std::env::var_os("UPDATE_ICRC3_VECTORS").is_some() {
+        std::fs::write(&snapshot_path, &generated)
+            .unwrap_or_else(|e| panic!("failed to write {}: {e}", snapshot_path.display()));
+        eprintln!("Updated {}", snapshot_path.display());
+        return;
+    }
+
+    let expected_raw = std::fs::read_to_string(&snapshot_path).unwrap_or_else(|e| {
+        panic!(
+            "failed to read {}: {e}\nIf this file is missing, regenerate with:\n  UPDATE_ICRC3_VECTORS=1 cargo test -p internet_identity --test integration icrc3_test_vectors",
+            snapshot_path.display()
+        )
+    });
+    let expected_value: serde_json::Value = serde_json::from_str(&expected_raw)
+        .unwrap_or_else(|e| panic!("failed to parse {}: {e}", snapshot_path.display()));
+
+    // Strip `certificate_cbor_hex` from both sides before comparing: the CBOR
+    // certificate's BLS signature is not stable across PocketIC versions /
+    // platforms, while the canister-produced `message_hex` and
+    // `signed_message_hex` bytes are fully deterministic and are what dapps
+    // actually rely on.
+    let generated_stable = serialize_snapshot_pretty(&strip_cert(&snapshot));
+    let expected_stable = serialize_snapshot_pretty(&strip_cert(&expected_value));
+
+    assert_eq!(
+        generated_stable, expected_stable,
+        "ICRC-3 test vectors changed. If this is intentional, regenerate the snapshot with:\n  UPDATE_ICRC3_VECTORS=1 cargo test -p internet_identity --test integration icrc3_test_vectors\nand commit the updated docs/icrc3-test-vectors.json."
     );
+}
+
+fn serialize_snapshot_pretty(value: &serde_json::Value) -> String {
+    use serde::Serialize;
+    let mut buf: Vec<u8> = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+    let mut serializer = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    value
+        .serialize(&mut serializer)
+        .expect("failed to serialize ICRC-3 test vectors");
+    buf.push(b'\n');
+    String::from_utf8(buf).expect("serde_json produced non-UTF8 output")
+}
+
+fn strip_cert(value: &serde_json::Value) -> serde_json::Value {
+    let mut cloned = value.clone();
+    if let Some(vectors) = cloned.get_mut("vectors").and_then(|v| v.as_array_mut()) {
+        for vector in vectors {
+            if let Some(obj) = vector.as_object_mut() {
+                obj.remove("certificate_cbor_hex");
+            }
+        }
+    }
+    cloned
 }
 
 /// Formats an `Icrc3Value` into a human-readable Candid-style string representation.

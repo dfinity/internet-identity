@@ -157,16 +157,19 @@ implicit:nonce                   -> Blob(hex"00..00")
 implicit:origin                  -> Text("https://some-dapp.com")
 ```
 
-## Generating vectors
+## Regenerating the snapshot
 
-Run the integration test with output capture:
+The integration test compares its output against
+`docs/icrc3-test-vectors.json` and fails CI if they diverge, so any change that
+affects the vectors must also be reflected in the committed snapshot. To
+regenerate it after an intentional change, run:
 
 ```bash
-cargo test -p internet_identity --test integration icrc3_test_vectors -- --nocapture
+UPDATE_ICRC3_VECTORS=1 cargo test -p internet_identity --test integration icrc3_test_vectors
 ```
 
-The test prints a JSON block between `--- ICRC-3 TEST VECTORS (JSON) ---` and
-`--- END TEST VECTORS ---` markers containing:
+and commit the resulting update to `docs/icrc3-test-vectors.json`. The snapshot
+has the following shape:
 
 ```json
 {
