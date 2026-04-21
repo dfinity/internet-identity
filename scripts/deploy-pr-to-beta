@@ -1,227 +1,109 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./deploy-pr-to-beta [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] --end <front|back> <PR_NUMBER>
+# Usage: ./deploy-pr-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) [options] <PR_NUMBER>
+#
+# Deploy CI-built artifacts from a pull request's canister-tests.yml run to
+# a staging canister. The PR's workflow run artifacts are fetched first —
+# before we ask the user any install-arg questions — so we can fail fast if
+# CI hasn't produced usable WASMs.
 
 print_usage() {
     cat <<EOF
-Usage: $0 [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] --end <front|back> <PR_NUMBER>
+Usage: $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) [--dry-run] [--no-checks] <PR_NUMBER>
 
-Select which staging canister to upgrade and which end(s) to deploy.
+Download CI-built wasm.gz files from the most recent canister-tests.yml run
+for <PR_NUMBER> and upgrade the selected staging canister(s) to them.
 
-Options:
-  --staging-a, -sa        Use Staging A (backend: fgte5-ciaaa-aaaad-aaatq-cai, frontend: gjxif-ryaaa-aaaad-ae4ka-cai)
-  --staging-b, -sb        Use Staging B (backend: jqajs-xiaaa-aaaad-aab5q-cai, frontend: uhh2r-oyaaa-aaaad-agbva-cai)
-  --staging-c, -sc        Use Staging C (backend: y2aaj-miaaa-aaaad-aacxq-cai, frontend: uag4f-daaaa-aaaad-agbvq-cai)
-  --staging <CANISTER_ID> Use the provided canister id
-  --end <front|back>      Which end(s) to deploy (can be specified multiple times)
-  -fe                     Shortcut for --end front
-  -be                     Shortcut for --end back
-  -h, --help              Show this help
+EOF
+    print_common_usage
+    cat <<EOF
+
+Artifacts fetched (named per the CI workflow):
+  Backend  → internet_identity_backend.wasm.gz
+  Frontend → docker-build-internet_identity_frontend job's
+             internet_identity_frontend.wasm.gz artifact
 EOF
 }
-
-PR_NUMBER=""
-STAGING_CANISTER_ID=""
-STAGING_NAME=""
-DEPLOY_FRONT=false
-DEPLOY_BACK=false
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help)
-            print_usage
-            exit 0
-            ;;
-        -sa|--staging-a)
-            STAGING_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
-            STAGING_NAME="a"
-            shift
-            ;;
-        -sb|--staging-b)
-            STAGING_CANISTER_ID="jqajs-xiaaa-aaaad-aab5q-cai"
-            STAGING_NAME="b"
-            shift
-            ;;
-        -sc|--staging-c)
-            STAGING_CANISTER_ID="y2aaj-miaaa-aaaad-aacxq-cai"
-            STAGING_NAME="c"
-            shift
-            ;;
-        --staging)
-            shift
-            if [ $# -eq 0 ]; then
-                echo "Error: --staging requires an argument" >&2
-                print_usage
-                exit 1
-            fi
-            STAGING_CANISTER_ID="$1"
-            STAGING_NAME="custom"
-            shift
-            ;;
-        --end)
-            shift
-            if [ $# -eq 0 ]; then
-                echo "Error: --end requires an argument (front or back)" >&2
-                print_usage
-                exit 1
-            fi
-            case "$1" in
-                front) DEPLOY_FRONT=true ;;
-                back)  DEPLOY_BACK=true ;;
-                *)
-                    echo "Error: --end value must be 'front' or 'back', got '$1'" >&2
-                    print_usage
-                    exit 1
-                    ;;
-            esac
-            shift
-            ;;
-        -fe)
-            DEPLOY_FRONT=true
-            shift
-            ;;
-        -be)
-            DEPLOY_BACK=true
-            shift
-            ;;
-        --)
-            shift
-            break
-            ;;
-        -*)
-            echo "Unknown option: $1" >&2
-            print_usage
-            exit 1
-            ;;
-        *)
-            if [ -z "$PR_NUMBER" ]; then
-                PR_NUMBER="$1"
-                shift
-            else
-                echo "Unexpected argument: $1" >&2
-                print_usage
-                exit 1
-            fi
-            ;;
-    esac
-done
-
-if [ -z "$PR_NUMBER" ]; then
-    echo "Error: PR number is required" >&2
-    print_usage
-    exit 1
-fi
-
-if [ -z "$STAGING_CANISTER_ID" ]; then
-    echo "Error: staging must be specified (use --staging-a/-sa, --staging-b/-sb, --staging-c/-sc, or --staging <CANISTER_ID>)" >&2
-    print_usage
-    exit 1
-fi
-
-if [ "$DEPLOY_FRONT" = false ] && [ "$DEPLOY_BACK" = false ]; then
-    echo "Error: --end must be specified (use --end front, --end back, -fe, or -be)" >&2
-    print_usage
-    exit 1
-fi
-
-if [ "$DEPLOY_FRONT" = true ] && [ "$STAGING_NAME" != "a" ] && [ "$STAGING_NAME" != "b" ] && [ "$STAGING_NAME" != "c" ]; then
-    echo "Error: Frontend deployment is only supported for Staging A, B, and C. Use --staging-a/-sa, --staging-b/-sb, or --staging-c/-sc." >&2
-    exit 1
-fi
 
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$SCRIPTS_DIR/.."
 cd "$ROOT_DIR"
 
-REPO="dfinity/internet-identity"
-WORKFLOW_FILE="canister-tests.yml"
-WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
-
-# Map staging environment to its frontend canister ID
-case "$STAGING_NAME" in
-    a) FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai" ;;
-    b) FRONTEND_CANISTER_ID="uhh2r-oyaaa-aaaad-agbva-cai" ;;
-    c) FRONTEND_CANISTER_ID="uag4f-daaaa-aaaad-agbvq-cai" ;;
-    *) FRONTEND_CANISTER_ID="" ;;
-esac
-
-source "$SCRIPTS_DIR/frontend-arg-helpers.bash"
+# shellcheck source=deploy-common.bash
+source "$SCRIPTS_DIR/deploy-common.bash"
 
 # -------------------------
-# Prompt for frontend install args if deploying frontend
+# CLI
 # -------------------------
-FRONTEND_INSTALL_ARG=""
-if [ "$DEPLOY_FRONT" = true ]; then
-    build_frontend_install_arg "$FRONTEND_CANISTER_ID"
-fi
+parse_common_args "$@" || { rc=$?; if [ "$rc" -eq 2 ]; then print_usage; exit 0; fi; print_usage; exit 1; }
 
-# Build the list of (artifact, canister, job_pattern, job_filter) tuples to deploy.
-# job_pattern and job_filter are substrings matched against the job name, so the script
-# is resilient to changes in matrix keys/order or GitHub's display-name formatting.
-DEPLOYMENTS=()
-if [ "$DEPLOY_BACK" = true ]; then
-    DEPLOYMENTS+=("internet_identity_backend.wasm.gz:$STAGING_CANISTER_ID:docker-build-internet_identity:internet_identity_backend.wasm.gz")
-fi
-if [ "$DEPLOY_FRONT" = true ]; then
-    DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID:docker-build-internet_identity_frontend:docker-build-internet_identity_frontend")
-fi
-
-# -------------------------
-# Cleanup handler
-# -------------------------
-cleanup() {
-    echo "Cleaning up temporary files..."
-    for pair in "${DEPLOYMENTS[@]}"; do
-        artifact="${pair%%:*}"
-        rm -f "$ROOT_DIR/$artifact.zip"
-        rm -f "$ROOT_DIR/$artifact"
-    done
-}
-trap cleanup EXIT
-# -------------------------
-
-# Get GitHub token from gh CLI
-if command -v gh >/dev/null 2>&1; then
-    GITHUB_TOKEN="$(gh auth token)"
-    if [ -z "$GITHUB_TOKEN" ]; then
-        echo "Error: gh CLI is not authenticated or token unavailable."
-        exit 1
-    fi
+# This script does require a PR number as a positional argument.
+PR_NUMBER=""
+if [ "${#REMAINING_ARGS[@]}" -eq 1 ]; then
+    PR_NUMBER="${REMAINING_ARGS[0]}"
+elif [ "${#REMAINING_ARGS[@]}" -gt 1 ]; then
+    echo "Error: expected a single PR number, got: ${REMAINING_ARGS[*]}" >&2
+    print_usage
+    exit 1
 else
-    echo "Error: gh CLI not found. Install and authenticate to access private workflows."
+    echo "Error: PR number is required" >&2
+    print_usage
     exit 1
 fi
 
+resolve_staging_config
+print_deployment_summary
+
+REPO="dfinity/internet-identity"
+WORKFLOW_FILE="canister-tests.yml"
+
+# -------------------------
+# Fetch CI artifacts FIRST, before asking the user any interactive questions.
+# Failing fast here avoids wasting the user's time on prompts when the
+# underlying CI run doesn't exist or isn't green.
+# -------------------------
+if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: gh CLI not found. Install and authenticate to access private workflows." >&2
+    exit 1
+fi
+GITHUB_TOKEN="$(gh auth token)"
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "Error: gh CLI is not authenticated or token unavailable." >&2
+    exit 1
+fi
 AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
 
-echo "Fetching workflow runs for PR #$PR_NUMBER..."
+echo ""
+echo "Resolving PR #$PR_NUMBER head branch..."
+BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName -q '.headRefName' || true)
+if [ -z "$BRANCH" ] || [ "$BRANCH" = "null" ]; then
+    echo "Error: could not determine head branch for PR #$PR_NUMBER in $REPO" >&2
+    exit 1
+fi
+echo "  PR #$PR_NUMBER → branch '$BRANCH'"
 
-# Get the branch name for this PR
-BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName -q '.headRefName')
-
-# Fetch the most recent workflow run for this PR's branch
+echo "Fetching workflow runs for branch '$BRANCH'..."
 RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
-    "https://api.github.com/repos/$REPO/actions/runs?per_page=100" \
-    | jq -r --arg BRANCH "$BRANCH" --arg WF "$WORKFLOW_FILE" '
+    "https://api.github.com/repos/$REPO/actions/runs?event=push&branch=$BRANCH&per_page=100" \
+    | jq -r --arg WF "$WORKFLOW_FILE" '
         [.workflow_runs[]
-            | select(.head_branch == $BRANCH)
             | select(.path == (".github/workflows/" + $WF))
         ]
         | sort_by(.run_number)
         | reverse
         | .[0].id
-    ')
+    ' || true)
 
 if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-    echo "Error: No canister-tests.yml workflow run found for PR #$PR_NUMBER"
+    echo "Error: No canister-tests.yml workflow run found for branch '$BRANCH'" >&2
     exit 1
 fi
+echo "  Workflow run: $RUN_ID"
 
-echo "Found workflow run ID: $RUN_ID"
-
-# Fetch all jobs for this run, paginating to collect every page.
-echo "Fetching jobs for workflow run..."
+# Collect all jobs for this run so we can validate each required build before
+# we start asking the user anything.
+echo "Fetching jobs for workflow run $RUN_ID..."
 JOBS_JSON='{"jobs":[]}'
 PAGE=1
 while true; do
@@ -239,22 +121,32 @@ while true; do
     PAGE=$((PAGE + 1))
 done
 
-TOTAL_JOBS=$(echo "$JOBS_JSON" | jq '.jobs | length')
-echo "Fetched $TOTAL_JOBS jobs."
+# Build the list of (artifact_name, canister_id, job_pattern, job_filter)
+# for the selected ends. job_pattern/job_filter are substrings matched
+# against the job name (resilient to matrix reordering / display-name
+# changes).
+ARTIFACTS=()
+if [ "$DEPLOY_BE" = true ]; then
+    ARTIFACTS+=("internet_identity_backend.wasm.gz:$BE_ID:docker-build-internet_identity:internet_identity_backend.wasm.gz")
+fi
+if [ "$DEPLOY_FE" = true ]; then
+    ARTIFACTS+=("internet_identity_frontend.wasm.gz:$FE_ID:docker-build-internet_identity_frontend:docker-build-internet_identity_frontend")
+fi
 
-for tuple in "${DEPLOYMENTS[@]}"; do
+# Validate each required job succeeded AND fetch the artifact URL for each,
+# failing fast on any problem before we prompt the user.
+echo ""
+echo "Validating CI artifacts..."
+
+declare -A ARTIFACT_URL_BY_NAME=()
+for tuple in "${ARTIFACTS[@]}"; do
     ARTIFACT_NAME="${tuple%%:*}"
-    remainder="${tuple#*:}"
-    CANISTER_ID="${remainder%%:*}"
-    remainder="${remainder#*:}"
-    JOB_PATTERN="${remainder%%:*}"
-    JOB_FILTER="${remainder#*:}"
-    ZIP_FILE="$ARTIFACT_NAME.zip"
+    rest="${tuple#*:}"
+    # canister_id is the second field — skip it here, it's used later.
+    rest="${rest#*:}"
+    JOB_PATTERN="${rest%%:*}"
+    JOB_FILTER="${rest#*:}"
 
-    echo ""
-    echo "=== Deploying $ARTIFACT_NAME to canister $CANISTER_ID ==="
-
-    # Find matching jobs by substring (resilient to matrix key/order changes)
     MATCHING_JOBS=$(echo "$JOBS_JSON" | jq -c \
         --arg PAT "$JOB_PATTERN" --arg FIL "$JOB_FILTER" '
         .jobs | map(select(.name | contains($PAT) and contains($FIL)))
@@ -262,15 +154,14 @@ for tuple in "${DEPLOYMENTS[@]}"; do
     MATCH_COUNT=$(echo "$MATCHING_JOBS" | jq 'length')
 
     if [ "$MATCH_COUNT" -eq 0 ]; then
-        echo "Error: No job matching '$JOB_PATTERN' + '$JOB_FILTER' found."
-        echo "Available jobs:"
-        echo "$JOBS_JSON" | jq -r '.jobs[] | "  - \(.name) (\(.status)/\(.conclusion))"'
+        echo "Error: No job matching '$JOB_PATTERN' + '$JOB_FILTER' found." >&2
+        echo "Available jobs:" >&2
+        echo "$JOBS_JSON" | jq -r '.jobs[] | "  - \(.name) (\(.status)/\(.conclusion))"' >&2
         exit 1
     fi
-
     if [ "$MATCH_COUNT" -gt 1 ]; then
-        echo "Error: Multiple jobs match '$JOB_PATTERN' + '$JOB_FILTER':"
-        echo "$MATCHING_JOBS" | jq -r '.[] | "  - \(.name) (\(.status)/\(.conclusion))"'
+        echo "Error: Multiple jobs match '$JOB_PATTERN' + '$JOB_FILTER':" >&2
+        echo "$MATCHING_JOBS" | jq -r '.[] | "  - \(.name) (\(.status)/\(.conclusion))"' >&2
         exit 1
     fi
 
@@ -279,59 +170,98 @@ for tuple in "${DEPLOYMENTS[@]}"; do
     JOB_CONCLUSION=$(echo "$MATCHING_JOBS" | jq -r '.[0].conclusion')
 
     if [ "$JOB_STATE" = "queued" ] || [ "$JOB_STATE" = "in_progress" ]; then
-        echo "Error: Required job '$JOB_NAME' has not completed yet (status: $JOB_STATE)"
+        echo "Error: Required job '$JOB_NAME' has not completed yet (status: $JOB_STATE)" >&2
         exit 1
     fi
-
     if [ "$JOB_CONCLUSION" != "success" ]; then
-        echo "Error: Required job '$JOB_NAME' did not succeed (conclusion: $JOB_CONCLUSION)"
+        echo "Error: Required job '$JOB_NAME' did not succeed (conclusion: $JOB_CONCLUSION)" >&2
         exit 1
     fi
 
-    echo "Required job '$JOB_NAME' succeeded."
-
-    echo "Fetching artifact list..."
     ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
         "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
         | jq -r --arg ART "$ARTIFACT_NAME" '
             .artifacts[] | select(.name == $ART) | .archive_download_url
         ')
-
     if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
-        echo "Error: Artifact not found: $ARTIFACT_NAME"
+        echo "Error: Artifact '$ARTIFACT_NAME' not found on run $RUN_ID" >&2
         exit 1
     fi
 
-    echo "Downloading artifact $ARTIFACT_NAME..."
-    curl -sfL -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
-
-    echo "Extracting ZIP..."
-    unzip -o "$ZIP_FILE" -d "$ROOT_DIR" >/dev/null
-
-    if [ ! -f "$ROOT_DIR/$ARTIFACT_NAME" ]; then
-        echo "Error: Extracted file not found: $ARTIFACT_NAME"
-        exit 1
-    fi
-
-    echo "Artifact extracted: $ARTIFACT_NAME"
-
-    # Build the install command with optional --argument for frontend
-    INSTALL_ARGS=()
-    if [ "$ARTIFACT_NAME" = "internet_identity_frontend.wasm.gz" ] && [ -n "$FRONTEND_INSTALL_ARG" ]; then
-        INSTALL_ARGS+=(--argument-type raw --argument "$FRONTEND_INSTALL_ARG")
-    fi
-
-    echo "Upgrading canister $CANISTER_ID..."
-    dfx canister \
-        --network ic \
-        --wallet "$WALLET_CANISTER_ID" \
-        install "$CANISTER_ID" \
-        --mode upgrade \
-        --wasm "$ROOT_DIR/$ARTIFACT_NAME" \
-        ${INSTALL_ARGS[@]+"${INSTALL_ARGS[@]}"}
-
-    echo "Upgrade of $CANISTER_ID complete."
+    ARTIFACT_URL_BY_NAME["$ARTIFACT_NAME"]="$ARTIFACT_URL"
+    echo "  OK — '$JOB_NAME' succeeded; artifact '$ARTIFACT_NAME' available."
 done
+
+# -------------------------
+# Download CI artifacts into a dedicated temp directory rather than the
+# repo root — the CI artifact names collide with names produced by
+# `scripts/build` locally (e.g. `internet_identity_frontend.wasm.gz`), so
+# extracting into the repo root would overwrite and then (via cleanup)
+# delete the developer's local build outputs. The temp dir is wiped on
+# EXIT regardless of outcome.
+# -------------------------
+ARTIFACT_DIR=$(mktemp -d -t ii-deploy-pr.XXXXXX)
+cleanup() {
+    if [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then
+        echo "Cleaning up downloaded artifacts (in $ARTIFACT_DIR)..." >&2
+        rm -rf "$ARTIFACT_DIR"
+    fi
+}
+trap cleanup EXIT
+
+# -------------------------
+# Download + extract each artifact
+# -------------------------
+echo ""
+echo "Downloading CI artifacts to $ARTIFACT_DIR..."
+for tuple in "${ARTIFACTS[@]}"; do
+    ARTIFACT_NAME="${tuple%%:*}"
+    ARTIFACT_URL="${ARTIFACT_URL_BY_NAME[$ARTIFACT_NAME]}"
+    ZIP_FILE="$ARTIFACT_DIR/$ARTIFACT_NAME.zip"
+
+    echo "  Downloading $ARTIFACT_NAME..."
+    curl -sfL -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
+    unzip -o "$ZIP_FILE" -d "$ARTIFACT_DIR" >/dev/null
+    if [ ! -f "$ARTIFACT_DIR/$ARTIFACT_NAME" ]; then
+        echo "Error: Extracted file not found: $ARTIFACT_DIR/$ARTIFACT_NAME" >&2
+        exit 1
+    fi
+    echo "  Extracted: $ARTIFACT_DIR/$ARTIFACT_NAME"
+done
+
+# -------------------------
+# Reachability + consistency
+# -------------------------
+run_reachability_checks || exit 1
+run_consistency_checks
+
+# -------------------------
+# Now — after CI artifacts are verified AND on disk — prompt for FE extras.
+# -------------------------
+if [ "$DEPLOY_FE" = true ]; then
+    prompt_fe_extra_args
+fi
+
+# -------------------------
+# Deploy (honours --dry-run)
+# -------------------------
+if [ "$DEPLOY_BE" = true ]; then
+    echo ""
+    echo "=== Deploying backend (PR #$PR_NUMBER, run $RUN_ID) to $BE_ID ==="
+    run_dfx_install \
+        "$BE_ID" \
+        "$ARTIFACT_DIR/internet_identity_backend.wasm.gz" \
+        "$(build_be_install_arg)"
+fi
+
+if [ "$DEPLOY_FE" = true ]; then
+    echo ""
+    echo "=== Deploying frontend (PR #$PR_NUMBER, run $RUN_ID) to $FE_ID ==="
+    run_dfx_install \
+        "$FE_ID" \
+        "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz" \
+        "$(build_fe_install_arg)"
+fi
 
 echo ""
 echo "All deployments complete."
