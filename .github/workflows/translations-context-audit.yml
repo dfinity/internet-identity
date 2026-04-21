@@ -45,7 +45,7 @@ jobs:
           git config --global user.email "gix-bot@users.noreply.github.com"
 
       - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code@2.1.116
 
       - name: Snapshot branch refs before Claude runs
         run: git for-each-ref --format='%(refname:short)=%(objectname)' refs/heads/ > "$RUNNER_TEMP/pre-refs.txt"
@@ -57,7 +57,7 @@ jobs:
         run: |
           claude -p "$(cat src/frontend/src/lib/locales/prompts/context-audit.md)" \
             --dangerously-skip-permissions \
-            --allowedTools "Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(awk:*),Bash(grep:*),Bash(sed:*),Bash(cat:*),Bash(basename:*),Bash(echo:*),Bash(jq:*),Bash(wc:*),Bash(head:*),Bash(tail:*),Bash(date:*),Bash(find:*),Bash(ls:*),Bash(mkdir:*),Bash(cd:*),Bash(envsubst:*),Bash(printf:*),Bash(sort:*),Bash(uniq:*),Bash(tr:*),Read,Write,Edit,Glob,Grep,Agent"
+            --allowedTools "Bash(git:*),Bash(gh pr:*),Bash(gh api repos/dfinity/internet-identity/:*),Bash(gh api graphql:*),Bash(npm:*),Bash(awk:*),Bash(grep:*),Bash(sed:*),Bash(cat:*),Bash(basename:*),Bash(echo:*),Bash(jq:*),Bash(wc:*),Bash(head:*),Bash(tail:*),Bash(date:*),Bash(find:*),Bash(ls:*),Bash(mkdir:*),Bash(cd:*),Bash(envsubst:*),Bash(printf:*),Bash(sort:*),Bash(uniq:*),Bash(tr:*),Read,Write,Edit,Glob,Grep,Agent"
 
       - name: Audit Claude changes
         if: always()
