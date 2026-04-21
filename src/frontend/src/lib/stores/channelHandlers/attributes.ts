@@ -31,7 +31,8 @@ const filterImplicitConsentKeys = (
   );
 
 /**
- * Handle legacy `ii_attributes` requests.
+ * Handle `ii_attributes` requests (the pre-ICRC-3 attribute sharing method
+ * that produces per-attribute signatures).
  *
  * Only responds if the user authenticated via OpenID and the dapp supports
  * certified attributes. Filters requested attributes to the implicit consent
@@ -147,6 +148,7 @@ export const handleLegacyAttributes =
       });
     } catch (error) {
       console.error(error);
+      onError("attributes-failed");
     }
   };
 
@@ -263,5 +265,6 @@ export const handleIcrc3Attributes =
       });
     } catch (error) {
       console.error(error);
+      onError("attributes-failed");
     }
   };

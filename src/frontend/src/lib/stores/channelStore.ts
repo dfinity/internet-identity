@@ -37,7 +37,8 @@ export type ChannelError =
   | "invalid-request"
   | "unverified-origin"
   | "unsupported-browser"
-  | "delegation-failed";
+  | "delegation-failed"
+  | "attributes-failed";
 
 type ChannelStore = Readable<Channel | undefined> & {
   establish: (options?: ChannelOptions) => void;
@@ -52,6 +53,7 @@ const getTransports = (): Transport[] => {
   return [
     new PostMessageTransport(),
     new LegacyTransport(
+      // Redirect requests and responses between related origins and primary origin
       primaryOrigin !== undefined
         ? {
             redirectToOrigin: primaryOrigin,

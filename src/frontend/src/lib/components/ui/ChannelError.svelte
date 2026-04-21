@@ -36,6 +36,10 @@
       title: $t`Authentication failed`,
       description: $t`Something went wrong while creating your delegation. Please try again; if the issue persists, contact support.`,
     },
+    "attributes-failed": {
+      title: $t`Attribute sharing failed`,
+      description: $t`Something went wrong while sharing attributes. Please try again; if the issue persists, contact support.`,
+    },
   };
 
   interface Props {
