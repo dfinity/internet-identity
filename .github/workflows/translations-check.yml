@@ -41,8 +41,16 @@ jobs:
           set -euo pipefail
 
           # Trigger 1: rule file(s) changed in the pushed commit range (new rule merged)?
+          # EVENT_BEFORE is the all-zero SHA on branch creation / force pushes
+          # from non-existent history; guard against that and verify both ends
+          # resolve before asking git to diff them.
           rule_diff_range=""
-          if [ "$EVENT_NAME" = "push" ] && [ -n "${EVENT_BEFORE:-}" ] && [ -n "${EVENT_AFTER:-}" ]; then
+          zero_sha="0000000000000000000000000000000000000000"
+          if [ "$EVENT_NAME" = "push" ] \
+            && [ -n "${EVENT_BEFORE:-}" ] && [ "$EVENT_BEFORE" != "$zero_sha" ] \
+            && [ -n "${EVENT_AFTER:-}" ] && [ "$EVENT_AFTER" != "$zero_sha" ] \
+            && git cat-file -e "$EVENT_BEFORE^{commit}" 2>/dev/null \
+            && git cat-file -e "$EVENT_AFTER^{commit}" 2>/dev/null; then
             rule_diff_range="$EVENT_BEFORE..$EVENT_AFTER"
             if git diff --quiet "$EVENT_BEFORE" "$EVENT_AFTER" -- src/frontend/src/lib/locales/CLAUDE.md src/frontend/src/lib/locales/rules/; then
               rules_changed=false

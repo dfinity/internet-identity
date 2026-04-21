@@ -36,6 +36,8 @@ jobs:
           ISSUE_PR_URL: ${{ github.event.issue.pull_request.url }}
           PR_NUMBER_DIRECT: ${{ github.event.pull_request.number }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REVIEW_BODY: ${{ github.event.review.body }}
+          REVIEW_STATE: ${{ github.event.review.state }}
         run: |
           set -euo pipefail
 
@@ -43,6 +45,23 @@ jobs:
           if [ "$EVENT_NAME" = "issue_comment" ] && [ -z "${ISSUE_PR_URL:-}" ]; then
             echo "run_claude=false" >> "$GITHUB_OUTPUT"
             echo "Not a PR comment — skipping"
+            exit 0
+          fi
+
+          # pull_request_review fires for approvals and dismissals too. Only
+          # proceed if the review body carries feedback text — inline review
+          # comments arrive separately via pull_request_review_comment.
+          if [ "$EVENT_NAME" = "pull_request_review" ] && [ -z "${REVIEW_BODY:-}" ]; then
+            echo "run_claude=false" >> "$GITHUB_OUTPUT"
+            echo "Review has no body (state='${REVIEW_STATE:-}') — skipping"
+            exit 0
+          fi
+
+          # Self-trigger guard: gix-bot's own comments must never kick off another
+          # run, even if the allowlist below were ever broadened to include it.
+          if [ "$COMMENT_USER" = "gix-bot" ]; then
+            echo "run_claude=false" >> "$GITHUB_OUTPUT"
+            echo "Self-reply — skipping"
             exit 0
           fi
 
@@ -55,13 +74,6 @@ jobs:
               exit 0
               ;;
           esac
-
-          # Avoid self-trigger loops from gix-bot's own replies.
-          if [ "$COMMENT_USER" = "gix-bot" ]; then
-            echo "run_claude=false" >> "$GITHUB_OUTPUT"
-            echo "Self-reply — skipping"
-            exit 0
-          fi
 
           pr_number="${PR_NUMBER_DIRECT:-$ISSUE_NUMBER}"
           if [ -z "$pr_number" ]; then
@@ -76,6 +88,16 @@ jobs:
           pr_head_repo=$(echo "$pr_json" | jq -r .head.repo.full_name)
           pr_state=$(echo "$pr_json" | jq -r .state)
           pr_merged=$(echo "$pr_json" | jq -r .merged)
+
+          # Reject fork PRs before any secret-bearing work. The gix-bot PAT
+          # cannot push to forks, and running Claude on a fork-origin PR would
+          # expose write-scoped secrets to a workflow influenced by untrusted
+          # head-repo content.
+          if [ "$pr_head_repo" != "$GITHUB_REPOSITORY" ]; then
+            echo "run_claude=false" >> "$GITHUB_OUTPUT"
+            echo "PR head repo '$pr_head_repo' is a fork — skipping"
+            exit 0
+          fi
 
           # Only run on translation PRs.
           if ! echo "$pr_title" | grep -q '^chore(fe):'; then
