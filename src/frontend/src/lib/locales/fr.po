@@ -124,6 +124,9 @@ msgstr "Authentification réussie"
 msgid "Authorize new device"
 msgstr "Autoriser un nouvel appareil"
 
+msgid "Back to sign-in options"
+msgstr ""
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Avant de commencer, trouvez un endroit privé et préparez votre phrase de récupération. Gardez-la confidentielle pour protéger votre identité."
 
@@ -157,14 +160,14 @@ msgstr "Vérification de votre ordre"
 msgid "Choose an account"
 msgstr "Choisissez un compte"
 
+msgid "Choose an authentication method to continue"
+msgstr ""
+
 msgid "choose language to continue"
 msgstr "choisissez une langue pour continuer"
 
 msgid "Choose method"
 msgstr "Choisissez une méthode"
-
-msgid "Choose method to continue"
-msgstr "Choisissez une méthode pour continuer"
 
 msgid "Clear all"
 msgstr "Tout effacer"
@@ -180,6 +183,12 @@ msgstr "Fermer le menu"
 
 msgid "Code copied to clipboard"
 msgstr "Code copié dans le presse-papiers"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "Configuration terminée"
@@ -294,6 +303,9 @@ msgstr "Saisissez chaque mot dans le bon ordre :"
 
 msgid "Enter recovery phrase"
 msgstr "Saisir la phrase de récupération"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Tout ce que vous devez savoir sur Internet Identity, votre moyen privé, sécurisé et facile de vous connecter à des applications sur l’Internet Computer."
@@ -463,6 +475,9 @@ msgstr "Lien non valide"
 
 msgid "Invalid code. Please check and try again."
 msgstr "Code invalide. Veuillez vérifier et réessayer."
+
+msgid "Invalid domain"
+msgstr ""
 
 msgid "Invalid recovery phrase"
 msgstr "Phrase de récupération invalide"
@@ -818,6 +833,12 @@ msgstr "Se connecter avec des méthodes familières"
 msgid "Sign in with another identity"
 msgstr "Se connecter avec une autre identité"
 
+msgid "Sign in with SSO"
+msgstr ""
+
+msgid "Sign In With SSO"
+msgstr ""
+
 msgid "Sign in with your {name} account from any device."
 msgstr "Se connecter avec votre compte {name} depuis n’importe quel appareil."
 
@@ -857,6 +878,12 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Code source"
+
+msgid "SSO is not available for \"{domainInput}\" yet."
+msgstr ""
+
+msgid "SSO sign-in failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "Recommencer"

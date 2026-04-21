@@ -124,6 +124,9 @@ msgstr "تصدیق کامیاب رہی"
 msgid "Authorize new device"
 msgstr "نئے آلے کی توثیق کریں"
 
+msgid "Back to sign-in options"
+msgstr ""
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "شروع کرنے سے پہلے کسی نجی جگہ پر جائیں اور اپنا ریکوری فریز تیار رکھیں۔ اپنی شناخت کے تحفظ کے لیے اسے خفیہ رکھیں۔"
 
@@ -157,14 +160,14 @@ msgstr "آپ کے آرڈر کی جانچ ہو رہی ہے"
 msgid "Choose an account"
 msgstr "اکاؤنٹ منتخب کریں"
 
+msgid "Choose an authentication method to continue"
+msgstr ""
+
 msgid "choose language to continue"
 msgstr "جاری رکھنے کے لیے زبان منتخب کریں"
 
 msgid "Choose method"
 msgstr "طریقہ منتخب کریں"
-
-msgid "Choose method to continue"
-msgstr "جاری رکھنے کے لیے طریقہ منتخب کریں"
 
 msgid "Clear all"
 msgstr "سب صاف کریں"
@@ -180,6 +183,12 @@ msgstr "مینو بند کریں"
 
 msgid "Code copied to clipboard"
 msgstr "کوڈ کلپ بورڈ پر کاپی ہو گیا"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "سیٹ اپ مکمل کریں"
@@ -294,6 +303,9 @@ msgstr "ہر لفظ درست ترتیب میں درج کریں:"
 
 msgid "Enter recovery phrase"
 msgstr "ریکوری فریز درج کریں"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Internet Identity کے بارے میں وہ سب کچھ جو آپ کو جاننا چاہیے — انٹرنیٹ کمپیوٹر کی ایپس میں لاگ اِن کا نجی، محفوظ اور آسان طریقہ۔"
@@ -463,6 +475,9 @@ msgstr "غلط کوڈ لنک"
 
 msgid "Invalid code. Please check and try again."
 msgstr "غلط کوڈ۔ براہِ کرم چیک کریں اور دوبارہ کوشش کریں"
+
+msgid "Invalid domain"
+msgstr ""
 
 msgid "Invalid recovery phrase"
 msgstr "غلط ریکوری فریز"
@@ -818,6 +833,12 @@ msgstr "مانوس طریقوں سے سائن اِن کریں"
 msgid "Sign in with another identity"
 msgstr "دوسری شناخت کے ساتھ سائن اِن کریں"
 
+msgid "Sign in with SSO"
+msgstr ""
+
+msgid "Sign In With SSO"
+msgstr ""
+
 msgid "Sign in with your {name} account from any device."
 msgstr "کسی بھی آلے سے اپنے {name} اکاؤنٹ کے ساتھ سائن اِن کریں۔"
 
@@ -857,6 +878,12 @@ msgstr ""
 
 msgid "Source code"
 msgstr "سورس کوڈ"
+
+msgid "SSO is not available for \"{domainInput}\" yet."
+msgstr ""
+
+msgid "SSO sign-in failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "دوبارہ شروع کریں"

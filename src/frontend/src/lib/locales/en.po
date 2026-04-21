@@ -124,6 +124,9 @@ msgstr "Authentication successful"
 msgid "Authorize new device"
 msgstr "Authorize new device"
 
+msgid "Back to sign-in options"
+msgstr "Back to sign-in options"
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 
@@ -157,14 +160,14 @@ msgstr "Checking your order"
 msgid "Choose an account"
 msgstr "Choose an account"
 
+msgid "Choose an authentication method to continue"
+msgstr "Choose an authentication method to continue"
+
 msgid "choose language to continue"
 msgstr "choose language to continue"
 
 msgid "Choose method"
 msgstr "Choose method"
-
-msgid "Choose method to continue"
-msgstr "Choose method to continue"
 
 msgid "Clear all"
 msgstr "Clear all"
@@ -180,6 +183,12 @@ msgstr "Close menu"
 
 msgid "Code copied to clipboard"
 msgstr "Code copied to clipboard"
+
+msgid "Company domain"
+msgstr "Company domain"
+
+msgid "company.domain.com"
+msgstr "company.domain.com"
 
 msgid "Complete set-up"
 msgstr "Complete set-up"
@@ -294,6 +303,9 @@ msgstr "Enter each word in the correct order:"
 
 msgid "Enter recovery phrase"
 msgstr "Enter recovery phrase"
+
+msgid "Enter your company domain"
+msgstr "Enter your company domain"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -463,6 +475,9 @@ msgstr "Invalid code link"
 
 msgid "Invalid code. Please check and try again."
 msgstr "Invalid code. Please check and try again."
+
+msgid "Invalid domain"
+msgstr "Invalid domain"
 
 msgid "Invalid recovery phrase"
 msgstr "Invalid recovery phrase"
@@ -818,6 +833,12 @@ msgstr "Sign in using familiar methods"
 msgid "Sign in with another identity"
 msgstr "Sign in with another identity"
 
+msgid "Sign in with SSO"
+msgstr "Sign in with SSO"
+
+msgid "Sign In With SSO"
+msgstr "Sign In With SSO"
+
 msgid "Sign in with your {name} account from any device."
 msgstr "Sign in with your {name} account from any device."
 
@@ -857,6 +878,12 @@ msgstr "Something went wrong while creating your delegation. Please try again; i
 
 msgid "Source code"
 msgstr "Source code"
+
+msgid "SSO is not available for \"{domainInput}\" yet."
+msgstr "SSO is not available for \"{domainInput}\" yet."
+
+msgid "SSO sign-in failed. Please try again."
+msgstr "SSO sign-in failed. Please try again."
 
 msgid "Start over"
 msgstr "Start over"

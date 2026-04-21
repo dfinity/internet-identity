@@ -124,6 +124,9 @@ msgstr "Autentikasi berhasil"
 msgid "Authorize new device"
 msgstr "Otorisasi perangkat baru"
 
+msgid "Back to sign-in options"
+msgstr ""
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Sebelum memulai, cari tempat yang privat dan siapkan frasa pemulihan Anda. Jaga kerahasiaannya untuk melindungi identitas Anda."
 
@@ -157,14 +160,14 @@ msgstr "Memeriksa pesanan Anda"
 msgid "Choose an account"
 msgstr "Pilih akun"
 
+msgid "Choose an authentication method to continue"
+msgstr ""
+
 msgid "choose language to continue"
 msgstr "pilih bahasa untuk melanjutkan"
 
 msgid "Choose method"
 msgstr "Pilih metode"
-
-msgid "Choose method to continue"
-msgstr "Pilih metode untuk melanjutkan"
 
 msgid "Clear all"
 msgstr "Hapus semua"
@@ -180,6 +183,12 @@ msgstr "Tutup menu"
 
 msgid "Code copied to clipboard"
 msgstr "Kode disalin ke papan klip"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "Selesaikan penyiapan"
@@ -294,6 +303,9 @@ msgstr "Masukkan setiap kata dalam urutan yang benar:"
 
 msgid "Enter recovery phrase"
 msgstr "Masukkan frasa pemulihan"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang pribadi, aman, dan mudah untuk masuk ke aplikasi di Internet Computer."
@@ -463,6 +475,9 @@ msgstr "Tautan kode tidak valid"
 
 msgid "Invalid code. Please check and try again."
 msgstr "Kode tidak valid. Silakan periksa dan coba lagi."
+
+msgid "Invalid domain"
+msgstr ""
 
 msgid "Invalid recovery phrase"
 msgstr "Frasa pemulihan tidak valid"
@@ -818,6 +833,12 @@ msgstr "Masuk menggunakan metode yang dikenal"
 msgid "Sign in with another identity"
 msgstr "Masuk dengan identitas lain"
 
+msgid "Sign in with SSO"
+msgstr ""
+
+msgid "Sign In With SSO"
+msgstr ""
+
 msgid "Sign in with your {name} account from any device."
 msgstr "Masuk dengan akun {name} Anda dari perangkat mana pun."
 
@@ -857,6 +878,12 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Kode sumber"
+
+msgid "SSO is not available for \"{domainInput}\" yet."
+msgstr ""
+
+msgid "SSO sign-in failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "Mulai ulang"
