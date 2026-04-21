@@ -1,0 +1,130 @@
+name: Translations Check
+
+# Creates translation PRs for languages that have missing `msgstr` entries
+# or are affected by newly-added rules in src/frontend/src/lib/locales/CLAUDE.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/frontend/src/lib/locales/**.po"
+      - "src/frontend/src/lib/locales/CLAUDE.md"
+      - "src/frontend/src/lib/locales/rules/**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: translations-check
+  cancel-in-progress: false
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    outputs:
+      needs_run: ${{ steps.decide.outputs.needs_run }}
+      rule_diff_range: ${{ steps.decide.outputs.rule_diff_range }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether to invoke Claude
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+
+          # Trigger 1: rule file(s) changed in the pushed commit range (new rule merged)?
+          rule_diff_range=""
+          if [ "$EVENT_NAME" = "push" ] && [ -n "${EVENT_BEFORE:-}" ] && [ -n "${EVENT_AFTER:-}" ]; then
+            rule_diff_range="$EVENT_BEFORE..$EVENT_AFTER"
+            if git diff --quiet "$EVENT_BEFORE" "$EVENT_AFTER" -- src/frontend/src/lib/locales/CLAUDE.md src/frontend/src/lib/locales/rules/; then
+              rules_changed=false
+            else
+              rules_changed=true
+            fi
+          else
+            rules_changed=false
+          fi
+
+          # Trigger 2: any .po file on main has empty msgstr and no open PR for it?
+          open_pr_branches=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --search "chore(fe): update" --json headRefName --jq '.[].headRefName' 2>/dev/null || true)
+
+          has_missing=false
+          for po in src/frontend/src/lib/locales/*.po; do
+            lang=$(basename "$po" .po)
+            [ "$lang" = "en" ] && continue
+            if echo "$open_pr_branches" | grep -qx "chore/translate-$lang"; then
+              continue
+            fi
+            # Skip the header entry (msgid "") then look for empty msgstr
+            if awk '/^msgid ""$/{skip=1;next}/^msgid /{skip=0}{if(!skip)print}' "$po" | grep -q '^msgstr ""$'; then
+              has_missing=true
+              break
+            fi
+          done
+
+          # Always run on workflow_dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            needs_run=true
+          elif [ "$rules_changed" = true ] || [ "$has_missing" = true ]; then
+            needs_run=true
+          else
+            needs_run=false
+          fi
+
+          echo "rules_changed=$rules_changed"
+          echo "has_missing=$has_missing"
+          echo "needs_run=$needs_run"
+          echo "rule_diff_range=$rule_diff_range"
+          echo "needs_run=$needs_run" >> "$GITHUB_OUTPUT"
+          echo "rule_diff_range=$rule_diff_range" >> "$GITHUB_OUTPUT"
+
+  run-claude:
+    needs: precheck
+    if: needs.precheck.outputs.needs_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node
+
+      - run: npm ci
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "gix-bot"
+          git config --global user.email "gix-bot@users.noreply.github.com"
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GIX_BOT_PAT }}
+          RULE_DIFF_RANGE: ${{ needs.precheck.outputs.rule_diff_range }}
+        run: |
+          prompt=$(envsubst '${RULE_DIFF_RANGE}' < src/frontend/src/lib/locales/prompts/check.md)
+          claude -p "$prompt" \
+            --dangerously-skip-permissions \
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep,Agent"
+
+      - name: Notify Slack on failure
+        if: ${{ failure() }}
+        uses: ./.github/actions/slack
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Translations check failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
