@@ -152,6 +152,9 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Snapshot branch refs before Claude runs
+        run: git for-each-ref --format='%(refname:short)=%(objectname)' refs/heads/ > "$RUNNER_TEMP/pre-refs.txt"
+
       - name: Run Claude
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -163,7 +166,39 @@ jobs:
           prompt=$(envsubst '${PR_NUMBER} ${PR_HEAD_REF} ${PR_HEAD_REPO}' < src/frontend/src/lib/locales/prompts/feedback.md)
           claude -p "$prompt" \
             --dangerously-skip-permissions \
-            --allowedTools "Bash,Read,Write,Edit,Glob,Grep,Agent"
+            --allowedTools "Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(awk:*),Bash(grep:*),Bash(sed:*),Bash(cat:*),Bash(basename:*),Bash(echo:*),Bash(jq:*),Bash(wc:*),Bash(head:*),Bash(tail:*),Bash(date:*),Bash(find:*),Bash(ls:*),Bash(mkdir:*),Bash(cd:*),Bash(envsubst:*),Bash(printf:*),Bash(sort:*),Bash(uniq:*),Bash(tr:*),Read,Write,Edit,Glob,Grep,Agent"
+
+      - name: Audit Claude changes
+        if: always()
+        env:
+          ALLOWED_PATHS_REGEX: '^src/frontend/src/lib/locales/([a-z][a-z-]*\.po|CLAUDE\.md|rules/[a-zA-Z0-9_-]+\.md)$|^src/frontend/src/(lib|routes)/.*\.svelte$'
+        run: |
+          set -euo pipefail
+          violations=()
+          while IFS='=' read -r ref sha; do
+            pre_sha=$(grep "^${ref}=" "$RUNNER_TEMP/pre-refs.txt" 2>/dev/null | cut -d= -f2 || true)
+            if [ -z "$pre_sha" ]; then
+              base="origin/main"
+            elif [ "$pre_sha" != "$sha" ]; then
+              base="$pre_sha"
+            else
+              continue
+            fi
+            files=$(git diff --name-only "$base..$sha" 2>/dev/null || true)
+            [ -z "$files" ] && continue
+            while IFS= read -r f; do
+              if ! echo "$f" | grep -qE "$ALLOWED_PATHS_REGEX"; then
+                violations+=("$ref: $f")
+              fi
+            done <<< "$files"
+          done < <(git for-each-ref --format='%(refname:short)=%(objectname)' refs/heads/)
+
+          if [ ${#violations[@]} -gt 0 ]; then
+            echo "::error::Claude modified files outside the allowed path set for this workflow:"
+            printf '  %s\n' "${violations[@]}"
+            exit 1
+          fi
+          echo "Audit passed — all changed files are within the allowed path set."
 
       - name: Notify Slack on failure
         if: ${{ failure() }}
