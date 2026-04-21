@@ -20,6 +20,7 @@ import {
   extractDelegation,
   Icrc3Attributes,
 } from "./auth";
+import { formatIcrc3Attributes } from "./icrc3";
 
 import "./main.css";
 
@@ -92,6 +93,9 @@ const requestAttributesEl = document.getElementById(
 ) as HTMLInputElement;
 const icrc3AttributesEl = document.getElementById(
   "icrc3Attributes",
+) as HTMLPreElement;
+const icrc3AttributesDecodedEl = document.getElementById(
+  "icrc3AttributesDecoded",
 ) as HTMLPreElement;
 
 let iiProtocolTestWindow: Window | undefined;
@@ -217,8 +221,18 @@ const updateDelegationView = ({
         // @ts-ignore Not known in TS types yet but supported in all browsers
         signature: icrc3Attributes.signature.toBase64(),
       });
+      try {
+        icrc3AttributesDecodedEl.innerText = formatIcrc3Attributes(
+          icrc3Attributes.data,
+        );
+      } catch (err) {
+        icrc3AttributesDecodedEl.innerText = `Failed to decode: ${
+          err instanceof Error ? err.message : String(err)
+        }`;
+      }
     } else {
       icrc3AttributesEl.innerText = "";
+      icrc3AttributesDecodedEl.innerText = "";
     }
   } else {
     delegationEl.innerText = "Current identity is not a DelegationIdentity";
