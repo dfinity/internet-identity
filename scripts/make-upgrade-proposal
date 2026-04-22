@@ -318,15 +318,36 @@ update_release_text() {
   echo "Please review: https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME"
 }
 
+# Resolve a proposal-backend-*/proposal-frontend-* tag to the release-* tag
+# pointing at the same commit. GitHub releases are only published for
+# release-* tags, so looking up wasm artifacts requires going through the
+# matching release tag. Mirrors the helper of the same name in
+# .github/actions/release/run.sh.
+resolve_release_tag() {
+  local proposal_tag="$1"
+  local commit
+  commit=$(git rev-parse "$proposal_tag" 2>/dev/null) || { echo ""; return; }
+  git tag --points-at "$commit" | grep "^release-" | sort | head -1 || true
+}
+
 detect_archive_hash_change() {
-  # Compare local archive.wasm.gz sha256 against the previous
-  # proposal-backend-*'s archive.wasm.gz. Emits "true" or "false" on stdout.
-  # Falls back to "true" if the previous archive cannot be fetched, so the
-  # BE proposal includes the archive hash in the conservative case.
-  local prev_tag
-  prev_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
-  if [ -z "$prev_tag" ]; then
+  # Compare local archive.wasm.gz sha256 against the archive attached to the
+  # release that corresponds to the previous proposal-backend-*. Emits "true"
+  # or "false" on stdout. Falls back to "true" if the previous archive can't
+  # be fetched, so the BE proposal includes the archive hash in the
+  # conservative case.
+  local prev_proposal_tag
+  prev_proposal_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
+  if [ -z "$prev_proposal_tag" ]; then
     echo "No previous proposal-backend-* tag found; treating archive as changed." >&2
+    echo "true"
+    return
+  fi
+
+  local prev_release_tag
+  prev_release_tag=$(resolve_release_tag "$prev_proposal_tag")
+  if [ -z "$prev_release_tag" ]; then
+    echo "Could not resolve ${prev_proposal_tag} to a release-* tag; treating archive as changed." >&2
     echo "true"
     return
   fi
@@ -335,8 +356,8 @@ detect_archive_hash_change() {
   prev_archive=$(mktemp)
   trap 'rm -f "$prev_archive"' RETURN
 
-  if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_tag}/archive.wasm.gz" -o "$prev_archive"; then
-    echo "Could not download ${prev_tag}/archive.wasm.gz; treating archive as changed." >&2
+  if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_release_tag}/archive.wasm.gz" -o "$prev_archive"; then
+    echo "Could not download ${prev_release_tag}/archive.wasm.gz; treating archive as changed." >&2
     echo "true"
     return
   fi
@@ -344,8 +365,8 @@ detect_archive_hash_change() {
   local prev_sha curr_sha
   prev_sha=$(shasum -a 256 "$prev_archive" | awk '{print $1}')
   curr_sha=$(shasum -a 256 ./archive.wasm.gz | awk '{print $1}')
-  echo "Previous archive (${prev_tag}): $prev_sha" >&2
-  echo "Current archive:                $curr_sha" >&2
+  echo "Previous archive (${prev_release_tag}): $prev_sha" >&2
+  echo "Current archive:                        $curr_sha" >&2
 
   if [ "$prev_sha" = "$curr_sha" ]; then
     echo "false"

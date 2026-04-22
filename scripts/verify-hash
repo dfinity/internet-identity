@@ -122,18 +122,25 @@ verify() {
   exit 1
 }
 
+# Build every requested canister in a single docker-build invocation.
+# scripts/docker-build accepts any combination of --internet-identity /
+# --frontend / --archive and builds just the ones requested.
+build_args=()
+[ -n "$expected_ii_hash" ] && build_args+=("--internet-identity")
+[ -n "$expected_iife_hash" ] && build_args+=("--frontend")
+[ -n "$expected_archive_hash" ] && build_args+=("--archive")
+
+./scripts/docker-build "${build_args[@]}"
+
 if [ -n "$expected_ii_hash" ]; then
-  ./scripts/docker-build
   verify "II backend" "$expected_ii_hash" ./internet_identity.wasm.gz
 fi
 
 if [ -n "$expected_iife_hash" ]; then
-  ./scripts/docker-build --frontend
   verify "II frontend" "$expected_iife_hash" ./internet_identity_frontend.wasm.gz
 fi
 
 if [ -n "$expected_archive_hash" ]; then
-  ./scripts/docker-build --archive
   verify "archive" "$expected_archive_hash" ./archive.wasm.gz
 fi
 
