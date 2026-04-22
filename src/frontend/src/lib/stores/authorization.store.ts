@@ -5,7 +5,7 @@ export type AuthorizationContext = {
 };
 
 export type Authorized = {
-  accountNumber: Promise<bigint | undefined>;
+  accountNumberPromise: Promise<bigint | undefined>;
 };
 
 const contextInternal = writable<AuthorizationContext | undefined>();
@@ -19,8 +19,8 @@ export const authorizationStore = {
   /** Called by the UI when the user authorizes with a specific account.
    *  Accepts a promise so the animation can start immediately while the
    *  account number resolves asynchronously. */
-  authorize: (accountNumber: Promise<bigint | undefined>): void => {
-    authorizedInternal.set({ accountNumber });
+  authorize: (accountNumberPromise: Promise<bigint | undefined>): void => {
+    authorizedInternal.set({ accountNumberPromise: accountNumberPromise });
   },
   subscribe: contextInternal.subscribe,
 };

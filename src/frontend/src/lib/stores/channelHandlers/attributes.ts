@@ -189,7 +189,7 @@ export const handleIcrc3Attributes =
     }
 
     // Wait for the user to authorize before serving attributes.
-    await waitForStore(authorizedStore);
+    const { accountNumberPromise } = await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
 
     // Validate the derivation origin if provided, same as delegation handler.
@@ -230,10 +230,11 @@ export const handleIcrc3Attributes =
     const attributeKeys = implicitKeys.filter((key) => availableKeys.has(key));
 
     try {
+      const accountNumber = await accountNumberPromise;
       const { message } = await authenticated.actor
         .prepare_icrc3_attributes({
           origin,
-          account_number: [],
+          account_number: accountNumber !== undefined ? [accountNumber] : [],
           identity_number: authenticated.identityNumber,
           attributes: attributeKeys.map((key) => ({
             key,
@@ -248,7 +249,7 @@ export const handleIcrc3Attributes =
         authenticated.actor
           .get_icrc3_attributes({
             origin,
-            account_number: [],
+            account_number: accountNumber !== undefined ? [accountNumber] : [],
             identity_number: authenticated.identityNumber,
             message,
           })

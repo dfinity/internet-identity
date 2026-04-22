@@ -75,7 +75,7 @@ export const handleDelegationRequest =
       // Read the identity *after* authorization so we capture whichever
       // identity the user settled on (they may have switched mid-flow).
       const [accountNumber, { identityNumber, actor }] = await Promise.all([
-        authorized.accountNumber,
+        authorized.accountNumberPromise,
         waitForStore(authenticationStore),
       ]);
 
