@@ -61,7 +61,7 @@ app.post("/account/:id/claims", express.json(), async (req, res) => {
 
 // Endpoint for SSO discoverability
 app.get("/.well-known/ii-openid-configuration", express.json(), async (req, res) => {
-  res.status(201).send({
+  res.status(200).send({
     client_id: "internet_identity",
     openid_configuration: `http://localhost:${port}/.well-known/openid-configuration`
   });
@@ -72,5 +72,8 @@ app.use(provider.callback());
 app.listen(port, () => {
   console.log(
     `For endpoints see: http://localhost:${port}/.well-known/openid-configuration`,
+  );
+  console.log(
+    `For SSO discovery see: http://localhost:${port}/.well-known/ii-openid-configuration`,
   );
 });
