@@ -3,6 +3,7 @@ import type {
   OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
+import { lookupSsoDomainForCredential } from "$lib/utils/ssoDomainStorage";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import {
@@ -253,24 +254,39 @@ export const issuerMatches = (
 ): boolean => buildIssuerFromConfig(configIssuer, metadata) === issuer;
 
 /**
- * Find the OpenID configuration for a given issuer.
+ * Find the OpenID configuration that issued a given credential.
  *
- * Not relying in the feature flag ENABLE_GENERIC_OPEN_ID means that if we enable and then disable the feature flag,
- * afterwards, the users that used the generic OpenID configurations will still be able to log in.
+ * Prefer matching on `(issuer, aud)` — `aud` is the provider-assigned OAuth
+ * client_id and is what distinguishes credentials obtained via different
+ * flows against the same issuer (e.g. a credential from the direct "Sign
+ * in with Google" button vs. one obtained via SSO where the org happens
+ * to use Google as their IdP — the two have different `client_id`s).
+ * Matching on issuer alone would cause the SSO credential to display as a
+ * direct-Google credential.
  *
- * SSO providers registered in `oidc_configs` are not resolved here — the SSO
- * flow synthesizes its own `OpenIdConfig` after the two-hop discovery in
- * `ssoDiscovery.ts` and calls `continueWithOpenId` directly.
+ * When `aud` is `undefined` (e.g. for a stored `LastUsedIdentity` whose
+ * shape predates this distinction) we fall back to issuer-only matching.
+ * That degrades gracefully for direct-provider credentials but will still
+ * mis-attribute SSO credentials in those legacy call sites until they're
+ * updated (tracked in #3795).
+ *
+ * Not relying on the feature flag ENABLE_GENERIC_OPEN_ID means that if we
+ * enable and then disable the feature flag, users that used the generic
+ * OpenID configurations can still sign in afterwards.
  *
  * @param issuer The issuer to find the configuration for.
- * @returns {OpenIdConfig | undefined} The configuration for the issuer.
+ * @param aud    The OAuth client_id claim of the credential, if known.
+ * @returns {OpenIdConfig | undefined} The configuration for the credential.
  */
 export const findConfig = (
   issuer: string,
+  aud: string | undefined,
   metadata: MetadataMapV2,
 ): OpenIdConfig | undefined =>
-  backendCanisterConfig.openid_configs[0]?.find((config) =>
-    issuerMatches(config.issuer, issuer, metadata),
+  backendCanisterConfig.openid_configs[0]?.find(
+    (config) =>
+      (aud === undefined || config.client_id === aud) &&
+      issuerMatches(config.issuer, issuer, metadata),
   );
 
 /**
@@ -348,15 +364,19 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
 
 /**
  * Return the logo of the OpenID provider from the config.
- * Returns `undefined` if it's a google config or not found.
- * @param issuer
- * @returns {string | undefined} The string is an SVG string that must be embedded in the HTML.
+ *
+ * Returns `undefined` when the credential doesn't match any direct provider
+ * in `openid_configs` (e.g. a credential obtained via the SSO two-hop
+ * flow). Callers should render a generic SSO icon in that case.
+ *
+ * @returns {string | undefined} An SVG string to be embedded via `{@html}`.
  */
 export const openIdLogo = (
   issuer: string,
+  aud: string | undefined,
   metadata: MetadataMapV2,
 ): string | undefined => {
-  const logo = findConfig(issuer, metadata)?.logo;
+  const logo = findConfig(issuer, aud, metadata)?.logo;
 
   // To prevent rendering an element with the same id multiple times in the DOM,
   // we namespace all ids in the svg string using an unique suffix on each call.
@@ -418,12 +438,29 @@ const namespaceIds = (
 };
 
 /**
- * Return the name of the OpenID provider from the config.
- * Returns `undefined` if it's a google config or not found.
- * @param issuer
- * @returns {string | undefined} The string is the name of the OpenID provider.
+ * Return a human-readable name for an OpenID credential.
+ *
+ * Resolution order:
+ * 1. Direct provider match on `(issuer, aud)` in `openid_configs` — returns
+ *    the provider's configured `name` (e.g. "Google").
+ * 2. SSO credential: if this device remembers the `discovery_domain` the
+ *    user entered when linking (stored by {@link rememberSsoDomainForCredential}
+ *    in `ssoDomainStorage.ts`), return that domain — so the UI can render
+ *    e.g. "dfinity.org account" instead of falsely attributing the
+ *    credential to the underlying IdP.
+ * 3. `undefined` otherwise, so callers can fall back to a generic label.
+ *
+ * `sub` is required so we can look up the per-credential SSO domain
+ * mapping; the direct-provider branch doesn't use it.
  */
 export const openIdName = (
   issuer: string,
+  sub: string | undefined,
+  aud: string | undefined,
   metadata: MetadataMapV2,
-): string | undefined => findConfig(issuer, metadata)?.name;
+): string | undefined => {
+  const direct = findConfig(issuer, aud, metadata)?.name;
+  if (direct !== undefined) return direct;
+  if (sub === undefined || aud === undefined) return undefined;
+  return lookupSsoDomainForCredential({ iss: issuer, sub, aud });
+};

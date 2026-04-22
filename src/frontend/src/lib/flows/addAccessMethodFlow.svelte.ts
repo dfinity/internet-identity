@@ -14,6 +14,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+import { rememberSsoDomainForCredential } from "$lib/utils/ssoDomainStorage";
 
 export class AddAccessMethodFlow {
   #view = $state<"chooseMethod" | "addPasskey" | "signInWithSso">(
@@ -119,9 +120,15 @@ export class AddAccessMethodFlow {
    * identity. Reuses {@link linkOpenIdAccount} by synthesizing an
    * `OpenIdConfig` from the two-hop discovery result — the issuer and
    * client_id we got from discovery plus a default name.
+   *
+   * On success we also remember `(iss, sub, aud) → domain` in localStorage
+   * so the access-methods UI can later label this credential by the SSO
+   * domain the user typed instead of by the underlying IdP's issuer.
    */
-  linkSsoAccount = (result: SsoDiscoveryResult): Promise<OpenIdCredential> => {
-    const { clientId, discovery } = result;
+  linkSsoAccount = async (
+    result: SsoDiscoveryResult,
+  ): Promise<OpenIdCredential> => {
+    const { domain, clientId, discovery } = result;
     const syntheticConfig: OpenIdConfig = {
       auth_uri: discovery.authorization_endpoint,
       jwks_uri: "",
@@ -133,6 +140,11 @@ export class AddAccessMethodFlow {
       auth_scope: selectAuthScopes(discovery.scopes_supported),
       client_id: clientId,
     };
-    return this.linkOpenIdAccount(syntheticConfig);
+    const credential = await this.linkOpenIdAccount(syntheticConfig);
+    rememberSsoDomainForCredential(
+      { iss: credential.iss, sub: credential.sub, aud: credential.aud },
+      domain,
+    );
+    return credential;
   };
 }

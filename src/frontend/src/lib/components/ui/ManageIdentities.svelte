@@ -44,6 +44,9 @@
     identity.authMethod.openid.metadata !== undefined
       ? openIdName(
           identity.authMethod.openid.iss,
+          identity.authMethod.openid.sub,
+          // `aud` not tracked on `LastUsedIdentity`; see #3795.
+          undefined,
           identity.authMethod.openid.metadata,
         )
       : undefined}

@@ -323,6 +323,8 @@
         onCancel={() => (removingAccessMethodKey = undefined)}
         providerName={openIdName(
           removingAccessMethod.openid.iss,
+          removingAccessMethod.openid.sub,
+          removingAccessMethod.openid.aud,
           removingAccessMethod.openid.metadata,
         ) ?? $t`Unknown`}
         isCurrentAccessMethod={isCurrentAccessMethod(

@@ -183,15 +183,18 @@ const createOpenIDConfig = (issuer: string): OpenIdConfig => ({
 
 describe("findConfig", () => {
   const appleIssuer = "https://appleid.apple.com";
+  // Every `createOpenIDConfig(...)` returns a config with client_id="test",
+  // so passing "test" as `aud` exercises the direct-match path.
+  const DIRECT_AUD = "test";
 
   beforeEach(() => {
     backendCanisterConfig.openid_configs = [];
   });
 
-  it("returns OpenID config when issuer matches in openid_configs", () => {
+  it("returns OpenID config when issuer and aud match in openid_configs", () => {
     const cfg = createOpenIDConfig("https://example.com/oauth2");
     backendCanisterConfig.openid_configs = [[cfg]];
-    expect(findConfig("https://example.com/oauth2", [])).toBe(cfg);
+    expect(findConfig("https://example.com/oauth2", DIRECT_AUD, [])).toBe(cfg);
   });
 
   it("matches a template issuer in openid_configs when claims provide values", () => {
@@ -201,7 +204,7 @@ describe("findConfig", () => {
     backendCanisterConfig.openid_configs = [[msCfg]];
     const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
-      findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, [
+      findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, DIRECT_AUD, [
         ["tid", { String: tid }],
       ]),
     ).toBe(msCfg);
@@ -214,14 +217,18 @@ describe("findConfig", () => {
     backendCanisterConfig.openid_configs = [[msCfg]];
     const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
-      findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, []),
+      findConfig(
+        `https://login.microsoftonline.com/${tid}/v2.0`,
+        DIRECT_AUD,
+        [],
+      ),
     ).toBeUndefined();
   });
 
   it("returns Apple config if issuer is Apple (from openid_configs)", () => {
     const appleConfig = createOpenIDConfig(appleIssuer);
     backendCanisterConfig.openid_configs = [[appleConfig]];
-    expect(findConfig(appleIssuer, [])).toBe(appleConfig);
+    expect(findConfig(appleIssuer, DIRECT_AUD, [])).toBe(appleConfig);
   });
 
   it("returns undefined when no issuer matches", () => {
@@ -231,8 +238,27 @@ describe("findConfig", () => {
     ];
     backendCanisterConfig.openid_configs = [cfgs];
     expect(
-      findConfig("https://no-such-issuer.example.com", []),
+      findConfig("https://no-such-issuer.example.com", DIRECT_AUD, []),
     ).toBeUndefined();
+  });
+
+  it("returns undefined when issuer matches but aud does not — the SSO-vs-direct discriminator", () => {
+    // A credential obtained via SSO against the same IdP would have the same
+    // issuer but a different aud (the SSO-specific client_id). findConfig
+    // must NOT misattribute it to the direct provider's config.
+    const googleCfg = createOpenIDConfig("https://accounts.google.com");
+    backendCanisterConfig.openid_configs = [[googleCfg]];
+    expect(
+      findConfig("https://accounts.google.com", "some-other-client-id", []),
+    ).toBeUndefined();
+  });
+
+  it("falls back to issuer-only matching when aud is undefined", () => {
+    // Legacy LastUsedIdentity entries don't track aud; we preserve the old
+    // behavior (issuer-only match) for those callers.
+    const cfg = createOpenIDConfig("https://example.com/oauth2");
+    backendCanisterConfig.openid_configs = [[cfg]];
+    expect(findConfig("https://example.com/oauth2", undefined, [])).toBe(cfg);
   });
 });
 

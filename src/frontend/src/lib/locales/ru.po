@@ -22,6 +22,15 @@ msgstr "{0} пользователь"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
 
+msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+msgstr ""
+
 msgid "{identityName} has been removed from this device."
 msgstr "Данные {identityName} были удалены с этого устройства."
 
@@ -229,6 +238,9 @@ msgstr "Продолжить с {name}"
 msgid "Continue with passkey"
 msgstr "Войти с ключом доступа"
 
+msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgstr ""
+
 msgid "Create account"
 msgstr "Создать аккаунт"
 
@@ -389,9 +401,6 @@ msgstr "Чем Internet Identity отличается от других инст
 msgid "How to stay secure"
 msgstr "Как оставаться в безопасности"
 
-msgid "HTTP {0}"
-msgstr ""
-
 msgid "I Acknowledge"
 msgstr "Я подтверждаю"
 
@@ -490,9 +499,6 @@ msgstr "Неверная резервная фраза"
 
 msgid "Invalid request"
 msgstr "Недействительный запрос"
-
-msgid "invalid response"
-msgstr ""
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Хранятся ли мои Face ID или отпечаток пальца в Internet Identity?"
@@ -616,9 +622,6 @@ msgstr "Назвать аккаунт"
 
 msgid "Name your identity"
 msgstr "Придумайте имя"
-
-msgid "network error"
-msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Никакие данные о том, в какие приложения вы входите с помощью Internet Identity, не передаются Google, Microsoft или Apple."
@@ -827,6 +830,9 @@ msgstr "Время сессии истекло"
 msgid "Set as default sign-in"
 msgstr "Установить как вход по умолчанию"
 
+msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
+msgstr ""
+
 msgid "Show all"
 msgstr "Показать все"
 
@@ -894,7 +900,22 @@ msgstr ""
 msgid "Source code"
 msgstr "Исходный код"
 
-msgid "SSO is not available for \"{domainInput}\" yet."
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider's discovery document is malformed: {msg}"
 msgstr ""
 
 msgid "SSO sign-in failed. Please try again."
@@ -981,9 +1002,6 @@ msgstr "Это приложение переехало на новую верс�
 msgid "This browser is not supported."
 msgstr ""
 
-msgid "This domain isn't correctly configured for Internet Identity ({detail})."
-msgstr ""
-
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Эта учётная запись уже была обновлена до нового интерфейса."
 
@@ -1031,6 +1049,9 @@ msgstr "Чтобы продолжить:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Чтобы завершить настройку вашего ключа доступа, следуйте инструкциям, показанным на вашем <0>новом устройстве</0>."
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgstr ""
 
 msgid "Type each word in the correct order:"
 msgstr "Введите каждое слово в правильном порядке:"

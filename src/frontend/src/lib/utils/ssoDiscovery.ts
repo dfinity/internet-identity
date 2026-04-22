@@ -59,6 +59,13 @@ export type OidcDiscoveryDocument = z.infer<typeof OidcDiscoveryDocumentSchema>;
 
 /** Result of the two-hop SSO discovery chain. */
 export interface SsoDiscoveryResult {
+  /**
+   * The organization domain the user typed on the SSO screen — i.e. the
+   * host of hop-1's `/.well-known/ii-openid-configuration`. Carried through
+   * so downstream code can label the resulting credential by the SSO
+   * provenance rather than by the underlying IdP's issuer.
+   */
+  domain: string;
   clientId: string;
   discovery: OidcDiscoveryDocument;
 }
@@ -355,6 +362,7 @@ export const discoverSsoConfig = async (
       Date.now() - cachedProvider.fetchedAt < PROVIDER_CACHE_TTL_MS
     ) {
       return {
+        domain: validatedDomain,
         clientId: cachedIIConfig.config.client_id,
         discovery: cachedProvider.document,
       };
@@ -371,6 +379,7 @@ export const discoverSsoConfig = async (
       );
       if (cachedProvider !== undefined) {
         return {
+          domain: validatedDomain,
           clientId: cachedIIConfig.config.client_id,
           discovery: cachedProvider.document,
         };
@@ -425,6 +434,7 @@ export const discoverSsoConfig = async (
       Date.now() - cachedProviderDoc.fetchedAt < PROVIDER_CACHE_TTL_MS
     ) {
       return {
+        domain: validatedDomain,
         clientId: iiConfig.client_id,
         discovery: cachedProviderDoc.document,
       };
@@ -445,7 +455,11 @@ export const discoverSsoConfig = async (
       fetchedAt: Date.now(),
     });
 
-    return { clientId: iiConfig.client_id, discovery: providerDoc };
+    return {
+      domain: validatedDomain,
+      clientId: iiConfig.client_id,
+      discovery: providerDoc,
+    };
   } finally {
     activeFetches--;
   }

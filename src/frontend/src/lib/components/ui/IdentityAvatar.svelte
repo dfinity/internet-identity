@@ -17,6 +17,10 @@
       identity.authMethod.openid.metadata !== undefined
       ? openIdLogo(
           identity.authMethod.openid.iss,
+          // `aud` not currently tracked on `LastUsedIdentity`; see #3795.
+          // Falls back to issuer-only matching — correct for direct
+          // providers, imprecise for SSO until that's fixed.
+          undefined,
           identity.authMethod.openid.metadata,
         )
       : undefined,

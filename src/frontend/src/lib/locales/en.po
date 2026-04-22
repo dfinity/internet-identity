@@ -22,6 +22,15 @@ msgstr "{0} user"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} has moved to the new Internet Identity"
 
+msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+msgstr "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgstr "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+msgstr "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} has been removed from this device."
 
@@ -229,6 +238,9 @@ msgstr "Continue with {name}"
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
 
+msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgstr "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+
 msgid "Create account"
 msgstr "Create account"
 
@@ -389,9 +401,6 @@ msgstr "How does Internet Identity compare to other Web3 authentication tools?"
 msgid "How to stay secure"
 msgstr "How to stay secure"
 
-msgid "HTTP {0}"
-msgstr "HTTP {0}"
-
 msgid "I Acknowledge"
 msgstr "I Acknowledge"
 
@@ -490,9 +499,6 @@ msgstr "Invalid recovery phrase"
 
 msgid "Invalid request"
 msgstr "Invalid request"
-
-msgid "invalid response"
-msgstr "invalid response"
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Is my Face ID or Fingerprint stored in Internet Identity?"
@@ -616,9 +622,6 @@ msgstr "Name account"
 
 msgid "Name your identity"
 msgstr "Name your identity"
-
-msgid "network error"
-msgstr "network error"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
@@ -827,6 +830,9 @@ msgstr "Session timed out"
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
+msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
+msgstr "Several SSO sign-ins are in flight already. Wait a moment and try again."
+
 msgid "Show all"
 msgstr "Show all"
 
@@ -894,8 +900,23 @@ msgstr "Something went wrong while sharing attributes. Please try again; if the 
 msgid "Source code"
 msgstr "Source code"
 
-msgid "SSO is not available for \"{domainInput}\" yet."
-msgstr "SSO is not available for \"{domainInput}\" yet."
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+
+msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+msgstr "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+
+msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+msgstr "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+
+msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+msgstr "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+
+msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+msgstr "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+
+msgid "SSO provider's discovery document is malformed: {msg}"
+msgstr "SSO provider's discovery document is malformed: {msg}"
 
 msgid "SSO sign-in failed. Please try again."
 msgstr "SSO sign-in failed. Please try again."
@@ -981,9 +1002,6 @@ msgstr "This app has moved to the new Internet Identity"
 msgid "This browser is not supported."
 msgstr "This browser is not supported."
 
-msgid "This domain isn't correctly configured for Internet Identity ({detail})."
-msgstr "This domain isn't correctly configured for Internet Identity ({detail})."
-
 msgid "This identity has already been upgraded to the new experience."
 msgstr "This identity has already been upgraded to the new experience."
 
@@ -1031,6 +1049,9 @@ msgstr "To continue:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgstr "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
 
 msgid "Type each word in the correct order:"
 msgstr "Type each word in the correct order:"
