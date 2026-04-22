@@ -22,6 +22,9 @@ msgstr "{0}-Benutzer"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} ist zur neuen Internet Identity umgezogen"
 
+msgid "{displayName} account"
+msgstr ""
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr ""
 
@@ -36,9 +39,6 @@ msgstr "{identityName} wurde von diesem Gerät entfernt."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Sie haben das Maximum von # Konto für eine einzelne App erreicht.} other {Sie haben das Maximum von # Konten für eine einzelne App erreicht.}}"
-
-msgid "{name} account"
-msgstr "{name}-Konto"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
@@ -734,9 +734,6 @@ msgstr "Wiederherstellungsphrase nicht verifiziert"
 msgid "Recovery phrase set"
 msgstr "Wiederherstellungsphrase festgelegt"
 
-msgid "Redirecting to the app"
-msgstr "Weiterleitung zur App..."
-
 msgid "Remove"
 msgstr "Entfernen"
 
@@ -857,8 +854,8 @@ msgstr ""
 msgid "Sign In With SSO"
 msgstr ""
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Melden Sie sich von jedem Gerät aus mit Ihrem {name}-Konto an."
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Abmelden"
@@ -899,6 +896,9 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Quellcode"
+
+msgid "SSO"
+msgstr ""
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""

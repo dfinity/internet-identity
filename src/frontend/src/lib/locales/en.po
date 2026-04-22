@@ -22,6 +22,9 @@ msgstr "{0} user"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} has moved to the new Internet Identity"
 
+msgid "{displayName} account"
+msgstr "{displayName} account"
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 
@@ -36,9 +39,6 @@ msgstr "{identityName} has been removed from this device."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
-
-msgid "{name} account"
-msgstr "{name} account"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
@@ -734,9 +734,6 @@ msgstr "Recovery phrase not verified"
 msgid "Recovery phrase set"
 msgstr "Recovery phrase set"
 
-msgid "Redirecting to the app"
-msgstr "Redirecting to the app"
-
 msgid "Remove"
 msgstr "Remove"
 
@@ -857,8 +854,8 @@ msgstr "Sign in with SSO"
 msgid "Sign In With SSO"
 msgstr "Sign In With SSO"
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Sign in with your {name} account from any device."
+msgid "Sign in with your {displayName} account from any device."
+msgstr "Sign in with your {displayName} account from any device."
 
 msgid "Sign out"
 msgstr "Sign out"
@@ -899,6 +896,9 @@ msgstr "Something went wrong while sharing attributes. Please try again; if the 
 
 msgid "Source code"
 msgstr "Source code"
+
+msgid "SSO"
+msgstr "SSO"
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."

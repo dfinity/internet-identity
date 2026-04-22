@@ -256,19 +256,22 @@ export const issuerMatches = (
 /**
  * Find the OpenID configuration that issued a given credential.
  *
- * Prefer matching on `(issuer, aud)` — `aud` is the provider-assigned OAuth
- * client_id and is what distinguishes credentials obtained via different
- * flows against the same issuer (e.g. a credential from the direct "Sign
- * in with Google" button vs. one obtained via SSO where the org happens
- * to use Google as their IdP — the two have different `client_id`s).
- * Matching on issuer alone would cause the SSO credential to display as a
- * direct-Google credential.
+ * Resolution is strict-then-fallback:
  *
- * When `aud` is `undefined` (e.g. for a stored `LastUsedIdentity` whose
- * shape predates this distinction) we fall back to issuer-only matching.
- * That degrades gracefully for direct-provider credentials but will still
- * mis-attribute SSO credentials in those legacy call sites until they're
- * updated (tracked in #3795).
+ * 1. **Strict `(issuer, aud)` match.** `aud` is the provider-assigned OAuth
+ *    client_id and is the authoritative discriminator when two credentials
+ *    share an issuer (e.g. direct-Google vs SSO-via-Google — same issuer,
+ *    different client_id). If we find a config whose `client_id === aud`
+ *    AND whose issuer template matches, return it.
+ * 2. **Issuer-only fallback.** If no strict match, fall back to any config
+ *    with a matching issuer. This covers:
+ *      - Callers that don't track `aud` (e.g. `LastUsedIdentity`; see #3795).
+ *      - Legacy credentials whose `aud` disagrees with the current
+ *        `openid_configs` entry (client_id rotation, migration artifacts).
+ *    SSO credentials would also match this fallback; {@link openIdName} and
+ *    {@link openIdLogo} short-circuit via the localStorage SSO map before
+ *    consulting `findConfig`, so the fallback doesn't mis-attribute SSO
+ *    credentials that were linked on this device.
  *
  * Not relying on the feature flag ENABLE_GENERIC_OPEN_ID means that if we
  * enable and then disable the feature flag, users that used the generic
@@ -282,12 +285,20 @@ export const findConfig = (
   issuer: string,
   aud: string | undefined,
   metadata: MetadataMapV2,
-): OpenIdConfig | undefined =>
-  backendCanisterConfig.openid_configs[0]?.find(
-    (config) =>
-      (aud === undefined || config.client_id === aud) &&
-      issuerMatches(config.issuer, issuer, metadata),
+): OpenIdConfig | undefined => {
+  const configs = backendCanisterConfig.openid_configs[0] ?? [];
+  if (aud !== undefined) {
+    const strict = configs.find(
+      (config) =>
+        config.client_id === aud &&
+        issuerMatches(config.issuer, issuer, metadata),
+    );
+    if (strict !== undefined) return strict;
+  }
+  return configs.find((config) =>
+    issuerMatches(config.issuer, issuer, metadata),
   );
+};
 
 /**
  * Pick the subset of OIDC scopes we actually request from what the provider
@@ -365,17 +376,27 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
 /**
  * Return the logo of the OpenID provider from the config.
  *
- * Returns `undefined` when the credential doesn't match any direct provider
- * in `openid_configs` (e.g. a credential obtained via the SSO two-hop
- * flow). Callers should render a generic SSO icon in that case.
+ * Returns `undefined` for credentials that this device remembers as having
+ * been linked via SSO (so callers can render a generic SSO icon). For
+ * everything else, defers to {@link findConfig} which does strict-then-
+ * fallback matching so direct-provider credentials get their logo even
+ * when `aud` disagrees with the current config.
  *
  * @returns {string | undefined} An SVG string to be embedded via `{@html}`.
  */
 export const openIdLogo = (
   issuer: string,
+  sub: string | undefined,
   aud: string | undefined,
   metadata: MetadataMapV2,
 ): string | undefined => {
+  if (
+    sub !== undefined &&
+    aud !== undefined &&
+    lookupSsoDomainForCredential({ iss: issuer, sub, aud }) !== undefined
+  ) {
+    return undefined;
+  }
   const logo = findConfig(issuer, aud, metadata)?.logo;
 
   // To prevent rendering an element with the same id multiple times in the DOM,
@@ -441,17 +462,15 @@ const namespaceIds = (
  * Return a human-readable name for an OpenID credential.
  *
  * Resolution order:
- * 1. Direct provider match on `(issuer, aud)` in `openid_configs` — returns
- *    the provider's configured `name` (e.g. "Google").
- * 2. SSO credential: if this device remembers the `discovery_domain` the
- *    user entered when linking (stored by {@link rememberSsoDomainForCredential}
- *    in `ssoDomainStorage.ts`), return that domain — so the UI can render
- *    e.g. "dfinity.org account" instead of falsely attributing the
- *    credential to the underlying IdP.
- * 3. `undefined` otherwise, so callers can fall back to a generic label.
- *
- * `sub` is required so we can look up the per-credential SSO domain
- * mapping; the direct-provider branch doesn't use it.
+ * 1. **SSO on this device** — if we remember the `discovery_domain` the
+ *    user entered when linking (stored by {@link rememberSsoDomainForCredential}),
+ *    return that domain. Runs BEFORE direct-provider lookup so SSO
+ *    credentials don't get falsely attributed to their underlying IdP.
+ * 2. **Direct provider** — {@link findConfig} resolves strict-then-fallback,
+ *    so we get the provider's configured `name` (e.g. "Google") for both
+ *    credentials whose `aud` matches the config and legacy credentials
+ *    whose `aud` disagrees but whose issuer matches.
+ * 3. `undefined` — caller should render a generic fallback.
  */
 export const openIdName = (
   issuer: string,
@@ -459,8 +478,9 @@ export const openIdName = (
   aud: string | undefined,
   metadata: MetadataMapV2,
 ): string | undefined => {
-  const direct = findConfig(issuer, aud, metadata)?.name;
-  if (direct !== undefined) return direct;
-  if (sub === undefined || aud === undefined) return undefined;
-  return lookupSsoDomainForCredential({ iss: issuer, sub, aud });
+  if (sub !== undefined && aud !== undefined) {
+    const domain = lookupSsoDomainForCredential({ iss: issuer, sub, aud });
+    if (domain !== undefined) return domain;
+  }
+  return findConfig(issuer, aud, metadata)?.name;
 };

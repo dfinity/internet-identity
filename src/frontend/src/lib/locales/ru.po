@@ -22,6 +22,9 @@ msgstr "{0} пользователь"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
 
+msgid "{displayName} account"
+msgstr ""
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr ""
 
@@ -36,9 +39,6 @@ msgstr "Данные {identityName} были удалены с этого уст
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Вы достигли максимума — # аккаунт для одного приложения.} few {Вы достигли максимума — # аккаунта для одного приложения.} many {Вы достигли максимума — # аккаунтов для одного приложения.} other {Вы достигли максимума — # аккаунтов для одного приложения.}}"
-
-msgid "{name} account"
-msgstr "{name} аккаунт"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# ключ доступа} few {# ключа доступа} many {# ключей доступа} other {# ключей доступа}}"
@@ -734,9 +734,6 @@ msgstr "Резервная фраза не подтверждена"
 msgid "Recovery phrase set"
 msgstr "Резервная фраза установлена"
 
-msgid "Redirecting to the app"
-msgstr "Перенаправление в приложение"
-
 msgid "Remove"
 msgstr "Удалить"
 
@@ -857,8 +854,8 @@ msgstr ""
 msgid "Sign In With SSO"
 msgstr ""
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Войдите в свой аккаунт {name} с любого устройства."
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Выйти"
@@ -899,6 +896,9 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Исходный код"
+
+msgid "SSO"
+msgstr ""
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""

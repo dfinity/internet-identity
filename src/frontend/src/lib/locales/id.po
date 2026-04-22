@@ -22,6 +22,9 @@ msgstr "Pengguna {0}"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} telah pindah ke Internet Identity baru"
 
+msgid "{displayName} account"
+msgstr ""
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr ""
 
@@ -36,9 +39,6 @@ msgstr "{identityName} telah dihapus dari perangkat ini."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
-
-msgid "{name} account"
-msgstr "Akun {name}"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, other {# Passkey}}"
@@ -734,9 +734,6 @@ msgstr "Frasa pemulihan tidak terverifikasi"
 msgid "Recovery phrase set"
 msgstr "Frasa pemulihan diatur"
 
-msgid "Redirecting to the app"
-msgstr "Mengalihkan ke aplikasi..."
-
 msgid "Remove"
 msgstr "Hapus"
 
@@ -857,8 +854,8 @@ msgstr ""
 msgid "Sign In With SSO"
 msgstr ""
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Masuk dengan akun {name} Anda dari perangkat mana pun."
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Keluar"
@@ -899,6 +896,9 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Kode sumber"
+
+msgid "SSO"
+msgstr ""
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""

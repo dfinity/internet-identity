@@ -22,6 +22,9 @@ msgstr "{0} користувач"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} перейшов до нової версії Internet Identity"
 
+msgid "{displayName} account"
+msgstr ""
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr ""
 
@@ -36,9 +39,6 @@ msgstr "{identityName} було видалено з цього пристрою.
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Ви досягли максимуму # облікового запису для одного застосунку.} few {Ви досягли максимуму # облікових записів для одного застосунку.} many {Ви досягли максимуму # облікових записів для одного застосунку.} other {Ви досягли максимуму # облікових записів для одного застосунку.}}"
-
-msgid "{name} account"
-msgstr "{name} обліковий запис"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# ключ доступу} few {# ключі доступу} many {# ключів доступу} other {# ключів доступу}}"
@@ -734,9 +734,6 @@ msgstr "Фраза відновлення не перевірена"
 msgid "Recovery phrase set"
 msgstr "Фраза відновлення встановлена"
 
-msgid "Redirecting to the app"
-msgstr "Перенаправлення до застосунку"
-
 msgid "Remove"
 msgstr "Видалити"
 
@@ -857,8 +854,8 @@ msgstr ""
 msgid "Sign In With SSO"
 msgstr ""
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Увійдіть за допомогою свого облікового запису {name} з будь-якого пристрою."
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Вийти"
@@ -899,6 +896,9 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Вихідний код"
+
+msgid "SSO"
+msgstr ""
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""

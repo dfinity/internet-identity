@@ -21,7 +21,9 @@
     openIdName(openid.iss, openid.sub, openid.aud, openid.metadata),
   );
   const email = $derived(getMetadataString(openid.metadata, "email"));
-  const logo = $derived(openIdLogo(openid.iss, openid.aud, openid.metadata));
+  const logo = $derived(
+    openIdLogo(openid.iss, openid.sub, openid.aud, openid.metadata),
+  );
   // Credential didn't match any entry in `openid_configs` on (iss, aud).
   // Treat it as SSO and render the generic SSO icon as a fallback.
   const isSso = $derived(logo === undefined);

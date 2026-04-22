@@ -22,6 +22,9 @@ msgstr "{0} gebruiker"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} is overgegaan naar de nieuwe Internet Identity"
 
+msgid "{displayName} account"
+msgstr ""
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr ""
 
@@ -36,9 +39,6 @@ msgstr "{identityName} is verwijderd van dit apparaat."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {U heeft het maximum van # account voor één app bereikt.} other {U heeft het maximum van # accounts voor één app bereikt.}}"
-
-msgid "{name} account"
-msgstr "{name} account"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
@@ -734,9 +734,6 @@ msgstr "Herstelzin niet geverifieerd"
 msgid "Recovery phrase set"
 msgstr "Herstelzin ingesteld"
 
-msgid "Redirecting to the app"
-msgstr "Doorverwijzen naar de app"
-
 msgid "Remove"
 msgstr "Verwijderen"
 
@@ -857,8 +854,8 @@ msgstr ""
 msgid "Sign In With SSO"
 msgstr ""
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Log in met uw {name}-account vanaf elk apparaat."
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Uitloggen"
@@ -899,6 +896,9 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Broncode"
+
+msgid "SSO"
+msgstr ""
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""

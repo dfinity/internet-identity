@@ -22,6 +22,9 @@ msgstr "{0} صارف"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} نئی Internet Identity پر منتقل ہو گئی ہے"
 
+msgid "{displayName} account"
+msgstr ""
+
 msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
 msgstr ""
 
@@ -36,9 +39,6 @@ msgstr "{identityName} کو اس آلے سے ہٹا دیا گیا ہے۔"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹ کی حد تک پہنچ چکے ہیں۔} other {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹس کی حد تک پہنچ چکے ہیں۔}}"
-
-msgid "{name} account"
-msgstr "{name} اکاؤنٹ"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# پاس کی} other {# پاس کیز}}"
@@ -734,9 +734,6 @@ msgstr "ریکوری فریز کی تصدیق نہیں ہوئی"
 msgid "Recovery phrase set"
 msgstr "ریکوری فریز سیٹ کر دیا گیا"
 
-msgid "Redirecting to the app"
-msgstr "ایپ کی طرف ری ڈائریکٹ کیا جا رہا ہے"
-
 msgid "Remove"
 msgstr "ہٹائیں"
 
@@ -857,8 +854,8 @@ msgstr ""
 msgid "Sign In With SSO"
 msgstr ""
 
-msgid "Sign in with your {name} account from any device."
-msgstr "کسی بھی آلے سے اپنے {name} اکاؤنٹ کے ساتھ سائن اِن کریں۔"
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "سائن آؤٹ"
@@ -899,6 +896,9 @@ msgstr ""
 
 msgid "Source code"
 msgstr "سورس کوڈ"
+
+msgid "SSO"
+msgstr ""
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""

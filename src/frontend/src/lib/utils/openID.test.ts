@@ -242,15 +242,35 @@ describe("findConfig", () => {
     ).toBeUndefined();
   });
 
-  it("returns undefined when issuer matches but aud does not — the SSO-vs-direct discriminator", () => {
-    // A credential obtained via SSO against the same IdP would have the same
-    // issuer but a different aud (the SSO-specific client_id). findConfig
-    // must NOT misattribute it to the direct provider's config.
+  it("falls back to issuer-only match when aud doesn't match any config", () => {
+    // Legacy/migrated credentials can have an `aud` that doesn't line up
+    // with the current `openid_configs` entry (e.g. client_id rotation).
+    // We prefer returning SOMETHING so the UI can label these direct-
+    // provider credentials correctly, and rely on the localStorage SSO
+    // map in `openIdName`/`openIdLogo` to short-circuit the SSO case
+    // before `findConfig` is consulted.
     const googleCfg = createOpenIDConfig("https://accounts.google.com");
     backendCanisterConfig.openid_configs = [[googleCfg]];
     expect(
       findConfig("https://accounts.google.com", "some-other-client-id", []),
-    ).toBeUndefined();
+    ).toBe(googleCfg);
+  });
+
+  it("prefers the strict (iss, aud) match over the issuer-only fallback", () => {
+    // If two configs share an issuer, the one whose client_id matches aud
+    // wins over the issuer-only fallback.
+    const cfgA = createOpenIDConfig("https://same-issuer.example");
+    const cfgB: OpenIdConfig = {
+      ...createOpenIDConfig("https://same-issuer.example"),
+      client_id: "other-aud",
+    };
+    backendCanisterConfig.openid_configs = [[cfgA, cfgB]];
+    expect(findConfig("https://same-issuer.example", "other-aud", [])).toBe(
+      cfgB,
+    );
+    expect(findConfig("https://same-issuer.example", DIRECT_AUD, [])).toBe(
+      cfgA,
+    );
   });
 
   it("falls back to issuer-only matching when aud is undefined", () => {
