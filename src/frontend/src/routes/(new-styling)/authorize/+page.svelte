@@ -4,7 +4,10 @@
   import type { OpenIdConfig } from "$lib/globals";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { authorizedStore } from "$lib/stores/authorization.store";
-  import { isAuthenticatedStore } from "$lib/stores/authentication.store";
+  import {
+    isAuthenticatedStore,
+    pendingOpenIdIssuerStore,
+  } from "$lib/stores/authentication.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { handleError } from "$lib/components/utils/error";
@@ -149,6 +152,7 @@
     if (config === undefined) {
       return;
     }
+    pendingOpenIdIssuerStore.set(config.issuer);
     openIdResumeProcessing = true;
     triggerDropWaveAnimation();
 
@@ -288,7 +292,7 @@
 {#if data.flow === "openid-init"}
   <!-- OpenID init — nothing to render, onMount redirects to provider. -->
 {:else if $authorizedStore !== undefined}
-  <!-- User has authorized — show redirect animation while delegation completes. -->
+  <!-- User has been authorized — show redirect animation while delegation completes. -->
   <RedirectAnimationView />
 {:else if data.flow === "openid-resume" && openIdResumeProcessing}
   <!-- OpenID callback is being processed — show animation while auth resolves. -->

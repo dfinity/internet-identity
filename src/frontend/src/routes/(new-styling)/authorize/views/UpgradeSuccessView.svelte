@@ -6,6 +6,7 @@
   import { Trans } from "$lib/components/locale";
 
   interface Props {
+    /** Called when the user clicks the continue button or the countdown expires. */
     onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
   }
 

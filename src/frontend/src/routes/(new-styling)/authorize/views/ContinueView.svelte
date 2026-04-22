@@ -33,6 +33,7 @@
 
   interface Props {
     effectiveOrigin: string;
+    /** Called when the user confirms with the default account or selects a specific account. */
     onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
   }
 
