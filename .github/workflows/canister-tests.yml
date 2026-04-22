@@ -513,7 +513,7 @@ jobs:
           done
 
       - name: "Run icp-cli"
-        run: icp network start -d --artificial-delay 0
+        run: icp network start -d
 
       - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
