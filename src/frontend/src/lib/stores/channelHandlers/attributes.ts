@@ -259,16 +259,6 @@ export const handleIcrc3Attributes =
       return;
     }
 
-    // Validate the derivation origin if provided, same as delegation handler.
-    const validationResult = await validateDerivationOrigin({
-      requestOrigin: channel.origin,
-      derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
-    });
-    if (validationResult.result === "invalid") {
-      onError("unverified-origin");
-      return;
-    }
-
     const requestedKeys = paramsResult.data.keys;
 
     // Build the attribute specs to certify — either from implicit consent
@@ -301,6 +291,16 @@ export const handleIcrc3Attributes =
       if (allImplicit) {
         await waitForStore(authorizedStore);
         const authenticated = await waitForStore(authenticationStore);
+
+        const validationResult = await validateDerivationOrigin({
+          requestOrigin: channel.origin,
+          derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+        });
+        if (validationResult.result === "invalid") {
+          onError("unverified-origin");
+          return;
+        }
+
         const available = await authenticated.actor
           .list_available_attributes({
             identity_number: authenticated.identityNumber,
@@ -325,6 +325,15 @@ export const handleIcrc3Attributes =
       const contextPromise = (async (): Promise<AttributeConsentContext> => {
         await waitForStore(authorizedStore);
         const authenticated = await waitForStore(authenticationStore);
+
+        const validationResult = await validateDerivationOrigin({
+          requestOrigin: channel.origin,
+          derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+        });
+        if (validationResult.result === "invalid") {
+          onError("unverified-origin");
+          return { groups: [], effectiveOrigin: "" };
+        }
 
         const available = await authenticated.actor
           .list_available_attributes({
@@ -356,11 +365,12 @@ export const handleIcrc3Attributes =
       }
     }
 
+    const { accountNumberPromise } = await waitForStore(authorizedStore);
+    const authenticated = await waitForStore(authenticationStore);
+
     const origin = remapToLegacyDomain(
       paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
     );
-    const { accountNumberPromise } = await waitForStore(authorizedStore);
-    const authenticated = await waitForStore(authenticationStore);
 
     try {
       const accountNumber = await accountNumberPromise;
