@@ -493,7 +493,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Install icp-cli
-        run: npm install -g @icp-sdk/icp-cli@$(jq -r '.["icp-cli"]' icp.json)
+        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
       # Helps with debugging
       - name: Show versions
@@ -549,7 +549,7 @@ jobs:
 
       - name: Deploy canisters
         run: |
-          # NOTE: icp canister install will run the postinstall scripts from icp.json
+          # NOTE: icp canister install will run the sync steps from icp.yaml
           icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
           icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
@@ -617,7 +617,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install icp-cli
-        run: npm install -g @icp-sdk/icp-cli@$(jq -r '.["icp-cli"]' icp.json)
+        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4

@@ -35,7 +35,7 @@ These backup memory files are generated using the `canister_tests` infrastructur
 The stable memory can also be copied from the local replica from the following path `ICP_CLI_STATE/state/replicated_state/node-100/state/tip/canister_states/CANISTER_ID/stable_memory.bin`, where ICP_CLI_STATE expands to:
 * on mac os: `~/Library/Application Support/org.dfinity.icp-cli/network/local`
 * on linux: `$HOME/.local/share/icp-cli/network/local`
-* for legacy projects where icp.json defines the local network (relative to `icp.json`): `.icp/network/local`
+* for legacy projects where icp.yaml defines the local network (relative to `icp.yaml`): `.icp/network/local`
 
 ## Registering the ICP-CLI Key as II Device
 

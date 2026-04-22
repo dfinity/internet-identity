@@ -43,26 +43,17 @@ This section gives an overview of Internet Identity's architecture, instructions
 
 ### Local Replica
 
-Use the Internet Identity canister in your local icp-cli project by adding the following code snippet to your `icp.json` file:
+Use the Internet Identity canister in your local icp-cli project by adding the following snippet to the `canisters` array in your `icp.yaml` file:
 
-```json
-{
-  "canisters": [
-    {
-      "name": "internet_identity",
-      "type": "custom",
-      "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2025-04-04-v3/internet_identity.did",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/download/release-2025-04-04-v3/internet_identity_production.wasm.gz",
-      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
-      "remote": {
-        "id": {
-          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
-        }
-      },
-      "frontend": {}
-    }
-  ]
-}
+```yaml
+canisters:
+  - name: internet_identity
+    build:
+      steps:
+        - type: pre-built
+          url: https://github.com/dfinity/internet-identity/releases/download/release-2025-04-04-v3/internet_identity_production.wasm.gz
+    init_args: "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})"
+```
 ```
 
 To deploy, run `icp deploy`.

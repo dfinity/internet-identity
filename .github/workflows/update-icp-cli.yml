@@ -18,7 +18,7 @@ jobs:
       - name: Check new icp-cli version
         id: update
         run: |
-          current_icp_cli_release=$(jq -r '."icp-cli"' < icp.json)
+          current_icp_cli_release=$(cat .icp-cli-version | tr -d '[:space:]')
           echo "current icp-cli release '$current_icp_cli_release'"
 
           latest_icp_cli_release=$(curl -sSL https://api.github.com/repos/dfinity/icp-cli/releases/latest | jq -r '.tag_name | sub("^v"; "")')
@@ -27,24 +27,22 @@ jobs:
           if [ "$current_icp_cli_release" != "$latest_icp_cli_release" ]
           then
             echo icp-cli needs an update
-            tmp_icp_json=$(mktemp)
-            jq --arg version "$latest_icp_cli_release" '.["icp-cli"] = $version' icp.json > "$tmp_icp_json"
-            mv "$tmp_icp_json" icp.json
+            echo "$latest_icp_cli_release" > .icp-cli-version
             echo "updated=1" >> "$GITHUB_OUTPUT"
           else
             echo "updated=0" >> "$GITHUB_OUTPUT"
           fi
 
-          cat ./icp.json
+          cat .icp-cli-version
 
-        # If the icp.json was updated, create a PR.
+        # If the version was updated, create a PR.
       - name: Create Pull Request
         if: ${{ steps.update.outputs.updated == '1' }}
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main
-          add-paths: ./icp.json
+          add-paths: ./.icp-cli-version
           commit-message: Update icp-cli release
           committer: GitHub <noreply@github.com>
           author: gix-bot <gix-bot@users.noreply.github.com>

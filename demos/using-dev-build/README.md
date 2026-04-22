@@ -26,7 +26,7 @@ $ icp deploy
 
 At this point, the replica (for all practical matters, a local version of the Internet Computer) is running and three canisters have been deployed:
 
-- `internet_identity`: The production version of Internet Identity (downloaded from the [latest release](https://github.com/dfinity/internet-identity/releases/latest), see [`icp.json`](./icp.json)).
+- `internet_identity`: The production version of Internet Identity (downloaded from the [latest release](https://github.com/dfinity/internet-identity/releases/latest), see [`icp.yaml`](./icp.yaml)).
 - `webapp`: A tiny webapp that calls out to the `internet_identity` canister for authentication, and that then calls the `whoami` canister (see below) to show that the identity is valid. You'll find the source of the webapp in [`index.html`](./webapp/index.html) and [`index.ts`](./webapp/index.ts).
 - `whoami`: A simple canister that checks that calls are authenticated, and that returns the "principal of the caller". The implementation is terribly simple:
   ```motoko
@@ -42,26 +42,18 @@ If the IC actually lets the call (request) through to the `whoami` canister, it 
 
 ### Adding Internet Identity to your Local Project
 
-This section explains how to add Internet Identity to your (local) project. Add the following snippet to the `canisters` array in your `icp.json` file (see full example [here](https://github.com/dfinity/internet-identity/blob/main/demos/using-dev-build/icp.json)):
+This section explains how to add Internet Identity to your (local) project. Add the following snippet to the `canisters` list in your `icp.yaml` file (see full example [here](https://github.com/dfinity/internet-identity/blob/main/demos/using-dev-build/icp.yaml)):
 
-```json
-{
-  "name": "internet_identity",
-  "type": "custom",
-  "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz",
-  "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
-  "remote": {
-    "id": {
-      "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
-    }
-  }
-}
+```yaml
+- name: internet_identity
+  build:
+    steps:
+      - type: pre-built
+        url: https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz
+  init_args: "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})"
 ```
 
-The `remote` property makes sure that your project will _not_ create a copy of Internet Identity on the IC when deploying to production.
-
-> Note: The wasm URL points to the production build of Internet Identity. Captcha is disabled via the `init_arg` in `icp.json` to make local test automation easy.
+> Note: The wasm URL points to the production build of Internet Identity. Captcha is disabled via the `init_args` in `icp.yaml` to make local test automation easy.
 
 ### Using the Auth-Client Library To Log In With Internet Identity
 
@@ -107,7 +99,7 @@ A detailed description of what happens behind the scenes is available in the [cl
 
 Let's now use those canisters.
 
-In order to talk to those canisters (for instance to view the webapp in your browser) you need to figure the ID of each canister and then use an URL of the form `https://localhost:4943/?canisterId=<canister ID>` (where `4943` is the port used by `icp` to proxy calls to the replica; that port is usually specified in the `icp.json`). You can find the canister IDs in the output of the `icp` command, or by checking `icp-cli`'s "internal" (read: non-documented) state:
+In order to talk to those canisters (for instance to view the webapp in your browser) you need to figure the ID of each canister and then use an URL of the form `https://localhost:4943/?canisterId=<canister ID>` (where `4943` is the port used by `icp` to proxy calls to the replica; that port is usually specified in the `icp.yaml`). You can find the canister IDs in the output of the `icp` command, or by checking `icp-cli`'s "internal" (read: non-documented) state:
 
 ```
 ~/internet-identity/demos/using-dev-build$ cat .icp/cache/mappings/local.ids.json
@@ -145,4 +137,4 @@ Run `npm run test` to run browser tests against the `internet_identity` canister
 
 ## More Information
 
-For more information, check the [`icp.json`](./icp.json) file, the [Genesis talk on Internet Identity](https://youtu.be/oxEr8UzGeBo) and the [Internet Computer documentation](https://internetcomputer.org/).
+For more information, check the [`icp.yaml`](./icp.yaml) file, the [Genesis talk on Internet Identity](https://youtu.be/oxEr8UzGeBo) and the [Internet Computer documentation](https://internetcomputer.org/).
