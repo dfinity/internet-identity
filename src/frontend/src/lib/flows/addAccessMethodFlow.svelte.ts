@@ -1,11 +1,17 @@
 import { frontendCanisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
-import { decodeJWT, requestJWT, selectAuthScopes } from "$lib/utils/openID";
+import {
+  OpenIdCredentialAlreadyLinkedHereError,
+  decodeJWT,
+  requestJWT,
+  selectAuthScopes,
+} from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
-import { throwCanisterError } from "$lib/utils/utils";
+import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import type {
   AuthnMethodData,
   OpenIdCredential,
+  OpenIdCredentialAddError,
   OpenIdConfig,
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
@@ -51,9 +57,30 @@ export class AddAccessMethodFlow {
       );
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
-      await actor
-        .openid_credential_add(identityNumber, jwt, salt)
-        .then(throwCanisterError);
+      try {
+        await actor
+          .openid_credential_add(identityNumber, jwt, salt)
+          .then(throwCanisterError);
+      } catch (err) {
+        // Specialize the generic "already registered to another identity"
+        // error: if the credential's (iss, sub, aud) is already attached
+        // to *this* identity, tell the user that specifically instead of
+        // implying another identity has it.
+        if (
+          isCanisterError<OpenIdCredentialAddError>(err) &&
+          err.type === "OpenIdCredentialAlreadyRegistered"
+        ) {
+          const info = await actor.get_anchor_info(identityNumber);
+          const linkedHere =
+            info.openid_credentials[0]?.some(
+              (c) => c.iss === iss && c.sub === sub && c.aud === aud,
+            ) ?? false;
+          if (linkedHere) {
+            throw new OpenIdCredentialAlreadyLinkedHereError();
+          }
+        }
+        throw err;
+      }
 
       const metadata: MetadataMapV2 = [];
       if (name !== undefined) {

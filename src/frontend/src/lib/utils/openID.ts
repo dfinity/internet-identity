@@ -95,6 +95,20 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
+ * Raised instead of the generic `OpenIdCredentialAlreadyRegistered` canister
+ * error when the `(iss, sub, aud)` the user is trying to link is already
+ * attached to the identity they're currently signed into. The UI shows a
+ * more specific message ("…already linked to *this* identity") instead of
+ * the generic "…linked to another identity" which would be misleading.
+ */
+export class OpenIdCredentialAlreadyLinkedHereError extends Error {
+  constructor() {
+    super("OpenID credential is already linked to this identity");
+    this.name = "OpenIdCredentialAlreadyLinkedHereError";
+  }
+}
+
+/**
  * Create JWT request redirect flow URL
  * @param config of the OpenID provider
  * @param options for the JWT request

@@ -11,7 +11,10 @@ import type {
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
-import { isOpenIdCancelError } from "$lib/utils/openID";
+import {
+  OpenIdCredentialAlreadyLinkedHereError,
+  isOpenIdCancelError,
+} from "$lib/utils/openID";
 import {
   AuthenticationV2Events,
   authenticationV2Funnel,
@@ -24,6 +27,15 @@ export const handleError = (error: unknown) => {
       title: "Operation canceled",
       description:
         "The interaction was canceled or timed out. Please try again.",
+    });
+    return;
+  }
+
+  // Specialization of the generic `OpenIdCredentialAlreadyRegistered` error
+  // below: the credential is already on THIS identity, not some other one.
+  if (error instanceof OpenIdCredentialAlreadyLinkedHereError) {
+    toaster.error({
+      title: "This account is already linked to this identity",
     });
     return;
   }
