@@ -45,7 +45,8 @@ If the IC actually lets the call (request) through to the `whoami` canister, it 
 This section explains how to add Internet Identity to your (local) project. Add the following snippet to the `canisters` array in your `icp.json` file (see full example [here](https://github.com/dfinity/internet-identity/blob/main/demos/using-dev-build/icp.json)):
 
 ```json
-"internet_identity": {
+{
+  "name": "internet_identity",
   "type": "custom",
   "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
   "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz",

@@ -59,7 +59,7 @@ jobs:
         run: shasum -a 256 ./internet_identity_backend.wasm.gz
 
       - name: Install icp-cli
-        run: npm install -g @icp-sdk/icp-cli
+        run: npm install -g @icp-sdk/icp-cli@$(jq -r '.["icp-cli"]' icp.json)
 
       - name: "Install key"
         env:

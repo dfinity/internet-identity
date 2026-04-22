@@ -21,15 +21,15 @@ jobs:
           current_icp_cli_release=$(jq -r '."icp-cli"' < icp.json)
           echo "current icp-cli release '$current_icp_cli_release'"
 
-          latest_icp_cli_release=$(curl -sSL https://api.github.com/repos/dfinity/icp-cli/releases/latest | jq .tag_name -r)
+          latest_icp_cli_release=$(curl -sSL https://api.github.com/repos/dfinity/icp-cli/releases/latest | jq -r '.tag_name | sub("^v"; "")')
           echo "latest icp-cli release '$latest_icp_cli_release'"
 
           if [ "$current_icp_cli_release" != "$latest_icp_cli_release" ]
           then
             echo icp-cli needs an update
-            sed -i -e \
-              "s/$current_icp_cli_release/$latest_icp_cli_release/g" \
-              "icp.json"
+            tmp_icp_json=$(mktemp)
+            jq --arg version "$latest_icp_cli_release" '.["icp-cli"] = $version' icp.json > "$tmp_icp_json"
+            mv "$tmp_icp_json" icp.json
             echo "updated=1" >> "$GITHUB_OUTPUT"
           else
             echo "updated=0" >> "$GITHUB_OUTPUT"

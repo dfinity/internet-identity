@@ -89,14 +89,14 @@ done
 
 
 ICP_NETWORK="${ICP_NETWORK:-local}"
-II_CANISTER_ID="${II_CANISTER_ID:-$(icp canister id internet_identity)}"
+II_CANISTER_ID="${II_CANISTER_ID:-$(icp canister status internet_identity --id-only)}"
 ISSUER_CANISTER="${ISSUER_CANISTER:-issuer}"
-ISSUER_CANISTER_ID=$(icp canister id "$ISSUER_CANISTER")
+ISSUER_CANISTER_ID=$(icp canister status "$ISSUER_CANISTER" --id-only)
 DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.icp0.io"
 ISSUER_DERIVATION_ORIGIN="${ISSUER_DERIVATION_ORIGIN:-$DEFAULT_DERIVATION_ORIGIN}"
 ISSUER_FRONTEND_HOSTNAME="${ISSUER_FRONTEND_HOSTNAME:-$ISSUER_DERIVATION_ORIGIN}"
 
-echo "Using DFX network: $ICP_NETWORK" >&2
+echo "Using ICP network: $ICP_NETWORK" >&2
 
 # At the time of writing icp-cli outputs incorrect JSON with icp network ping (commas between object
 # entries are missing).
@@ -123,5 +123,5 @@ then
     WALLET_ARG+=( "--wallet" "$WALLET")
 fi
 
-icp canister call "${WALLET_ARG[@]}" --network "$ICP_NETWORK" "$ISSUER_CANISTER" configure \
+icp canister call "${WALLET_ARG[@]}" -e "$ICP_NETWORK" "$ISSUER_CANISTER" configure \
     '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = opt vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'
