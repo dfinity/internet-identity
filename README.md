@@ -43,12 +43,13 @@ This section gives an overview of Internet Identity's architecture, instructions
 
 ### Local Replica
 
-Use the Internet Identity canister in your local dfx project by adding the following code snippet to your `dfx.json` file:
+Use the Internet Identity canister in your local icp-cli project by adding the following code snippet to your `icp.json` file:
 
 ```json
 {
-  "canisters": {
-    "internet_identity": {
+  "canisters": [
+    {
+      "name": "internet_identity",
       "type": "custom",
       "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2025-04-04-v3/internet_identity.did",
       "wasm": "https://github.com/dfinity/internet-identity/releases/download/release-2025-04-04-v3/internet_identity_production.wasm.gz",
@@ -60,11 +61,11 @@ Use the Internet Identity canister in your local dfx project by adding the follo
       },
       "frontend": {}
     }
-  }
+  ]
 }
 ```
 
-To deploy, run `dfx deploy`.
+To deploy, run `icp deploy`.
 
 To access Internet Identity or configure it for your dapp, use one of the following URLs:
 
@@ -129,7 +130,7 @@ Internet Identity requires data in stable memory to have a specific layout in or
 
 If on upgrade II traps with the message `stable memory layout version ... is no longer supported` then the stable memory layout has changed and is no longer compatible.
 
-The easiest way to address this is to reinstall the canister (thus wiping stable memory). A canister can be reinstalled by executing `dfx deploy <canister> --mode reinstall`.
+The easiest way to address this is to reinstall the canister (thus wiping stable memory). A canister can be reinstalled by executing `icp deploy <canister> --mode reinstall`.
 
 ## Contributing
 

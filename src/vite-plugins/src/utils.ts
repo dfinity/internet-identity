@@ -4,23 +4,17 @@ import { execSync } from "child_process";
 import type { IncomingMessage, ServerResponse } from "http";
 import { request } from "undici";
 
-/**
- * Read the replica port from dfx's local state
- */
 export const readReplicaPort = (): string => {
-  const stdout = execSync("dfx info webserver-port");
+  const stdout = execSync("icp info webserver-port");
   return stdout.toString().trim();
 };
 
-/**
- * Read a canister ID from dfx's local state
- */
 export const readCanisterId = ({
   canisterName,
 }: {
   canisterName: string;
 }): string => {
-  const command = `dfx canister id ${canisterName}`;
+  const command = `icp canister status ${canisterName} --id-only`;
   try {
     const stdout = execSync(command);
     return stdout.toString().trim();
@@ -31,9 +25,8 @@ export const readCanisterId = ({
   }
 };
 
-/** Get the http host of a running replica */
 export const getReplicaHost = (): string => {
-  const command = `dfx info webserver-port`;
+  const command = `icp info webserver-port`;
   try {
     const stdout = execSync(command);
     const port = stdout.toString().trim();

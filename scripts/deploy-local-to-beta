@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Deploy LOCALLY-BUILT artifacts to a staging canister. Builds the wasm.gz
 # files with `scripts/build` (on-demand, per `-rfe`/`-rbe`) and runs the
-# resulting artifacts through `dfx canister install`.
+# resulting artifacts through `icp canister install`.
 
 print_usage() {
     cat <<EOF
@@ -101,14 +101,14 @@ if [ "$DEPLOY_BE" = true ]; then
     BE_WASM="$ROOT_DIR/internet_identity.wasm.gz"
     echo ""
     echo "=== Deploying backend to $BE_ID ==="
-    run_dfx_install "$BE_ID" "$BE_WASM" "$(build_be_install_arg)"
+    run_icp_install "$BE_ID" "$BE_WASM" "$(build_be_install_arg)"
 fi
 
 if [ "$DEPLOY_FE" = true ]; then
     FE_WASM="$ROOT_DIR/internet_identity_frontend.wasm.gz"
     echo ""
     echo "=== Deploying frontend to $FE_ID ==="
-    run_dfx_install "$FE_ID" "$FE_WASM" "$(build_fe_install_arg)"
+    run_icp_install "$FE_ID" "$FE_WASM" "$(build_fe_install_arg)"
 fi
 
 echo ""

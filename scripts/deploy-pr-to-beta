@@ -248,7 +248,7 @@ fi
 if [ "$DEPLOY_BE" = true ]; then
     echo ""
     echo "=== Deploying backend (PR #$PR_NUMBER, run $RUN_ID) to $BE_ID ==="
-    run_dfx_install \
+    run_icp_install \
         "$BE_ID" \
         "$ARTIFACT_DIR/internet_identity_backend.wasm.gz" \
         "$(build_be_install_arg)"
@@ -257,7 +257,7 @@ fi
 if [ "$DEPLOY_FE" = true ]; then
     echo ""
     echo "=== Deploying frontend (PR #$PR_NUMBER, run $RUN_ID) to $FE_ID ==="
-    run_dfx_install \
+    run_icp_install \
         "$FE_ID" \
         "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz" \
         "$(build_fe_install_arg)"
