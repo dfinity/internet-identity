@@ -201,7 +201,7 @@ describe("ssoDiscovery", () => {
       );
 
       await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
-        "ii-openid-configuration missing required field: client_id",
+        /ii-openid-configuration.*client_id/,
       );
     });
 
@@ -213,7 +213,7 @@ describe("ssoDiscovery", () => {
       );
 
       await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
-        "ii-openid-configuration missing required field: openid_configuration",
+        /ii-openid-configuration.*openid_configuration/,
       );
     });
 
@@ -267,7 +267,7 @@ describe("ssoDiscovery", () => {
         );
 
       await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
-        "Provider discovery missing required field: issuer",
+        /Provider discovery.*issuer/,
       );
     });
 
@@ -401,7 +401,7 @@ describe("ssoDiscovery", () => {
       );
 
       await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
-        "ii-openid-configuration response is not a valid object",
+        /ii-openid-configuration.*expected object/,
       );
     });
 
@@ -415,7 +415,7 @@ describe("ssoDiscovery", () => {
         );
 
       await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
-        "Provider discovery document is not a valid object",
+        /Provider discovery.*expected object/,
       );
     });
   });

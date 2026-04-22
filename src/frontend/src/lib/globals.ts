@@ -42,13 +42,6 @@ const backendCanisterConfigIDL = IDL.Record({
       }),
     ),
   ),
-  // `oidc_configs` is deliberately omitted from the frontend decode — the
-  // backend still serves it in `InternetIdentitySynchronizedConfig` for any
-  // future consumer, but the current SSO flow is user-initiated: the SSO
-  // screen calls `add_discoverable_oidc_config` directly on submit and
-  // relies on the backend's canary allowlist as the gate, not a pre-baked
-  // FE-visible list. Candid is forward-compatible, so the extra wire field
-  // is ignored here.
 });
 
 // Types for above IDL definition

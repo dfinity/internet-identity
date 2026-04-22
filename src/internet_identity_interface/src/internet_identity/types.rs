@@ -237,7 +237,6 @@ pub struct InternetIdentityFrontendArgs {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.

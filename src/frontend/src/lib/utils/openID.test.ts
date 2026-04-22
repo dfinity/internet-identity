@@ -11,7 +11,6 @@ import { backendCanisterConfig } from "$lib/globals";
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
     openid_configs: [],
-    oidc_configs: [],
   },
 }));
 
@@ -238,28 +237,31 @@ describe("findConfig", () => {
 });
 
 describe("selectAuthScopes", () => {
-  it("returns defaults when scopes_supported is undefined", () => {
+  it("returns openid + profile + email when scopes_supported is undefined", () => {
+    // `openid` is required by the OIDC spec, so we always ask for it.
     expect(selectAuthScopes(undefined)).toEqual(["openid", "profile", "email"]);
   });
 
-  it("returns intersection of defaults and advertised scopes", () => {
-    expect(selectAuthScopes(["openid", "email", "offline_access"])).toEqual([
+  it("always includes openid even if the provider omits it from scopes_supported", () => {
+    // Some providers don't advertise `openid` in their /.well-known/openid-
+    // configuration scopes_supported list; the spec still requires it.
+    expect(selectAuthScopes(["email", "offline_access"])).toEqual([
       "openid",
       "email",
     ]);
   });
 
-  it("falls back to defaults when filter leaves empty list", () => {
-    // Without a fallback the `scope` query param sent to `/authorize` would be
-    // empty, which providers reject.
-    expect(selectAuthScopes(["custom_scope_one", "custom_scope_two"])).toEqual([
-      "openid",
-      "profile",
-      "email",
-    ]);
+  it("keeps optional scopes only if advertised", () => {
+    expect(
+      selectAuthScopes(["openid", "profile", "email", "offline_access"]),
+    ).toEqual(["openid", "profile", "email"]);
   });
 
-  it("falls back to defaults when scopes_supported is empty", () => {
-    expect(selectAuthScopes([])).toEqual(["openid", "profile", "email"]);
+  it("returns just openid when no optional scopes are advertised", () => {
+    expect(selectAuthScopes(["custom_scope_one"])).toEqual(["openid"]);
+  });
+
+  it("returns just openid when scopes_supported is empty", () => {
+    expect(selectAuthScopes([])).toEqual(["openid"]);
   });
 });

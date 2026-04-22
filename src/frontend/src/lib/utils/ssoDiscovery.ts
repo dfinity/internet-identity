@@ -30,18 +30,33 @@
  *   don't leak armed timers.
  */
 
-/** Subset of fields from a standard OIDC discovery document we use. */
-export interface OidcDiscoveryDocument {
-  issuer: string;
-  authorization_endpoint: string;
-  scopes_supported?: string[];
-}
+import { z } from "zod";
+
+/**
+ * Subset of fields from a standard OIDC discovery document we use. The
+ * schema is the single source of truth; the exported type is derived from
+ * it so anything reading from this module can't accidentally skip
+ * validation.
+ */
+const OidcDiscoveryDocumentSchema = z.object({
+  issuer: z.string().min(1),
+  authorization_endpoint: z.string().min(1),
+  scopes_supported: z.array(z.string()).optional(),
+});
+export type OidcDiscoveryDocument = z.infer<typeof OidcDiscoveryDocumentSchema>;
 
 /** Result of the two-hop SSO discovery chain. */
 export interface SsoDiscoveryResult {
   clientId: string;
   discovery: OidcDiscoveryDocument;
 }
+
+/** Response shape of `https://{domain}/.well-known/ii-openid-configuration`. */
+const IIOpenIdConfigurationSchema = z.object({
+  client_id: z.string().min(1),
+  openid_configuration: z.string().min(1),
+});
+type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
 
 /**
  * Raised when hop 1 (`/.well-known/ii-openid-configuration` on the user's
@@ -66,27 +81,15 @@ export class DomainNotConfiguredError extends Error {
   }
 }
 
-/** Response shape of the `/.well-known/ii-openid-configuration` endpoint. */
-interface IIOpenIdConfiguration {
-  client_id: string;
-  openid_configuration: string;
-}
-
 /**
  * OIDC provider domains we're willing to complete the second hop against.
  *
- * This is a defense-in-depth check: even if an organization's
- * `ii-openid-configuration` is tampered with, we refuse to redirect users
- * into an auth flow on a host we've never heard of. Entries must be either
- * mainstream OIDC providers or known SaaS identity platforms.
+ * Defense-in-depth: even if an organization's `ii-openid-configuration` is
+ * tampered with, we refuse to redirect users into an auth flow on a host
+ * we've never heard of. For the current canary (only `dfinity.org` is on
+ * the backend allowlist) the only real provider is `dfinity.okta.com`.
  */
-const TRUSTED_PROVIDER_DOMAINS = new Set([
-  "accounts.google.com",
-  "appleid.apple.com",
-  "login.microsoftonline.com",
-  "dfinity.okta.com",
-  "login.dfinity.org",
-]);
+const TRUSTED_PROVIDER_DOMAINS = new Set(["dfinity.okta.com"]);
 
 const II_CONFIG_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const PROVIDER_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -173,30 +176,33 @@ const validateProviderUrl = (url: string): URL => {
   return parsed;
 };
 
+/** Zod parse with a prefixed error message for easier user-visible output. */
+const parseOrThrow = <T>(
+  schema: z.ZodSchema<T>,
+  data: unknown,
+  context: string,
+): T => {
+  const result = schema.safeParse(data);
+  if (result.success) {
+    return result.data;
+  }
+  const first = result.error.issues[0];
+  const path =
+    first !== undefined && first.path.length > 0
+      ? first.path.join(".")
+      : "(root)";
+  throw new Error(`${context}: ${first?.message ?? "invalid"} at ${path}`);
+};
+
 /** Validate the `ii-openid-configuration` response structure. */
 const validateIIConfig = (data: unknown): IIOpenIdConfiguration => {
-  if (typeof data !== "object" || data === null) {
-    throw new Error("ii-openid-configuration response is not a valid object");
-  }
-  const obj = data as Record<string, unknown>;
-  if (typeof obj.client_id !== "string" || obj.client_id.length === 0) {
-    throw new Error(
-      "ii-openid-configuration missing required field: client_id",
-    );
-  }
-  if (
-    typeof obj.openid_configuration !== "string" ||
-    obj.openid_configuration.length === 0
-  ) {
-    throw new Error(
-      "ii-openid-configuration missing required field: openid_configuration",
-    );
-  }
-  validateProviderUrl(obj.openid_configuration);
-  return {
-    client_id: obj.client_id,
-    openid_configuration: obj.openid_configuration,
-  };
+  const parsed = parseOrThrow(
+    IIOpenIdConfigurationSchema,
+    data,
+    "ii-openid-configuration",
+  );
+  validateProviderUrl(parsed.openid_configuration);
+  return parsed;
 };
 
 /** Validate an OIDC discovery document from the provider. */
@@ -204,21 +210,11 @@ const validateProviderDiscovery = (
   data: unknown,
   expectedHostname: string,
 ): OidcDiscoveryDocument => {
-  if (typeof data !== "object" || data === null) {
-    throw new Error("Provider discovery document is not a valid object");
-  }
-  const doc = data as Record<string, unknown>;
-  if (typeof doc.issuer !== "string" || doc.issuer.length === 0) {
-    throw new Error("Provider discovery missing required field: issuer");
-  }
-  if (
-    typeof doc.authorization_endpoint !== "string" ||
-    doc.authorization_endpoint.length === 0
-  ) {
-    throw new Error(
-      "Provider discovery missing required field: authorization_endpoint",
-    );
-  }
+  const doc = parseOrThrow(
+    OidcDiscoveryDocumentSchema,
+    data,
+    "Provider discovery",
+  );
 
   // Issuer hostname must match the expected provider host exactly or as a
   // true subdomain — this blocks look-alike attacks.
@@ -248,15 +244,8 @@ const validateProviderDiscovery = (
     );
   }
 
-  return {
-    issuer: doc.issuer,
-    authorization_endpoint: doc.authorization_endpoint,
-    scopes_supported: Array.isArray(doc.scopes_supported)
-      ? doc.scopes_supported.filter(
-          (s: unknown): s is string => typeof s === "string",
-        )
-      : undefined,
-  };
+  // zod already validated scopes_supported as `string[]` (or undefined).
+  return doc;
 };
 
 /**

@@ -112,6 +112,9 @@ msgstr "Aangezien u momenteel bent ingelogd met dit account, wordt u uitgelogd."
 msgid "As you are currently signed in with this passkey, you will be signed out."
 msgstr "Aangezien u momenteel bent ingelogd met deze passkey, wordt u uitgelogd."
 
+msgid "Attribute sharing failed"
+msgstr ""
+
 msgid "Authenticating..."
 msgstr "Authenticeren..."
 
@@ -160,14 +163,14 @@ msgstr "Uw bestelling controleren"
 msgid "Choose an account"
 msgstr "Kies een account"
 
-msgid "Choose an authentication method to continue"
-msgstr ""
-
 msgid "choose language to continue"
 msgstr "kies taal om door te gaan"
 
 msgid "Choose method"
 msgstr "Kies methode"
+
+msgid "Choose method to continue"
+msgstr ""
 
 msgid "Clear all"
 msgstr "Alles wissen"
@@ -386,6 +389,9 @@ msgstr "Hoe verhoudt Internet Identity zich tot andere Web3-authenticatietools?"
 msgid "How to stay secure"
 msgstr "Veilig blijven"
 
+msgid "HTTP {0}"
+msgstr ""
+
 msgid "I Acknowledge"
 msgstr "Ik begrijp het"
 
@@ -484,6 +490,9 @@ msgstr "Ongeldige herstelzin"
 
 msgid "Invalid request"
 msgstr "Ongeldige aanvraag"
+
+msgid "invalid response"
+msgstr ""
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Wordt mijn Face ID of vingerafdruk opgeslagen in Internet Identity?"
@@ -607,6 +616,9 @@ msgstr "Accountnaam"
 
 msgid "Name your identity"
 msgstr "Geef uw identiteit een naam"
+
+msgid "network error"
+msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
@@ -876,6 +888,9 @@ msgstr "Er klopt iets niet!"
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr ""
 
+msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
+msgstr ""
+
 msgid "Source code"
 msgstr "Broncode"
 
@@ -964,6 +979,9 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Deze app is overgegaan naar de nieuwe Internet Identity"
 
 msgid "This browser is not supported."
+msgstr ""
+
+msgid "This domain isn't correctly configured for Internet Identity ({detail})."
 msgstr ""
 
 msgid "This identity has already been upgraded to the new experience."

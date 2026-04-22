@@ -112,6 +112,9 @@ msgstr "As you are currently signed in with this Account, you will be signed out
 msgid "As you are currently signed in with this passkey, you will be signed out."
 msgstr "As you are currently signed in with this passkey, you will be signed out."
 
+msgid "Attribute sharing failed"
+msgstr "Attribute sharing failed"
+
 msgid "Authenticating..."
 msgstr "Authenticating..."
 
@@ -160,14 +163,14 @@ msgstr "Checking your order"
 msgid "Choose an account"
 msgstr "Choose an account"
 
-msgid "Choose an authentication method to continue"
-msgstr "Choose an authentication method to continue"
-
 msgid "choose language to continue"
 msgstr "choose language to continue"
 
 msgid "Choose method"
 msgstr "Choose method"
+
+msgid "Choose method to continue"
+msgstr "Choose method to continue"
 
 msgid "Clear all"
 msgstr "Clear all"
@@ -386,6 +389,9 @@ msgstr "How does Internet Identity compare to other Web3 authentication tools?"
 msgid "How to stay secure"
 msgstr "How to stay secure"
 
+msgid "HTTP {0}"
+msgstr "HTTP {0}"
+
 msgid "I Acknowledge"
 msgstr "I Acknowledge"
 
@@ -484,6 +490,9 @@ msgstr "Invalid recovery phrase"
 
 msgid "Invalid request"
 msgstr "Invalid request"
+
+msgid "invalid response"
+msgstr "invalid response"
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Is my Face ID or Fingerprint stored in Internet Identity?"
@@ -607,6 +616,9 @@ msgstr "Name account"
 
 msgid "Name your identity"
 msgstr "Name your identity"
+
+msgid "network error"
+msgstr "network error"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
@@ -876,6 +888,9 @@ msgstr "Something is wrong!"
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 
+msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
+msgstr "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
+
 msgid "Source code"
 msgstr "Source code"
 
@@ -965,6 +980,9 @@ msgstr "This app has moved to the new Internet Identity"
 
 msgid "This browser is not supported."
 msgstr "This browser is not supported."
+
+msgid "This domain isn't correctly configured for Internet Identity ({detail})."
+msgstr "This domain isn't correctly configured for Internet Identity ({detail})."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "This identity has already been upgraded to the new experience."

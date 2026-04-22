@@ -112,6 +112,9 @@ msgstr "Оскільки ви наразі увійшли в цей обліко
 msgid "As you are currently signed in with this passkey, you will be signed out."
 msgstr "Оскільки ви наразі увійшли з цим ключем доступу, вас буде виведено з нього."
 
+msgid "Attribute sharing failed"
+msgstr ""
+
 msgid "Authenticating..."
 msgstr "Автентифікація..."
 
@@ -160,14 +163,14 @@ msgstr "Перевірка вашого замовлення"
 msgid "Choose an account"
 msgstr "Виберіть обліковий запис"
 
-msgid "Choose an authentication method to continue"
-msgstr ""
-
 msgid "choose language to continue"
 msgstr "виберіть мову для продовження"
 
 msgid "Choose method"
 msgstr "Виберіть метод"
+
+msgid "Choose method to continue"
+msgstr ""
 
 msgid "Clear all"
 msgstr "Очистити все"
@@ -386,6 +389,9 @@ msgstr "Чим Internet Identity відрізняється від інших і
 msgid "How to stay secure"
 msgstr "Як залишатися в безпеці"
 
+msgid "HTTP {0}"
+msgstr ""
+
 msgid "I Acknowledge"
 msgstr "Я підтверджую"
 
@@ -484,6 +490,9 @@ msgstr "Неправильна фраза відновлення"
 
 msgid "Invalid request"
 msgstr "Недійсний запит"
+
+msgid "invalid response"
+msgstr ""
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Чи зберігаються мій Face ID або відбиток пальця в Internet Identity?"
@@ -607,6 +616,9 @@ msgstr "Назвати обліковий запис"
 
 msgid "Name your identity"
 msgstr "Назвіть свій ідентифікатор"
+
+msgid "network error"
+msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Жодні дані про те, в які застосунки ви входите через Internet Identity, не передаються Google, Microsoft чи Apple."
@@ -876,6 +888,9 @@ msgstr "Щось не так!"
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr ""
 
+msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
+msgstr ""
+
 msgid "Source code"
 msgstr "Вихідний код"
 
@@ -964,6 +979,9 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Цей застосунок перейшов до нової версії Internet Identity"
 
 msgid "This browser is not supported."
+msgstr ""
+
+msgid "This domain isn't correctly configured for Internet Identity ({detail})."
 msgstr ""
 
 msgid "This identity has already been upgraded to the new experience."

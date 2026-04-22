@@ -275,17 +275,18 @@ export const findConfig = (
 
 /**
  * Pick the subset of OIDC scopes we actually request from what the provider
- * advertises. If nothing advertised (or the intersection is empty after
- * filtering), fall back to the canonical defaults — sending an empty `scope`
- * to the authorize endpoint would cause the request to fail.
+ * advertises. `openid` is required by the OIDC spec — nothing works without
+ * it — so we always include it regardless of what the provider says it
+ * supports. The other defaults (`profile`, `email`) are only included if the
+ * provider advertises them.
  */
 export const selectAuthScopes = (scopesSupported?: string[]): string[] => {
-  const defaults = ["openid", "profile", "email"];
+  const optional = ["profile", "email"];
   if (scopesSupported === undefined) {
-    return defaults;
+    return ["openid", ...optional];
   }
-  const filtered = scopesSupported.filter((s) => defaults.includes(s));
-  return filtered.length > 0 ? filtered : defaults;
+  const filtered = scopesSupported.filter((s) => optional.includes(s));
+  return ["openid", ...filtered];
 };
 
 /**

@@ -16,8 +16,8 @@ use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt, DeviceData,
-    DiscoverableOidcConfig, FrontendHostname, InternetIdentityInit,
-    InternetIdentitySynchronizedConfig, MetadataEntryV2, OpenIdConfig,
+    FrontendHostname, InternetIdentityInit, InternetIdentitySynchronizedConfig, MetadataEntryV2,
+    OpenIdConfig,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -925,7 +925,6 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         decoded_config,
         InternetIdentitySynchronizedConfig {
             openid_configs: Some(openid_configs),
-            oidc_configs: None,
         }
     );
 
@@ -934,65 +933,6 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
     let result = verify_response_certification(&env, canister_id, request, http_response, 2);
     assert_eq!(result.verification_version, 2);
 
-    Ok(())
-}
-
-/// Regression: `add_discoverable_oidc_config` must update `/.config.did.bin`
-/// so the frontend sees the new domain without requiring a canister upgrade.
-/// Earlier, the certified asset only got rebuilt in `initialize()`.
-#[test]
-fn add_discoverable_oidc_config_refreshes_config_asset() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-
-    // Baseline: no oidc_configs before the update call.
-    let before: InternetIdentitySynchronizedConfig = candid::decode_one(
-        &http_request(
-            &env,
-            canister_id,
-            &HttpRequest {
-                method: "GET".to_string(),
-                url: "/.config.did.bin".to_string(),
-                headers: vec![],
-                body: ByteBuf::new(),
-                certificate_version: Some(2),
-            },
-        )?
-        .body,
-    )
-    .expect("decode baseline");
-    assert_eq!(before.oidc_configs, None);
-
-    api::add_discoverable_oidc_config(
-        &env,
-        canister_id,
-        DiscoverableOidcConfig {
-            discovery_domain: "dfinity.org".to_string(),
-        },
-    )?;
-
-    // The asset must reflect the new registration immediately.
-    let after: InternetIdentitySynchronizedConfig = candid::decode_one(
-        &http_request(
-            &env,
-            canister_id,
-            &HttpRequest {
-                method: "GET".to_string(),
-                url: "/.config.did.bin".to_string(),
-                headers: vec![],
-                body: ByteBuf::new(),
-                certificate_version: Some(2),
-            },
-        )?
-        .body,
-    )
-    .expect("decode after");
-    assert_eq!(
-        after.oidc_configs,
-        Some(vec![DiscoverableOidcConfig {
-            discovery_domain: "dfinity.org".to_string(),
-        }])
-    );
     Ok(())
 }
 

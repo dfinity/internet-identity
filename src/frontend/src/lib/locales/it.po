@@ -112,6 +112,9 @@ msgstr "Poiché sei attualmente connesso con questo account, verrai disconnesso.
 msgid "As you are currently signed in with this passkey, you will be signed out."
 msgstr "Poiché sei attualmente connesso con questa passkey, verrai disconnesso."
 
+msgid "Attribute sharing failed"
+msgstr ""
+
 msgid "Authenticating..."
 msgstr "Autenticazione in corso..."
 
@@ -160,14 +163,14 @@ msgstr "Verifica del tuo ordine in corso"
 msgid "Choose an account"
 msgstr "Scegli un account"
 
-msgid "Choose an authentication method to continue"
-msgstr ""
-
 msgid "choose language to continue"
 msgstr "scegli la lingua per continuare"
 
 msgid "Choose method"
 msgstr "Scegli il metodo"
+
+msgid "Choose method to continue"
+msgstr ""
 
 msgid "Clear all"
 msgstr "Cancella tutto"
@@ -386,6 +389,9 @@ msgstr "Qual è la differenza tra Internet Identity e altri strumenti di autenti
 msgid "How to stay secure"
 msgstr "Come restare al sicuro"
 
+msgid "HTTP {0}"
+msgstr ""
+
 msgid "I Acknowledge"
 msgstr "Prendo atto"
 
@@ -484,6 +490,9 @@ msgstr "Frase di recupero non valida"
 
 msgid "Invalid request"
 msgstr "Richiesta non valida"
+
+msgid "invalid response"
+msgstr ""
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Il mio Face ID o la mia impronta digitale sono memorizzati in Internet Identity?"
@@ -607,6 +616,9 @@ msgstr "Nome account"
 
 msgid "Name your identity"
 msgstr "Dai un nome alla tua identità"
+
+msgid "network error"
+msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Nessun dato relativo alle applicazioni a cui accedi con Internet Identity viene condiviso con Google, Microsoft o Apple."
@@ -876,6 +888,9 @@ msgstr "Qualcosa non è corretto!"
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr ""
 
+msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
+msgstr ""
+
 msgid "Source code"
 msgstr "Codice sorgente"
 
@@ -964,6 +979,9 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Questa app è stata spostata nella nuova Internet Identity"
 
 msgid "This browser is not supported."
+msgstr ""
+
+msgid "This domain isn't correctly configured for Internet Identity ({detail})."
 msgstr ""
 
 msgid "This identity has already been upgraded to the new experience."
