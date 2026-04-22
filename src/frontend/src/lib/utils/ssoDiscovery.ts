@@ -11,13 +11,25 @@
  * should be rejected at the UI layer; this module does not carry its own
  * domain allowlist.
  *
- * Security:
+ * Security — trust model:
+ * - The first hop is gated upstream by the backend's canary allowlist
+ *   (`ALLOWED_DISCOVERY_DOMAINS` on the canister): `add_discoverable_oidc_config`
+ *   traps for any domain an II admin hasn't approved, so by the time this
+ *   module runs, the domain has been explicitly blessed by II.
+ * - Once the first hop succeeds, whatever the domain owner publishes at
+ *   `/.well-known/ii-openid-configuration` determines the IdP for the second
+ *   hop. We don't maintain a second-hop allowlist — the org knows their own
+ *   IdP better than II does, and an attacker who can tamper with a trusted
+ *   domain's `.well-known` has already broken something more fundamental
+ *   (the canary-allowed domain itself).
+ *
+ * Security — checks we still enforce:
  * - Domain input validated (DNS format, length limits).
- * - All endpoints must use HTTPS.
- * - `openid_configuration` URL validated against a trusted-provider allowlist.
+ * - All three URLs (ii-openid-configuration, provider discovery, auth
+ *   endpoint) must be HTTPS.
  * - Provider `issuer` hostname must match `openid_configuration` hostname
- *   exactly or be a true subdomain (not `endsWith`, which would accept
- *   look-alikes like `evilaccounts.google.com` for `accounts.google.com`).
+ *   exactly or as a true subdomain (prevents a tampered provider-discovery
+ *   doc from bouncing auth off-host AFTER we've committed to a provider).
  * - Provider `authorization_endpoint` hostname must match the same.
  *
  * Rate limiting:
@@ -80,16 +92,6 @@ export class DomainNotConfiguredError extends Error {
     this.name = "DomainNotConfiguredError";
   }
 }
-
-/**
- * OIDC provider domains we're willing to complete the second hop against.
- *
- * Defense-in-depth: even if an organization's `ii-openid-configuration` is
- * tampered with, we refuse to redirect users into an auth flow on a host
- * we've never heard of. For the current canary (only `dfinity.org` is on
- * the backend allowlist) the only real provider is `dfinity.okta.com`.
- */
-const TRUSTED_PROVIDER_DOMAINS = new Set(["dfinity.okta.com"]);
 
 const II_CONFIG_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const PROVIDER_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -155,23 +157,20 @@ export const validateDomain = (domain: string): string => {
   return trimmed;
 };
 
-/** Validate a URL uses HTTPS and points to a trusted provider domain. */
+/**
+ * Validate the `openid_configuration` URL from hop 1 before we follow it.
+ *
+ * Only HTTPS is enforced here. Which IdP host the org uses is the org's
+ * decision — we inherit that trust from the backend's canary allowlist,
+ * which is what gated their ability to register in the first place. See
+ * the trust-model note at the top of this file.
+ */
 const validateProviderUrl = (url: string): URL => {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:") {
     throw new Error(
       `Provider URL must use HTTPS: ${parsed.protocol}//${parsed.hostname}`,
     );
-  }
-  let trusted = false;
-  for (const trustedDomain of TRUSTED_PROVIDER_DOMAINS) {
-    if (hostnameMatchesAllowed(parsed.hostname, trustedDomain)) {
-      trusted = true;
-      break;
-    }
-  }
-  if (!trusted) {
-    throw new Error(`Provider domain not trusted: ${parsed.hostname}`);
   }
   return parsed;
 };

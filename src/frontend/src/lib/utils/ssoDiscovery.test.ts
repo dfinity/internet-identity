@@ -234,23 +234,6 @@ describe("ssoDiscovery", () => {
       );
     });
 
-    it("rejects untrusted provider domains", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            client_id: "some-client-id",
-            openid_configuration:
-              "https://evil.example.com/.well-known/openid-configuration",
-          }),
-          { status: 200 },
-        ),
-      );
-
-      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
-        "Provider domain not trusted",
-      );
-    });
-
     it("rejects provider discovery with missing issuer", async () => {
       vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(
