@@ -229,10 +229,16 @@ impl Provider {
     }
 }
 
-/// CANARY: SSO via two-hop discovery is a proof-of-concept. Only this domain is
-/// accepted as a `discovery_domain` for now. Widen this list (or move it to
-/// canister config) once the feature exits canary.
-pub const ALLOWED_DISCOVERY_DOMAINS: &[&str] = &["dfinity.org"];
+/// CANARY: SSO via two-hop discovery is a proof-of-concept. Only these
+/// domains are accepted as a `discovery_domain` for now. Widen this list
+/// (or move it to canister config) once the feature exits canary.
+pub const ALLOWED_DISCOVERY_DOMAINS: &[&str] = &[
+    "dfinity.org",
+    // DO NOT MERGE: temporary entry for testing the two-hop flow end-to-end
+    // on staging-C from a test canister that hosts `/.well-known/ii-openid-
+    // configuration`. Must be removed before this PR lands on main.
+    "s4i6f-riaaa-aaaad-agnna-cai.icp0.io",
+];
 
 pub fn is_allowed_discovery_domain(domain: &str) -> bool {
     ALLOWED_DISCOVERY_DOMAINS

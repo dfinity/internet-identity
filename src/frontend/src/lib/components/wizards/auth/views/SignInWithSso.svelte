@@ -29,37 +29,63 @@
   let isSubmitting = $state(false);
 
   /**
-   * Map a backend/discovery error to a user-visible message. Three cases
-   * we explicitly translate:
+   * Map a backend/discovery error to a user-visible message. Tries to give
+   * the most actionable phrasing available for each distinct failure mode:
    *
-   * 1. Canary-allowlist trap from the backend's `add_discoverable_oidc_config`
-   *    → the domain is well-formed but not yet approved by II admins.
-   * 2. {@link DomainNotConfiguredError} from hop-1 discovery → the domain
-   *    owner hasn't set up `/.well-known/ii-openid-configuration` (or it's
-   *    broken). We include the HTTP status when the failure was an HTTP
-   *    error, otherwise a generic reason.
-   * 3. Anything else → surface the raw message, which should only happen
-   *    for unexpected infrastructure failures.
+   * - **Canary-allowlist trap** from `add_discoverable_oidc_config`: the
+   *   domain is well-formed but not yet approved by II admins.
+   * - **Hop 1 unreachable / HTTP error / malformed response** → wrapped in
+   *   {@link DomainNotConfiguredError}; we surface the specific reason
+   *   (HTTP status or parser detail) so a domain owner can diagnose.
+   * - **Hop 2 failures** (issuer / auth_endpoint mismatch, HTTPS, zod
+   *   parse) → pattern-matched to short human messages; falls back to the
+   *   raw error text so nothing gets silently swallowed.
    */
   const mapSubmitError = (e: unknown, domainInput: string): string => {
     if (e instanceof DomainNotConfiguredError) {
-      // Reported errors the user can act on:
-      // - HTTP error: e.g. 404 when the path doesn't exist (most common).
-      // - invalid-response: 2xx but HTML / non-JSON body (SPA fallback).
-      // - network: DNS/TLS/timeout.
-      const detail =
-        e.reason === "http-error" && e.httpStatus !== undefined
-          ? $t`HTTP ${String(e.httpStatus)}`
-          : e.reason === "invalid-response"
-            ? $t`invalid response`
-            : $t`network error`;
-      return $t`This domain isn't correctly configured for Internet Identity (${detail}).`;
+      if (e.reason === "http-error" && e.httpStatus !== undefined) {
+        return $t`${domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP ${String(e.httpStatus)}). The domain owner needs to publish it for II to sign you in.`;
+      }
+      if (e.reason === "network") {
+        return $t`Couldn't reach ${domainInput}. Check the spelling and your network, then try again.`;
+      }
+      // invalid-response: response decoded but didn't match the expected
+      // shape. The detail (zod error or "Provider URL must use HTTPS: …")
+      // is much more actionable than "invalid response".
+      if (e.detail !== undefined && e.detail.length > 0) {
+        return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed: ${e.detail}`;
+      }
+      return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed.`;
     }
     if (e instanceof Error) {
-      if (e.message.toLowerCase().includes("canary allowlist")) {
-        return $t`SSO is not available for "${domainInput}" yet.`;
+      const msg = e.message;
+      if (msg.toLowerCase().includes("canary allowlist")) {
+        return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
       }
-      return e.message;
+      // Hop-2 verification failures — keep the detail but lead with a
+      // short human summary.
+      if (msg.includes("Provider issuer hostname mismatch")) {
+        return $t`SSO provider misconfigured: issuer doesn't match the configured hostname. (${msg})`;
+      }
+      if (msg.includes("Provider authorization endpoint hostname mismatch")) {
+        return $t`SSO provider misconfigured: authorization endpoint points to a different host than the issuer. (${msg})`;
+      }
+      if (msg.includes("Provider issuer must use HTTPS")) {
+        return $t`SSO provider misconfigured: issuer URL is not HTTPS. (${msg})`;
+      }
+      if (msg.includes("Provider authorization endpoint must use HTTPS")) {
+        return $t`SSO provider misconfigured: authorization endpoint is not HTTPS. (${msg})`;
+      }
+      if (msg.startsWith("Provider discovery:")) {
+        return $t`SSO provider's discovery document is malformed: ${msg}`;
+      }
+      if (msg.startsWith("Rate limited:")) {
+        return $t`Too many recent attempts for ${domainInput}. Wait a few minutes and try again.`;
+      }
+      if (msg === "Too many concurrent SSO discovery requests") {
+        return $t`Several SSO sign-ins are in flight already. Wait a moment and try again.`;
+      }
+      return msg;
     }
     return $t`SSO sign-in failed. Please try again.`;
   };

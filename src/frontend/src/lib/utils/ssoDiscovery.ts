@@ -82,7 +82,7 @@ export class DomainNotConfiguredError extends Error {
   constructor(
     public readonly reason: "http-error" | "invalid-response" | "network",
     public readonly httpStatus?: number,
-    detail?: string,
+    public readonly detail?: string,
   ) {
     super(
       detail !== undefined
