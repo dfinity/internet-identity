@@ -144,9 +144,10 @@
       return;
     }
     const authFlow = new AuthFlow({ trackLastUsed: false });
-    const { iss, ...metadata } = decodeJWT(jwt);
+    const { iss, aud, ...metadata } = decodeJWT(jwt);
     const config = findConfig(
       iss,
+      aud,
       Object.entries(metadata).map(([key, value]) => [key, { String: value! }]),
     );
     if (config === undefined) {
