@@ -85,10 +85,12 @@
         </Tooltip>
       {/each}
       <!--
-        SSO entry is always rendered. If no domains are registered on the
-        deployment, the SignInWithSso screen will reject every input with
-        "This domain is not registered as an OIDC provider." — we still
-        surface the option so users know the mechanism exists.
+        SSO entry is always rendered. Registration is enforced on the
+        backend (via the `ALLOWED_DISCOVERY_DOMAINS` canary allowlist on
+        `add_discoverable_oidc_config`), so unregistered domains surface as
+        an error inside the SignInWithSso screen rather than being gated
+        here — we keep this option visible so users know the mechanism
+        exists.
       -->
       <Button
         onclick={signInWithSso}

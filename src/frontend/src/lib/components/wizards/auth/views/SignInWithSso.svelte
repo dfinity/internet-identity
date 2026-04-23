@@ -219,7 +219,6 @@
       aria-label={$t`Company domain`}
     />
     <Button
-      onclick={handleSubmit}
       variant="primary"
       size="lg"
       type="submit"

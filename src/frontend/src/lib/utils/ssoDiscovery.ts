@@ -6,16 +6,15 @@
  * 2. Fetch the standard OIDC discovery document from the `openid_configuration`
  *    URL → returns `authorization_endpoint`, `scopes_supported`, etc.
  *
- * The caller is responsible for checking that `domain` is in the backend's
- * `oidc_configs` list before calling `discoverSsoConfig`. Unknown domains
- * should be rejected at the UI layer; this module does not carry its own
- * domain allowlist.
- *
  * Security — trust model:
- * - The first hop is gated upstream by the backend's canary allowlist
- *   (`ALLOWED_DISCOVERY_DOMAINS` on the canister): `add_discoverable_oidc_config`
- *   traps for any domain an II admin hasn't approved, so by the time this
- *   module runs, the domain has been explicitly blessed by II.
+ * - The caller must call `add_discoverable_oidc_config({ discovery_domain })`
+ *   on the backend BEFORE invoking `discoverSsoConfig`. That call traps on
+ *   the backend's canary allowlist (`ALLOWED_DISCOVERY_DOMAINS`) for any
+ *   domain an II admin hasn't approved, so by the time this module runs,
+ *   the domain has been explicitly blessed by II.
+ * - This module doesn't carry its own domain allowlist — the check lives
+ *   on the canister, not in frontend code that the user's device could
+ *   bypass.
  * - Once the first hop succeeds, whatever the domain owner publishes at
  *   `/.well-known/ii-openid-configuration` determines the IdP for the second
  *   hop. We don't maintain a second-hop allowlist — the org knows their own
