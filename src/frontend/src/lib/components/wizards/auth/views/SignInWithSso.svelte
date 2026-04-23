@@ -23,24 +23,28 @@
 
   const { continueWithSso, goBack }: Props = $props();
 
+  /**
+   * Debounce delay before kicking off the (network-heavy) two-hop lookup.
+   * Short enough that the button typically enables by the time the user
+   * finishes typing; long enough to avoid firing requests on every keystroke.
+   */
+  const LOOKUP_DEBOUNCE_MS = 200;
+
   let inputRef = $state<HTMLInputElement>();
   let domain = $state("");
   let error = $state<string>();
+  let isLookingUp = $state(false);
   let isSubmitting = $state(false);
-
   /**
-   * Map a backend/discovery error to a user-visible message. Tries to give
-   * the most actionable phrasing available for each distinct failure mode:
-   *
-   * - **Canary-allowlist trap** from `add_discoverable_oidc_config`: the
-   *   domain is well-formed but not yet approved by II admins.
-   * - **Hop 1 unreachable / HTTP error / malformed response** → wrapped in
-   *   {@link DomainNotConfiguredError}; we surface the specific reason
-   *   (HTTP status or parser detail) so a domain owner can diagnose.
-   * - **Hop 2 failures** (issuer / auth_endpoint mismatch, HTTPS, zod
-   *   parse) → pattern-matched to short human messages; falls back to the
-   *   raw error text so nothing gets silently swallowed.
+   * Result of the most recent successful discovery for the currently-typed
+   * `domain`. Non-undefined means the Continue button can invoke
+   * `continueWithSso` directly from the click handler — critical for
+   * Safari, which blocks `window.open` calls that follow an `await`.
    */
+  let preparedResult = $state<SsoDiscoveryResult>();
+
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
   const mapSubmitError = (e: unknown, domainInput: string): string => {
     if (e instanceof DomainNotConfiguredError) {
       if (e.reason === "http-error" && e.httpStatus !== undefined) {
@@ -49,9 +53,6 @@
       if (e.reason === "network") {
         return $t`Couldn't reach ${domainInput}. Check the spelling and your network, then try again.`;
       }
-      // invalid-response: response decoded but didn't match the expected
-      // shape. The detail (zod error or "Provider URL must use HTTPS: …")
-      // is much more actionable than "invalid response".
       if (e.detail !== undefined && e.detail.length > 0) {
         return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed: ${e.detail}`;
       }
@@ -62,8 +63,6 @@
       if (msg.toLowerCase().includes("canary allowlist")) {
         return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
       }
-      // Hop-2 verification failures — keep the detail but lead with a
-      // short human summary.
       if (msg.includes("Provider issuer hostname mismatch")) {
         return $t`SSO provider misconfigured: issuer doesn't match the configured hostname. (${msg})`;
       }
@@ -90,36 +89,87 @@
     return $t`SSO sign-in failed. Please try again.`;
   };
 
-  const handleSubmit = async () => {
+  const invalidatePrepared = () => {
+    preparedResult = undefined;
     error = undefined;
-    const trimmed = domain.trim().toLowerCase();
-    if (trimmed.length === 0) {
-      return;
+    if (debounceTimer !== undefined) {
+      clearTimeout(debounceTimer);
+      debounceTimer = undefined;
     }
+    isLookingUp = false;
+  };
 
+  /**
+   * Debounced lookup: runs the backend registration + two-hop discovery
+   * shortly after the user stops typing, and stashes the result so the
+   * Continue button can hand off to `continueWithSso` synchronously.
+   *
+   * Drives the button's enabled state: the button lights up only once
+   * `preparedResult` is populated for the current `domain`.
+   */
+  const handleInput = () => {
+    invalidatePrepared();
+    const trimmed = domain.trim().toLowerCase();
+    if (trimmed.length === 0) return;
+
+    // Immediate format validation so bad input gets feedback without a
+    // backend round-trip. Only surface the error if the input looks like
+    // a complete domain (contains a dot); otherwise the user is still
+    // mid-typing.
     try {
       validateDomain(trimmed);
     } catch (e) {
-      error = e instanceof Error ? e.message : $t`Invalid domain`;
+      if (trimmed.includes(".")) {
+        error = e instanceof Error ? e.message : $t`Invalid domain`;
+      }
       return;
     }
 
+    debounceTimer = setTimeout(async () => {
+      debounceTimer = undefined;
+      isLookingUp = true;
+      // The input may change again while these awaits are in flight; we
+      // only apply / error-out when our `trimmed` is still the current
+      // domain, so a stale response can't clobber a fresher one.
+      const matchesCurrent = () => trimmed === domain.trim().toLowerCase();
+      try {
+        await anonymousActor.add_discoverable_oidc_config({
+          discovery_domain: trimmed,
+        });
+        const result = await discoverSsoConfig(trimmed);
+        if (matchesCurrent()) {
+          preparedResult = result;
+        }
+      } catch (e) {
+        if (matchesCurrent()) {
+          error = mapSubmitError(e, trimmed);
+        }
+      } finally {
+        if (matchesCurrent()) {
+          isLookingUp = false;
+        }
+      }
+    }, LOOKUP_DEBOUNCE_MS);
+  };
+
+  const handleSubmit = async () => {
+    if (preparedResult === undefined) {
+      // Button should be disabled in this state; defensive no-op.
+      return;
+    }
     isSubmitting = true;
     try {
-      // Register the domain with the backend. This is the gate: the backend
-      // traps if the domain isn't on the canary allowlist. If it's already
-      // registered, the call is idempotent and returns OK.
-      await anonymousActor.add_discoverable_oidc_config({
-        discovery_domain: trimmed,
-      });
-
-      // Run our own two-hop discovery and redirect. The backend will also
-      // run its own discovery asynchronously (for JWT verification later);
-      // the two paths are intentionally independent.
-      const result = await discoverSsoConfig(trimmed);
-      await continueWithSso(result);
+      // IMPORTANT: no `await` before `continueWithSso`. The popup is
+      // opened synchronously inside `continueWithSso → requestJWT →
+      // requestWithPopup → redirectInPopup → window.open`. Any await
+      // between the click event and `window.open` causes Safari to
+      // block the popup. All the network work
+      // (add_discoverable_oidc_config + two-hop discovery) is already
+      // done — stashed in `preparedResult` by the debounced input
+      // handler.
+      await continueWithSso(preparedResult);
     } catch (e) {
-      error = mapSubmitError(e, trimmed);
+      error = mapSubmitError(e, domain.trim().toLowerCase());
     } finally {
       isSubmitting = false;
     }
@@ -127,6 +177,9 @@
 
   onMount(() => {
     inputRef?.focus();
+    return () => {
+      if (debounceTimer !== undefined) clearTimeout(debounceTimer);
+    };
   });
 </script>
 
@@ -152,9 +205,7 @@
     <Input
       bind:element={inputRef}
       bind:value={domain}
-      oninput={() => {
-        error = undefined;
-      }}
+      oninput={handleInput}
       inputmode="url"
       placeholder={$t`company.domain.com`}
       type="text"
@@ -172,11 +223,14 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={domain.trim().length === 0 || isSubmitting}
+      disabled={preparedResult === undefined || isSubmitting || isLookingUp}
     >
       {#if isSubmitting}
         <ProgressRing />
         <span>{$t`Signing in...`}</span>
+      {:else if isLookingUp}
+        <ProgressRing />
+        <span>{$t`Checking...`}</span>
       {:else}
         <span>{$t`Continue`}</span>
       {/if}
