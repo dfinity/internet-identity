@@ -1,0 +1,12 @@
+canisters:
+  - name: internet_identity
+    remote:
+      ic: rdmx6-jaaaa-aaaaa-aaadq-cai
+
+  - name: issuer
+    build:
+      steps:
+        - type: script
+          commands:
+            - "./build.sh"
+            - "cp vc_demo_issuer.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""

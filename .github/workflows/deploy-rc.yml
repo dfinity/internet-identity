@@ -63,10 +63,10 @@ jobs:
 
       - name: "Install key"
         env:
-          DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
+          ICP_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
         run: |
           key_pem=$(mktemp)
-          printenv "DFX_DEPLOY_KEY" > "$key_pem"
+          printenv "ICP_DEPLOY_KEY" > "$key_pem"
           icp identity import --disable-encryption --force default "$key_pem"
           rm "$key_pem"
 
