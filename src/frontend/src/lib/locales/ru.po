@@ -169,6 +169,9 @@ msgstr "Проверка резервной фразы"
 msgid "Checking your order"
 msgstr "Проверка порядка слов"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Выберите аккаунт"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Выберите способ"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Выберите способ входа"
 
 msgid "Clear all"
 msgstr "Очистить все"

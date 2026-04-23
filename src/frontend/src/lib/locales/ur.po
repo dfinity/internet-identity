@@ -169,6 +169,9 @@ msgstr "ریکوری فریز کی جانچ ہو رہی ہے"
 msgid "Checking your order"
 msgstr "آپ کے آرڈر کی جانچ ہو رہی ہے"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "اکاؤنٹ منتخب کریں"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "طریقہ منتخب کریں"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "جاری رکھنے کے لیے طریقہ منتخب کریں"
 
 msgid "Clear all"
 msgstr "سب صاف کریں"

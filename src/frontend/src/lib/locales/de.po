@@ -169,6 +169,9 @@ msgstr "Wiederherstellungsphrase wird überprüft"
 msgid "Checking your order"
 msgstr "Ihre Reihenfolge wird überprüft"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Wählen Sie ein Konto aus"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Methode auswählen"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Methode wählen, um fortzufahren"
 
 msgid "Clear all"
 msgstr "Alle löschen"

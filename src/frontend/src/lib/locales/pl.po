@@ -169,6 +169,9 @@ msgstr "Sprawdzanie frazy odzyskiwania"
 msgid "Checking your order"
 msgstr "Sprawdzanie Twojego zamówienia"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Wybierz konto"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Wybierz metodę"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Wybierz metodę, aby kontynuować"
 
 msgid "Clear all"
 msgstr "Wyczyść wszystko"

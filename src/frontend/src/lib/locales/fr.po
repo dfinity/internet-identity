@@ -169,6 +169,9 @@ msgstr "Vérification de la phrase de récupération"
 msgid "Checking your order"
 msgstr "Vérification de votre ordre"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Choisissez un compte"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Choisissez une méthode"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Choisissez une méthode pour continuer"
 
 msgid "Clear all"
 msgstr "Tout effacer"

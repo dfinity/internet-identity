@@ -169,6 +169,9 @@ msgstr "Checking recovery phrase"
 msgid "Checking your order"
 msgstr "Checking your order"
 
+msgid "Checking..."
+msgstr "Checking..."
+
 msgid "Choose an account"
 msgstr "Choose an account"
 

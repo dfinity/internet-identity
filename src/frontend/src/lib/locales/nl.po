@@ -169,6 +169,9 @@ msgstr "Herstelzin controleren"
 msgid "Checking your order"
 msgstr "Uw bestelling controleren"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Kies een account"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Kies methode"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Kies methode om door te gaan"
 
 msgid "Clear all"
 msgstr "Alles wissen"

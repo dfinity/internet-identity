@@ -169,6 +169,9 @@ msgstr "Memeriksa frasa pemulihan"
 msgid "Checking your order"
 msgstr "Memeriksa pesanan Anda"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Pilih akun"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Pilih metode"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Pilih metode untuk melanjutkan"
 
 msgid "Clear all"
 msgstr "Hapus semua"

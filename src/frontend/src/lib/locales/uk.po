@@ -169,6 +169,9 @@ msgstr "Перевірка фрази відновлення"
 msgid "Checking your order"
 msgstr "Перевірка вашого замовлення"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Виберіть обліковий запис"
 
@@ -179,7 +182,7 @@ msgid "Choose method"
 msgstr "Виберіть метод"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Виберіть метод для продовження"
 
 msgid "Clear all"
 msgstr "Очистити все"
