@@ -534,7 +534,10 @@ jobs:
           path: demos/test-app
 
       - name: Create Canisters
-        run: icp canister create --all
+        run: |
+          icp canister create internet_identity
+          icp canister create internet_identity_frontend
+          icp canister create test_app
 
       - name: Generate OpenID configs
         id: openid-configs
