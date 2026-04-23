@@ -4,6 +4,8 @@ import {
   issuerMatches,
   extractIssuerTemplateClaims,
   selectAuthScopes,
+  extractIdTokenFromCallback,
+  OAuthProviderError,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
@@ -309,5 +311,118 @@ describe("selectAuthScopes", () => {
 
   it("returns just openid when scopes_supported is empty", () => {
     expect(selectAuthScopes([])).toEqual(["openid"]);
+  });
+});
+
+describe("extractIdTokenFromCallback", () => {
+  const STATE = "expected-state";
+  const callback = (fragment: string) =>
+    `https://example.id.ai/callback${fragment.length > 0 ? `#${fragment}` : ""}`;
+
+  it("returns the id_token when state matches and no error is present", () => {
+    expect(
+      extractIdTokenFromCallback(
+        callback(`state=${STATE}&id_token=eyJhbGciOi.test.token`),
+        STATE,
+      ),
+    ).toBe("eyJhbGciOi.test.token");
+  });
+
+  it("throws OAuthProviderError with error and error_description", () => {
+    // Real-world example: Okta app registered as Web App (code-only)
+    // refuses our `response_type=id_token code` hybrid request.
+    let thrown: unknown;
+    try {
+      extractIdTokenFromCallback(
+        callback(
+          `state=${STATE}&error=unsupported_response_type&error_description=The+response+type+is+not+supported+by+the+authorization+server.+Configured+response+types%3A+%5Bcode%5D`,
+        ),
+        STATE,
+      );
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(OAuthProviderError);
+    const err = thrown as OAuthProviderError;
+    expect(err.error).toBe("unsupported_response_type");
+    expect(err.errorDescription).toBe(
+      "The response type is not supported by the authorization server. Configured response types: [code]",
+    );
+    expect(err.message).toContain("unsupported_response_type");
+    expect(err.message).toContain("The response type is not supported");
+  });
+
+  it("throws OAuthProviderError with only error when error_description is absent", () => {
+    let thrown: unknown;
+    try {
+      extractIdTokenFromCallback(
+        callback(`state=${STATE}&error=access_denied`),
+        STATE,
+      );
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(OAuthProviderError);
+    const err = thrown as OAuthProviderError;
+    expect(err.error).toBe("access_denied");
+    expect(err.errorDescription).toBeUndefined();
+  });
+
+  it("checks state before surfacing a provider error", () => {
+    // Guards against a forged callback: an attacker who can inject a
+    // fragment with a legitimate-looking provider error shouldn't be
+    // able to influence user-facing messaging without passing the CSRF
+    // check first.
+    expect(() =>
+      extractIdTokenFromCallback(
+        callback(`state=attacker-state&error=unsupported_response_type`),
+        STATE,
+      ),
+    ).toThrow("Invalid state");
+  });
+
+  it("throws 'Invalid state' when state is missing", () => {
+    expect(() =>
+      extractIdTokenFromCallback(
+        callback(`id_token=eyJhbGciOi.test.token`),
+        STATE,
+      ),
+    ).toThrow("Invalid state");
+  });
+
+  it("throws 'No token received' when the provider omits both id_token and error", () => {
+    // Fallback for a spec-violating provider (e.g. pure auth-code flow
+    // with no error in the fragment — we'd see `code=...` but no
+    // `id_token=...`). The callback will still have state for our
+    // CSRF guard to pass.
+    expect(() =>
+      extractIdTokenFromCallback(callback(`state=${STATE}&code=abc123`), STATE),
+    ).toThrow("No token received");
+  });
+});
+
+describe("OAuthProviderError", () => {
+  it("includes error and description in the message when both are present", () => {
+    const err = new OAuthProviderError(
+      "invalid_scope",
+      "The requested scope is not allowed.",
+    );
+    expect(err.error).toBe("invalid_scope");
+    expect(err.errorDescription).toBe("The requested scope is not allowed.");
+    expect(err.message).toBe(
+      "OAuth provider error: invalid_scope: The requested scope is not allowed.",
+    );
+    expect(err.name).toBe("OAuthProviderError");
+  });
+
+  it("omits the description from the message when it's absent", () => {
+    const err = new OAuthProviderError("access_denied");
+    expect(err.message).toBe("OAuth provider error: access_denied");
+    expect(err.errorDescription).toBeUndefined();
+  });
+
+  it("is an Error instance (so existing `instanceof Error` branches still catch it)", () => {
+    const err = new OAuthProviderError("server_error");
+    expect(err).toBeInstanceOf(Error);
   });
 });

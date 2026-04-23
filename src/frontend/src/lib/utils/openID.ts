@@ -109,6 +109,35 @@ export class OpenIdCredentialAlreadyLinkedHereError extends Error {
 }
 
 /**
+ * Raised when an OAuth provider redirects back to II with an `error` (and
+ * optional `error_description`) in the callback fragment — per RFC 6749
+ * §4.1.2.1 / 4.2.2.1. Typical causes are the SSO app being misconfigured:
+ *   • `unsupported_response_type` — the Okta/Auth0/etc. app doesn't allow
+ *     the hybrid flow we request (`response_type=id_token code`).
+ *   • `invalid_scope` — advertised scope wasn't actually granted.
+ *   • `access_denied` — the user clicked "deny" on the consent screen.
+ *
+ * Carrying `error` and `errorDescription` separately (rather than just a
+ * pre-formatted message) lets `mapSubmitError` in the SSO view produce a
+ * UI string that points the user at the right knob to turn, instead of a
+ * generic "No token received" that looks like a bug in II.
+ */
+export class OAuthProviderError extends Error {
+  readonly error: string;
+  readonly errorDescription?: string;
+  constructor(error: string, errorDescription?: string) {
+    const suffix =
+      errorDescription !== undefined && errorDescription.length > 0
+        ? `: ${errorDescription}`
+        : "";
+    super(`OAuth provider error: ${error}${suffix}`);
+    this.name = "OAuthProviderError";
+    this.error = error;
+    this.errorDescription = errorDescription;
+  }
+}
+
+/**
  * Create JWT request redirect flow URL
  * @param config of the OpenID provider
  * @param options for the JWT request
@@ -143,6 +172,44 @@ export const createRedirectURL = (
 };
 
 /**
+ * Parse the OAuth authorize callback URL and extract the `id_token`.
+ *
+ * Exported so `requestWithPopup` and tests can share a single source of
+ * truth for how a callback fragment is interpreted. Throws:
+ *   - `Error("Invalid state")` if the callback's `state` doesn't match
+ *     `expectedState` (CSRF guard).
+ *   - `OAuthProviderError` if the callback carries an `error=...`
+ *     fragment (RFC 6749 §4.1.2.1 / 4.2.2.1) — checked BEFORE the
+ *     `id_token` null-check so a misconfigured SSO app surfaces its
+ *     own message instead of a generic "No token received" that looks
+ *     like a bug in II.
+ *   - `Error("No token received")` if neither `id_token` nor `error`
+ *     was in the fragment (fallback for spec-violating providers).
+ */
+export const extractIdTokenFromCallback = (
+  callback: string,
+  expectedState: string,
+): string => {
+  const callbackURL = new URL(callback);
+  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
+  if (searchParams.get("state") !== expectedState) {
+    throw new Error("Invalid state");
+  }
+  const error = searchParams.get("error");
+  if (error !== null) {
+    throw new OAuthProviderError(
+      error,
+      searchParams.get("error_description") ?? undefined,
+    );
+  }
+  const id_token = searchParams.get("id_token");
+  if (id_token === null) {
+    throw new Error("No token received");
+  }
+  return id_token;
+};
+
+/**
  * Request JWT through redirect flow in a popup
  * @param config of the OpenID provider
  * @param options for the JWT request
@@ -153,17 +220,13 @@ const requestWithPopup = async (
 ): Promise<string> => {
   const redirectURL = createRedirectURL(config, options);
   const callback = await redirectInPopup(redirectURL.href);
-  const callbackURL = new URL(callback);
-  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
-  const id_token = searchParams.get("id_token");
-  if (searchParams.get("state") !== redirectURL.searchParams.get("state")) {
-    throw new Error("Invalid state");
+  const expectedState = redirectURL.searchParams.get("state");
+  if (expectedState === null) {
+    // `createRedirectURL` always sets `state`; reaching here means the
+    // redirect URL was tampered with before it hit the popup.
+    throw new Error("Missing state in redirect URL");
   }
-  if (id_token === null) {
-    throw new Error("No token received");
-  }
-
-  return id_token;
+  return extractIdTokenFromCallback(callback, expectedState);
 };
 
 /**

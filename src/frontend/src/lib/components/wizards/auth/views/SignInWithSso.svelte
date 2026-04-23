@@ -12,6 +12,7 @@
     DomainNotConfiguredError,
   } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+  import { OAuthProviderError } from "$lib/utils/openID";
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
@@ -57,6 +58,23 @@
         return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed: ${e.detail}`;
       }
       return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed.`;
+    }
+    if (e instanceof OAuthProviderError) {
+      // `unsupported_response_type` is the signature of an SSO app that
+      // only allows the plain authorization-code flow. II needs the
+      // hybrid flow (id_token + code) because it verifies JWTs canister-
+      // side with no token-endpoint exchange. Spell out the fix so the
+      // SSO admin can act on it directly.
+      if (e.error === "unsupported_response_type") {
+        return $t`${domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type "id_token code" (e.g. in Okta, set the app to Single-Page Application with "Implicit (hybrid)" grant enabled).`;
+      }
+      if (e.error === "access_denied") {
+        return $t`${domainInput}'s SSO denied the sign-in. Try again, and check with your SSO admin if the problem persists.`;
+      }
+      if (e.errorDescription !== undefined && e.errorDescription.length > 0) {
+        return $t`${domainInput}'s SSO returned "${e.error}": ${e.errorDescription}`;
+      }
+      return $t`${domainInput}'s SSO returned error "${e.error}".`;
     }
     if (e instanceof Error) {
       const msg = e.message;
