@@ -22,7 +22,7 @@ Options:
   --issuer-canister CANISTER      The canister to configure (name or canister ID), defaults to "issuer"
   --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.icp0.io
   --issuer-frontend-hostname URL  The issuer's frontend hostname, defaults to issuer's derivation origin
-  --wallet CANISTER_ID            Optional wallet canister ID to use to configure the issuer, if any.
+  --proxy CANISTER_ID             Optional proxy canister ID to route calls through, if any.
 EOF
 }
 
@@ -72,9 +72,9 @@ do
             shift; # shift past --issuer-canister & value
             shift;
             ;;
-        --wallet)
-            WALLET="${2:?missing value for '--wallet'}"
-            shift; # shift past --wallet & value
+        --proxy)
+            WALLET="${2:?missing value for '--proxy'}"
+            shift; # shift past --proxy & value
             shift;
             ;;
         *)
@@ -120,7 +120,7 @@ declare -a WALLET_ARG=( )
 if [ "$WALLET" ]
 then
     echo "Using wallet: $WALLET" >&2
-    WALLET_ARG+=( "--wallet" "$WALLET")
+    WALLET_ARG+=( "--proxy" "$WALLET")
 fi
 
 icp canister call "${WALLET_ARG[@]}" -e "$ICP_NETWORK" "$ISSUER_CANISTER" configure \

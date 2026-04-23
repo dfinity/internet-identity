@@ -75,9 +75,9 @@ jobs:
           wallet="${{ env.wallet_canister_id }}"
           # Needed to suppress icp-cli warning about insecure plaintext identity
           export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister -e ic --wallet "$wallet" install --mode upgrade \
-            --wasm internet_identity_backend.wasm.gz \
-            ${{ env.ii_canister_id }}
+          icp canister install ${{ env.ii_canister_id }} \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --wasm internet_identity_backend.wasm.gz
 
       - name: Send RC link to slack
         uses: ./.github/actions/slack

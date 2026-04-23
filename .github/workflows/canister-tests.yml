@@ -553,9 +553,9 @@ jobs:
       - name: Deploy canisters
         run: |
           # NOTE: icp canister install will run the sync steps from icp.yaml
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
-          icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
+          icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           icp canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server
@@ -649,10 +649,10 @@ jobs:
           # Needed to suppress icp-cli warning about insecure plaintext identity
           export ICP_WARNING=-mainnet_plaintext_identity
           sha=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1 | sed 's/../\\&/g')
-          icp canister -e ic --wallet "$wallet" install --mode upgrade \
-            --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
-            --wasm internet_identity_backend.wasm.gz \
-            y2aaj-miaaa-aaaad-aacxq-cai
+          icp canister install y2aaj-miaaa-aaaad-aacxq-cai \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --args "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
+            --wasm internet_identity_backend.wasm.gz
 
       - name: "Download test app wasm"
         uses: actions/download-artifact@v4
@@ -665,9 +665,9 @@ jobs:
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
           # Needed to suppress icp-cli warning about insecure plaintext identity
           export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister -e ic --wallet "$wallet" install --mode upgrade \
-            --wasm ./test_app.wasm \
-            vt36r-2qaaa-aaaad-aad5a-cai
+          icp canister install vt36r-2qaaa-aaaad-aad5a-cai \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --wasm ./test_app.wasm
 
       - name: "Download VC issuer wasm"
         uses: actions/download-artifact@v4
@@ -680,14 +680,14 @@ jobs:
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
           # Needed to suppress icp-cli warning about insecure plaintext identity
           export ICP_WARNING=-mainnet_plaintext_identity
-          icp canister -e ic --wallet "$wallet" install --mode upgrade \
-            --wasm vc_demo_issuer.wasm.gz \
-            v2yvn-myaaa-aaaad-aad4q-cai
+          icp canister install v2yvn-myaaa-aaaad-aad4q-cai \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --wasm vc_demo_issuer.wasm.gz
           ./demos/vc_issuer/provision \
             --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
             --icp-network ic \
             --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
-            --wallet "$wallet"
+            --proxy "$wallet"
 
       - name: "Deploy archive"
         run: |

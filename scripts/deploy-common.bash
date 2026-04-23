@@ -556,12 +556,12 @@ run_icp_install() {
 
     local cmd=(
         icp canister
-            -e "$IC_NETWORK"
-            --wallet "$WALLET_CANISTER_ID"
             install "$canister_id"
+            -e "$IC_NETWORK"
+            --proxy "$WALLET_CANISTER_ID"
             --mode upgrade
             --wasm "$wasm_path"
-            --argument "$install_arg"
+            --args "$install_arg"
     )
 
     if [ "$DRY_RUN" = true ]; then

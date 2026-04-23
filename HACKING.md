@@ -35,7 +35,7 @@ icp deploy internet_identity
 >
 > ```
 > II_DUMMY_CAPTCHA=0 icp deploy internet_identity \
->     --argument '(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaEnabled}}}})'
+>     --args '(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaEnabled}}}})'
 > ```
 
 Then the canister can be used as
@@ -100,7 +100,7 @@ We have a set of Selenium tests that run through the various flows. To set up a 
 
 - If you want to run the new playwright tests, you need to deploy II with a specific argument:
   ```bash
-  icp canister install internet_identity --wasm internet_identity.wasm.gz --upgrade-unchanged --mode=upgrade --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
+  icp canister install internet_identity --wasm internet_identity.wasm.gz --mode=upgrade --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
   ```
 
 1. Start the vite dev server with TLS enabled and hot reloading disabled: `TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev`
