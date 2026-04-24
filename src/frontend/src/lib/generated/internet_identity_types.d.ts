@@ -462,6 +462,13 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+/**
+ * SSO provider config that uses two-hop discovery.
+ * The backend fetches https://{discovery_domain}/.well-known/ii-openid-configuration
+ * for { client_id, openid_configuration } and then fetches the standard OIDC
+ * discovery at openid_configuration for { issuer, jwks_uri }.
+ */
+export interface DiscoverableOidcConfig { 'discovery_domain' : string }
 export interface DummyAuthConfig {
   /**
    * Prompts user for a index value (0 - 255) when set to true,
@@ -594,10 +601,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -902,6 +905,16 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+/**
+ * Resolved SSO provider state.
+ * All fields other than discovery_domain are None until discovery completes.
+ */
+export interface OidcConfig {
+  'openid_configuration' : [] | [string],
+  'issuer' : [] | [string],
+  'discovery_domain' : string,
+  'client_id' : [] | [string],
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -1191,6 +1204,10 @@ export interface WebAuthnCredential {
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
+  'add_discoverable_oidc_config' : ActorMethod<
+    [DiscoverableOidcConfig],
+    undefined
+  >,
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
@@ -1321,6 +1338,11 @@ export interface _SERVICE {
    */
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
+  /**
+   * OIDC Discovery
+   * ===============
+   */
+  'discovered_oidc_configs' : ActorMethod<[], Array<OidcConfig>>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   /**

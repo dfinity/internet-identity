@@ -22,7 +22,16 @@ msgstr "{0} صارف"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} نئی Internet Identity پر منتقل ہو گئی ہے"
 
-msgid "{attribute}:"
+msgid "{displayName} account"
+msgstr ""
+
+msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr ""
 
 msgid "{identityName} has been removed from this device."
@@ -31,20 +40,8 @@ msgstr "{identityName} کو اس آلے سے ہٹا دیا گیا ہے۔"
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹ کی حد تک پہنچ چکے ہیں۔} other {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹس کی حد تک پہنچ چکے ہیں۔}}"
 
-msgid "{name} account"
-msgstr "{name} اکاؤنٹ"
-
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# پاس کی} other {# پاس کیز}}"
-
-msgid "{providerName} {attribute}:"
-msgstr ""
-
-msgid "{providerName} email:"
-msgstr ""
-
-msgid "{providerName} name:"
-msgstr ""
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>بالکل نئے سرے سے ڈیزائن کیا گیا انٹرفیس:</0> ہم نے Internet Identity کو نیا، جدید انداز اور احساس دیا ہے۔ نیا ڈیزائن بدیہی ہے اور نیویگییشن کو مزید آسان بناتا ہے، جس سے صارف کے سفر میں زیادہ روانی یقینی ہوتی ہے۔"
@@ -115,9 +112,6 @@ msgstr "اپنی شناخت کے ذریعے سائن اِن کرنے کے طری
 msgid "Advanced identity management"
 msgstr "جدید شناختی نظم و نسق"
 
-msgid "Allow to access this info"
-msgstr ""
-
 msgid "Are you sure?"
 msgstr "کیا آپ کو یقین ہے؟"
 
@@ -142,6 +136,9 @@ msgstr "تصدیق کامیاب رہی"
 msgid "Authorize new device"
 msgstr "نئے آلے کی توثیق کریں"
 
+msgid "Back to sign-in options"
+msgstr ""
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "شروع کرنے سے پہلے کسی نجی جگہ پر جائیں اور اپنا ریکوری فریز تیار رکھیں۔ اپنی شناخت کے تحفظ کے لیے اسے خفیہ رکھیں۔"
 
@@ -160,9 +157,6 @@ msgstr "منسوخ کریں"
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA حروف"
 
-msgid "Change"
-msgstr ""
-
 msgid "Characters are case-sensitive"
 msgstr "حروف بڑے اور چھوٹے ہونے کے لحاظ سے حساس ہوتے ہیں"
 
@@ -175,6 +169,9 @@ msgstr "ریکوری فریز کی جانچ ہو رہی ہے"
 msgid "Checking your order"
 msgstr "آپ کے آرڈر کی جانچ ہو رہی ہے"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "اکاؤنٹ منتخب کریں"
 
@@ -186,9 +183,6 @@ msgstr "طریقہ منتخب کریں"
 
 msgid "Choose method to continue"
 msgstr "جاری رکھنے کے لیے طریقہ منتخب کریں"
-
-msgid "Choose which details you'd like to share"
-msgstr ""
 
 msgid "Clear all"
 msgstr "سب صاف کریں"
@@ -204,6 +198,12 @@ msgstr "مینو بند کریں"
 
 msgid "Code copied to clipboard"
 msgstr "کوڈ کلپ بورڈ پر کاپی ہو گیا"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "سیٹ اپ مکمل کریں"
@@ -240,6 +240,9 @@ msgstr "{name} کے ساتھ جاری رکھیں"
 
 msgid "Continue with passkey"
 msgstr "پاس کی کے ساتھ جاری رکھیں"
+
+msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgstr ""
 
 msgid "Create account"
 msgstr "اکاؤنٹ بنائیں"
@@ -283,9 +286,6 @@ msgstr "Dashlane کے غیر ہم آہنگ ہونے کی تصدیق ہو گئی 
 msgid "Default"
 msgstr "ڈیفالٹ"
 
-msgid "Deny All"
-msgstr ""
-
 msgid "Discoverable passkeys"
 msgstr "قابلِ دریافت پاس کیز"
 
@@ -307,9 +307,6 @@ msgstr "{name} میں ترمیم کریں"
 msgid "Edit account"
 msgstr "اکاؤنٹ میں ترمیم کریں"
 
-msgid "Email:"
-msgstr ""
-
 msgid "Enable multiple accounts"
 msgstr "متعدد اکاؤنٹس فعال کریں"
 
@@ -324,6 +321,9 @@ msgstr "ہر لفظ درست ترتیب میں درج کریں:"
 
 msgid "Enter recovery phrase"
 msgstr "ریکوری فریز درج کریں"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Internet Identity کے بارے میں وہ سب کچھ جو آپ کو جاننا چاہیے — انٹرنیٹ کمپیوٹر کی ایپس میں لاگ اِن کا نجی، محفوظ اور آسان طریقہ۔"
@@ -494,6 +494,9 @@ msgstr "غلط کوڈ لنک"
 msgid "Invalid code. Please check and try again."
 msgstr "غلط کوڈ۔ براہِ کرم چیک کریں اور دوبارہ کوشش کریں"
 
+msgid "Invalid domain"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "غلط ریکوری فریز"
 
@@ -560,9 +563,6 @@ msgstr "حد مکمل ہو گئی"
 msgid "Link copied to clipboard"
 msgstr "لنک کلپ بورڈ پر کاپی ہو گیا"
 
-msgid "Loading permissions"
-msgstr ""
-
 msgid "Locked legacy recovery phrase"
 msgstr "مقفل پرانا ریکوری فریز"
 
@@ -625,9 +625,6 @@ msgstr "اکاؤنٹ کا نام رکھیں"
 
 msgid "Name your identity"
 msgstr "اپنی شناخت کا نام رکھیں"
-
-msgid "Name:"
-msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Google، Microsoft یا Apple کے ساتھ یہ معلومات شیئر نہیں کی جاتیں کہ آپ Internet Identity کے ذریعے کن ایپلیکیشنز میں لاگ اِن کرتے ہیں۔"
@@ -797,9 +794,6 @@ msgstr "ایپ پر واپس جائیں"
 msgid "Return to application"
 msgstr "ایپلی کیشن پر واپس جائیں"
 
-msgid "Review Permissions"
-msgstr ""
-
 msgid "Right now"
 msgstr "ابھی"
 
@@ -836,7 +830,7 @@ msgstr "سیشن کا وقت ختم ہو گیا"
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
 
-msgid "Share {label}"
+msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
 msgstr ""
 
 msgid "Show all"
@@ -857,8 +851,14 @@ msgstr "مانوس طریقوں سے سائن اِن کریں"
 msgid "Sign in with another identity"
 msgstr "دوسری شناخت کے ساتھ سائن اِن کریں"
 
-msgid "Sign in with your {name} account from any device."
-msgstr "کسی بھی آلے سے اپنے {name} اکاؤنٹ کے ساتھ سائن اِن کریں۔"
+msgid "Sign in with SSO"
+msgstr ""
+
+msgid "Sign In With SSO"
+msgstr ""
+
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "سائن آؤٹ"
@@ -899,6 +899,30 @@ msgstr ""
 
 msgid "Source code"
 msgstr "سورس کوڈ"
+
+msgid "SSO"
+msgstr ""
+
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider's discovery document is malformed: {msg}"
+msgstr ""
+
+msgid "SSO sign-in failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "دوبارہ شروع کریں"
@@ -1028,6 +1052,9 @@ msgstr "جاری رکھنے کے لیے:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "اپنی پاس کی سیٹ اپ مکمل کرنے کے لیے، اپنی <0>نئی ڈیوائس</0> پر دکھائی گئی ہدایات پر عمل کریں۔"
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgstr ""
 
 msgid "Type each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں درج کریں:"

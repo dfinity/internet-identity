@@ -280,9 +280,6 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
-    // Deprecated in init args: use add_discoverable_oidc_config update call instead.
-    // Kept for backward compatibility and config() query output.
-    oidc_configs : opt vec DiscoverableOidcConfig;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
     // Configuration to show dapps explorer or not

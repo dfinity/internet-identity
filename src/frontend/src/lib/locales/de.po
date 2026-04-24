@@ -22,7 +22,16 @@ msgstr "{0}-Benutzer"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} ist zur neuen Internet Identity umgezogen"
 
-msgid "{attribute}:"
+msgid "{displayName} account"
+msgstr ""
+
+msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr ""
 
 msgid "{identityName} has been removed from this device."
@@ -31,20 +40,8 @@ msgstr "{identityName} wurde von diesem Gerät entfernt."
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Sie haben das Maximum von # Konto für eine einzelne App erreicht.} other {Sie haben das Maximum von # Konten für eine einzelne App erreicht.}}"
 
-msgid "{name} account"
-msgstr "{name}-Konto"
-
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
-
-msgid "{providerName} {attribute}:"
-msgstr ""
-
-msgid "{providerName} email:"
-msgstr ""
-
-msgid "{providerName} name:"
-msgstr ""
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Völlig überarbeitetes Interface:</0> Wir haben Internet Identity ein frisches, modernes Erscheinungsbild verliehen. Das neue Design ist intuitiv und einfacher zu bedienen, wodurch die Nutzerführung reibungsloser wird."
@@ -115,9 +112,6 @@ msgstr "Verwalten Sie die Anmeldemethoden Ihrer Identität."
 msgid "Advanced identity management"
 msgstr "Erweiterte Identitätsverwaltung"
 
-msgid "Allow to access this info"
-msgstr ""
-
 msgid "Are you sure?"
 msgstr "Sind Sie sicher?"
 
@@ -142,6 +136,9 @@ msgstr "Authentifizierung erfolgreich"
 msgid "Authorize new device"
 msgstr "Neues Gerät autorisieren"
 
+msgid "Back to sign-in options"
+msgstr ""
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Bevor Sie beginnen, suchen Sie sich einen privaten Ort und halten Sie Ihre Wiederherstellungsphrase bereit. Behandeln Sie diese vertraulich, um Ihre Identität zu schützen."
 
@@ -160,9 +157,6 @@ msgstr "Abbrechen"
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-Zeichen"
 
-msgid "Change"
-msgstr ""
-
 msgid "Characters are case-sensitive"
 msgstr "Groß- und Kleinschreibung beachten"
 
@@ -175,6 +169,9 @@ msgstr "Wiederherstellungsphrase wird überprüft"
 msgid "Checking your order"
 msgstr "Ihre Reihenfolge wird überprüft"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Wählen Sie ein Konto aus"
 
@@ -186,9 +183,6 @@ msgstr "Methode auswählen"
 
 msgid "Choose method to continue"
 msgstr "Methode wählen, um fortzufahren"
-
-msgid "Choose which details you'd like to share"
-msgstr ""
 
 msgid "Clear all"
 msgstr "Alle löschen"
@@ -204,6 +198,12 @@ msgstr "Menü schließen"
 
 msgid "Code copied to clipboard"
 msgstr "Code in die Zwischenablage kopiert"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "Einrichtung abschließen"
@@ -240,6 +240,9 @@ msgstr "Mit {name} fortfahren"
 
 msgid "Continue with passkey"
 msgstr "Mit Passkey fortfahren"
+
+msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgstr ""
 
 msgid "Create account"
 msgstr "Konto erstellen"
@@ -283,9 +286,6 @@ msgstr "Es wurde bestätigt, dass Dashlane inkompatibel ist."
 msgid "Default"
 msgstr "Standard"
 
-msgid "Deny All"
-msgstr ""
-
 msgid "Discoverable passkeys"
 msgstr "Auffindbare Passkeys"
 
@@ -307,9 +307,6 @@ msgstr "{name} bearbeiten"
 msgid "Edit account"
 msgstr "Konto bearbeiten"
 
-msgid "Email:"
-msgstr ""
-
 msgid "Enable multiple accounts"
 msgstr "Mehrere Konten aktivieren"
 
@@ -324,6 +321,9 @@ msgstr "Geben Sie jedes Wort in der richtigen Reihenfolge ein:"
 
 msgid "Enter recovery phrase"
 msgstr "Wiederherstellungsphrase eingeben"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, sichere und einfache Möglichkeit, sich bei Apps auf dem Internet Computer anzumelden."
@@ -494,6 +494,9 @@ msgstr "Ungültiger Code-Link"
 msgid "Invalid code. Please check and try again."
 msgstr "Ungültiger Code. Bitte überprüfen und erneut versuchen."
 
+msgid "Invalid domain"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "Ungültige Wiederherstellungsphrase"
 
@@ -560,9 +563,6 @@ msgstr "Limit erreicht"
 msgid "Link copied to clipboard"
 msgstr "Link in die Zwischenablage kopiert"
 
-msgid "Loading permissions"
-msgstr ""
-
 msgid "Locked legacy recovery phrase"
 msgstr "Gesperrte Legacy-Wiederherstellungsphrase"
 
@@ -625,9 +625,6 @@ msgstr "Konto benennen"
 
 msgid "Name your identity"
 msgstr "Benennen Sie Ihre Identität"
-
-msgid "Name:"
-msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Es werden keine Daten an Google, Microsoft oder Apple darüber weitergegeben, bei welchen Anwendungen Sie sich mit Internet Identity anmelden."
@@ -797,9 +794,6 @@ msgstr "Zurück zur App"
 msgid "Return to application"
 msgstr "Zur Anwendung zurückkehren"
 
-msgid "Review Permissions"
-msgstr ""
-
 msgid "Right now"
 msgstr "Jetzt gerade"
 
@@ -836,7 +830,7 @@ msgstr "Sitzung abgelaufen"
 msgid "Set as default sign-in"
 msgstr "Als Standardanmeldung festlegen"
 
-msgid "Share {label}"
+msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
 msgstr ""
 
 msgid "Show all"
@@ -857,8 +851,14 @@ msgstr "Anmelden mit bekannten Methoden"
 msgid "Sign in with another identity"
 msgstr "Mit einer anderen Identität anmelden"
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Melden Sie sich von jedem Gerät aus mit Ihrem {name}-Konto an."
+msgid "Sign in with SSO"
+msgstr ""
+
+msgid "Sign In With SSO"
+msgstr ""
+
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Abmelden"
@@ -899,6 +899,30 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Quellcode"
+
+msgid "SSO"
+msgstr ""
+
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider's discovery document is malformed: {msg}"
+msgstr ""
+
+msgid "SSO sign-in failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "Neu starten"
@@ -1028,6 +1052,9 @@ msgstr "So fahren Sie fort:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Um die Einrichtung Ihres Passkeys abzuschließen, folgen Sie den Anweisungen auf Ihrem <0>neuen Gerät</0>."
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgstr ""
 
 msgid "Type each word in the correct order:"
 msgstr "Geben Sie jedes Wort in der richtigen Reihenfolge ein:"

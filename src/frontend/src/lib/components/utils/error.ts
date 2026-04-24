@@ -11,7 +11,11 @@ import type {
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
-import { isOpenIdCancelError } from "$lib/utils/openID";
+import {
+  OAuthProviderError,
+  OpenIdCredentialAlreadyLinkedHereError,
+  isOpenIdCancelError,
+} from "$lib/utils/openID";
 import {
   AuthenticationV2Events,
   authenticationV2Funnel,
@@ -24,6 +28,34 @@ export const handleError = (error: unknown) => {
       title: "Operation canceled",
       description:
         "The interaction was canceled or timed out. Please try again.",
+    });
+    return;
+  }
+
+  // Specialization of the generic `OpenIdCredentialAlreadyRegistered` error
+  // below: the credential is already on THIS identity, not some other one.
+  if (error instanceof OpenIdCredentialAlreadyLinkedHereError) {
+    toaster.error({
+      title: "This account is already linked to this identity",
+    });
+    return;
+  }
+
+  // OAuth provider returned `error=…` in the callback fragment (RFC 6749
+  // §4.1.2.1 / 4.2.2.1). Surface the provider's own description so a
+  // misconfigured SSO app (e.g. Okta set to `response_types=[code]` only)
+  // doesn't look like an II bug. The SSO view's `mapSubmitError` gives
+  // more specific guidance when the error hits inside `SignInWithSso`;
+  // this branch covers callers (direct-OpenID entry points) that route
+  // through `handleError` instead.
+  if (error instanceof OAuthProviderError) {
+    toaster.error({
+      title: `SSO provider returned "${error.error}"`,
+      description:
+        error.errorDescription !== undefined &&
+        error.errorDescription.length > 0
+          ? error.errorDescription
+          : "Ask your SSO admin to check the app's OAuth configuration.",
     });
     return;
   }

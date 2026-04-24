@@ -1,11 +1,17 @@
 import { frontendCanisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
-import { decodeJWT, requestJWT } from "$lib/utils/openID";
+import {
+  OpenIdCredentialAlreadyLinkedHereError,
+  decodeJWT,
+  requestJWT,
+  selectAuthScopes,
+} from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
-import { throwCanisterError } from "$lib/utils/utils";
+import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import type {
   AuthnMethodData,
   OpenIdCredential,
+  OpenIdCredentialAddError,
   OpenIdConfig,
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
@@ -13,9 +19,13 @@ import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
+import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+import { rememberSsoDomainForCredential } from "$lib/utils/ssoDomainStorage";
 
 export class AddAccessMethodFlow {
-  #view = $state<"chooseMethod" | "addPasskey">("chooseMethod");
+  #view = $state<"chooseMethod" | "addPasskey" | "signInWithSso">(
+    "chooseMethod",
+  );
   #isSystemOverlayVisible = $state(false);
 
   get view() {
@@ -47,9 +57,30 @@ export class AddAccessMethodFlow {
       );
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
-      await actor
-        .openid_credential_add(identityNumber, jwt, salt)
-        .then(throwCanisterError);
+      try {
+        await actor
+          .openid_credential_add(identityNumber, jwt, salt)
+          .then(throwCanisterError);
+      } catch (err) {
+        // Specialize the generic "already registered to another identity"
+        // error: if the credential's (iss, sub, aud) is already attached
+        // to *this* identity, tell the user that specifically instead of
+        // implying another identity has it.
+        if (
+          isCanisterError<OpenIdCredentialAddError>(err) &&
+          err.type === "OpenIdCredentialAlreadyRegistered"
+        ) {
+          const info = await actor.get_anchor_info(identityNumber);
+          const linkedHere =
+            info.openid_credentials[0]?.some(
+              (c) => c.iss === iss && c.sub === sub && c.aud === aud,
+            ) ?? false;
+          if (linkedHere) {
+            throw new OpenIdCredentialAlreadyLinkedHereError();
+          }
+        }
+        throw err;
+      }
 
       const metadata: MetadataMapV2 = [];
       if (name !== undefined) {
@@ -101,5 +132,46 @@ export class AddAccessMethodFlow {
 
   continueWithPasskey = () => {
     this.#view = "addPasskey";
+  };
+
+  signInWithSso = () => {
+    this.#view = "signInWithSso";
+  };
+
+  chooseMethod = () => {
+    this.#view = "chooseMethod";
+  };
+
+  /**
+   * Link an SSO-discovered provider as an access method to the current
+   * identity. Reuses {@link linkOpenIdAccount} by synthesizing an
+   * `OpenIdConfig` from the two-hop discovery result — the issuer and
+   * client_id we got from discovery plus a default name.
+   *
+   * On success we also remember `(iss, sub, aud) → domain` in localStorage
+   * so the access-methods UI can later label this credential by the SSO
+   * domain the user typed instead of by the underlying IdP's issuer.
+   */
+  linkSsoAccount = async (
+    result: SsoDiscoveryResult,
+  ): Promise<OpenIdCredential> => {
+    const { domain, clientId, discovery } = result;
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: "",
+      name: "SSO",
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: discovery.issuer,
+      auth_scope: selectAuthScopes(discovery.scopes_supported),
+      client_id: clientId,
+    };
+    const credential = await this.linkOpenIdAccount(syntheticConfig);
+    rememberSsoDomainForCredential(
+      { iss: credential.iss, sub: credential.sub, aud: credential.aud },
+      domain,
+    );
+    return credential;
   };
 }

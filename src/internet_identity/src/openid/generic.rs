@@ -5,6 +5,7 @@ use super::{
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::secs_to_nanos;
+use crate::state;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use candid::Principal;
@@ -229,13 +230,29 @@ impl Provider {
     }
 }
 
-/// CANARY: SSO via two-hop discovery is a proof-of-concept. Only this domain is
-/// accepted as a `discovery_domain` for now. Widen this list (or move it to
+/// CANARY: SSO via two-hop discovery is a proof-of-concept. Exactly one
+/// domain is currently accepted as a `discovery_domain`, and which one
+/// depends on whether this deployment self-identifies as production via
+/// the `is_production` init arg:
+///
+/// * `is_production == Some(true)` (i.e. `id.ai`) → `dfinity.org`
+/// * otherwise (beta, staging, local dev, tests) → `beta.dfinity.org`
+///
+/// Keeping the prod/beta allowlists disjoint means a DNS takeover of the
+/// beta test domain can't backdoor the production canister, and lets us
+/// stage registration changes (e.g. a new IdP) on `beta.dfinity.org`
+/// without risking the production issuer. Widen this (or move it to
 /// canister config) once the feature exits canary.
-pub const ALLOWED_DISCOVERY_DOMAINS: &[&str] = &["dfinity.org"];
+pub fn allowed_discovery_domains() -> &'static [&'static str] {
+    let is_production = state::persistent_state(|ps| ps.is_production);
+    match is_production {
+        Some(true) => &["dfinity.org"],
+        _ => &["beta.dfinity.org"],
+    }
+}
 
 pub fn is_allowed_discovery_domain(domain: &str) -> bool {
-    ALLOWED_DISCOVERY_DOMAINS
+    allowed_discovery_domains()
         .iter()
         .any(|allowed| allowed.eq_ignore_ascii_case(domain))
 }
@@ -363,7 +380,7 @@ pub struct DiscoveryState {
     pub last_jwks_uri: Rc<RefCell<Option<String>>>,
 }
 
-// TODO: `DISCOVERY_TASKS` is unbounded — a long `ALLOWED_DISCOVERY_DOMAINS` list
+// TODO: `DISCOVERY_TASKS` is unbounded — a long `allowed_discovery_domains()` list
 // or many admin-configured SSO providers would fan out into many periodic HTTP
 // outcalls. Revisit once the canary allowlist is lifted. See reviewer comment on
 // https://github.com/dfinity/internet-identity/pull/3778#discussion_r3099150266.

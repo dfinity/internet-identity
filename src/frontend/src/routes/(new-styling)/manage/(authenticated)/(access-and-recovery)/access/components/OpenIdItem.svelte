@@ -4,6 +4,7 @@
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import Button from "$lib/components/ui/Button.svelte";
+  import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
@@ -16,9 +17,17 @@
 
   const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
 
-  const name = $derived(openIdName(openid.iss, openid.metadata));
+  const name = $derived(
+    openIdName(openid.iss, openid.sub, openid.aud, openid.metadata),
+  );
   const email = $derived(getMetadataString(openid.metadata, "email"));
-  const logo = $derived(openIdLogo(openid.iss, openid.metadata));
+  const logo = $derived(
+    openIdLogo(openid.iss, openid.sub, openid.aud, openid.metadata),
+  );
+  // Credential didn't match any entry in `openid_configs` on (iss, aud).
+  // Treat it as SSO and render the generic SSO icon as a fallback.
+  const isSso = $derived(logo === undefined);
+  const displayName = $derived(name ?? $t`SSO`);
   const options = $derived(
     onUnlink !== undefined
       ? [
@@ -33,16 +42,18 @@
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">
-  {#if logo !== undefined}
-    <div class="text-fg-primary relative size-6">
+  <div class="text-fg-primary relative size-6">
+    {#if isSso}
+      <SsoIcon class="size-6" />
+    {:else}
       {@html logo}
-      {#if isCurrentAccessMethod}
-        <div
-          class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
-        ></div>
-      {/if}
-    </div>
-  {/if}
+    {/if}
+    {#if isCurrentAccessMethod}
+      <div
+        class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
+      ></div>
+    {/if}
+  </div>
   {#if options.length > 0}
     <Select {options} align="end">
       <Button
@@ -58,7 +69,7 @@
   {/if}
 </div>
 <div class="text-text-primary mb-1 text-base font-semibold">
-  {$t`${name} account`}
+  {$t`${displayName} account`}
 </div>
 <div class="text-text-tertiary text-sm">
   {email ?? $t`Hidden email`}
@@ -99,5 +110,5 @@
   </div>
 </div>
 <div class="text-text-primary text-xs">
-  {$t`Sign in with your ${name} account from any device.`}
+  {$t`Sign in with your ${displayName} account from any device.`}
 </div>

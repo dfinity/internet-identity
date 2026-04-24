@@ -22,7 +22,16 @@ msgstr "{0} gebruiker"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} is overgegaan naar de nieuwe Internet Identity"
 
-msgid "{attribute}:"
+msgid "{displayName} account"
+msgstr ""
+
+msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr ""
 
 msgid "{identityName} has been removed from this device."
@@ -31,20 +40,8 @@ msgstr "{identityName} is verwijderd van dit apparaat."
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {U heeft het maximum van # account voor één app bereikt.} other {U heeft het maximum van # accounts voor één app bereikt.}}"
 
-msgid "{name} account"
-msgstr "{name} account"
-
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
-
-msgid "{providerName} {attribute}:"
-msgstr ""
-
-msgid "{providerName} email:"
-msgstr ""
-
-msgid "{providerName} name:"
-msgstr ""
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Volledig Vernieuwde Interface:</0> We hebben Internet Identity een frisse, moderne uitstraling gegeven. Het nieuwe ontwerp is intuïtief en overzichtelijker, wat zorgt voor een soepelere gebruikerservaring."
@@ -115,9 +112,6 @@ msgstr "Beheer de manieren waarop u kunt inloggen met uw identiteit."
 msgid "Advanced identity management"
 msgstr "Geavanceerd identiteitsbeheer"
 
-msgid "Allow to access this info"
-msgstr ""
-
 msgid "Are you sure?"
 msgstr "Weet u het zeker?"
 
@@ -142,6 +136,9 @@ msgstr "Authenticatie succesvol"
 msgid "Authorize new device"
 msgstr "Autoriseer nieuw apparaat"
 
+msgid "Back to sign-in options"
+msgstr ""
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Voordat u begint, zoek een privéplek en zorg dat u uw herstelzin bij de hand heeft. Houd deze vertrouwelijk om uw identiteit te beschermen."
 
@@ -160,9 +157,6 @@ msgstr "Annuleren"
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-tekens"
 
-msgid "Change"
-msgstr ""
-
 msgid "Characters are case-sensitive"
 msgstr "Tekens zijn hoofdlettergevoelig"
 
@@ -175,6 +169,9 @@ msgstr "Herstelzin controleren"
 msgid "Checking your order"
 msgstr "Uw bestelling controleren"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Kies een account"
 
@@ -186,9 +183,6 @@ msgstr "Kies methode"
 
 msgid "Choose method to continue"
 msgstr "Kies methode om door te gaan"
-
-msgid "Choose which details you'd like to share"
-msgstr ""
 
 msgid "Clear all"
 msgstr "Alles wissen"
@@ -204,6 +198,12 @@ msgstr "Menu sluiten"
 
 msgid "Code copied to clipboard"
 msgstr "Code gekopieerd naar klembord"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "Instelling voltooien"
@@ -240,6 +240,9 @@ msgstr "Doorgaan met {name}"
 
 msgid "Continue with passkey"
 msgstr "Doorgaan met passkey"
+
+msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgstr ""
 
 msgid "Create account"
 msgstr "Account aanmaken"
@@ -283,9 +286,6 @@ msgstr "Dashlane is bevestigd als incompatibel."
 msgid "Default"
 msgstr "Standaard"
 
-msgid "Deny All"
-msgstr ""
-
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
@@ -307,9 +307,6 @@ msgstr "Bewerk {name}"
 msgid "Edit account"
 msgstr "Account bewerken"
 
-msgid "Email:"
-msgstr ""
-
 msgid "Enable multiple accounts"
 msgstr "Meerdere accounts inschakelen"
 
@@ -324,6 +321,9 @@ msgstr "Voer elk woord in de juiste volgorde in:"
 
 msgid "Enter recovery phrase"
 msgstr "Voer herstelzin in"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles wat u moet weten over Internet Identity, uw veilige, privacyvriendelijke en gemakkelijke manier om in te loggen op Internet Computer-apps."
@@ -494,6 +494,9 @@ msgstr "Ongeldige codelink"
 msgid "Invalid code. Please check and try again."
 msgstr "Ongeldige code. Controleer en probeer het opnieuw."
 
+msgid "Invalid domain"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "Ongeldige herstelzin"
 
@@ -560,9 +563,6 @@ msgstr "Limiet bereikt"
 msgid "Link copied to clipboard"
 msgstr "Link gekopieerd naar klembord"
 
-msgid "Loading permissions"
-msgstr ""
-
 msgid "Locked legacy recovery phrase"
 msgstr "Vergrendelde legacy-herstelzin"
 
@@ -625,9 +625,6 @@ msgstr "Accountnaam"
 
 msgid "Name your identity"
 msgstr "Geef uw identiteit een naam"
-
-msgid "Name:"
-msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
@@ -797,9 +794,6 @@ msgstr "Terug naar app"
 msgid "Return to application"
 msgstr "Terug naar applicatie"
 
-msgid "Review Permissions"
-msgstr ""
-
 msgid "Right now"
 msgstr "Op dit moment"
 
@@ -836,7 +830,7 @@ msgstr "Sessie verlopen"
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
-msgid "Share {label}"
+msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
 msgstr ""
 
 msgid "Show all"
@@ -857,8 +851,14 @@ msgstr "Inloggen met vertrouwde methoden"
 msgid "Sign in with another identity"
 msgstr "Inloggen met een andere identiteit"
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Log in met uw {name}-account vanaf elk apparaat."
+msgid "Sign in with SSO"
+msgstr ""
+
+msgid "Sign In With SSO"
+msgstr ""
+
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Uitloggen"
@@ -899,6 +899,30 @@ msgstr ""
 
 msgid "Source code"
 msgstr "Broncode"
+
+msgid "SSO"
+msgstr ""
+
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+msgstr ""
+
+msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+msgstr ""
+
+msgid "SSO provider's discovery document is malformed: {msg}"
+msgstr ""
+
+msgid "SSO sign-in failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "Opnieuw beginnen"
@@ -1028,6 +1052,9 @@ msgstr "Om verder te gaan:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Om uw passkey te voltooien, volgt u de instructies op uw <0>nieuwe apparaat</0>."
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgstr ""
 
 msgid "Type each word in the correct order:"
 msgstr "Typ elk woord in de juiste volgorde:"

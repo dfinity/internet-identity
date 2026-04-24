@@ -670,7 +670,6 @@ fn config() -> InternetIdentityInit {
         related_origins: persistent_state.related_origins.clone(),
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
-        oidc_configs: persistent_state.oidc_configs.clone(),
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -728,7 +727,12 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
-    if let Some(oidc_configs) = config.oidc_configs {
+    // Re-populate in-memory SSO provider state from persistent storage.
+    // `OIDC_CONFIGS` is a thread-local Vec that is lost across upgrades, so we
+    // need to replay the persisted domains here. SSO providers cannot be
+    // registered via init args — only via `add_discoverable_oidc_config`.
+    let persisted_oidc_configs = state::persistent_state(|s| s.oidc_configs.clone());
+    if let Some(oidc_configs) = persisted_oidc_configs {
         openid::setup_oidc(oidc_configs);
     }
 

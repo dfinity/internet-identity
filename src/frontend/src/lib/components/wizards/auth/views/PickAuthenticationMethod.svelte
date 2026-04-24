@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
+  import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { backendCanisterConfig } from "$lib/globals";
@@ -12,9 +13,14 @@
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
+    signInWithSso: () => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithOpenId }: Props = $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithOpenId,
+    signInWithSso,
+  }: Props = $props();
 
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();
@@ -43,6 +49,15 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
+    <Button
+      onclick={setupOrUseExistingPasskey}
+      disabled={!supportsPasskeys || authenticatingProviderId !== undefined}
+      size="xl"
+      variant={"secondary"}
+    >
+      <PasskeyIcon />
+      {$t`Continue with passkey`}
+    </Button>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider}
         {@const name = provider.name}
@@ -69,16 +84,25 @@
           </Button>
         </Tooltip>
       {/each}
+      <!--
+        SSO entry is always rendered. Registration is enforced on the
+        backend (via the `ALLOWED_DISCOVERY_DOMAINS` canary allowlist on
+        `add_discoverable_oidc_config`), so unregistered domains surface as
+        an error inside the SignInWithSso screen rather than being gated
+        here — we keep this option visible so users know the mechanism
+        exists.
+      -->
+      <Button
+        onclick={signInWithSso}
+        variant="secondary"
+        disabled={authenticatingProviderId !== undefined}
+        size="xl"
+        class="flex-1"
+        aria-label={$t`Sign in with SSO`}
+      >
+        <SsoIcon class="size-6" />
+      </Button>
     </div>
-    <Button
-      onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || authenticatingProviderId !== undefined}
-      size="xl"
-      variant={"secondary"}
-    >
-      <PasskeyIcon />
-      {$t`Continue with passkey`}
-    </Button>
   </div>
   <div class="border-border-tertiary border-t"></div>
   <div class="flex flex-row items-center justify-between gap-4">

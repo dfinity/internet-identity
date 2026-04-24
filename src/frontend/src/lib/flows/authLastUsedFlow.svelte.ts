@@ -60,6 +60,9 @@ export class AuthLastUsedFlow {
         const issuer = lastUsedIdentity.authMethod.openid.iss;
         const config = findConfig(
           issuer,
+          // `aud` not tracked on `LastUsedIdentity`; see #3795. Falls back
+          // to issuer-only matching.
+          undefined,
           lastUsedIdentity.authMethod.openid.metadata ?? [],
         );
         if (config === undefined) {

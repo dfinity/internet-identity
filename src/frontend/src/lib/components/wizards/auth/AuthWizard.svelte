@@ -13,6 +13,8 @@
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
+  import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
+  import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
@@ -93,6 +95,29 @@
     }
   };
 
+  const handleContinueWithSso = async (
+    result: SsoDiscoveryResult,
+  ): Promise<void | "cancelled"> => {
+    try {
+      isAuthenticating = true;
+      const authResult = await authFlow.continueWithSso(result);
+      if (authResult.type === "signIn") {
+        await onSignIn(authResult.identityNumber);
+      } else if (authResult.name !== undefined) {
+        await onSignUp(
+          await authFlow.completeOpenIdRegistration(authResult.name),
+        );
+      }
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
   const handleCompleteOpenIdRegistration = async (
     name: string,
   ): Promise<void> => {
@@ -122,6 +147,11 @@
     <CreatePasskey create={handleCreatePasskey} />
   {:else if authFlow.view === "setupNewIdentity"}
     <CreateIdentity create={handleCompleteOpenIdRegistration} />
+  {:else if authFlow.view === "signInWithSso"}
+    <SignInWithSso
+      continueWithSso={handleContinueWithSso}
+      goBack={authFlow.chooseMethod}
+    />
   {/if}
 {/snippet}
 
@@ -149,6 +179,7 @@
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
       continueWithOpenId={handleContinueWithOpenId}
+      signInWithSso={authFlow.signInWithSso}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}

@@ -237,16 +237,6 @@ pub struct InternetIdentityFrontendArgs {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
-}
-
-impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
-    fn from(value: &InternetIdentityInit) -> Self {
-        Self {
-            openid_configs: value.openid_configs.clone(),
-            oidc_configs: value.oidc_configs.clone(),
-        }
-    }
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
@@ -266,9 +256,6 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    /// SSO provider configs managed via `add_discoverable_oidc_config` update call.
-    /// Retained in init args for backward compatibility and `config()` query output.
-    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,

@@ -22,8 +22,17 @@ msgstr "{0} user"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} has moved to the new Internet Identity"
 
-msgid "{attribute}:"
-msgstr "{attribute}:"
+msgid "{displayName} account"
+msgstr "{displayName} account"
+
+msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+msgstr "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgstr "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+msgstr "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} has been removed from this device."
@@ -31,20 +40,8 @@ msgstr "{identityName} has been removed from this device."
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 
-msgid "{name} account"
-msgstr "{name} account"
-
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
-
-msgid "{providerName} {attribute}:"
-msgstr "{providerName} {attribute}:"
-
-msgid "{providerName} email:"
-msgstr "{providerName} email:"
-
-msgid "{providerName} name:"
-msgstr "{providerName} name:"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
@@ -115,9 +112,6 @@ msgstr "Add or remove the ways you can sign in with your identity."
 msgid "Advanced identity management"
 msgstr "Advanced identity management"
 
-msgid "Allow to access this info"
-msgstr "Allow to access this info"
-
 msgid "Are you sure?"
 msgstr "Are you sure?"
 
@@ -142,6 +136,9 @@ msgstr "Authentication successful"
 msgid "Authorize new device"
 msgstr "Authorize new device"
 
+msgid "Back to sign-in options"
+msgstr "Back to sign-in options"
+
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 
@@ -160,9 +157,6 @@ msgstr "Cancel"
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA characters"
 
-msgid "Change"
-msgstr "Change"
-
 msgid "Characters are case-sensitive"
 msgstr "Characters are case-sensitive"
 
@@ -175,6 +169,9 @@ msgstr "Checking recovery phrase"
 msgid "Checking your order"
 msgstr "Checking your order"
 
+msgid "Checking..."
+msgstr "Checking..."
+
 msgid "Choose an account"
 msgstr "Choose an account"
 
@@ -186,9 +183,6 @@ msgstr "Choose method"
 
 msgid "Choose method to continue"
 msgstr "Choose method to continue"
-
-msgid "Choose which details you'd like to share"
-msgstr "Choose which details you'd like to share"
 
 msgid "Clear all"
 msgstr "Clear all"
@@ -204,6 +198,12 @@ msgstr "Close menu"
 
 msgid "Code copied to clipboard"
 msgstr "Code copied to clipboard"
+
+msgid "Company domain"
+msgstr "Company domain"
+
+msgid "company.domain.com"
+msgstr "company.domain.com"
 
 msgid "Complete set-up"
 msgstr "Complete set-up"
@@ -240,6 +240,9 @@ msgstr "Continue with {name}"
 
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
+
+msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgstr "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
 
 msgid "Create account"
 msgstr "Create account"
@@ -283,9 +286,6 @@ msgstr "Dashlane has been confirmed to be incompatible."
 msgid "Default"
 msgstr "Default"
 
-msgid "Deny All"
-msgstr "Deny All"
-
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
@@ -307,9 +307,6 @@ msgstr "Edit {name}"
 msgid "Edit account"
 msgstr "Edit account"
 
-msgid "Email:"
-msgstr "Email:"
-
 msgid "Enable multiple accounts"
 msgstr "Enable multiple accounts"
 
@@ -324,6 +321,9 @@ msgstr "Enter each word in the correct order:"
 
 msgid "Enter recovery phrase"
 msgstr "Enter recovery phrase"
+
+msgid "Enter your company domain"
+msgstr "Enter your company domain"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -494,6 +494,9 @@ msgstr "Invalid code link"
 msgid "Invalid code. Please check and try again."
 msgstr "Invalid code. Please check and try again."
 
+msgid "Invalid domain"
+msgstr "Invalid domain"
+
 msgid "Invalid recovery phrase"
 msgstr "Invalid recovery phrase"
 
@@ -560,9 +563,6 @@ msgstr "Limit reached"
 msgid "Link copied to clipboard"
 msgstr "Link copied to clipboard"
 
-msgid "Loading permissions"
-msgstr "Loading permissions"
-
 msgid "Locked legacy recovery phrase"
 msgstr "Locked legacy recovery phrase"
 
@@ -625,9 +625,6 @@ msgstr "Name account"
 
 msgid "Name your identity"
 msgstr "Name your identity"
-
-msgid "Name:"
-msgstr "Name:"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
@@ -797,9 +794,6 @@ msgstr "Return to app"
 msgid "Return to application"
 msgstr "Return to application"
 
-msgid "Review Permissions"
-msgstr "Review Permissions"
-
 msgid "Right now"
 msgstr "Right now"
 
@@ -836,8 +830,8 @@ msgstr "Session timed out"
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
-msgid "Share {label}"
-msgstr "Share {label}"
+msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
+msgstr "Several SSO sign-ins are in flight already. Wait a moment and try again."
 
 msgid "Show all"
 msgstr "Show all"
@@ -857,8 +851,14 @@ msgstr "Sign in using familiar methods"
 msgid "Sign in with another identity"
 msgstr "Sign in with another identity"
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Sign in with your {name} account from any device."
+msgid "Sign in with SSO"
+msgstr "Sign in with SSO"
+
+msgid "Sign In With SSO"
+msgstr "Sign In With SSO"
+
+msgid "Sign in with your {displayName} account from any device."
+msgstr "Sign in with your {displayName} account from any device."
 
 msgid "Sign out"
 msgstr "Sign out"
@@ -899,6 +899,30 @@ msgstr "Something went wrong while sharing attributes. Please try again; if the 
 
 msgid "Source code"
 msgstr "Source code"
+
+msgid "SSO"
+msgstr "SSO"
+
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+
+msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+msgstr "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
+
+msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+msgstr "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
+
+msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+msgstr "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
+
+msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+msgstr "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
+
+msgid "SSO provider's discovery document is malformed: {msg}"
+msgstr "SSO provider's discovery document is malformed: {msg}"
+
+msgid "SSO sign-in failed. Please try again."
+msgstr "SSO sign-in failed. Please try again."
 
 msgid "Start over"
 msgstr "Start over"
@@ -1028,6 +1052,9 @@ msgstr "To continue:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgstr "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
 
 msgid "Type each word in the correct order:"
 msgstr "Type each word in the correct order:"

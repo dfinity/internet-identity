@@ -33,7 +33,10 @@ import {
   RequestConfig,
   decodeJWT,
   extractIssuerTemplateClaims,
+  selectAuthScopes,
 } from "$lib/utils/openID";
+import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+import { rememberSsoDomainForCredential } from "$lib/utils/ssoDomainStorage";
 import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
@@ -47,6 +50,7 @@ export class AuthFlow {
     | "setupOrUseExistingPasskey"
     | "setupNewPasskey"
     | "setupNewIdentity"
+    | "signInWithSso"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -88,6 +92,70 @@ export class AuthFlow {
       AuthenticationV2Events.ContinueWithPasskeyScreen,
     );
     this.#view = "setupOrUseExistingPasskey";
+  };
+
+  signInWithSso = (): void => {
+    this.#view = "signInWithSso";
+  };
+
+  continueWithSso = async (
+    ssoResult: SsoDiscoveryResult,
+  ): Promise<
+    | {
+        identityNumber: bigint;
+        type: "signIn";
+      }
+    | {
+        name?: string;
+        type: "signUp";
+      }
+  > => {
+    const { domain, clientId, discovery } = ssoResult;
+
+    // Build a synthetic OpenIdConfig from SSO discovery result
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: "",
+      name: "SSO",
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: discovery.issuer,
+      auth_scope: selectAuthScopes(discovery.scopes_supported),
+      client_id: clientId,
+    };
+
+    // Pre-fetch the JWT so we can record the `(iss, sub, aud) → domain`
+    // mapping before handing off to the OpenID flow. Passing the JWT into
+    // `continueWithOpenId` avoids a second round-trip to the provider.
+    // The SSO domain is what the user typed; without remembering it here,
+    // `OpenIdItem` would later render this credential as e.g. "Google
+    // account" when the underlying IdP happens to be Google.
+    this.#systemOverlay = true;
+    let jwt: string;
+    try {
+      jwt = await requestJWT(
+        {
+          clientId,
+          authURL: discovery.authorization_endpoint,
+          authScope: syntheticConfig.auth_scope.join(" "),
+        },
+        {
+          nonce: get(sessionStore).nonce,
+          mediation: "required",
+        },
+      );
+    } catch (error) {
+      this.#view = "chooseMethod";
+      throw error;
+    } finally {
+      this.#systemOverlay = false;
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
+    }
+    const { iss, sub, aud } = decodeJWT(jwt);
+    rememberSsoDomainForCredential({ iss, sub, aud }, domain);
+
+    return await this.continueWithOpenId(syntheticConfig, jwt);
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {

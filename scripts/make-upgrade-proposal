@@ -55,7 +55,7 @@ NOT_MOCKED_COMMANDS=(
   echo
   printf
   update_release_text
-  wait_for_archive_canister_hash
+  detect_archive_hash_change
   download_wasms
   request_verification_command
   deploy_release_candidate
@@ -318,12 +318,62 @@ update_release_text() {
   echo "Please review: https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME"
 }
 
-wait_for_archive_canister_hash() {
-  echo "Go to the release page"
-  echo "Compare the hashes of archive canisters from the previous release and this one"
-  echo "If they are different, we need a new canister"
-  echo "Update the release page verify command: \"scripts/verify-hash\""
-  echo "Release page: https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME"
+# Resolve a proposal-backend-*/proposal-frontend-* tag to the release-* tag
+# pointing at the same commit. GitHub releases are only published for
+# release-* tags, so looking up wasm artifacts requires going through the
+# matching release tag. Mirrors the helper of the same name in
+# .github/actions/release/run.sh.
+resolve_release_tag() {
+  local proposal_tag="$1"
+  local commit
+  commit=$(git rev-parse "$proposal_tag" 2>/dev/null) || { echo ""; return; }
+  git tag --points-at "$commit" | grep "^release-" | sort | head -1 || true
+}
+
+detect_archive_hash_change() {
+  # Compare local archive.wasm.gz sha256 against the archive attached to the
+  # release that corresponds to the previous proposal-backend-*. Emits "true"
+  # or "false" on stdout. Falls back to "true" if the previous archive can't
+  # be fetched, so the BE proposal includes the archive hash in the
+  # conservative case.
+  local prev_proposal_tag
+  prev_proposal_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
+  if [ -z "$prev_proposal_tag" ]; then
+    echo "No previous proposal-backend-* tag found; treating archive as changed." >&2
+    echo "true"
+    return
+  fi
+
+  local prev_release_tag
+  prev_release_tag=$(resolve_release_tag "$prev_proposal_tag")
+  if [ -z "$prev_release_tag" ]; then
+    echo "Could not resolve ${prev_proposal_tag} to a release-* tag; treating archive as changed." >&2
+    echo "true"
+    return
+  fi
+
+  local prev_archive
+  prev_archive=$(mktemp)
+
+  if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_release_tag}/archive.wasm.gz" -o "$prev_archive"; then
+    rm -f "$prev_archive"
+    echo "Could not download ${prev_release_tag}/archive.wasm.gz; treating archive as changed." >&2
+    echo "true"
+    return
+  fi
+
+  local prev_sha curr_sha
+  prev_sha=$(sha256 "$prev_archive")
+  curr_sha=$(sha256 ./archive.wasm.gz)
+  rm -f "$prev_archive"
+  echo "Previous archive (${prev_release_tag}): $prev_sha" >&2
+  echo "Current archive:                        $curr_sha" >&2
+
+  if [ "$prev_sha" = "$curr_sha" ]; then
+    echo "false"
+  else
+    echo "true"
+  fi
 }
 
 download_wasms() {
@@ -535,6 +585,18 @@ append_proposal_argument() {
   if should_upgrade_backend "$upgrade_type"; then
     ARGUMENTS="$(cat args.txt)"
     II_WASM_SHA=$(sha256sum "internet_identity.wasm.gz" | awk '{print $1}')
+    ARCHIVE_WASM_SHA=$(sha256sum "archive.wasm.gz" | awk '{print $1}')
+    local archive_changed
+    archive_changed=$(checklist_must_get "Archive changed")
+
+    # BE proposal verify command: always --ii-hash; add --archive-hash only
+    # when the archive wasm differs from the previous proposal-backend-*.
+    local verify_cmd
+    if [ "$archive_changed" = "true" ]; then
+      verify_cmd=$(printf './scripts/verify-hash \\\n    --ii-hash %s \\\n    --archive-hash %s' "$II_WASM_SHA" "$ARCHIVE_WASM_SHA")
+    else
+      verify_cmd="./scripts/verify-hash --ii-hash ${II_WASM_SHA}"
+    fi
 
     # Remove previously appended sections (idempotent on re-run)
     sed -i.bak '/^## Backend Argument Verification/,$d' backend_proposal.md && rm -f backend_proposal.md.bak
@@ -549,7 +611,7 @@ To build the wasm modules yourself and verify their hashes, run the following co
 \`\`\`
 git pull  # to ensure you have the latest changes.
 git checkout ${git_commit}
-./scripts/verify-hash --ii-hash ${II_WASM_SHA}
+${verify_cmd}
 \`\`\`
 
 ## Backend Argument Verification
@@ -729,52 +791,87 @@ dry_run_proposal() {
   fi
 }
 
-make_proposal() {
-  local upgrade_type="$(checklist_must_get 'Upgrade type')"
-  
-  if should_upgrade_backend "$upgrade_type"; then
-    echo "=== Creating Backend Proposal ==="
-    # Download again the release tag wasm to check the hash along the latest downloaded before.
-    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
-    # Read again the arguments to check the hash along the mainnet_arg.bin file sent in the proposal.
-    ic-admin \
-      --use-hsm \
-      --key-id "01" \
-      --slot 0 \
-      --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
-      --nns-url "https://ic0.app" \
-      propose-to-change-nns-canister \
-      --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
-      --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
-      --mode upgrade \
-      --wasm-module-path ./internet_identity.wasm.gz \
-      --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
-      --arg mainnet_arg.bin \
-      --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
-      --summary-file ./backend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")"
+parse_proposal_id() {
+  # Parse an NNS proposal ID from captured ic-admin stdout. The
+  # propose-to-change-nns-canister subcommand prints the ID via
+  # propose_action_from_command as "proposal {proposal_id}", and
+  # ProposalId's Display impl is itself "proposal N", so the line
+  # reads "proposal proposal N". Matching the doubled form avoids
+  # false positives from other numeric output on the same stream.
+  # See dfinity/nns-dapp scripts/nns-dapp/release for the same pattern.
+  #
+  # Uses bash's regex match (no external pipeline) to keep behavior
+  # predictable under `set -eo pipefail`.
+  local output="$1" label="$2"
+  local id=""
+  if [[ "$output" =~ proposal[[:space:]]+proposal[[:space:]]+([0-9]+) ]]; then
+    id="${BASH_REMATCH[1]}"
   fi
+  if [ -z "$id" ]; then
+    echo "ERROR: could not parse ${label} from ic-admin output." >&2
+    echo "       Run the command manually and record the proposal number in the checklist file." >&2
+    return 1
+  fi
+  # NNS proposal numbers are in the hundreds of thousands. Anything
+  # noticeably smaller almost certainly came from a false-positive
+  # match — refuse to record it as a proposal ID.
+  if [ "$id" -lt 100000 ]; then
+    echo "ERROR: parsed ${label} '${id}' looks wrong (expected >= 100000)." >&2
+    return 1
+  fi
+  echo "$id"
+}
 
-  if should_upgrade_frontend "$upgrade_type"; then
-    echo "=== Creating Frontend Proposal ==="
-    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
-    ic-admin \
-      --use-hsm \
-      --key-id "01" \
-      --slot 0 \
-      --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
-      --nns-url "https://ic0.app" \
-      propose-to-change-nns-canister \
-      --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
-      --canister-id uqzsh-gqaaa-aaaaq-qaada-cai \
-      --mode upgrade \
-      --wasm-module-path ./internet_identity_frontend.wasm.gz \
-      --wasm-module-sha256 "$(sha256 internet_identity_frontend-$TAG_NAME.wasm.gz)" \
-      --arg mainnet_frontend_arg.bin \
-      --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
-      --summary-file ./frontend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")"
-  fi
+make_backend_proposal() {
+  echo "=== Creating Backend Proposal ===" >&2
+  # Download again the release tag wasm to check the hash along the latest downloaded before.
+  curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz >&2
+  # Read again the arguments to check the hash along the mainnet_arg.bin file sent in the proposal.
+  local output
+  # shellcheck disable=SC2312
+  output=$(ic-admin \
+    --use-hsm \
+    --key-id "01" \
+    --slot 0 \
+    --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
+    --nns-url "https://ic0.app" \
+    propose-to-change-nns-canister \
+    --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
+    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+    --mode upgrade \
+    --wasm-module-path ./internet_identity.wasm.gz \
+    --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
+    --arg mainnet_arg.bin \
+    --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
+    --summary-file ./backend_proposal.md \
+    --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")" \
+    2>&1 | tee /dev/stderr)
+  parse_proposal_id "$output" "backend proposal number"
+}
+
+make_frontend_proposal() {
+  echo "=== Creating Frontend Proposal ===" >&2
+  curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz >&2
+  local output
+  # shellcheck disable=SC2312
+  output=$(ic-admin \
+    --use-hsm \
+    --key-id "01" \
+    --slot 0 \
+    --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
+    --nns-url "https://ic0.app" \
+    propose-to-change-nns-canister \
+    --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
+    --canister-id uqzsh-gqaaa-aaaaq-qaada-cai \
+    --mode upgrade \
+    --wasm-module-path ./internet_identity_frontend.wasm.gz \
+    --wasm-module-sha256 "$(sha256 internet_identity_frontend-$TAG_NAME.wasm.gz)" \
+    --arg mainnet_frontend_arg.bin \
+    --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
+    --summary-file ./frontend_proposal.md \
+    --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")" \
+    2>&1 | tee /dev/stderr)
+  parse_proposal_id "$output" "frontend proposal number"
 }
 
 tag_proposal() {
@@ -850,23 +947,11 @@ create_forum_post() {
     proposals_text="Proposals ${linked_nums[0]} and ${linked_nums[1]}"
   fi
 
-  # Replace the default "This is Internet Identity release ..." line with the proposals version
+  # Replace the default "This is Internet Identity release ..." line with the proposals version.
+  # The release body already carries a "## Try it out" section (added by
+  # .github/actions/release/run.sh), so no extra insertion is needed here.
   local body
   body=$(echo "$release_body" | sed "s|This is Internet Identity release \(.*\) for commit \(.*\)\.|${proposals_text} to upgrade Internet Identity to \1 for commit \2.|")
-
-  # Insert "Try it out" section right before "## What's Changed"
-  local try_it_out
-  try_it_out="## Try it out
-* Staging: https://beta.id.ai
-* Testing application: https://try.id.ai
-
-"
-  local whats_changed_marker="## What's Changed"
-  if [[ "$body" != *"$whats_changed_marker"* ]]; then
-    echo "Error: could not find '## What's Changed' section in release body to insert 'Try it out' section." >&2
-    exit 1
-  fi
-  body="${body/$whats_changed_marker/${try_it_out}${whats_changed_marker}}"
 
   # URL-encode title and body for the Discourse new-topic URL
   local encoded_title encoded_body
@@ -912,15 +997,15 @@ record "New tag pushed" git push "$REPO_HTTPS_URL" $TAG_NAME
 confirm_cmd wait_for_release
 confirm_manual "Review release page update" update_release_text
 
-if should_upgrade_backend "$UPGRADE_TYPE"; then
-  confirm_manual "Add archive canister if needed" wait_for_archive_canister_hash
-fi
-
 confirm_cmd download_wasms
 
 if should_upgrade_backend "$UPGRADE_TYPE"; then
   record "II WASM hash" sha256 internet_identity.wasm.gz
   record "Archive WASM hash" sha256 archive.wasm.gz
+  # Auto-detect whether the archive wasm differs from the previous
+  # proposal-backend-* release. The BE proposal's verify-hash command
+  # includes --archive-hash only when this says "true".
+  record "Archive changed" detect_archive_hash_change
 fi
 
 if should_upgrade_frontend "$UPGRADE_TYPE"; then
@@ -955,14 +1040,15 @@ confirm_manual "Confirm proposal arguments" confirm_proposal_arguments
 confirm_manual "Share proposal contents on Slack" share_proposal
 confirm_cmd dry_run_proposal
 confirm_manual "Review proposal" echo "Review the proposal above"
-confirm_cmd make_proposal
 
+# Proposal numbers are parsed from ic-admin's stdout rather than asked from
+# the user: on success it prints "proposal proposal N" (see parse_proposal_id).
 if should_upgrade_backend "$UPGRADE_TYPE"; then
-  record "Backend proposal number" bash -c 'read -p "Enter backend proposal number: " num; echo "$num"'
+  record "Backend proposal number" make_backend_proposal
 fi
 
 if should_upgrade_frontend "$UPGRADE_TYPE"; then
-  record "Frontend proposal number" bash -c 'read -p "Enter frontend proposal number: " num; echo "$num"'
+  record "Frontend proposal number" make_frontend_proposal
 fi
 
 confirm_cmd tag_proposal

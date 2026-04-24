@@ -37,26 +37,30 @@ print_green() {
 #########
 
 function title() {
-    echo "Verifies the hash of the II and archive wasm files"
+    echo "Verifies the hashes of the II, frontend, and archive wasm files"
 }
 
 function usage() {
     cat << EOF
 
 Usage:
-  $0 --ii-hash II_HASH [--iife-hash IIFE_HASH] [--archive-hash ARCHIVE_HASH]
+  $0 [--ii-hash II_HASH] [--iife-hash IIFE_HASH] [--archive-hash ARCHIVE_HASH]
+
+At least one of --ii-hash, --iife-hash, --archive-hash must be provided.
 
 Options:
-  --ii-hash HASH                  Expected II SHA256 hash of the II wasm.
-  --iife-hash HASH                Optional II frontend hash, if the frontend needs to be verified as well.
-  --archive-hash ARCHIVE_HASH     Optional archive hash, if the archive needs to be verified as well.
+  --ii-hash HASH                  Expected SHA256 hash of the II backend wasm.
+  --iife-hash HASH                Expected SHA256 hash of the II frontend wasm.
+  --archive-hash HASH             Expected SHA256 hash of the archive wasm.
 EOF
 }
 
 function help() {
     cat << EOF
 
-Builds the II canister (and optionally also the frontend and archive) and compares the hash of the built wasm with the expected hash.
+Builds each canister for which a hash is provided and compares the hash of the
+built wasm with the expected hash. Canisters with no hash are skipped, so this
+script can verify the backend, frontend, and archive independently or together.
 EOF
 }
 
@@ -96,71 +100,49 @@ do
     esac
 done
 
-if [ -z "$expected_ii_hash" ]
-then
-    echo no II hash provided
+if [ -z "$expected_ii_hash" ] && [ -z "$expected_iife_hash" ] && [ -z "$expected_archive_hash" ]; then
+    echo "Error: no hash provided. Pass at least one of --ii-hash, --iife-hash, --archive-hash." >&2
     usage
     exit 1
 fi
 
-# Run the build
-./scripts/docker-build
-prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
+matches=()
 
-ii_match=false
-iife_match=false
-archive_match=false
-
-if [ "$prod_build_sha256" == "$expected_ii_hash" ]
-then
-  ii_match=true
-else
-  print_red "sha mismatch: $prod_build_sha256 /= $expected_ii_hash"
+verify() {
+  local label="$1" expected="$2" wasm_path="$3"
+  local actual
+  actual="$(shasum -a 256 "$wasm_path" | cut -d ' ' -f1)"
+  if [ "$actual" = "$expected" ]; then
+    matches+=("$(basename "$wasm_path") sha256 matches expected hash $expected")
+    return
+  fi
+  print_red "sha mismatch for $label: $actual /= $expected"
+  # On mismatch, still report anything that matched before we abort.
+  for m in "${matches[@]}"; do print_green "$m"; done
   exit 1
+}
+
+# Build every requested canister in a single docker-build invocation.
+# scripts/docker-build accepts any combination of --internet-identity /
+# --frontend / --archive and builds just the ones requested.
+build_args=()
+[ -n "$expected_ii_hash" ] && build_args+=("--internet-identity")
+[ -n "$expected_iife_hash" ] && build_args+=("--frontend")
+[ -n "$expected_archive_hash" ] && build_args+=("--archive")
+
+./scripts/docker-build "${build_args[@]}"
+
+if [ -n "$expected_ii_hash" ]; then
+  verify "II backend" "$expected_ii_hash" ./internet_identity.wasm.gz
 fi
 
-if [ -n "$expected_iife_hash" ]
-then
-  ./scripts/docker-build --frontend
-  iife_sha256="$(shasum -a 256 ./internet_identity_frontend.wasm.gz | cut -d ' ' -f1)"
-  if [ "$iife_sha256" == "$expected_iife_hash" ]
-  then
-    iife_match=true
-  else
-    print_red "sha mismatch: $iife_sha256 /= $expected_iife_hash"
-    if $ii_match; then
-      print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
-    fi
-    exit 1
-  fi
+if [ -n "$expected_iife_hash" ]; then
+  verify "II frontend" "$expected_iife_hash" ./internet_identity_frontend.wasm.gz
 fi
 
-if [ -n "$expected_archive_hash" ]
-then
-  ./scripts/docker-build --archive
-  archive_sha256="$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)"
-  if [ "$archive_sha256" == "$expected_archive_hash" ]
-  then
-    archive_match=true
-  else
-    print_red "sha mismatch: $archive_sha256 /= $expected_archive_hash"
-    if $ii_match; then
-      print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
-    fi
-    exit 1
-  fi
+if [ -n "$expected_archive_hash" ]; then
+  verify "archive" "$expected_archive_hash" ./archive.wasm.gz
 fi
 
-if $ii_match; then
-  print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
-fi
-
-if $iife_match; then
-  print_green "internet_identity_frontend.wasm.gz sha256 matches expected hash $expected_iife_hash"
-fi
-
-if $archive_match; then
-  print_green "archive.wasm.gz sha256 matches expected hash $expected_archive_hash"
-fi
-
+for m in "${matches[@]}"; do print_green "$m"; done
 print_green "Wasm verification successful!"

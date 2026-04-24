@@ -8,9 +8,11 @@
   } from "$lib/generated/internet_identity_types";
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
+  import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
+  import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
   interface Props {
     onOpenIdLinked: (credential: OpenIdCredential) => void;
@@ -48,6 +50,16 @@
       onError(error); // Propagate unhandled errors to parent component
     }
   };
+  const handleContinueWithSso = async (ssoResult: SsoDiscoveryResult) => {
+    try {
+      onOpenIdLinked(await addAccessMethodFlow.linkSsoAccount(ssoResult));
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error);
+    }
+  };
   const handleCreatePasskey = async () => {
     try {
       onPasskeyRegistered(
@@ -74,6 +86,7 @@
   <AddAccessMethod
     continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
     linkOpenIdAccount={handleContinueWithOpenId}
+    signInWithSso={addAccessMethodFlow.signInWithSso}
     {maxPasskeysReached}
     {openIdCredentials}
   />
@@ -82,6 +95,11 @@
     createPasskey={handleCreatePasskey}
     continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
     {isUsingPasskeys}
+  />
+{:else if addAccessMethodFlow.view === "signInWithSso"}
+  <SignInWithSso
+    continueWithSso={handleContinueWithSso}
+    goBack={addAccessMethodFlow.chooseMethod}
   />
 {/if}
 
