@@ -416,14 +416,6 @@ export const handleIcrc3ImplicitAttributes =
       return;
     }
 
-    const dapp = getDapps().find((d) => d.hasOrigin(channel.origin));
-    if (
-      dapp?.certifiedAttributes !== true &&
-      frontendCanisterConfig.fetch_root_key[0] !== true
-    ) {
-      return;
-    }
-
     const requestedKeys = paramsResult.data.keys;
     if (requestedKeys.length === 0) {
       return;
@@ -517,14 +509,6 @@ export const handleIcrc3ConsentAttributes =
           message: z.prettifyError(paramsResult.error),
         },
       });
-      return;
-    }
-
-    const dapp = getDapps().find((d) => d.hasOrigin(channel.origin));
-    if (
-      dapp?.certifiedAttributes !== true &&
-      frontendCanisterConfig.fetch_root_key[0] !== true
-    ) {
       return;
     }
 
