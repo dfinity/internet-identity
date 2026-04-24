@@ -17,16 +17,22 @@
 
   const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
 
+  // `sso_domain` / `sso_name` are populated by the canister at response
+  // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
+  // text` surfaces on the TS side as `[] | [string]`, hence the `[0]`
+  // unwrap.
+  const ssoDomain = $derived(openid.sso_domain[0]);
+  const ssoName = $derived(openid.sso_name[0]);
+  // Authoritative SSO marker — set by the canister for credentials
+  // whose `(iss, aud)` resolves to a registered discoverable provider.
+  const isSso = $derived(ssoDomain !== undefined);
   const name = $derived(
-    openIdName(openid.iss, openid.sub, openid.aud, openid.metadata),
+    openIdName(openid.iss, openid.aud, openid.metadata, ssoName, ssoDomain),
   );
   const email = $derived(getMetadataString(openid.metadata, "email"));
   const logo = $derived(
-    openIdLogo(openid.iss, openid.sub, openid.aud, openid.metadata),
+    openIdLogo(openid.iss, openid.aud, openid.metadata, ssoDomain),
   );
-  // Credential didn't match any entry in `openid_configs` on (iss, aud).
-  // Treat it as SSO and render the generic SSO icon as a fallback.
-  const isSso = $derived(logo === undefined);
   const displayName = $derived(name ?? $t`SSO`);
   const options = $derived(
     onUnlink !== undefined
@@ -43,7 +49,14 @@
 
 <div class="mb-3 flex h-9 flex-row items-center">
   <div class="text-fg-primary relative size-6">
-    {#if isSso}
+    {#if isSso || logo === undefined}
+      <!--
+        SSO credentials render the generic SSO icon. We also fall back
+        to it when `findConfig` returned nothing (direct-provider
+        credentials whose issuer doesn't match any `openid_configs`
+        entry, e.g. after client_id rotation) so `{@html logo}` never
+        stringifies `undefined` into the DOM.
+      -->
       <SsoIcon class="size-6" />
     {:else}
       {@html logo}

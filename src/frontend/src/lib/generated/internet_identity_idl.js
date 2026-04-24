@@ -307,6 +307,8 @@ export const idlFactory = ({ IDL }) => {
     'iss' : Iss,
     'sub' : Sub,
     'metadata' : MetadataMapV2,
+    'sso_domain' : IDL.Opt(IDL.Text),
+    'sso_name' : IDL.Opt(IDL.Text),
     'last_usage_timestamp' : IDL.Opt(Timestamp),
   });
   const DeviceRegistrationInfo = IDL.Record({

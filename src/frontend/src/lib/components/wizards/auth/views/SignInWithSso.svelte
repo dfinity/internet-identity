@@ -13,6 +13,7 @@
   } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
   import { OAuthProviderError } from "$lib/utils/openID";
+  import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
@@ -20,9 +21,19 @@
       result: SsoDiscoveryResult,
     ) => Promise<void | "cancelled">;
     goBack: () => void;
+    /**
+     * Credentials already linked to the signed-in identity. When present,
+     * the Continue button is disabled and an inline hint is shown if the
+     * discovered SSO's `(iss, aud)` matches an existing credential —
+     * mirroring how the add-access-method UI disables already-linked
+     * direct providers (Google / Apple / Microsoft) in
+     * `AddAccessMethod.svelte`. Leave this `undefined` in the sign-in
+     * flow, where reusing an already-linked credential is the point.
+     */
+    openIdCredentials?: OpenIdCredential[];
   }
 
-  const { continueWithSso, goBack }: Props = $props();
+  const { continueWithSso, goBack, openIdCredentials }: Props = $props();
 
   /**
    * Debounce delay before kicking off the (network-heavy) two-hop lookup.
@@ -44,33 +55,63 @@
    */
   let preparedResult = $state<SsoDiscoveryResult>();
 
+  /**
+   * True when `preparedResult`'s `(issuer, client_id)` already matches a
+   * credential in `openIdCredentials` — i.e. this SSO domain is already
+   * linked to the signed-in identity. Keeps the add-access-method Continue
+   * button disabled with an inline hint, matching the direct-provider
+   * behaviour in `AddAccessMethod.svelte`. Always `false` in the sign-in
+   * flow (where `openIdCredentials` is left undefined).
+   */
+  const isAlreadyLinked = $derived.by(() => {
+    if (preparedResult === undefined || openIdCredentials === undefined) {
+      return false;
+    }
+    const { discovery, clientId } = preparedResult;
+    return openIdCredentials.some(
+      (c) => c.iss === discovery.issuer && c.aud === clientId,
+    );
+  });
+
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const mapSubmitError = (e: unknown, domainInput: string): string => {
+  /**
+   * Map caught errors to user-actionable copy, or `undefined` for
+   * "nothing useful to tell the user" — the caller will fall back to a
+   * generic message. Raw errors are always logged to the console so
+   * engineers have the full stack while end users see concise copy.
+   *
+   * Only branches that the user (or their SSO admin) can act on live
+   * here; provider-misconfiguration details (hostname mismatch, HTTPS,
+   * malformed discovery document) are dropped to the generic path —
+   * they're dev-facing and the console log is the right audience.
+   */
+  const mapSubmitError = (
+    e: unknown,
+    domainInput: string,
+  ): string | undefined => {
     if (e instanceof DomainNotConfiguredError) {
       if (e.reason === "http-error" && e.httpStatus !== undefined) {
-        return $t`${domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP ${String(e.httpStatus)}). The domain owner needs to publish it for II to sign you in.`;
+        return $t`${domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP ${String(e.httpStatus)}).`;
       }
       if (e.reason === "network") {
-        return $t`Couldn't reach ${domainInput}. Check the spelling and your network, then try again.`;
-      }
-      if (e.detail !== undefined && e.detail.length > 0) {
-        return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed: ${e.detail}`;
+        return $t`Couldn't reach ${domainInput}. Check the spelling and your network.`;
       }
       return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed.`;
     }
     if (e instanceof OAuthProviderError) {
-      // `unsupported_response_type` is the signature of an SSO app that
-      // only allows the plain authorization-code flow. II needs the
-      // hybrid flow (id_token + code) because it verifies JWTs canister-
-      // side with no token-endpoint exchange. Spell out the fix so the
-      // SSO admin can act on it directly.
+      // `unsupported_response_type` = the SSO app is code-only; II needs
+      // the hybrid flow because it verifies JWTs canister-side with no
+      // token-endpoint exchange. Spell out the fix so the SSO admin can
+      // act on it directly.
       if (e.error === "unsupported_response_type") {
-        return $t`${domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type "id_token code" (e.g. in Okta, set the app to Single-Page Application with "Implicit (hybrid)" grant enabled).`;
+        return $t`${domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type "id_token code".`;
       }
       if (e.error === "access_denied") {
-        return $t`${domainInput}'s SSO denied the sign-in. Try again, and check with your SSO admin if the problem persists.`;
+        return $t`${domainInput}'s SSO denied the sign-in.`;
       }
+      // Everything else: show the provider's own words if any, else the
+      // error code. Useful because these bubble straight from the IdP.
       if (e.errorDescription !== undefined && e.errorDescription.length > 0) {
         return $t`${domainInput}'s SSO returned "${e.error}": ${e.errorDescription}`;
       }
@@ -81,30 +122,28 @@
       if (msg.toLowerCase().includes("canary allowlist")) {
         return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
       }
-      if (msg.includes("Provider issuer hostname mismatch")) {
-        return $t`SSO provider misconfigured: issuer doesn't match the configured hostname. (${msg})`;
-      }
-      if (msg.includes("Provider authorization endpoint hostname mismatch")) {
-        return $t`SSO provider misconfigured: authorization endpoint points to a different host than the issuer. (${msg})`;
-      }
-      if (msg.includes("Provider issuer must use HTTPS")) {
-        return $t`SSO provider misconfigured: issuer URL is not HTTPS. (${msg})`;
-      }
-      if (msg.includes("Provider authorization endpoint must use HTTPS")) {
-        return $t`SSO provider misconfigured: authorization endpoint is not HTTPS. (${msg})`;
-      }
-      if (msg.startsWith("Provider discovery:")) {
-        return $t`SSO provider's discovery document is malformed: ${msg}`;
-      }
       if (msg.startsWith("Rate limited:")) {
-        return $t`Too many recent attempts for ${domainInput}. Wait a few minutes and try again.`;
+        return $t`Too many recent attempts for ${domainInput}. Wait a few minutes.`;
       }
       if (msg === "Too many concurrent SSO discovery requests") {
-        return $t`Several SSO sign-ins are in flight already. Wait a moment and try again.`;
+        return $t`Several SSO sign-ins are in flight already. Wait a moment.`;
       }
-      return msg;
     }
-    return $t`SSO sign-in failed. Please try again.`;
+    return undefined;
+  };
+
+  /**
+   * Set `error` from a thrown exception: always `console.error` the raw
+   * error (so engineers can inspect the stack / non-Error values), then
+   * surface a user-actionable message if we have one, or a generic
+   * fallback.
+   */
+  const setErrorFrom = (e: unknown, domainInput: string) => {
+    // eslint-disable-next-line no-console
+    console.error("SSO sign-in failed", e);
+    error =
+      mapSubmitError(e, domainInput) ??
+      $t`SSO sign-in for ${domainInput} failed. Please try again.`;
   };
 
   const invalidatePrepared = () => {
@@ -160,7 +199,7 @@
         }
       } catch (e) {
         if (matchesCurrent()) {
-          error = mapSubmitError(e, trimmed);
+          setErrorFrom(e, trimmed);
         }
       } finally {
         if (matchesCurrent()) {
@@ -187,7 +226,7 @@
       // handler.
       await continueWithSso(preparedResult);
     } catch (e) {
-      error = mapSubmitError(e, domain.trim().toLowerCase());
+      setErrorFrom(e, domain.trim().toLowerCase());
     } finally {
       isSubmitting = false;
     }
@@ -207,7 +246,7 @@
       <SsoIcon class="size-5" />
     </FeaturedIcon>
     <div class="flex flex-col gap-3">
-      <h1 class="text-2xl font-medium">{$t`Sign In With SSO`}</h1>
+      <h1 class="text-2xl font-medium">{$t`Continue with SSO`}</h1>
       <p class="text-text-tertiary text-base font-medium">
         {$t`Enter your company domain`}
       </p>
@@ -236,11 +275,19 @@
       {error}
       aria-label={$t`Company domain`}
     />
+    {#if isAlreadyLinked}
+      <p class="text-text-tertiary text-sm">
+        {$t`This SSO is already linked to your identity.`}
+      </p>
+    {/if}
     <Button
       variant="primary"
       size="lg"
       type="submit"
-      disabled={preparedResult === undefined || isSubmitting || isLookingUp}
+      disabled={preparedResult === undefined ||
+        isSubmitting ||
+        isLookingUp ||
+        isAlreadyLinked}
     >
       {#if isSubmitting}
         <ProgressRing />
