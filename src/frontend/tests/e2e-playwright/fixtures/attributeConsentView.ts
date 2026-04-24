@@ -50,7 +50,11 @@ class AttributeConsentView {
   }
 
   async waitForVisible(): Promise<void> {
-    await expect(this.heading).toBeVisible();
+    // Generous timeout: the handler waits for auth to complete and for
+    // `list_available_attributes` to return before the heading can render,
+    // and the passkey path on mobile CI regularly takes more than the 5s
+    // Playwright default between the final "Continue" and `ready = true`.
+    await expect(this.heading).toBeVisible({ timeout: 15_000 });
   }
 
   async expectHidden(): Promise<void> {
