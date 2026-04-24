@@ -25,13 +25,15 @@ class AttributeConsentView {
    *  attribute keys) in Unicode bidi isolation marks (FSI U+2068 / PDI
    *  U+2069) for correct RTL rendering, so a plain-substring match won't
    *  hit those rows. The regex below lets any character in the caller's
-   *  label be preceded/followed by those marks. */
+   *  label be preceded/followed by those marks, and anchors at both ends
+   *  so `"Email:"` doesn't accidentally match `"Google email:"`. */
   row(label: string): Locator {
+    const body = label
+      .split("")
+      .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("[\\u2068\\u2069]*");
     const pattern = new RegExp(
-      label
-        .split("")
-        .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("[\\u2068\\u2069]*"),
+      `^[\\u2068\\u2069]*${body}[\\u2068\\u2069]*$`,
       "i",
     );
     return this.#page.getByRole("group", { name: pattern });

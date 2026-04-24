@@ -476,11 +476,16 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       identities,
       signInWithIdentity,
     }) => {
-      // Sign the passkey identity into the dapp's authorize popup.
+      // Sign the passkey identity into the dapp's authorize popup, then
+      // hit the final "Continue" that triggers authorization — the consent
+      // handler only wakes up once the user has authorized.
       await signInWithIdentity(
         authorizePage.page,
         identities[0].identityNumber,
       );
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
       await attributeConsentView.accept();
     });
   });
