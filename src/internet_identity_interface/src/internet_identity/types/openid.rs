@@ -15,17 +15,29 @@ pub struct OpenIdCredentialData {
     // authn method stats if this value is already set to any value.
     pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: HashMap<String, MetadataEntryV2>,
-    /// SSO discovery domain for credentials linked via two-hop OIDC
-    /// discovery, looked up on demand by `(iss, aud)`. `None` for direct-
-    /// provider credentials (Google / Apple / Microsoft) and for SSO
-    /// credentials whose provider is no longer registered on the
-    /// canister.
-    pub sso_domain: Option<String>,
-    /// Human-readable SSO name served alongside `client_id` at
-    /// `{sso_domain}/.well-known/ii-openid-configuration`. `None` when
-    /// the domain doesn't publish one — callers that want a label should
-    /// fall back to `sso_domain` on the frontend side.
-    pub sso_name: Option<String>,
+    /// Two-hop SSO provenance for credentials linked via
+    /// `add_discoverable_oidc_config`. Looked up on demand by `(iss, aud)`
+    /// from current canister state. `None` for direct-provider credentials
+    /// (Google / Apple / Microsoft) and for SSO credentials whose provider
+    /// is no longer registered on the canister.
+    pub sso_configuration: Option<SsoConfiguration>,
+}
+
+/// Per-credential SSO provenance returned alongside an
+/// `OpenIdCredentialData`. Grouped into one optional struct (rather than
+/// two independent optional fields) so "is this credential SSO?" is a
+/// single presence check.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SsoConfiguration {
+    /// The `discovery_domain` the user entered (always present for SSO
+    /// credentials).
+    pub domain: String,
+    /// Human-readable name served alongside `client_id` at
+    /// `{domain}/.well-known/ii-openid-configuration`. `None` when the
+    /// domain doesn't publish one — callers that want a label should
+    /// fall back to `domain` on the frontend side. Kept separate from
+    /// `domain` so callers can render the two cases differently.
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

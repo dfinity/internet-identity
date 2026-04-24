@@ -937,19 +937,13 @@ export interface OpenIdCredential {
   'sub' : Sub,
   'metadata' : MetadataMapV2,
   /**
-   * SSO discovery domain, looked up by `(iss, aud)` against the
-   * canister's registered discoverable OIDC configs. `None` for
-   * direct-provider credentials (Google / Apple / Microsoft) and for
-   * SSO credentials whose provider is no longer registered.
+   * Two-hop SSO provenance for credentials linked via
+   * `add_discoverable_oidc_config`. Looked up on demand by `(iss, aud)`
+   * against current canister state. `null` for direct-provider
+   * credentials (Google / Apple / Microsoft) and for SSO credentials
+   * whose provider is no longer registered.
    */
-  'sso_domain' : [] | [string],
-  /**
-   * Human-readable SSO name from the domain's
-   * `/.well-known/ii-openid-configuration`. `None` when the domain
-   * doesn't publish one — callers should fall back to `sso_domain`
-   * for the label.
-   */
-  'sso_name' : [] | [string],
+  'sso_configuration' : [] | [SsoConfiguration],
   'last_usage_timestamp' : [] | [Timestamp],
 }
 export type OpenIdCredentialAddError = {
@@ -1156,6 +1150,25 @@ export interface SignedIdAlias {
   'credential_jws' : string,
   'id_alias' : Principal,
   'id_dapp' : Principal,
+}
+/**
+ * Per-credential SSO provenance. Grouped as a single optional record so
+ * `sso_configuration : null` is a single "this credential isn't SSO"
+ * check, rather than two independent optional fields.
+ */
+export interface SsoConfiguration {
+  /**
+   * The `discovery_domain` the user entered (always present when the
+   * outer `sso_configuration` is non-null).
+   */
+  'domain' : string,
+  /**
+   * Human-readable name from the domain's
+   * `/.well-known/ii-openid-configuration`. `null` when the domain
+   * doesn't publish one — callers should fall back to `domain` for
+   * the label.
+   */
+  'name' : [] | [string],
 }
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],

@@ -21,6 +21,7 @@ use identity_jose::jws::{
 };
 use internet_identity_interface::internet_identity::types::{
     DiscoverableOidcConfig, MetadataEntryV2, OpenIdConfig, OpenIdEmailVerificationScheme,
+    SsoConfiguration,
 };
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
@@ -707,13 +708,13 @@ pub fn discovered_state_for(
     })
 }
 
-/// Looks up the SSO domain + optional SSO name for an OpenID credential
-/// by its `(iss, aud)` pair. Computed on-demand from current
-/// `DISCOVERY_TASKS` state — that way `get_anchor_info` always reflects
-/// live SSO metadata (the domain's current `name` field, or absence
-/// thereof) instead of whatever got stamped at verification time.
+/// Looks up the SSO provenance for an OpenID credential by its
+/// `(iss, aud)` pair. Computed on-demand from current `DISCOVERY_TASKS`
+/// state — that way `get_anchor_info` always reflects live SSO metadata
+/// (the domain's current `name` field, or absence thereof) instead of
+/// whatever got stamped at verification time.
 ///
-/// Returns `(None, None)` for:
+/// Returns `None` for:
 ///   - Direct-provider credentials (Google / Apple / Microsoft — the
 ///     matching provider isn't a `DiscoverableProvider`, so no task
 ///     matches on `(iss, aud)`).
@@ -722,12 +723,14 @@ pub fn discovered_state_for(
 ///   - SSO credentials whose hop-1 / hop-2 discovery hasn't completed
 ///     yet (task exists but `client_id_ref` / `issuer_ref` are `None`).
 ///
-/// The caller renders a human-readable label by falling back
-/// `sso_name → sso_domain → direct-provider `findConfig` result` on the
-/// frontend — the backend intentionally does not collapse the two: we
-/// want the FE to be able to tell "no name published" apart from "has a
-/// name" for future divergent rendering.
-pub fn sso_fields_for(iss: &str, aud: &str) -> (Option<String>, Option<String>) {
+/// Returns `Some(SsoConfiguration { domain, name })` otherwise, where
+/// `name` may still be `None` if the domain doesn't publish one.
+/// Callers that want a human-readable label fall back
+/// `name → domain → direct-provider `findConfig` result` on the
+/// frontend — the backend intentionally does not collapse the two so
+/// the FE can tell "no name published" apart from "has a name" for
+/// future divergent rendering.
+pub fn sso_configuration_for(iss: &str, aud: &str) -> Option<SsoConfiguration> {
     DISCOVERY_TASKS.with_borrow(|tasks| {
         tasks
             .iter()
@@ -735,13 +738,10 @@ pub fn sso_fields_for(iss: &str, aud: &str) -> (Option<String>, Option<String>) 
                 t.issuer_ref.borrow().as_deref() == Some(iss)
                     && t.client_id_ref.borrow().as_deref() == Some(aud)
             })
-            .map(|t| {
-                (
-                    Some(t.discovery_domain.clone()),
-                    t.name_ref.borrow().clone(),
-                )
+            .map(|t| SsoConfiguration {
+                domain: t.discovery_domain.clone(),
+                name: t.name_ref.borrow().clone(),
             })
-            .unwrap_or((None, None))
     })
 }
 

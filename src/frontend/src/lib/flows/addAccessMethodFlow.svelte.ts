@@ -73,12 +73,12 @@ export class AddAccessMethodFlow {
         sub,
         metadata,
         last_usage_timestamp: [],
-        // `sso_domain` / `sso_name` are populated by the canister when
-        // the credential is later returned via `get_anchor_info`; the
-        // FE-constructed echo of the just-added credential doesn't know
-        // them, so leave empty (Candid `opt text` = `[] | [string]`).
-        sso_domain: [],
-        sso_name: [],
+        // `sso_configuration` is populated by the canister when the
+        // credential is later returned via `get_anchor_info`; the FE-
+        // constructed echo of the just-added credential doesn't know
+        // it, so leave empty (Candid `opt SsoConfiguration` = `[] |
+        // [SsoConfiguration]`).
+        sso_configuration: [],
       };
     } finally {
       this.#isSystemOverlayVisible = false;

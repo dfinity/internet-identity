@@ -17,21 +17,27 @@
 
   const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
 
-  // `sso_domain` / `sso_name` are populated by the canister at response
-  // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
-  // text` surfaces on the TS side as `[] | [string]`, hence the `[0]`
-  // unwrap.
-  const ssoDomain = $derived(openid.sso_domain[0]);
-  const ssoName = $derived(openid.sso_name[0]);
+  // `sso_configuration` is populated by the canister at response time
+  // via `openid::generic::sso_configuration_for(iss, aud)`. Candid
+  // `opt SsoConfiguration` surfaces on the TS side as
+  // `[] | [SsoConfiguration]`, hence the `[0]` unwrap. When present it
+  // always carries a `domain`; `name` is a separate optional.
+  const sso = $derived(openid.sso_configuration[0]);
   // Authoritative SSO marker — set by the canister for credentials
   // whose `(iss, aud)` resolves to a registered discoverable provider.
-  const isSso = $derived(ssoDomain !== undefined);
+  const isSso = $derived(sso !== undefined);
   const name = $derived(
-    openIdName(openid.iss, openid.aud, openid.metadata, ssoName, ssoDomain),
+    openIdName(
+      openid.iss,
+      openid.aud,
+      openid.metadata,
+      sso?.name[0],
+      sso?.domain,
+    ),
   );
   const email = $derived(getMetadataString(openid.metadata, "email"));
   const logo = $derived(
-    openIdLogo(openid.iss, openid.aud, openid.metadata, ssoDomain),
+    openIdLogo(openid.iss, openid.aud, openid.metadata, sso?.domain),
   );
   const displayName = $derived(name ?? $t`SSO`);
   const options = $derived(

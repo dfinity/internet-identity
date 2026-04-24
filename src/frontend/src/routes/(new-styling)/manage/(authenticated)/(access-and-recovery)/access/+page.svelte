@@ -325,8 +325,8 @@
           removingAccessMethod.openid.iss,
           removingAccessMethod.openid.aud,
           removingAccessMethod.openid.metadata,
-          removingAccessMethod.openid.sso_name[0],
-          removingAccessMethod.openid.sso_domain[0],
+          removingAccessMethod.openid.sso_configuration[0]?.name[0],
+          removingAccessMethod.openid.sso_configuration[0]?.domain,
         ) ?? $t`Unknown`}
         isCurrentAccessMethod={isCurrentAccessMethod(
           $authenticatedStore,

@@ -302,13 +302,16 @@ export const idlFactory = ({ IDL }) => {
   const Aud = IDL.Text;
   const Iss = IDL.Text;
   const Sub = IDL.Text;
+  const SsoConfiguration = IDL.Record({
+    'domain' : IDL.Text,
+    'name' : IDL.Opt(IDL.Text),
+  });
   const OpenIdCredential = IDL.Record({
     'aud' : Aud,
     'iss' : Iss,
     'sub' : Sub,
     'metadata' : MetadataMapV2,
-    'sso_domain' : IDL.Opt(IDL.Text),
-    'sso_name' : IDL.Opt(IDL.Text),
+    'sso_configuration' : IDL.Opt(SsoConfiguration),
     'last_usage_timestamp' : IDL.Opt(Timestamp),
   });
   const DeviceRegistrationInfo = IDL.Record({

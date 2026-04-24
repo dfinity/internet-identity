@@ -43,8 +43,7 @@ const makeOpenId = (
   last_usage_timestamp: lastUse !== undefined ? [lastUse] : [],
   aud: "",
   metadata: [],
-  sso_domain: [],
-  sso_name: [],
+  sso_configuration: [],
 });
 
 describe("compareAccessMethods", () => {

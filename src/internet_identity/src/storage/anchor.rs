@@ -127,21 +127,22 @@ impl From<Device> for DeviceDataWithoutAlias {
 
 impl From<OpenIdCredential> for OpenIdCredentialData {
     fn from(openid_credential: OpenIdCredential) -> Self {
-        // Populate SSO fields on-demand from current `DISCOVERY_TASKS`
+        // Populate SSO provenance on-demand from current `DISCOVERY_TASKS`
         // state so the FE always sees the live value — if a domain
         // updates the `name` in its `/.well-known/ii-openid-
         // configuration`, the next `get_anchor_info` reflects it
         // without any per-credential storage migration.
-        let (sso_domain, sso_name) =
-            crate::openid::sso_fields_for(&openid_credential.iss, &openid_credential.aud);
+        let sso_configuration = crate::openid::sso_configuration_for(
+            &openid_credential.iss,
+            &openid_credential.aud,
+        );
         Self {
             iss: openid_credential.iss,
             sub: openid_credential.sub,
             aud: openid_credential.aud,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
-            sso_domain,
-            sso_name,
+            sso_configuration,
         }
     }
 }
