@@ -22,6 +22,9 @@ msgstr "Utilisateur {0}"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} est passé à la nouvelle Internet Identity"
 
+msgid "{attribute}:"
+msgstr ""
+
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} a été supprimée de cet appareil."
 
@@ -33,6 +36,15 @@ msgstr "Compte {name}"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# passkey} other {# passkeys}}"
+
+msgid "{providerName} {attribute}:"
+msgstr ""
+
+msgid "{providerName} email:"
+msgstr ""
+
+msgid "{providerName} name:"
+msgstr ""
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Interface entièrement repensée :</0> Nous avons donné à Internet Identity une apparence moderne et renouvelée. Le nouveau design est intuitif et plus facile à parcourir, garantissant une expérience utilisateur plus fluide."
@@ -103,6 +115,9 @@ msgstr "Ajoutez ou supprimez les moyens qui vous permettent de vous connecter av
 msgid "Advanced identity management"
 msgstr "Gestion avancée de l’identité"
 
+msgid "Allow to access this info"
+msgstr ""
+
 msgid "Are you sure?"
 msgstr "Êtes-vous sûr ?"
 
@@ -111,6 +126,9 @@ msgstr "Comme vous êtes actuellement connecté avec ce compte, vous allez être
 
 msgid "As you are currently signed in with this passkey, you will be signed out."
 msgstr "Comme vous êtes actuellement connecté avec cette passkey, vous allez être déconnecté."
+
+msgid "Attribute sharing failed"
+msgstr ""
 
 msgid "Authenticating..."
 msgstr "Authentification en cours..."
@@ -142,6 +160,9 @@ msgstr "Annuler"
 msgid "CAPTCHA characters"
 msgstr "Caractères CAPTCHA"
 
+msgid "Change"
+msgstr ""
+
 msgid "Characters are case-sensitive"
 msgstr "Respectez les majuscules et minuscules"
 
@@ -165,6 +186,9 @@ msgstr "Choisissez une méthode"
 
 msgid "Choose method to continue"
 msgstr "Choisissez une méthode pour continuer"
+
+msgid "Choose which details you'd like to share"
+msgstr ""
 
 msgid "Clear all"
 msgstr "Tout effacer"
@@ -259,6 +283,9 @@ msgstr "Il a été confirmé que Dashlane est incompatible."
 msgid "Default"
 msgstr "Par défaut"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "Passkeys découvrables"
 
@@ -279,6 +306,9 @@ msgstr "Modifier {name}"
 
 msgid "Edit account"
 msgstr "Modifier le compte"
+
+msgid "Email:"
+msgstr ""
 
 msgid "Enable multiple accounts"
 msgstr "Activer plusieurs comptes"
@@ -530,6 +560,9 @@ msgstr "Limite atteinte"
 msgid "Link copied to clipboard"
 msgstr "Lien copié dans le presse-papiers"
 
+msgid "Loading permissions"
+msgstr ""
+
 msgid "Locked legacy recovery phrase"
 msgstr "Ancienne phrase de récupération verrouillée"
 
@@ -592,6 +625,9 @@ msgstr "Nommez le compte"
 
 msgid "Name your identity"
 msgstr "Nommez votre identité"
+
+msgid "Name:"
+msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Aucune donnée n’est partagée avec Google, Microsoft ou Apple concernant les applications auxquelles vous vous connectez avec Internet Identity."
@@ -704,9 +740,6 @@ msgstr "Phrase de récupération non vérifiée"
 msgid "Recovery phrase set"
 msgstr "Phrase de récupération définie"
 
-msgid "Redirecting to the app"
-msgstr "Redirection vers l’application"
-
 msgid "Remove"
 msgstr "Supprimer"
 
@@ -764,6 +797,9 @@ msgstr "Retour à l’application"
 msgid "Return to application"
 msgstr "Retour à l’application"
 
+msgid "Review Permissions"
+msgstr ""
+
 msgid "Right now"
 msgstr "À l’instant"
 
@@ -799,6 +835,9 @@ msgstr "Session expirée"
 
 msgid "Set as default sign-in"
 msgstr "Définir comme connexion par défaut"
+
+msgid "Share {label}"
+msgstr ""
 
 msgid "Show all"
 msgstr "Tout afficher"
@@ -853,6 +892,9 @@ msgid "Something is wrong!"
 msgstr "Incorrect"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+msgstr ""
+
+msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
 msgstr ""
 
 msgid "Source code"
