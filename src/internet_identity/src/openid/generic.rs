@@ -260,8 +260,20 @@ pub fn is_allowed_discovery_domain(domain: &str) -> bool {
 /// SSO provider that resolves its configuration via two-hop discovery.
 /// Used with the `DiscoverableOidcConfig` type.
 pub struct DiscoverableProvider {
+    /// The `discovery_domain` from the `DiscoverableOidcConfig` this provider
+    /// was created from. Known at construction (never changes) — it's the
+    /// canonical label for the SSO, and what we want to stamp onto any
+    /// credential verified by this provider so the FE can render it as
+    /// e.g. "dfinity.org" regardless of the underlying IdP's issuer.
+    discovery_domain: String,
     discovered_client_id: Rc<RefCell<Option<String>>>,
     discovered_issuer: Rc<RefCell<Option<String>>>,
+    /// The `name` field, if any, served alongside `client_id` /
+    /// `openid_configuration` at `{discovery_domain}/.well-known/ii-openid-
+    /// configuration`. Populated during hop-1 fetch; `None` otherwise. The
+    /// FE uses this as the human-readable label for SSO credentials
+    /// (e.g. "DFINITY") and falls back to `discovery_domain` when absent.
+    discovered_name: Rc<RefCell<Option<String>>>,
     certs: Rc<RefCell<Vec<Jwk>>>,
 }
 
@@ -352,6 +364,20 @@ impl OpenIdProvider for DiscoverableProvider {
         if let Some(name) = claims.name {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
         }
+        // Stamp SSO provenance onto the credential: the domain that was
+        // entered by the user (canonical label), and optionally the
+        // human-readable name from `/.well-known/ii-openid-configuration`.
+        // The FE reads these back via `get_anchor_info` so it can render
+        // SSO credentials correctly across devices — without this, the
+        // per-device localStorage hack the previous iteration carried
+        // couldn't survive reloads, let alone a different browser.
+        metadata.insert(
+            "sso_domain".into(),
+            MetadataEntryV2::String(self.discovery_domain.clone()),
+        );
+        if let Some(sso_name) = self.discovered_name.borrow().clone() {
+            metadata.insert("sso_name".into(), MetadataEntryV2::String(sso_name));
+        }
         Ok(OpenIdCredential {
             iss: claims.iss,
             sub: claims.sub,
@@ -371,6 +397,13 @@ pub struct DiscoveryState {
     pub client_id_ref: Rc<RefCell<Option<String>>>,
     pub openid_configuration_ref: Rc<RefCell<Option<String>>>,
     pub issuer_ref: Rc<RefCell<Option<String>>>,
+    /// Human-readable SSO name served at
+    /// `{discovery_domain}/.well-known/ii-openid-configuration`.
+    /// Populated by hop-1 once per refresh; `None` if absent in the
+    /// hop-1 body. Only read by the periodic discovery timer in
+    /// non-test builds (same shape as `certs_ref` / `last_jwks_uri`).
+    #[allow(dead_code)]
+    pub name_ref: Rc<RefCell<Option<String>>>,
     /// Only read by the periodic discovery timer (non-test builds).
     #[allow(dead_code)]
     pub certs_ref: Rc<RefCell<Vec<Jwk>>>,
@@ -394,6 +427,7 @@ impl DiscoverableProvider {
         let discovered_issuer: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
         let discovered_client_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
         let openid_configuration: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let discovered_name: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 
         DISCOVERY_TASKS.with_borrow_mut(|tasks| {
             tasks.push(DiscoveryState {
@@ -401,14 +435,17 @@ impl DiscoverableProvider {
                 client_id_ref: Rc::clone(&discovered_client_id),
                 openid_configuration_ref: Rc::clone(&openid_configuration),
                 issuer_ref: Rc::clone(&discovered_issuer),
+                name_ref: Rc::clone(&discovered_name),
                 certs_ref: Rc::clone(&certs),
                 last_jwks_uri: Rc::new(RefCell::new(None)),
             });
         });
 
         DiscoverableProvider {
+            discovery_domain: config.discovery_domain,
             discovered_client_id,
             discovered_issuer,
+            discovered_name,
             certs,
         }
     }
@@ -490,6 +527,9 @@ async fn run_discovery_tasks() {
         task.openid_configuration_ref
             .replace(Some(ii_config.openid_configuration));
         task.issuer_ref.replace(Some(doc.issuer));
+        // `name` may be `None` (field absent / older deployment) — in that
+        // case the FE falls back to the `discovery_domain` for the label.
+        task.name_ref.replace(ii_config.name);
 
         // Start or restart cert fetching when jwks_uri changes
         let jwks_changed = {
@@ -646,6 +686,12 @@ fn transform_discovery(response: HttpResponse) -> HttpResponse {
 struct IIOpenIdConfiguration {
     client_id: String,
     openid_configuration: String,
+    /// Human-readable name for the SSO (e.g. `"DFINITY"`). Optional; the
+    /// FE falls back to the `discovery_domain` when this is absent. Kept
+    /// `Option<>` + `#[serde(default)]` so older deployments that don't
+    /// publish the field continue to parse.
+    #[serde(default)]
+    name: Option<String>,
 }
 
 /// OIDC discovery document — only the fields needed by the backend.

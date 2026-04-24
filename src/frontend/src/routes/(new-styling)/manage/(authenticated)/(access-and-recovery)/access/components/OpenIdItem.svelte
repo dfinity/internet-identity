@@ -24,9 +24,14 @@
   const logo = $derived(
     openIdLogo(openid.iss, openid.sub, openid.aud, openid.metadata),
   );
-  // Credential didn't match any entry in `openid_configs` on (iss, aud).
-  // Treat it as SSO and render the generic SSO icon as a fallback.
-  const isSso = $derived(logo === undefined);
+  // The canister stamps `sso_domain` on any credential verified by a
+  // `DiscoverableProvider` — that's the authoritative SSO marker, and
+  // it survives across devices (unlike the logo-absence heuristic the
+  // previous iteration used, which was fooled by direct-provider
+  // credentials whose issuer didn't match any `openid_configs` entry).
+  const isSso = $derived(
+    getMetadataString(openid.metadata, "sso_domain") !== undefined,
+  );
   const displayName = $derived(name ?? $t`SSO`);
   const options = $derived(
     onUnlink !== undefined
