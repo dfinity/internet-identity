@@ -14,6 +14,11 @@ pub const ATTRIBUTE_VALUE_MAX_BYTES: usize = 50_000;
 
 pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
 
+/// Upper bound on the `<domain>` component of an `sso:<domain>` attribute
+/// scope. 253 mirrors the RFC 1035 DNS name length; we do not require a
+/// fully-qualified DNS name, only a reasonable cap.
+pub const SSO_DOMAIN_MAX_BYTES: usize = 253;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub enum AttributeName {
     Email,
@@ -58,12 +63,14 @@ impl std::fmt::Display for AttributeName {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub enum AttributeScope {
     OpenId { issuer: String },
+    Sso { domain: String },
 }
 
 impl std::fmt::Display for AttributeScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AttributeScope::OpenId { issuer } => write!(f, "openid:{}", issuer),
+            AttributeScope::Sso { domain } => write!(f, "sso:{}", domain),
         }
     }
 }
@@ -147,12 +154,52 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     Ok(())
 }
 
+/// Format-only validation for the `<domain>` component of an `sso:<domain>`
+/// attribute scope. Intentionally not coupled to the SSO canary allowlist
+/// (`allowed_discovery_domains()` in the canister): a credential whose SSO
+/// domain is no longer allowed should still be parseable, and the scope
+/// parser has no access to canister runtime state anyway. A scope that does
+/// not match any registered SSO provider simply yields no attributes.
+fn validate_sso_domain(domain: &str) -> Result<(), String> {
+    let mut problems = vec![];
+
+    if domain.is_empty() {
+        problems.push("empty domain".to_string());
+    }
+
+    if domain.len() > SSO_DOMAIN_MAX_BYTES {
+        problems.push(format!(
+            "must not exceed {} bytes (got {} bytes)",
+            SSO_DOMAIN_MAX_BYTES,
+            domain.len(),
+        ));
+    }
+
+    // Disallow ':' so that the `rsplitn(2, ':')` attribute-key parser can
+    // unambiguously split scope from attribute name.
+    if domain.contains(':') {
+        problems.push("must not contain ':'".to_string());
+    }
+
+    if domain.chars().any(|c| c.is_whitespace()) {
+        problems.push("must not contain whitespace".to_string());
+    }
+
+    if !problems.is_empty() {
+        return Err(problems.join(", "));
+    }
+
+    Ok(())
+}
+
 impl TryFrom<&str> for AttributeScope {
     type Error = String;
 
     /// Parses an attribute scope string by splitting on the first `':'`.
     ///
-    /// Currently, only scopes of the form `openid:<issuer>` are supported.
+    /// Supported forms:
+    /// - `openid:<issuer>`  (e.g. `openid:https://accounts.google.com`)
+    /// - `sso:<domain>`     (e.g. `sso:dfinity.org`)
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut parts = value.splitn(2, ':');
 
@@ -177,6 +224,22 @@ impl TryFrom<&str> for AttributeScope {
 
                 Ok(AttributeScope::OpenId { issuer })
             }
+            "sso" => {
+                let domain = parts
+                    .next()
+                    .ok_or_else(|| format!("Missing domain in attribute scope: {}", value))?
+                    .to_string();
+
+                validate_sso_domain(&domain).map_err(|err| {
+                    format!(
+                        "Invalid domain `{}` in attribute scope: {}",
+                        ellipsized(&domain, SSO_DOMAIN_MAX_BYTES),
+                        err
+                    )
+                })?;
+
+                Ok(AttributeScope::Sso { domain })
+            }
             _ => Err(format!("Unknown attribute scope: {}", scope_str)),
         }
     }
@@ -184,7 +247,8 @@ impl TryFrom<&str> for AttributeScope {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub struct AttributeKey {
-    /// E.g., `Some("openid:https://google.com")` in "openid:https://google.com:email" or `None` in "name".
+    /// E.g., `Some("openid:https://google.com")` in `"openid:https://google.com:email"`,
+    /// `Some("sso:dfinity.org")` in `"sso:dfinity.org:email"`, or `None` in `"name"`.
     pub scope: Option<AttributeScope>,
 
     /// E.g., "email", "name"
@@ -1007,11 +1071,88 @@ mod tests {
         }
 
         #[test]
+        fn test_attribute_scope_sso_conversions() {
+            let max_length_domain = "a".repeat(SSO_DOMAIN_MAX_BYTES);
+            let max_length_input = format!("sso:{}", max_length_domain);
+
+            let too_long_domain = "a".repeat(SSO_DOMAIN_MAX_BYTES + 1);
+            let too_long_input = format!("sso:{}", too_long_domain);
+            let too_long_error = format!(
+                "Invalid domain `{}...` in attribute scope: must not exceed 253 bytes (got 254 bytes)",
+                &too_long_domain[..SSO_DOMAIN_MAX_BYTES - "...".len()],
+            );
+
+            let test_cases: Vec<(&str, &str, Result<AttributeScope, String>)> = vec![
+                (
+                    "sso basic",
+                    "sso:dfinity.org",
+                    Ok(AttributeScope::Sso {
+                        domain: "dfinity.org".to_string(),
+                    }),
+                ),
+                (
+                    "sso beta",
+                    "sso:beta.dfinity.org",
+                    Ok(AttributeScope::Sso {
+                        domain: "beta.dfinity.org".to_string(),
+                    }),
+                ),
+                (
+                    "sso subdomain",
+                    "sso:accounts.dfinity.org",
+                    Ok(AttributeScope::Sso {
+                        domain: "accounts.dfinity.org".to_string(),
+                    }),
+                ),
+                (
+                    "sso missing domain",
+                    "sso:",
+                    Err("Invalid domain `` in attribute scope: empty domain".to_string()),
+                ),
+                (
+                    "sso no colon",
+                    "sso",
+                    Err("Missing domain in attribute scope: sso".to_string()),
+                ),
+                (
+                    "sso with whitespace",
+                    "sso:bad domain",
+                    Err(
+                        "Invalid domain `bad domain` in attribute scope: must not contain whitespace"
+                            .to_string(),
+                    ),
+                ),
+                (
+                    "sso at max length",
+                    &max_length_input,
+                    Ok(AttributeScope::Sso {
+                        domain: max_length_domain.clone(),
+                    }),
+                ),
+                (
+                    "sso exceeds max length",
+                    &too_long_input,
+                    Err(too_long_error.clone()),
+                ),
+            ];
+
+            for (label, input, expected) in test_cases {
+                let result = AttributeScope::try_from(input);
+                pretty_assert_eq!(result, expected, "Failed test case: {}", label);
+            }
+        }
+
+        #[test]
         fn test_attribute_scope_display() {
             let scope = AttributeScope::OpenId {
                 issuer: "https://google.com".to_string(),
             };
             pretty_assert_eq!(scope.to_string(), "openid:https://google.com");
+
+            let sso = AttributeScope::Sso {
+                domain: "dfinity.org".to_string(),
+            };
+            pretty_assert_eq!(sso.to_string(), "sso:dfinity.org");
         }
 
         #[test]
@@ -1080,6 +1221,43 @@ mod tests {
                     "invalid scope",
                     "unknown:https://issuer:email",
                     Err("Unknown attribute scope: unknown".to_string()),
+                ),
+                (
+                    "sso scope with email",
+                    "sso:dfinity.org:email",
+                    Ok(AttributeKey {
+                        scope: Some(AttributeScope::Sso {
+                            domain: "dfinity.org".to_string(),
+                        }),
+                        attribute_name: AttributeName::Email,
+                    }),
+                ),
+                (
+                    "sso scope with name",
+                    "sso:dfinity.org:name",
+                    Ok(AttributeKey {
+                        scope: Some(AttributeScope::Sso {
+                            domain: "dfinity.org".to_string(),
+                        }),
+                        attribute_name: AttributeName::Name,
+                    }),
+                ),
+                (
+                    // verified_email under sso: parses fine — it is silently
+                    // dropped downstream by prepare_sso_attributes.
+                    "sso scope with verified_email parses",
+                    "sso:dfinity.org:verified_email",
+                    Ok(AttributeKey {
+                        scope: Some(AttributeScope::Sso {
+                            domain: "dfinity.org".to_string(),
+                        }),
+                        attribute_name: AttributeName::VerifiedEmail,
+                    }),
+                ),
+                (
+                    "sso scope with invalid attribute",
+                    "sso:dfinity.org:bogus",
+                    Err("Unknown attribute: bogus".to_string()),
                 ),
                 ("empty", "", Err("Unknown attribute: ".to_string())),
             ];

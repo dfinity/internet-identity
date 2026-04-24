@@ -246,6 +246,114 @@ fn should_get_certified_attributes() {
     );
 }
 
+/// Verifies that the `sso:<domain>` attribute scope is accepted by the
+/// canister request validator and behaves correctly when there is no matching
+/// SSO credential: it is silently dropped (no error, no attribute returned),
+/// mirroring the existing openid: "attribute not available" behavior.
+///
+/// End-to-end SSO credential creation cannot be exercised from PocketIC
+/// because it relies on HTTP outcalls for two-hop discovery; see the comment
+/// in `integration/config/oidc_configs.rs`. Deeper SSO flows are covered by
+/// the canister unit tests in `src/internet_identity/src/attributes.rs`
+/// (module `sso_attributes_tests`).
+#[test]
+fn sso_scope_request_is_accepted_and_silently_drops_when_no_sso_credential() {
+    use internet_identity_interface::internet_identity::types::DiscoverableOidcConfig;
+
+    let env = env();
+    #[allow(unused_variables)]
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        crate::openid::openid_google_test_data();
+
+    let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+    init_args.openid_configs = Some(vec![OpenIdConfig {
+        name: "Google".into(),
+        logo: "logo".into(),
+        issuer: "https://accounts.google.com".into(),
+        client_id: "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com"
+            .into(),
+        jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+        auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+        auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+        fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+        email_verification: None,
+    }]);
+
+    let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(init_args),
+        1_000_000_000_000_000,
+    );
+    crate::openid::mock_google_certs_response(&env);
+    deploy_archive_via_ii(&env, ii_backend_canister_id);
+
+    // Register an SSO provider. Discovery won't complete in PocketIC, so no
+    // credential will ever be matched against it — which is exactly the
+    // scenario we want to validate here.
+    api::add_discoverable_oidc_config(
+        &env,
+        ii_backend_canister_id,
+        DiscoverableOidcConfig {
+            discovery_domain: "beta.dfinity.org".into(),
+        },
+    )
+    .expect("failed to register SSO provider");
+
+    let identity_number =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method(
+            &env,
+            ii_backend_canister_id,
+            &test_authn_method,
+        );
+
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    api::openid_credential_add(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )
+    .expect("failed to call openid_credential_add")
+    .expect("openid_credential_add returned an error");
+
+    let origin = "https://some-dapp.com";
+    env.advance_time(Duration::from_secs(15));
+
+    // Mixed request: a supported openid: key and a well-formed sso: key that
+    // has no matching credential. The canister must accept both and return
+    // only the one it can fulfill.
+    let prepare_request = PrepareAttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attribute_keys: vec![
+            "openid:https://accounts.google.com:email".into(),
+            "sso:beta.dfinity.org:email".into(),
+        ],
+    };
+
+    let prepare_response = api::prepare_attributes(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        prepare_request,
+    )
+    .expect("failed to call prepare_attributes")
+    .expect("prepare_attributes returned an error");
+
+    // Only the openid: attribute comes back; the sso: key is silently dropped.
+    assert_eq!(prepare_response.attributes.len(), 1);
+    assert_eq!(
+        prepare_response.attributes[0].0,
+        "openid:https://accounts.google.com:email"
+    );
+}
+
 /// Regression test: Microsoft credentials use a template issuer with `{tid}` placeholder.
 /// `get_attributes` must use the template issuer (from the OpenID config) as the scope key,
 /// NOT the resolved issuer (from the JWT `iss` claim with the actual tenant ID).

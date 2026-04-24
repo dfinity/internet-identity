@@ -20,7 +20,7 @@ use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
-mod generic;
+pub(crate) mod generic;
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -178,6 +178,18 @@ impl OpenIdCredential {
         self.with_provider(|provider| provider.issuer())
     }
 
+    /// Returns the `discovery_domain` of the SSO provider that currently
+    /// matches this credential, if any. `None` for credentials matched to a
+    /// hardcoded (non-discoverable) `Provider` — those are addressable via
+    /// the `openid:<issuer>` attribute scope instead.
+    ///
+    /// Used to route attribute requests to the `sso:<domain>` scope with
+    /// exclusive semantics: a credential with `Some(domain)` here is
+    /// reachable via `sso:<domain>` only, never via `openid:<issuer>`.
+    pub fn discovery_domain(&self) -> Option<String> {
+        self.with_provider(|provider| provider.discovery_domain())
+    }
+
     fn read_attribute_as_string(&self, attribute_name: &str) -> Option<String> {
         let MetadataEntryV2::String(value) = self.metadata.get(attribute_name)? else {
             return None;
@@ -248,6 +260,19 @@ pub trait OpenIdProvider {
     fn client_id(&self) -> Option<String>;
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme>;
+
+    /// SSO discovery domain for this provider, if any. Returns `Some(domain)` only
+    /// for providers created from a `DiscoverableOidcConfig` (the two-hop SSO
+    /// discovery flow). All other providers (Google, Microsoft, hardcoded
+    /// generic OIDC) inherit the default `None`.
+    ///
+    /// Credentials whose matched provider reports `Some(domain)` are reachable
+    /// via the `sso:<domain>` attribute scope and are *not* reachable via
+    /// `openid:<issuer>` — see `OpenIdCredential::discovery_domain` and
+    /// `Anchor::prepare_openid_attributes` / `prepare_sso_attributes`.
+    fn discovery_domain(&self) -> Option<String> {
+        None
+    }
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///

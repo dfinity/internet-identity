@@ -39,23 +39,32 @@ impl Anchor {
         let seed = account.calculate_seed();
         let domain = ATTRIBUTES_CERTIFICATION_DOMAIN;
 
-        // Process scope `openid` ...
-        let openid_certified_attributes = state::assets_and_signatures(|certified_assets, sigs| {
+        // Each OpenID credential is addressable via exactly one scope:
+        //   - `Some(Sso { domain })`     if matched to a `DiscoverableProvider`
+        //   - `Some(OpenId { issuer })`  if matched to a hardcoded provider (Google, Microsoft, …)
+        //   - skipped                    if no provider currently matches
+        // This mirrors the scope partitioning done in `prepare_openid_attributes` /
+        // `prepare_sso_attributes`.
+        let certified_attributes = state::assets_and_signatures(|certified_assets, sigs| {
             self.openid_credentials
                 .iter()
                 .flat_map(|openid_credential| {
-                    // It is important here to rely on the issuer ID as opposed to `openid_credential.iss`
-                    // becasue, e.g., for Microsoft accounts, the issuer has a tenant ID parameter
-                    // which should *not* be instantiated for a general Microsoft attribute scope.
-                    let Some(issuer) = openid_credential.config_issuer() else {
-                        ic_cdk::println!(
-                            "No matching OpenID provider for issuer: {}, skipping credential",
-                            openid_credential.iss
-                        );
-                        return BTreeSet::new();
+                    // Note we rely on the issuer *template* (not `openid_credential.iss`)
+                    // because e.g. Microsoft instantiates a `{tid}` placeholder per
+                    // tenant — and general attribute scopes should address the template.
+                    let scope = match openid_credential.discovery_domain() {
+                        Some(domain) => Some(AttributeScope::Sso { domain }),
+                        None => match openid_credential.config_issuer() {
+                            Some(issuer) => Some(AttributeScope::OpenId { issuer }),
+                            None => {
+                                ic_cdk::println!(
+                                    "No matching OpenID provider for issuer: {}, skipping credential",
+                                    openid_credential.iss
+                                );
+                                return BTreeSet::new();
+                            }
+                        },
                     };
-
-                    let scope = Some(AttributeScope::OpenId { issuer });
 
                     let Some(attributes_to_fetch) = attributes.remove(&scope) else {
                         return BTreeSet::new();
@@ -91,7 +100,7 @@ impl Anchor {
         });
 
         CertifiedAttributes {
-            certified_attributes: openid_certified_attributes,
+            certified_attributes,
             expires_at_timestamp_ns,
         }
     }
@@ -108,14 +117,21 @@ impl Anchor {
     ) -> Vec<Attribute> {
         let mut attributes = Vec::new();
 
-        // Process scope `openid` ...
+        // The two preparers partition credentials by provider type (SSO vs. hardcoded),
+        // so their per-credential output maps have disjoint keys. A simple
+        // `or_else` lookup per credential is sufficient; no need to merge
+        // per-credential values.
         let mut openid_attributes_to_certify =
             self.prepare_openid_attributes(&mut requested_attributes);
+        let mut sso_attributes_to_certify = self.prepare_sso_attributes(&mut requested_attributes);
 
         for openid_credential in &self.openid_credentials {
-            let Some(new_attributes) =
-                openid_attributes_to_certify.remove(&openid_credential.key())
-            else {
+            let key = openid_credential.key();
+            let new_attributes = openid_attributes_to_certify
+                .remove(&key)
+                .or_else(|| sso_attributes_to_certify.remove(&key));
+
+            let Some(new_attributes) = new_attributes else {
                 continue;
             };
 
@@ -137,6 +153,12 @@ impl Anchor {
     /// for which we have values in our OpenID credentials' JWT.
     ///
     /// `requested_attributes` is mutated to remove the attributes for which values were found.
+    ///
+    /// SSO-sourced credentials (matched to a `DiscoverableProvider`, i.e.
+    /// `discovery_domain().is_some()`) are skipped: they are reachable only
+    /// via `Anchor::prepare_sso_attributes`, never via the `openid:<issuer>`
+    /// scope. Scope exclusivity is enforced here at the matched-provider
+    /// level.
     fn prepare_openid_attributes(
         &self,
         requested_attributes: &mut BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
@@ -144,6 +166,11 @@ impl Anchor {
         self.openid_credentials
             .iter()
             .filter_map(|openid_credential| {
+                // Exclusivity: SSO-sourced credentials belong to `sso:<domain>`, not `openid:`.
+                if openid_credential.discovery_domain().is_some() {
+                    return None;
+                }
+
                 // E.g., `openid:https://accounts.google.com`
                 let scope = Some(AttributeScope::OpenId {
                     issuer: openid_credential.config_issuer()?,
@@ -164,6 +191,59 @@ impl Anchor {
                             Name => openid_credential.get_name()?,
                             Email => openid_credential.get_email()?,
                             VerifiedEmail => openid_credential.get_verified_email()?,
+                        };
+
+                        let key = AttributeKey {
+                            scope: scope.clone(),
+                            attribute_name,
+                        };
+                        let value = value.into_bytes();
+
+                        Some(Attribute { key, value })
+                    })
+                    .collect::<Vec<_>>();
+
+                Some((openid_credential.key(), attributes))
+            })
+            .collect()
+    }
+
+    /// Returns `(attribute_key, attribute_value)` pairs for attributes requested
+    /// under the `sso:<domain>` scope, drawn from SSO-sourced OpenID credentials
+    /// (those whose matched provider is a `DiscoverableProvider`).
+    ///
+    /// Only `Name` and `Email` are extracted. `VerifiedEmail` requests under
+    /// `sso:` are silently dropped — intentionally out of scope for the SSO
+    /// attribute flow. This matches the existing silent-drop behavior of
+    /// `prepare_openid_attributes` for attributes that have no value.
+    ///
+    /// `requested_attributes` is mutated to remove the scope entries that were
+    /// matched and consumed (same convention as `prepare_openid_attributes`).
+    fn prepare_sso_attributes(
+        &self,
+        requested_attributes: &mut BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
+    ) -> BTreeMap<OpenIdCredentialKey, Vec<Attribute>> {
+        self.openid_credentials
+            .iter()
+            .filter_map(|openid_credential| {
+                // Exclusivity filter: only SSO-sourced credentials participate.
+                // Non-discoverable credentials have `discovery_domain() == None`
+                // here and are skipped by the `?`.
+                let scope = Some(AttributeScope::Sso {
+                    domain: openid_credential.discovery_domain()?,
+                });
+
+                let attributes = requested_attributes
+                    .remove(&scope)?
+                    .into_iter()
+                    .filter_map(|attribute_name| {
+                        use AttributeName::*;
+
+                        let value = match attribute_name {
+                            Name => openid_credential.get_name()?,
+                            Email => openid_credential.get_email()?,
+                            // VerifiedEmail is intentionally unsupported under sso:.
+                            VerifiedEmail => return None,
                         };
 
                         let key = AttributeKey {
@@ -272,10 +352,14 @@ impl Anchor {
         for spec in &attribute_specs {
             match &spec.key.scope {
                 Some(AttributeScope::OpenId { issuer }) => {
-                    let credential = self
-                        .openid_credentials
-                        .iter()
-                        .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()));
+                    // Exclusivity: SSO-sourced credentials are addressable only
+                    // via `sso:<domain>`. Skip them here so a spec that targets
+                    // the discovered issuer URL of an SSO credential surfaces as
+                    // a normal "no credential found" problem.
+                    let credential = self.openid_credentials.iter().find(|c| {
+                        c.discovery_domain().is_none()
+                            && c.config_issuer().as_deref() == Some(issuer.as_str())
+                    });
 
                     let Some(credential) = credential else {
                         problems.push(format!("No credential found for issuer: {}", issuer));
@@ -308,6 +392,64 @@ impl Anchor {
                     }
 
                     // Compute the certified key.
+                    let certified_key = if spec.omit_scope {
+                        spec.key.attribute_name.to_string()
+                    } else {
+                        spec.key.to_string()
+                    };
+
+                    match certified_pairs.entry(certified_key) {
+                        std::collections::btree_map::Entry::Occupied(entry) => {
+                            problems.push(format!(
+                                "Duplicate certified attribute key '{}' derived from spec {}",
+                                entry.key(),
+                                spec.key
+                            ));
+                        }
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            entry.insert(Icrc3Value::Text(stored));
+                        }
+                    }
+                }
+                Some(AttributeScope::Sso { domain }) => {
+                    let credential = self
+                        .openid_credentials
+                        .iter()
+                        .find(|c| c.discovery_domain().as_deref() == Some(domain.as_str()));
+
+                    let Some(credential) = credential else {
+                        problems.push(format!("No credential found for sso domain: {}", domain));
+                        continue;
+                    };
+
+                    // `verified_email` is intentionally not supported under `sso:`;
+                    // surface it here as "not available" (ICRC-3 requires explicit
+                    // presence, unlike the silent-drop in `prepare_sso_attributes`).
+                    let stored_value = match spec.key.attribute_name {
+                        AttributeName::Email => credential.get_email(),
+                        AttributeName::Name => credential.get_name(),
+                        AttributeName::VerifiedEmail => None,
+                    };
+
+                    let Some(stored) = stored_value else {
+                        problems.push(format!(
+                            "Attribute {} not available for sso domain {}",
+                            spec.key.attribute_name, domain
+                        ));
+                        continue;
+                    };
+
+                    // If a value was provided, validate it matches.
+                    if let Some(ref expected_value) = spec.value {
+                        if expected_value.as_slice() != stored.as_bytes() {
+                            problems.push(format!(
+                                "Attribute value mismatch for {}: provided value does not match stored value",
+                                spec.key
+                            ));
+                            continue;
+                        }
+                    }
+
                     let certified_key = if spec.omit_scope {
                         spec.key.attribute_name.to_string()
                     } else {
@@ -391,20 +533,34 @@ impl Anchor {
     /// If `requested` is `Some(keys)`, returns only attributes matching the given keys.
     /// Unscoped keys (e.g., `"email"`) match all scopes; scoped keys match exactly.
     /// Response keys are always fully scoped.
+    ///
+    /// Each credential is listed under exactly one scope:
+    /// - `sso:<domain>` if matched to a `DiscoverableProvider` — only `email`
+    ///   and `name` are exposed under that scope (`verified_email` is not).
+    /// - `openid:<issuer>` otherwise — all of `email`, `name`, `verified_email`
+    ///   are exposed when available.
     pub fn list_available_attributes(
         &self,
         requested: Option<Vec<AttributeKey>>,
     ) -> Vec<(String, Vec<u8>)> {
-        let all_attribute_names = AttributeName::all();
         let mut result = BTreeMap::new();
 
         for credential in &self.openid_credentials {
-            let Some(issuer) = credential.config_issuer() else {
-                continue;
-            };
-            let scope = AttributeScope::OpenId { issuer };
+            // Exclusivity: decide the single scope this credential is addressable
+            // under. SSO-sourced credentials are NOT listed under `openid:`.
+            let (scope, attribute_names): (AttributeScope, &[AttributeName]) =
+                match credential.discovery_domain() {
+                    Some(domain) => (
+                        AttributeScope::Sso { domain },
+                        &[AttributeName::Email, AttributeName::Name][..],
+                    ),
+                    None => match credential.config_issuer() {
+                        Some(issuer) => (AttributeScope::OpenId { issuer }, AttributeName::all()),
+                        None => continue,
+                    },
+                };
 
-            for &attr_name in all_attribute_names {
+            for &attr_name in attribute_names {
                 let value = match attr_name {
                     AttributeName::Email => credential.get_email(),
                     AttributeName::Name => credential.get_name(),
@@ -1994,6 +2150,363 @@ mod tests {
             }]));
 
             pretty_assert_eq!(result.len(), 0);
+        }
+    }
+
+    /// Tests the `sso:<domain>` attribute scope added alongside `openid:<issuer>`.
+    ///
+    /// These tests exercise credentials whose matched provider is a
+    /// `DiscoverableProvider` (SSO via two-hop discovery). We shortcut the two
+    /// HTTP discovery hops via `generic::set_discovered_state_for_test`, which
+    /// writes into the same shared `Rc<RefCell<…>>` cells that `DiscoverableProvider`
+    /// holds — after the call, the provider behaves as if discovery had run.
+    mod sso_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::{
+            DiscoverableOidcConfig, OpenIdConfig,
+        };
+
+        const SSO_DOMAIN: &str = "test-sso.example";
+        const SSO_ISSUER: &str = "https://idp.example/issuer";
+        const SSO_CLIENT_ID: &str = "sso-client-id";
+        const SUB: &str = "sso-user-789";
+
+        fn setup_sso_provider() {
+            crate::openid::setup_oidc(vec![DiscoverableOidcConfig {
+                discovery_domain: SSO_DOMAIN.to_string(),
+            }]);
+            crate::openid::generic::set_discovered_state_for_test(
+                SSO_DOMAIN,
+                SSO_ISSUER,
+                SSO_CLIENT_ID,
+            );
+        }
+
+        fn sso_credential_with(metadata: HashMap<String, MetadataEntryV2>) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: SSO_ISSUER.to_string(),
+                sub: SUB.to_string(),
+                aud: SSO_CLIENT_ID.to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            }
+        }
+
+        fn anchor_with_openid_credentials(credentials: Vec<OpenIdCredential>) -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = credentials;
+            anchor
+        }
+
+        fn sso_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::Sso {
+                domain: SSO_DOMAIN.to_string(),
+            })
+        }
+
+        fn openid_sso_issuer_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::OpenId {
+                issuer: SSO_ISSUER.to_string(),
+            })
+        }
+
+        fn email_and_name_metadata() -> HashMap<String, MetadataEntryV2> {
+            HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@test-sso.example".to_string()),
+                ),
+                (
+                    "name".to_string(),
+                    MetadataEntryV2::String("SSO User".to_string()),
+                ),
+            ])
+        }
+
+        // Sanity: discovery_domain() returns Some for SSO-matched credentials.
+        #[test]
+        fn credential_reports_discovery_domain() {
+            setup_sso_provider();
+            let credential = sso_credential_with(email_and_name_metadata());
+            pretty_assert_eq!(credential.discovery_domain(), Some(SSO_DOMAIN.to_string()),);
+        }
+
+        // `prepare_sso_attributes` extracts email and name for an SSO credential.
+        #[test]
+        fn prepare_sso_returns_email_and_name() {
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            let mut requested: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
+                BTreeMap::from([(
+                    sso_scope(),
+                    BTreeSet::from([AttributeName::Email, AttributeName::Name]),
+                )]);
+
+            let result = anchor.prepare_sso_attributes(&mut requested);
+            assert!(
+                requested.is_empty(),
+                "requested should be drained for matching SSO scope"
+            );
+
+            let attrs = result
+                .get(&(
+                    SSO_ISSUER.to_string(),
+                    SUB.to_string(),
+                    SSO_CLIENT_ID.to_string(),
+                ))
+                .expect("sso attributes should be present");
+
+            pretty_assert_eq!(
+                attribute_pairs(attrs),
+                BTreeSet::from([
+                    (
+                        format!("sso:{SSO_DOMAIN}:email"),
+                        "user@test-sso.example".to_string(),
+                    ),
+                    (format!("sso:{SSO_DOMAIN}:name"), "SSO User".to_string()),
+                ])
+            );
+        }
+
+        // `verified_email` requests under `sso:` are silently dropped.
+        #[test]
+        fn prepare_sso_silently_drops_verified_email() {
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            let mut requested: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
+                BTreeMap::from([(
+                    sso_scope(),
+                    BTreeSet::from([AttributeName::Email, AttributeName::VerifiedEmail]),
+                )]);
+
+            let result = anchor.prepare_sso_attributes(&mut requested);
+
+            // Scope consumed even though only email was produced.
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(
+                    SSO_ISSUER.to_string(),
+                    SUB.to_string(),
+                    SSO_CLIENT_ID.to_string(),
+                ))
+                .expect("sso attributes should be present");
+
+            pretty_assert_eq!(
+                attribute_pairs(attrs),
+                BTreeSet::from([(
+                    format!("sso:{SSO_DOMAIN}:email"),
+                    "user@test-sso.example".to_string(),
+                )])
+            );
+        }
+
+        // Exclusivity: `prepare_openid_attributes` ignores SSO-sourced credentials.
+        #[test]
+        fn prepare_openid_skips_sso_credential() {
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            // Ask for `openid:<discovered_issuer>:email` — this would match the
+            // credential if exclusivity were not enforced.
+            let mut requested: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
+                BTreeMap::from([(
+                    openid_sso_issuer_scope(),
+                    BTreeSet::from([AttributeName::Email]),
+                )]);
+
+            let result = anchor.prepare_openid_attributes(&mut requested);
+
+            pretty_assert_eq!(
+                result.len(),
+                0,
+                "openid scope must not expose SSO-sourced credentials"
+            );
+            assert!(
+                !requested.is_empty(),
+                "requested scope must remain untouched since no openid credential matched"
+            );
+        }
+
+        // Exclusivity: `prepare_sso_attributes` ignores non-SSO credentials.
+        #[test]
+        fn prepare_sso_skips_non_discoverable_credential() {
+            // Set up a plain (hardcoded) provider.
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Plain".to_string(),
+                logo: String::new(),
+                issuer: "https://plain.example".to_string(),
+                client_id: "plain-client-id".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: None,
+            }]);
+            let credential = OpenIdCredential {
+                iss: "https://plain.example".to_string(),
+                sub: "plain-user".to_string(),
+                aud: "plain-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: email_and_name_metadata(),
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+
+            // Ask for `sso:plain.example:email` — would match if exclusivity were
+            // not enforced, since nothing in the scope name itself couples to
+            // "is this a DiscoverableProvider?".
+            let mut requested: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
+                BTreeMap::from([(
+                    Some(AttributeScope::Sso {
+                        domain: "plain.example".to_string(),
+                    }),
+                    BTreeSet::from([AttributeName::Email]),
+                )]);
+
+            let result = anchor.prepare_sso_attributes(&mut requested);
+
+            pretty_assert_eq!(
+                result.len(),
+                0,
+                "sso scope must not expose non-discoverable credentials"
+            );
+            assert!(!requested.is_empty());
+        }
+
+        // `list_available_attributes` lists an SSO credential under `sso:`
+        // only — never under `openid:`.
+        #[test]
+        fn list_available_attributes_lists_sso_credential_under_sso_scope_only() {
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            let listed = anchor.list_available_attributes(None);
+            let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
+
+            pretty_assert_eq!(
+                keys,
+                BTreeSet::from([
+                    format!("sso:{SSO_DOMAIN}:email"),
+                    format!("sso:{SSO_DOMAIN}:name"),
+                ]),
+            );
+        }
+
+        // ICRC-3 exclusivity: `sso:<domain>:verified_email` surfaces as
+        // AttributeMismatch (unlike the silent-drop in `prepare_sso_attributes`),
+        // and `openid:<discovered_issuer>:email` is rejected for an SSO-sourced
+        // credential. We intentionally do not exercise the ICRC-3 success path
+        // here — that path reaches `Account::calculate_seed()` which requires
+        // canister state (salt) unavailable in unit tests, matching the
+        // approach taken by the existing ICRC-3 tests in this module.
+        #[test]
+        fn icrc3_sso_verified_email_is_not_available() {
+            use internet_identity_interface::internet_identity::types::attributes::{
+                PrepareIcrc3AttributeError, ValidatedAttributeSpec,
+            };
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+            let account = crate::storage::account::Account::new(
+                ANCHOR_NUMBER,
+                "https://dapp.com".to_string(),
+                None,
+                None,
+            );
+
+            let verified_spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: sso_scope(),
+                    attribute_name: AttributeName::VerifiedEmail,
+                },
+                value: None,
+                omit_scope: false,
+            };
+            let res = anchor.prepare_icrc3_attributes(
+                vec![verified_spec],
+                vec![0u8; 32],
+                "https://rp.example".to_string(),
+                1_000_000_000,
+                account,
+            );
+            match res {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems.iter().any(|p| p.contains("not available")),
+                        "expected 'not available' problem, got {:?}",
+                        problems
+                    );
+                }
+                other => panic!(
+                    "expected AttributeMismatch for verified_email under sso:, got {:?}",
+                    other
+                ),
+            }
+        }
+
+        #[test]
+        fn icrc3_openid_scope_cannot_address_sso_credential() {
+            use internet_identity_interface::internet_identity::types::attributes::{
+                PrepareIcrc3AttributeError, ValidatedAttributeSpec,
+            };
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+            let account = crate::storage::account::Account::new(
+                ANCHOR_NUMBER,
+                "https://dapp.com".to_string(),
+                None,
+                None,
+            );
+
+            // `openid:<discovered_issuer>:email` on an SSO-sourced credential
+            // must be rejected (exclusivity).
+            let openid_spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: openid_sso_issuer_scope(),
+                    attribute_name: AttributeName::Email,
+                },
+                value: None,
+                omit_scope: false,
+            };
+            let res = anchor.prepare_icrc3_attributes(
+                vec![openid_spec],
+                vec![0u8; 32],
+                "https://rp.example".to_string(),
+                1_000_000_000,
+                account,
+            );
+            match res {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems.iter().any(|p| p.contains("No credential found")),
+                        "expected 'No credential found' problem, got {:?}",
+                        problems
+                    );
+                }
+                other => panic!(
+                    "expected AttributeMismatch for openid: on SSO-sourced credential, got {:?}",
+                    other
+                ),
+            }
         }
     }
 }

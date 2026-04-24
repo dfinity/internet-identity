@@ -263,6 +263,7 @@ pub struct DiscoverableProvider {
     discovered_client_id: Rc<RefCell<Option<String>>>,
     discovered_issuer: Rc<RefCell<Option<String>>>,
     certs: Rc<RefCell<Vec<Jwk>>>,
+    discovery_domain: String,
 }
 
 impl OpenIdProvider for DiscoverableProvider {
@@ -279,6 +280,10 @@ impl OpenIdProvider for DiscoverableProvider {
         // verification heuristics (Google `email_verified`, Microsoft `tid`).
         // Verification is a trust decision made when the SSO domain is configured.
         None
+    }
+
+    fn discovery_domain(&self) -> Option<String> {
+        Some(self.discovery_domain.clone())
     }
 
     fn verify(
@@ -410,6 +415,7 @@ impl DiscoverableProvider {
             discovered_client_id,
             discovered_issuer,
             certs,
+            discovery_domain: config.discovery_domain,
         }
     }
 }
@@ -675,6 +681,25 @@ pub fn discovered_state_for(
             })
             .unwrap_or((None, None, None))
     })
+}
+
+/// Test-only: fills the discovered state for a previously-registered
+/// `discovery_domain` without running the two-hop HTTP discovery. Used in unit
+/// tests to exercise flows that depend on matched `DiscoverableProvider`
+/// credentials (e.g. the `sso:<domain>` attribute scope).
+///
+/// Panics if no discovery task exists for `discovery_domain`; register one
+/// first via `openid::setup_oidc` or `openid::add_oidc_config`.
+#[cfg(test)]
+pub fn set_discovered_state_for_test(domain: &str, issuer: &str, client_id: &str) {
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        let task = tasks
+            .iter()
+            .find(|t| t.discovery_domain == domain)
+            .expect("no discovery task for domain; register via setup_oidc first");
+        task.issuer_ref.replace(Some(issuer.to_string()));
+        task.client_id_ref.replace(Some(client_id.to_string()));
+    });
 }
 
 fn compute_next_certs_fetch_delay<T, E>(
