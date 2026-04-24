@@ -4,7 +4,12 @@ import { test as authorizeTest } from "./authorize";
 /** Page-object for the explicit ICRC-3 attribute consent screen. Wraps the
  *  II authorize window so specs don't hand-roll role queries every time. */
 class AttributeConsentView {
-  static readonly HEADING = "Review Permissions";
+  // `AttributeConsentView.svelte` renders a different heading depending on
+  // the flow variant: "Review Permissions" for OpenID 1-click and "Allow to
+  // access this info" for the regular authorize flow. Match either so tests
+  // don't need to know which variant they triggered.
+  static readonly HEADING_RE =
+    /^(Review Permissions|Allow to access this info)$/;
 
   readonly #page: Page;
 
@@ -14,7 +19,7 @@ class AttributeConsentView {
 
   get heading(): Locator {
     return this.#page.getByRole("heading", {
-      name: AttributeConsentView.HEADING,
+      name: AttributeConsentView.HEADING_RE,
     });
   }
 
@@ -50,11 +55,7 @@ class AttributeConsentView {
   }
 
   async waitForVisible(): Promise<void> {
-    // Generous timeout: the handler waits for auth to complete and for
-    // `list_available_attributes` to return before the heading can render,
-    // and the passkey path on mobile CI regularly takes more than the 5s
-    // Playwright default between the final "Continue" and `ready = true`.
-    await expect(this.heading).toBeVisible({ timeout: 15_000 });
+    await expect(this.heading).toBeVisible();
   }
 
   async expectHidden(): Promise<void> {
