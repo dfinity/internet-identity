@@ -33,9 +33,7 @@ export const getReplicaHost = (): string => {
     const port = new URL(status.gateway_url).port;
     return `http://127.0.0.1:${port}`;
   } catch (e) {
-    throw Error(
-      `Could not get replica port, is the replica running? ${e}`,
-    );
+    throw Error(`Could not get replica port, is the replica running? ${e}`);
   }
 };
 
