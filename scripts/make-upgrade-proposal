@@ -354,17 +354,18 @@ detect_archive_hash_change() {
 
   local prev_archive
   prev_archive=$(mktemp)
-  trap 'rm -f "$prev_archive"' RETURN
 
   if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_release_tag}/archive.wasm.gz" -o "$prev_archive"; then
+    rm -f "$prev_archive"
     echo "Could not download ${prev_release_tag}/archive.wasm.gz; treating archive as changed." >&2
     echo "true"
     return
   fi
 
   local prev_sha curr_sha
-  prev_sha=$(shasum -a 256 "$prev_archive" | awk '{print $1}')
-  curr_sha=$(shasum -a 256 ./archive.wasm.gz | awk '{print $1}')
+  prev_sha=$(sha256 "$prev_archive")
+  curr_sha=$(sha256 ./archive.wasm.gz)
+  rm -f "$prev_archive"
   echo "Previous archive (${prev_release_tag}): $prev_sha" >&2
   echo "Current archive:                        $curr_sha" >&2
 
@@ -798,10 +799,15 @@ parse_proposal_id() {
   # reads "proposal proposal N". Matching the doubled form avoids
   # false positives from other numeric output on the same stream.
   # See dfinity/nns-dapp scripts/nns-dapp/release for the same pattern.
+  #
+  # Uses bash's regex match (no external pipeline) to keep behavior
+  # predictable under `set -eo pipefail`.
   local output="$1" label="$2"
-  local id
-  id=$(echo "$output" | grep -oE 'proposal proposal [0-9]+' | head -1 | awk '{print $3}')
-  if [ -z "$id" ] || ! [[ "$id" =~ ^[0-9]+$ ]]; then
+  local id=""
+  if [[ "$output" =~ proposal[[:space:]]+proposal[[:space:]]+([0-9]+) ]]; then
+    id="${BASH_REMATCH[1]}"
+  fi
+  if [ -z "$id" ]; then
     echo "ERROR: could not parse ${label} from ic-admin output." >&2
     echo "       Run the command manually and record the proposal number in the checklist file." >&2
     return 1
