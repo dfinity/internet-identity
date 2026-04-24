@@ -238,6 +238,13 @@ impl TryFrom<&str> for AttributeScope {
                     )
                 })?;
 
+                // SSO domains are DNS hostnames — normalize to lowercase so
+                // `sso:DFINITY.ORG:email` and `sso:dfinity.org:email` match
+                // the same credential. This also aligns with
+                // `openid::generic::is_allowed_discovery_domain`, which
+                // already compares case-insensitively.
+                let domain = domain.to_ascii_lowercase();
+
                 Ok(AttributeScope::Sso { domain })
             }
             _ => Err(format!("Unknown attribute scope: {}", scope_str)),
@@ -303,6 +310,17 @@ pub struct ValidatedPrepareAttributeRequest {
     pub attribute_keys: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
 }
 
+/// Problem message appended by the legacy attribute-sharing validators when a
+/// request carries an `sso:<domain>` scoped key.
+///
+/// The legacy flow (`prepare_attributes`, `get_attributes`,
+/// `list_available_attributes`) is deprecated and will not gain new
+/// functionality. All `sso:<domain>` attribute requests must go through the
+/// ICRC-3 flow (`prepare_icrc3_attributes` / `get_icrc3_attributes`) instead.
+pub const LEGACY_SSO_SCOPE_REJECTION: &str =
+    "sso:<domain> attribute scope is not supported by the legacy attribute-sharing flow; \
+     use the ICRC-3 attribute flow (prepare_icrc3_attributes / get_icrc3_attributes) instead";
+
 impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
     type Error = PrepareAttributeError;
 
@@ -345,6 +363,10 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
                     continue;
                 }
             };
+            if matches!(scope, Some(AttributeScope::Sso { .. })) {
+                problems.push(LEGACY_SSO_SCOPE_REJECTION.to_string());
+                continue;
+            }
             attribute_keys
                 .entry(scope)
                 .or_insert_with(BTreeSet::new)
@@ -460,6 +482,10 @@ impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
                     continue;
                 }
             };
+            if matches!(attribute.key.scope, Some(AttributeScope::Sso { .. })) {
+                problems.push(LEGACY_SSO_SCOPE_REJECTION.to_string());
+                continue;
+            }
             attributes
                 .entry(attribute.key.scope.clone())
                 .or_insert_with(BTreeSet::new)
@@ -788,7 +814,13 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
                 let mut parsed = Vec::with_capacity(keys.len().min(MAX_ATTRIBUTES_PER_REQUEST));
                 for key in keys {
                     match AttributeKey::try_from(key) {
-                        Ok(k) => parsed.push(k),
+                        Ok(k) => {
+                            if matches!(k.scope, Some(AttributeScope::Sso { .. })) {
+                                problems.push(LEGACY_SSO_SCOPE_REJECTION.to_string());
+                                continue;
+                            }
+                            parsed.push(k);
+                        }
                         Err(e) => problems.push(e),
                     }
                 }
@@ -1102,6 +1134,23 @@ mod tests {
                     "sso:accounts.dfinity.org",
                     Ok(AttributeScope::Sso {
                         domain: "accounts.dfinity.org".to_string(),
+                    }),
+                ),
+                (
+                    // DNS hostnames are case-insensitive; the parser
+                    // normalizes to lowercase so `sso:DFINITY.ORG` and
+                    // `sso:dfinity.org` match the same credential.
+                    "sso uppercase normalizes to lowercase",
+                    "sso:DFINITY.ORG",
+                    Ok(AttributeScope::Sso {
+                        domain: "dfinity.org".to_string(),
+                    }),
+                ),
+                (
+                    "sso mixed case normalizes to lowercase",
+                    "sso:Beta.DFinity.Org",
+                    Ok(AttributeScope::Sso {
+                        domain: "beta.dfinity.org".to_string(),
                     }),
                 ),
                 (
@@ -1483,6 +1532,20 @@ mod tests {
                         MAX_ATTRIBUTES_PER_REQUEST
                     )],
                 ),
+                (
+                    "sso scope rejected by legacy flow",
+                    GetAttributesRequest {
+                        identity_number: 444,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        issued_at_timestamp_ns: 4,
+                        attributes: vec![(
+                            "sso:dfinity.org:email".to_string(),
+                            b"user@dfinity.org".to_vec(),
+                        )],
+                    },
+                    vec![LEGACY_SSO_SCOPE_REJECTION.to_string()],
+                ),
             ];
 
             for (label, input, expected_problems) in test_cases {
@@ -1696,6 +1759,18 @@ mod tests {
                         attribute_keys: vec!["email".to_string(), "invalid".to_string()],
                     },
                     vec!["Unknown attribute: invalid".to_string()],
+                ),
+                (
+                    // The legacy flow rejects sso: scopes; they must go
+                    // through the ICRC-3 flow instead.
+                    "sso scope rejected by legacy flow",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec!["sso:dfinity.org:email".to_string()],
+                    },
+                    vec![LEGACY_SSO_SCOPE_REJECTION.to_string()],
                 ),
             ];
 
@@ -2150,6 +2225,19 @@ mod tests {
             match err {
                 ListAvailableAttributesError::ValidationError { problems } => {
                     assert!(problems[0].contains("Unknown attribute"));
+                }
+                other => panic!("Expected ValidationError, got {:?}", other),
+            }
+
+            // sso: scope is rejected by the legacy flow.
+            let req = ListAvailableAttributesRequest {
+                identity_number: 10000,
+                attributes: Some(vec!["sso:dfinity.org:email".to_string()]),
+            };
+            let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
+            match err {
+                ListAvailableAttributesError::ValidationError { problems } => {
+                    pretty_assert_eq!(problems, vec![LEGACY_SSO_SCOPE_REJECTION.to_string()]);
                 }
                 other => panic!("Expected ValidationError, got {:?}", other),
             }

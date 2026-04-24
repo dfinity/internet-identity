@@ -400,9 +400,16 @@ impl DiscoverableProvider {
         let discovered_client_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
         let openid_configuration: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 
+        // Canonicalize the domain to lowercase so that downstream scope
+        // matching (attribute-scope `sso:<domain>`, `DiscoveryState` lookup by
+        // domain) is deterministic regardless of the casing the admin used
+        // when registering. `is_allowed_discovery_domain` already accepts
+        // case-insensitively via `eq_ignore_ascii_case`.
+        let discovery_domain = config.discovery_domain.to_ascii_lowercase();
+
         DISCOVERY_TASKS.with_borrow_mut(|tasks| {
             tasks.push(DiscoveryState {
-                discovery_domain: config.discovery_domain.clone(),
+                discovery_domain: discovery_domain.clone(),
                 client_id_ref: Rc::clone(&discovered_client_id),
                 openid_configuration_ref: Rc::clone(&openid_configuration),
                 issuer_ref: Rc::clone(&discovered_issuer),
@@ -415,7 +422,7 @@ impl DiscoverableProvider {
             discovered_client_id,
             discovered_issuer,
             certs,
-            discovery_domain: config.discovery_domain,
+            discovery_domain,
         }
     }
 }

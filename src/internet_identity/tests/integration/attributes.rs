@@ -246,10 +246,10 @@ fn should_get_certified_attributes() {
     );
 }
 
-/// Verifies that the `sso:<domain>` attribute scope is accepted by the
-/// canister request validator and behaves correctly when there is no matching
-/// SSO credential: it is silently dropped (no error, no attribute returned),
-/// mirroring the existing openid: "attribute not available" behavior.
+/// Verifies that the legacy `prepare_attributes` flow rejects `sso:<domain>`
+/// attribute scopes with a `ValidationError`. The legacy flow is deprecated
+/// and new attribute functionality (including SSO) must go through the ICRC-3
+/// flow (`prepare_icrc3_attributes` / `get_icrc3_attributes`).
 ///
 /// End-to-end SSO credential creation cannot be exercised from PocketIC
 /// because it relies on HTTP outcalls for two-hop discovery; see the comment
@@ -257,8 +257,8 @@ fn should_get_certified_attributes() {
 /// the canister unit tests in `src/internet_identity/src/attributes.rs`
 /// (module `sso_attributes_tests`).
 #[test]
-fn sso_scope_request_is_accepted_and_silently_drops_when_no_sso_credential() {
-    use internet_identity_interface::internet_identity::types::DiscoverableOidcConfig;
+fn legacy_prepare_attributes_rejects_sso_scope() {
+    use internet_identity_interface::internet_identity::types::attributes::PrepareAttributeError;
 
     let env = env();
     #[allow(unused_variables)]
@@ -288,18 +288,6 @@ fn sso_scope_request_is_accepted_and_silently_drops_when_no_sso_credential() {
     crate::openid::mock_google_certs_response(&env);
     deploy_archive_via_ii(&env, ii_backend_canister_id);
 
-    // Register an SSO provider. Discovery won't complete in PocketIC, so no
-    // credential will ever be matched against it — which is exactly the
-    // scenario we want to validate here.
-    api::add_discoverable_oidc_config(
-        &env,
-        ii_backend_canister_id,
-        DiscoverableOidcConfig {
-            discovery_domain: "beta.dfinity.org".into(),
-        },
-    )
-    .expect("failed to register SSO provider");
-
     let identity_number =
         crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method(
             &env,
@@ -324,9 +312,8 @@ fn sso_scope_request_is_accepted_and_silently_drops_when_no_sso_credential() {
     let origin = "https://some-dapp.com";
     env.advance_time(Duration::from_secs(15));
 
-    // Mixed request: a supported openid: key and a well-formed sso: key that
-    // has no matching credential. The canister must accept both and return
-    // only the one it can fulfill.
+    // Mixed request: a supported openid: key and an sso: key — the latter is
+    // not valid for the legacy flow and must cause the whole request to fail.
     let prepare_request = PrepareAttributeRequest {
         identity_number,
         origin: origin.to_string(),
@@ -343,15 +330,29 @@ fn sso_scope_request_is_accepted_and_silently_drops_when_no_sso_credential() {
         test_principal,
         prepare_request,
     )
-    .expect("failed to call prepare_attributes")
-    .expect("prepare_attributes returned an error");
+    .expect("failed to call prepare_attributes");
 
-    // Only the openid: attribute comes back; the sso: key is silently dropped.
-    assert_eq!(prepare_response.attributes.len(), 1);
-    assert_eq!(
-        prepare_response.attributes[0].0,
-        "openid:https://accounts.google.com:email"
-    );
+    match prepare_response {
+        Err(PrepareAttributeError::ValidationError { problems }) => {
+            assert!(
+                problems.iter().any(|p| p.contains("sso:<domain>")),
+                "expected an sso-scope-rejection message, got {:?}",
+                problems
+            );
+            assert!(
+                problems.iter().any(|p| p.contains("ICRC-3")),
+                "expected rejection to point at the ICRC-3 flow, got {:?}",
+                problems
+            );
+        }
+        Err(other) => panic!(
+            "expected ValidationError rejecting sso scope in legacy flow, got {:?}",
+            other
+        ),
+        Ok(_) => {
+            panic!("expected ValidationError rejecting sso scope in legacy flow, got Ok response")
+        }
+    }
 }
 
 /// Regression test: Microsoft credentials use a template issuer with `{tid}` placeholder.
