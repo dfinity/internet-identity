@@ -24,8 +24,21 @@ import {
   type AvailableAttribute,
   attributeConsentResultStore,
   attributeConsentStore,
-  extractAttributeName,
 } from "$lib/stores/attributeConsent.store";
+
+/** Extract the attribute name from a fully scoped key.
+ *  e.g., "openid:https://accounts.google.com:email" → "email" */
+export const extractAttributeName = (key: string): string => {
+  const lastColon = key.lastIndexOf(":");
+  return lastColon >= 0 ? key.slice(lastColon + 1) : key;
+};
+
+/** Extract the scope from a fully scoped key.
+ *  e.g., "openid:https://accounts.google.com:email" → "openid:https://accounts.google.com" */
+export const extractScope = (key: string): string | undefined => {
+  const lastColon = key.lastIndexOf(":");
+  return lastColon >= 0 ? key.slice(0, lastColon) : undefined;
+};
 
 /** Serialize ICRC-3 consent requests so the user only ever sees one
  *  consent screen at a time — if a (possibly malicious) dapp sends several

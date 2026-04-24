@@ -5,7 +5,7 @@
     AttributeGroup,
     AvailableAttribute,
   } from "$lib/stores/attributeConsent.store";
-  import { extractScope } from "$lib/stores/attributeConsent.store";
+  import { extractScope } from "$lib/stores/channelHandlers/attributes";
   import { backendCanisterConfig } from "$lib/globals";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import Button from "$lib/components/ui/Button.svelte";

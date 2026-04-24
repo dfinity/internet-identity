@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AvailableAttribute } from "$lib/stores/attributeConsent.store";
-  import { extractScope } from "$lib/stores/attributeConsent.store";
+  import { extractScope } from "$lib/stores/channelHandlers/attributes";
   import { backendCanisterConfig } from "$lib/globals";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@lucide/svelte";
