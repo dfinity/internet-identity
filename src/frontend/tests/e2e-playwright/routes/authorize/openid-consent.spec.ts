@@ -415,4 +415,73 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       await attributeConsentView.expectHidden();
     });
   });
+
+  test.describe("regular passkey flow with linked OpenID credential", () => {
+    // User signs in via passkey, not 1-click OpenID — so `flow.type` is
+    // "regular" and the implicit fast-path never runs. Attributes are still
+    // sourced from the OpenID credential that was linked to the anchor
+    // ahead of time, so the consent handler has something to show.
+    const name = "Linked User";
+    const email = "linked@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [{ claims: { name, email } }],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        // No `openid:` → the authorize page does not take the 1-click route.
+        useIcrc3Attributes: true,
+        attributes: ["email", "name"],
+      },
+    });
+
+    // Link the OpenID credential to the passkey identity before the test
+    // runs the dapp sign-in.
+    test.beforeEach(
+      async ({
+        page,
+        identities,
+        signInWithIdentity,
+        signInWithOpenId,
+        openIdUsers,
+      }) => {
+        await page.goto(II_URL + "/manage/access");
+        await signInWithIdentity(page, identities[0].identityNumber);
+        for (const user of openIdUsers) {
+          await page.getByRole("button", { name: "Add new" }).click();
+          const popupPromise = page.context().waitForEvent("page");
+          await page.getByRole("button", { name: user.issuer.name }).click();
+          const popup = await popupPromise;
+          const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+          await signInWithOpenId(popup, user.id);
+          await closePromise;
+        }
+      },
+    );
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) return;
+      const entries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(entries.email).toBe(email);
+      expect(entries.name).toBe(name);
+    });
+
+    test("consent renders and certifies linked attributes", async ({
+      attributeConsentView,
+      authorizePage,
+      identities,
+      signInWithIdentity,
+    }) => {
+      // Sign the passkey identity into the dapp's authorize popup.
+      await signInWithIdentity(
+        authorizePage.page,
+        identities[0].identityNumber,
+      );
+      await attributeConsentView.accept();
+    });
+  });
 });
