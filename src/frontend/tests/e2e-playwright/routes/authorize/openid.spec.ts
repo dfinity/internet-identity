@@ -290,6 +290,16 @@ test.describe("Authorize with direct OpenID", () => {
       openIdUsers,
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      // Mixing implicit keys with non-implicit / unknown ones takes the
+      // consent path instead of 1-click. The defaults (all options checked,
+      // first provider selected for the `name` picker) match the assertions
+      // below — just accept.
+      await expect(
+        authorizePage.page.getByRole("heading", { name: "Review Permissions" }),
+      ).toBeVisible();
+      await authorizePage.page
+        .getByRole("button", { name: "Continue" })
+        .click();
     });
   });
 
