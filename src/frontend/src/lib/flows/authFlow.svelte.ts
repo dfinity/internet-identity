@@ -34,7 +34,6 @@ import {
   selectAuthScopes,
 } from "$lib/utils/openID";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
-import { rememberSsoDomainForCredential } from "$lib/utils/ssoDomainStorage";
 import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
@@ -108,9 +107,13 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
-    const { domain, clientId, discovery } = ssoResult;
+    const { clientId, discovery } = ssoResult;
 
-    // Build a synthetic OpenIdConfig from SSO discovery result
+    // Build a synthetic OpenIdConfig from SSO discovery result. The
+    // canister identifies the matching DiscoverableProvider by (iss,
+    // aud) and stamps `sso_domain` (+ optional `sso_name`) onto the
+    // credential when it verifies the JWT — the FE doesn't need to
+    // remember anything about this flow locally.
     const syntheticConfig: OpenIdConfig = {
       auth_uri: discovery.authorization_endpoint,
       jwks_uri: "",
@@ -123,37 +126,7 @@ export class AuthFlow {
       client_id: clientId,
     };
 
-    // Pre-fetch the JWT so we can record the `(iss, sub, aud) → domain`
-    // mapping before handing off to the OpenID flow. Passing the JWT into
-    // `continueWithOpenId` avoids a second round-trip to the provider.
-    // The SSO domain is what the user typed; without remembering it here,
-    // `OpenIdItem` would later render this credential as e.g. "Google
-    // account" when the underlying IdP happens to be Google.
-    this.#systemOverlay = true;
-    let jwt: string;
-    try {
-      jwt = await requestJWT(
-        {
-          clientId,
-          authURL: discovery.authorization_endpoint,
-          authScope: syntheticConfig.auth_scope.join(" "),
-        },
-        {
-          nonce: get(sessionStore).nonce,
-          mediation: "required",
-        },
-      );
-    } catch (error) {
-      this.#view = "chooseMethod";
-      throw error;
-    } finally {
-      this.#systemOverlay = false;
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
-    }
-    const { iss, sub, aud } = decodeJWT(jwt);
-    rememberSsoDomainForCredential({ iss, sub, aud }, domain);
-
-    return await this.continueWithOpenId(syntheticConfig, jwt);
+    return await this.continueWithOpenId(syntheticConfig);
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {

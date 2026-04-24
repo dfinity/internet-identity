@@ -248,9 +248,11 @@ describe("findConfig", () => {
     // Legacy/migrated credentials can have an `aud` that doesn't line up
     // with the current `openid_configs` entry (e.g. client_id rotation).
     // We prefer returning SOMETHING so the UI can label these direct-
-    // provider credentials correctly, and rely on the localStorage SSO
-    // map in `openIdName`/`openIdLogo` to short-circuit the SSO case
-    // before `findConfig` is consulted.
+    // provider credentials correctly. SSO credentials are disambiguated
+    // earlier via canister-stamped `sso_domain` / `sso_name` metadata —
+    // `openIdName` / `openIdLogo` short-circuit on those before ever
+    // consulting `findConfig`, so the issuer-only fallback can't
+    // mis-attribute an SSO credential to its underlying IdP.
     const googleCfg = createOpenIDConfig("https://accounts.google.com");
     backendCanisterConfig.openid_configs = [[googleCfg]];
     expect(

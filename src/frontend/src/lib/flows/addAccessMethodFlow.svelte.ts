@@ -1,17 +1,11 @@
 import { frontendCanisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
-import {
-  OpenIdCredentialAlreadyLinkedHereError,
-  decodeJWT,
-  requestJWT,
-  selectAuthScopes,
-} from "$lib/utils/openID";
+import { decodeJWT, requestJWT, selectAuthScopes } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
-import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import { throwCanisterError } from "$lib/utils/utils";
 import type {
   AuthnMethodData,
   OpenIdCredential,
-  OpenIdCredentialAddError,
   OpenIdConfig,
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
@@ -20,7 +14,6 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
-import { rememberSsoDomainForCredential } from "$lib/utils/ssoDomainStorage";
 
 export class AddAccessMethodFlow {
   #view = $state<"chooseMethod" | "addPasskey" | "signInWithSso">(
@@ -57,30 +50,15 @@ export class AddAccessMethodFlow {
       );
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
-      try {
-        await actor
-          .openid_credential_add(identityNumber, jwt, salt)
-          .then(throwCanisterError);
-      } catch (err) {
-        // Specialize the generic "already registered to another identity"
-        // error: if the credential's (iss, sub, aud) is already attached
-        // to *this* identity, tell the user that specifically instead of
-        // implying another identity has it.
-        if (
-          isCanisterError<OpenIdCredentialAddError>(err) &&
-          err.type === "OpenIdCredentialAlreadyRegistered"
-        ) {
-          const info = await actor.get_anchor_info(identityNumber);
-          const linkedHere =
-            info.openid_credentials[0]?.some(
-              (c) => c.iss === iss && c.sub === sub && c.aud === aud,
-            ) ?? false;
-          if (linkedHere) {
-            throw new OpenIdCredentialAlreadyLinkedHereError();
-          }
-        }
-        throw err;
-      }
+      // AddAccessMethod.svelte already disables the per-provider button
+      // when that provider is linked to the current identity, and
+      // SignInWithSso.svelte disables Continue once discovery reveals
+      // the same `(iss, aud)` on the identity, so the canister's
+      // `OpenIdCredentialAlreadyRegistered` reply here is only hit when
+      // the credential is linked to another identity. Treat it as-is.
+      await actor
+        .openid_credential_add(identityNumber, jwt, salt)
+        .then(throwCanisterError);
 
       const metadata: MetadataMapV2 = [];
       if (name !== undefined) {
@@ -95,6 +73,12 @@ export class AddAccessMethodFlow {
         sub,
         metadata,
         last_usage_timestamp: [],
+        // `sso_domain` / `sso_name` are populated by the canister when
+        // the credential is later returned via `get_anchor_info`; the
+        // FE-constructed echo of the just-added credential doesn't know
+        // them, so leave empty (Candid `opt text` = `[] | [string]`).
+        sso_domain: [],
+        sso_name: [],
       };
     } finally {
       this.#isSystemOverlayVisible = false;
@@ -148,14 +132,13 @@ export class AddAccessMethodFlow {
    * `OpenIdConfig` from the two-hop discovery result — the issuer and
    * client_id we got from discovery plus a default name.
    *
-   * On success we also remember `(iss, sub, aud) → domain` in localStorage
-   * so the access-methods UI can later label this credential by the SSO
-   * domain the user typed instead of by the underlying IdP's issuer.
+   * The canister itself stamps `sso_domain` (and, when published by the
+   * domain, `sso_name`) onto the credential metadata on verification, so
+   * the access-methods UI can label SSO credentials by domain across
+   * devices — no per-device FE bookkeeping needed.
    */
-  linkSsoAccount = async (
-    result: SsoDiscoveryResult,
-  ): Promise<OpenIdCredential> => {
-    const { domain, clientId, discovery } = result;
+  linkSsoAccount = (result: SsoDiscoveryResult): Promise<OpenIdCredential> => {
+    const { clientId, discovery } = result;
     const syntheticConfig: OpenIdConfig = {
       auth_uri: discovery.authorization_endpoint,
       jwks_uri: "",
@@ -167,11 +150,6 @@ export class AddAccessMethodFlow {
       auth_scope: selectAuthScopes(discovery.scopes_supported),
       client_id: clientId,
     };
-    const credential = await this.linkOpenIdAccount(syntheticConfig);
-    rememberSsoDomainForCredential(
-      { iss: credential.iss, sub: credential.sub, aud: credential.aud },
-      domain,
-    );
-    return credential;
+    return this.linkOpenIdAccount(syntheticConfig);
   };
 }

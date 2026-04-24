@@ -936,6 +936,20 @@ export interface OpenIdCredential {
   'iss' : Iss,
   'sub' : Sub,
   'metadata' : MetadataMapV2,
+  /**
+   * SSO discovery domain, looked up by `(iss, aud)` against the
+   * canister's registered discoverable OIDC configs. `None` for
+   * direct-provider credentials (Google / Apple / Microsoft) and for
+   * SSO credentials whose provider is no longer registered.
+   */
+  'sso_domain' : [] | [string],
+  /**
+   * Human-readable SSO name from the domain's
+   * `/.well-known/ii-openid-configuration`. `None` when the domain
+   * doesn't publish one — callers should fall back to `sso_domain`
+   * for the label.
+   */
+  'sso_name' : [] | [string],
   'last_usage_timestamp' : [] | [Timestamp],
 }
 export type OpenIdCredentialAddError = {

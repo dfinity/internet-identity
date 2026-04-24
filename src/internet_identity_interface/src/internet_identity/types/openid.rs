@@ -15,6 +15,17 @@ pub struct OpenIdCredentialData {
     // authn method stats if this value is already set to any value.
     pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: HashMap<String, MetadataEntryV2>,
+    /// SSO discovery domain for credentials linked via two-hop OIDC
+    /// discovery, looked up on demand by `(iss, aud)`. `None` for direct-
+    /// provider credentials (Google / Apple / Microsoft) and for SSO
+    /// credentials whose provider is no longer registered on the
+    /// canister.
+    pub sso_domain: Option<String>,
+    /// Human-readable SSO name served alongside `client_id` at
+    /// `{sso_domain}/.well-known/ii-openid-configuration`. `None` when
+    /// the domain doesn't publish one — callers that want a label should
+    /// fall back to `sso_domain` on the frontend side.
+    pub sso_name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

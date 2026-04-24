@@ -25,13 +25,22 @@ msgstr "{application} se ha trasladado al nuevo Internet Identity"
 msgid "{displayName} account"
 msgstr ""
 
-msgid "{domainInput} didn't serve /.well-known/ii-openid-configuration (HTTP {0}). The domain owner needs to publish it for II to sign you in."
-msgstr ""
-
-msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed: {0}"
+msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr ""
 
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+msgstr ""
+
+msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
+msgstr ""
+
+msgid "{domainInput}'s SSO denied the sign-in."
+msgstr ""
+
+msgid "{domainInput}'s SSO returned \"{0}\": {1}"
+msgstr ""
+
+msgid "{domainInput}'s SSO returned error \"{0}\"."
 msgstr ""
 
 msgid "{identityName} has been removed from this device."
@@ -241,7 +250,10 @@ msgstr "Continuar con {name}"
 msgid "Continue with passkey"
 msgstr "Continuar con passkey"
 
-msgid "Couldn't reach {domainInput}. Check the spelling and your network, then try again."
+msgid "Continue with SSO"
+msgstr ""
+
+msgid "Couldn't reach {domainInput}. Check the spelling and your network."
 msgstr ""
 
 msgid "Create account"
@@ -830,7 +842,7 @@ msgstr "La sesión ha expirado"
 msgid "Set as default sign-in"
 msgstr "Establecer como inicio de sesión predeterminado"
 
-msgid "Several SSO sign-ins are in flight already. Wait a moment and try again."
+msgid "Several SSO sign-ins are in flight already. Wait a moment."
 msgstr ""
 
 msgid "Show all"
@@ -850,12 +862,6 @@ msgstr "Inicia la sesión usando métodos conocidos"
 
 msgid "Sign in with another identity"
 msgstr "Iniciar sesión con otra identidad"
-
-msgid "Sign in with SSO"
-msgstr ""
-
-msgid "Sign In With SSO"
-msgstr ""
 
 msgid "Sign in with your {displayName} account from any device."
 msgstr ""
@@ -906,22 +912,7 @@ msgstr ""
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
 msgstr ""
 
-msgid "SSO provider misconfigured: authorization endpoint is not HTTPS. ({msg})"
-msgstr ""
-
-msgid "SSO provider misconfigured: authorization endpoint points to a different host than the issuer. ({msg})"
-msgstr ""
-
-msgid "SSO provider misconfigured: issuer doesn't match the configured hostname. ({msg})"
-msgstr ""
-
-msgid "SSO provider misconfigured: issuer URL is not HTTPS. ({msg})"
-msgstr ""
-
-msgid "SSO provider's discovery document is malformed: {msg}"
-msgstr ""
-
-msgid "SSO sign-in failed. Please try again."
+msgid "SSO sign-in for {domainInput} failed. Please try again."
 msgstr ""
 
 msgid "Start over"
@@ -1017,6 +1008,9 @@ msgstr "Esto puede tardar unos segundos"
 msgid "This passkey is no longer associated with any identity."
 msgstr "Esta passkey ya no está asociada a ninguna identidad."
 
+msgid "This SSO is already linked to your identity."
+msgstr ""
+
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Esta YubiKey tiene un firmware antiguo (5.1) que es incompatible."
 
@@ -1053,7 +1047,7 @@ msgstr "Para continuar:"
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Para terminar de configurar tu passkey, sigue las instrucciones que aparecen en tu <0>nuevo dispositivo</0>."
 
-msgid "Too many recent attempts for {domainInput}. Wait a few minutes and try again."
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
 msgstr ""
 
 msgid "Type each word in the correct order:"
