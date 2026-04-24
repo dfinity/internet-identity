@@ -877,7 +877,17 @@ type PrepareAttributeRequest = record {
     // II account for the relying party.
     account_number : opt AccountNumber;
 
-    // The attribute to be prepared.
+    // The attributes to be prepared. Each key has the form
+    // `<scope>:<attribute_name>`, where `<scope>` is either
+    // `openid:<issuer>` (e.g. `openid:https://accounts.google.com:email`)
+    // or `sso:<domain>` (e.g. `sso:dfinity.org:email`).
+    //
+    // Each linked credential is addressable via exactly one scope:
+    // credentials obtained through a `DiscoverableOidcConfig` (two-hop SSO
+    // discovery) are reachable only via `sso:<domain>`; credentials from
+    // hardcoded OIDC providers (Google, Microsoft, …) are reachable only via
+    // `openid:<issuer>`. Under `sso:` only `email` and `name` are supported;
+    // under `openid:` `email`, `name`, and `verified_email` are supported.
     attribute_keys : vec text;
 };
 
@@ -955,9 +965,12 @@ type Icrc3Value = variant {
 
 // A specification of an attribute to be certified.
 type AttributeSpec = record {
-    // `attribute_scope:attribute_name`
+    // `<attribute_scope>:<attribute_name>` where `<attribute_scope>` is
+    // either `openid:<issuer>` or `sso:<domain>`.
     //
-    // Example: `openid:https://accounts.google.com:email`
+    // Examples:
+    // - `openid:https://accounts.google.com:email`
+    // - `sso:dfinity.org:email`
     key : text;
 
     // If `value` is set, this attribute should be certified only if it matches
@@ -1046,8 +1059,10 @@ type ListAvailableAttributesRequest = record {
     identity_number : IdentityNumber;
 
     // Optional list of attribute keys to filter by.
-    // Each key is either a fully-scoped key (e.g., "openid:https://accounts.google.com:email")
-    // or an unscoped attribute name (e.g., "email") which matches all scopes.
+    // Each key is either a fully-scoped key (e.g.,
+    // `"openid:https://accounts.google.com:email"` or
+    // `"sso:dfinity.org:email"`) or an unscoped attribute name (e.g.,
+    // `"email"`) which matches all scopes.
     // If not provided, all available attributes are returned.
     attributes : opt vec text;
 };
