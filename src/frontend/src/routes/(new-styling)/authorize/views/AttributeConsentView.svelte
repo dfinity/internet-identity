@@ -175,6 +175,11 @@
   let selections = $state(
     new Map<string, { checked: boolean; selectedIndex: number }>(),
   );
+  let effectiveOrigin = $state("");
+  // `ready` is flipped only after `mergedGroups`, `selections`, and
+  // `effectiveOrigin` have all been set from the resolved context — the UI
+  // below gates on it so a click can never submit with default-empty state.
+  let ready = $state(false);
 
   $effect(() => {
     context.then((ctx) => {
@@ -185,6 +190,8 @@
           { checked: true, selectedIndex: 0 },
         ]),
       );
+      effectiveOrigin = ctx.effectiveOrigin;
+      ready = true;
     });
   });
 
@@ -252,8 +259,11 @@
   };
 </script>
 
-{#await context}
-  <!-- Skeleton placeholder while attributes are being resolved -->
+{#if !ready}
+  <!-- Skeleton placeholder while the context promise resolves and state is
+       being initialized. Gating on `ready` (instead of `{#await context}`)
+       avoids a frame where `{:then}` renders with default-empty state and
+       a fast click could submit an empty consent result. -->
   <div
     class="flex min-w-0 flex-1 flex-col"
     aria-busy="true"
@@ -271,9 +281,9 @@
     <div class="skeleton mb-6 h-4 w-16"></div>
     <div class="skeleton h-12 w-full rounded-lg"></div>
   </div>
-{:then ctx}
+{:else}
   <div class="flex min-w-0 flex-1 flex-col">
-    <AuthorizeHeader origin={ctx.effectiveOrigin} />
+    <AuthorizeHeader origin={effectiveOrigin} />
     <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
       {#if variant === "openid"}
         {$t`Review Permissions`}
@@ -322,4 +332,4 @@
       {$t`Continue`}
     </Button>
   </div>
-{/await}
+{/if}

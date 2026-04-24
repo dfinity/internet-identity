@@ -27,6 +27,22 @@ import {
   extractAttributeName,
 } from "$lib/stores/attributeConsent.store";
 
+/** Serialize ICRC-3 consent requests so the user only ever sees one
+ *  consent screen at a time — if a (possibly malicious) dapp sends several
+ *  in parallel, each `setContext` would otherwise overwrite the previous
+ *  one and the user could click through on one request while a different
+ *  one silently receives their approval. The legacy and implicit handlers
+ *  don't touch `attributeConsentStore`, so only the consent handler needs
+ *  this lock. */
+let consentQueueTail: Promise<unknown> = Promise.resolve();
+const serializeConsentRequest = <T>(fn: () => Promise<T>): Promise<T> => {
+  const prev = consentQueueTail;
+  const next = prev.then(fn);
+  // Don't let a rejection from an earlier call block the queue.
+  consentQueueTail = next.catch(() => {});
+  return next;
+};
+
 /** Check if a scoped key is an implicit consent key for the given issuer. */
 const isImplicitConsentKey = (key: string, configIssuer: string): boolean =>
   key === `openid:${configIssuer}:name` ||
@@ -39,21 +55,19 @@ const filterImplicitConsentKeys = (
   configIssuer: string,
 ): string[] => keys.filter((key) => isImplicitConsentKey(key, configIssuer));
 
-/** Resolve a single requested key against available attributes. */
+/** Resolve a single requested key against available attributes.
+ *  An exact match (e.g. `openid:google:email` requested + available) yields
+ *  a single scoped option. Otherwise the request is treated as unscoped
+ *  (e.g. `email`) and matches every available key that shares the suffix,
+ *  producing one option per matching scope. */
 const resolveKey = (
   requestedKey: string,
   available: Array<[string, Uint8Array | number[]]>,
   decoder: TextDecoder,
 ): AvailableAttribute[] => {
-  const availableKeys = available.map(([key]) => key);
-  const isScoped = availableKeys.includes(requestedKey);
-
-  if (isScoped) {
-    const entry = available.find(([key]) => key === requestedKey);
-    if (entry === undefined) {
-      return [];
-    }
-    const rawValue = new Uint8Array(entry[1]);
+  const exactMatch = available.find(([key]) => key === requestedKey);
+  if (exactMatch !== undefined) {
+    const rawValue = new Uint8Array(exactMatch[1]);
     return [
       {
         key: requestedKey,
@@ -64,7 +78,6 @@ const resolveKey = (
     ];
   }
 
-  // Unscoped key — find all available keys ending with :requestedKey
   return available
     .filter(([key]) => key.endsWith(`:${requestedKey}`))
     .map(([key, value]) => {
@@ -114,12 +127,15 @@ export const handleLegacyAttributes =
     if (request.id === undefined || request.method !== "ii_attributes") {
       return;
     }
+    // Capture the narrowed id so the serialized closure doesn't have to
+    // re-narrow across the `await` boundary.
+    const requestId = request.id;
 
     const paramsResult = AttributesParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       await channel.send({
         jsonrpc: "2.0",
-        id: request.id,
+        id: requestId,
         error: {
           code: INVALID_PARAMS_ERROR_CODE,
           message: z.prettifyError(paramsResult.error),
@@ -138,7 +154,8 @@ export const handleLegacyAttributes =
       return;
     }
 
-    // Only OpenID flows have attributes — bail if not OpenID.
+    // Attributes are sourced from OpenID credential metadata — non-OpenID
+    // flows have nothing to serve, so bail.
     const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
     if (flow.type !== "1-click-openid") {
       return;
@@ -149,7 +166,9 @@ export const handleLegacyAttributes =
     await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
 
-    // Validate the derivation origin if provided, same as delegation handler.
+    // Confirm `icrc95DerivationOrigin` is an alternate origin the channel's
+    // origin is permitted to use — prevents dapp A from certifying
+    // attributes under dapp B's origin by claiming B as its derivation.
     const validationResult = await validateDerivationOrigin({
       requestOrigin: channel.origin,
       derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
@@ -172,7 +191,10 @@ export const handleLegacyAttributes =
     );
 
     try {
-      // Prepare and certify attributes via the canister (two-step: prepare + get).
+      // Two-phase certification: `prepare_attributes` produces the message
+      // to certify, `get_attributes` returns the signature once the message
+      // has been certified (retried because certification lags by a few
+      // heartbeats).
       const { attributes, issued_at_timestamp_ns } = await authenticated.actor
         .prepare_attributes({
           origin,
@@ -198,7 +220,7 @@ export const handleLegacyAttributes =
 
       await channel.send({
         jsonrpc: "2.0",
-        id: request.id,
+        id: requestId,
         result: {
           attributes: Object.fromEntries(
             certified_attributes.map((attribute) => [
@@ -223,23 +245,100 @@ export const handleLegacyAttributes =
   };
 
 /**
- * Certify and send the selected attribute specs to the relying party.
- * Shared between the implicit and consent handlers.
+ * Everything the consent handler needs to drive the consent UI and, once
+ * the user agrees, certify + send. Built by `resolveConsentPipeline`.
  */
-const certifyAndSend = async (
-  channel: Channel,
-  onError: (error: ChannelError) => void,
-  request: JsonRequest & { id: string | number },
-  params: { nonce: string },
-  authenticated: { identityNumber: bigint; actor: Authenticated["actor"] },
-  accountNumber: bigint | undefined,
-  origin: string,
+type ConsentPipeline = {
+  accountNumberPromise: Promise<bigint | undefined>;
+  authenticated: Authenticated;
+  origin: string;
+  groups: AttributeGroup[];
+};
+
+/**
+ * Resolve everything the consent handler needs before it can either show
+ * the consent UI or certify an empty set: wait for auth, validate the
+ * derivation origin, ask the canister for available attributes, and shape
+ * the groups for the UI. Errors are swallowed and reported via `onError`
+ * — returning `null` tells the caller to give up without throwing (Svelte's
+ * `{#await}` doesn't render rejected promises).
+ */
+const resolveConsentPipeline = async (params: {
+  channel: Channel;
+  onError: (error: ChannelError) => void;
+  derivationOrigin: string | undefined;
+  requestedKeys: string[];
+}): Promise<ConsentPipeline | null> => {
+  const { channel, onError, derivationOrigin, requestedKeys } = params;
+  try {
+    const { accountNumberPromise } = await waitForStore(authorizedStore);
+    const authenticated = await waitForStore(authenticationStore);
+
+    const validationResult = await validateDerivationOrigin({
+      requestOrigin: channel.origin,
+      derivationOrigin,
+    });
+    if (validationResult.result === "invalid") {
+      onError("unverified-origin");
+      return null;
+    }
+
+    const origin = remapToLegacyDomain(derivationOrigin ?? channel.origin);
+
+    const available =
+      requestedKeys.length > 0
+        ? await authenticated.actor
+            .list_available_attributes({
+              identity_number: authenticated.identityNumber,
+              attributes: [requestedKeys],
+            })
+            .then(throwCanisterError)
+        : [];
+
+    return {
+      accountNumberPromise,
+      authenticated,
+      origin,
+      groups: resolveAttributeGroups(requestedKeys, available),
+    };
+  } catch (error) {
+    console.error(error);
+    onError("attributes-failed");
+    return null;
+  }
+};
+
+/**
+ * Drive the canister's two-phase ICRC-3 certification and hand the result
+ * back to the relying party: `prepare_icrc3_attributes` returns a message
+ * to certify, `get_icrc3_attributes` returns the signature once the
+ * message has been certified (retried because certification lags the
+ * prepare call by a few heartbeats). Shared by both ICRC-3 handlers.
+ */
+const certifyAndSend = async (params: {
+  channel: Channel;
+  onError: (error: ChannelError) => void;
+  requestId: string | number;
+  nonce: string;
+  authenticated: { identityNumber: bigint; actor: Authenticated["actor"] };
+  accountNumber: bigint | undefined;
+  origin: string;
   attributeSpecs: Array<{
     key: string;
     value: [] | [Uint8Array];
     omit_scope: boolean;
-  }>,
-): Promise<void> => {
+  }>;
+}): Promise<void> => {
+  const {
+    channel,
+    onError,
+    requestId,
+    nonce,
+    authenticated,
+    accountNumber,
+    origin,
+    attributeSpecs,
+  } = params;
   try {
     const { message } = await authenticated.actor
       .prepare_icrc3_attributes({
@@ -247,7 +346,7 @@ const certifyAndSend = async (
         account_number: accountNumber !== undefined ? [accountNumber] : [],
         identity_number: authenticated.identityNumber,
         attributes: attributeSpecs,
-        nonce: z.util.base64ToUint8Array(params.nonce),
+        nonce: z.util.base64ToUint8Array(nonce),
       })
       .then(throwCanisterError);
 
@@ -264,7 +363,7 @@ const certifyAndSend = async (
 
     await channel.send({
       jsonrpc: "2.0",
-      id: request.id,
+      id: requestId,
       result: {
         data: z.util.uint8ArrayToBase64(new Uint8Array(message)),
         signature: z.util.uint8ArrayToBase64(new Uint8Array(signature)),
@@ -290,10 +389,13 @@ export const handleIcrc3ImplicitAttributes =
     if (request.id === undefined || request.method !== "ii-icrc3-attributes") {
       return;
     }
+    const requestId = request.id;
 
     const paramsResult = Icrc3AttributesParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      // The consent handler reports the error response — stay silent here.
+      // The consent handler is always registered alongside this one and
+      // reports the parse failure to the RP; staying silent here avoids a
+      // duplicate JSON-RPC error response on the channel.
       return;
     }
 
@@ -321,50 +423,55 @@ export const handleIcrc3ImplicitAttributes =
       return;
     }
 
-    const { accountNumberPromise } = await waitForStore(authorizedStore);
-    const authenticated = await waitForStore(authenticationStore);
+    try {
+      const { accountNumberPromise } = await waitForStore(authorizedStore);
+      const authenticated = await waitForStore(authenticationStore);
 
-    const validationResult = await validateDerivationOrigin({
-      requestOrigin: channel.origin,
-      derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
-    });
-    if (validationResult.result === "invalid") {
-      onError("unverified-origin");
-      return;
+      const validationResult = await validateDerivationOrigin({
+        requestOrigin: channel.origin,
+        derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+      });
+      if (validationResult.result === "invalid") {
+        onError("unverified-origin");
+        return;
+      }
+
+      const origin = remapToLegacyDomain(
+        paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
+      );
+
+      // Filter to keys the canister actually has — the user may not have
+      // granted every implicit claim (e.g. missing verified_email).
+      const available = await authenticated.actor
+        .list_available_attributes({
+          identity_number: authenticated.identityNumber,
+          attributes: [requestedKeys],
+        })
+        .then(throwCanisterError);
+      const availableKeys = new Set(available.map(([key]) => key));
+      const attributeSpecs = requestedKeys
+        .filter((key) => availableKeys.has(key))
+        .map((key) => ({
+          key,
+          value: [] as [],
+          omit_scope: false,
+        }));
+
+      const accountNumber = await accountNumberPromise;
+      await certifyAndSend({
+        channel,
+        onError,
+        requestId,
+        nonce: paramsResult.data.nonce,
+        authenticated,
+        accountNumber,
+        origin,
+        attributeSpecs,
+      });
+    } catch (error) {
+      console.error(error);
+      onError("attributes-failed");
     }
-
-    const origin = remapToLegacyDomain(
-      paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
-    );
-
-    // Filter to keys the canister actually has — the user may not have
-    // granted every implicit claim (e.g. missing verified_email).
-    const available = await authenticated.actor
-      .list_available_attributes({
-        identity_number: authenticated.identityNumber,
-        attributes: [requestedKeys],
-      })
-      .then(throwCanisterError);
-    const availableKeys = new Set(available.map(([key]) => key));
-    const attributeSpecs = requestedKeys
-      .filter((key) => availableKeys.has(key))
-      .map((key) => ({
-        key,
-        value: [] as [],
-        omit_scope: false,
-      }));
-
-    const accountNumber = await accountNumberPromise;
-    await certifyAndSend(
-      channel,
-      onError,
-      { ...request, id: request.id },
-      paramsResult.data,
-      authenticated,
-      accountNumber,
-      origin,
-      attributeSpecs,
-    );
   };
 
 /**
@@ -378,12 +485,13 @@ export const handleIcrc3ConsentAttributes =
     if (request.id === undefined || request.method !== "ii-icrc3-attributes") {
       return;
     }
+    const requestId = request.id;
 
     const paramsResult = Icrc3AttributesParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       await channel.send({
         jsonrpc: "2.0",
-        id: request.id,
+        id: requestId,
         error: {
           code: INVALID_PARAMS_ERROR_CODE,
           message: z.prettifyError(paramsResult.error),
@@ -402,108 +510,81 @@ export const handleIcrc3ConsentAttributes =
 
     const requestedKeys = paramsResult.data.keys;
 
-    // Wait for the flow — set eagerly by the authorize page — so we can
-    // bail out as soon as we know the implicit handler will take this.
-    const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-    const implicitHandlerWillHandle =
-      flow.type === "1-click-openid" &&
-      requestedKeys.length > 0 &&
-      requestedKeys.every((key) => isImplicitConsentKey(key, flow.issuer));
-    if (implicitHandlerWillHandle) {
-      return;
-    }
-
-    // Kick off all remaining async work inside a single promise — we can
-    // set the consent context immediately so the loading screen appears
-    // while auth resolves and the canister call runs. Errors are caught
-    // inside the promise so the consent view always sees a resolved value
-    // (never a rejection that Svelte's `{#await}` can't render).
-    const pipelinePromise = (async () => {
+    await serializeConsentRequest(async () => {
       try {
-        const { accountNumberPromise } = await waitForStore(authorizedStore);
-        const authenticated = await waitForStore(authenticationStore);
-
-        const validationResult = await validateDerivationOrigin({
-          requestOrigin: channel.origin,
-          derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
-        });
-        if (validationResult.result === "invalid") {
-          onError("unverified-origin");
-          return null;
+        // Wait for the flow — set eagerly by the authorize page — so we can
+        // bail out as soon as we know the implicit handler will take this.
+        const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
+        const implicitHandlerWillHandle =
+          flow.type === "1-click-openid" &&
+          requestedKeys.length > 0 &&
+          requestedKeys.every((key) => isImplicitConsentKey(key, flow.issuer));
+        if (implicitHandlerWillHandle) {
+          return;
         }
 
-        const origin = remapToLegacyDomain(
-          paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
+        // Kick off the pipeline but don't await it yet — we want to set the
+        // consent context synchronously from the (still-pending) promise so
+        // the consent view can paint its loading skeleton while auth
+        // resolves and `list_available_attributes` runs in the background.
+        const pipelinePromise = resolveConsentPipeline({
+          channel,
+          onError,
+          derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+          requestedKeys,
+        });
+
+        attributeConsentStore.setContext(
+          pipelinePromise.then((pipeline) => ({
+            groups: pipeline?.groups ?? [],
+            effectiveOrigin: pipeline?.origin ?? "",
+          })),
         );
 
-        const available =
-          requestedKeys.length > 0
-            ? await authenticated.actor
-                .list_available_attributes({
-                  identity_number: authenticated.identityNumber,
-                  attributes: [requestedKeys],
-                })
-                .then(throwCanisterError)
-            : [];
+        const pipeline = await pipelinePromise;
+        if (pipeline === null) {
+          // Error (or invalid origin) already reported — resolve the consent
+          // result so the UI transitions away from the loading state instead
+          // of hanging.
+          attributeConsentStore.setConsent({ attributes: [] });
+          return;
+        }
 
-        return {
-          accountNumberPromise,
-          authenticated,
-          origin,
-          groups: resolveAttributeGroups(requestedKeys, available),
-        };
-      } catch (error) {
-        console.error(error);
-        onError("attributes-failed");
-        return null;
+        let attributeSpecs: Array<{
+          key: string;
+          value: [] | [Uint8Array];
+          omit_scope: boolean;
+        }>;
+
+        if (pipeline.groups.length === 0) {
+          // Nothing the dapp requested is available — certify an empty set
+          // and auto-resolve consent so the UI skips the empty picker view.
+          attributeSpecs = [];
+          attributeConsentStore.setConsent({ attributes: [] });
+        } else {
+          const consent = await waitForStore(attributeConsentResultStore);
+          attributeSpecs = consent.attributes.map((attr) => ({
+            key: attr.key,
+            value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
+            omit_scope: attr.omitScope,
+          }));
+        }
+
+        const accountNumber = await pipeline.accountNumberPromise;
+        await certifyAndSend({
+          channel,
+          onError,
+          requestId,
+          nonce: paramsResult.data.nonce,
+          authenticated: pipeline.authenticated,
+          accountNumber,
+          origin: pipeline.origin,
+          attributeSpecs,
+        });
+      } finally {
+        // Always reset consent state so the next request on this channel
+        // starts from a clean slate (no leftover context/result from us).
+        attributeConsentStore.clear();
       }
-    })();
-
-    attributeConsentStore.setContext(
-      pipelinePromise.then((pipeline) => ({
-        groups: pipeline?.groups ?? [],
-        effectiveOrigin: pipeline?.origin ?? "",
-      })),
-    );
-
-    const pipeline = await pipelinePromise;
-    if (pipeline === null) {
-      // Error (or invalid origin) already reported — resolve the consent
-      // result so the UI transitions away from the loading state instead of
-      // hanging.
-      attributeConsentStore.setConsent({ attributes: [] });
-      return;
-    }
-
-    let attributeSpecs: Array<{
-      key: string;
-      value: [] | [Uint8Array];
-      omit_scope: boolean;
-    }>;
-
-    if (pipeline.groups.length === 0) {
-      // Nothing the dapp requested is available — certify an empty set and
-      // auto-resolve consent so the UI skips the empty picker view.
-      attributeSpecs = [];
-      attributeConsentStore.setConsent({ attributes: [] });
-    } else {
-      const consent = await waitForStore(attributeConsentResultStore);
-      attributeSpecs = consent.attributes.map((attr) => ({
-        key: attr.key,
-        value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
-        omit_scope: attr.omitScope,
-      }));
-    }
-
-    const accountNumber = await pipeline.accountNumberPromise;
-    await certifyAndSend(
-      channel,
-      onError,
-      { ...request, id: request.id },
-      paramsResult.data,
-      pipeline.authenticated,
-      accountNumber,
-      origin,
-      attributeSpecs,
-    );
+    });
   };
