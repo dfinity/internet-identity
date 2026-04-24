@@ -845,7 +845,7 @@ make_backend_proposal() {
     --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
     --summary-file ./backend_proposal.md \
     --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")" \
-    2>&1 | tee /dev/tty)
+    2>&1 | tee /dev/stderr)
   parse_proposal_id "$output" "backend proposal number"
 }
 
@@ -870,7 +870,7 @@ make_frontend_proposal() {
     --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
     --summary-file ./frontend_proposal.md \
     --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")" \
-    2>&1 | tee /dev/tty)
+    2>&1 | tee /dev/stderr)
   parse_proposal_id "$output" "frontend proposal number"
 }
 
