@@ -17,20 +17,21 @@
 
   const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
 
+  // `sso_domain` / `sso_name` are populated by the canister at response
+  // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
+  // text` surfaces on the TS side as `[] | [string]`, hence the `[0]`
+  // unwrap.
+  const ssoDomain = $derived(openid.sso_domain[0]);
+  const ssoName = $derived(openid.sso_name[0]);
+  // Authoritative SSO marker — set by the canister for credentials
+  // whose `(iss, aud)` resolves to a registered discoverable provider.
+  const isSso = $derived(ssoDomain !== undefined);
   const name = $derived(
-    openIdName(openid.iss, openid.sub, openid.aud, openid.metadata),
+    openIdName(openid.iss, openid.aud, openid.metadata, ssoName, ssoDomain),
   );
   const email = $derived(getMetadataString(openid.metadata, "email"));
   const logo = $derived(
-    openIdLogo(openid.iss, openid.sub, openid.aud, openid.metadata),
-  );
-  // The canister stamps `sso_domain` on any credential verified by a
-  // `DiscoverableProvider` — that's the authoritative SSO marker, and
-  // it survives across devices (unlike the logo-absence heuristic the
-  // previous iteration used, which was fooled by direct-provider
-  // credentials whose issuer didn't match any `openid_configs` entry).
-  const isSso = $derived(
-    getMetadataString(openid.metadata, "sso_domain") !== undefined,
+    openIdLogo(openid.iss, openid.aud, openid.metadata, ssoDomain),
   );
   const displayName = $derived(name ?? $t`SSO`);
   const options = $derived(

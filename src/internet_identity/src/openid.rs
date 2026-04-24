@@ -22,6 +22,11 @@ use std::{cell::RefCell, collections::HashMap};
 
 mod generic;
 
+// Re-export the SSO-metadata lookup so the storage-layer
+// `OpenIdCredential → OpenIdCredentialData` conversion can call it
+// without making the whole `generic` module public.
+pub use generic::sso_fields_for;
+
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);

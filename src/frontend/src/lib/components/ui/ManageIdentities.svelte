@@ -44,10 +44,14 @@
     identity.authMethod.openid.metadata !== undefined
       ? openIdName(
           identity.authMethod.openid.iss,
-          identity.authMethod.openid.sub,
-          // `aud` not tracked on `LastUsedIdentity`; see #3795.
+          // `aud`, `ssoName`, `ssoDomain` not tracked on
+          // `LastUsedIdentity`; see #3795. Fall through to issuer-only
+          // `findConfig` — correct for direct providers, imprecise for
+          // SSO until that's fixed.
           undefined,
           identity.authMethod.openid.metadata,
+          undefined,
+          undefined,
         )
       : undefined}
   <div class="flex flex-col gap-8">

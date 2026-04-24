@@ -259,21 +259,14 @@ pub fn is_allowed_discovery_domain(domain: &str) -> bool {
 
 /// SSO provider that resolves its configuration via two-hop discovery.
 /// Used with the `DiscoverableOidcConfig` type.
+///
+/// The `discovery_domain` and human-readable `name` aren't held on the
+/// provider itself — they live on the matching `DiscoveryState` in
+/// `DISCOVERY_TASKS` (written by the periodic discovery timer, read by
+/// `sso_fields_for` when shaping API responses).
 pub struct DiscoverableProvider {
-    /// The `discovery_domain` from the `DiscoverableOidcConfig` this provider
-    /// was created from. Known at construction (never changes) — it's the
-    /// canonical label for the SSO, and what we want to stamp onto any
-    /// credential verified by this provider so the FE can render it as
-    /// e.g. "dfinity.org" regardless of the underlying IdP's issuer.
-    discovery_domain: String,
     discovered_client_id: Rc<RefCell<Option<String>>>,
     discovered_issuer: Rc<RefCell<Option<String>>>,
-    /// The `name` field, if any, served alongside `client_id` /
-    /// `openid_configuration` at `{discovery_domain}/.well-known/ii-openid-
-    /// configuration`. Populated during hop-1 fetch; `None` otherwise. The
-    /// FE uses this as the human-readable label for SSO credentials
-    /// (e.g. "DFINITY") and falls back to `discovery_domain` when absent.
-    discovered_name: Rc<RefCell<Option<String>>>,
     certs: Rc<RefCell<Vec<Jwk>>>,
 }
 
@@ -350,7 +343,13 @@ impl OpenIdProvider for DiscoverableProvider {
                 OpenIDJWTVerificationError::GenericError("Invalid signature".to_string())
             })?;
 
-        // Return credential with metadata
+        // Return credential with metadata. SSO-specific labels
+        // (`sso_domain`, `sso_name`) are NOT stored here; they're looked
+        // up on-demand from current `DISCOVERY_TASKS` state when a
+        // credential is returned via the API (see
+        // `openid::generic::sso_fields_for`). Computing them at query
+        // time means the FE always sees the current SSO `name` if the
+        // domain's `/.well-known/ii-openid-configuration` is updated.
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
@@ -363,20 +362,6 @@ impl OpenIdProvider for DiscoverableProvider {
         }
         if let Some(name) = claims.name {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
-        }
-        // Stamp SSO provenance onto the credential: the domain that was
-        // entered by the user (canonical label), and optionally the
-        // human-readable name from `/.well-known/ii-openid-configuration`.
-        // The FE reads these back via `get_anchor_info` so it can render
-        // SSO credentials correctly across devices — without this, the
-        // per-device localStorage hack the previous iteration carried
-        // couldn't survive reloads, let alone a different browser.
-        metadata.insert(
-            "sso_domain".into(),
-            MetadataEntryV2::String(self.discovery_domain.clone()),
-        );
-        if let Some(sso_name) = self.discovered_name.borrow().clone() {
-            metadata.insert("sso_name".into(), MetadataEntryV2::String(sso_name));
         }
         Ok(OpenIdCredential {
             iss: claims.iss,
@@ -400,9 +385,8 @@ pub struct DiscoveryState {
     /// Human-readable SSO name served at
     /// `{discovery_domain}/.well-known/ii-openid-configuration`.
     /// Populated by hop-1 once per refresh; `None` if absent in the
-    /// hop-1 body. Only read by the periodic discovery timer in
-    /// non-test builds (same shape as `certs_ref` / `last_jwks_uri`).
-    #[allow(dead_code)]
+    /// hop-1 body. Read by `sso_fields_for` when shaping credential
+    /// responses.
     pub name_ref: Rc<RefCell<Option<String>>>,
     /// Only read by the periodic discovery timer (non-test builds).
     #[allow(dead_code)]
@@ -431,21 +415,19 @@ impl DiscoverableProvider {
 
         DISCOVERY_TASKS.with_borrow_mut(|tasks| {
             tasks.push(DiscoveryState {
-                discovery_domain: config.discovery_domain.clone(),
+                discovery_domain: config.discovery_domain,
                 client_id_ref: Rc::clone(&discovered_client_id),
                 openid_configuration_ref: Rc::clone(&openid_configuration),
                 issuer_ref: Rc::clone(&discovered_issuer),
-                name_ref: Rc::clone(&discovered_name),
+                name_ref: discovered_name,
                 certs_ref: Rc::clone(&certs),
                 last_jwks_uri: Rc::new(RefCell::new(None)),
             });
         });
 
         DiscoverableProvider {
-            discovery_domain: config.discovery_domain,
             discovered_client_id,
             discovered_issuer,
-            discovered_name,
             certs,
         }
     }
@@ -527,8 +509,10 @@ async fn run_discovery_tasks() {
         task.openid_configuration_ref
             .replace(Some(ii_config.openid_configuration));
         task.issuer_ref.replace(Some(doc.issuer));
-        // `name` may be `None` (field absent / older deployment) — in that
-        // case the FE falls back to the `discovery_domain` for the label.
+        // Pass `name` through unchanged — `None` means the domain didn't
+        // publish one in `/.well-known/ii-openid-configuration`. The FE
+        // decides how to render: "DFINITY" if `sso_name` is present,
+        // "dfinity.org" if only `sso_domain` is available.
         task.name_ref.replace(ii_config.name);
 
         // Start or restart cert fetching when jwks_uri changes
@@ -686,10 +670,10 @@ fn transform_discovery(response: HttpResponse) -> HttpResponse {
 struct IIOpenIdConfiguration {
     client_id: String,
     openid_configuration: String,
-    /// Human-readable name for the SSO (e.g. `"DFINITY"`). Optional; the
-    /// FE falls back to the `discovery_domain` when this is absent. Kept
-    /// `Option<>` + `#[serde(default)]` so older deployments that don't
-    /// publish the field continue to parse.
+    /// Human-readable name for the SSO (e.g. `"DFINITY"`). Optional; we
+    /// pass it through to the API as-is, letting the FE pick between
+    /// this and the bare domain for rendering. `#[serde(default)]` so
+    /// older deployments that don't publish the field continue to parse.
     #[serde(default)]
     name: Option<String>,
 }
@@ -720,6 +704,44 @@ pub fn discovered_state_for(
                 )
             })
             .unwrap_or((None, None, None))
+    })
+}
+
+/// Looks up the SSO domain + optional SSO name for an OpenID credential
+/// by its `(iss, aud)` pair. Computed on-demand from current
+/// `DISCOVERY_TASKS` state — that way `get_anchor_info` always reflects
+/// live SSO metadata (the domain's current `name` field, or absence
+/// thereof) instead of whatever got stamped at verification time.
+///
+/// Returns `(None, None)` for:
+///   - Direct-provider credentials (Google / Apple / Microsoft — the
+///     matching provider isn't a `DiscoverableProvider`, so no task
+///     matches on `(iss, aud)`).
+///   - SSO credentials whose domain has since been removed from the
+///     canister's allowlist (no task registered at all).
+///   - SSO credentials whose hop-1 / hop-2 discovery hasn't completed
+///     yet (task exists but `client_id_ref` / `issuer_ref` are `None`).
+///
+/// The caller renders a human-readable label by falling back
+/// `sso_name → sso_domain → direct-provider `findConfig` result` on the
+/// frontend — the backend intentionally does not collapse the two: we
+/// want the FE to be able to tell "no name published" apart from "has a
+/// name" for future divergent rendering.
+pub fn sso_fields_for(iss: &str, aud: &str) -> (Option<String>, Option<String>) {
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        tasks
+            .iter()
+            .find(|t| {
+                t.issuer_ref.borrow().as_deref() == Some(iss)
+                    && t.client_id_ref.borrow().as_deref() == Some(aud)
+            })
+            .map(|t| {
+                (
+                    Some(t.discovery_domain.clone()),
+                    t.name_ref.borrow().clone(),
+                )
+            })
+            .unwrap_or((None, None))
     })
 }
 

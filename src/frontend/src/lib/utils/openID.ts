@@ -441,22 +441,22 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
  * Return the logo of the OpenID provider from the config.
  *
  * Returns `undefined` for SSO-linked credentials — identified by the
- * `sso_domain` metadata entry the canister stamps on any credential
- * verified via a `DiscoverableProvider` — so callers can render a
- * generic SSO icon instead of the underlying IdP's logo. Direct-
- * provider credentials fall through to {@link findConfig}, which does
- * strict-then-fallback matching so they get their logo even when `aud`
- * disagrees with the current config.
+ * `sso_domain` optional field the canister populates on `OpenIdCredential`
+ * at response time (via `openid::generic::sso_fields_for`) — so callers
+ * can render a generic SSO icon instead of the underlying IdP's logo.
+ * Direct-provider credentials fall through to {@link findConfig}, which
+ * does strict-then-fallback matching so they get their logo even when
+ * `aud` disagrees with the current config.
  *
  * @returns {string | undefined} An SVG string to be embedded via `{@html}`.
  */
 export const openIdLogo = (
   issuer: string,
-  _sub: string | undefined,
   aud: string | undefined,
   metadata: MetadataMapV2,
+  ssoDomain: string | undefined,
 ): string | undefined => {
-  if (getMetadataString(metadata, "sso_domain") !== undefined) {
+  if (ssoDomain !== undefined) {
     return undefined;
   }
   const logo = findConfig(issuer, aud, metadata)?.logo;
@@ -524,33 +524,37 @@ const namespaceIds = (
  * Return a human-readable name for an OpenID credential.
  *
  * Resolution order:
- * 1. **SSO name** from credential metadata (`sso_name`, stamped by the
- *    canister from the `name` field of the SSO's `/.well-known/ii-
- *    openid-configuration`). This is what the org self-identifies as —
- *    e.g. `"DFINITY"`.
- * 2. **SSO domain** from credential metadata (`sso_domain`, stamped by
- *    the canister with the `discovery_domain` the user entered). Falls
- *    back here when the SSO didn't publish a `name` — e.g. `"dfinity.org"`.
+ * 1. **SSO name** — `ssoName`, which the canister populates from the
+ *    `name` field of the SSO's `/.well-known/ii-openid-configuration`.
+ *    This is what the org self-identifies as, e.g. `"DFINITY"`.
+ * 2. **SSO domain** — `ssoDomain`, the `discovery_domain` the user
+ *    entered. Used when the SSO didn't publish a `name`, e.g.
+ *    `"dfinity.org"`.
  * 3. **Direct provider** — {@link findConfig} resolves strict-then-
  *    fallback, so we get the provider's configured `name` (e.g. "Google")
  *    for both credentials whose `aud` matches the config and legacy
  *    credentials whose `aud` disagrees but whose issuer matches.
  * 4. `undefined` — caller should render a generic fallback.
  *
- * Checking `sso_name` / `sso_domain` BEFORE direct-provider lookup
- * means SSO credentials aren't falsely attributed to their underlying
- * IdP (e.g. an SSO-via-Google credential reads as "DFINITY", not
- * "Google").
+ * Checking the SSO params BEFORE direct-provider lookup means SSO
+ * credentials aren't falsely attributed to their underlying IdP (e.g.
+ * an SSO-via-Google credential reads as "DFINITY", not "Google").
+ *
+ * The SSO values are passed explicitly instead of read from `metadata`
+ * so the FE can distinguish "SSO with a published name" from "SSO with
+ * only a domain" — useful if we later want to render the two cases
+ * differently. Callers that don't have an `OpenIdCredential` on hand
+ * (e.g. `LastUsedIdentity`-backed UI; see #3795) pass `undefined` for
+ * both and fall through to `findConfig`.
  */
 export const openIdName = (
   issuer: string,
-  _sub: string | undefined,
   aud: string | undefined,
   metadata: MetadataMapV2,
+  ssoName: string | undefined,
+  ssoDomain: string | undefined,
 ): string | undefined => {
-  const ssoName = getMetadataString(metadata, "sso_name");
   if (ssoName !== undefined) return ssoName;
-  const ssoDomain = getMetadataString(metadata, "sso_domain");
   if (ssoDomain !== undefined) return ssoDomain;
   return findConfig(issuer, aud, metadata)?.name;
 };
