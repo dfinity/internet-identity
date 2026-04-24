@@ -513,7 +513,7 @@ prepare_production_backend_argument() {
     echo "(null)" > args.txt
   fi
   didc_encode_ii_init args.txt > icp_arg.bin
-  # DFX raw arguments are encoded differently than ic-admin's --arg values (mainnet_arg.bin).
+  # icp-cli raw arguments are encoded differently than ic-admin's --arg values (mainnet_arg.bin).
   xxd -r -p icp_arg.bin > mainnet_arg.bin
 }
 
