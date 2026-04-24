@@ -66,7 +66,7 @@ export const handleDelegationRequest =
       const effectiveOrigin = remapToLegacyDomain(
         params.icrc95DerivationOrigin ?? channel.origin,
       );
-      authorizationStore.setContext(effectiveOrigin);
+      authorizationStore.setEffectiveOrigin(effectiveOrigin);
 
       // Authorization is the commit point — the user may switch identities
       // freely before this. Once authorized, the UI is no longer needed.

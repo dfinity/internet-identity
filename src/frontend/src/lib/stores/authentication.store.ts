@@ -97,11 +97,3 @@ export const isAuthenticatedStore: Readable<boolean> = derived(
   authenticationStore,
   (authenticated) => authenticated !== undefined,
 );
-
-/** Stores the OpenID issuer early (before full authentication completes)
- *  so the attribute handler can determine implicit consent synchronously. */
-const pendingOpenIdIssuerInternal = writable<string | undefined>();
-export const pendingOpenIdIssuerStore = {
-  set: (issuer: string): void => pendingOpenIdIssuerInternal.set(issuer),
-  subscribe: pendingOpenIdIssuerInternal.subscribe,
-};

@@ -4,10 +4,7 @@
   import type { OpenIdConfig } from "$lib/globals";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { authorizedStore } from "$lib/stores/authorization.store";
-  import {
-    isAuthenticatedStore,
-    pendingOpenIdIssuerStore,
-  } from "$lib/stores/authentication.store";
+  import { isAuthenticatedStore } from "$lib/stores/authentication.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { handleError } from "$lib/components/utils/error";
@@ -161,7 +158,10 @@
     if (config === undefined) {
       return;
     }
-    pendingOpenIdIssuerStore.set(config.issuer);
+    authorizationStore.setFlow({
+      type: "1-click-openid",
+      issuer: config.issuer,
+    });
     openIdResumeProcessing = true;
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
@@ -181,7 +181,11 @@
     if (data.flow === "openid-init") {
       initiateOpenId(data.config);
     } else if (data.flow === "openid-resume") {
+      // resumeOpenId sets the flow once the JWT (and thus the issuer)
+      // has been decoded.
       resumeOpenId();
+    } else {
+      authorizationStore.setFlow({ type: "regular" });
     }
   });
 </script>

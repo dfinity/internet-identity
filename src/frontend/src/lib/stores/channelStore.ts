@@ -24,7 +24,8 @@ import {
 import { handleDelegationRequest } from "$lib/stores/channelHandlers/delegation";
 import {
   handleLegacyAttributes,
-  handleIcrc3Attributes,
+  handleIcrc3ImplicitAttributes,
+  handleIcrc3ConsentAttributes,
 } from "$lib/stores/channelHandlers/attributes";
 
 // ---------------------------------------------------------------------------
@@ -101,7 +102,11 @@ export const channelStore: ChannelStore = {
       );
       channel.addEventListener(
         "request",
-        handleIcrc3Attributes(channel, onError),
+        handleIcrc3ImplicitAttributes(channel, onError),
+      );
+      channel.addEventListener(
+        "request",
+        handleIcrc3ConsentAttributes(channel, onError),
       );
       channel.addEventListener("close", () =>
         channelErrorStore.set("connection-closed"),
