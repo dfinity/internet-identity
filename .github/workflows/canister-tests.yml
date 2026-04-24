@@ -563,7 +563,10 @@ jobs:
 
       - name: Build test app frontend (chrome extension)
         if: matrix.device == 'chrome-extension'
-        run: npm run build --prefix demos/test-app
+        working-directory: demos/test-app
+        run: |
+          npm ci
+          npm run build
 
       - name: Run Playwright tests
         run: |

@@ -6,8 +6,9 @@ import {
   SignedDelegation,
 } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
-import { Signer } from "@slide-computer/signer";
-import { PostMessageTransport } from "@slide-computer/signer-web";
+import { AuthClient } from "@icp-sdk/auth/client";
+import { Signer } from "@icp-sdk/signer";
+import { PostMessageTransport } from "@icp-sdk/signer/web";
 
 // The type of response from II as per the spec
 interface AuthResponseSuccess {
@@ -64,108 +65,71 @@ export const authWithII = async ({
   certifiedAttributes?: Record<string, CertifiedAttribute>;
   icrc3Attributes?: Icrc3Attributes;
 }> => {
-  // Authenticate with signer-js instead if we use the ICRC-25 protocol
+  // Authenticate via the ICRC-25 protocol
   if (useIcrc25) {
-    const transport = new PostMessageTransport({ url: url_ });
-    const signer = new Signer({
-      transport,
-      derivationOrigin,
-      autoCloseTransportChannel: false,
-    });
     const hasAttributes =
       requestAttributes !== undefined && requestAttributes.length > 0;
 
-    const legacyAttributesPromise =
-      hasAttributes && !useIcrc3Attributes
-        ? signer
-            .sendRequest({
-              jsonrpc: "2.0",
-              method: "ii_attributes",
-              id: window.crypto.randomUUID(),
-              params: {
-                attributes: requestAttributes,
-              },
-            })
-            .then((response) => {
-              if (
-                !("result" in response) ||
-                typeof response.result !== "object" ||
-                response.result === null ||
-                !("attributes" in response.result)
-              ) {
-                throw new Error("Attributes response is missing result");
-              }
-              return Object.fromEntries(
-                Object.entries(response.result.attributes).map(
-                  ([key, { value, signature, expiration }]) =>
-                    [
-                      key,
-                      {
-                        // @ts-ignore Not known in TS types yet but supported in all browsers
-                        value: Uint8Array.fromBase64(value),
-                        // @ts-ignore Not known in TS types yet but supported in all browsers
-                        signature: Uint8Array.fromBase64(signature),
-                        expiration: BigInt(expiration),
-                      },
-                    ] as [string, CertifiedAttribute],
-                ),
-              );
-            })
-        : Promise.resolve(undefined);
+    // Legacy (non-ICRC-3) attributes are not supported by AuthClient.
+    // For that case we use @icp-sdk/signer directly to share a single
+    // channel between the ICRC-34 delegation request and the
+    // `ii_attributes` request.
+    if (hasAttributes && !useIcrc3Attributes) {
+      const transport = new PostMessageTransport({ url: url_ });
+      const signer = new Signer({
+        transport,
+        derivationOrigin,
+        autoCloseTransportChannel: false,
+      });
+      try {
+        const [delegationChain, certifiedAttributes] = await Promise.all([
+          signer.requestDelegation({
+            publicKey: sessionIdentity.getPublicKey(),
+            maxTimeToLive,
+          }),
+          fetchLegacyAttributes(signer, requestAttributes),
+        ]);
+        return {
+          identity: DelegationIdentity.fromDelegation(
+            sessionIdentity,
+            delegationChain,
+          ),
+          authnMethod: "passkey",
+          certifiedAttributes,
+        };
+      } finally {
+        await signer.closeChannel();
+      }
+    }
 
-    const nonce = icrc3Nonce ?? crypto.getRandomValues(new Uint8Array(32));
-    const icrc3AttributesPromise =
-      hasAttributes && useIcrc3Attributes
-        ? signer
-            .sendRequest({
-              jsonrpc: "2.0",
-              method: "ii-icrc3-attributes",
-              id: window.crypto.randomUUID(),
-              params: {
-                keys: requestAttributes,
-                // @ts-ignore Not known in TS types yet but supported in all browsers
-                nonce: nonce.toBase64(),
-              },
-            })
-            .then((response) => {
-              if (
-                !("result" in response) ||
-                typeof response.result !== "object" ||
-                response.result === null ||
-                !("data" in response.result) ||
-                !("signature" in response.result)
-              ) {
-                return undefined;
-              }
-              return {
-                // @ts-ignore Not known in TS types yet but supported in all browsers
-                data: Uint8Array.fromBase64(response.result.data),
-                // @ts-ignore Not known in TS types yet but supported in all browsers
-                signature: Uint8Array.fromBase64(response.result.signature),
-              };
-            })
-        : Promise.resolve(undefined);
-
-    const delegationPromise = signer.delegation({
-      maxTimeToLive,
-      publicKey: new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+    const authClient = new AuthClient({
+      identity: sessionIdentity,
+      identityProvider: url_,
+      derivationOrigin,
+      idleOptions: { disableIdle: true },
     });
-    const [delegation, certifiedAttributes, icrc3Attributes] =
-      await Promise.all([
-        delegationPromise,
-        legacyAttributesPromise,
-        icrc3AttributesPromise,
-      ]);
-    await signer.closeChannel();
+    const nonce = icrc3Nonce ?? crypto.getRandomValues(new Uint8Array(32));
+
+    const [identity, icrc3Attributes] = await Promise.all([
+      authClient.signIn({ maxTimeToLive }),
+      hasAttributes && useIcrc3Attributes
+        ? authClient.requestAttributes({
+            keys: requestAttributes,
+            nonce,
+          })
+        : Promise.resolve(undefined),
+    ]);
+
+    if (!(identity instanceof DelegationIdentity)) {
+      throw new Error(
+        "Expected a DelegationIdentity from AuthClient.signIn, got " +
+          identity.constructor.name,
+      );
+    }
+
     return {
-      identity: DelegationIdentity.fromDelegation(
-        sessionIdentity,
-        // We need to cast the delegation from signer-js to avoid a TS issue because one type is imported from cjs and another esm:
-        // Types of property 'delegations' are incompatible.
-        delegation as unknown as DelegationChain,
-      ),
+      identity,
       authnMethod: "passkey",
-      certifiedAttributes: certifiedAttributes ?? undefined,
       icrc3Attributes: icrc3Attributes ?? undefined,
     };
   }
@@ -238,6 +202,54 @@ export const authWithII = async ({
   });
 
   return { identity, authnMethod: message.authnMethod };
+};
+
+const fetchLegacyAttributes = async (
+  signer: Signer,
+  attributes: string[],
+): Promise<Record<string, CertifiedAttribute>> => {
+  const response = await signer.sendRequest({
+    jsonrpc: "2.0",
+    method: "ii_attributes",
+    id: window.crypto.randomUUID(),
+    params: { attributes },
+  });
+  if (
+    !("result" in response) ||
+    typeof response.result !== "object" ||
+    response.result === null ||
+    !("attributes" in response.result) ||
+    typeof response.result.attributes !== "object" ||
+    response.result.attributes === null
+  ) {
+    throw new Error("Attributes response is missing result");
+  }
+  const entries: [string, CertifiedAttribute][] = [];
+  for (const [key, raw] of Object.entries(response.result.attributes)) {
+    if (
+      typeof raw !== "object" ||
+      raw === null ||
+      !("value" in raw) ||
+      typeof raw.value !== "string" ||
+      !("signature" in raw) ||
+      typeof raw.signature !== "string" ||
+      !("expiration" in raw) ||
+      (typeof raw.expiration !== "string" && typeof raw.expiration !== "number")
+    ) {
+      throw new Error(`Invalid attribute entry for key '${key}'`);
+    }
+    entries.push([
+      key,
+      {
+        // @ts-ignore Not known in TS types yet but supported in all browsers
+        value: Uint8Array.fromBase64(raw.value),
+        // @ts-ignore Not known in TS types yet but supported in all browsers
+        signature: Uint8Array.fromBase64(raw.signature),
+        expiration: BigInt(raw.expiration),
+      },
+    ]);
+  }
+  return Object.fromEntries(entries);
 };
 
 // Read delegations the delegations from the response

@@ -103,7 +103,6 @@
   },
   "workspaces": [
     "src/vc-api",
-    "demos/test-app",
     "demos/vc_issuer",
     "src/vite-plugins",
     "src/sig-verifier-js"
