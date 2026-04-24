@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-npm ci
+npm ci --no-audit --no-fund
 npm run build
 
 cargo build --release --target wasm32-unknown-unknown
