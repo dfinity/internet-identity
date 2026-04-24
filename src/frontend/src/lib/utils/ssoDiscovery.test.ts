@@ -122,13 +122,15 @@ describe("ssoDiscovery", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
-    // Each of these tests exhausts all 3 retry attempts on hop 1, so they
-    // wait through the full exponential backoff (2s + 4s = 6s). Bumped
-    // timeout accordingly. `mockImplementation` (not `mockResolvedValue`)
-    // so each retry gets a fresh Response — reusing one throws
-    // `Body has already been read` after the first `.json()`.
-    it("wraps HTTP 404 on hop 1 as DomainNotConfiguredError(http-error, 404)", async () => {
-      vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+    // `mockImplementation` (not `mockResolvedValue`) so each retry gets
+    // a fresh Response — reusing one throws `Body has already been read`
+    // after the first `.json()`. The network- and invalid-response tests
+    // still run through the full 3 retry attempts (2s + 4s = 6s of
+    // exponential backoff), so they need the bumped timeout. The 404 case
+    // fails fast — deterministic 4xx aren't retried, see
+    // `isTransientHttpStatus` in `ssoDiscovery.ts`.
+    it("wraps HTTP 404 on hop 1 as DomainNotConfiguredError(http-error, 404) without retrying", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
         Promise.resolve(
           new Response("not found", {
             status: 404,
@@ -142,6 +144,27 @@ describe("ssoDiscovery", () => {
         reason: "http-error",
         httpStatus: 404,
       });
+      // Single attempt — retrying 404 would just burn ~14s of backoff
+      // for the same deterministic answer.
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries hop 1 on HTTP 503 (transient) and gives up with http-error", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+        Promise.resolve(
+          new Response("Service Unavailable", {
+            status: 503,
+          }),
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toMatchObject({
+        name: "DomainNotConfiguredError",
+        reason: "http-error",
+        httpStatus: 503,
+      });
+      // 3 attempts = `MAX_RETRIES` in `ssoDiscovery.ts`.
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
     }, 10000);
 
     it("wraps a 200 HTML response on hop 1 as DomainNotConfiguredError(invalid-response)", async () => {

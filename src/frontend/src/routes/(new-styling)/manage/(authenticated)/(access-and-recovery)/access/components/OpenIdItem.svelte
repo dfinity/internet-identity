@@ -48,7 +48,14 @@
 
 <div class="mb-3 flex h-9 flex-row items-center">
   <div class="text-fg-primary relative size-6">
-    {#if isSso}
+    {#if isSso || logo === undefined}
+      <!--
+        SSO credentials render the generic SSO icon. We also fall back
+        to it when `findConfig` returned nothing (direct-provider
+        credentials whose issuer doesn't match any `openid_configs`
+        entry, e.g. after client_id rotation) so `{@html logo}` never
+        stringifies `undefined` into the DOM.
+      -->
       <SsoIcon class="size-6" />
     {:else}
       {@html logo}

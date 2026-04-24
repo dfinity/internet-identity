@@ -9,9 +9,10 @@
  * Security — trust model:
  * - The caller must call `add_discoverable_oidc_config({ discovery_domain })`
  *   on the backend BEFORE invoking `discoverSsoConfig`. That call traps on
- *   the backend's canary allowlist (`ALLOWED_DISCOVERY_DOMAINS`) for any
- *   domain an II admin hasn't approved, so by the time this module runs,
- *   the domain has been explicitly blessed by II.
+ *   the backend's canary allowlist (returned by
+ *   `openid::generic::allowed_discovery_domains()`) for any domain an II
+ *   admin hasn't approved, so by the time this module runs, the domain
+ *   has been explicitly blessed by II.
  * - This module doesn't carry its own domain allowlist — the check lives
  *   on the canister, not in frontend code that the user's device could
  *   bypass.
@@ -297,7 +298,18 @@ const errorMessage = (e: unknown): string | undefined =>
     ? (e as { message: string }).message
     : undefined;
 
-/** Fetch JSON with timeout, retries, and exponential backoff. */
+/**
+ * Whether a failed HTTP response is transient enough that a retry might
+ * succeed. Intentionally narrow: only server-time statuses (`408`,
+ * `429`, `5xx`) are retried. Deterministic 4xx (`400`, `401`, `403`,
+ * `404`, ...) fail fast — retrying a domain's `/.well-known/ii-openid-
+ * configuration` that returns `404` three times just buys the user
+ * 2s + 4s + 8s of waiting for the same answer.
+ */
+const isTransientHttpStatus = (status: number): boolean =>
+  status === 408 || status === 429 || status >= 500;
+
+/** Fetch JSON with timeout, retries on transient errors, and exponential backoff. */
 const fetchWithRetry = async (
   url: string,
   timeoutMs: number,
@@ -310,24 +322,37 @@ const fetchWithRetry = async (
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    // Default: treat unknown / network errors as transient and retry.
+    // The try block overrides this with the HTTP-status classification
+    // when the response itself was received.
+    let retryable = true;
     try {
       const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error(
-          `Fetch failed: ${response.status} ${response.statusText}`,
-        );
+      if (response.ok) {
+        return await response.json();
       }
-      return await response.json();
+      lastError = new Error(
+        `Fetch failed: ${response.status} ${response.statusText}`,
+      );
+      retryable = isTransientHttpStatus(response.status);
     } catch (error) {
-      lastError = error;
       if (error instanceof Error && error.name === "AbortError") {
+        // Explicit timeout: surface the abort immediately; don't backoff
+        // through retries when the first attempt already spent the full
+        // budget.
         throw error;
       }
+      // Network errors (TypeError from `fetch`) and other unknowns: leave
+      // `retryable = true` as initialised.
+      lastError = error;
     } finally {
-      // Clear the abort timer on every exit path so a late abort can't fire
-      // after the attempt is already done.
+      // Clear the abort timer on every exit path so a late abort can't
+      // fire after the attempt is already done.
       clearTimeout(timeoutId);
     }
+    // Break out of the retry loop on deterministic failures (4xx other
+    // than 408 / 429) so the UI can surface them without backoff delay.
+    if (!retryable) throw lastError;
   }
   throw lastError;
 };
