@@ -41,6 +41,8 @@ pub struct StorablePersistentState {
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
     dummy_auth: Option<DummyAuthConfig>,
+    // VAPID private key (PKCS#8 DER-encoded P-256) for Web Push notifications.
+    vapid_key: Option<Vec<u8>>,
 }
 
 impl Storable for StorablePersistentState {
@@ -86,6 +88,7 @@ impl From<PersistentState> for StorablePersistentState {
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
+            vapid_key: s.vapid_key,
         }
     }
 }
@@ -109,6 +112,7 @@ impl From<StorablePersistentState> for PersistentState {
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
+            vapid_key: s.vapid_key,
         }
     }
 }
@@ -160,6 +164,7 @@ mod tests {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            vapid_key: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -187,6 +192,7 @@ mod tests {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            vapid_key: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }

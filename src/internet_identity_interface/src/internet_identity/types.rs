@@ -23,6 +23,8 @@ mod api_v2;
 pub mod attributes;
 pub mod icrc3;
 pub mod openid;
+pub mod push;
+pub mod smtp;
 pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed

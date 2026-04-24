@@ -397,6 +397,52 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const DkimCheckName = IDL.Variant({
+    'DkimSignaturePresent' : IDL.Null,
+    'PublicKeyFetched' : IDL.Null,
+    'AlgorithmSupported' : IDL.Null,
+    'BodyHashValid' : IDL.Null,
+    'SignatureValid' : IDL.Null,
+    'SignatureParsed' : IDL.Null,
+    'RequiredHeadersSigned' : IDL.Null,
+  });
+  const DkimCheckStatus = IDL.Variant({
+    'Skipped' : IDL.Null,
+    'Fail' : IDL.Null,
+    'Pass' : IDL.Null,
+  });
+  const DkimCheck = IDL.Record({
+    'status' : DkimCheckStatus,
+    'name' : DkimCheckName,
+    'detail' : IDL.Opt(IDL.Text),
+  });
+  const DkimVerificationStatus = IDL.Variant({
+    'Unverified' : IDL.Record({ 'checks' : IDL.Vec(DkimCheck) }),
+    'Verified' : IDL.Record({ 'checks' : IDL.Vec(DkimCheck) }),
+    'Pending' : IDL.Null,
+  });
+  const PostboxEmail = IDL.Record({
+    'dkim_status' : IDL.Opt(DkimVerificationStatus),
+    'subject' : IDL.Text,
+    'body' : IDL.Text,
+    'recipient' : IDL.Text,
+    'sender' : IDL.Text,
+  });
+  const PushSubscription = IDL.Record({
+    'endpoint' : IDL.Text,
+    'p256dh' : IDL.Vec(IDL.Nat8),
+    'auth' : IDL.Vec(IDL.Nat8),
+  });
+  const PushSubscribeError = IDL.Variant({
+    'InvalidSubscription' : IDL.Text,
+    'TooManySubscriptions' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+    'InternalCanisterError' : IDL.Text,
+  });
+  const PushUnsubscribeError = IDL.Variant({
+    'Unauthorized' : IDL.Principal,
+    'InternalCanisterError' : IDL.Text,
+  });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -585,6 +631,26 @@ export const idlFactory = ({ IDL }) => {
       'origin' : FrontendHostname,
       'anchor_number' : UserNumber,
     }),
+  });
+  const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
+  const SmtpEnvelope = IDL.Record({ 'to' : SmtpAddress, 'from' : SmtpAddress });
+  const SmtpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
+  const SmtpMessage = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(SmtpHeader),
+  });
+  const SmtpRequest = IDL.Record({
+    'envelope' : IDL.Opt(SmtpEnvelope),
+    'message' : IDL.Opt(SmtpMessage),
+    'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+  });
+  const SmtpRequestError = IDL.Record({
+    'code' : IDL.Nat64,
+    'message' : IDL.Text,
+  });
+  const SmtpResponse = IDL.Variant({
+    'Ok' : IDL.Record({}),
+    'Err' : SmtpRequestError,
   });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
@@ -801,6 +867,27 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
         ['query'],
       ),
+    'get_postbox' : IDL.Func([UserNumber], [IDL.Vec(PostboxEmail)], ['query']),
+    'push_subscribe' : IDL.Func(
+        [UserNumber, PushSubscription],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : PushSubscribeError })],
+        [],
+      ),
+    'push_unsubscribe' : IDL.Func(
+        [UserNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : PushUnsubscribeError })],
+        [],
+      ),
+    'push_vapid_public_key' : IDL.Func(
+        [],
+        [IDL.Opt(IDL.Vec(IDL.Nat8))],
+        ['query'],
+      ),
+    'push_init_vapid_key' : IDL.Func(
+        [],
+        [IDL.Variant({ 'Ok' : IDL.Vec(IDL.Nat8), 'Err' : PushSubscribeError })],
+        [],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -966,6 +1053,12 @@ export const idlFactory = ({ IDL }) => {
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : SetDefaultAccountError })],
         [],
+      ),
+    'smtp_request' : IDL.Func([SmtpRequest], [SmtpResponse], []),
+    'smtp_request_validate' : IDL.Func(
+        [SmtpRequest],
+        [SmtpResponse],
+        ['query'],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),

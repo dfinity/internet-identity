@@ -45,6 +45,7 @@ serde_bytes = "0.11"
 serde_cbor = "0.11"
 sha2 = "0.10"
 rsa = "0.9.7"
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
 minicbor = "1.0.0"
 
 # Certification

@@ -469,6 +469,26 @@ export interface DeviceWithUsage {
  * discovery at openid_configuration for { issuer, jwks_uri }.
  */
 export interface DiscoverableOidcConfig { 'discovery_domain' : string }
+export interface DkimCheck {
+  'status' : DkimCheckStatus,
+  'name' : DkimCheckName,
+  'detail' : [] | [string],
+}
+export type DkimCheckName = { 'DkimSignaturePresent' : null } |
+  { 'PublicKeyFetched' : null } |
+  { 'AlgorithmSupported' : null } |
+  { 'BodyHashValid' : null } |
+  { 'SignatureValid' : null } |
+  { 'SignatureParsed' : null } |
+  { 'RequiredHeadersSigned' : null };
+export type DkimCheckStatus = { 'Skipped' : null } |
+  { 'Fail' : null } |
+  { 'Pass' : null };
+export type DkimVerificationStatus = {
+    'Unverified' : { 'checks' : Array<DkimCheck> }
+  } |
+  { 'Verified' : { 'checks' : Array<DkimCheck> } } |
+  { 'Pending' : null };
 export interface DummyAuthConfig {
   /**
    * Prompts user for a index value (0 - 255) when set to true,
@@ -975,6 +995,24 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+export interface PostboxEmail {
+  'dkim_status' : [] | [DkimVerificationStatus],
+  'subject' : string,
+  'body' : string,
+  'recipient' : string,
+  'sender' : string,
+}
+export interface PushSubscription {
+  'endpoint' : string,
+  'p256dh' : Uint8Array | number[],
+  'auth' : Uint8Array | number[],
+}
+export type PushSubscribeError = { 'InvalidSubscription' : string } |
+  { 'TooManySubscriptions' : null } |
+  { 'Unauthorized' : Principal } |
+  { 'InternalCanisterError' : string };
+export type PushUnsubscribeError = { 'Unauthorized' : Principal } |
+  { 'InternalCanisterError' : string };
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1157,6 +1195,25 @@ export interface SignedIdAlias {
   'id_alias' : Principal,
   'id_dapp' : Principal,
 }
+export interface SmtpAddress { 'domain' : string, 'user' : string }
+export interface SmtpEnvelope { 'to' : SmtpAddress, 'from' : SmtpAddress }
+/**
+ * SMTP Gateway Protocol types
+ * ============================
+ */
+export interface SmtpHeader { 'value' : string, 'name' : string }
+export interface SmtpMessage {
+  'body' : Uint8Array | number[],
+  'headers' : Array<SmtpHeader>,
+}
+export interface SmtpRequest {
+  'envelope' : [] | [SmtpEnvelope],
+  'message' : [] | [SmtpMessage],
+  'gateway_flags' : [] | [Array<string>],
+}
+export interface SmtpRequestError { 'code' : bigint, 'message' : string }
+export type SmtpResponse = { 'Ok' : {} } |
+  { 'Err' : SmtpRequestError };
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1404,7 +1461,40 @@ export interface _SERVICE {
     { 'Ok' : IdAliasCredentials } |
       { 'Err' : GetIdAliasError }
   >,
+  'get_postbox' : ActorMethod<[UserNumber], Array<PostboxEmail>>,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  /**
+   * Subscribes the caller's browser for Web Push notifications on new emails
+   * arriving at the given identity's postbox. Generates the canister's VAPID
+   * key pair on first call.
+   */
+  'push_subscribe' : ActorMethod<
+    [UserNumber, PushSubscription],
+    { 'Ok' : null } |
+      { 'Err' : PushSubscribeError }
+  >,
+  /** Removes a previously registered push subscription by endpoint URL. */
+  'push_unsubscribe' : ActorMethod<
+    [UserNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : PushUnsubscribeError }
+  >,
+  /**
+   * Returns the canister's VAPID public key (65-byte uncompressed SEC-1).
+   * Returns empty if the key hasn't been generated yet — use
+   * `push_init_vapid_key` to generate it.
+   */
+  'push_vapid_public_key' : ActorMethod<[], [] | [Uint8Array | number[]]>,
+  /**
+   * Ensures the canister has a VAPID key pair and returns the public key.
+   * The frontend calls this at the start of the opt-in flow to obtain the
+   * `applicationServerKey` required by `PushManager.subscribe()`.
+   */
+  'push_init_vapid_key' : ActorMethod<
+    [],
+    { 'Ok' : Uint8Array | number[] } |
+      { 'Err' : PushSubscribeError }
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -1591,6 +1681,12 @@ export interface _SERVICE {
     { 'Ok' : AccountInfo } |
       { 'Err' : SetDefaultAccountError }
   >,
+  /**
+   * SMTP Gateway Protocol
+   * =====================
+   */
+  'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<

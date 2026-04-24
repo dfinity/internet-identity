@@ -18,9 +18,18 @@ export const load: LayoutLoad = async ({ url }) => {
     throw redirect(307, location);
   }
 
-  const identityInfo = await authentication.actor
-    .identity_info(authentication.identityNumber)
-    .then(throwCanisterError);
+  const [identityInfo, postboxEmails] = await Promise.all([
+    authentication.actor
+      .identity_info(authentication.identityNumber)
+      .then(throwCanisterError),
+    authentication.actor
+      .get_postbox(authentication.identityNumber)
+      .catch(() => []),
+  ]);
 
-  return { identityInfo, identityNumber: authentication.identityNumber };
+  return {
+    identityInfo,
+    identityNumber: authentication.identityNumber,
+    postboxEmails,
+  };
 };

@@ -130,6 +130,8 @@ use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter}
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
+use storable::push_subscription::StorablePushSubscriptionList;
+use storable::smtp::{StorableEmail, StorableEmailAddress, StorableEmailList};
 use storable::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
@@ -178,6 +180,8 @@ const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
+const SMTP_POSTBOX_MEMORY_INDEX: u8 = 23u8;
+const PUSH_SUBSCRIPTION_MEMORY_INDEX: u8 = 24u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -214,6 +218,9 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID: MemoryId =
 
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX);
+
+const SMTP_POSTBOX_MEMORY_ID: MemoryId = MemoryId::new(SMTP_POSTBOX_MEMORY_INDEX);
+const PUSH_SUBSCRIPTION_MEMORY_ID: MemoryId = MemoryId::new(PUSH_SUBSCRIPTION_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -339,6 +346,13 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+
+    smtp_postbox_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    smtp_postbox: StableBTreeMap<StorableEmailAddress, StorableEmailList, ManagedMemory<M>>,
+
+    push_subscription_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    push_subscriptions:
+        StableBTreeMap<StorableAnchorNumber, StorablePushSubscriptionList, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -422,6 +436,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
         let lookup_anchor_with_passkey_pubkey_hash_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
+        let smtp_postbox_memory = memory_manager.get(SMTP_POSTBOX_MEMORY_ID);
+        let push_subscription_memory = memory_manager.get(PUSH_SUBSCRIPTION_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -522,6 +538,10 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchor_with_passkey_pubkey_hash_memory: StableBTreeMap::init(
                 lookup_anchor_with_passkey_pubkey_hash_memory,
             ),
+            smtp_postbox_memory_wrapper: MemoryWrapper::new(smtp_postbox_memory.clone()),
+            smtp_postbox: StableBTreeMap::init(smtp_postbox_memory),
+            push_subscription_memory_wrapper: MemoryWrapper::new(push_subscription_memory.clone()),
+            push_subscriptions: StableBTreeMap::init(push_subscription_memory),
         }
     }
 
@@ -765,9 +785,8 @@ impl<M: Memory + Clone> Storage<M> {
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
 
-        credential_to_be_removed.cloned().for_each(|key| {
-            self.lookup_anchor_with_openid_credential_memory
-                .remove(&key);
+        credential_to_be_removed.for_each(|key| {
+            self.lookup_anchor_with_openid_credential_memory.remove(key);
         });
         credential_to_be_added.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
@@ -1944,6 +1963,112 @@ impl<M: Memory + Clone> Storage<M> {
         self.header.version
     }
 
+    pub fn get_emails(&self, recipient: &str) -> Vec<StorableEmail> {
+        let key = StorableEmailAddress(recipient.to_string());
+        self.smtp_postbox
+            .get(&key)
+            .map(|list| list.emails)
+            .unwrap_or_default()
+    }
+
+    /// Stores an email and returns the index of the newly stored email within the list.
+    pub fn store_email(&mut self, recipient: String, email: StorableEmail) -> usize {
+        use internet_identity_interface::internet_identity::types::smtp::MAX_EMAILS_PER_USER;
+
+        let key = StorableEmailAddress(recipient);
+        let mut list = self
+            .smtp_postbox
+            .get(&key)
+            .unwrap_or(StorableEmailList { emails: Vec::new() });
+
+        list.emails.push(email);
+
+        // Keep only the most recent emails
+        if list.emails.len() > MAX_EMAILS_PER_USER {
+            let start = list.emails.len() - MAX_EMAILS_PER_USER;
+            list.emails = list.emails.split_off(start);
+        }
+
+        let index = list.emails.len() - 1;
+        self.smtp_postbox.insert(key, list);
+        index
+    }
+
+    #[cfg_attr(test, allow(dead_code))]
+    pub fn update_email_dkim_status(
+        &mut self,
+        recipient: String,
+        email_index: usize,
+        status: internet_identity_interface::internet_identity::types::smtp::DkimVerificationStatus,
+    ) {
+        let key = StorableEmailAddress(recipient);
+        if let Some(mut list) = self.smtp_postbox.get(&key) {
+            if let Some(email) = list.emails.get_mut(email_index) {
+                email.dkim_status = Some(status);
+                self.smtp_postbox.insert(key, list);
+            }
+        }
+    }
+
+    /// Returns all push subscriptions stored for the given anchor.
+    #[cfg_attr(test, allow(dead_code))]
+    pub fn get_push_subscriptions(
+        &self,
+        anchor: AnchorNumber,
+    ) -> Vec<internet_identity_interface::internet_identity::types::push::PushSubscription> {
+        self.push_subscriptions
+            .get(&anchor)
+            .map(|list| list.subscriptions)
+            .unwrap_or_default()
+    }
+
+    /// Adds a push subscription for the given anchor.
+    ///
+    /// If a subscription with the same endpoint already exists, it is replaced
+    /// (endpoints are globally unique per the Web Push spec). Enforces the
+    /// per-user cap of [`MAX_PUSH_SUBSCRIPTIONS_PER_USER`] by evicting the
+    /// oldest subscription when full.
+    pub fn add_push_subscription(
+        &mut self,
+        anchor: AnchorNumber,
+        subscription: internet_identity_interface::internet_identity::types::push::PushSubscription,
+    ) {
+        use internet_identity_interface::internet_identity::types::push::MAX_PUSH_SUBSCRIPTIONS_PER_USER;
+
+        let mut list =
+            self.push_subscriptions
+                .get(&anchor)
+                .unwrap_or(StorablePushSubscriptionList {
+                    subscriptions: Vec::new(),
+                });
+
+        // Replace any existing subscription for the same endpoint.
+        list.subscriptions
+            .retain(|s| s.endpoint != subscription.endpoint);
+        list.subscriptions.push(subscription);
+
+        // Keep only the most recent subscriptions.
+        if list.subscriptions.len() > MAX_PUSH_SUBSCRIPTIONS_PER_USER {
+            let start = list.subscriptions.len() - MAX_PUSH_SUBSCRIPTIONS_PER_USER;
+            list.subscriptions = list.subscriptions.split_off(start);
+        }
+
+        self.push_subscriptions.insert(anchor, list);
+    }
+
+    /// Removes a single push subscription by endpoint. Silently no-ops if
+    /// the anchor or endpoint does not exist.
+    pub fn remove_push_subscription(&mut self, anchor: AnchorNumber, endpoint: &str) {
+        if let Some(mut list) = self.push_subscriptions.get(&anchor) {
+            list.subscriptions.retain(|s| s.endpoint != endpoint);
+            if list.subscriptions.is_empty() {
+                self.push_subscriptions.remove(&anchor);
+            } else {
+                self.push_subscriptions.insert(anchor, list);
+            }
+        }
+    }
+
     pub fn memory_sizes(&self) -> HashMap<String, u64> {
         HashMap::from_iter(vec![
             ("header".to_string(), self.header_memory.size()),
@@ -2019,6 +2144,14 @@ impl<M: Memory + Clone> Storage<M> {
                 "lookup_anchor_with_passkey_pubkey_hash_memory".to_string(),
                 self.lookup_anchor_with_passkey_pubkey_hash_memory_wrapper
                     .size(),
+            ),
+            (
+                "smtp_postbox".to_string(),
+                self.smtp_postbox_memory_wrapper.size(),
+            ),
+            (
+                "push_subscriptions".to_string(),
+                self.push_subscription_memory_wrapper.size(),
             ),
         ])
     }

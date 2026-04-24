@@ -3,6 +3,7 @@
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
+    MailIcon,
     MenuIcon,
     XIcon,
     LifeBuoyIcon,
@@ -394,6 +395,17 @@
             <span class="sm:max-md:hidden">{$t`Access and recovery`}</span>
           </NavItem>
         </li>
+        {#if data.postboxEmails.length > 0}
+          <li class="contents">
+            <NavItem
+              href="/manage/postbox"
+              current={page.url.pathname === "/manage/postbox"}
+            >
+              <MailIcon class="size-5 sm:max-md:mx-auto" />
+              <span class="sm:max-md:hidden">{$t`Postbox`}</span>
+            </NavItem>
+          </li>
+        {/if}
       </ul>
     </nav>
     <!-- Empty space between top and bottom content-->

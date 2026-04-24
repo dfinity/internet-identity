@@ -17,6 +17,7 @@ serde_json = { version = "1.0", default-features = false, features = ["std"] }
 sha2 = { workspace = true, features = ["oid"] }
 base64.workspace = true
 rsa.workspace = true
+p256.workspace = true
 minicbor = { workspace = true, features = ["std", "derive"] }
 
 # Captcha deps

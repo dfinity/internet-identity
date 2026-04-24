@@ -32,6 +32,12 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
     OpenIdPrepareDelegationResponse,
 };
+use internet_identity_interface::internet_identity::types::push::{
+    PushSubscribeError, PushSubscription, PushUnsubscribeError,
+};
+use internet_identity_interface::internet_identity::types::smtp::{
+    PostboxEmail, SmtpRequest, SmtpResponse,
+};
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
     PrepareIdAliasRequest, PreparedIdAlias,
@@ -55,12 +61,15 @@ mod delegation;
 mod http;
 mod ii_domain;
 
+mod dkim;
 mod openid;
+mod smtp;
 mod state;
 mod stats;
 mod storage;
 mod utils;
 mod vc_mvp;
+mod web_push;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -1553,6 +1562,134 @@ mod attribute_sharing_old_vc {
             &req.rp_id_alias_jwt,
             &req.issuer_id_alias_jwt,
         )
+    }
+}
+
+mod smtp_gateway {
+    use super::*;
+
+    #[update]
+    fn smtp_request(request: SmtpRequest) -> SmtpResponse {
+        smtp::handle_smtp_request(request)
+    }
+
+    #[query]
+    fn smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
+        smtp::handle_smtp_request_validate(request)
+    }
+
+    #[query]
+    fn get_postbox(anchor_number: AnchorNumber) -> Vec<PostboxEmail> {
+        smtp::get_postbox(anchor_number)
+    }
+}
+
+mod push_api {
+    use super::*;
+    use crate::authz_utils::check_authz_and_record_activity;
+    use internet_identity_interface::internet_identity::types::push::{
+        MAX_PUSH_ENDPOINT_BYTES, PUSH_AUTH_SECRET_BYTES, PUSH_P256DH_KEY_BYTES,
+    };
+
+    /// Subscribes the caller's browser for Web Push notifications when new
+    /// emails arrive on the given anchor.
+    ///
+    /// The caller must be authorized for `anchor_number`. Subscribing again
+    /// with the same endpoint replaces the previous entry.
+    #[update]
+    async fn push_subscribe(
+        anchor_number: AnchorNumber,
+        subscription: PushSubscription,
+    ) -> Result<(), PushSubscribeError> {
+        check_authz_and_record_activity(anchor_number)
+            .map_err(|_| PushSubscribeError::Unauthorized(ic_cdk::caller()))?;
+
+        if subscription.endpoint.is_empty() || subscription.endpoint.len() > MAX_PUSH_ENDPOINT_BYTES
+        {
+            return Err(PushSubscribeError::InvalidSubscription(
+                "endpoint length out of range".into(),
+            ));
+        }
+        if subscription.p256dh.len() != PUSH_P256DH_KEY_BYTES {
+            return Err(PushSubscribeError::InvalidSubscription(format!(
+                "p256dh key must be exactly {PUSH_P256DH_KEY_BYTES} bytes"
+            )));
+        }
+        if subscription.auth.len() != PUSH_AUTH_SECRET_BYTES {
+            return Err(PushSubscribeError::InvalidSubscription(format!(
+                "auth secret must be exactly {PUSH_AUTH_SECRET_BYTES} bytes"
+            )));
+        }
+
+        // Make sure the VAPID key exists before recording the subscription —
+        // otherwise the first few emails would dispatch with no key and never
+        // fire a push.
+        #[cfg(not(test))]
+        {
+            web_push::ensure_vapid_key()
+                .await
+                .map_err(PushSubscribeError::InternalCanisterError)?;
+        }
+
+        state::storage_borrow_mut(|s| s.add_push_subscription(anchor_number, subscription));
+        Ok(())
+    }
+
+    /// Unsubscribes a specific push endpoint for the given anchor. No-ops if
+    /// the endpoint was not subscribed.
+    #[update]
+    fn push_unsubscribe(
+        anchor_number: AnchorNumber,
+        endpoint: String,
+    ) -> Result<(), PushUnsubscribeError> {
+        check_authz_and_record_activity(anchor_number)
+            .map_err(|_| PushUnsubscribeError::Unauthorized(ic_cdk::caller()))?;
+
+        state::storage_borrow_mut(|s| s.remove_push_subscription(anchor_number, &endpoint));
+        Ok(())
+    }
+
+    /// Returns the canister's VAPID public key (65 bytes, uncompressed SEC-1
+    /// encoding). Returns `None` if the key hasn't been generated yet — the
+    /// frontend should then call [`push_init_vapid_key`] to trigger generation.
+    #[query]
+    fn push_vapid_public_key() -> Option<ByteBuf> {
+        #[cfg(not(test))]
+        {
+            web_push::vapid_public_key_bytes().map(ByteBuf::from)
+        }
+        #[cfg(test)]
+        {
+            None
+        }
+    }
+
+    /// Ensures the canister has a VAPID key pair and returns the public key.
+    ///
+    /// This is an update call so it can generate a key via raw_rand and
+    /// persist it. The frontend calls this at the start of the opt-in flow
+    /// to obtain the `applicationServerKey` required by PushManager.subscribe().
+    #[update]
+    async fn push_init_vapid_key() -> Result<ByteBuf, PushSubscribeError> {
+        #[cfg(not(test))]
+        {
+            web_push::ensure_vapid_key()
+                .await
+                .map_err(PushSubscribeError::InternalCanisterError)?;
+            web_push::vapid_public_key_bytes()
+                .map(ByteBuf::from)
+                .ok_or_else(|| {
+                    PushSubscribeError::InternalCanisterError(
+                        "VAPID key missing immediately after generation".into(),
+                    )
+                })
+        }
+        #[cfg(test)]
+        {
+            Err(PushSubscribeError::InternalCanisterError(
+                "push notifications are not available in test builds".into(),
+            ))
+        }
     }
 }
 

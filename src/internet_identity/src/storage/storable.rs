@@ -16,6 +16,8 @@ pub mod metadata_v2;
 pub mod openid_credential;
 pub mod openid_credential_key;
 pub mod passkey_credential;
+pub mod push_subscription;
 pub mod recovery_key;
+pub mod smtp;
 pub mod special_device_migration;
 pub mod storable_persistent_state;

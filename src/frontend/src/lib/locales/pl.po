@@ -13,6 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=3; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2));\n"
 
+msgid "(no subject)"
+msgstr ""
+
 msgid "{0} logo"
 msgstr "{0} logo"
 
@@ -343,8 +346,14 @@ msgstr "Edytuj {name}"
 msgid "Edit account"
 msgstr "Edytuj konto"
 
+msgid "Email notifications"
+msgstr "Email notifications"
+
 msgid "Email:"
 msgstr ""
+
+msgid "Emails received for your identity."
+msgstr "Emails received for your identity."
 
 msgid "Enable multiple accounts"
 msgstr "Włącz wiele kont"
@@ -385,6 +394,21 @@ msgstr "Na przykład użytkownik A loguje się do Internet Identity za pomocą s
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Zapomnij o zapamiętywaniu skomplikowanych nazw użytkowników i haseł. Dzięki kluczom dostępu po prostu wybierasz swoją nazwę, aby się zalogować — szybko, bezpiecznie i bezproblemowo."
+
+msgid "From:"
+msgstr ""
+
+msgid "Get notified on this device when a new email arrives."
+msgstr "Get notified on this device when a new email arrives."
+
+msgid "Notifications failed"
+msgstr "Notifications failed"
+
+msgid "Notifications not enabled"
+msgstr "Notifications not enabled"
+
+msgid "To:"
+msgstr ""
 
 msgid "Full control"
 msgstr "Pełna kontrola"
@@ -674,6 +698,42 @@ msgstr ""
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Nie są udostępniane żadne dane Google, Microsoft ani Apple dotyczące aplikacji, w których logujesz się za pomocą Internet Identity."
 
+msgid "No email selected."
+msgstr ""
+
+msgid "DKIM verified"
+msgstr ""
+
+msgid "Not verified"
+msgstr ""
+
+msgid "Verifying..."
+msgstr ""
+
+msgid "Verification details"
+msgstr ""
+
+msgid "DKIM-Signature header present"
+msgstr ""
+
+msgid "Signature parsed"
+msgstr ""
+
+msgid "Algorithm supported"
+msgstr ""
+
+msgid "Required headers signed"
+msgstr ""
+
+msgid "Body hash valid"
+msgstr ""
+
+msgid "Public key fetched via DNS"
+msgstr ""
+
+msgid "RSA signature valid"
+msgstr ""
+
 msgid "No identity found"
 msgstr "Nie znaleziono tożsamości"
 
@@ -754,6 +814,9 @@ msgstr "Wybierz coś rozpoznawalnego, na przykład swoje imię"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Wróć do swojego <0>istniejącego urządzenia</0> i wybierz <1>Zacznij od nowa</1>, aby spróbować ponownie."
+
+msgid "Postbox"
+msgstr ""
 
 msgid "Powered by"
 msgstr "Zasilane przez"
@@ -1295,6 +1358,9 @@ msgstr "Wszystko gotowe. Twój klucz dostępu został zarejestrowany."
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Logujesz się jako <0>{name}</0>."
+
+msgid "Your browser blocked the permission prompt."
+msgstr "Your browser blocked the permission prompt."
 
 msgid "Your identity and sign-in methods at a glance."
 msgstr "Twoja tożsamość i metody logowania w skrócie."

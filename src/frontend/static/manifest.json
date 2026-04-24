@@ -1,0 +1,17 @@
+{
+  "name": "Internet Identity",
+  "short_name": "Internet Identity",
+  "start_url": "/manage",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "Internet Identity authentication and postbox",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

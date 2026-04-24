@@ -13,6 +13,9 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Poedit 3.9\n"
 
+msgid "(no subject)"
+msgstr ""
+
 msgid "{0} logo"
 msgstr "{0} логотип"
 
@@ -343,8 +346,14 @@ msgstr "Редагувати {name}"
 msgid "Edit account"
 msgstr "Редагувати обліковий запис"
 
+msgid "Email notifications"
+msgstr "Email notifications"
+
 msgid "Email:"
 msgstr ""
+
+msgid "Emails received for your identity."
+msgstr "Emails received for your identity."
 
 msgid "Enable multiple accounts"
 msgstr "Увімкнути кілька облікових записів"
@@ -385,6 +394,21 @@ msgstr "Наприклад, користувач A входить до Internet 
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Забудьте про запам'ятовування складних імен користувача та паролів. Завдяки ключам доступу ви просто обираєте своє ім'я для входу — швидко, безпечно та без проблем."
+
+msgid "From:"
+msgstr ""
+
+msgid "Get notified on this device when a new email arrives."
+msgstr "Get notified on this device when a new email arrives."
+
+msgid "Notifications failed"
+msgstr "Notifications failed"
+
+msgid "Notifications not enabled"
+msgstr "Notifications not enabled"
+
+msgid "To:"
+msgstr ""
 
 msgid "Full control"
 msgstr "Повний контроль"
@@ -674,6 +698,42 @@ msgstr ""
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Жодні дані про те, в які застосунки ви входите через Internet Identity, не передаються Google, Microsoft чи Apple."
 
+msgid "No email selected."
+msgstr ""
+
+msgid "DKIM verified"
+msgstr ""
+
+msgid "Not verified"
+msgstr ""
+
+msgid "Verifying..."
+msgstr ""
+
+msgid "Verification details"
+msgstr ""
+
+msgid "DKIM-Signature header present"
+msgstr ""
+
+msgid "Signature parsed"
+msgstr ""
+
+msgid "Algorithm supported"
+msgstr ""
+
+msgid "Required headers signed"
+msgstr ""
+
+msgid "Body hash valid"
+msgstr ""
+
+msgid "Public key fetched via DNS"
+msgstr ""
+
+msgid "RSA signature valid"
+msgstr ""
+
 msgid "No identity found"
 msgstr "Ідентифікатор не знайдено"
 
@@ -754,6 +814,9 @@ msgstr "Виберіть щось впізнаване, наприклад, св
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Будь ласка, поверніться до свого <0>наявного пристрою</0> та виберіть <1>Почати спочатку</1>, щоб спробувати знову."
+
+msgid "Postbox"
+msgstr ""
 
 msgid "Powered by"
 msgstr "Працює на"
@@ -1295,6 +1358,9 @@ msgstr "Усе готово. Ваш ключ доступу зареєстров
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Ви входите як <0>{name}</0>."
+
+msgid "Your browser blocked the permission prompt."
+msgstr "Your browser blocked the permission prompt."
 
 msgid "Your identity and sign-in methods at a glance."
 msgstr "Ваш ідентифікатор та способи входу — все в одному місці."

@@ -127,6 +127,9 @@ pub struct PersistentState {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
+    // VAPID private key (PKCS#8 DER-encoded P-256) for Web Push notifications.
+    // Generated lazily on first push subscription.
+    pub vapid_key: Option<Vec<u8>>,
 }
 
 impl Default for PersistentState {
@@ -149,6 +152,7 @@ impl Default for PersistentState {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            vapid_key: None,
         }
     }
 }

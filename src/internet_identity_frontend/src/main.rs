@@ -270,6 +270,12 @@ fn get_asset_headers(
 /// font-src 'self':
 ///   Allow fonts only from same origin
 ///
+/// manifest-src 'self':
+///   Allow the web app manifest (manifest.json) from same origin. Without
+///   this, browsers would fall back to default-src 'none' and block the
+///   <link rel="manifest"> element — which is needed for service worker
+///   push notifications on the postbox page.
+///
 /// frame-ancestors 'self' <related_origins...>:
 /// connect-src:
 ///   In production, `connect-src 'self' https:` allows connections to the same origin
@@ -331,6 +337,7 @@ fn get_content_security_policy(
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
+         manifest-src 'self';\
          frame-ancestors {embedding_allowlist};\
          frame-src {embedding_allowlist};"
     );
