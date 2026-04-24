@@ -565,7 +565,7 @@ jobs:
         if: matrix.device == 'chrome-extension'
         working-directory: demos/test-app
         run: |
-          npm ci
+          npm ci --no-audit --no-fund
           npm run build
 
       - name: Run Playwright tests
