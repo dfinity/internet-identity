@@ -98,7 +98,7 @@
         disabled={authenticatingProviderId !== undefined}
         size="xl"
         class="flex-1"
-        aria-label={$t`Sign in with SSO`}
+        aria-label={$t`Continue with SSO`}
       >
         <SsoIcon class="size-6" />
       </Button>
