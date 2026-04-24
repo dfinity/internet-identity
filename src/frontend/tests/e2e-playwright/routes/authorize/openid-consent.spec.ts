@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
 import {
@@ -47,29 +47,16 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
 }
 
 // ---------------------------------------------------------------------------
-// Consent UI helpers
-// ---------------------------------------------------------------------------
-
-const CONSENT_HEADING = "Review Permissions";
-
-const waitForConsent = async (page: Page): Promise<void> => {
-  await expect(
-    page.getByRole("heading", { name: CONSENT_HEADING }),
-  ).toBeVisible();
-};
-
-const acceptConsent = async (page: Page): Promise<void> => {
-  await waitForConsent(page);
-  await page.getByRole("button", { name: "Continue" }).click();
-};
-
-// ---------------------------------------------------------------------------
 // Tests
 //
 // These cover the ICRC-3 attribute consent screen — the path taken when a
 // dapp's requested keys can't all be handled by implicit consent (so the
 // fast-path `handleIcrc3ImplicitAttributes` bails and
 // `handleIcrc3ConsentAttributes` shows the consent UI).
+//
+// UI interactions go through the `attributeConsentView` fixture rather than
+// raw role queries, so if the consent DOM shape changes we update it once in
+// the fixture instead of across every spec.
 // ---------------------------------------------------------------------------
 
 test.describe("Authorize with OpenID — explicit consent UI", () => {
@@ -101,12 +88,13 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("shows consent and certifies the matching scoped email unscoped", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await acceptConsent(authorizePage.page);
+      await attributeConsentView.accept();
     });
   });
 
@@ -139,17 +127,17 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("one row in the UI, both forms certified", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
-      await waitForConsent(page);
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await attributeConsentView.waitForVisible();
       // Exactly one picker row is shown (the merged "Email" row).
-      await expect(page.getByRole("group", { name: "Email:" })).toBeVisible();
-      await expect(page.getByRole("group")).toHaveCount(1);
-      await page.getByRole("button", { name: "Continue" }).click();
+      await expect(attributeConsentView.row("Email:")).toBeVisible();
+      await expect(attributeConsentView.rows).toHaveCount(1);
+      await attributeConsentView.continue();
     });
   });
 
@@ -185,18 +173,18 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("shows a provider-labeled scoped row and a generic unscoped row", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
-      await waitForConsent(page);
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await attributeConsentView.waitForVisible();
       await expect(
-        page.getByRole("group", { name: `${providerName} email:` }),
+        attributeConsentView.row(`${providerName} email:`),
       ).toBeVisible();
-      await expect(page.getByRole("group", { name: "Email:" })).toBeVisible();
-      await page.getByRole("button", { name: "Continue" }).click();
+      await expect(attributeConsentView.row("Email:")).toBeVisible();
+      await attributeConsentView.continue();
     });
   });
 
@@ -255,16 +243,16 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("default picker option is certified", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
-      await waitForConsent(page);
-      // The "Change" button is only rendered when the picker has >1 option.
-      await expect(page.getByRole("button", { name: "Change" })).toBeVisible();
-      await page.getByRole("button", { name: "Continue" }).click();
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await attributeConsentView.waitForVisible();
+      // The picker button is only rendered when the row has >1 option.
+      await expect(attributeConsentView.pickerButton).toBeVisible();
+      await attributeConsentView.continue();
     });
   });
 
@@ -294,15 +282,15 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("denies all rows and continues", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
-      await waitForConsent(page);
-      await page.getByRole("button", { name: "Deny All" }).click();
-      await page.getByRole("button", { name: "Continue" }).click();
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await attributeConsentView.waitForVisible();
+      await attributeConsentView.denyAll();
+      await attributeConsentView.continue();
     });
   });
 
@@ -332,19 +320,15 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("uncheck email then continue", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
-      await waitForConsent(page);
-      // Uncheck the checkbox inside the "Email:" row group.
-      await page
-        .getByRole("group", { name: "Email:" })
-        .getByRole("checkbox")
-        .uncheck();
-      await page.getByRole("button", { name: "Continue" }).click();
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await attributeConsentView.waitForVisible();
+      await attributeConsentView.uncheckRow("Email:");
+      await attributeConsentView.continue();
     });
   });
 
@@ -377,16 +361,16 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("only the known key renders a consent row", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
-      await waitForConsent(page);
-      await expect(page.getByRole("group", { name: "Name:" })).toBeVisible();
-      await expect(page.getByRole("group")).toHaveCount(1);
-      await page.getByRole("button", { name: "Continue" }).click();
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await attributeConsentView.waitForVisible();
+      await expect(attributeConsentView.row("Name:")).toBeVisible();
+      await expect(attributeConsentView.rows).toHaveCount(1);
+      await attributeConsentView.continue();
     });
   });
 
@@ -415,20 +399,18 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
 
     test("consent screen never appears", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const page = authorizePage.page;
-      await signInWithOpenId(page, openIdUsers[0].id);
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       // Handler auto-resolves → II window closes without ever rendering the
       // consent heading. The fixture waits for the window to close after the
       // test body returns; if the consent screen were ever shown, the
       // auto-close would block and this test would time out instead of the
       // assertion below firing.
-      await expect(
-        page.getByRole("heading", { name: CONSENT_HEADING }),
-      ).toBeHidden();
+      await attributeConsentView.expectHidden();
     });
   });
 });

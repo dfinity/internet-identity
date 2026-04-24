@@ -285,6 +285,7 @@ test.describe("Authorize with direct OpenID", () => {
     });
 
     test("should omit attributes", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
@@ -294,12 +295,7 @@ test.describe("Authorize with direct OpenID", () => {
       // consent path instead of 1-click. The defaults (all options checked,
       // first provider selected for the `name` picker) match the assertions
       // below — just accept.
-      await expect(
-        authorizePage.page.getByRole("heading", { name: "Review Permissions" }),
-      ).toBeVisible();
-      await authorizePage.page
-        .getByRole("button", { name: "Continue" })
-        .click();
+      await attributeConsentView.accept();
     });
   });
 

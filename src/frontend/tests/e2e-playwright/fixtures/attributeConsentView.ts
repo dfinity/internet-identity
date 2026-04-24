@@ -1,0 +1,70 @@
+import { expect, Locator, Page } from "@playwright/test";
+import { test as authorizeTest } from "./authorize";
+
+/** Page-object for the explicit ICRC-3 attribute consent screen. Wraps the
+ *  II authorize window so specs don't hand-roll role queries every time. */
+class AttributeConsentView {
+  static readonly HEADING = "Review Permissions";
+
+  readonly #page: Page;
+
+  constructor(page: Page) {
+    this.#page = page;
+  }
+
+  get heading(): Locator {
+    return this.#page.getByRole("heading", {
+      name: AttributeConsentView.HEADING,
+    });
+  }
+
+  /** A single attribute row, matched by its label (e.g. `"Email:"`,
+   *  `"Google email:"`). */
+  row(label: string): Locator {
+    return this.#page.getByRole("group", { name: label });
+  }
+
+  /** All rendered attribute rows — useful for counting. */
+  get rows(): Locator {
+    return this.#page.getByRole("group");
+  }
+
+  /** The picker's chevron button; only present when a row has >1 option. */
+  get pickerButton(): Locator {
+    return this.#page.getByRole("button", { name: "Change" });
+  }
+
+  async waitForVisible(): Promise<void> {
+    await expect(this.heading).toBeVisible();
+  }
+
+  async expectHidden(): Promise<void> {
+    await expect(this.heading).toBeHidden();
+  }
+
+  async uncheckRow(label: string): Promise<void> {
+    await this.row(label).getByRole("checkbox").uncheck();
+  }
+
+  async denyAll(): Promise<void> {
+    await this.#page.getByRole("button", { name: "Deny All" }).click();
+  }
+
+  async continue(): Promise<void> {
+    await this.#page.getByRole("button", { name: "Continue" }).click();
+  }
+
+  /** Convenience: wait for the screen and click Continue. */
+  async accept(): Promise<void> {
+    await this.waitForVisible();
+    await this.continue();
+  }
+}
+
+export const test = authorizeTest.extend<{
+  attributeConsentView: AttributeConsentView;
+}>({
+  attributeConsentView: async ({ authorizePage }, use) => {
+    await use(new AttributeConsentView(authorizePage.page));
+  },
+});
