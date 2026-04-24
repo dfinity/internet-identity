@@ -298,12 +298,16 @@ const resolveConsentPipeline = async (params: {
 
     const origin = remapToLegacyDomain(derivationOrigin ?? channel.origin);
 
+    // TODO: pass `[requestedKeys]` once the canister silently drops unknown
+    // keys. Today it errors on anything it doesn't recognise, which would
+    // reject mixed `["email", "favorite_color"]` requests outright — so for
+    // now we ask for everything available on the anchor and filter below.
     const available =
       requestedKeys.length > 0
         ? await authenticated.actor
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
-              attributes: [requestedKeys],
+              attributes: [],
             })
             .then(throwCanisterError)
         : [];
@@ -455,10 +459,13 @@ export const handleIcrc3ImplicitAttributes =
 
       // Filter to keys the canister actually has — the user may not have
       // granted every implicit claim (e.g. missing verified_email).
+      // TODO: pass `[requestedKeys]` once the canister silently drops unknown
+      // keys; today it errors on unknown names, so fetch everything and
+      // filter via `availableKeys` below.
       const available = await authenticated.actor
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
-          attributes: [requestedKeys],
+          attributes: [],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));

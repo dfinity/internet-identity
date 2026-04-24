@@ -333,9 +333,11 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
   });
 
   test.describe("unknown attribute keys are silently dropped", () => {
-    // Canister's `list_available_attributes` ignores names it doesn't know
-    // (`favorite_color`, `ghost`) rather than rejecting the whole request.
-    // The consent UI only shows rows for keys that resolved to something.
+    // Consent handler asks the canister for everything the anchor has, then
+    // resolves the request against that set on the frontend, so unknown names
+    // (`favorite_color`, `ghost`) simply don't match anything rather than
+    // rejecting the whole request. The consent UI only shows rows for keys
+    // that resolved to something.
     const name = "Partly Known";
 
     test.use({

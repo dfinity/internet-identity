@@ -721,14 +721,13 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
                         MAX_ATTRIBUTES_PER_REQUEST
                     ));
                 }
-                // Unknown keys are silently dropped — `list_available_attributes`
-                // is a "what of this do you have?" query, so an unrecognised key
-                // means "nothing" rather than "invalid request". Strict name
-                // validation lives in `prepare_icrc3_attributes`.
-                let parsed: Vec<AttributeKey> = keys
-                    .into_iter()
-                    .filter_map(|key| AttributeKey::try_from(key).ok())
-                    .collect();
+                let mut parsed = Vec::with_capacity(keys.len().min(MAX_ATTRIBUTES_PER_REQUEST));
+                for key in keys {
+                    match AttributeKey::try_from(key) {
+                        Ok(k) => parsed.push(k),
+                        Err(e) => problems.push(e),
+                    }
+                }
                 if !problems.is_empty() {
                     return Err(ListAvailableAttributesError::ValidationError { problems });
                 }
@@ -1963,28 +1962,19 @@ mod tests {
                 }
                 other => panic!("Expected ValidationError, got {:?}", other),
             }
-        }
 
-        #[test]
-        fn test_unknown_keys_are_silently_dropped() {
-            // Unknown attribute names: list is a "what of this do you have?"
-            // query, so unknowns are dropped rather than rejected.
+            // Invalid key
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["unknown_attribute".to_string()]),
             };
-            let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
-            pretty_assert_eq!(validated.attributes.unwrap().len(), 0);
-
-            // Mixed known + unknown: the known one survives, the unknown is dropped.
-            let req = ListAvailableAttributesRequest {
-                identity_number: 10000,
-                attributes: Some(vec!["email".to_string(), "color".to_string()]),
-            };
-            let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
-            let attrs = validated.attributes.unwrap();
-            pretty_assert_eq!(attrs.len(), 1);
-            pretty_assert_eq!(attrs[0].attribute_name, AttributeName::Email);
+            let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
+            match err {
+                ListAvailableAttributesError::ValidationError { problems } => {
+                    assert!(problems[0].contains("Unknown attribute"));
+                }
+                other => panic!("Expected ValidationError, got {:?}", other),
+            }
         }
     }
 }
