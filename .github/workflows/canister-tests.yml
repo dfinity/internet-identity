@@ -5,6 +5,8 @@ name: Canister tests
 
 on:
   push:
+    branches: [main]
+    tags: ['release-*']
   pull_request:
 
 jobs:
