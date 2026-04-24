@@ -19,9 +19,22 @@ class AttributeConsentView {
   }
 
   /** A single attribute row, matched by its label (e.g. `"Email:"`,
-   *  `"Google email:"`). */
+   *  `"Google email:"`).
+   *
+   *  aria-labels wrap runtime-interpolated values (provider names,
+   *  attribute keys) in Unicode bidi isolation marks (FSI U+2068 / PDI
+   *  U+2069) for correct RTL rendering, so a plain-substring match won't
+   *  hit those rows. The regex below lets any character in the caller's
+   *  label be preceded/followed by those marks. */
   row(label: string): Locator {
-    return this.#page.getByRole("group", { name: label });
+    const pattern = new RegExp(
+      label
+        .split("")
+        .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("[\\u2068\\u2069]*"),
+      "i",
+    );
+    return this.#page.getByRole("group", { name: pattern });
   }
 
   /** All rendered attribute rows — useful for counting. */
