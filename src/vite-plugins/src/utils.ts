@@ -5,8 +5,9 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { request } from "undici";
 
 export const readReplicaPort = (): string => {
-  const stdout = execSync("icp info webserver-port");
-  return stdout.toString().trim();
+  const stdout = execSync("icp network status --json");
+  const status = JSON.parse(stdout.toString());
+  return new URL(status.gateway_url).port;
 };
 
 export const readCanisterId = ({
@@ -26,14 +27,14 @@ export const readCanisterId = ({
 };
 
 export const getReplicaHost = (): string => {
-  const command = `icp info webserver-port`;
   try {
-    const stdout = execSync(command);
-    const port = stdout.toString().trim();
+    const stdout = execSync("icp network status --json");
+    const status = JSON.parse(stdout.toString());
+    const port = new URL(status.gateway_url).port;
     return `http://127.0.0.1:${port}`;
   } catch (e) {
     throw Error(
-      `Could not get replica port '${command}', is the replica running? ${e}`,
+      `Could not get replica port, is the replica running? ${e}`,
     );
   }
 };

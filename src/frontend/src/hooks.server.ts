@@ -16,7 +16,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     )
       .toString()
       .trim();
-    const port = execSync("icp info webserver-port").toString().trim();
+    const port = new URL(
+      JSON.parse(execSync("icp network status --json").toString()).gateway_url,
+    ).port;
     const canisterResponse = await fetch(
       `http://${canisterId}.localhost:${port}`,
     );

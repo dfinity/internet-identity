@@ -23,7 +23,8 @@ export const readCanisterId = ({
 };
 
 function getCanisterHost({ canisterName }: { canisterName: string }): string {
-  const port = execSync("icp info webserver-port");
+  const status = JSON.parse(execSync("icp network status --json").toString());
+  const port = new URL(status.gateway_url).port;
   const canisterId = readCanisterId({ canisterName });
   return `http://${canisterId}.localhost:${port}`;
 }
