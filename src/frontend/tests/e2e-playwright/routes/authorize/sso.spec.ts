@@ -174,15 +174,16 @@ test.describe("Authorize via SSO", () => {
 
   // 1-click SSO: the dapp passes `?sso=<domain>` on the authorize URL,
   // II runs discovery + redirect immediately without showing the auth
-  // wizard. Equivalent of the `?openid=<issuer>` 1-click that direct
-  // OpenID providers already use.
+  // wizard. Mirrors the `?openid=<issuer>` 1-click for direct providers.
   test.describe("1-click via ?sso= search param", () => {
+    const name = "John Doe";
+
     test.use({
       openIdConfig: {
         defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
-            claims: { name: "John Doe" },
+            claims: { name },
           },
         ],
       },
@@ -206,6 +207,61 @@ test.describe("Authorize via SSO", () => {
       // it kicks off the SSO redirect on mount. We end up on the IdP
       // sign-in form directly, then come back to the auth page for the
       // final Continue.
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  // 1-click SSO with attribute auto-approval: when every requested key
+  // is in the SSO auto-approve allowlist (`sso:<domain>:name`,
+  // `sso:<domain>:email`), II skips the consent UI just like the
+  // 1-click OpenID path does for `openid:<issuer>:<key>`.
+  test.describe("1-click via ?sso= with auto-approved attributes", () => {
+    const name = "John Doe";
+    const email = "john.doe@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name, email },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
+        useIcrc3Attributes: true,
+        attributes: [
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(textEntries).toMatchObject({
+        [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
+        [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
+      });
+    });
+
+    test("auto-approves name and email without consent UI", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // No consent screen, no manual Continue — `signInWithOpenId`
+      // drives only the IdP popup, then the page closes itself once the
+      // 1-click handler certifies the attributes.
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });

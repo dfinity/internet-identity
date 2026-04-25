@@ -148,6 +148,11 @@
       discovery_domain: domain,
     });
     const result = await discoverSsoConfig(domain, { allowlistedHosts });
+    // Stash the SSO discovery domain so `resumeOpenId` knows the
+    // returning JWT belongs to a 1-click SSO flow rather than a 1-click
+    // OpenID one. The flow type drives which auto-approve allowlist the
+    // attribute consent handler bypasses.
+    sessionStorage.setItem("ii-sso-1-click-domain", domain);
     const syntheticConfig: OpenIdConfig = {
       auth_uri: result.discovery.authorization_endpoint,
       jwks_uri: "",
@@ -192,10 +197,21 @@
     if (config === undefined) {
       return;
     }
-    authorizationStore.setFlow({
-      type: "1-click-openid",
-      issuer: config.issuer,
-    });
+    // The marker is set by `initiateSso` for the `?sso=<domain>` path.
+    // If present, treat the returning JWT as a 1-click SSO flow so the
+    // attribute consent handler auto-approves `sso:<domain>:<key>` keys
+    // instead of `openid:<issuer>:<key>` ones. Clear it so a stale
+    // marker can't leak into a subsequent direct-OpenID round-trip.
+    const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
+    sessionStorage.removeItem("ii-sso-1-click-domain");
+    if (ssoDomain !== null) {
+      authorizationStore.setFlow({ type: "1-click-sso", domain: ssoDomain });
+    } else {
+      authorizationStore.setFlow({
+        type: "1-click-openid",
+        issuer: config.issuer,
+      });
+    }
     openIdResumeProcessing = true;
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
