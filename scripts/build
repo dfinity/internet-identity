@@ -168,10 +168,10 @@ function build_canister() {
           # indicate the II canister init argument type
           ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "(opt InternetIdentityInit)" -v public
 
-          # Write metadata for dfx.
+          # Write metadata for icp-cli.
           # The metadata includes a link to the release, which only exists if this is a release build.
           # In case of a release build, the version looks like this: <commit>,<release>,<dirty>
-          # We include the URL of a checksum file so that dfx clients can check the hash
+          # We include the URL of a checksum file so that icp-cli clients can check the hash
           # of the build (for caching & integrity checking)
           IFS=,
           read -r -a version_parts <<< "$II_VERSION"
@@ -189,7 +189,7 @@ function build_canister() {
                   --arg init_arg "(null)" \
                   --arg init_guide "$init_guide" \
                   '. | .pullable = { wasm_url: $wasm_url, wasm_hash_url: $wasm_hash_url, dependencies: [], init_arg: "(null)", init_guide: $init_guide} ')
-              ic-wasm "$canister.wasm" -o "$canister.wasm" metadata dfx -d "$metadata_json" -v public
+              ic-wasm "$canister.wasm" -o "$canister.wasm" metadata icp-cli -d "$metadata_json" -v public
           fi
 
         fi
@@ -199,7 +199,7 @@ function build_canister() {
           # indicate the frontend canister init argument type
           ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "(InternetIdentityFrontendInit)" -v public
 
-          # Write pullable metadata for dfx.
+          # Write pullable metadata for icp-cli.
           IFS=, read -r -a version_parts <<< "$II_VERSION"
           release="${version_parts[1]}"
           if [ -n "$release" ]
@@ -216,7 +216,7 @@ function build_canister() {
                   --arg init_arg "$fe_init_arg" \
                   --arg init_guide "$init_guide" \
                   '. | .pullable = { wasm_url: $wasm_url, wasm_hash_url: $wasm_hash_url, dependencies: ["rdmx6-jaaaa-aaaaa-aaadq-cai"], init_arg: $init_arg, init_guide: $init_guide} ')
-              ic-wasm "$canister.wasm" -o "$canister.wasm" metadata dfx -d "$metadata_json" -v public
+              ic-wasm "$canister.wasm" -o "$canister.wasm" metadata icp-cli -d "$metadata_json" -v public
           fi
 
         fi

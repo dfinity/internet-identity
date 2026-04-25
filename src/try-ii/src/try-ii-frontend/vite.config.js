@@ -30,7 +30,7 @@ export default defineConfig({
     tailwindcss(),
     sveltekit(),
     environment("all", { prefix: "CANISTER_" }),
-    environment("all", { prefix: "DFX_" }),
+    environment("all", { prefix: "ICP_" }),
   ],
   resolve: {
     alias: [

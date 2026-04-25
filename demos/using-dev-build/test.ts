@@ -1,20 +1,17 @@
 #!/usr/bin/env ts-node
-/* This starts the test suite. The II canister id is read from dfx.
+/* This starts the test suite. The II canister id is read from icp-cli.
  * This expects the replica to be running, and expects the II canister to have
  * been deployed.
  */
 
 import { execSync, spawn } from "child_process";
 
-/**
- * Read a canister ID from dfx's local state
- */
 export const readCanisterId = ({
   canisterName,
 }: {
   canisterName: string;
 }): string => {
-  const command = `dfx canister id ${canisterName}`;
+  const command = `icp canister status ${canisterName} --id-only`;
   try {
     const stdout = execSync(command);
     return stdout.toString().trim();
@@ -26,7 +23,8 @@ export const readCanisterId = ({
 };
 
 function getCanisterHost({ canisterName }: { canisterName: string }): string {
-  const port = execSync("dfx info webserver-port");
+  const status = JSON.parse(execSync("icp network status --json").toString());
+  const port = new URL(status.gateway_url).port;
   const canisterId = readCanisterId({ canisterName });
   return `http://${canisterId}.localhost:${port}`;
 }

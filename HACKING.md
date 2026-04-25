@@ -8,7 +8,7 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 The build requires the following dependencies:
 
-- [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
+- [`icp-cli`](https://github.com/dfinity/icp-cli/releases/latest) (install via `npm install -g @icp-sdk/icp-cli` or `brew install icp-cli`)
 - Rustup with target `wasm32-unknown-unknown` (see [rustup instructions](https://rust-lang.github.io/rustup/cross-compilation.html)), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 - CMake
 - [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
@@ -20,13 +20,13 @@ To run the Internet Identity canister, proceed as follows after cloning the repo
 
 ```bash
 npm ci
-dfx start [--clean] [--background]
+icp network start [--clean] [-d]
 ```
 
 In a different terminal, run the following command to install the Internet Identity canister:
 
 ```bash
-dfx deploy internet_identity --no-wallet
+icp deploy internet_identity
 ```
 
 > [!NOTE]\
@@ -34,25 +34,25 @@ dfx deploy internet_identity --no-wallet
 > `II_DUMMY_CAPTCHA` to `0` and configure II to use a CAPTCHA:
 >
 > ```
-> II_DUMMY_CAPTCHA=0 dfx deploy internet_identity --no-wallet \
->     --argument '(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaEnabled}}}})'
+> II_DUMMY_CAPTCHA=0 icp deploy internet_identity \
+>     --args '(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaEnabled}}}})'
 > ```
 
 Then the canister can be used as
 
 ```bash
-$ dfx canister call internet_identity stats
+$ icp canister call internet_identity stats
 (
   record { ... }
 )
 ```
 
-See `dfx canister call --help` and [the documentation](https://sdk.dfinity.org/docs/developers-guide/cli-reference/dfx-canister.html#_examples) for more information.
+See `icp canister call --help` and [the documentation](https://cli.internetcomputer.org/0.2/reference/icp-canister) for more information.
 
-The `dfx` executable can proxy queries to the canister. To view it, run the following and open the resulting link in your browser:
+The `icp` executable can proxy queries to the canister. To view it, run the following and open the resulting link in your browser:
 
 ```bash
-echo "http://$(dfx canister id internet_identity).localhost:4943"
+echo "http://$(icp canister status internet_identity --id-only).localhost:4943"
 ```
 
 _Note: The URL doesn't work for safari._
@@ -63,8 +63,8 @@ The fastest workflow to get the development environment running is to deploy onc
 
 ```bash
 npm ci
-dfx start [--clean] [--background]
-dfx deploy internet_identity --no-wallet
+icp network start [--clean] [-d]
+icp deploy internet_identity
 ```
 
 To serve the frontend locally (recommended during development), run
@@ -95,12 +95,12 @@ into the following issues:
 
 We have a set of Selenium tests that run through the various flows. To set up a local deployment follow these steps:
 
-1. Start a local replica with `dfx start`
-1. Deploy II and the other test canisters with `dfx deploy --no-wallet`
+1. Start a local replica with `icp network start`
+1. Deploy II and the other test canisters with `icp deploy`
 
 - If you want to run the new playwright tests, you need to deploy II with a specific argument:
   ```bash
-  dfx canister install internet_identity --wasm internet_identity.wasm.gz --upgrade-unchanged --mode=upgrade --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
+  icp canister install internet_identity --wasm internet_identity.wasm.gz --mode=upgrade --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
   ```
 
 1. Start the vite dev server with TLS enabled and hot reloading disabled: `TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev`
@@ -166,7 +166,7 @@ So running the usual `cargo build --target wasm32-unknown-unknown -p internet_id
 Use the following command to build the backend canister Wasm file instead:
 
 ```bash
-dfx build internet_identity
+icp build internet_identity
 ```
 
 This will produce `./internet_identity.wasm.gz`.
@@ -176,7 +176,7 @@ This will produce `./internet_identity.wasm.gz`.
 To experiment with Attribute Sharing / Verifiable Credentials feature, one can start a demo VC-issuer by running
 
 ```bash
-dfx deploy issuer
+icp deploy issuer
 ```
 
 This will deploy also `internet_identity`, and provision the issuer for the testing environment.
@@ -185,7 +185,7 @@ See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
 Our [`test-app`](./demos/test-app) offers a simple relying party functionality and can be deployed using
 
 ```bash
-dfx deploy test_app
+icp deploy test_app
 ```
 
 Afterward one can serve the frontends locally via:

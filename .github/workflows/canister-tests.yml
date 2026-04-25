@@ -492,13 +492,14 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install chromium
 
-      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
+      - name: Install icp-cli
+        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
       # Helps with debugging
       - name: Show versions
         run: |
-          echo dfx --version
-          dfx --version
+          echo icp --version
+          icp --version
           echo node --version
           node --version
 
@@ -511,8 +512,8 @@ jobs:
             npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
           done
 
-      - name: "Run dfx"
-        run: dfx start --background --artificial-delay 0
+      - name: "Run icp-cli"
+        run: icp network start -d
 
       - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
@@ -533,7 +534,10 @@ jobs:
           path: demos/test-app
 
       - name: Create Canisters
-        run: dfx canister create --all
+        run: |
+          icp canister create internet_identity
+          icp canister create internet_identity_frontend
+          icp canister create test_app
 
       - name: Generate OpenID configs
         id: openid-configs
@@ -548,11 +552,11 @@ jobs:
 
       - name: Deploy canisters
         run: |
-          # NOTE: dfx install will run the postinstall scripts from dfx.json
-          dfx canister install internet_identity --wasm internet_identity_backend.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
-          II_CANISTER_ID=$(dfx canister id internet_identity)
-          dfx canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
-          dfx canister install test_app --wasm demos/test-app/test_app.wasm
+          # NOTE: icp canister install will run the sync steps from icp.yaml
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          II_CANISTER_ID=$(icp canister status internet_identity --id-only)
+          icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
+          icp canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server
         id: dev-server-start
@@ -569,9 +573,9 @@ jobs:
         run: |
           npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /) --reporter=line,html
 
-      - name: Stop dfx
+      - name: Stop icp-cli
         if: ${{ always() }}
-        run: dfx stop
+        run: icp network stop
 
       - name: Stop dev server
         if: ${{ always() }}
@@ -615,7 +619,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
+      - name: Install icp-cli
+        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
@@ -631,23 +636,23 @@ jobs:
 
       - name: "Install key"
         env:
-          DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
+          ICP_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
         run: |
           key_pem=$(mktemp)
-          printenv "DFX_DEPLOY_KEY" > "$key_pem"
-          dfx identity import --disable-encryption --force default "$key_pem"
+          printenv "ICP_DEPLOY_KEY" > "$key_pem"
+          icp identity import --disable-encryption --force default "$key_pem"
           rm "$key_pem"
 
       - name: "Deploy II"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to surpass dfx error to use the insecure plaintext identity
-          export DFX_WARNING=-mainnet_plaintext_identity
+          # Needed to suppress icp-cli warning about insecure plaintext identity
+          export ICP_WARNING=-mainnet_plaintext_identity
           sha=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1 | sed 's/../\\&/g')
-          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
-            --wasm internet_identity_backend.wasm.gz \
-            y2aaj-miaaa-aaaad-aacxq-cai
+          icp canister install y2aaj-miaaa-aaaad-aacxq-cai \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --args "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
+            --wasm internet_identity_backend.wasm.gz
 
       - name: "Download test app wasm"
         uses: actions/download-artifact@v4
@@ -658,11 +663,11 @@ jobs:
       - name: "Deploy test app"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to surpass dfx error to use the insecure plaintext identity
-          export DFX_WARNING=-mainnet_plaintext_identity
-          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --wasm ./test_app.wasm \
-            vt36r-2qaaa-aaaad-aad5a-cai
+          # Needed to suppress icp-cli warning about insecure plaintext identity
+          export ICP_WARNING=-mainnet_plaintext_identity
+          icp canister install vt36r-2qaaa-aaaad-aad5a-cai \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --wasm ./test_app.wasm
 
       - name: "Download VC issuer wasm"
         uses: actions/download-artifact@v4
@@ -673,21 +678,21 @@ jobs:
       - name: "Deploy Issuer"
         run: |
           wallet="cvthj-wyaaa-aaaad-aaaaq-cai"
-          # Needed to surpass dfx error to use the insecure plaintext identity
-          export DFX_WARNING=-mainnet_plaintext_identity
-          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --wasm vc_demo_issuer.wasm.gz \
-            v2yvn-myaaa-aaaad-aad4q-cai
+          # Needed to suppress icp-cli warning about insecure plaintext identity
+          export ICP_WARNING=-mainnet_plaintext_identity
+          icp canister install v2yvn-myaaa-aaaad-aad4q-cai \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --wasm vc_demo_issuer.wasm.gz
           ./demos/vc_issuer/provision \
             --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
-            --dfx-network ic \
+            --icp-network ic \
             --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
-            --wallet "$wallet"
+            --proxy "$wallet"
 
       - name: "Deploy archive"
         run: |
-          # Needed to surpass dfx error to use the insecure plaintext identity
-          export DFX_WARNING=-mainnet_plaintext_identity
+          # Needed to suppress icp-cli warning about insecure plaintext identity
+          export ICP_WARNING=-mainnet_plaintext_identity
           scripts/deploy-archive --wasm archive.wasm.gz --canister-id y2aaj-miaaa-aaaad-aacxq-cai --network ic
 
   # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
@@ -801,8 +806,8 @@ jobs:
           cp internet_identity_backend.wasm.gz internet_identity_production.wasm.gz
           cp internet_identity_backend.wasm.gz internet_identity_dev.wasm.gz
 
-      # Create a sha file for dfx pull, referenced by the metadata set in the build
-      - name: Create sha for dfx pull
+      # Create a sha file for icp-cli pull, referenced by the metadata set in the build
+      - name: Create sha for icp-cli pull
         run: |
           shasum -a 256 \
             ./internet_identity_backend.wasm.gz > \

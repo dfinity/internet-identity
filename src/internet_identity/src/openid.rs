@@ -8,6 +8,7 @@ use ic_canister_sig_creation::{
 use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
+use internet_identity_interface::internet_identity::types::attributes::AttributeScope;
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
@@ -20,7 +21,7 @@ use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
-mod generic;
+pub(crate) mod generic;
 
 // Re-export the SSO-metadata lookup so the storage-layer
 // `OpenIdCredential → OpenIdCredentialData` conversion can call it
@@ -183,6 +184,39 @@ impl OpenIdCredential {
         self.with_provider(|provider| provider.issuer())
     }
 
+    /// Returns the `discovery_domain` of the SSO provider that currently
+    /// matches this credential, if any. `None` for credentials matched to a
+    /// hardcoded (non-discoverable) `Provider` — those are addressable via
+    /// the `openid:<issuer>` attribute scope instead.
+    ///
+    /// Used to route attribute requests to the `sso:<domain>` scope with
+    /// exclusive semantics: a credential with `Some(domain)` here is
+    /// reachable via `sso:<domain>` only, never via `openid:<issuer>`.
+    pub fn discovery_domain(&self) -> Option<String> {
+        self.with_provider(|provider| provider.discovery_domain())
+    }
+
+    /// Returns the single `AttributeScope` this credential is addressable
+    /// under, computed with one provider lookup. This is the source of truth
+    /// for scope exclusivity:
+    ///
+    /// - `Some(Sso { domain })`     for credentials matched to a `DiscoverableProvider`
+    /// - `Some(OpenId { issuer })`  for credentials matched to a hardcoded provider
+    /// - `None`                     when no provider currently matches (discovery
+    ///   pending or provider unregistered) — credential is unreachable.
+    ///
+    /// Prefer this over calling `discovery_domain()` + `config_issuer()`
+    /// separately, which would perform two `with_provider` scans per
+    /// credential in hot paths.
+    pub fn matched_attribute_scope(&self) -> Option<AttributeScope> {
+        self.with_provider(|provider| match provider.discovery_domain() {
+            Some(domain) => Some(AttributeScope::Sso { domain }),
+            None => provider
+                .issuer()
+                .map(|issuer| AttributeScope::OpenId { issuer }),
+        })
+    }
+
     fn read_attribute_as_string(&self, attribute_name: &str) -> Option<String> {
         let MetadataEntryV2::String(value) = self.metadata.get(attribute_name)? else {
             return None;
@@ -253,6 +287,19 @@ pub trait OpenIdProvider {
     fn client_id(&self) -> Option<String>;
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme>;
+
+    /// SSO discovery domain for this provider, if any. Returns `Some(domain)` only
+    /// for providers created from a `DiscoverableOidcConfig` (the two-hop SSO
+    /// discovery flow). All other providers (Google, Microsoft, hardcoded
+    /// generic OIDC) inherit the default `None`.
+    ///
+    /// Credentials whose matched provider reports `Some(domain)` are reachable
+    /// via the `sso:<domain>` attribute scope and are *not* reachable via
+    /// `openid:<issuer>` — see `OpenIdCredential::discovery_domain` and
+    /// `Anchor::prepare_openid_attributes` / `prepare_sso_attributes`.
+    fn discovery_domain(&self) -> Option<String> {
+        None
+    }
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -330,6 +377,15 @@ pub fn add_oidc_config(config: DiscoverableOidcConfig) {
         ));
     }
 
+    // Canonicalize the domain to lowercase. DNS hostnames are
+    // case-insensitive and `is_allowed_discovery_domain` already accepts
+    // case-insensitively via `eq_ignore_ascii_case`. Storing a canonical form
+    // keeps `OIDC_CONFIGS`, `DISCOVERY_TASKS`, `DiscoverableProvider`, and
+    // downstream attribute-scope matching (`sso:<domain>`) all in sync.
+    let config = DiscoverableOidcConfig {
+        discovery_domain: config.discovery_domain.to_ascii_lowercase(),
+    };
+
     // Skip if already registered
     let already_exists = OIDC_CONFIGS.with_borrow(|stored| {
         stored
@@ -353,6 +409,13 @@ pub fn add_oidc_config(config: DiscoverableOidcConfig) {
 }
 
 fn add_oidc_config_internal(config: DiscoverableOidcConfig) {
+    // Canonicalize so `OIDC_CONFIGS`, `DISCOVERY_TASKS` (in `DiscoverableProvider`),
+    // and downstream `sso:<domain>` scope matching stay in sync. `add_oidc_config`
+    // already canonicalizes, but `setup_oidc` replays persisted configs at
+    // post-upgrade time which may contain values from before this change.
+    let config = DiscoverableOidcConfig {
+        discovery_domain: config.discovery_domain.to_ascii_lowercase(),
+    };
     OIDC_CONFIGS.with_borrow_mut(|stored| {
         stored.push(config.clone());
     });

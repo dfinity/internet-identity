@@ -4,23 +4,18 @@ import { execSync } from "child_process";
 import type { IncomingMessage, ServerResponse } from "http";
 import { request } from "undici";
 
-/**
- * Read the replica port from dfx's local state
- */
 export const readReplicaPort = (): string => {
-  const stdout = execSync("dfx info webserver-port");
-  return stdout.toString().trim();
+  const stdout = execSync("icp network status --json");
+  const status = JSON.parse(stdout.toString());
+  return new URL(status.gateway_url).port;
 };
 
-/**
- * Read a canister ID from dfx's local state
- */
 export const readCanisterId = ({
   canisterName,
 }: {
   canisterName: string;
 }): string => {
-  const command = `dfx canister id ${canisterName}`;
+  const command = `icp canister status ${canisterName} --id-only`;
   try {
     const stdout = execSync(command);
     return stdout.toString().trim();
@@ -31,17 +26,14 @@ export const readCanisterId = ({
   }
 };
 
-/** Get the http host of a running replica */
 export const getReplicaHost = (): string => {
-  const command = `dfx info webserver-port`;
   try {
-    const stdout = execSync(command);
-    const port = stdout.toString().trim();
+    const stdout = execSync("icp network status --json");
+    const status = JSON.parse(stdout.toString());
+    const port = new URL(status.gateway_url).port;
     return `http://127.0.0.1:${port}`;
   } catch (e) {
-    throw Error(
-      `Could not get replica port '${command}', is the replica running? ${e}`,
-    );
+    throw Error(`Could not get replica port, is the replica running? ${e}`);
   }
 };
 
