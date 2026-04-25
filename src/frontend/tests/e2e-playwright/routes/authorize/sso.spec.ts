@@ -3,7 +3,7 @@ import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
-import { fromBase64 } from "../../utils";
+import { fromBase64, II_URL } from "../../utils";
 
 type Icrc3Value =
   | { Nat: bigint }
@@ -155,6 +155,7 @@ test.describe("Authorize via SSO", () => {
 
     test("should return attributes", async ({
       authorizePage,
+      attributeConsentView,
       openSsoPopup,
       signInWithOpenId,
       openIdUsers,
@@ -163,25 +164,27 @@ test.describe("Authorize via SSO", () => {
       const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(ssoPage, openIdUsers[0].id);
       await closePromise;
-      // 1-click is intentionally not exercised here. The user has no
-      // pre-existing credential for this issuer, so the wizard takes
-      // the consent path with all defaults selected.
-      //
+      // After the IdP popup closes, the wizard lands on ContinueView
+      // (selectedIdentity is set, $authorizedStore is not yet). Click
+      // Continue to commit the authorization — this triggers the consent
+      // pipeline that will render the SSO attribute rows.
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
       // The SSO consent rows are labelled with the published SSO name
       // (`Test SSO 11107`, served by `test_openid_provider`'s hop-1
       // response) — verify both the email and name rows render that
       // prefix instead of the bare-domain fallback. This exercises the
-      // consent-screen frontend discovery: even though we authenticated
-      // through SSO here, the lookup runs independently per domain.
+      // consent-screen frontend discovery: the lookup runs independently
+      // per domain, regardless of how the user authenticated.
+      await attributeConsentView.waitForVisible();
       await expect(
-        authorizePage.page.getByText(`Test SSO ${SSO_OPENID_PORT} email:`),
+        attributeConsentView.row(`Test SSO ${SSO_OPENID_PORT} email:`),
       ).toBeVisible();
       await expect(
-        authorizePage.page.getByText(`Test SSO ${SSO_OPENID_PORT} name:`),
+        attributeConsentView.row(`Test SSO ${SSO_OPENID_PORT} name:`),
       ).toBeVisible();
-      await authorizePage.page
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
+      await attributeConsentView.continue();
     });
   });
 
@@ -282,20 +285,22 @@ test.describe("Authorize via SSO", () => {
   // Both `?openid=` and `?sso=` set in one URL is a misconfigured
   // sign-in URL. Rather than silently picking one entry point, II
   // surfaces it as an "invalid request" via the existing ChannelError
-  // UI so the dapp gets a clear signal to fix the URL.
-  test.describe("conflicting ?openid and ?sso", () => {
-    test.use({
-      authorizeConfig: {
-        protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        sso: SSO_DISCOVERY_DOMAIN,
-      },
-    });
-
-    test("renders the channel error", async ({ authorizePage }) => {
-      await expect(
-        authorizePage.page.getByRole("heading", { name: "Invalid request" }),
-      ).toBeVisible();
-    });
+  // UI so the dapp gets a clear signal to fix the URL. We open the
+  // authorize popup directly here rather than going through the
+  // `authorizePage` fixture — that fixture ends with a
+  // `waitForEvent("close")`, but the channel-error view is a static
+  // page the user has to dismiss themselves, so it never closes on its
+  // own.
+  test("renders ChannelError when both ?openid and ?sso are set", async ({
+    page,
+  }) => {
+    const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
+    const url = new URL(II_URL + "/authorize");
+    url.searchParams.set("openid", issuer);
+    url.searchParams.set("sso", SSO_DISCOVERY_DOMAIN);
+    await page.goto(url.toString());
+    await expect(
+      page.getByRole("heading", { name: "Invalid request" }),
+    ).toBeVisible();
   });
 });

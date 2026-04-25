@@ -15,7 +15,6 @@
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { XIcon } from "@lucide/svelte";
   import { Trans } from "$lib/components/locale";
-  import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
 
@@ -189,14 +188,6 @@
     }
     const authFlow = new AuthFlow({ trackLastUsed: false });
     const { iss, aud, ...metadata } = decodeJWT(jwt);
-    const config = findConfig(
-      iss,
-      aud,
-      Object.entries(metadata).map(([key, value]) => [key, { String: value! }]),
-    );
-    if (config === undefined) {
-      return;
-    }
     // The marker is set by `initiateSso` for the `?sso=<domain>` path.
     // If present, treat the returning JWT as a 1-click SSO flow so the
     // attribute consent handler auto-approves `sso:<domain>:<key>` keys
@@ -204,9 +195,39 @@
     // marker can't leak into a subsequent direct-OpenID round-trip.
     const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
     sessionStorage.removeItem("ii-sso-1-click-domain");
+    let config: OpenIdConfig | undefined;
     if (ssoDomain !== null) {
+      // SSO sign-in: there's no matching `openid_configs` entry to look
+      // up because the provider is registered as a `DiscoverableOidcConfig`
+      // on the canister, not a direct `OpenIdConfig`. Build a synthetic
+      // config from the JWT itself — `continueWithOpenId` only needs
+      // `name` (for analytics) and `client_id` / `issuer` here since
+      // the JWT is already in hand and the canister side picks the
+      // matching `DiscoverableProvider` by `(iss, aud)`.
+      config = {
+        auth_uri: "",
+        jwks_uri: "",
+        logo: "",
+        name: ssoDomain,
+        fedcm_uri: [],
+        email_verification: [],
+        issuer: iss,
+        auth_scope: [],
+        client_id: aud ?? "",
+      };
       authorizationStore.setFlow({ type: "1-click-sso", domain: ssoDomain });
     } else {
+      config = findConfig(
+        iss,
+        aud,
+        Object.entries(metadata).map(([key, value]) => [
+          key,
+          { String: value! },
+        ]),
+      );
+      if (config === undefined) {
+        return;
+      }
       authorizationStore.setFlow({
         type: "1-click-openid",
         issuer: config.issuer,
@@ -359,12 +380,6 @@
 
 {#if data.flow === "openid-init" || data.flow === "sso-init"}
   <!-- OpenID/SSO init — nothing to render, onMount redirects to provider. -->
-{:else if data.flow === "error"}
-  <!-- Reuse the channel error UI for invalid sign-in URLs (e.g. both
-       `?openid=` and `?sso=` set). The `invalid-request` copy already
-       reads "an invalid authentication request was received", which
-       fits this case. -->
-  <ChannelError error="invalid-request" />
 {:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
   <!-- Consent needed (or loading) — consent view handles its own loading state. -->
   {@render panelWrapper(attributeConsentContent)}

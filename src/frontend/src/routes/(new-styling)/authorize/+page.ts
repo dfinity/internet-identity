@@ -8,13 +8,12 @@ export const load: PageLoad = ({ url }) => {
 
   // `?openid=` and `?sso=` are mutually exclusive — they pick different
   // 1-click entry points and combining them has no well-defined meaning.
-  // Surface this on the page rather than picking one silently so the
-  // dapp gets a clear signal to fix its sign-in URL.
+  // The layout intercepts this case at `hasError` time and renders the
+  // channel-error view, so we just need to bail out of the per-page
+  // flow selection here. Returning `flow: "normal"` is harmless — the
+  // page never renders when `hasError` is true.
   if (issuer !== null && ssoDomain !== null) {
-    return {
-      flow: "error" as const,
-      reason: "conflicting-params" as const,
-    };
+    return { flow: "normal" as const };
   }
 
   if (issuer !== null) {

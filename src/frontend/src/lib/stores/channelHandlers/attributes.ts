@@ -542,6 +542,9 @@ export const handleIcrc3OneClickSsoAttributes =
 
       // Filter to keys the canister actually has — the user may have
       // signed in with a subset of the allowlist (e.g. no email claim).
+      // `list_available_attributes` covers both `openid:<issuer>` and
+      // `sso:<domain>` scopes (`verified_email` is omitted under
+      // `sso:` because the canister can't certify it there).
       const available = await authenticated.actor
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
