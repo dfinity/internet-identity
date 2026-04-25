@@ -246,6 +246,115 @@ fn should_get_certified_attributes() {
     );
 }
 
+/// Verifies that the legacy `prepare_attributes` flow rejects `sso:<domain>`
+/// attribute scopes with a `ValidationError`. The legacy flow is deprecated
+/// and new attribute functionality (including SSO) must go through the ICRC-3
+/// flow (`prepare_icrc3_attributes` / `get_icrc3_attributes`).
+///
+/// End-to-end SSO credential creation cannot be exercised from PocketIC
+/// because it relies on HTTP outcalls for two-hop discovery; see the comment
+/// in `integration/config/oidc_configs.rs`. Deeper SSO flows are covered by
+/// the canister unit tests in `src/internet_identity/src/attributes.rs`
+/// (module `sso_attributes_tests`).
+#[test]
+fn legacy_prepare_attributes_rejects_sso_scope() {
+    use internet_identity_interface::internet_identity::types::attributes::PrepareAttributeError;
+
+    let env = env();
+    #[allow(unused_variables)]
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        crate::openid::openid_google_test_data();
+
+    let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+    init_args.openid_configs = Some(vec![OpenIdConfig {
+        name: "Google".into(),
+        logo: "logo".into(),
+        issuer: "https://accounts.google.com".into(),
+        client_id: "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com"
+            .into(),
+        jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+        auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+        auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+        fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+        email_verification: None,
+    }]);
+
+    let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(init_args),
+        1_000_000_000_000_000,
+    );
+    crate::openid::mock_google_certs_response(&env);
+    deploy_archive_via_ii(&env, ii_backend_canister_id);
+
+    let identity_number =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method(
+            &env,
+            ii_backend_canister_id,
+            &test_authn_method,
+        );
+
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    api::openid_credential_add(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )
+    .expect("failed to call openid_credential_add")
+    .expect("openid_credential_add returned an error");
+
+    let origin = "https://some-dapp.com";
+    env.advance_time(Duration::from_secs(15));
+
+    // Mixed request: a supported openid: key and an sso: key — the latter is
+    // not valid for the legacy flow and must cause the whole request to fail.
+    let prepare_request = PrepareAttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attribute_keys: vec![
+            "openid:https://accounts.google.com:email".into(),
+            "sso:beta.dfinity.org:email".into(),
+        ],
+    };
+
+    let prepare_response = api::prepare_attributes(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        prepare_request,
+    )
+    .expect("failed to call prepare_attributes");
+
+    match prepare_response {
+        Err(PrepareAttributeError::ValidationError { problems }) => {
+            assert!(
+                problems.iter().any(|p| p.contains("sso:<domain>")),
+                "expected an sso-scope-rejection message, got {:?}",
+                problems
+            );
+            assert!(
+                problems.iter().any(|p| p.contains("ICRC-3")),
+                "expected rejection to point at the ICRC-3 flow, got {:?}",
+                problems
+            );
+        }
+        Err(other) => panic!(
+            "expected ValidationError rejecting sso scope in legacy flow, got {:?}",
+            other
+        ),
+        Ok(_) => {
+            panic!("expected ValidationError rejecting sso scope in legacy flow, got Ok response")
+        }
+    }
+}
+
 /// Regression test: Microsoft credentials use a template issuer with `{tid}` placeholder.
 /// `get_attributes` must use the template issuer (from the OpenID config) as the scope key,
 /// NOT the resolved issuer (from the JWT `iss` claim with the actual tenant ID).

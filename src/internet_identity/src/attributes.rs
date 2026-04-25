@@ -29,6 +29,14 @@ fn expiration_timestamp_ns(issued_at_timestamp_ns: Timestamp) -> Timestamp {
 }
 
 impl Anchor {
+    /// **Deprecated.** Legacy attribute-sharing flow — paired with
+    /// [`Anchor::prepare_attributes`] and [`Anchor::list_available_attributes`].
+    /// New functionality must go through the ICRC-3 flow
+    /// ([`Anchor::prepare_icrc3_attributes`] / [`Anchor::get_icrc3_attributes`])
+    /// which is the path the project is evolving. This legacy flow only
+    /// supports the `openid:<issuer>` scope; `sso:<domain>` requests are
+    /// rejected at the request-validation boundary (see
+    /// `LEGACY_SSO_SCOPE_REJECTION` in the interface crate).
     pub fn get_attributes(
         &self,
         mut attributes: BTreeMap<Option<AttributeScope>, BTreeSet<Attribute>>,
@@ -39,23 +47,25 @@ impl Anchor {
         let seed = account.calculate_seed();
         let domain = ATTRIBUTES_CERTIFICATION_DOMAIN;
 
-        // Process scope `openid` ...
-        let openid_certified_attributes = state::assets_and_signatures(|certified_assets, sigs| {
+        let certified_attributes = state::assets_and_signatures(|certified_assets, sigs| {
             self.openid_credentials
                 .iter()
                 .flat_map(|openid_credential| {
-                    // It is important here to rely on the issuer ID as opposed to `openid_credential.iss`
-                    // becasue, e.g., for Microsoft accounts, the issuer has a tenant ID parameter
-                    // which should *not* be instantiated for a general Microsoft attribute scope.
-                    let Some(issuer) = openid_credential.config_issuer() else {
-                        ic_cdk::println!(
-                            "No matching OpenID provider for issuer: {}, skipping credential",
-                            openid_credential.iss
-                        );
-                        return BTreeSet::new();
+                    // Legacy flow: only credentials addressable under
+                    // `openid:<issuer>` are served here. SSO-sourced
+                    // credentials (matched to a `DiscoverableProvider`) are
+                    // skipped — they are routed through the ICRC-3 flow.
+                    let scope = match openid_credential.matched_attribute_scope() {
+                        Some(scope @ AttributeScope::OpenId { .. }) => Some(scope),
+                        Some(AttributeScope::Sso { .. }) => return BTreeSet::new(),
+                        None => {
+                            ic_cdk::println!(
+                                "No matching OpenID provider for issuer: {}, skipping credential",
+                                openid_credential.iss
+                            );
+                            return BTreeSet::new();
+                        }
                     };
-
-                    let scope = Some(AttributeScope::OpenId { issuer });
 
                     let Some(attributes_to_fetch) = attributes.remove(&scope) else {
                         return BTreeSet::new();
@@ -91,15 +101,23 @@ impl Anchor {
         });
 
         CertifiedAttributes {
-            certified_attributes: openid_certified_attributes,
+            certified_attributes,
             expires_at_timestamp_ns,
         }
     }
 
-    /// Processes `requested_attributes` for all attribute scopes, prepares signatures for
-    /// the (attribute_key, attribute_value) pairs that can be fulfilled for this (anchor, account).
+    /// **Deprecated.** Legacy attribute-sharing flow — see
+    /// [`Anchor::get_attributes`] for the full context. Only supports the
+    /// `openid:<issuer>` scope; `sso:<domain>` requests are rejected at the
+    /// request-validation boundary. New functionality goes through the
+    /// ICRC-3 flow.
     ///
-    /// Returns the list of attribute keys certified with expiry `now_timestamp_ns + ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS`.
+    /// Processes `requested_attributes` for all openid scopes, prepares
+    /// signatures for the `(attribute_key, attribute_value)` pairs that can
+    /// be fulfilled for this (anchor, account).
+    ///
+    /// Returns the list of attribute keys certified with expiry
+    /// `now_timestamp_ns + ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS`.
     pub fn prepare_attributes(
         &self,
         mut requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
@@ -108,7 +126,6 @@ impl Anchor {
     ) -> Vec<Attribute> {
         let mut attributes = Vec::new();
 
-        // Process scope `openid` ...
         let mut openid_attributes_to_certify =
             self.prepare_openid_attributes(&mut requested_attributes);
 
@@ -137,6 +154,11 @@ impl Anchor {
     /// for which we have values in our OpenID credentials' JWT.
     ///
     /// `requested_attributes` is mutated to remove the attributes for which values were found.
+    ///
+    /// SSO-sourced credentials (matched to a `DiscoverableProvider`) are
+    /// skipped as a defense-in-depth measure; the request validator rejects
+    /// `sso:<domain>` scopes before they reach this function, but the filter
+    /// keeps exclusivity local to the extraction step as well.
     fn prepare_openid_attributes(
         &self,
         requested_attributes: &mut BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
@@ -144,10 +166,11 @@ impl Anchor {
         self.openid_credentials
             .iter()
             .filter_map(|openid_credential| {
-                // E.g., `openid:https://accounts.google.com`
-                let scope = Some(AttributeScope::OpenId {
-                    issuer: openid_credential.config_issuer()?,
-                });
+                // Only credentials that resolve to `openid:<issuer>` participate.
+                let scope = match openid_credential.matched_attribute_scope()? {
+                    scope @ AttributeScope::OpenId { .. } => Some(scope),
+                    AttributeScope::Sso { .. } => return None,
+                };
 
                 // Why we do not include `sub` / `aud` in the map lookup key:
                 // --------------------------------------------------------------
@@ -272,10 +295,17 @@ impl Anchor {
         for spec in &attribute_specs {
             match &spec.key.scope {
                 Some(AttributeScope::OpenId { issuer }) => {
-                    let credential = self
-                        .openid_credentials
-                        .iter()
-                        .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()));
+                    // Exclusivity: SSO-sourced credentials are addressable only
+                    // via `sso:<domain>`. `matched_attribute_scope()` returns
+                    // `OpenId { .. }` only for non-discoverable providers, so a
+                    // single lookup per credential suffices (vs. separate
+                    // `discovery_domain()` + `config_issuer()` calls).
+                    let credential = self.openid_credentials.iter().find(|c| {
+                        c.matched_attribute_scope()
+                            == Some(AttributeScope::OpenId {
+                                issuer: issuer.clone(),
+                            })
+                    });
 
                     let Some(credential) = credential else {
                         problems.push(format!("No credential found for issuer: {}", issuer));
@@ -308,6 +338,66 @@ impl Anchor {
                     }
 
                     // Compute the certified key.
+                    let certified_key = if spec.omit_scope {
+                        spec.key.attribute_name.to_string()
+                    } else {
+                        spec.key.to_string()
+                    };
+
+                    match certified_pairs.entry(certified_key) {
+                        std::collections::btree_map::Entry::Occupied(entry) => {
+                            problems.push(format!(
+                                "Duplicate certified attribute key '{}' derived from spec {}",
+                                entry.key(),
+                                spec.key
+                            ));
+                        }
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            entry.insert(Icrc3Value::Text(stored));
+                        }
+                    }
+                }
+                Some(AttributeScope::Sso { domain }) => {
+                    let credential = self.openid_credentials.iter().find(|c| {
+                        c.matched_attribute_scope()
+                            == Some(AttributeScope::Sso {
+                                domain: domain.clone(),
+                            })
+                    });
+
+                    let Some(credential) = credential else {
+                        problems.push(format!("No credential found for sso domain: {}", domain));
+                        continue;
+                    };
+
+                    // `verified_email` is intentionally not supported under `sso:`;
+                    // surface it here as "not available" (ICRC-3 requires explicit
+                    // presence).
+                    let stored_value = match spec.key.attribute_name {
+                        AttributeName::Email => credential.get_email(),
+                        AttributeName::Name => credential.get_name(),
+                        AttributeName::VerifiedEmail => None,
+                    };
+
+                    let Some(stored) = stored_value else {
+                        problems.push(format!(
+                            "Attribute {} not available for sso domain {}",
+                            spec.key.attribute_name, domain
+                        ));
+                        continue;
+                    };
+
+                    // If a value was provided, validate it matches.
+                    if let Some(ref expected_value) = spec.value {
+                        if expected_value.as_slice() != stored.as_bytes() {
+                            problems.push(format!(
+                                "Attribute value mismatch for {}: provided value does not match stored value",
+                                spec.key
+                            ));
+                            continue;
+                        }
+                    }
+
                     let certified_key = if spec.omit_scope {
                         spec.key.attribute_name.to_string()
                     } else {
@@ -385,12 +475,20 @@ impl Anchor {
         Ok(GetIcrc3AttributeResponse { signature })
     }
 
-    /// Lists available attribute key/value pairs from stored OpenID credentials.
+    /// **Deprecated.** Legacy attribute-sharing flow — see
+    /// [`Anchor::get_attributes`] for the full context. New functionality goes
+    /// through the ICRC-3 flow.
     ///
-    /// If `requested` is `None`, returns all available attributes.
-    /// If `requested` is `Some(keys)`, returns only attributes matching the given keys.
-    /// Unscoped keys (e.g., `"email"`) match all scopes; scoped keys match exactly.
-    /// Response keys are always fully scoped.
+    /// Lists available `openid:<issuer>:<attr>` key/value pairs from stored
+    /// OpenID credentials. SSO-sourced credentials (matched to a
+    /// `DiscoverableProvider`) are not listed here — they're addressable only
+    /// through the ICRC-3 flow, and `sso:<domain>` filter keys are rejected at
+    /// the request-validation boundary.
+    ///
+    /// If `requested` is `None`, returns all available openid attributes.
+    /// If `requested` is `Some(keys)`, returns only attributes matching the
+    /// given keys. Unscoped keys (e.g., `"email"`) match all openid scopes;
+    /// scoped keys match exactly. Response keys are always fully scoped.
     pub fn list_available_attributes(
         &self,
         requested: Option<Vec<AttributeKey>>,
@@ -399,10 +497,12 @@ impl Anchor {
         let mut result = BTreeMap::new();
 
         for credential in &self.openid_credentials {
-            let Some(issuer) = credential.config_issuer() else {
-                continue;
+            // Only openid: credentials are listed here; SSO-sourced credentials
+            // are routed through the ICRC-3 flow.
+            let scope = match credential.matched_attribute_scope() {
+                Some(scope @ AttributeScope::OpenId { .. }) => scope,
+                Some(AttributeScope::Sso { .. }) | None => continue,
             };
-            let scope = AttributeScope::OpenId { issuer };
 
             for &attr_name in all_attribute_names {
                 let value = match attr_name {
@@ -1994,6 +2094,253 @@ mod tests {
             }]));
 
             pretty_assert_eq!(result.len(), 0);
+        }
+    }
+
+    /// Tests the `sso:<domain>` attribute scope added alongside `openid:<issuer>`.
+    ///
+    /// These tests exercise credentials whose matched provider is a
+    /// `DiscoverableProvider` (SSO via two-hop discovery). We shortcut the two
+    /// HTTP discovery hops via `generic::set_discovered_state_for_test`, which
+    /// writes into the same shared `Rc<RefCell<…>>` cells that `DiscoverableProvider`
+    /// holds — after the call, the provider behaves as if discovery had run.
+    mod sso_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::DiscoverableOidcConfig;
+
+        const SSO_DOMAIN: &str = "test-sso.example";
+        const SSO_ISSUER: &str = "https://idp.example/issuer";
+        const SSO_CLIENT_ID: &str = "sso-client-id";
+        const SUB: &str = "sso-user-789";
+
+        fn setup_sso_provider() {
+            crate::openid::setup_oidc(vec![DiscoverableOidcConfig {
+                discovery_domain: SSO_DOMAIN.to_string(),
+            }]);
+            crate::openid::generic::set_discovered_state_for_test(
+                SSO_DOMAIN,
+                SSO_ISSUER,
+                SSO_CLIENT_ID,
+            );
+        }
+
+        fn sso_credential_with(metadata: HashMap<String, MetadataEntryV2>) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: SSO_ISSUER.to_string(),
+                sub: SUB.to_string(),
+                aud: SSO_CLIENT_ID.to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            }
+        }
+
+        fn anchor_with_openid_credentials(credentials: Vec<OpenIdCredential>) -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = credentials;
+            anchor
+        }
+
+        fn sso_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::Sso {
+                domain: SSO_DOMAIN.to_string(),
+            })
+        }
+
+        fn openid_sso_issuer_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::OpenId {
+                issuer: SSO_ISSUER.to_string(),
+            })
+        }
+
+        fn email_and_name_metadata() -> HashMap<String, MetadataEntryV2> {
+            HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@test-sso.example".to_string()),
+                ),
+                (
+                    "name".to_string(),
+                    MetadataEntryV2::String("SSO User".to_string()),
+                ),
+            ])
+        }
+
+        // Sanity: discovery_domain() returns Some for SSO-matched credentials.
+        #[test]
+        fn credential_reports_discovery_domain() {
+            setup_sso_provider();
+            let credential = sso_credential_with(email_and_name_metadata());
+            pretty_assert_eq!(credential.discovery_domain(), Some(SSO_DOMAIN.to_string()),);
+        }
+
+        // `matched_attribute_scope()` returns `Sso { .. }` for an
+        // SSO-sourced credential (exclusivity is resolved with a single
+        // `with_provider` lookup).
+        #[test]
+        fn matched_attribute_scope_is_sso_for_discoverable_credential() {
+            setup_sso_provider();
+            let credential = sso_credential_with(email_and_name_metadata());
+            pretty_assert_eq!(
+                credential.matched_attribute_scope(),
+                Some(AttributeScope::Sso {
+                    domain: SSO_DOMAIN.to_string(),
+                }),
+            );
+        }
+
+        // Exclusivity: the legacy `prepare_openid_attributes` ignores
+        // SSO-sourced credentials. (The request validator now also rejects
+        // `sso:<domain>` scoped keys before they reach here — this test
+        // covers the defense-in-depth filter inside the extraction step.)
+        #[test]
+        fn prepare_openid_skips_sso_credential() {
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            // Ask for `openid:<discovered_issuer>:email` — this would match the
+            // credential if exclusivity were not enforced.
+            let mut requested: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
+                BTreeMap::from([(
+                    openid_sso_issuer_scope(),
+                    BTreeSet::from([AttributeName::Email]),
+                )]);
+
+            let result = anchor.prepare_openid_attributes(&mut requested);
+
+            pretty_assert_eq!(
+                result.len(),
+                0,
+                "openid scope must not expose SSO-sourced credentials"
+            );
+            assert!(
+                !requested.is_empty(),
+                "requested scope must remain untouched since no openid credential matched"
+            );
+        }
+
+        // The legacy `list_available_attributes` omits SSO-sourced credentials
+        // entirely — they're addressable only through the ICRC-3 flow.
+        #[test]
+        fn list_available_attributes_omits_sso_credential() {
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+
+            let listed = anchor.list_available_attributes(None);
+
+            pretty_assert_eq!(
+                listed.len(),
+                0,
+                "sso credential should not be listed via the legacy flow"
+            );
+        }
+
+        // ICRC-3 exclusivity: `sso:<domain>:verified_email` surfaces as
+        // AttributeMismatch (unlike the silent-drop in `prepare_sso_attributes`),
+        // and `openid:<discovered_issuer>:email` is rejected for an SSO-sourced
+        // credential. We intentionally do not exercise the ICRC-3 success path
+        // here — that path reaches `Account::calculate_seed()` which requires
+        // canister state (salt) unavailable in unit tests, matching the
+        // approach taken by the existing ICRC-3 tests in this module.
+        #[test]
+        fn icrc3_sso_verified_email_is_not_available() {
+            use internet_identity_interface::internet_identity::types::attributes::{
+                PrepareIcrc3AttributeError, ValidatedAttributeSpec,
+            };
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+            let account = crate::storage::account::Account::new(
+                ANCHOR_NUMBER,
+                "https://dapp.com".to_string(),
+                None,
+                None,
+            );
+
+            let verified_spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: sso_scope(),
+                    attribute_name: AttributeName::VerifiedEmail,
+                },
+                value: None,
+                omit_scope: false,
+            };
+            let res = anchor.prepare_icrc3_attributes(
+                vec![verified_spec],
+                vec![0u8; 32],
+                "https://rp.example".to_string(),
+                1_000_000_000,
+                account,
+            );
+            match res {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems.iter().any(|p| p.contains("not available")),
+                        "expected 'not available' problem, got {:?}",
+                        problems
+                    );
+                }
+                other => panic!(
+                    "expected AttributeMismatch for verified_email under sso:, got {:?}",
+                    other
+                ),
+            }
+        }
+
+        #[test]
+        fn icrc3_openid_scope_cannot_address_sso_credential() {
+            use internet_identity_interface::internet_identity::types::attributes::{
+                PrepareIcrc3AttributeError, ValidatedAttributeSpec,
+            };
+            setup_sso_provider();
+            let anchor =
+                anchor_with_openid_credentials(vec![
+                    sso_credential_with(email_and_name_metadata()),
+                ]);
+            let account = crate::storage::account::Account::new(
+                ANCHOR_NUMBER,
+                "https://dapp.com".to_string(),
+                None,
+                None,
+            );
+
+            // `openid:<discovered_issuer>:email` on an SSO-sourced credential
+            // must be rejected (exclusivity).
+            let openid_spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: openid_sso_issuer_scope(),
+                    attribute_name: AttributeName::Email,
+                },
+                value: None,
+                omit_scope: false,
+            };
+            let res = anchor.prepare_icrc3_attributes(
+                vec![openid_spec],
+                vec![0u8; 32],
+                "https://rp.example".to_string(),
+                1_000_000_000,
+                account,
+            );
+            match res {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems.iter().any(|p| p.contains("No credential found")),
+                        "expected 'No credential found' problem, got {:?}",
+                        problems
+                    );
+                }
+                other => panic!(
+                    "expected AttributeMismatch for openid: on SSO-sourced credential, got {:?}",
+                    other
+                ),
+            }
         }
     }
 }
