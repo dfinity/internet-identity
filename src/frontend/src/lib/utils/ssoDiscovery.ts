@@ -72,13 +72,24 @@ export interface SsoDiscoveryResult {
    */
   domain: string;
   clientId: string;
+  /**
+   * Human-readable name for the SSO, as published by the domain at hop-1
+   * in the optional `name` field. Used by the consent UI to render
+   * `sso:<domain>:<key>` attribute rows with a friendly prefix
+   * (e.g. "DFINITY email:"); falls back to `domain` when absent.
+   */
+  name?: string;
   discovery: OidcDiscoveryDocument;
 }
 
-/** Response shape of `https://{domain}/.well-known/ii-openid-configuration`. */
+/** Response shape of `https://{domain}/.well-known/ii-openid-configuration`.
+ *
+ * `name` is optional: legacy / minimal deployments don't publish one
+ * and the FE falls back to the bare discovery domain for labelling. */
 const IIOpenIdConfigurationSchema = z.object({
   client_id: z.string().min(1),
   openid_configuration: z.string().min(1),
+  name: z.string().min(1).optional(),
 });
 type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
 
@@ -470,6 +481,7 @@ export const discoverSsoConfig = async (
       return {
         domain: validatedDomain,
         clientId: cachedIIConfig.config.client_id,
+        name: cachedIIConfig.config.name,
         discovery: cachedProvider.document,
       };
     }
@@ -542,6 +554,7 @@ export const discoverSsoConfig = async (
       return {
         domain: validatedDomain,
         clientId: iiConfig.client_id,
+        name: iiConfig.name,
         discovery: cachedProviderDoc.document,
       };
     }
@@ -565,6 +578,7 @@ export const discoverSsoConfig = async (
     return {
       domain: validatedDomain,
       clientId: iiConfig.client_id,
+      name: iiConfig.name,
       discovery: providerDoc,
     };
   } finally {

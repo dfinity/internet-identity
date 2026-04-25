@@ -166,6 +166,19 @@ test.describe("Authorize via SSO", () => {
       // 1-click is intentionally not exercised here. The user has no
       // pre-existing credential for this issuer, so the wizard takes
       // the consent path with all defaults selected.
+      //
+      // The SSO consent rows are labelled with the published SSO name
+      // (`Test SSO 11107`, served by `test_openid_provider`'s hop-1
+      // response) — verify both the email and name rows render that
+      // prefix instead of the bare-domain fallback. This exercises the
+      // consent-screen frontend discovery: even though we authenticated
+      // through SSO here, the lookup runs independently per domain.
+      await expect(
+        authorizePage.page.getByText(`Test SSO ${SSO_OPENID_PORT} email:`),
+      ).toBeVisible();
+      await expect(
+        authorizePage.page.getByText(`Test SSO ${SSO_OPENID_PORT} name:`),
+      ).toBeVisible();
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();

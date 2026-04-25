@@ -63,7 +63,11 @@ app.post("/account/:id/claims", express.json(), async (req, res) => {
 app.get("/.well-known/ii-openid-configuration", (req, res) => {
   res.status(200).json({
     client_id: "internet_identity",
-    openid_configuration: `http://localhost:${port}/.well-known/openid-configuration`
+    openid_configuration: `http://localhost:${port}/.well-known/openid-configuration`,
+    // Optional human-readable SSO name. Surfaced in the II consent
+    // screen as `<name> email:` etc., so e2e tests can verify the
+    // prefix branch instead of the bare-domain fallback.
+    name: `Test SSO ${port}`
   });
 });
 
