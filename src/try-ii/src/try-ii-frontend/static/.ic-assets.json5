@@ -4,7 +4,7 @@
 
     // Provides a base set of security headers that will work for most dapps.
     // Any headers you manually specify will override the headers provided by the policy.
-    // See 'dfx info security-policy' to see the policy and for advice on how to harden the headers.
+    // See https://cli.internetcomputer.org for the policy and for advice on how to harden the headers.
     // Once you improved the headers for your dapp, set the security policy to "hardened" to disable the warning.
     // Options are: "hardened" | "standard" | "disabled".
     security_policy: "standard",

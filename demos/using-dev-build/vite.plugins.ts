@@ -3,15 +3,15 @@ import { join } from "path";
 
 // npm run dev = local
 // npm run build = local
-// dfx deploy = local
-// dfx deploy --network ic = ic
-const network = process.env.DFX_NETWORK ?? ("local" as const);
+// icp deploy = local
+// icp deploy -e ic = ic
+const network = process.env.ICP_NETWORK ?? ("local" as const);
 
 export const readCanisterIds = (): Record<string, string> => {
   const canisterIdsJsonFile =
     network === "ic"
-      ? join(process.cwd(), "canister_ids.json")
-      : join(process.cwd(), ".dfx", "local", "canister_ids.json");
+      ? join(process.cwd(), ".icp", "data", "mappings", "ic.ids.json")
+      : join(process.cwd(), ".icp", "cache", "mappings", "local.ids.json");
 
   try {
     type Details = {

@@ -11,7 +11,7 @@
 #   — everything else is derived from the four shared values (BE_ID, FE_ID,
 #   BE_URL, FE_URL) or left opaque via opt null to preserve prior state.
 # - Install-arg builders that emit Candid text for each canister.
-# - A dfx install runner that honours --dry-run.
+# - An icp install runner that honours --dry-run.
 #
 # Globals set by parse_common_args (and expected by later helpers):
 #   STAGING_NAME       : "a" | "b" | "c" | "custom"
@@ -123,7 +123,7 @@ Common options:
   --end <front|back>        Which end(s) to deploy (can be repeated)
   -fe                       Shortcut for --end front
   -be                       Shortcut for --end back
-  --dry-run                 Print dfx install commands instead of running them
+  --dry-run                 Print icp canister install commands instead of running them
   --no-checks               Skip reachability and consistency checks
   -h, --help                Show this help
 EOF
@@ -541,10 +541,10 @@ EOF
 }
 
 # -------------------------
-# dfx install runner (honours DRY_RUN)
+# icp install runner (honours DRY_RUN)
 # -------------------------
 # Args: <canister_id> <wasm_path> <install_arg_candid_text>
-run_dfx_install() {
+run_icp_install() {
     local canister_id="$1"
     local wasm_path="$2"
     local install_arg="$3"
@@ -555,13 +555,13 @@ run_dfx_install() {
     fi
 
     local cmd=(
-        dfx canister
-            --network "$IC_NETWORK"
-            --wallet "$WALLET_CANISTER_ID"
+        icp canister
             install "$canister_id"
+            -e "$IC_NETWORK"
+            --proxy "$WALLET_CANISTER_ID"
             --mode upgrade
             --wasm "$wasm_path"
-            --argument "$install_arg"
+            --args "$install_arg"
     )
 
     if [ "$DRY_RUN" = true ]; then

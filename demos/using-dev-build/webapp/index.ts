@@ -30,9 +30,9 @@ let authClient: AuthClient;
 document.body.onload = async () => {
   let iiUrl;
 
-  if (process.env.DFX_NETWORK === "local") {
+  if (process.env.ICP_NETWORK === "local") {
     iiUrl = local_ii_url;
-  } else if (process.env.DFX_NETWORK === "ic") {
+  } else if (process.env.ICP_NETWORK === "ic") {
     iiUrl = `https://${process.env.INTERNET_IDENTITY_CANISTER_ID}.ic0.app`;
   } else {
     // fall back to local

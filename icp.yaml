@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.2.0/docs/schemas/icp-yaml-schema.json
+
+canisters:
+  - name: internet_identity_frontend
+    build:
+      steps:
+        - type: script
+          commands:
+            - "II_FETCH_ROOT_KEY=1 scripts/build --frontend"
+            - "cp internet_identity_frontend.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
+    init_args:
+      path: src/internet_identity_frontend/local_test_arg.did
+
+  - name: internet_identity
+    build:
+      steps:
+        - type: script
+          commands:
+            - "II_FETCH_ROOT_KEY=1 scripts/build"
+            - "cp internet_identity.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
+    init_args: "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}; openid_google = opt opt record { client_id = \"775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com\" }; related_origins = opt vec { \"https://identity.internetcomputer.org\"; \"https://identity.ic0.app\" } })"
+
+  - name: test_app
+    build:
+      steps:
+        - type: script
+          commands:
+            - "demos/test-app/build.sh"
+            - "cp demos/test-app/test_app.wasm \"$ICP_WASM_OUTPUT_PATH\""
+
+  - name: issuer
+    build:
+      steps:
+        - type: script
+          commands:
+            - "demos/vc_issuer/build.sh"
+            - "cp demos/vc_issuer/vc_demo_issuer.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
+    sync:
+      steps:
+        - type: script
+          command: "demos/vc_issuer/provision"

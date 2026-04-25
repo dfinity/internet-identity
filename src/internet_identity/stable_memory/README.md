@@ -32,30 +32,30 @@ These backup memory files are generated using the `canister_tests` infrastructur
     ```
 ### Using the Local Replica
 
-The stable memory can also be copied from the local replica from the following path `DFX_STATE/state/replicated_state/node-100/state/tip/canister_states/CANISTER_ID/stable_memory.bin`, where DFX_STATE expands to:
-* on mac os: `~/Library/Application Support/org.dfinity.dfx/network/local`
-* on linux: `$HOME/.local/share/dfx/network/local`
-* for legacy projects where dfx.json defines the local network (relative to `dfx.json`): `dfx/network/local`
+The stable memory can also be copied from the local replica from the following path `ICP_CLI_STATE/state/replicated_state/node-100/state/tip/canister_states/CANISTER_ID/stable_memory.bin`, where ICP_CLI_STATE expands to:
+* on mac os: `~/Library/Application Support/org.dfinity.icp-cli/network/local`
+* on linux: `$HOME/.local/share/icp-cli/network/local`
+* for legacy projects where icp.yaml defines the local network (relative to `icp.yaml`): `.icp/network/local`
 
-## Registering the DFX Key as II Device
+## Registering the ICP-CLI Key as II Device
 
-Registering the `dfx` public key in II can be useful for testing as certain calls (e.g. `register`) require the `caller` to match the submitted public keys.
+Registering the `icp` public key in II can be useful for testing as certain calls (e.g. `register`) require the `caller` to match the submitted public keys.
 
-To register dfx as a device:
+To register icp-cli as a device:
 1. Export the key in the DER file format:
     ```bash
-    dfx identity export IDENTITY | openssl ec -out FILE_NAME -pubout -outform der
+    icp identity export IDENTITY | openssl ec -out FILE_NAME -pubout -outform der
     ```
-2. Make sure that the current `dfx` identity matches the one exported in step 1
+2. Make sure that the current `icp-cli` identity matches the one exported in step 1
     ```bash
-    dfx identity use IDENTITY
+    icp identity default IDENTITY
     ```
-3. Register an anchor using `dfx` (assuming DUMMY_CAPTCHA, otherwise the actual challenge `chars` have to be submitted)
+3. Register an anchor using `icp` (assuming DUMMY_CAPTCHA, otherwise the actual challenge `chars` have to be submitted)
     ```bash
-    challenge_key=$(dfx canister call II_CANISTER_ID create_challenge --candid src/internet_identity/internet_identity.did | sed -n 's/.*challenge_key[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p')
+    challenge_key=$(icp canister call II_CANISTER_ID create_challenge --candid src/internet_identity/internet_identity.did | sed -n 's/.*challenge_key[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p')
     pubkey_blob=$(hexdump -ve '1/1 "%.2x"' DER_PUBKEY_FILE_NAME | sed 's/../\\&/g')
-    dfx canister call II_CANISTER_ID \
-        register "(record{pubkey=blob \"$pubkey_blob\";alias=\"dfx test key\";purpose=variant{authentication};key_type=variant{unknown};protection=variant{unprotected};},record{key=\"$challenge_key\";chars=\"a\"})" \
+    icp canister call II_CANISTER_ID \
+        register "(record{pubkey=blob \"$pubkey_blob\";alias=\"icp-cli test key\";purpose=variant{authentication};key_type=variant{unknown};protection=variant{unprotected};},record{key=\"$challenge_key\";chars=\"a\"})" \
         --candid src/internet_identity/internet_identity.did
     ```
-**Note:** It is recommended to do this with an identity that is stored _unencrypted_. Otherwise, the passphrase has to be entered for every single `dfx` command.
+**Note:** It is recommended to do this with an identity that is stored _unencrypted_. Otherwise, the passphrase has to be entered for every single `icp` command.
