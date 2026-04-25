@@ -259,8 +259,6 @@
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
       resumeOpenId();
-    } else if (data.flow === "error") {
-      // Render-only path; nothing to kick off.
     } else {
       authorizationStore.setFlow({ type: "regular" });
     }
