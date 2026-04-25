@@ -27,7 +27,11 @@ export const test = base.extend<{
    */
   openSsoPopup: (authPage: Page, domain?: string) => Promise<Page>;
 }>({
-  openSsoPopup: async (_, use) => {
+  // Playwright requires fixture functions to start with an object
+  // destructuring pattern even when nothing is consumed; the empty
+  // pattern would normally trip the no-empty-pattern lint rule.
+  // eslint-disable-next-line no-empty-pattern
+  openSsoPopup: async ({}, use) => {
     await use(async (authPage: Page, domain: string = SSO_DISCOVERY_DOMAIN) => {
       await authPage.getByRole("button", { name: "Continue with SSO" }).click();
       await authPage

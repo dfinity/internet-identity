@@ -73,12 +73,6 @@ const isOneClickOpenIdKey = (key: string, configIssuer: string): boolean =>
 const isOneClickSsoKey = (key: string, domain: string): boolean =>
   key === `sso:${domain}:name` || key === `sso:${domain}:email`;
 
-/** Filters attribute keys to the 1-click OpenID auto-approve allowlist. */
-const filterOneClickOpenIdKeys = (
-  keys: string[],
-  configIssuer: string,
-): string[] => keys.filter((key) => isOneClickOpenIdKey(key, configIssuer));
-
 /** Resolve a single requested key against available attributes.
  *  An exact match (e.g. `openid:google:email` requested + available) yields
  *  a single scoped option. Otherwise the request is treated as unscoped
@@ -209,9 +203,8 @@ export const handleLegacyAttributes =
     );
 
     // Legacy attributes only certify the 1-click OpenID allowlist.
-    const oneClickKeys = filterOneClickOpenIdKeys(
-      paramsResult.data.attributes,
-      configIssuer,
+    const oneClickKeys = paramsResult.data.attributes.filter((key) =>
+      isOneClickOpenIdKey(key, configIssuer),
     );
 
     try {
