@@ -483,8 +483,15 @@ jobs:
     env:
       # Suffix used for tagging artifacts
       artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
-      # OpenID provider instance ports (see /src/test_openid_provider)
-      openid_providers: "11105 11106"
+      # OpenID provider instance ports (see /src/test_openid_provider).
+      # 11105 / 11106 back the direct OpenID test fixtures; 11107 backs
+      # the SSO discovery (two-hop) test fixture, which goes through
+      # `add_discoverable_oidc_config` and the canister allowlist.
+      openid_providers: "11105 11106 11107"
+      # SSO discovery domains we ship to the canister at install time —
+      # the dedicated SSO test port. Other ports are reachable directly
+      # via `openid_configs` and don't need to be on the SSO allowlist.
+      sso_discoverable_domains: "localhost:11107"
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
@@ -556,7 +563,12 @@ jobs:
       - name: Deploy canisters
         run: |
           # NOTE: icp canister install will run the sync steps from icp.yaml
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          # Build a Candid `vec text` literal from the space-separated env var.
+          sso_domains_vec=""
+          for domain in ${{ env.sso_discoverable_domains }}; do
+            sso_domains_vec="$sso_domains_vec\"$domain\"; "
+          done
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_discoverable_domains = opt vec { $sso_domains_vec } })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
           icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           icp canister install test_app --wasm demos/test-app/test_app.wasm

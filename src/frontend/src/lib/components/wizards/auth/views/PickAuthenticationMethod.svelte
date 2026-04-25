@@ -86,8 +86,10 @@
       {/each}
       <!--
         SSO entry is always rendered. Registration is enforced on the
-        backend (via the `ALLOWED_DISCOVERY_DOMAINS` canary allowlist on
-        `add_discoverable_oidc_config`), so unregistered domains surface as
+        backend by the `sso_discoverable_domains` allowlist (init arg,
+        falling back to the `is_production`-keyed defaults in
+        `allowed_discovery_domains`) checked inside
+        `add_discoverable_oidc_config`. Unregistered domains surface as
         an error inside the SignInWithSso screen rather than being gated
         here — we keep this option visible so users know the mechanism
         exists.

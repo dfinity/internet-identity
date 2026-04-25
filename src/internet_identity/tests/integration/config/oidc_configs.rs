@@ -4,12 +4,13 @@ use internet_identity_interface::internet_identity::types::{
     DiscoverableOidcConfig, InternetIdentityInit,
 };
 
-/// Canary allowlist on the non-production branch (default install, i.e.
-/// `is_production == None`). Keep in sync with
+/// Built-in fallback when neither `is_production` nor
+/// `sso_discoverable_domains` is set in the init args. Keep in sync with
 /// `openid::generic::allowed_discovery_domains()`.
 const BETA_ALLOWED_DOMAIN: &str = "beta.dfinity.org";
 
-/// Canary allowlist on the production branch. Keep in sync with
+/// Built-in fallback for production installs when no explicit
+/// `sso_discoverable_domains` is set. Keep in sync with
 /// `openid::generic::allowed_discovery_domains()`.
 const PROD_ALLOWED_DOMAIN: &str = "dfinity.org";
 
@@ -161,4 +162,91 @@ fn should_allow_only_production_domain_on_production_canister() {
     let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
     assert_eq!(discovered.len(), 1);
     assert_eq!(discovered[0].discovery_domain, PROD_ALLOWED_DOMAIN);
+}
+
+/// `sso_discoverable_domains` (when set) replaces the built-in defaults.
+/// This is what e2e tests rely on to register `localhost:11107`, and what
+/// production installs will use to widen the canary list once SSO exits
+/// the proof-of-concept phase.
+#[test]
+fn should_honour_explicit_sso_discoverable_domains() {
+    let env = env();
+    let config = InternetIdentityInit {
+        sso_discoverable_domains: Some(vec!["localhost:11107".into(), "acme.example".into()]),
+        ..Default::default()
+    };
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    // Built-in default (`beta.dfinity.org`) is no longer accepted — the
+    // explicit list replaces it rather than extending it.
+    let rejected = api::add_discoverable_oidc_config(
+        &env,
+        canister_id,
+        DiscoverableOidcConfig {
+            discovery_domain: BETA_ALLOWED_DOMAIN.into(),
+        },
+    );
+    assert!(rejected.is_err());
+
+    // Both explicit entries are accepted.
+    api::add_discoverable_oidc_config(
+        &env,
+        canister_id,
+        DiscoverableOidcConfig {
+            discovery_domain: "localhost:11107".into(),
+        },
+    )
+    .unwrap();
+    api::add_discoverable_oidc_config(
+        &env,
+        canister_id,
+        DiscoverableOidcConfig {
+            discovery_domain: "acme.example".into(),
+        },
+    )
+    .unwrap();
+
+    let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
+    let domains: Vec<String> = discovered
+        .into_iter()
+        .map(|d| d.discovery_domain)
+        .collect();
+    assert_eq!(domains.len(), 2);
+    assert!(domains.contains(&"localhost:11107".to_string()));
+    assert!(domains.contains(&"acme.example".to_string()));
+}
+
+/// Setting `sso_discoverable_domains` overrides `is_production`: even on
+/// a production install, the explicit list is what gates registration.
+#[test]
+fn should_honour_explicit_list_over_is_production() {
+    let env = env();
+    let config = InternetIdentityInit {
+        is_production: Some(true),
+        sso_discoverable_domains: Some(vec!["test.id.ai".into()]),
+        ..Default::default()
+    };
+
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    // Production default (`dfinity.org`) is no longer accepted.
+    let rejected = api::add_discoverable_oidc_config(
+        &env,
+        canister_id,
+        DiscoverableOidcConfig {
+            discovery_domain: PROD_ALLOWED_DOMAIN.into(),
+        },
+    );
+    assert!(rejected.is_err());
+
+    // The explicit entry is accepted.
+    api::add_discoverable_oidc_config(
+        &env,
+        canister_id,
+        DiscoverableOidcConfig {
+            discovery_domain: "test.id.ai".into(),
+        },
+    )
+    .unwrap();
 }

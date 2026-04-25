@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test";
 import { addVirtualAuthenticator, II_URL } from "../utils";
 import { test } from "../fixtures";
+import { SSO_OPENID_PORT } from "../fixtures/sso";
 
 const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";
@@ -225,6 +226,85 @@ test.describe("First visit", () => {
       await page.getByRole("button", { name: "Create identity" }).click();
 
       // Assert that dashboard is shown
+      await page.waitForURL(II_URL + "/manage");
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${name}!`),
+        }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("SSO user with name claim", () => {
+    const name = "įìęèéêêëėįì";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name },
+          },
+        ],
+      },
+    });
+
+    test("Sign up with SSO", async ({
+      page,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // Pick SSO to continue
+      await page.goto(II_URL);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      const popup = await openSsoPopup(page);
+
+      // Sign in on the IdP page (same flow as direct OpenID)
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
+
+      // Assert that dashboard is shown
+      await page.waitForURL(II_URL + "/manage");
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${name}!`),
+        }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("SSO user without name claim", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: {},
+          },
+        ],
+      },
+    });
+
+    test("Sign up with SSO", async ({
+      page,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await page.goto(II_URL);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      const popup = await openSsoPopup(page);
+
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
+
+      const name = "John Doe";
+      await page.getByLabel("Identity name").fill(name);
+      await page.getByRole("button", { name: "Create identity" }).click();
+
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {

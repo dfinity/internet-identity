@@ -237,6 +237,13 @@ pub struct InternetIdentityFrontendArgs {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
+    /// Allowlist of SSO discovery domains. Mirrored to the frontend so
+    /// it can apply the same scheme bypass as the canister: any host on
+    /// this list may publish its discovery endpoints over HTTP, which is
+    /// what makes e2e tests against `http://localhost:11107` work.
+    /// Production deployments leave this list to the strict-HTTPS
+    /// defaults; only blessed loopback entries get the bypass.
+    pub sso_discoverable_domains: Option<Vec<String>>,
 }
 
 /// Init arguments of II which can be supplied on install and upgrade.
@@ -256,6 +263,12 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
+    /// Allowlist of domains that may be registered as discoverable SSO
+    /// providers via `add_discoverable_oidc_config`. When `Some`, this list
+    /// fully replaces the built-in defaults; when `None`, falls back to
+    /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
+    /// keyed off `is_production`.
+    pub sso_discoverable_domains: Option<Vec<String>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,

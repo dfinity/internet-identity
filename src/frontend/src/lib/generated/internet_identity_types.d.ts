@@ -106,9 +106,12 @@ export interface ArchiveInfo {
  */
 export interface AttributeSpec {
   /**
-   * `attribute_scope:attribute_name`
+   * `<attribute_scope>:<attribute_name>` where `<attribute_scope>` is
+   * either `openid:<issuer>` or `sso:<domain>`.
    * 
-   * Example: `openid:https://accounts.google.com:email`
+   * Examples:
+   * - `openid:https://accounts.google.com:email`
+   * - `sso:dfinity.org:email`
    */
   'key' : string,
   /**
@@ -601,6 +604,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -793,6 +800,14 @@ export interface InternetIdentityInit {
    */
   'new_flow_origins' : [] | [Array<string>],
   /**
+   * Allowlist of domains that may be registered as discoverable SSO
+   * providers via `add_discoverable_oidc_config`. When set, fully replaces
+   * the built-in defaults. When unset, falls back to `dfinity.org`
+   * (production) or `beta.dfinity.org` (everything else), keyed off
+   * `is_production`.
+   */
+  'sso_discoverable_domains' : [] | [Array<string>],
+  /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
    * See ArchiveConfig for details.
@@ -867,8 +882,10 @@ export type ListAvailableAttributesError = {
 export interface ListAvailableAttributesRequest {
   /**
    * Optional list of attribute keys to filter by.
-   * Each key is either a fully-scoped key (e.g., "openid:https://accounts.google.com:email")
-   * or an unscoped attribute name (e.g., "email") which matches all scopes.
+   * Each key is either a fully-scoped key (e.g.,
+   * `"openid:https://accounts.google.com:email"` or
+   * `"sso:dfinity.org:email"`) or an unscoped attribute name (e.g.,
+   * `"email"`) which matches all scopes.
    * If not provided, all available attributes are returned.
    */
   'attributes' : [] | [Array<string>],
@@ -988,7 +1005,17 @@ export interface PrepareAttributeRequest {
    */
   'origin' : FrontendHostname,
   /**
-   * The attribute to be prepared.
+   * The attributes to be prepared. Each key has the form
+   * `<scope>:<attribute_name>`, where `<scope>` is either
+   * `openid:<issuer>` (e.g. `openid:https://accounts.google.com:email`)
+   * or `sso:<domain>` (e.g. `sso:dfinity.org:email`).
+   * 
+   * Each linked credential is addressable via exactly one scope:
+   * credentials obtained through a `DiscoverableOidcConfig` (two-hop SSO
+   * discovery) are reachable only via `sso:<domain>`; credentials from
+   * hardcoded OIDC providers (Google, Microsoft, …) are reachable only via
+   * `openid:<issuer>`. Under `sso:` only `email` and `name` are supported;
+   * under `openid:` `email`, `name`, and `verified_email` are supported.
    */
   'attribute_keys' : Array<string>,
   /**

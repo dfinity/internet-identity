@@ -8,6 +8,7 @@ import {
   addVirtualAuthenticator,
 } from "../../utils";
 import { test } from "../../fixtures";
+import { SSO_OPENID_PORT } from "../../fixtures/sso";
 
 const DEFAULT_USER_NAME = "John Doe";
 
@@ -201,6 +202,39 @@ test("Authorize by signing up with OpenID", async ({
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
+  });
+});
+
+test.describe("Sign up with SSO", () => {
+  test.use({
+    openIdConfig: {
+      defaultPort: SSO_OPENID_PORT,
+      createUsers: [
+        {
+          claims: { name: DEFAULT_USER_NAME },
+        },
+      ],
+    },
+  });
+
+  test("Authorize by signing up with SSO", async ({
+    page,
+    openIdUsers,
+    openSsoPopup,
+    signInWithOpenId,
+  }) => {
+    await authorize(page, async (authPage) => {
+      // Pick SSO entry, type the discovery domain, wait for two-hop
+      // discovery, then drive the IdP popup the same way as direct OpenID.
+      const ssoPage = await openSsoPopup(authPage);
+      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(ssoPage, openIdUsers[0].id);
+      await closePromise;
+
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
   });
 });
 

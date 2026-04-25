@@ -5,7 +5,7 @@
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
-  import { anonymousActor } from "$lib/globals";
+  import { anonymousActor, backendCanisterConfig } from "$lib/globals";
   import {
     validateDomain,
     discoverSsoConfig,
@@ -41,6 +41,17 @@
    * finishes typing; long enough to avoid firing requests on every keystroke.
    */
   const LOOKUP_DEBOUNCE_MS = 200;
+
+  /**
+   * Hosts the canister has blessed for SSO discovery. Threaded into
+   * {@link validateDomain} and {@link discoverSsoConfig} so e2e setups
+   * pointing at `localhost:11107` skip the strict-DNS / strict-HTTPS
+   * checks. Production deployments leave this empty — the strict path
+   * still runs.
+   */
+  const allowlistedHosts = new Set(
+    backendCanisterConfig.sso_discoverable_domains[0] ?? [],
+  );
 
   let inputRef = $state<HTMLInputElement>();
   let domain = $state("");
@@ -171,12 +182,13 @@
 
     // Immediate format validation so bad input gets feedback without a
     // backend round-trip. Only surface the error if the input looks like
-    // a complete domain (contains a dot); otherwise the user is still
-    // mid-typing.
+    // a complete domain (contains a dot or is otherwise allowlisted —
+    // `localhost:11107` has no dots but is still "complete" for tests);
+    // otherwise the user is still mid-typing.
     try {
-      validateDomain(trimmed);
+      validateDomain(trimmed, allowlistedHosts);
     } catch (e) {
-      if (trimmed.includes(".")) {
+      if (trimmed.includes(".") || allowlistedHosts.has(trimmed)) {
         error = e instanceof Error ? e.message : $t`Invalid domain`;
       }
       return;
@@ -193,7 +205,7 @@
         await anonymousActor.add_discoverable_oidc_config({
           discovery_domain: trimmed,
         });
-        const result = await discoverSsoConfig(trimmed);
+        const result = await discoverSsoConfig(trimmed, { allowlistedHosts });
         if (matchesCurrent()) {
           preparedResult = result;
         }

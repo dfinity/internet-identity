@@ -115,6 +115,10 @@ pub struct PersistentState {
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
+    // Allowlist of domains accepted by `add_discoverable_oidc_config`. `None`
+    // falls back to the built-in `is_production`-keyed defaults; `Some(vec)`
+    // replaces them entirely.
+    pub sso_discoverable_domains: Option<Vec<String>>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -143,6 +147,7 @@ impl Default for PersistentState {
             related_origins: None,
             new_flow_origins: None,
             openid_configs: None,
+            sso_discoverable_domains: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,

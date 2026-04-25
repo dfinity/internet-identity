@@ -160,6 +160,16 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
 /// domain is no longer allowed should still be parseable, and the scope
 /// parser has no access to canister runtime state anyway. A scope that does
 /// not match any registered SSO provider simply yields no attributes.
+///
+/// Colons are permitted so that `host:port` discovery domains (e.g. the
+/// e2e test domain `localhost:11107`) round-trip through the
+/// `sso:<domain>:<name>` form. Parsing is still unambiguous: the
+/// attribute-key splitter takes the part after the LAST `:` as the
+/// attribute name, and the scope splitter takes the part before the
+/// FIRST `:` as the prefix — anything in between is the domain.
+/// Attribute names themselves are simple identifiers (`name`, `email`,
+/// `verified_email`) and never contain `:`, so the rsplit is always
+/// well-defined.
 fn validate_sso_domain(domain: &str) -> Result<(), String> {
     let mut problems = vec![];
 
@@ -173,12 +183,6 @@ fn validate_sso_domain(domain: &str) -> Result<(), String> {
             SSO_DOMAIN_MAX_BYTES,
             domain.len(),
         ));
-    }
-
-    // Disallow ':' so that the `rsplitn(2, ':')` attribute-key parser can
-    // unambiguously split scope from attribute name.
-    if domain.contains(':') {
-        problems.push("must not contain ':'".to_string());
     }
 
     if domain.chars().any(|c| c.is_whitespace()) {
@@ -1170,6 +1174,18 @@ mod tests {
                         "Invalid domain `bad domain` in attribute scope: must not contain whitespace"
                             .to_string(),
                     ),
+                ),
+                (
+                    // `host:port` discovery domains (e.g. e2e tests pointed
+                    // at `localhost:11107`) round-trip through the scope
+                    // form. The parser splits on the FIRST `:` for the
+                    // prefix and on the LAST `:` for the attribute name —
+                    // anything in between is the domain.
+                    "sso with port",
+                    "sso:localhost:11107",
+                    Ok(AttributeScope::Sso {
+                        domain: "localhost:11107".to_string(),
+                    }),
                 ),
                 (
                     "sso at max length",
