@@ -239,14 +239,6 @@ pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
 }
 
-impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
-    fn from(value: &InternetIdentityInit) -> Self {
-        Self {
-            openid_configs: value.openid_configs.clone(),
-        }
-    }
-}
-
 /// Init arguments of II which can be supplied on install and upgrade.
 ///
 /// Each field is wrapped in `Option<>` to indicate whether the field should
@@ -378,6 +370,27 @@ pub struct OpenIdConfig {
     pub auth_scope: Vec<String>,
     pub fedcm_uri: Option<String>,
     pub email_verification: Option<OpenIdEmailVerificationScheme>,
+}
+
+/// SSO provider configuration that uses two-hop discovery.
+///
+/// The backend fetches `https://{discovery_domain}/.well-known/ii-openid-configuration`
+/// to obtain `{ client_id, openid_configuration }`, then fetches the standard OIDC
+/// discovery document at `openid_configuration` to resolve `issuer` and `jwks_uri`.
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct DiscoverableOidcConfig {
+    pub discovery_domain: String,
+}
+
+/// Resolved SSO provider state returned by the `discovered_oidc_configs` query.
+/// Any field other than `discovery_domain` is `None` until the two-hop discovery
+/// completes for that domain.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct OidcConfig {
+    pub discovery_domain: String,
+    pub client_id: Option<String>,
+    pub openid_configuration: Option<String>,
+    pub issuer: Option<String>,
 }
 
 pub enum AuthorizationKey {

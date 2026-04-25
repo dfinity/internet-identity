@@ -94,6 +94,35 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
+ * Raised when an OAuth provider redirects back to II with an `error` (and
+ * optional `error_description`) in the callback fragment — per RFC 6749
+ * §4.1.2.1 / 4.2.2.1. Typical causes are the SSO app being misconfigured:
+ *   • `unsupported_response_type` — the Okta/Auth0/etc. app doesn't allow
+ *     the hybrid flow we request (`response_type=id_token code`).
+ *   • `invalid_scope` — advertised scope wasn't actually granted.
+ *   • `access_denied` — the user clicked "deny" on the consent screen.
+ *
+ * Carrying `error` and `errorDescription` separately (rather than just a
+ * pre-formatted message) lets `mapSubmitError` in the SSO view produce a
+ * UI string that points the user at the right knob to turn, instead of a
+ * generic "No token received" that looks like a bug in II.
+ */
+export class OAuthProviderError extends Error {
+  readonly error: string;
+  readonly errorDescription?: string;
+  constructor(error: string, errorDescription?: string) {
+    const suffix =
+      errorDescription !== undefined && errorDescription.length > 0
+        ? `: ${errorDescription}`
+        : "";
+    super(`OAuth provider error: ${error}${suffix}`);
+    this.name = "OAuthProviderError";
+    this.error = error;
+    this.errorDescription = errorDescription;
+  }
+}
+
+/**
  * Create JWT request redirect flow URL
  * @param config of the OpenID provider
  * @param options for the JWT request
@@ -128,6 +157,44 @@ export const createRedirectURL = (
 };
 
 /**
+ * Parse the OAuth authorize callback URL and extract the `id_token`.
+ *
+ * Exported so `requestWithPopup` and tests can share a single source of
+ * truth for how a callback fragment is interpreted. Throws:
+ *   - `Error("Invalid state")` if the callback's `state` doesn't match
+ *     `expectedState` (CSRF guard).
+ *   - `OAuthProviderError` if the callback carries an `error=...`
+ *     fragment (RFC 6749 §4.1.2.1 / 4.2.2.1) — checked BEFORE the
+ *     `id_token` null-check so a misconfigured SSO app surfaces its
+ *     own message instead of a generic "No token received" that looks
+ *     like a bug in II.
+ *   - `Error("No token received")` if neither `id_token` nor `error`
+ *     was in the fragment (fallback for spec-violating providers).
+ */
+export const extractIdTokenFromCallback = (
+  callback: string,
+  expectedState: string,
+): string => {
+  const callbackURL = new URL(callback);
+  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
+  if (searchParams.get("state") !== expectedState) {
+    throw new Error("Invalid state");
+  }
+  const error = searchParams.get("error");
+  if (error !== null) {
+    throw new OAuthProviderError(
+      error,
+      searchParams.get("error_description") ?? undefined,
+    );
+  }
+  const id_token = searchParams.get("id_token");
+  if (id_token === null) {
+    throw new Error("No token received");
+  }
+  return id_token;
+};
+
+/**
  * Request JWT through redirect flow in a popup
  * @param config of the OpenID provider
  * @param options for the JWT request
@@ -138,17 +205,13 @@ const requestWithPopup = async (
 ): Promise<string> => {
   const redirectURL = createRedirectURL(config, options);
   const callback = await redirectInPopup(redirectURL.href);
-  const callbackURL = new URL(callback);
-  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
-  const id_token = searchParams.get("id_token");
-  if (searchParams.get("state") !== redirectURL.searchParams.get("state")) {
-    throw new Error("Invalid state");
+  const expectedState = redirectURL.searchParams.get("state");
+  if (expectedState === null) {
+    // `createRedirectURL` always sets `state`; reaching here means the
+    // redirect URL was tampered with before it hit the popup.
+    throw new Error("Missing state in redirect URL");
   }
-  if (id_token === null) {
-    throw new Error("No token received");
-  }
-
-  return id_token;
+  return extractIdTokenFromCallback(callback, expectedState);
 };
 
 /**
@@ -253,24 +316,69 @@ export const issuerMatches = (
 ): boolean => buildIssuerFromConfig(configIssuer, metadata) === issuer;
 
 /**
- * Find the OpenID configuration for a given issuer.
+ * Find the OpenID configuration that issued a given credential.
  *
- * First, it tries to find a match in the generic OpenID configurations.
- * If no match is found, it falls back to the Google configuration if the issuer matches Google's issuer.
+ * Resolution is strict-then-fallback:
  *
- * Not relying in the feature flag ENABLE_GENERIC_OPEN_ID means that if we enable and then disable the feature flag,
- * afterwards, the users that used the generic OpenID configurations will still be able to log in.
+ * 1. **Strict `(issuer, aud)` match.** `aud` is the provider-assigned OAuth
+ *    client_id and is the authoritative discriminator when two credentials
+ *    share an issuer (e.g. direct-Google vs SSO-via-Google — same issuer,
+ *    different client_id). If we find a config whose `client_id === aud`
+ *    AND whose issuer template matches, return it.
+ * 2. **Issuer-only fallback.** If no strict match, fall back to any config
+ *    with a matching issuer. This covers:
+ *      - Callers that don't track `aud` (e.g. `LastUsedIdentity`; see #3795).
+ *      - Legacy credentials whose `aud` disagrees with the current
+ *        `openid_configs` entry (client_id rotation, migration artifacts).
+ *    SSO credentials would also match this fallback — but {@link openIdName}
+ *    and {@link openIdLogo} short-circuit on the `sso_domain` / `sso_name`
+ *    metadata the canister stamps on SSO-linked credentials before they
+ *    ever consult `findConfig`, so an SSO credential can't be mis-attributed
+ *    to its underlying IdP even if the issuer happens to match a direct-
+ *    provider config.
+ *
+ * Not relying on the feature flag ENABLE_GENERIC_OPEN_ID means that if we
+ * enable and then disable the feature flag, users that used the generic
+ * OpenID configurations can still sign in afterwards.
  *
  * @param issuer The issuer to find the configuration for.
- * @returns {OpenIdConfig | undefined} The configuration for the issuer.
+ * @param aud    The OAuth client_id claim of the credential, if known.
+ * @returns {OpenIdConfig | undefined} The configuration for the credential.
  */
 export const findConfig = (
   issuer: string,
+  aud: string | undefined,
   metadata: MetadataMapV2,
-): OpenIdConfig | undefined =>
-  backendCanisterConfig.openid_configs[0]?.find((config) =>
+): OpenIdConfig | undefined => {
+  const configs = backendCanisterConfig.openid_configs[0] ?? [];
+  if (aud !== undefined) {
+    const strict = configs.find(
+      (config) =>
+        config.client_id === aud &&
+        issuerMatches(config.issuer, issuer, metadata),
+    );
+    if (strict !== undefined) return strict;
+  }
+  return configs.find((config) =>
     issuerMatches(config.issuer, issuer, metadata),
   );
+};
+
+/**
+ * Pick the subset of OIDC scopes we actually request from what the provider
+ * advertises. `openid` is required by the OIDC spec — nothing works without
+ * it — so we always include it regardless of what the provider says it
+ * supports. The other defaults (`profile`, `email`) are only included if the
+ * provider advertises them.
+ */
+export const selectAuthScopes = (scopesSupported?: string[]): string[] => {
+  const optional = ["profile", "email"];
+  if (scopesSupported === undefined) {
+    return ["openid", ...optional];
+  }
+  const filtered = scopesSupported.filter((s) => optional.includes(s));
+  return ["openid", ...filtered];
+};
 
 /**
  * Request JWT token through FedCM with redirect in a popup as fallback
@@ -331,15 +439,27 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
 
 /**
  * Return the logo of the OpenID provider from the config.
- * Returns `undefined` if it's a google config or not found.
- * @param issuer
- * @returns {string | undefined} The string is an SVG string that must be embedded in the HTML.
+ *
+ * Returns `undefined` for SSO-linked credentials — identified by the
+ * `sso_domain` optional field the canister populates on `OpenIdCredential`
+ * at response time (via `openid::generic::sso_fields_for`) — so callers
+ * can render a generic SSO icon instead of the underlying IdP's logo.
+ * Direct-provider credentials fall through to {@link findConfig}, which
+ * does strict-then-fallback matching so they get their logo even when
+ * `aud` disagrees with the current config.
+ *
+ * @returns {string | undefined} An SVG string to be embedded via `{@html}`.
  */
 export const openIdLogo = (
   issuer: string,
+  aud: string | undefined,
   metadata: MetadataMapV2,
+  ssoDomain: string | undefined,
 ): string | undefined => {
-  const logo = findConfig(issuer, metadata)?.logo;
+  if (ssoDomain !== undefined) {
+    return undefined;
+  }
+  const logo = findConfig(issuer, aud, metadata)?.logo;
 
   // To prevent rendering an element with the same id multiple times in the DOM,
   // we namespace all ids in the svg string using an unique suffix on each call.
@@ -401,12 +521,40 @@ const namespaceIds = (
 };
 
 /**
- * Return the name of the OpenID provider from the config.
- * Returns `undefined` if it's a google config or not found.
- * @param issuer
- * @returns {string | undefined} The string is the name of the OpenID provider.
+ * Return a human-readable name for an OpenID credential.
+ *
+ * Resolution order:
+ * 1. **SSO name** — `ssoName`, which the canister populates from the
+ *    `name` field of the SSO's `/.well-known/ii-openid-configuration`.
+ *    This is what the org self-identifies as, e.g. `"DFINITY"`.
+ * 2. **SSO domain** — `ssoDomain`, the `discovery_domain` the user
+ *    entered. Used when the SSO didn't publish a `name`, e.g.
+ *    `"dfinity.org"`.
+ * 3. **Direct provider** — {@link findConfig} resolves strict-then-
+ *    fallback, so we get the provider's configured `name` (e.g. "Google")
+ *    for both credentials whose `aud` matches the config and legacy
+ *    credentials whose `aud` disagrees but whose issuer matches.
+ * 4. `undefined` — caller should render a generic fallback.
+ *
+ * Checking the SSO params BEFORE direct-provider lookup means SSO
+ * credentials aren't falsely attributed to their underlying IdP (e.g.
+ * an SSO-via-Google credential reads as "DFINITY", not "Google").
+ *
+ * The SSO values are passed explicitly instead of read from `metadata`
+ * so the FE can distinguish "SSO with a published name" from "SSO with
+ * only a domain" — useful if we later want to render the two cases
+ * differently. Callers that don't have an `OpenIdCredential` on hand
+ * (e.g. `LastUsedIdentity`-backed UI; see #3795) pass `undefined` for
+ * both and fall through to `findConfig`.
  */
 export const openIdName = (
   issuer: string,
+  aud: string | undefined,
   metadata: MetadataMapV2,
-): string | undefined => findConfig(issuer, metadata)?.name;
+  ssoName: string | undefined,
+  ssoDomain: string | undefined,
+): string | undefined => {
+  if (ssoName !== undefined) return ssoName;
+  if (ssoDomain !== undefined) return ssoDomain;
+  return findConfig(issuer, aud, metadata)?.name;
+};

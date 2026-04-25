@@ -541,7 +541,7 @@ pub struct Claims {
 
 impl Claims {
     fn key(&self) -> OpenIdCredentialKey {
-        (self.iss.clone(), self.sub.clone())
+        (self.iss.clone(), self.sub.clone(), self.aud.clone())
     }
 }
 

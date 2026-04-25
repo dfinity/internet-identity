@@ -8,22 +8,29 @@ use ic_canister_sig_creation::{
 use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
+use internet_identity_interface::internet_identity::types::attributes::AttributeScope;
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
-    OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
+    AnchorNumber, Delegation, DiscoverableOidcConfig, IdRegFinishError, MetadataEntryV2,
+    OidcConfig, OpenIdConfig, OpenIdEmailVerificationScheme, PublicKey, SessionKey,
+    SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
-mod generic;
+pub(crate) mod generic;
+
+// Re-export the SSO-metadata lookup so the storage-layer
+// `OpenIdCredential → OpenIdCredentialData` conversion can call it
+// without making the whole `generic` module public.
+pub use generic::sso_fields_for;
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
-pub type OpenIdCredentialKey = (Iss, Sub);
+pub type OpenIdCredentialKey = (Iss, Sub, Aud);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
@@ -83,11 +90,11 @@ pub struct OpenIdCredential {
 
 impl OpenIdCredential {
     pub fn key(&self) -> OpenIdCredentialKey {
-        (self.iss.clone(), self.sub.clone())
+        (self.iss.clone(), self.sub.clone(), self.aud.clone())
     }
 
     pub fn principal(&self, anchor_number: AnchorNumber) -> Principal {
-        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
+        let seed = calculate_delegation_seed(&self.key(), anchor_number);
         let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
         Principal::self_authenticating(public_key)
     }
@@ -100,7 +107,7 @@ impl OpenIdCredential {
         state::ensure_salt_set().await;
 
         let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
-        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
+        let seed = calculate_delegation_seed(&self.key(), anchor_number);
 
         state::signature_map_mut(|sigs| {
             add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
@@ -122,7 +129,7 @@ impl OpenIdCredential {
         state::assets_and_signatures(|certified_assets, sigs| {
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
-                seed: &calculate_delegation_seed(&self.aud, &self.key(), anchor_number),
+                seed: &calculate_delegation_seed(&self.key(), anchor_number),
                 message: &delegation_signature_msg(&session_key, expiration, None),
             };
 
@@ -149,7 +156,14 @@ impl OpenIdCredential {
             providers
                 .iter()
                 .find(|provider| {
-                    let issuer_placeholders = get_issuer_placeholders(&provider.issuer());
+                    // Skip providers whose discovery is still pending.
+                    let Some(template) = provider.issuer() else {
+                        return false;
+                    };
+                    let Some(provider_aud) = provider.client_id() else {
+                        return false;
+                    };
+                    let issuer_placeholders = get_issuer_placeholders(&template);
                     let mut issuer_claims: Vec<(String, String)> = vec![];
                     for key in issuer_placeholders {
                         if let Some(MetadataEntryV2::String(value)) = self.metadata.get(&key) {
@@ -158,9 +172,8 @@ impl OpenIdCredential {
                             return false;
                         }
                     }
-                    let effective_issuer =
-                        replace_issuer_placeholders(&provider.issuer(), &issuer_claims);
-                    effective_issuer == self.iss
+                    let effective_issuer = replace_issuer_placeholders(&template, &issuer_claims);
+                    effective_issuer == self.iss && provider_aud == self.aud
                 })
                 .and_then(|provider| f(provider.as_ref()))
         })
@@ -168,7 +181,40 @@ impl OpenIdCredential {
 
     /// Find current config for stored credential
     pub fn config_issuer(&self) -> Option<String> {
-        self.with_provider(|provider| Some(provider.issuer()))
+        self.with_provider(|provider| provider.issuer())
+    }
+
+    /// Returns the `discovery_domain` of the SSO provider that currently
+    /// matches this credential, if any. `None` for credentials matched to a
+    /// hardcoded (non-discoverable) `Provider` — those are addressable via
+    /// the `openid:<issuer>` attribute scope instead.
+    ///
+    /// Used to route attribute requests to the `sso:<domain>` scope with
+    /// exclusive semantics: a credential with `Some(domain)` here is
+    /// reachable via `sso:<domain>` only, never via `openid:<issuer>`.
+    pub fn discovery_domain(&self) -> Option<String> {
+        self.with_provider(|provider| provider.discovery_domain())
+    }
+
+    /// Returns the single `AttributeScope` this credential is addressable
+    /// under, computed with one provider lookup. This is the source of truth
+    /// for scope exclusivity:
+    ///
+    /// - `Some(Sso { domain })`     for credentials matched to a `DiscoverableProvider`
+    /// - `Some(OpenId { issuer })`  for credentials matched to a hardcoded provider
+    /// - `None`                     when no provider currently matches (discovery
+    ///   pending or provider unregistered) — credential is unreachable.
+    ///
+    /// Prefer this over calling `discovery_domain()` + `config_issuer()`
+    /// separately, which would perform two `with_provider` scans per
+    /// credential in hot paths.
+    pub fn matched_attribute_scope(&self) -> Option<AttributeScope> {
+        self.with_provider(|provider| match provider.discovery_domain() {
+            Some(domain) => Some(AttributeScope::Sso { domain }),
+            None => provider
+                .issuer()
+                .map(|issuer| AttributeScope::OpenId { issuer }),
+        })
     }
 
     fn read_attribute_as_string(&self, attribute_name: &str) -> Option<String> {
@@ -231,9 +277,29 @@ impl OpenIdCredential {
 }
 
 pub trait OpenIdProvider {
-    fn issuer(&self) -> String;
+    /// Issuer template for this provider. `None` means discovery is still pending —
+    /// matching and verification skip such providers. May contain placeholders like
+    /// `{tid}` that are filled from JWT claims before comparison.
+    fn issuer(&self) -> Option<String>;
+
+    /// Client id (the expected JWT `aud`) for this provider. `None` means discovery
+    /// is still pending.
+    fn client_id(&self) -> Option<String>;
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme>;
+
+    /// SSO discovery domain for this provider, if any. Returns `Some(domain)` only
+    /// for providers created from a `DiscoverableOidcConfig` (the two-hop SSO
+    /// discovery flow). All other providers (Google, Microsoft, hardcoded
+    /// generic OIDC) inherit the default `None`.
+    ///
+    /// Credentials whose matched provider reports `Some(domain)` are reachable
+    /// via the `sso:<domain>` attribute scope and are *not* reachable via
+    /// `openid:<issuer>` — see `OpenIdCredential::discovery_domain` and
+    /// `Anchor::prepare_openid_attributes` / `prepare_sso_attributes`.
+    fn discovery_domain(&self) -> Option<String> {
+        None
+    }
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -251,10 +317,40 @@ pub trait OpenIdProvider {
 #[derive(Deserialize)]
 struct PartialClaims {
     iss: String,
+    aud: AudClaim,
+}
+
+/// JWT `aud` claim — per RFC 7519 may be a single string or an array of strings
+/// (Microsoft sometimes ships it as an array). Matching treats an array as a
+/// set: any element equal to the provider's configured client id is accepted.
+#[derive(Deserialize, Clone)]
+#[serde(untagged)]
+pub(super) enum AudClaim {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+impl AudClaim {
+    /// Returns `true` if `expected` is the single value or contained in the array.
+    pub(super) fn matches(&self, expected: &str) -> bool {
+        match self {
+            AudClaim::Single(s) => s == expected,
+            AudClaim::Multiple(v) => v.iter().any(|s| s == expected),
+        }
+    }
+
+    /// Returns `true` if the claim carries no audience at all.
+    pub(super) fn is_empty(&self) -> bool {
+        match self {
+            AudClaim::Single(s) => s.is_empty(),
+            AudClaim::Multiple(v) => v.is_empty(),
+        }
+    }
 }
 
 thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
+    static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = const { RefCell::new(vec![]) };
 }
 
 pub fn setup(configs: Vec<OpenIdConfig>) {
@@ -263,6 +359,87 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
             providers.push(Box::new(generic::Provider::create(config)));
         }
     });
+}
+
+pub fn setup_oidc(configs: Vec<DiscoverableOidcConfig>) {
+    for config in configs {
+        add_oidc_config_internal(config);
+    }
+    #[cfg(not(test))]
+    generic::init_discovery_timers();
+}
+
+pub fn add_oidc_config(config: DiscoverableOidcConfig) {
+    if !generic::is_allowed_discovery_domain(&config.discovery_domain) {
+        ic_cdk::trap(&format!(
+            "discovery_domain '{}' is not on the canary allowlist",
+            config.discovery_domain
+        ));
+    }
+
+    // Canonicalize the domain to lowercase. DNS hostnames are
+    // case-insensitive and `is_allowed_discovery_domain` already accepts
+    // case-insensitively via `eq_ignore_ascii_case`. Storing a canonical form
+    // keeps `OIDC_CONFIGS`, `DISCOVERY_TASKS`, `DiscoverableProvider`, and
+    // downstream attribute-scope matching (`sso:<domain>`) all in sync.
+    let config = DiscoverableOidcConfig {
+        discovery_domain: config.discovery_domain.to_ascii_lowercase(),
+    };
+
+    // Skip if already registered
+    let already_exists = OIDC_CONFIGS.with_borrow(|stored| {
+        stored
+            .iter()
+            .any(|c| c.discovery_domain == config.discovery_domain)
+    });
+    if already_exists {
+        return;
+    }
+
+    add_oidc_config_internal(config.clone());
+
+    // Persist to state so it survives upgrades
+    state::persistent_state_mut(|persistent_state| {
+        let configs = persistent_state.oidc_configs.get_or_insert_with(Vec::new);
+        configs.push(config);
+    });
+
+    #[cfg(not(test))]
+    generic::init_discovery_timers();
+}
+
+fn add_oidc_config_internal(config: DiscoverableOidcConfig) {
+    // Canonicalize so `OIDC_CONFIGS`, `DISCOVERY_TASKS` (in `DiscoverableProvider`),
+    // and downstream `sso:<domain>` scope matching stay in sync. `add_oidc_config`
+    // already canonicalizes, but `setup_oidc` replays persisted configs at
+    // post-upgrade time which may contain values from before this change.
+    let config = DiscoverableOidcConfig {
+        discovery_domain: config.discovery_domain.to_ascii_lowercase(),
+    };
+    OIDC_CONFIGS.with_borrow_mut(|stored| {
+        stored.push(config.clone());
+    });
+    PROVIDERS.with_borrow_mut(|providers| {
+        providers.push(Box::new(generic::DiscoverableProvider::create(config)));
+    });
+}
+
+pub fn get_discovered_oidc_configs() -> Vec<OidcConfig> {
+    OIDC_CONFIGS.with_borrow(|configs| {
+        configs
+            .iter()
+            .map(|config| {
+                let (client_id, openid_configuration, issuer) =
+                    generic::discovered_state_for(&config.discovery_domain);
+                OidcConfig {
+                    discovery_domain: config.discovery_domain.clone(),
+                    client_id,
+                    openid_configuration,
+                    issuer,
+                }
+            })
+            .collect()
+    })
 }
 
 pub fn with_provider<F, R>(jwt: &str, callback: F) -> Result<R, OpenIDJWTVerificationError>
@@ -275,22 +452,46 @@ where
             OpenIDJWTVerificationError::GenericError("Failed to decode JWT".to_string())
         })?;
 
-    let PartialClaims { iss } = serde_json::from_slice(validation_item.claims()).map_err(|_| {
-        OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string())
-    })?;
+    let PartialClaims { iss, aud } =
+        serde_json::from_slice(validation_item.claims()).map_err(|_| {
+            OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string())
+        })?;
+    if aud.is_empty() {
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "JWT has empty aud claim".to_string(),
+        ));
+    }
 
     PROVIDERS.with_borrow(|providers| {
         providers
             .iter()
             .find(|provider| {
-                let issuer_placeholders = get_issuer_placeholders(&provider.issuer());
+                // Skip providers whose discovery is still pending.
+                let Some(template) = provider.issuer() else {
+                    return false;
+                };
+                let Some(provider_aud) = provider.client_id() else {
+                    return false;
+                };
+                let issuer_placeholders = get_issuer_placeholders(&template);
                 let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
-                let effective_issuer =
-                    replace_issuer_placeholders(&provider.issuer(), &issuer_claims);
-                effective_issuer == iss
+                let effective_issuer = replace_issuer_placeholders(&template, &issuer_claims);
+                effective_issuer == iss && aud.matches(&provider_aud)
             })
             .ok_or_else(|| {
-                OpenIDJWTVerificationError::GenericError(format!("Unsupported issuer: {}", iss))
+                // If any provider is still waiting on discovery, surface a "pending" error
+                // rather than the generic "unsupported issuer" so the frontend can retry.
+                let has_pending = providers
+                    .iter()
+                    .any(|p| p.issuer().is_none() || p.client_id().is_none());
+                if has_pending {
+                    OpenIDJWTVerificationError::GenericError(
+                        "OIDC provider discovery is still in progress, please try again shortly"
+                            .to_string(),
+                    )
+                } else {
+                    OpenIDJWTVerificationError::GenericError(format!("Unsupported issuer: {}", iss))
+                }
             })
             .and_then(|provider| callback(provider.as_ref()))
     })
@@ -347,24 +548,26 @@ pub fn replace_issuer_placeholders(template: &str, claims: &Vec<(String, String)
     result
 }
 
-/// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`
+/// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`.
+///
+/// All three key components (`iss`, `sub`, `aud`) participate in the seed so that the
+/// same user at the same provider with different OIDC clients derives distinct
+/// principals — this is the security property that makes SSO safe.
 ///
 /// # Arguments
 ///
-/// * `client_id`: The client id for which the `OpenIdCredential` was created
-/// * `(iss, sub)`: The key of the `OpenIdCredential` to create a `Hash` from
+/// * `(iss, sub, aud)`: The key of the `OpenIdCredential` to derive the `Hash` from
 /// * `anchor_number`: The anchor number the credential is assigned to
 #[allow(clippy::cast_possible_truncation)]
 fn calculate_delegation_seed(
-    client_id: &str,
-    (iss, sub): &OpenIdCredentialKey,
+    (iss, sub, aud): &OpenIdCredentialKey,
     anchor_number: AnchorNumber,
 ) -> Hash {
     let mut blob: Vec<u8> = vec![];
     blob.push(32);
     blob.extend_from_slice(&salt());
-    blob.push(client_id.len() as u8);
-    blob.extend(client_id.bytes());
+    blob.push(aud.len() as u8);
+    blob.extend(aud.bytes());
 
     blob.push(iss.len() as u8);
     blob.extend(iss.bytes());
@@ -394,12 +597,29 @@ fn salt() -> [u8; 32] {
 }
 
 #[cfg(test)]
-struct ExampleProvider;
+struct ExampleProvider {
+    issuer: Option<String>,
+    client_id: Option<String>,
+}
+
+#[cfg(test)]
+impl Default for ExampleProvider {
+    fn default() -> Self {
+        Self {
+            issuer: Some("https://example.com".into()),
+            client_id: Some("example-aud".into()),
+        }
+    }
+}
 
 #[cfg(test)]
 impl OpenIdProvider for ExampleProvider {
-    fn issuer(&self) -> String {
-        "https://example.com".into()
+    fn issuer(&self) -> Option<String> {
+        self.issuer.clone()
+    }
+
+    fn client_id(&self) -> Option<String> {
+        self.client_id.clone()
     }
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
@@ -419,24 +639,34 @@ impl OpenIdProvider for ExampleProvider {
 impl ExampleProvider {
     fn credential(&self) -> OpenIdCredential {
         OpenIdCredential {
-            iss: self.issuer(),
+            iss: self
+                .issuer
+                .clone()
+                .unwrap_or_else(|| "https://example.com".into()),
             sub: "example-sub".into(),
-            aud: "example-aud".into(),
+            aud: self
+                .client_id
+                .clone()
+                .unwrap_or_else(|| "example-aud".into()),
             last_usage_timestamp: None,
             metadata: HashMap::new(),
         }
     }
 }
 
+// Example JWT with {"iss":"https://example.com","aud":"example-aud"}.
+#[cfg(test)]
+const EXAMPLE_JWT: &str = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjoiZXhhbXBsZS1hdWQifQ.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0";
+
 #[test]
 fn should_return_credential() {
-    let provider = ExampleProvider {};
+    let provider = ExampleProvider::default();
     let credential = provider.credential();
     PROVIDERS.replace(vec![Box::new(provider)]);
-    let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIn0.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0";
 
     assert_eq!(
-        with_provider(jwt, |provider| provider.verify(jwt, &[0u8; 32])),
+        with_provider(EXAMPLE_JWT, |provider| provider
+            .verify(EXAMPLE_JWT, &[0u8; 32])),
         Ok(credential)
     );
 }
@@ -444,14 +674,55 @@ fn should_return_credential() {
 #[test]
 fn should_return_error_unsupported_issuer() {
     PROVIDERS.replace(vec![]);
-    let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIn0.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0";
 
     assert_eq!(
-        with_provider(jwt, |provider| provider.verify(jwt, &[0u8; 32])),
+        with_provider(EXAMPLE_JWT, |provider| provider
+            .verify(EXAMPLE_JWT, &[0u8; 32])),
         Err(OpenIDJWTVerificationError::GenericError(
             "Unsupported issuer: https://example.com".to_string()
         ))
     );
+}
+
+#[test]
+fn should_skip_provider_when_discovery_pending() {
+    // Provider with no discovered issuer/client_id — must be skipped and the
+    // surface error should be the "discovery in progress" message.
+    let pending = ExampleProvider {
+        issuer: None,
+        client_id: None,
+    };
+    PROVIDERS.replace(vec![Box::new(pending)]);
+
+    assert_eq!(
+        with_provider(EXAMPLE_JWT, |provider| provider
+            .verify(EXAMPLE_JWT, &[0u8; 32])),
+        Err(OpenIDJWTVerificationError::GenericError(
+            "OIDC provider discovery is still in progress, please try again shortly".to_string()
+        ))
+    );
+}
+
+#[test]
+fn should_disambiguate_providers_by_aud() {
+    // Two providers sharing the same iss but different aud — only the one whose
+    // client_id matches the JWT's aud claim should verify.
+    let matching = ExampleProvider {
+        issuer: Some("https://example.com".into()),
+        client_id: Some("example-aud".into()),
+    };
+    let expected = matching.credential();
+    let other = ExampleProvider {
+        issuer: Some("https://example.com".into()),
+        client_id: Some("other-aud".into()),
+    };
+    PROVIDERS.replace(vec![Box::new(other), Box::new(matching)]);
+
+    let returned = with_provider(EXAMPLE_JWT, |provider| {
+        provider.verify(EXAMPLE_JWT, &[0u8; 32])
+    })
+    .expect("expected matching provider");
+    assert_eq!(returned.aud, expected.aud);
 }
 
 #[test]
@@ -600,8 +871,12 @@ struct ExamplePlaceholderProvider;
 
 #[cfg(test)]
 impl OpenIdProvider for ExamplePlaceholderProvider {
-    fn issuer(&self) -> String {
-        "https://login.microsoftonline.com/{tid}/v2.0".into()
+    fn issuer(&self) -> Option<String> {
+        Some("https://login.microsoftonline.com/{tid}/v2.0".into())
+    }
+
+    fn client_id(&self) -> Option<String> {
+        Some("example-aud".into())
     }
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
@@ -636,22 +911,22 @@ impl ExamplePlaceholderProvider {
 
 #[test]
 fn find_config_issuer_from_credential() {
-    let provider = ExampleProvider {};
+    let provider = ExampleProvider::default();
     let placeholder_provider = ExamplePlaceholderProvider {};
     let config_issuer = provider.issuer();
     let placeholder_config_issuer = placeholder_provider.issuer();
     PROVIDERS.replace(vec![Box::new(provider), Box::new(placeholder_provider)]);
 
     assert_eq!(
-        ExampleProvider.credential().config_issuer(),
-        Some(config_issuer)
+        ExampleProvider::default().credential().config_issuer(),
+        config_issuer
     );
     assert_eq!(
         ExamplePlaceholderProvider.credential().config_issuer(),
-        Some(placeholder_config_issuer)
+        placeholder_config_issuer
     );
 
-    let mut unknown_credential = ExampleProvider.credential();
+    let mut unknown_credential = ExampleProvider::default().credential();
     unknown_credential.iss = "https://example.com/unknown".to_string();
     assert_eq!(unknown_credential.config_issuer(), None);
 }

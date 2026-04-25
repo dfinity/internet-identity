@@ -25,7 +25,11 @@ pub struct StorableOpenIdCredential {
 
 impl StorableOpenIdCredential {
     pub fn key(&self) -> StorableOpenIdCredentialKey {
-        StorableOpenIdCredentialKey(self.iss.clone(), self.sub.clone())
+        StorableOpenIdCredentialKey {
+            iss: self.iss.clone(),
+            sub: self.sub.clone(),
+            aud: self.aud.clone(),
+        }
     }
 }
 

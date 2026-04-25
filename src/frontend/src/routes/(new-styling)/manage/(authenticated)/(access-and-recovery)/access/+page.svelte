@@ -187,6 +187,7 @@
           .openid_credential_remove($authenticatedStore.identityNumber, [
             removingAccessMethod.openid.iss,
             removingAccessMethod.openid.sub,
+            removingAccessMethod.openid.aud,
           ])
           .then(throwCanisterError);
       }
@@ -322,7 +323,10 @@
         onCancel={() => (removingAccessMethodKey = undefined)}
         providerName={openIdName(
           removingAccessMethod.openid.iss,
+          removingAccessMethod.openid.aud,
           removingAccessMethod.openid.metadata,
+          removingAccessMethod.openid.sso_name[0],
+          removingAccessMethod.openid.sso_domain[0],
         ) ?? $t`Unknown`}
         isCurrentAccessMethod={isCurrentAccessMethod(
           $authenticatedStore,

@@ -30,6 +30,7 @@ captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255
 
 # OpenID deps
 identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false }
+url = { version = "2.5", default-features = false, features = ["std"] }
 
 # All IC deps
 candid.workspace = true

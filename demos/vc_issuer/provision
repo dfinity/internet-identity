@@ -14,15 +14,15 @@ function usage() {
     cat >&2 << EOF
 
 Usage:
-  $0 [--ii-canister-id CANISTER_ID] [--dfx-network NETWORK]
+  $0 [--ii-canister-id CANISTER_ID] [--icp-network NETWORK]
 
 Options:
   --ii-canister-id CANISTER_ID    The canister ID to use as IDP, defaults to the local internet_identity canister
-  --dfx-network NETWORK           The network to use (typically "local" or "ic"), defaults to "local"
+  --icp-network NETWORK           The network to use (typically "local" or "ic"), defaults to "local"
   --issuer-canister CANISTER      The canister to configure (name or canister ID), defaults to "issuer"
   --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.icp0.io
   --issuer-frontend-hostname URL  The issuer's frontend hostname, defaults to issuer's derivation origin
-  --wallet CANISTER_ID            Optional wallet canister ID to use to configure the issuer, if any.
+  --proxy CANISTER_ID             Optional proxy canister ID to route calls through, if any.
 EOF
 }
 
@@ -35,7 +35,7 @@ EOF
 }
 
 II_CANISTER_ID=
-DFX_NETWORK=
+ICP_NETWORK=
 WALLET=
 
 while [[ $# -gt 0  ]]
@@ -52,9 +52,9 @@ do
             shift; # shift past --ii-canister-id & value
             shift;
             ;;
-        --dfx-network)
-            DFX_NETWORK="${2:?missing value for '--dfx-network'}"
-            shift; # shift past --dfx-network & value
+        --icp-network)
+            ICP_NETWORK="${2:?missing value for '--icp-network'}"
+            shift; # shift past --icp-network & value
             shift;
             ;;
         --issuer-canister)
@@ -72,9 +72,9 @@ do
             shift; # shift past --issuer-canister & value
             shift;
             ;;
-        --wallet)
-            WALLET="${2:?missing value for '--wallet'}"
-            shift; # shift past --wallet & value
+        --proxy)
+            WALLET="${2:?missing value for '--proxy'}"
+            shift; # shift past --proxy & value
             shift;
             ;;
         *)
@@ -88,23 +88,23 @@ do
 done
 
 
-DFX_NETWORK="${DFX_NETWORK:-local}"
-II_CANISTER_ID="${II_CANISTER_ID:-$(dfx canister id internet_identity)}"
+ICP_NETWORK="${ICP_NETWORK:-local}"
+II_CANISTER_ID="${II_CANISTER_ID:-$(icp canister status internet_identity --id-only)}"
 ISSUER_CANISTER="${ISSUER_CANISTER:-issuer}"
-ISSUER_CANISTER_ID=$(dfx canister id "$ISSUER_CANISTER")
+ISSUER_CANISTER_ID=$(icp canister status "$ISSUER_CANISTER" --id-only)
 DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.icp0.io"
 ISSUER_DERIVATION_ORIGIN="${ISSUER_DERIVATION_ORIGIN:-$DEFAULT_DERIVATION_ORIGIN}"
 ISSUER_FRONTEND_HOSTNAME="${ISSUER_FRONTEND_HOSTNAME:-$ISSUER_DERIVATION_ORIGIN}"
 
-echo "Using DFX network: $DFX_NETWORK" >&2
+echo "Using ICP network: $ICP_NETWORK" >&2
 
-# At the time of writing dfx outputs incorrect JSON with dfx ping (commas between object
+# At the time of writing icp-cli outputs incorrect JSON with icp network ping (commas between object
 # entries are missing).
 # In order to read the root key we grab the array from the '"root_key": [...]' bit, the brackets
 # to match what candid expects ({}), replace the commas between array entries to match
-# what candid expects (semicolon) and annotate the numbers with their type (otherwise dfx assumes 'nat'
+# what candid expects (semicolon) and annotate the numbers with their type (otherwise icp-cli assumes 'nat'
 # instead of 'nat8').
-rootkey_did=$(dfx ping "$DFX_NETWORK" \
+rootkey_did=$(icp network ping "$ICP_NETWORK" \
     | sed -n 's/.*"root_key": \[\(.*\)\].*/{\1}/p' \
     | sed 's/\([0-9][0-9]*\)/\1:nat8/g' \
     | sed 's/,/;/g')
@@ -120,8 +120,8 @@ declare -a WALLET_ARG=( )
 if [ "$WALLET" ]
 then
     echo "Using wallet: $WALLET" >&2
-    WALLET_ARG+=( "--wallet" "$WALLET")
+    WALLET_ARG+=( "--proxy" "$WALLET")
 fi
 
-dfx canister call "${WALLET_ARG[@]}" --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure \
+icp canister call "${WALLET_ARG[@]}" -e "$ICP_NETWORK" "$ISSUER_CANISTER" configure \
     '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = opt vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'

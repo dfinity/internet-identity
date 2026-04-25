@@ -9,8 +9,8 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OpenIdConfig,
-    RateLimitConfig, Timestamp,
+    AnalyticsConfig, CaptchaConfig, DiscoverableOidcConfig, DummyAuthConfig, FrontendHostname,
+    OpenIdConfig, RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -36,6 +36,7 @@ pub struct StorablePersistentState {
     related_origins: Option<Vec<String>>,
     new_flow_origins: Option<Vec<String>>,
     openid_configs: Option<Vec<OpenIdConfig>>,
+    oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     analytics_config: Option<AnalyticsConfig>,
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
@@ -80,6 +81,7 @@ impl From<PersistentState> for StorablePersistentState {
             related_origins: s.related_origins,
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
+            oidc_configs: s.oidc_configs,
             analytics_config: s.analytics_config,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
@@ -101,6 +103,7 @@ impl From<StorablePersistentState> for PersistentState {
             related_origins: s.related_origins,
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
+            oidc_configs: s.oidc_configs,
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
             enable_dapps_explorer: s.enable_dapps_explorer,
@@ -152,6 +155,7 @@ mod tests {
             related_origins: None,
             new_flow_origins: None,
             openid_configs: None,
+            oidc_configs: None,
             analytics_config: None,
             enable_dapps_explorer: None,
             is_production: None,
@@ -177,6 +181,7 @@ mod tests {
             related_origins: None,
             new_flow_origins: None,
             openid_configs: None,
+            oidc_configs: None,
             event_stats_24h_start: None,
             analytics_config: None,
             enable_dapps_explorer: None,

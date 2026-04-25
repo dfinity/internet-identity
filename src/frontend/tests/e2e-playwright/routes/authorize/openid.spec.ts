@@ -1,10 +1,49 @@
 import { expect } from "@playwright/test";
+import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
 import {
   ALTERNATE_OPENID_PORT,
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
-import { II_URL } from "../../utils";
+import { fromBase64, II_URL } from "../../utils";
+
+type Icrc3Value =
+  | { Nat: bigint }
+  | { Int: bigint }
+  | { Blob: number[] }
+  | { Text: string }
+  | { Array: Icrc3Value[] }
+  | { Map: [string, Icrc3Value][] };
+
+const Icrc3Value = IDL.Rec();
+Icrc3Value.fill(
+  IDL.Variant({
+    Nat: IDL.Nat,
+    Int: IDL.Int,
+    Blob: IDL.Vec(IDL.Nat8),
+    Text: IDL.Text,
+    Array: IDL.Vec(Icrc3Value),
+    Map: IDL.Vec(IDL.Tuple(IDL.Text, Icrc3Value)),
+  }),
+);
+
+function decodeIcrc3Map(base64Data: string): Record<string, Icrc3Value> {
+  const dataBytes = fromBase64(base64Data);
+  const { Map: map } = IDL.decode([Icrc3Value], dataBytes)[0] as {
+    Map: [string, Icrc3Value][];
+  };
+  return Object.fromEntries(map);
+}
+
+function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(decodeIcrc3Map(base64Data))
+      .filter(
+        (entry): entry is [string, { Text: string }] => "Text" in entry[1],
+      )
+      .map(([key, { Text: text }]) => [key, text]),
+  );
+}
 
 test.describe("Authorize with direct OpenID", () => {
   test.describe("without any attributes", () => {
@@ -22,12 +61,13 @@ test.describe("Authorize with direct OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
       },
     });
 
-    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedAttributes).toBeUndefined();
+      expect(authorizedIcrc3Attributes).toBeUndefined();
     });
 
     test("should authenticate only", async ({
@@ -55,6 +95,7 @@ test.describe("Authorize with direct OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`,
@@ -62,15 +103,97 @@ test.describe("Authorize with direct OpenID", () => {
       },
     });
 
-    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedAttributes).toEqual({
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      expect(authorizedIcrc3Attributes.signature.length).toBeGreaterThan(0);
+
+      const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
+
+      // Verify user attributes are Text
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(textEntries).toMatchObject({
         [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: name,
         [`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`]: email,
       });
+
+      // Verify implicit:origin is Text
+      expect(map["implicit:origin"]).toHaveProperty("Text");
+
+      // Verify implicit:nonce is a 32-byte Blob
+      expect(map["implicit:nonce"]).toHaveProperty("Blob");
+      const { Blob: nonceBlob } = map["implicit:nonce"] as {
+        Blob: number[];
+      };
+      expect(nonceBlob).toHaveLength(32);
+
+      // Verify implicit:issued_at_timestamp_ns is a Nat
+      expect(map["implicit:issued_at_timestamp_ns"]).toHaveProperty("Nat");
+      const { Nat: timestamp } = map["implicit:issued_at_timestamp_ns"] as {
+        Nat: bigint;
+      };
+      expect(timestamp).toBeGreaterThan(BigInt(0));
     });
 
     test("should return attributes", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  test.describe("with app-supplied nonce", () => {
+    const name = "John Doe";
+    // prettier-ignore
+    const knownNonce = new Uint8Array([
+      80, 48, 222, 48, 28, 157, 149, 134, 236, 61, 19, 71, 200, 105, 53, 187,
+      44, 126, 9, 241, 76, 103, 217, 148, 12, 55, 90, 181, 33, 208, 99, 7,
+    ]);
+
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
+        icrc3Nonce: knownNonce,
+        attributes: [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
+
+      // Verify the nonce in the ICRC-3 map matches the one we supplied
+      expect(map["implicit:nonce"]).toHaveProperty("Blob");
+      const { Blob: nonceBlob } = map["implicit:nonce"] as {
+        Blob: number[];
+      };
+      expect(Array.from(nonceBlob)).toEqual(Array.from(knownNonce));
+    });
+
+    test("should include the app-supplied nonce", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
@@ -99,18 +222,19 @@ test.describe("Authorize with direct OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown scoped attribute
           `favorite_food`, // Unknown unscoped attribute
-          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Missing implicit consent
+          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Wrong issuer for 1-click OpenID auto-approval
         ],
       },
     });
 
     // Link both OpenID provider users with identity first to ensure attributes from
-    // both providers are available, but only one is returned through implicit consent.
+    // both providers are available, but only the active issuer's are auto-approved.
     test.beforeEach(
       async ({
         page,
@@ -137,19 +261,42 @@ test.describe("Authorize with direct OpenID", () => {
       },
     );
 
-    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedAttributes).toEqual({
-        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: defaultName,
-      });
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const blobEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      // Only the name from the default (active) provider — auto-approved
+      // via 1-click OpenID — should be present.
+      expect(
+        blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
+      ).toBe(defaultName);
+      expect(
+        blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`],
+      ).toBeUndefined();
+      expect(blobEntries["favorite_food"]).toBeUndefined();
+      expect(
+        blobEntries[`openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`],
+      ).toBeUndefined();
     });
 
     test("should omit attributes", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      // Mixing 1-click-eligible keys with non-eligible / unknown ones takes
+      // the consent path instead of 1-click. The defaults (all options
+      // checked, first provider selected for the `name` picker) match the
+      // assertions below — just accept.
+      await attributeConsentView.accept();
     });
   });
 
@@ -168,18 +315,28 @@ test.describe("Authorize with direct OpenID", () => {
       authorizeConfig: {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`,
         ],
       },
     });
 
-    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedAttributes).toEqual({
-        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`]:
-          email,
-      });
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const blobEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(
+        blobEntries[
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`
+        ],
+      ).toBe(email);
     });
 
     test("should return verified email", async ({

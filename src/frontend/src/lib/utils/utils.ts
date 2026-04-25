@@ -1,12 +1,13 @@
-// Turns an 'unknown' into a string, if possible, otherwise use the default
-// `def` parameter.
 import type { SignedDelegation } from "$lib/generated/internet_identity_types";
 import { Signature } from "@icp-sdk/core/agent";
+import { type Readable } from "svelte/store";
 import {
   Delegation,
   SignedDelegation as FrontendSignedDelegation,
 } from "@icp-sdk/core/identity";
 
+// Turns an 'unknown' into a string, if possible, otherwise use the default
+// `def` parameter.
 export function unknownToString(obj: unknown, def: string): string {
   // Only booleans, numbers and strings _may_ not be objects, so first we try
   // Object's toString, and if not we go through the remaining types.
@@ -403,3 +404,29 @@ export const secureRandomId = (
   }
   return chars.join("");
 };
+
+/**
+ * Resolves when the store value satisfies the condition.
+ * The condition maps the store value to `R | undefined` — returning `undefined`
+ * means "keep waiting", any other value resolves the promise.
+ * If no condition is provided, resolves when the store value is not `undefined`.
+ */
+export function waitForStore<T>(store: Readable<T | undefined>): Promise<T>;
+export function waitForStore<T, R>(
+  store: Readable<T>,
+  condition: (value: T) => R | undefined,
+): Promise<R>;
+export function waitForStore<T, R>(
+  store: Readable<T>,
+  condition: (value: T) => R | undefined = (value) => value as R | undefined,
+): Promise<R> {
+  return new Promise((resolve) => {
+    const unsubscribe = store.subscribe((value) => {
+      const result = condition(value);
+      if (result !== undefined) {
+        queueMicrotask(() => unsubscribe());
+        resolve(result);
+      }
+    });
+  });
+}

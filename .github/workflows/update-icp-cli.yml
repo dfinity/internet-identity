@@ -1,0 +1,60 @@
+# A GitHub Actions workflow that regularly checks for new icp-cli releases
+# and creates a PR on new versions.
+name: icp-cli Update
+
+on:
+  schedule:
+    # check for new icp-cli releases daily at 7:30
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  icp-cli-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+        # First, check icp-cli releases for a new version.
+      - name: Check new icp-cli version
+        id: update
+        run: |
+          current_icp_cli_release=$(cat .icp-cli-version | tr -d '[:space:]')
+          echo "current icp-cli release '$current_icp_cli_release'"
+
+          latest_icp_cli_release=$(curl -sSL https://api.github.com/repos/dfinity/icp-cli/releases/latest | jq -r '.tag_name | sub("^v"; "")')
+          echo "latest icp-cli release '$latest_icp_cli_release'"
+
+          if [ "$current_icp_cli_release" != "$latest_icp_cli_release" ]
+          then
+            echo icp-cli needs an update
+            echo "$latest_icp_cli_release" > .icp-cli-version
+            echo "updated=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=0" >> "$GITHUB_OUTPUT"
+          fi
+
+          cat .icp-cli-version
+
+        # If the version was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: ./.icp-cli-version
+          commit-message: Update icp-cli release
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-icp-cli-update
+          delete-branch: true
+          title: "Update icp-cli"
+
+        # Since this is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "icp-cli update failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

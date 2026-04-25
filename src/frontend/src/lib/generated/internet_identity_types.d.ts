@@ -101,6 +101,34 @@ export interface ArchiveInfo {
    */
   'archive_canister' : [] | [Principal],
 }
+/**
+ * A specification of an attribute to be certified.
+ */
+export interface AttributeSpec {
+  /**
+   * `attribute_scope:attribute_name`
+   * 
+   * Example: `openid:https://accounts.google.com:email`
+   */
+  'key' : string,
+  /**
+   * If `value` is set, this attribute should be certified only if it matches
+   * the current value. This enables the II frontend to request a certificate
+   * for a set of attributes that is guaranteed to be approved by the user.
+   */
+  'value' : [] | [Uint8Array | number[]],
+  /**
+   * Whether the attribute scope should be omitted before certification.
+   * Certifying unscoped attributes is useful, e.g., when the user wants
+   * to share their preferred email without revealing which OpenID
+   * provider they use with II.
+   * 
+   * Examples (e.g., `key = "openid:https://accounts.google.com:email"`):
+   * 1. If `omit_scope = true`, then the certified attribute key is `email`.
+   * 2. Otherwise, the certified attribute key is literally the value of `key`.
+   */
+  'omit_scope' : boolean,
+}
 export type Aud = string;
 /**
  * The authentication methods currently supported by II.
@@ -434,6 +462,13 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+/**
+ * SSO provider config that uses two-hop discovery.
+ * The backend fetches https://{discovery_domain}/.well-known/ii-openid-configuration
+ * for { client_id, openid_configuration } and then fetches the standard OIDC
+ * discovery at openid_configuration for { issuer, jwks_uri }.
+ */
+export interface DiscoverableOidcConfig { 'discovery_domain' : string }
 export interface DummyAuthConfig {
   /**
    * Prompts user for a index value (0 - 255) when set to true,
@@ -497,6 +532,31 @@ export type GetDelegationResponse = {
      */
     'signed_delegation' : SignedDelegation
   };
+export type GetIcrc3AttributeError = { 'AuthorizationError' : Principal } |
+  { 'NoSuchSignature' : null } |
+  { 'ValidationError' : { 'problems' : Array<string> } } |
+  { 'GetAccountError' : GetAccountError };
+export interface GetIcrc3AttributeRequest {
+  /**
+   * Origin of the relying party in the attribute sharing flow.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * II account for the relying party.
+   */
+  'account_number' : [] | [AccountNumber],
+  /**
+   * The message blob from PrepareIcrc3AttributeResponse.
+   */
+  'message' : Uint8Array | number[],
+  /**
+   * Identity for which the attributes were prepared.
+   */
+  'identity_number' : IdentityNumber,
+}
+export interface GetIcrc3AttributeResponse {
+  'signature' : Uint8Array | number[],
+}
 export type GetIdAliasError = {
     /**
      * Internal canister error. See the error message for details.
@@ -541,6 +601,12 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+export type Icrc3Value = { 'Int' : bigint } |
+  { 'Map' : Array<[string, Icrc3Value]> } |
+  { 'Nat' : bigint } |
+  { 'Blob' : Uint8Array | number[] } |
+  { 'Text' : string } |
+  { 'Array' : Array<Icrc3Value> };
 /**
  * The signed id alias credentials for each involved party.
  */
@@ -791,6 +857,29 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type ListAvailableAttributesError = {
+    'AuthorizationError' : Principal
+  } |
+  { 'ValidationError' : { 'problems' : Array<string> } };
+/**
+ * List available attributes
+ */
+export interface ListAvailableAttributesRequest {
+  /**
+   * Optional list of attribute keys to filter by.
+   * Each key is either a fully-scoped key (e.g., "openid:https://accounts.google.com:email")
+   * or an unscoped attribute name (e.g., "email") which matches all scopes.
+   * If not provided, all available attributes are returned.
+   */
+  'attributes' : [] | [Array<string>],
+  /**
+   * Identity for which available attributes should be listed.
+   */
+  'identity_number' : IdentityNumber,
+}
+export type ListAvailableAttributesResponse = Array<
+  [string, Uint8Array | number[]]
+>;
 export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
 /**
  * Map with some variants for the value type.
@@ -816,6 +905,16 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+/**
+ * Resolved SSO provider state.
+ * All fields other than discovery_domain are None until discovery completes.
+ */
+export interface OidcConfig {
+  'openid_configuration' : [] | [string],
+  'issuer' : [] | [string],
+  'discovery_domain' : string,
+  'client_id' : [] | [string],
+}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
@@ -837,6 +936,20 @@ export interface OpenIdCredential {
   'iss' : Iss,
   'sub' : Sub,
   'metadata' : MetadataMapV2,
+  /**
+   * SSO discovery domain, looked up by `(iss, aud)` against the
+   * canister's registered discoverable OIDC configs. `None` for
+   * direct-provider credentials (Google / Apple / Microsoft) and for
+   * SSO credentials whose provider is no longer registered.
+   */
+  'sso_domain' : [] | [string],
+  /**
+   * Human-readable SSO name from the domain's
+   * `/.well-known/ii-openid-configuration`. `None` when the domain
+   * doesn't publish one — callers should fall back to `sso_domain`
+   * for the label.
+   */
+  'sso_name' : [] | [string],
   'last_usage_timestamp' : [] | [Timestamp],
 }
 export type OpenIdCredentialAddError = {
@@ -846,7 +959,7 @@ export type OpenIdCredentialAddError = {
   { 'JwtExpired' : null } |
   { 'Unauthorized' : Principal } |
   { 'JwtVerificationFailed' : null };
-export type OpenIdCredentialKey = [Iss, Sub];
+export type OpenIdCredentialKey = [Iss, Sub, Aud];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
   { 'Unauthorized' : Principal };
@@ -890,6 +1003,42 @@ export interface PrepareAttributeRequest {
 export interface PrepareAttributeResponse {
   'attributes' : Array<[string, Uint8Array | number[]]>,
   'issued_at_timestamp_ns' : Timestamp,
+}
+export type PrepareIcrc3AttributeError = { 'AuthorizationError' : Principal } |
+  { 'ValidationError' : { 'problems' : Array<string> } } |
+  { 'GetAccountError' : GetAccountError } |
+  { 'AttributeMismatch' : { 'problems' : Array<string> } };
+export interface PrepareIcrc3AttributeRequest {
+  /**
+   * Origin of the relying party in the attribute sharing flow.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * II account for the relying party.
+   */
+  'account_number' : [] | [AccountNumber],
+  /**
+   * The attributes to be certified.
+   */
+  'attributes' : Array<AttributeSpec>,
+  /**
+   * The nonce is a 32-byte value generated by the relying party.
+   * The purpose of the nonce is to prevent replay attacks and
+   * enable the relying party to expire attributes issued for a given flow.
+   * The value of the nonce will be included into the signed ICRC-3
+   * message as a separate attribute with the key `implicit:nonce`.
+   */
+  'nonce' : Uint8Array | number[],
+  /**
+   * Identity for which the attributes should be prepared.
+   */
+  'identity_number' : IdentityNumber,
+}
+export interface PrepareIcrc3AttributeResponse {
+  /**
+   * Candid-encoded ICRC-3 Value map. Pass this to get_icrc3_attributes.
+   */
+  'message' : Uint8Array | number[],
 }
 export type PrepareIdAliasError = {
     /**
@@ -1069,6 +1218,10 @@ export interface WebAuthnCredential {
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
+  'add_discoverable_oidc_config' : ActorMethod<
+    [DiscoverableOidcConfig],
+    undefined
+  >,
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
@@ -1199,6 +1352,11 @@ export interface _SERVICE {
    */
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
+  /**
+   * OIDC Discovery
+   * ===============
+   */
+  'discovered_oidc_configs' : ActorMethod<[], Array<OidcConfig>>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   /**
@@ -1235,6 +1393,11 @@ export interface _SERVICE {
   'get_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, Timestamp],
     GetDelegationResponse
+  >,
+  'get_icrc3_attributes' : ActorMethod<
+    [GetIcrc3AttributeRequest],
+    { 'Ok' : GetIcrc3AttributeResponse } |
+      { 'Err' : GetIcrc3AttributeError }
   >,
   'get_id_alias' : ActorMethod<
     [GetIdAliasRequest],
@@ -1309,6 +1472,11 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  'list_available_attributes' : ActorMethod<
+    [ListAvailableAttributesRequest],
+    { 'Ok' : ListAvailableAttributesResponse } |
+      { 'Err' : ListAvailableAttributesError }
+  >,
   /**
    * Returns all devices of the user (authentication and recovery) but no information about device registrations.
    * Note: Clears out the 'alias' fields on the devices. Use 'get_anchor_info' to obtain the full information.
@@ -1389,6 +1557,15 @@ export interface _SERVICE {
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
+  >,
+  /**
+   * ICRC-3 Attribute sharing protocol
+   * ==================================
+   */
+  'prepare_icrc3_attributes' : ActorMethod<
+    [PrepareIcrc3AttributeRequest],
+    { 'Ok' : PrepareIcrc3AttributeResponse } |
+      { 'Err' : PrepareIcrc3AttributeError }
   >,
   /**
    * Old Verifiable Credentials API

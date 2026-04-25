@@ -202,7 +202,14 @@ fn create_openid_credential_and_config(
     let OpenIDRegFinishArg { jwt, salt, name: _ } = openid_registration_data;
 
     let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
-        Ok((provider.verify(jwt, salt)?, provider.issuer()))
+        // `with_provider` only yields providers whose discovery has completed, so
+        // `issuer()` is always Some — surface an explicit error if that ever breaks.
+        let issuer = provider.issuer().ok_or_else(|| {
+            openid::OpenIDJWTVerificationError::GenericError(
+                "Selected provider has no issuer after discovery filter".to_string(),
+            )
+        })?;
+        Ok((provider.verify(jwt, salt)?, issuer))
     })?;
 
     Ok((openid_credential, openid_config_iss))

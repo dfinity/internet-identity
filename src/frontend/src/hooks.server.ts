@@ -11,10 +11,14 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.ok
   ) {
     // Get frontend canister id and then fetch it's HTML
-    const canisterId = execSync("dfx canister id internet_identity_frontend")
+    const canisterId = execSync(
+      "icp canister status internet_identity_frontend --id-only",
+    )
       .toString()
       .trim();
-    const port = execSync("dfx info webserver-port").toString().trim();
+    const port = new URL(
+      JSON.parse(execSync("icp network status --json").toString()).gateway_url,
+    ).port;
     const canisterResponse = await fetch(
       `http://${canisterId}.localhost:${port}`,
     );

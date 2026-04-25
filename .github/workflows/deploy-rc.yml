@@ -58,25 +58,26 @@ jobs:
       - name: "Print shasum of found build"
         run: shasum -a 256 ./internet_identity_backend.wasm.gz
 
-      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
+      - name: Install icp-cli
+        run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
       - name: "Install key"
         env:
-          DFX_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
+          ICP_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}
         run: |
           key_pem=$(mktemp)
-          printenv "DFX_DEPLOY_KEY" > "$key_pem"
-          dfx identity import --disable-encryption --force default "$key_pem"
+          printenv "ICP_DEPLOY_KEY" > "$key_pem"
+          icp identity import --disable-encryption --force default "$key_pem"
           rm "$key_pem"
 
       - name: "Deploy Release Candidate"
         run: |
           wallet="${{ env.wallet_canister_id }}"
-          # Needed to surpass dfx error to use the insecure plaintext identity
-          export DFX_WARNING=-mainnet_plaintext_identity
-          dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --wasm internet_identity_backend.wasm.gz \
-            ${{ env.ii_canister_id }}
+          # Needed to suppress icp-cli warning about insecure plaintext identity
+          export ICP_WARNING=-mainnet_plaintext_identity
+          icp canister install ${{ env.ii_canister_id }} \
+            -e ic --proxy "$wallet" --mode upgrade \
+            --wasm internet_identity_backend.wasm.gz
 
       - name: Send RC link to slack
         uses: ./.github/actions/slack

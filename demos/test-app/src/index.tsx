@@ -14,7 +14,13 @@ import ReactDOM from "react-dom/client";
 
 import { decodeJwt } from "jose";
 
-import { authWithII, CertifiedAttribute, extractDelegation } from "./auth";
+import {
+  authWithII,
+  CertifiedAttribute,
+  extractDelegation,
+  Icrc3Attributes,
+} from "./auth";
+import { formatIcrc3Attributes } from "./icrc3";
 
 import "./main.css";
 
@@ -78,9 +84,19 @@ const allowPinAuthenticationEl = document.getElementById(
   "allowPinAuthentication",
 ) as HTMLInputElement;
 const useIcrc25El = document.getElementById("useIcrc25") as HTMLInputElement;
+const useIcrc3AttributesEl = document.getElementById(
+  "useIcrc3Attributes",
+) as HTMLInputElement;
+const icrc3NonceEl = document.getElementById("icrc3Nonce") as HTMLInputElement;
 const requestAttributesEl = document.getElementById(
   "requestAttributes",
 ) as HTMLInputElement;
+const icrc3AttributesEl = document.getElementById(
+  "icrc3Attributes",
+) as HTMLPreElement;
+const icrc3AttributesDecodedEl = document.getElementById(
+  "icrc3AttributesDecoded",
+) as HTMLPreElement;
 
 let iiProtocolTestWindow: Window | undefined;
 
@@ -130,10 +146,12 @@ const updateDelegationView = ({
   authnMethod,
   identity,
   certifiedAttributes,
+  icrc3Attributes,
 }: {
   authnMethod?: string;
   identity: Identity;
   certifiedAttributes?: Record<string, CertifiedAttribute>;
+  icrc3Attributes?: Icrc3Attributes;
 }) => {
   principalEl.innerText = identity.getPrincipal().toText();
 
@@ -186,13 +204,35 @@ const updateDelegationView = ({
     ).toString();
 
     // Display certified attributes if available.
-    if (certifiedAttributes) {
+    if (certifiedAttributes !== undefined) {
       certifiedAttributesEl.innerText = Object.entries(certifiedAttributes)
         .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
         .map(([key, { value }]) => `${key}: ${new TextDecoder().decode(value)}`)
         .join("\n");
     } else {
-      certifiedAttributesEl.innerText = "No certified attributes";
+      certifiedAttributesEl.innerText = "";
+    }
+
+    // Display ICRC-3 attributes if available.
+    if (icrc3Attributes !== undefined) {
+      icrc3AttributesEl.innerText = JSON.stringify({
+        // @ts-ignore Not known in TS types yet but supported in all browsers
+        data: icrc3Attributes.data.toBase64(),
+        // @ts-ignore Not known in TS types yet but supported in all browsers
+        signature: icrc3Attributes.signature.toBase64(),
+      });
+      try {
+        icrc3AttributesDecodedEl.innerText = formatIcrc3Attributes(
+          icrc3Attributes.data,
+        );
+      } catch (err) {
+        icrc3AttributesDecodedEl.innerText = `Failed to decode: ${
+          err instanceof Error ? err.message : String(err)
+        }`;
+      }
+    } else {
+      icrc3AttributesEl.innerText = "";
+      icrc3AttributesDecodedEl.innerText = "";
     }
   } else {
     delegationEl.innerText = "Current identity is not a DelegationIdentity";
@@ -311,6 +351,12 @@ const init = async () => {
         sessionIdentity: getLocalIdentity(),
         autoSelectionPrincipal,
         useIcrc25: useIcrc25El.checked,
+        useIcrc3Attributes: useIcrc3AttributesEl.checked,
+        icrc3Nonce:
+          icrc3NonceEl.value.trim() !== ""
+            ? // @ts-ignore Not known in TS types yet but supported in all browsers
+              Uint8Array.fromBase64(icrc3NonceEl.value.trim())
+            : undefined,
         requestAttributes: requestAttributesEl.value
           .split("\n")
           .map((s) => s.trim())
@@ -321,6 +367,7 @@ const init = async () => {
         identity: delegationIdentity,
         authnMethod: result.authnMethod,
         certifiedAttributes: result.certifiedAttributes,
+        icrc3Attributes: result.icrc3Attributes,
       });
     } catch (e) {
       showError(JSON.stringify(e));

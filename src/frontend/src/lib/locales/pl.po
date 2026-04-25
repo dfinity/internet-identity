@@ -22,17 +22,47 @@ msgstr "{0} użytkownik"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} został przeniesiony do nowej tożsamości internetowej"
 
+msgid "{attribute}:"
+msgstr ""
+
+msgid "{displayName} account"
+msgstr ""
+
+msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
+msgstr ""
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+msgstr ""
+
+msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
+msgstr ""
+
+msgid "{domainInput}'s SSO denied the sign-in."
+msgstr ""
+
+msgid "{domainInput}'s SSO returned \"{0}\": {1}"
+msgstr ""
+
+msgid "{domainInput}'s SSO returned error \"{0}\"."
+msgstr ""
+
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} została usunięta z tego urządzenia."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Osiągnąłeś/aś maksymalnie # konto dla pojedynczej aplikacji.} few {Osiągnąłeś/aś maksymalnie # konta dla pojedynczej aplikacji.} other {Osiągnąłeś/aś maksymalnie # kont dla pojedynczej aplikacji.}}"
 
-msgid "{name} account"
-msgstr "{name} konto"
-
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# klucz dostępu} few {# klucze dostępu} other {# kluczy dostępu}}"
+
+msgid "{providerName} {attribute}:"
+msgstr ""
+
+msgid "{providerName} email:"
+msgstr ""
+
+msgid "{providerName} name:"
+msgstr ""
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Całkowicie przeprojektowany interfejs:</0> Nadaliśmy Internet Identity odświeżony, nowoczesny wygląd i charakter. Nowy projekt jest intuicyjny i łatwiejszy w nawigacji, zapewniając płynniejszą podróż użytkownika."
@@ -103,6 +133,9 @@ msgstr "Dodaj lub usuń sposoby logowania za pomocą swojej tożsamości."
 msgid "Advanced identity management"
 msgstr "Zaawansowane zarządzanie tożsamością"
 
+msgid "Allow to access this info"
+msgstr ""
+
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
 
@@ -112,14 +145,23 @@ msgstr "Ponieważ jesteś obecnie zalogowany/a przy użyciu tego konta, zostanie
 msgid "As you are currently signed in with this passkey, you will be signed out."
 msgstr "Ponieważ jesteś obecnie zalogowany/a przy użyciu tego klucza dostępu, zostaniesz wylogowany/a."
 
+msgid "Attribute sharing failed"
+msgstr ""
+
 msgid "Authenticating..."
 msgstr "Uwierzytelnianie..."
+
+msgid "Authentication failed"
+msgstr ""
 
 msgid "Authentication successful"
 msgstr "Uwierzytelnianie zakończone sukcesem"
 
 msgid "Authorize new device"
 msgstr "Autoryzuj nowe urządzenie"
+
+msgid "Back to sign-in options"
+msgstr ""
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Zanim zaczniesz, znajdź ustronne miejsce i przygotuj swoją frazę odzyskiwania. Zachowaj ją w tajemnicy, aby chronić swoją tożsamość."
@@ -139,6 +181,9 @@ msgstr "Anuluj"
 msgid "CAPTCHA characters"
 msgstr "Znaki CAPTCHA"
 
+msgid "Change"
+msgstr ""
+
 msgid "Characters are case-sensitive"
 msgstr "Znaki rozróżniają wielkość liter"
 
@@ -151,6 +196,9 @@ msgstr "Sprawdzanie frazy odzyskiwania"
 msgid "Checking your order"
 msgstr "Sprawdzanie Twojego zamówienia"
 
+msgid "Checking..."
+msgstr ""
+
 msgid "Choose an account"
 msgstr "Wybierz konto"
 
@@ -162,6 +210,9 @@ msgstr "Wybierz metodę"
 
 msgid "Choose method to continue"
 msgstr "Wybierz metodę, aby kontynuować"
+
+msgid "Choose which details you'd like to share"
+msgstr ""
 
 msgid "Clear all"
 msgstr "Wyczyść wszystko"
@@ -177,6 +228,12 @@ msgstr "Zamknij menu"
 
 msgid "Code copied to clipboard"
 msgstr "Kod skopiowany do schowka"
+
+msgid "Company domain"
+msgstr ""
+
+msgid "company.domain.com"
+msgstr ""
 
 msgid "Complete set-up"
 msgstr "Zakończ konfigurację"
@@ -213,6 +270,12 @@ msgstr "Kontynuuj z {name}"
 
 msgid "Continue with passkey"
 msgstr "Kontynuuj za pomocą klucza dostępu"
+
+msgid "Continue with SSO"
+msgstr ""
+
+msgid "Couldn't reach {domainInput}. Check the spelling and your network."
+msgstr ""
 
 msgid "Create account"
 msgstr "Utwórz konto"
@@ -256,6 +319,9 @@ msgstr "Potwierdzono, że Dashlane jest niekompatybilny."
 msgid "Default"
 msgstr "Domyślny"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "Identyfikowalne klucze dostępu"
 
@@ -277,11 +343,11 @@ msgstr "Edytuj {name}"
 msgid "Edit account"
 msgstr "Edytuj konto"
 
+msgid "Email:"
+msgstr ""
+
 msgid "Enable multiple accounts"
 msgstr "Włącz wiele kont"
-
-msgid "Encountered an internal error while processing the request."
-msgstr "Wystąpił błąd wewnętrzny podczas przetwarzania żądania."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Wprowadź nazwę dla swojej tożsamości, aby zakończyć aktualizację. Po ustawieniu nie będzie można jej później zmienić."
@@ -294,6 +360,9 @@ msgstr "Wpisz każde słowo we właściwej kolejności:"
 
 msgid "Enter recovery phrase"
 msgstr "Wpisz frazę odzyskiwania"
+
+msgid "Enter your company domain"
+msgstr ""
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Wszystko, co musisz wiedzieć o Internet Identity, Twoim prywatnym, bezpiecznym i łatwym sposobie logowania do aplikacji w Internet Computer."
@@ -464,6 +533,9 @@ msgstr "Nieprawidłowy link do kodu"
 msgid "Invalid code. Please check and try again."
 msgstr "Nieprawidłowy kod. Sprawdź i spróbuj ponownie."
 
+msgid "Invalid domain"
+msgstr ""
+
 msgid "Invalid recovery phrase"
 msgstr "Nieprawidłowa fraza odzyskiwania"
 
@@ -487,9 +559,6 @@ msgstr "Wygląda na to, że otrzymano nieprawidłowe żądanie uwierzytelnienia.
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Wygląda na to, że nie udało się nawiązać połączenia z usługą. Spróbuj użyć innej przeglądarki; jeśli problem będzie się powtarzał, skontaktuj się z pomocą techniczną."
-
-msgid "It seems like the connection with the service could not be re-established."
-msgstr "Wygląda na to, że nie udało się ponownie nawiązać połączenia z usługą."
 
 msgid "It seems like the request could not be processed."
 msgstr "Wygląda na to, że żądanie nie mogło zostać przetworzone."
@@ -532,6 +601,9 @@ msgstr "Osiągnięto limit"
 
 msgid "Link copied to clipboard"
 msgstr "Link skopiowany do schowka"
+
+msgid "Loading permissions"
+msgstr ""
 
 msgid "Locked legacy recovery phrase"
 msgstr "Zablokowana stara fraza odzyskiwania"
@@ -595,6 +667,9 @@ msgstr "Nazwa konta"
 
 msgid "Name your identity"
 msgstr "Nazwij swoją tożsamość"
+
+msgid "Name:"
+msgstr ""
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Nie są udostępniane żadne dane Google, Microsoft ani Apple dotyczące aplikacji, w których logujesz się za pomocą Internet Identity."
@@ -707,9 +782,6 @@ msgstr "Fraza odzyskiwania niezweryfikowana"
 msgid "Recovery phrase set"
 msgstr "Fraza odzyskiwania ustawiona"
 
-msgid "Redirecting to the app"
-msgstr "Przekierowywanie do aplikacji"
-
 msgid "Remove"
 msgstr "Usuń"
 
@@ -767,6 +839,9 @@ msgstr "Powrót do aplikacji"
 msgid "Return to application"
 msgstr "Powrót do aplikacji"
 
+msgid "Review Permissions"
+msgstr ""
+
 msgid "Right now"
 msgstr "Teraz"
 
@@ -803,6 +878,12 @@ msgstr "Sesja wygasła"
 msgid "Set as default sign-in"
 msgstr "Ustaw jako domyślne logowanie"
 
+msgid "Several SSO sign-ins are in flight already. Wait a moment."
+msgstr ""
+
+msgid "Share {label}"
+msgstr ""
+
 msgid "Show all"
 msgstr "Pokaż wszystkie"
 
@@ -821,8 +902,8 @@ msgstr "Loguj się za pomocą znanych metod"
 msgid "Sign in with another identity"
 msgstr "Zaloguj się z inną tożsamością"
 
-msgid "Sign in with your {name} account from any device."
-msgstr "Zaloguj się na swoje konto {name} z dowolnego urządzenia."
+msgid "Sign in with your {displayName} account from any device."
+msgstr ""
 
 msgid "Sign out"
 msgstr "Wyloguj się"
@@ -855,12 +936,23 @@ msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "Coś jest nie tak!"
 
-msgctxt "Fallback error message when an unexpected error is caught"
-msgid "Something went wrong"
-msgstr "Coś poszło nie tak"
+msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+msgstr ""
+
+msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
+msgstr ""
 
 msgid "Source code"
 msgstr "Kod źródłowy"
+
+msgid "SSO"
+msgstr ""
+
+msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
+msgstr ""
+
+msgid "SSO sign-in for {domainInput} failed. Please try again."
+msgstr ""
 
 msgid "Start over"
 msgstr "Zacznij od nowa"
@@ -940,6 +1032,9 @@ msgstr "Wystąpił problem z połączeniem z aplikacją. Spróbuj użyć innej p
 msgid "This app has moved to the new Internet Identity"
 msgstr "Ta aplikacja została przeniesiona do nowego Internet Identity"
 
+msgid "This browser is not supported."
+msgstr ""
+
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Ta tożsamość została już zaktualizowana do nowego doświadczenia."
 
@@ -951,6 +1046,9 @@ msgstr "Może to potrwać kilka sekund"
 
 msgid "This passkey is no longer associated with any identity."
 msgstr "Ten klucz dostępu nie jest już powiązany z żadną tożsamością."
+
+msgid "This SSO is already linked to your identity."
+msgstr ""
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Ten YubiKey ma starsze oprogramowanie układowe (5.1), które jest niekompatybilne."
@@ -988,6 +1086,9 @@ msgstr "Aby kontynuować:"
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Aby dokończyć konfigurowanie klucza dostępu, postępuj zgodnie z instrukcjami wyświetlanymi na <0>nowym urządzeniu</0>."
 
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
+msgstr ""
+
 msgid "Type each word in the correct order:"
 msgstr "Wpisz każde słowo we właściwej kolejności:"
 
@@ -1005,9 +1106,6 @@ msgstr "Zrozumienie Internet Identity"
 
 msgid "Undo"
 msgstr "Cofnij"
-
-msgid "Unexpected error"
-msgstr "Nieoczekiwany błąd"
 
 msgid "Unknown"
 msgstr "Nieznany"
@@ -1032,6 +1130,9 @@ msgstr "Odblokuj, aby kontynuować"
 
 msgid "Unsupported"
 msgstr "Nieobsługiwane"
+
+msgid "Unsupported browser"
+msgstr ""
 
 msgid "Unsupported Browser"
 msgstr "Nieobsługiwana przeglądarka"

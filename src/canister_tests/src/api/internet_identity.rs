@@ -365,6 +365,34 @@ pub fn config(
     call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ()).map(|(x,)| x)
 }
 
+pub fn discovered_oidc_configs(
+    env: &PocketIc,
+    canister_id: CanisterId,
+) -> Result<Vec<types::OidcConfig>, RejectResponse> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "discovered_oidc_configs",
+        (),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn add_discoverable_oidc_config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    config: types::DiscoverableOidcConfig,
+) -> Result<(), RejectResponse> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "add_discoverable_oidc_config",
+        (config,),
+    )
+}
+
 pub fn openid_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,

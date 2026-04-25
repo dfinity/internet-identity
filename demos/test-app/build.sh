@@ -5,9 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-pushd ../../
-npm run --workspace ./demos/test-app build
-popd
+npm ci --no-audit --no-fund
+npm run build
 
 cargo build --release --target wasm32-unknown-unknown
 ic-wasm "target/wasm32-unknown-unknown/release/test_app.wasm" -o "./test_app.wasm" shrink

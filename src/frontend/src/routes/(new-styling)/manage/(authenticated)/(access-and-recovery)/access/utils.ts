@@ -55,7 +55,8 @@ export const toAccessMethods = (
 
 /**
  * Returns a unique string key for an access method.
- * Uses credential ID for passkeys and issuer+subject for OpenID.
+ * Uses credential ID for passkeys and a JSON-encoded (iss, sub, aud) triple
+ * for OpenID so components can't collide via concatenation.
  */
 export const toKey = (accessMethod: AccessMethod): string => {
   if (
@@ -67,7 +68,11 @@ export const toKey = (accessMethod: AccessMethod): string => {
     );
   }
   if ("openid" in accessMethod) {
-    return accessMethod.openid.iss + accessMethod.openid.sub;
+    return JSON.stringify([
+      accessMethod.openid.iss,
+      accessMethod.openid.sub,
+      accessMethod.openid.aud,
+    ]);
   }
   throw new Error("Unknown access method type");
 };

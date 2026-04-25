@@ -32,7 +32,7 @@ function help() {
 
 Deploys the archive to the specified II canister.
 
-NOTE: This requires dfx, hexdump, sed, a running II canister with the appropriate configuration to accept the supplied archive wasm.
+NOTE: This requires icp-cli, hexdump, sed, a running II canister with the appropriate configuration to accept the supplied archive wasm.
 EOF
 }
 
@@ -90,7 +90,7 @@ declare -a network_arg=( )
 
 if [ "$network" ]
 then
-    network_arg+=( "--network" "$network")
+    network_arg+=( "-e" "$network")
 fi
 
-dfx canister "${network_arg[@]}" call "$canister_id" deploy_archive --argument-file <(echo "(blob \"$(hexdump -ve '1/1 "%.2x"' "$wasm" | sed 's/../\\&/g')\")")
+icp canister "${network_arg[@]}" call "$canister_id" deploy_archive --args-file <(echo "(blob \"$(hexdump -ve '1/1 "%.2x"' "$wasm" | sed 's/../\\&/g')\")")

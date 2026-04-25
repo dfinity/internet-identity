@@ -80,6 +80,20 @@
         </div>
         <div>
           <label
+            for="useIcrc3Attributes"
+            style="display: inline-block; width: 200px"
+            >Use ICRC-3 attributes:</label
+          >
+          <input type="checkbox" id="useIcrc3Attributes" />
+        </div>
+        <div>
+          <label for="icrc3Nonce" style="display: inline-block; width: 200px"
+            >ICRC-3 nonce (base64):</label
+          >
+          <input type="text" id="icrc3Nonce" />
+        </div>
+        <div>
+          <label
             for="requestAttributes"
             style="display: inline-block; width: 200px"
             >Request attributes:</label
@@ -99,6 +113,10 @@
         <div id="expiration"></div>
         <h3>Certified Attributes:</h3>
         <pre id="certifiedAttributes"></pre>
+        <h3>ICRC-3 Attributes (decoded):</h3>
+        <pre id="icrc3AttributesDecoded"></pre>
+        <h3>ICRC-3 Attributes (raw):</h3>
+        <pre id="icrc3Attributes"></pre>
       </section>
 
       <section>

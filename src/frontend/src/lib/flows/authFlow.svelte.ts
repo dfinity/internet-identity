@@ -33,7 +33,9 @@ import {
   RequestConfig,
   decodeJWT,
   extractIssuerTemplateClaims,
+  selectAuthScopes,
 } from "$lib/utils/openID";
+import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
@@ -47,6 +49,7 @@ export class AuthFlow {
     | "setupOrUseExistingPasskey"
     | "setupNewPasskey"
     | "setupNewIdentity"
+    | "signInWithSso"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -88,6 +91,44 @@ export class AuthFlow {
       AuthenticationV2Events.ContinueWithPasskeyScreen,
     );
     this.#view = "setupOrUseExistingPasskey";
+  };
+
+  signInWithSso = (): void => {
+    this.#view = "signInWithSso";
+  };
+
+  continueWithSso = async (
+    ssoResult: SsoDiscoveryResult,
+  ): Promise<
+    | {
+        identityNumber: bigint;
+        type: "signIn";
+      }
+    | {
+        name?: string;
+        type: "signUp";
+      }
+  > => {
+    const { clientId, discovery } = ssoResult;
+
+    // Build a synthetic OpenIdConfig from SSO discovery result. The
+    // canister identifies the matching DiscoverableProvider by (iss,
+    // aud) and stamps `sso_domain` (+ optional `sso_name`) onto the
+    // credential when it verifies the JWT — the FE doesn't need to
+    // remember anything about this flow locally.
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: "",
+      name: "SSO",
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: discovery.issuer,
+      auth_scope: selectAuthScopes(discovery.scopes_supported),
+      client_id: clientId,
+    };
+
+    return await this.continueWithOpenId(syntheticConfig);
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
@@ -210,7 +251,7 @@ export class AuthFlow {
           identityNumber,
           name: info.name[0],
           authMethod: {
-            openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
+            openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
           },
           createdAtMillis: info.created_at.map(nanosToMillis)[0],
         });
@@ -411,19 +452,11 @@ export class AuthFlow {
       if (email !== undefined) {
         metadata.push(["email", { String: email }]);
       }
-      const claimKeys = extractIssuerTemplateClaims(configIssuer);
-      if (claimKeys !== undefined) {
-        claimKeys.forEach((key) => {
-          if (restJWTClaims[key] !== undefined) {
-            metadata.push([
-              key,
-              {
-                String: restJWTClaims[key],
-              },
-            ]);
-          }
-        });
-      }
+      extractIssuerTemplateClaims(configIssuer).forEach((key) => {
+        if (restJWTClaims[key] !== undefined) {
+          metadata.push([key, { String: restJWTClaims[key] }]);
+        }
+      });
       if (this.#options.trackLastUsed) {
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber,

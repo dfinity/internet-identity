@@ -2,7 +2,9 @@ name: Frontend checks and lints
 
 on:
   push:
+    branches: [main]
   pull_request:
+  merge_group:
 
 jobs:
   frontend-checks:
@@ -38,9 +40,9 @@ jobs:
           done < <(jq <src/frontend/src/flows/dappsExplorer/dapps.json -cMr '.[] | .logo' )
       - name: Commit type interfaces
         uses: EndBug/add-and-commit@v9
-        # We don't want to commit automatic changes to main, and we can't
-        # push to fork PRs (read-only token).
-        if: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
+        # Push only fires on `main` now, so this is inert. Preserved for
+        # reference; re-enable by gating on a suitable event.
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main' }}
         with:
           add: |
             src/frontend/generated

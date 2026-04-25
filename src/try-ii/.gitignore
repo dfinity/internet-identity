@@ -7,8 +7,8 @@
 .DS_Store
 **/.DS_Store
 
-# dfx temporary files
-.dfx/
+# icp-cli temporary files
+.icp/
 
 # generated files
 **/declarations/

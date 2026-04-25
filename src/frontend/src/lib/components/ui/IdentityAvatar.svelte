@@ -17,7 +17,15 @@
       identity.authMethod.openid.metadata !== undefined
       ? openIdLogo(
           identity.authMethod.openid.iss,
+          // `aud` not currently tracked on `LastUsedIdentity` (see
+          // #3795) — issuer-only fallback in `findConfig` is correct
+          // for direct providers, imprecise for SSO until that's
+          // fixed. `ssoDomain` is unknown here for the same reason,
+          // so SSO-linked last-used identities render with the
+          // underlying IdP's logo.
+          undefined,
           identity.authMethod.openid.metadata,
+          undefined,
         )
       : undefined,
   );

@@ -15,10 +15,6 @@ export const reroute: Reroute = ({ url }) => {
   if (url.hash === "#authorize") {
     return get(DISCOVERABLE_PASSKEY_FLOW) ? "/authorize" : "/legacy/authorize";
   }
-  // Load direct authorization page instead if openid param is present
-  if (url.pathname === "/authorize" && url.searchParams.has("openid")) {
-    return `/init-openid-authorize`;
-  }
   if (url.pathname === "/") {
     return get(DISCOVERABLE_PASSKEY_FLOW) || building ? "/" : "/legacy";
   }

@@ -13,6 +13,15 @@ cat > "$section_intro" << EOF
 This is Internet Identity release [$RELEASE_TAG](https://github.com/dfinity/internet-identity/releases/tag/$RELEASE_TAG) for commit [$GITHUB_SHA](https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA).
 EOF
 
+# "Try it out" section so readers (and downstream forum/proposal tooling) can
+# reach staging and the test application without hunting for links.
+section_try_it_out=$(mktemp)
+cat > "$section_try_it_out" <<EOF
+## Try it out
+* Staging: https://beta.id.ai
+* Testing application: https://try.id.ai
+EOF
+
 # Starting the artifacts section where we add the shas of all input assets
 section_build_flavors=$(mktemp)
 
@@ -37,7 +46,8 @@ git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
 ./scripts/verify-hash \
     --ii-hash $(shasum -a 256 "internet_identity_backend.wasm.gz" | cut -d ' ' -f1) \
-    --iife-hash $(shasum -a 256 internet_identity_frontend.wasm.gz | cut -d ' ' -f1)
+    --iife-hash $(shasum -a 256 "internet_identity_frontend.wasm.gz" | cut -d ' ' -f1) \
+    --archive-hash $(shasum -a 256 "archive.wasm.gz" | cut -d ' ' -f1)
 \`\`\`
 
 Make sure to compare the hashes also with the proposal payload when verifying canister upgrade proposals.
@@ -177,6 +187,7 @@ fi
 body=$(mktemp)
 >&2 echo "Using '$body' for body"
 cat "$section_intro" >> "$body" && echo >> "$body" && rm "$section_intro"
+cat "$section_try_it_out" >> "$body" && echo >> "$body" && rm "$section_try_it_out"
 cat "$section_changelog" >> "$body" && echo >> "$body" && rm "$section_changelog"
 cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build_flavors"
 cat "$section_wasm_verification" >> "$body" && echo >> "$body" && rm "$section_wasm_verification"
