@@ -18,8 +18,6 @@ export interface AttributeGroup {
 export interface AttributeConsentContext {
   groups: AttributeGroup[];
   effectiveOrigin: string;
-  /** When set, all keys are implicit and should be used directly. */
-  implicitKeys?: string[];
 }
 
 export interface AttributeConsent {

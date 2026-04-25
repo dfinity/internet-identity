@@ -228,13 +228,13 @@ test.describe("Authorize with direct OpenID", () => {
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown scoped attribute
           `favorite_food`, // Unknown unscoped attribute
-          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Missing implicit consent
+          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Wrong issuer for 1-click OpenID auto-approval
         ],
       },
     });
 
     // Link both OpenID provider users with identity first to ensure attributes from
-    // both providers are available, but only one is returned through implicit consent.
+    // both providers are available, but only the active issuer's are auto-approved.
     test.beforeEach(
       async ({
         page,
@@ -271,7 +271,8 @@ test.describe("Authorize with direct OpenID", () => {
       const blobEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
-      // Only the name from the default provider should be present via implicit consent.
+      // Only the name from the default (active) provider — auto-approved
+      // via 1-click OpenID — should be present.
       expect(
         blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
       ).toBe(defaultName);
@@ -291,10 +292,10 @@ test.describe("Authorize with direct OpenID", () => {
       openIdUsers,
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      // Mixing implicit keys with non-implicit / unknown ones takes the
-      // consent path instead of 1-click. The defaults (all options checked,
-      // first provider selected for the `name` picker) match the assertions
-      // below — just accept.
+      // Mixing 1-click-eligible keys with non-eligible / unknown ones takes
+      // the consent path instead of 1-click. The defaults (all options
+      // checked, first provider selected for the `name` picker) match the
+      // assertions below — just accept.
       await attributeConsentView.accept();
     });
   });

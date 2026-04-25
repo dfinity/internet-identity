@@ -24,7 +24,7 @@ import {
 import { handleDelegationRequest } from "$lib/stores/channelHandlers/delegation";
 import {
   handleLegacyAttributes,
-  handleIcrc3ImplicitAttributes,
+  handleIcrc3OneClickOpenIdAttributes,
   handleIcrc3ConsentAttributes,
 } from "$lib/stores/channelHandlers/attributes";
 
@@ -102,7 +102,7 @@ export const channelStore: ChannelStore = {
       );
       channel.addEventListener(
         "request",
-        handleIcrc3ImplicitAttributes(channel, onError),
+        handleIcrc3OneClickOpenIdAttributes(channel, onError),
       );
       channel.addEventListener(
         "request",

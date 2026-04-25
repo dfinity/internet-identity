@@ -44,9 +44,9 @@ export const extractScope = (key: string): string | undefined => {
  *  consent screen at a time — if a (possibly malicious) dapp sends several
  *  in parallel, each `setContext` would otherwise overwrite the previous
  *  one and the user could click through on one request while a different
- *  one silently receives their approval. The legacy and implicit handlers
- *  don't touch `attributeConsentStore`, so only the consent handler needs
- *  this lock. */
+ *  one silently receives their approval. The legacy and 1-click OpenID
+ *  handlers don't touch `attributeConsentStore`, so only the consent
+ *  handler needs this lock. */
 let consentQueueTail: Promise<unknown> = Promise.resolve();
 const serializeConsentRequest = <T>(fn: () => Promise<T>): Promise<T> => {
   const prev = consentQueueTail;
@@ -56,17 +56,20 @@ const serializeConsentRequest = <T>(fn: () => Promise<T>): Promise<T> => {
   return next;
 };
 
-/** Check if a scoped key is an implicit consent key for the given issuer. */
-const isImplicitConsentKey = (key: string, configIssuer: string): boolean =>
+/** Whether a scoped key is in the 1-click OpenID auto-approve allowlist
+ *  for the given issuer — these keys skip the consent screen because the
+ *  user already proved possession of that issuer's account during the
+ *  1-click flow. */
+const isOneClickOpenIdKey = (key: string, configIssuer: string): boolean =>
   key === `openid:${configIssuer}:name` ||
   key === `openid:${configIssuer}:email` ||
   key === `openid:${configIssuer}:verified_email`;
 
-/** Filters attribute keys to only those the user implicitly consents to. */
-const filterImplicitConsentKeys = (
+/** Filters attribute keys to the 1-click OpenID auto-approve allowlist. */
+const filterOneClickOpenIdKeys = (
   keys: string[],
   configIssuer: string,
-): string[] => keys.filter((key) => isImplicitConsentKey(key, configIssuer));
+): string[] => keys.filter((key) => isOneClickOpenIdKey(key, configIssuer));
 
 /** Resolve a single requested key against available attributes.
  *  An exact match (e.g. `openid:google:email` requested + available) yields
@@ -197,8 +200,8 @@ export const handleLegacyAttributes =
       paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
     );
 
-    // Legacy attributes use implicit consent only.
-    const implicitConsentKeys = filterImplicitConsentKeys(
+    // Legacy attributes only certify the 1-click OpenID allowlist.
+    const oneClickKeys = filterOneClickOpenIdKeys(
       paramsResult.data.attributes,
       configIssuer,
     );
@@ -211,7 +214,7 @@ export const handleLegacyAttributes =
       const { attributes, issued_at_timestamp_ns } = await authenticated.actor
         .prepare_attributes({
           origin,
-          attribute_keys: implicitConsentKeys,
+          attribute_keys: oneClickKeys,
           account_number: [],
           identity_number: authenticated.identityNumber,
         })
@@ -393,14 +396,14 @@ const certifyAndSend = async (params: {
 };
 
 /**
- * Handle `ii-icrc3-attributes` requests where the user has signed in via an
- * OpenID provider and every requested key is an implicit consent claim for
- * that issuer (no consent UI needed).
+ * Handle `ii-icrc3-attributes` requests where the user has signed in via the
+ * 1-click OpenID flow and every requested key is in that issuer's
+ * auto-approve allowlist (no consent UI needed).
  *
  * Waits for the authorization flow — set eagerly by the authorize page.
  * Returns early for non-OpenID flows; the consent handler takes those.
  */
-export const handleIcrc3ImplicitAttributes =
+export const handleIcrc3OneClickOpenIdAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
   async (request: JsonRequest) => {
     if (request.id === undefined || request.method !== "ii-icrc3-attributes") {
@@ -426,9 +429,7 @@ export const handleIcrc3ImplicitAttributes =
       return;
     }
     const configIssuer = flow.issuer;
-    if (
-      !requestedKeys.every((key) => isImplicitConsentKey(key, configIssuer))
-    ) {
+    if (!requestedKeys.every((key) => isOneClickOpenIdKey(key, configIssuer))) {
       return;
     }
 
@@ -450,7 +451,7 @@ export const handleIcrc3ImplicitAttributes =
       );
 
       // Filter to keys the canister actually has — the user may not have
-      // granted every implicit claim (e.g. missing verified_email).
+      // granted every claim in the allowlist (e.g. missing verified_email).
       // TODO: pass `[requestedKeys]` once the canister silently drops unknown
       // keys; today it errors on unknown names, so fetch everything and
       // filter via `availableKeys` below.
@@ -488,7 +489,7 @@ export const handleIcrc3ImplicitAttributes =
 
 /**
  * Handle `ii-icrc3-attributes` requests that require explicit consent (or
- * have nothing to certify). Pairs with `handleIcrc3ImplicitAttributes`:
+ * have nothing to certify). Pairs with `handleIcrc3OneClickOpenIdAttributes`:
  * returns early when that handler will take the request.
  */
 export const handleIcrc3ConsentAttributes =
@@ -517,13 +518,14 @@ export const handleIcrc3ConsentAttributes =
     await serializeConsentRequest(async () => {
       try {
         // Wait for the flow — set eagerly by the authorize page — so we can
-        // bail out as soon as we know the implicit handler will take this.
+        // bail out as soon as we know the 1-click OpenID handler will take
+        // this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-        const implicitHandlerWillHandle =
+        const oneClickHandlerWillHandle =
           flow.type === "1-click-openid" &&
           requestedKeys.length > 0 &&
-          requestedKeys.every((key) => isImplicitConsentKey(key, flow.issuer));
-        if (implicitHandlerWillHandle) {
+          requestedKeys.every((key) => isOneClickOpenIdKey(key, flow.issuer));
+        if (oneClickHandlerWillHandle) {
           return;
         }
 

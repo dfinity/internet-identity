@@ -50,9 +50,9 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
 // Tests
 //
 // These cover the ICRC-3 attribute consent screen — the path taken when a
-// dapp's requested keys can't all be handled by implicit consent (so the
-// fast-path `handleIcrc3ImplicitAttributes` bails and
-// `handleIcrc3ConsentAttributes` shows the consent UI).
+// dapp's requested keys aren't all in the 1-click OpenID auto-approve
+// allowlist (so the fast-path `handleIcrc3OneClickOpenIdAttributes` bails
+// and `handleIcrc3ConsentAttributes` shows the consent UI).
 //
 // UI interactions go through the `attributeConsentView` fixture rather than
 // raw role queries, so if the consent DOM shape changes we update it once in
@@ -61,8 +61,9 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
 
 test.describe("Authorize with OpenID — explicit consent UI", () => {
   test.describe("unscoped email request", () => {
-    // Single scoped attribute `openid:issuer:email` would be implicit; a bare
-    // `email` never is, so the consent screen appears.
+    // A single scoped `openid:issuer:email` would be auto-approved via
+    // 1-click OpenID; a bare `email` never is, so the consent screen
+    // appears.
     const email = "unscoped.user@example.com";
 
     test.use({
@@ -99,9 +100,9 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
   });
 
   test.describe("email + verified_email merge into one row", () => {
-    // Both are non-implicit (unscoped) so the consent handler takes the
-    // request; the view merges them into a single "Email" row whose consent
-    // still emits both certified forms.
+    // Neither is on the 1-click OpenID allowlist (unscoped), so the consent
+    // handler takes the request; the view merges them into a single "Email"
+    // row whose consent still emits both certified forms.
     const email = "verified.merge@example.com";
 
     test.use({
@@ -142,10 +143,10 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
   });
 
   test.describe("scoped + unscoped same attribute → two rows", () => {
-    // The scoped form is implicit on its own, but pairing it with the unscoped
-    // form forces the consent handler (not all keys implicit). The dedupe
-    // logic keys by (name, omitScope), so the two requests survive as
-    // distinct rows with distinct labels.
+    // The scoped form is auto-approved on its own via 1-click OpenID, but
+    // pairing it with the unscoped form forces the consent handler (not all
+    // keys are on the allowlist). The dedupe logic keys by (name, omitScope),
+    // so the two requests survive as distinct rows with distinct labels.
     const email = "mixed.forms@example.com";
     const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
     const providerName = `Test OpenID ${DEFAULT_OPENID_PORT}`;
@@ -418,8 +419,8 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
 
   test.describe("regular passkey flow with linked OpenID credential", () => {
     // User signs in via passkey, not 1-click OpenID — so `flow.type` is
-    // "regular" and the implicit fast-path never runs. Attributes are still
-    // sourced from the OpenID credential that was linked to the anchor
+    // "regular" and the 1-click OpenID fast-path never runs. Attributes are
+    // still sourced from the OpenID credential that was linked to the anchor
     // ahead of time, so the consent handler has something to show.
     const name = "Linked User";
     const email = "linked@example.com";

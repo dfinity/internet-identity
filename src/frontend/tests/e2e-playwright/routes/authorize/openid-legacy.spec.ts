@@ -104,13 +104,13 @@ test.describe("Authorize with direct OpenID (legacy attributes)", () => {
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown scoped attribute
           `favorite_food`, // Unknown unscoped attribute
-          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Missing implicit consent
+          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Wrong issuer for 1-click OpenID auto-approval
         ],
       },
     });
 
     // Link both OpenID provider users with identity first to ensure attributes from
-    // both providers are available, but only one is returned through implicit consent.
+    // both providers are available, but only the active issuer's are auto-approved.
     test.beforeEach(
       async ({
         page,
