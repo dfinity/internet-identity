@@ -15,6 +15,7 @@
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { XIcon } from "@lucide/svelte";
   import { Trans } from "$lib/components/locale";
+  import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
 
@@ -34,7 +35,7 @@
     authorizationContextStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
-  import { decodeJWT, findConfig } from "$lib/utils/openID";
+  import { decodeJWT, findConfig, selectAuthScopes } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import {
     DirectOpenIdEvents,
@@ -42,6 +43,8 @@
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
+  import { anonymousActor, backendCanisterConfig } from "$lib/globals";
+  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
   const { data }: PageProps = $props();
 
@@ -129,6 +132,36 @@
     window.location.assign(next);
   };
 
+  /**
+   * 1-click SSO equivalent of {@link initiateOpenId}: register the
+   * discovery domain with the canister, run two-hop discovery, then
+   * redirect through the same OpenID-redirect machinery as the direct
+   * flow. Distinct from the wizard `SignInWithSso` path only in that it
+   * has nothing to debounce or validate UI-side — the URL has already
+   * committed to a domain that's on the allowlist (gated in `+page.ts`).
+   */
+  const initiateSso = async (domain: string) => {
+    const allowlistedHosts = new Set(
+      backendCanisterConfig.sso_discoverable_domains[0] ?? [],
+    );
+    await anonymousActor.add_discoverable_oidc_config({
+      discovery_domain: domain,
+    });
+    const result = await discoverSsoConfig(domain, { allowlistedHosts });
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: result.discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: "",
+      name: "SSO",
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: result.discovery.issuer,
+      auth_scope: selectAuthScopes(result.discovery.scopes_supported),
+      client_id: result.clientId,
+    };
+    initiateOpenId(syntheticConfig);
+  };
+
   /** Process the OpenID callback and authorize. */
   const resumeOpenId = async () => {
     const searchParams = new URLSearchParams(window.location.hash.slice(1));
@@ -181,10 +214,16 @@
   onMount(() => {
     if (data.flow === "openid-init") {
       initiateOpenId(data.config);
+    } else if (data.flow === "sso-init") {
+      // Discovery + redirect runs async; the page renders nothing while
+      // it's in flight (mirrors the openid-init render branch).
+      initiateSso(data.domain).catch(handleError);
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
       resumeOpenId();
+    } else if (data.flow === "error") {
+      // Render-only path; nothing to kick off.
     } else {
       authorizationStore.setFlow({ type: "regular" });
     }
@@ -302,8 +341,14 @@
   </div>
 {/snippet}
 
-{#if data.flow === "openid-init"}
-  <!-- OpenID init — nothing to render, onMount redirects to provider. -->
+{#if data.flow === "openid-init" || data.flow === "sso-init"}
+  <!-- OpenID/SSO init — nothing to render, onMount redirects to provider. -->
+{:else if data.flow === "error"}
+  <!-- Reuse the channel error UI for invalid sign-in URLs (e.g. both
+       `?openid=` and `?sso=` set). The `invalid-request` copy already
+       reads "an invalid authentication request was received", which
+       fits this case. -->
+  <ChannelError error="invalid-request" />
 {:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
   <!-- Consent needed (or loading) — consent view handles its own loading state. -->
   {@render panelWrapper(attributeConsentContent)}

@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test";
 import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
+import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { fromBase64 } from "../../utils";
 
@@ -168,6 +169,64 @@ test.describe("Authorize via SSO", () => {
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();
+    });
+  });
+
+  // 1-click SSO: the dapp passes `?sso=<domain>` on the authorize URL,
+  // II runs discovery + redirect immediately without showing the auth
+  // wizard. Equivalent of the `?openid=<issuer>` 1-click that direct
+  // OpenID providers already use.
+  test.describe("1-click via ?sso= search param", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name: "John Doe" },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
+        useIcrc3Attributes: true,
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    });
+
+    test("redirects straight to the IdP without showing the wizard", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // The /authorize page in this case does NOT render the wizard —
+      // it kicks off the SSO redirect on mount. We end up on the IdP
+      // sign-in form directly, then come back to the auth page for the
+      // final Continue.
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  // Both `?openid=` and `?sso=` set in one URL is a misconfigured
+  // sign-in URL. Rather than silently picking one entry point, II
+  // surfaces it as an "invalid request" via the existing ChannelError
+  // UI so the dapp gets a clear signal to fix the URL.
+  test.describe("conflicting ?openid and ?sso", () => {
+    test.use({
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        sso: SSO_DISCOVERY_DOMAIN,
+      },
+    });
+
+    test("renders the channel error", async ({ authorizePage }) => {
+      await expect(
+        authorizePage.page.getByRole("heading", { name: "Invalid request" }),
+      ).toBeVisible();
     });
   });
 });

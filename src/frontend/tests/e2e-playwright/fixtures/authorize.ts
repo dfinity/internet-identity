@@ -10,7 +10,14 @@ export type AuthorizeConfig = {
   | { protocol: "legacy" }
   | {
       protocol: "icrc25";
+      /** Triggers `?openid=<issuer>` 1-click direct OpenID. */
       openid?: string;
+      /**
+       * Triggers `?sso=<domain>` 1-click SSO discovery. Mutually
+       * exclusive with `openid` — combining the two surfaces an error
+       * page rather than picking one silently.
+       */
+      sso?: string;
       attributes?: string[];
       useIcrc3Attributes?: boolean;
       icrc3Nonce?: Uint8Array;
@@ -50,15 +57,20 @@ export const test = base.extend<{
     const protocol = authorizeConfig.protocol ?? "legacy";
 
     if (protocol === "icrc25") {
+      const queryParams: string[] = [];
+      if ("openid" in authorizeConfig && authorizeConfig.openid !== undefined) {
+        queryParams.push(
+          `openid=${encodeURIComponent(authorizeConfig.openid)}`,
+        );
+      }
+      if ("sso" in authorizeConfig && authorizeConfig.sso !== undefined) {
+        queryParams.push(`sso=${encodeURIComponent(authorizeConfig.sso)}`);
+      }
+      const querySuffix =
+        queryParams.length > 0 ? `?${queryParams.join("&")}` : "";
       await testAppPage
         .getByRole("textbox", { name: "Identity Provider" })
-        .fill(
-          internetIdentityURL +
-            "/authorize" +
-            ("openid" in authorizeConfig && authorizeConfig.openid !== undefined
-              ? `?openid=${encodeURIComponent(authorizeConfig.openid)}`
-              : ""),
-        );
+        .fill(internetIdentityURL + "/authorize" + querySuffix);
       await testAppPage
         .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
         .setChecked(true);
