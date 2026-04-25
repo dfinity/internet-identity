@@ -779,6 +779,15 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             })
         }
         if let Some(sso_discoverable_domains) = arg.sso_discoverable_domains {
+            // Canonicalize at the boundary: trim whitespace and lowercase
+            // ASCII so allowlist lookups (case-insensitive on the canister
+            // via `eq_ignore_ascii_case`) and the value shipped through
+            // `/.config.did.bin` to the frontend (compared via case-
+            // sensitive `Set.has`) agree byte-for-byte.
+            let sso_discoverable_domains = sso_discoverable_domains
+                .into_iter()
+                .map(|domain| domain.trim().to_ascii_lowercase())
+                .collect();
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.sso_discoverable_domains = Some(sso_discoverable_domains);
             })

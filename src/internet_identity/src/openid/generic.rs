@@ -488,10 +488,12 @@ async fn run_discovery_tasks() {
     for task in tasks {
         // Hop 1: fetch /.well-known/ii-openid-configuration. Default to
         // https; for an allowlisted host whose name reads as a local-dev
-        // address (`localhost` / `127.x` / `[::1]`, with optional port),
-        // fall back to http so the e2e test provider — which can't serve
-        // TLS — is reachable. The allowlist itself is the trust gate; an
-        // unblessed domain never reaches this code path.
+        // address (`localhost` / `127.0.0.1`, with optional port), fall
+        // back to http so the e2e test provider — which can't serve TLS
+        // — is reachable. The allowlist itself is the trust gate; an
+        // unblessed domain never reaches this code path. IPv6 loopback
+        // is intentionally not in scope; tests only ever use the
+        // hostname form.
         let hop1_scheme = scheme_for_allowlisted_host(&task.discovery_domain);
         let hop1_url = format!(
             "{hop1_scheme}://{}/.well-known/ii-openid-configuration",
@@ -590,7 +592,10 @@ fn validate_discovery_url(url: &str) -> Result<(), String> {
 
 /// "host" or "host:port" portion of a URL, lowercased. Mirrors how
 /// admins write allowlist entries (e.g. `dfinity.org`, `localhost:11107`)
-/// so equality checks are straightforward.
+/// so equality checks are straightforward. IPv6 hosts are intentionally
+/// not handled — bracketed allowlist entries (`[::1]:11107`) wouldn't
+/// match the `host_str + port` join produced here, and we don't ship
+/// IPv6 in the test setup.
 #[cfg(not(test))]
 fn host_with_port(url: &url::Url) -> Option<String> {
     let host = url.host_str()?.to_lowercase();
@@ -602,11 +607,15 @@ fn host_with_port(url: &url::Url) -> Option<String> {
 
 /// Scheme to use when constructing the hop-1 URL for an allowlisted
 /// domain. Allowlisted hosts whose name resolves to the loopback (the
-/// e2e test provider) get `http`; everything else gets `https`.
+/// e2e test provider) get `http`; everything else gets `https`. Only
+/// the hostname form of loopback is recognised (`localhost`,
+/// `127.0.0.1`); allowlist entries written as bracketed IPv6
+/// (`[::1]:11107`) would still render as `https` and are not part of
+/// the supported test setup.
 #[cfg(not(test))]
 fn scheme_for_allowlisted_host(host: &str) -> &'static str {
     let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    if matches!(bare.as_str(), "localhost" | "127.0.0.1" | "[::1]") {
+    if matches!(bare.as_str(), "localhost" | "127.0.0.1") {
         "http"
     } else {
         "https"

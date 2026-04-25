@@ -54,8 +54,13 @@
    * test domains (`localhost:11107`); production hosts are still
    * required to use HTTPS.
    */
+  // Lowercase defensively; matches the case-insensitive comparison the
+  // canister applies and keeps lookups working if a legacy install
+  // shipped mixed-case domains.
   const allowlistedSsoHosts = new Set(
-    backendCanisterConfig.sso_discoverable_domains[0] ?? [],
+    (backendCanisterConfig.sso_discoverable_domains[0] ?? []).map((host) =>
+      host.toLowerCase(),
+    ),
   );
 
   const ensureSsoLookup = (domain: string): void => {

@@ -49,8 +49,15 @@
    * checks. Production deployments leave this empty — the strict path
    * still runs.
    */
+  // The canister normalizes entries to lowercase at install time, but
+  // lowercasing again here keeps lookups robust against legacy
+  // installs (or future config sources) that ship mixed-case domains —
+  // backend allowlist checks are case-insensitive (`eq_ignore_ascii_case`)
+  // so the frontend `Set.has` lookup needs to match that.
   const allowlistedHosts = new Set(
-    backendCanisterConfig.sso_discoverable_domains[0] ?? [],
+    (backendCanisterConfig.sso_discoverable_domains[0] ?? []).map((host) =>
+      host.toLowerCase(),
+    ),
   );
 
   let inputRef = $state<HTMLInputElement>();

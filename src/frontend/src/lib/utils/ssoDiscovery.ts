@@ -196,7 +196,10 @@ export const validateDomain = (
 /**
  * "host" or "host:port" portion of a URL, lowercased — the form admins
  * use when writing allowlist entries (`dfinity.org`, `localhost:11107`)
- * so equality checks don't need to account for default ports.
+ * so equality checks don't need to account for default ports. IPv6
+ * hosts are intentionally not handled: bracketed allowlist entries like
+ * `[::1]:11107` won't match the `hostname + port` join produced here,
+ * and the test setup only ever uses the hostname form.
  */
 const hostWithPort = (url: URL): string => {
   const host = url.hostname.toLowerCase();
@@ -206,8 +209,10 @@ const hostWithPort = (url: URL): string => {
 /**
  * Scheme to use when constructing the hop-1 URL. Allowlisted hosts that
  * resolve to the loopback (the e2e test provider, which can't serve TLS)
- * get `http`; everything else gets `https`. Mirrors the backend's
- * `scheme_for_allowlisted_host`.
+ * get `http`; everything else gets `https`. Only the hostname form of
+ * loopback is recognised (`localhost`, `127.0.0.1`); IPv6 loopback in
+ * the allowlist would still render as `https` and is out of scope.
+ * Mirrors the backend's `scheme_for_allowlisted_host`.
  */
 const schemeForHost = (
   host: string,
@@ -215,9 +220,7 @@ const schemeForHost = (
 ): "http" | "https" => {
   if (!allowlistedHosts.has(host)) return "https";
   const bare = host.split(":", 1)[0]?.toLowerCase() ?? host;
-  return bare === "localhost" || bare === "127.0.0.1" || bare === "[::1]"
-    ? "http"
-    : "https";
+  return bare === "localhost" || bare === "127.0.0.1" ? "http" : "https";
 };
 
 /**
