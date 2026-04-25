@@ -585,7 +585,9 @@ jobs:
 
       - name: Stop dev server
         if: ${{ always() }}
-        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }}
+        # `|| true` so that a dev server which has already exited (e.g. after
+        # `icp network stop` triggered shutdown above) doesn't fail the job.
+        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }} || true
 
       - name: Archive dev server logs
         if: ${{ always() }}
