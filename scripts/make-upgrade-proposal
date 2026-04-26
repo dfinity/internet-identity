@@ -435,26 +435,30 @@ prepare_staging_frontend_argument() {
 
 deploy_staging_backend() {
   echo "Deploying II backend release candidate to staging"
-  icp canister \
+  # icp-cli's --proxy expects a custom proxy canister exposing a `proxy`
+  # method, which is NOT what a dfx wallet canister implements. Use dfx
+  # here so wallet_call routing keeps working against the existing wallet.
+  dfx canister \
+    --network ic \
+    --wallet cvthj-wyaaa-aaaad-aaaaq-cai \
     install "$STAGING_BACKEND_CANISTER_ID" \
-    -e ic \
-    --proxy cvthj-wyaaa-aaaad-aaaaq-cai \
       --mode upgrade \
       --wasm ./internet_identity.wasm.gz \
-      --args-format bin \
-      --args "$(cat ./staging_icp_arg.bin)"
+      --argument-type raw \
+      --argument "$(cat ./staging_icp_arg.bin)"
 }
 
 deploy_staging_frontend() {
   echo "Deploying II frontend release candidate to staging"
-  icp canister \
+  # See deploy_staging_backend: dfx is used here for wallet-routed upgrades.
+  dfx canister \
+    --network ic \
+    --wallet cvthj-wyaaa-aaaad-aaaaq-cai \
     install "$STAGING_FRONTEND_CANISTER_ID" \
-    -e ic \
-    --proxy cvthj-wyaaa-aaaad-aaaaq-cai \
       --mode upgrade \
       --wasm ./internet_identity_frontend.wasm.gz \
-      --args-format bin \
-      --args "$(cat ./staging_icp_frontend_arg.bin)"
+      --argument-type raw \
+      --argument "$(cat ./staging_icp_frontend_arg.bin)"
 }
 
 test_release_candidate() {
