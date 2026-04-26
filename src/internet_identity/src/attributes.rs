@@ -523,7 +523,7 @@ impl Anchor {
                 // on `prepare_icrc3_attributes`. Mirror the prepare-side
                 // exclusion here so the listing matches what's actually
                 // certifiable.
-                if matches!(scope, AttributeScope::Sso { .. })
+                if matches!(&scope, AttributeScope::Sso { .. })
                     && attr_name == AttributeName::VerifiedEmail
                 {
                     continue;
