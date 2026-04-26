@@ -1248,8 +1248,8 @@ msgstr "U heeft al een {name}-account gekoppeld"
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "U upgrade ID <0>{identityNumber}</0>"
 
-msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr "U kunt het op elk moment weer toevoegen door in te loggen met hetzelfde {openIdProvider}-account."
+msgid "You can add it back anytime by signing in with the same {provider} account."
+msgstr "U kunt het op elk moment weer toevoegen door in te loggen met hetzelfde {provider}-account."
 
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "U kunt het op elk moment weer toevoegen door in te loggen met dezelfde passkey."

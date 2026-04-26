@@ -1248,8 +1248,8 @@ msgstr "Sie haben bereits ein {name}-Konto verknüpft"
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Sie aktualisieren die ID <0>{identityNumber}</0>"
 
-msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr "Sie können sie jederzeit wieder hinzufügen, indem Sie sich mit demselben {openIdProvider}-Konto anmelden."
+msgid "You can add it back anytime by signing in with the same {provider} account."
+msgstr "Sie können sie jederzeit wieder hinzufügen, indem Sie sich mit demselben {provider}-Konto anmelden."
 
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "Sie können sie jederzeit wieder hinzufügen, indem Sie sich mit demselben Passkey anmelden."

@@ -1248,8 +1248,8 @@ msgstr "You already have a {name} account linked"
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "You are upgrading ID <0>{identityNumber}</0>"
 
-msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr "You can add it back anytime by signing in with the same {openIdProvider} account."
+msgid "You can add it back anytime by signing in with the same {provider} account."
+msgstr "You can add it back anytime by signing in with the same {provider} account."
 
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "You can add it back anytime by signing in with the same passkey."

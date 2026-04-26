@@ -3,13 +3,35 @@ export const REDIRECT_CALLBACK_PATH = "/callback";
 
 export class CallbackPopupClosedError extends Error {}
 
-export const redirectInPopup = (url: string): Promise<string> => {
+/**
+ * Open a popup that round-trips through an OAuth provider and resolves with
+ * the callback URL.
+ *
+ * Accepts either:
+ * - A `string` URL: navigated to immediately. Used by the synchronous flows
+ *   where the redirect URL is known at click time.
+ * - A `Promise<string>`: the popup is opened to `about:blank` first
+ *   (synchronously, to consume the user-activation token before any
+ *   `await` — Safari blocks `window.open` after an awaited Promise),
+ *   then navigated once the URL resolves. Used for flows that need an
+ *   async step (e.g. SSO two-hop discovery) before the redirect URL is
+ *   known. If the promise rejects, the popup is closed and the outer
+ *   promise rejects with the same error.
+ */
+export const redirectInPopup = (
+  url: string | Promise<string>,
+): Promise<string> => {
   const width = 500;
   const height = 600;
   const left = (window.innerWidth - width) / 2 + window.screenX;
   const top = (window.innerHeight - height) / 2 + window.screenY;
+  // For deferred URLs, open about:blank synchronously so we don't lose
+  // the user-activation token — same-origin (inherited), so we can later
+  // navigate via `redirectWindow.location.href = ...` even though we'll
+  // end up on a cross-origin IdP.
+  const initialUrl = typeof url === "string" ? url : "about:blank";
   const redirectWindow = window.open(
-    url,
+    initialUrl,
     "_blank",
     `width=${width},height=${height},left=${left},top=${top}`,
   );
@@ -44,6 +66,23 @@ export const redirectInPopup = (url: string): Promise<string> => {
       cleanup();
       resolve(event.data);
     });
+
+    if (typeof url !== "string") {
+      url.then(
+        (resolvedUrl) => {
+          // The user may have closed the popup or the close-poller may have
+          // already rejected during the await — `closed` covers both.
+          if (redirectWindow.closed) {
+            return;
+          }
+          redirectWindow.location.href = resolvedUrl;
+        },
+        (error: unknown) => {
+          cleanup();
+          reject(error);
+        },
+      );
+    }
   });
 };
 

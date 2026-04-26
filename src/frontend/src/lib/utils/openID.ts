@@ -195,15 +195,40 @@ export const extractIdTokenFromCallback = (
 };
 
 /**
- * Request JWT through redirect flow in a popup
- * @param config of the OpenID provider
- * @param options for the JWT request
+ * Request JWT through the redirect flow in a popup.
+ *
+ * Accepts either:
+ * - A `RequestConfig`: redirect URL is built synchronously and the popup
+ *   navigates straight to the IdP. Used by the standard flows where the
+ *   provider config is already in hand at click time.
+ * - A `Promise<RequestConfig>`: popup is opened to `about:blank`
+ *   synchronously (so the user-activation token is consumed before any
+ *   `await` — Safari blocks `window.open` after one), then navigated to
+ *   the IdP once the config resolves. Used by callers that need an async
+ *   step (e.g. SSO two-hop discovery) before the URL is known.
  */
-const requestWithPopup = async (
-  config: Omit<RequestConfig, "configURL">,
+export const requestWithPopup = async (
+  configOrPromise:
+    | Omit<RequestConfig, "configURL">
+    | Promise<Omit<RequestConfig, "configURL">>,
   options: RequestOptions,
 ): Promise<string> => {
-  const redirectURL = createRedirectURL(config, options);
+  if (configOrPromise instanceof Promise) {
+    // Capture the redirect URL's `state` from inside the promise chain so
+    // we can verify it against the callback once the popup posts back.
+    let capturedState: string | undefined;
+    const urlPromise = configOrPromise.then((config) => {
+      const redirectURL = createRedirectURL(config, options);
+      capturedState = redirectURL.searchParams.get("state") ?? undefined;
+      return redirectURL.href;
+    });
+    const callback = await redirectInPopup(urlPromise);
+    if (capturedState === undefined) {
+      throw new Error("Missing state in redirect URL");
+    }
+    return extractIdTokenFromCallback(callback, capturedState);
+  }
+  const redirectURL = createRedirectURL(configOrPromise, options);
   const callback = await redirectInPopup(redirectURL.href);
   const expectedState = redirectURL.searchParams.get("state");
   if (expectedState === null) {

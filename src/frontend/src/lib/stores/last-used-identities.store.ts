@@ -31,6 +31,23 @@ export type LastUsedIdentity = {
           loginHint?: string;
           metadata?: MetadataMapV2;
         };
+      }
+    | {
+        // SSO credentials are resolved via the two-hop discovery chain
+        // (`add_discoverable_oidc_config` + `discoverSsoConfig`), not via
+        // the static `openid_configs` list — so we only need the discovery
+        // domain (and the optional friendly name from hop 1) to rebuild
+        // the request config at sign-in time. `iss`/`sub` aren't stored
+        // because a fresh JWT gives us new ones on every re-auth.
+        // `email` (when the IdP publishes one) is kept purely for the
+        // identity row's secondary text — display fallback is
+        // email → name → domain.
+        sso: {
+          domain: string;
+          name?: string;
+          email?: string;
+          loginHint?: string;
+        };
       };
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
@@ -75,7 +92,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const lastUsedStore = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
-    version: 4,
+    version: 5,
   });
   const selectedStore = writable<bigint | undefined>(
     Object.values(get(lastUsedStore)).sort(

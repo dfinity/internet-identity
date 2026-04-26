@@ -25,6 +25,9 @@
         >{getMetadataString(identity.authMethod.openid.metadata, "email") ??
           $t`Hidden email`}</span
       >
+    {:else if "sso" in identity.authMethod}
+      {@const sso = identity.authMethod.sso}
+      <span>{sso.email ?? sso.name ?? sso.domain}</span>
     {:else}
       <span>
         {$t`Passkey`}
