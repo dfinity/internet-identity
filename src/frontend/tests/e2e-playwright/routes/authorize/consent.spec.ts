@@ -421,11 +421,15 @@ test.describe("Authorize — explicit consent UI", () => {
 
   test.describe("with linked OpenID credential", () => {
     // User signs in via passkey, not 1-click OpenID — so `flow.type` is
-    // "regular" and the 1-click OpenID fast-path never runs. Attributes are
-    // still sourced from the OpenID credential that was linked to the anchor
-    // ahead of time, so the consent handler has something to show.
+    // "regular" and the 1-click OpenID fast-path never runs. Attributes
+    // are still sourced from the OpenID credential that was linked to
+    // the anchor ahead of time, so the consent handler has something to
+    // show. Scoped requests so the row labels render with the issuer
+    // name, mirroring the SSO scope test below.
     const name = "Linked User";
     const email = "linked@example.com";
+    const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
+    const providerName = `Test OpenID ${DEFAULT_OPENID_PORT}`;
 
     test.use({
       openIdConfig: {
@@ -436,7 +440,7 @@ test.describe("Authorize — explicit consent UI", () => {
         protocol: "icrc25",
         // No `openid:` → the authorize page does not take the 1-click route.
         useIcrc3Attributes: true,
-        attributes: ["email", "name"],
+        attributes: [`openid:${issuer}:name`, `openid:${issuer}:email`],
       },
     });
 
@@ -469,11 +473,11 @@ test.describe("Authorize — explicit consent UI", () => {
       expect(authorizedIcrc3Attributes).toBeDefined();
       if (authorizedIcrc3Attributes === undefined) return;
       const entries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
-      expect(entries.email).toBe(email);
-      expect(entries.name).toBe(name);
+      expect(entries[`openid:${issuer}:email`]).toBe(email);
+      expect(entries[`openid:${issuer}:name`]).toBe(name);
     });
 
-    test("should certify the credential's attributes", async ({
+    test("should label rows with the issuer name", async ({
       attributeConsentView,
       authorizePage,
       identities,
@@ -490,7 +494,10 @@ test.describe("Authorize — explicit consent UI", () => {
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();
-      await consent.accept();
+      await consent.waitForVisible();
+      await expect(consent.row(`${providerName} email:`)).toBeVisible();
+      await expect(consent.row(`${providerName} name:`)).toBeVisible();
+      await consent.continue();
     });
   });
 
