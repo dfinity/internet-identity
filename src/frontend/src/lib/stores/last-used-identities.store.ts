@@ -92,7 +92,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const lastUsedStore = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
-    version: 5,
+    version: 4,
   });
   const selectedStore = writable<bigint | undefined>(
     Object.values(get(lastUsedStore)).sort(
