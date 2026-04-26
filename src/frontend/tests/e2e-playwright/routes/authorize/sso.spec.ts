@@ -48,8 +48,8 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   );
 }
 
-test.describe("Authorize with SSO (wizard)", () => {
-  test.describe("without any attributes", () => {
+test.describe("Authorize with SSO", () => {
+  test.describe("without any attributes (wizard)", () => {
     const name = "John Doe";
 
     test.use({
@@ -88,7 +88,40 @@ test.describe("Authorize with SSO (wizard)", () => {
     });
   });
 
-  test.describe("with name and email attributes", () => {
+  test.describe("without any attributes (1-click)", () => {
+    const name = "John Doe";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name }, // Claim should not be returned without explicit request
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
+        useIcrc3Attributes: true,
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeUndefined();
+    });
+
+    test("should authenticate only", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  test.describe("with name and email attributes (wizard)", () => {
     const name = "John Doe";
     const email = "john.doe@example.com";
 
@@ -174,6 +207,107 @@ test.describe("Authorize with SSO (wizard)", () => {
         consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
       ).toBeVisible();
       await consent.continue();
+    });
+  });
+
+  test.describe("with name and email attributes (1-click)", () => {
+    const name = "John Doe";
+    const email = "john.doe@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name, email },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
+        useIcrc3Attributes: true,
+        attributes: [
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(textEntries).toMatchObject({
+        [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
+        [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
+      });
+    });
+
+    test("should auto-approve attributes", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // No consent screen, no manual Continue — the 1-click handler
+      // certifies the auto-approve allowlist (`sso:<domain>:{name,email}`)
+      // and the popup closes itself.
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  test.describe("with app-supplied nonce", () => {
+    const name = "John Doe";
+    // prettier-ignore
+    const knownNonce = new Uint8Array([
+      80, 48, 222, 48, 28, 157, 149, 134, 236, 61, 19, 71, 200, 105, 53, 187,
+      44, 126, 9, 241, 76, 103, 217, 148, 12, 55, 90, 181, 33, 208, 99, 7,
+    ]);
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
+        useIcrc3Attributes: true,
+        icrc3Nonce: knownNonce,
+        attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:name`],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
+      expect(map["implicit:nonce"]).toHaveProperty("Blob");
+      const { Blob: nonceBlob } = map["implicit:nonce"] as {
+        Blob: number[];
+      };
+      expect(Array.from(nonceBlob)).toEqual(Array.from(knownNonce));
+    });
+
+    test("should include the app-supplied nonce", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
 
@@ -291,160 +425,21 @@ test.describe("Authorize with SSO (wizard)", () => {
       // No consent UI: empty groups auto-resolve to an empty consent set.
     });
   });
-});
 
-test.describe("Authorize with SSO (1-click)", () => {
-  test.describe("without any attributes", () => {
-    const name = "John Doe";
-
-    test.use({
-      openIdConfig: {
-        defaultPort: SSO_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name }, // Claim should not be returned without explicit request
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
-      },
+  test.describe("with conflicting ?openid and ?sso", () => {
+    // Misconfigured sign-in URL. We open the authorize page directly
+    // rather than going through `authorizePage` — that fixture ends with
+    // `waitForEvent("close")`, but the channel-error view is static and
+    // never closes on its own.
+    test("should render ChannelError", async ({ page }) => {
+      const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
+      const url = new URL(II_URL + "/authorize");
+      url.searchParams.set("openid", issuer);
+      url.searchParams.set("sso", SSO_DISCOVERY_DOMAIN);
+      await page.goto(url.toString());
+      await expect(
+        page.getByRole("heading", { name: "Invalid request" }),
+      ).toBeVisible();
     });
-
-    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeUndefined();
-    });
-
-    test("should authenticate only", async ({
-      authorizePage,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-    });
-  });
-
-  test.describe("with name and email attributes", () => {
-    const name = "John Doe";
-    const email = "john.doe@example.com";
-
-    test.use({
-      openIdConfig: {
-        defaultPort: SSO_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name, email },
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
-        attributes: [
-          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
-          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
-        ],
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeDefined();
-      if (authorizedIcrc3Attributes === undefined) {
-        return;
-      }
-      const textEntries = decodeIcrc3TextEntries(
-        authorizedIcrc3Attributes.data,
-      );
-      expect(textEntries).toMatchObject({
-        [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
-        [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
-      });
-    });
-
-    test("should auto-approve attributes", async ({
-      authorizePage,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      // No consent screen, no manual Continue — the 1-click handler
-      // certifies the auto-approve allowlist (`sso:<domain>:{name,email}`)
-      // and the popup closes itself.
-      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-    });
-  });
-
-  test.describe("with app-supplied nonce", () => {
-    const name = "John Doe";
-    // prettier-ignore
-    const knownNonce = new Uint8Array([
-      80, 48, 222, 48, 28, 157, 149, 134, 236, 61, 19, 71, 200, 105, 53, 187,
-      44, 126, 9, 241, 76, 103, 217, 148, 12, 55, 90, 181, 33, 208, 99, 7,
-    ]);
-
-    test.use({
-      openIdConfig: {
-        defaultPort: SSO_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name },
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
-        icrc3Nonce: knownNonce,
-        attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:name`],
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeDefined();
-      if (authorizedIcrc3Attributes === undefined) {
-        return;
-      }
-
-      const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
-      expect(map["implicit:nonce"]).toHaveProperty("Blob");
-      const { Blob: nonceBlob } = map["implicit:nonce"] as {
-        Blob: number[];
-      };
-      expect(Array.from(nonceBlob)).toEqual(Array.from(knownNonce));
-    });
-
-    test("should include the app-supplied nonce", async ({
-      authorizePage,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-    });
-  });
-});
-
-test.describe("Authorize entry-point conflicts", () => {
-  // Both `?openid=` and `?sso=` set in one URL is a misconfigured
-  // sign-in URL. We open the authorize page directly here rather than
-  // going through `authorizePage` — that fixture ends with
-  // `waitForEvent("close")`, but the channel-error view is static and
-  // never closes on its own.
-  test("should render ChannelError when both ?openid and ?sso are set", async ({
-    page,
-  }) => {
-    const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
-    const url = new URL(II_URL + "/authorize");
-    url.searchParams.set("openid", issuer);
-    url.searchParams.set("sso", SSO_DISCOVERY_DOMAIN);
-    await page.goto(url.toString());
-    await expect(
-      page.getByRole("heading", { name: "Invalid request" }),
-    ).toBeVisible();
   });
 });

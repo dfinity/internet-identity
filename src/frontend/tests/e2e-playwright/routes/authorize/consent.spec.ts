@@ -46,21 +46,16 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-//
-// These cover the ICRC-3 attribute consent screen — the path taken when a
-// dapp's requested keys aren't all in the 1-click OpenID auto-approve
-// allowlist (so the fast-path `handleIcrc3OneClickOpenIdAttributes` bails
-// and `handleIcrc3ConsentAttributes` shows the consent UI).
-//
-// UI interactions go through the `attributeConsentView` fixture rather than
-// raw role queries, so if the consent DOM shape changes we update it once in
-// the fixture instead of across every spec.
-// ---------------------------------------------------------------------------
+// Cover the ICRC-3 attribute consent screen — the path taken when a
+// dapp's requested keys aren't all in the 1-click auto-approve
+// allowlist (so the fast-path `handleIcrc3OneClickOpenIdAttributes` /
+// `handleIcrc3OneClickSsoAttributes` bails and
+// `handleIcrc3ConsentAttributes` shows the consent UI). The consent UI
+// itself is provider-agnostic; we use direct OpenID for setup because
+// it's the simplest flow that lets us exercise every UI shape.
 
-test.describe("Authorize with OpenID — explicit consent UI", () => {
-  test.describe("unscoped email request", () => {
+test.describe("Authorize — explicit consent UI", () => {
+  test.describe("with unscoped email", () => {
     // A single scoped `openid:issuer:email` would be auto-approved via
     // 1-click OpenID; a bare `email` never is, so the consent screen
     // appears.
@@ -88,7 +83,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.email).toBe(email);
     });
 
-    test("shows consent and certifies the matching scoped email unscoped", async ({
+    test("should certify the matching scoped email unscoped", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -100,7 +95,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("email + verified_email merge into one row", () => {
+  test.describe("with email and verified_email merging", () => {
     // Neither is on the 1-click OpenID allowlist (unscoped), so the consent
     // handler takes the request; the view merges them into a single "Email"
     // row whose consent still emits both certified forms.
@@ -128,7 +123,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.verified_email).toBe(email);
     });
 
-    test("one row in the UI, both forms certified", async ({
+    test("should merge into one row and certify both forms", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -144,7 +139,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("scoped + unscoped same attribute → two rows", () => {
+  test.describe("with scoped and unscoped of same attribute", () => {
     // The scoped form is auto-approved on its own via 1-click OpenID, but
     // pairing it with the unscoped form forces the consent handler (not all
     // keys are on the allowlist). The dedupe logic keys by (name, omitScope),
@@ -175,7 +170,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.email).toBe(email);
     });
 
-    test("shows a provider-labeled scoped row and a generic unscoped row", async ({
+    test("should show provider-labeled scoped and generic unscoped rows", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -190,7 +185,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("multi-provider unscoped email → picker", () => {
+  test.describe("with multi-provider unscoped email", () => {
     // User has two OpenID credentials (default + alternate); an unscoped
     // `email` resolves to options from both, rendered as a picker. Default
     // selection is the first option (default provider).
@@ -244,7 +239,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.email).toBe(defaultEmail);
     });
 
-    test("default picker option is certified", async ({
+    test("should certify default picker option", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -259,7 +254,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("Deny All → empty attribute set", () => {
+  test.describe("with all attributes denied", () => {
     const email = "denied@example.com";
 
     test.use({
@@ -284,7 +279,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.email).toBeUndefined();
     });
 
-    test("denies all rows and continues", async ({
+    test("should deny all rows and continue", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -298,7 +293,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("unchecking one row omits only that attribute", () => {
+  test.describe("with one attribute unchecked", () => {
     const name = "Selective User";
     const email = "selective@example.com";
 
@@ -323,7 +318,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.email).toBeUndefined();
     });
 
-    test("uncheck email then continue", async ({
+    test("should omit only the unchecked attribute", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -337,7 +332,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("unknown attribute keys are silently dropped", () => {
+  test.describe("with unknown attribute keys", () => {
     // Consent handler asks the canister for everything the anchor has, then
     // resolves the request against that set on the frontend, so unknown names
     // (`favorite_color`, `ghost`) simply don't match anything rather than
@@ -367,7 +362,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.ghost).toBeUndefined();
     });
 
-    test("only the known key renders a consent row", async ({
+    test("should silently drop the unknown keys", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -382,7 +377,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("no available attributes skips the consent UI", () => {
+  test.describe("with no available attributes", () => {
     // A request whose keys all resolve to nothing available on the anchor
     // (here: user has no email claim) auto-resolves the consent result so
     // the UI never renders a blank screen.
@@ -406,7 +401,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.email).toBeUndefined();
     });
 
-    test("consent screen never appears", async ({
+    test("should skip the consent UI", async ({
       attributeConsentView,
       authorizePage,
       signInWithOpenId,
@@ -423,7 +418,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
     });
   });
 
-  test.describe("regular passkey flow with linked OpenID credential", () => {
+  test.describe("with linked OpenID credential (passkey flow)", () => {
     // User signs in via passkey, not 1-click OpenID — so `flow.type` is
     // "regular" and the 1-click OpenID fast-path never runs. Attributes are
     // still sourced from the OpenID credential that was linked to the anchor
@@ -477,7 +472,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       expect(entries.name).toBe(name);
     });
 
-    test("consent renders and certifies linked attributes", async ({
+    test("should certify linked attributes", async ({
       attributeConsentView,
       authorizePage,
       identities,
