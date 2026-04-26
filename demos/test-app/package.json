@@ -3,8 +3,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@icp-sdk/auth": "^6.2.2",
     "@icp-sdk/core": "^5.3.1",
-    "@icp-sdk/auth": "^6.2.1",
     "@icp-sdk/signer": "^5.3.0",
     "@noble/hashes": "^1.8.0",
     "buffer": "^6.0.3",
