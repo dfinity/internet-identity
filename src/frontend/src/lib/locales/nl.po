@@ -23,28 +23,28 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} is overgegaan naar de nieuwe Internet Identity"
 
 msgid "{attribute}:"
-msgstr ""
+msgstr "{attribute}:"
 
 msgid "{displayName} account"
-msgstr ""
+msgstr "{displayName}-account"
 
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
-msgstr ""
+msgstr "{domainInput} heeft /.well-known/ii-openid-configuration niet gepubliceerd (HTTP {0})."
 
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
-msgstr ""
+msgstr "De /.well-known/ii-openid-configuration van {domainInput} is ongeldig."
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
-msgstr ""
+msgstr "De SSO-app van {domainInput} staat de hybride OAuth-flow die II nodig heeft niet toe. Vraag de SSO-beheerder om response_type \"id_token code\" in te schakelen."
 
 msgid "{domainInput}'s SSO denied the sign-in."
-msgstr ""
+msgstr "De SSO van {domainInput} heeft de aanmelding geweigerd."
 
 msgid "{domainInput}'s SSO returned \"{0}\": {1}"
-msgstr ""
+msgstr "De SSO van {domainInput} gaf \"{0}\" terug: {1}"
 
 msgid "{domainInput}'s SSO returned error \"{0}\"."
-msgstr ""
+msgstr "De SSO van {domainInput} gaf de fout \"{0}\" terug."
 
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} is verwijderd van dit apparaat."
@@ -56,13 +56,13 @@ msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
 
 msgid "{providerName} {attribute}:"
-msgstr ""
+msgstr "{providerName} {attribute}:"
 
 msgid "{providerName} email:"
-msgstr ""
+msgstr "{providerName} e-mailadres:"
 
 msgid "{providerName} name:"
-msgstr ""
+msgstr "{providerName} naam:"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Volledig Vernieuwde Interface:</0> We hebben Internet Identity een frisse, moderne uitstraling gegeven. Het nieuwe ontwerp is intuïtief en overzichtelijker, wat zorgt voor een soepelere gebruikerservaring."
@@ -134,7 +134,7 @@ msgid "Advanced identity management"
 msgstr "Geavanceerd identiteitsbeheer"
 
 msgid "Allow to access this info"
-msgstr ""
+msgstr "Toegang tot deze informatie toestaan"
 
 msgid "Are you sure?"
 msgstr "Weet u het zeker?"
@@ -146,13 +146,13 @@ msgid "As you are currently signed in with this passkey, you will be signed out.
 msgstr "Aangezien u momenteel bent ingelogd met deze passkey, wordt u uitgelogd."
 
 msgid "Attribute sharing failed"
-msgstr ""
+msgstr "Delen van attributen mislukt"
 
 msgid "Authenticating..."
 msgstr "Authenticeren..."
 
 msgid "Authentication failed"
-msgstr ""
+msgstr "Authenticatie mislukt"
 
 msgid "Authentication successful"
 msgstr "Authenticatie succesvol"
@@ -161,7 +161,7 @@ msgid "Authorize new device"
 msgstr "Autoriseer nieuw apparaat"
 
 msgid "Back to sign-in options"
-msgstr ""
+msgstr "Terug naar inlogopties"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Voordat u begint, zoek een privéplek en zorg dat u uw herstelzin bij de hand heeft. Houd deze vertrouwelijk om uw identiteit te beschermen."
@@ -182,7 +182,7 @@ msgid "CAPTCHA characters"
 msgstr "CAPTCHA-tekens"
 
 msgid "Change"
-msgstr ""
+msgstr "Wijzigen"
 
 msgid "Characters are case-sensitive"
 msgstr "Tekens zijn hoofdlettergevoelig"
@@ -197,7 +197,7 @@ msgid "Checking your order"
 msgstr "Uw bestelling controleren"
 
 msgid "Checking..."
-msgstr ""
+msgstr "Controleren..."
 
 msgid "Choose an account"
 msgstr "Kies een account"
@@ -212,7 +212,7 @@ msgid "Choose method to continue"
 msgstr "Kies methode om door te gaan"
 
 msgid "Choose which details you'd like to share"
-msgstr ""
+msgstr "Kies welke gegevens u wilt delen"
 
 msgid "Clear all"
 msgstr "Alles wissen"
@@ -230,10 +230,10 @@ msgid "Code copied to clipboard"
 msgstr "Code gekopieerd naar klembord"
 
 msgid "Company domain"
-msgstr ""
+msgstr "Bedrijfsdomein"
 
 msgid "company.domain.com"
-msgstr ""
+msgstr "bedrijf.domein.com"
 
 msgid "Complete set-up"
 msgstr "Instelling voltooien"
@@ -272,10 +272,10 @@ msgid "Continue with passkey"
 msgstr "Doorgaan met passkey"
 
 msgid "Continue with SSO"
-msgstr ""
+msgstr "Doorgaan met SSO"
 
 msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr ""
+msgstr "Kon {domainInput} niet bereiken. Controleer de spelling en uw netwerk."
 
 msgid "Create account"
 msgstr "Account aanmaken"
@@ -320,7 +320,7 @@ msgid "Default"
 msgstr "Standaard"
 
 msgid "Deny All"
-msgstr ""
+msgstr "Alles weigeren"
 
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
@@ -344,7 +344,7 @@ msgid "Edit account"
 msgstr "Account bewerken"
 
 msgid "Email:"
-msgstr ""
+msgstr "E-mailadres:"
 
 msgid "Enable multiple accounts"
 msgstr "Meerdere accounts inschakelen"
@@ -362,7 +362,7 @@ msgid "Enter recovery phrase"
 msgstr "Voer herstelzin in"
 
 msgid "Enter your company domain"
-msgstr ""
+msgstr "Voer uw bedrijfsdomein in"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles wat u moet weten over Internet Identity, uw veilige, privacyvriendelijke en gemakkelijke manier om in te loggen op Internet Computer-apps."
@@ -534,7 +534,7 @@ msgid "Invalid code. Please check and try again."
 msgstr "Ongeldige code. Controleer en probeer het opnieuw."
 
 msgid "Invalid domain"
-msgstr ""
+msgstr "Ongeldig domein"
 
 msgid "Invalid recovery phrase"
 msgstr "Ongeldige herstelzin"
@@ -603,7 +603,7 @@ msgid "Link copied to clipboard"
 msgstr "Link gekopieerd naar klembord"
 
 msgid "Loading permissions"
-msgstr ""
+msgstr "Machtigingen laden"
 
 msgid "Locked legacy recovery phrase"
 msgstr "Vergrendelde legacy-herstelzin"
@@ -669,7 +669,7 @@ msgid "Name your identity"
 msgstr "Geef uw identiteit een naam"
 
 msgid "Name:"
-msgstr ""
+msgstr "Naam:"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
@@ -840,7 +840,7 @@ msgid "Return to application"
 msgstr "Terug naar applicatie"
 
 msgid "Review Permissions"
-msgstr ""
+msgstr "Machtigingen controleren"
 
 msgid "Right now"
 msgstr "Op dit moment"
@@ -879,10 +879,10 @@ msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
 msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr ""
+msgstr "Er zijn al meerdere SSO-aanmeldingen bezig. Een moment geduld."
 
 msgid "Share {label}"
-msgstr ""
+msgstr "{label} delen"
 
 msgid "Show all"
 msgstr "Alles tonen"
@@ -903,7 +903,7 @@ msgid "Sign in with another identity"
 msgstr "Inloggen met een andere identiteit"
 
 msgid "Sign in with your {displayName} account from any device."
-msgstr ""
+msgstr "Log in met uw {displayName}-account vanaf elk apparaat."
 
 msgid "Sign out"
 msgstr "Uitloggen"
@@ -937,22 +937,22 @@ msgid "Something is wrong!"
 msgstr "Er klopt iets niet!"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
-msgstr ""
+msgstr "Er is iets misgegaan bij het aanmaken van uw delegatie. Probeer het opnieuw; als het probleem aanhoudt, neem dan contact op met ondersteuning."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
-msgstr ""
+msgstr "Er is iets misgegaan bij het delen van attributen. Probeer het opnieuw; als het probleem aanhoudt, neem dan contact op met ondersteuning."
 
 msgid "Source code"
 msgstr "Broncode"
 
 msgid "SSO"
-msgstr ""
+msgstr "SSO"
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
-msgstr ""
+msgstr "SSO is nog niet beschikbaar voor \"{domainInput}\". Vraag een II-beheerder om dit domein te registreren."
 
 msgid "SSO sign-in for {domainInput} failed. Please try again."
-msgstr ""
+msgstr "SSO-aanmelding voor {domainInput} is mislukt. Probeer het opnieuw."
 
 msgid "Start over"
 msgstr "Opnieuw beginnen"
@@ -1033,7 +1033,7 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Deze app is overgegaan naar de nieuwe Internet Identity"
 
 msgid "This browser is not supported."
-msgstr ""
+msgstr "Deze browser wordt niet ondersteund."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Deze identiteit is al geüpgraded naar de nieuwe ervaring."
@@ -1048,7 +1048,7 @@ msgid "This passkey is no longer associated with any identity."
 msgstr "Deze passkey is niet langer gekoppeld aan een identiteit."
 
 msgid "This SSO is already linked to your identity."
-msgstr ""
+msgstr "Deze SSO is al gekoppeld aan uw identiteit."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Deze YubiKey heeft oudere firmware (5.1) die incompatibel is."
@@ -1087,7 +1087,7 @@ msgid "To finish setting up your passkey, follow the instructions shown on your 
 msgstr "Om uw passkey te voltooien, volgt u de instructies op uw <0>nieuwe apparaat</0>."
 
 msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr ""
+msgstr "Te veel recente pogingen voor {domainInput}. Wacht enkele minuten."
 
 msgid "Type each word in the correct order:"
 msgstr "Typ elk woord in de juiste volgorde:"
@@ -1132,7 +1132,7 @@ msgid "Unsupported"
 msgstr "Niet ondersteund"
 
 msgid "Unsupported browser"
-msgstr ""
+msgstr "Niet-ondersteunde browser"
 
 msgid "Unsupported Browser"
 msgstr "Niet-ondersteunde browser"

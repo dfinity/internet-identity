@@ -23,28 +23,28 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
 
 msgid "{attribute}:"
-msgstr ""
+msgstr "{attribute}:"
 
 msgid "{displayName} account"
-msgstr ""
+msgstr "Аккаунт {displayName}"
 
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
-msgstr ""
+msgstr "Домен {domainInput} не опубликовал /.well-known/ii-openid-configuration (HTTP {0})."
 
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
-msgstr ""
+msgstr "Файл /.well-known/ii-openid-configuration домена {domainInput} имеет неверный формат."
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
-msgstr ""
+msgstr "SSO-приложение домена {domainInput} не поддерживает гибридный OAuth-поток, необходимый II. Попросите администратора SSO включить response_type «id_token code»."
 
 msgid "{domainInput}'s SSO denied the sign-in."
-msgstr ""
+msgstr "SSO домена {domainInput} отклонил вход."
 
 msgid "{domainInput}'s SSO returned \"{0}\": {1}"
-msgstr ""
+msgstr "SSO домена {domainInput} вернул «{0}»: {1}"
 
 msgid "{domainInput}'s SSO returned error \"{0}\"."
-msgstr ""
+msgstr "SSO домена {domainInput} вернул ошибку «{0}»."
 
 msgid "{identityName} has been removed from this device."
 msgstr "Данные {identityName} были удалены с этого устройства."
@@ -56,13 +56,13 @@ msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# ключ доступа} few {# ключа доступа} many {# ключей доступа} other {# ключей доступа}}"
 
 msgid "{providerName} {attribute}:"
-msgstr ""
+msgstr "{providerName} {attribute}:"
 
 msgid "{providerName} email:"
-msgstr ""
+msgstr "Email {providerName}:"
 
 msgid "{providerName} name:"
-msgstr ""
+msgstr "Имя {providerName}:"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Полностью обновлённый интерфейс:</0> Мы придали Internet Identity свежий, современный вид. Новый дизайн интуитивно понятен и удобен в навигации, что делает работу с сервисом приятнее."
@@ -134,7 +134,7 @@ msgid "Advanced identity management"
 msgstr "Контроль над доступом"
 
 msgid "Allow to access this info"
-msgstr ""
+msgstr "Разрешить доступ к этим данным"
 
 msgid "Are you sure?"
 msgstr "Вы уверены?"
@@ -146,13 +146,13 @@ msgid "As you are currently signed in with this passkey, you will be signed out.
 msgstr "Поскольку вы в данный момент вошли в систему с этим ключом доступа, вы будете выведены из системы."
 
 msgid "Attribute sharing failed"
-msgstr ""
+msgstr "Не удалось передать атрибуты"
 
 msgid "Authenticating..."
 msgstr "Аутентификация..."
 
 msgid "Authentication failed"
-msgstr ""
+msgstr "Ошибка аутентификации"
 
 msgid "Authentication successful"
 msgstr "Аутентификация прошла успешно"
@@ -161,7 +161,7 @@ msgid "Authorize new device"
 msgstr "Авторизовать новое устройство"
 
 msgid "Back to sign-in options"
-msgstr ""
+msgstr "Назад к способам входа"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Подготовьте резервную фразу и держите её в секрете. Убедитесь, что никто не видит ваш экран."
@@ -182,7 +182,7 @@ msgid "CAPTCHA characters"
 msgstr "Символы CAPTCHA"
 
 msgid "Change"
-msgstr ""
+msgstr "Изменить"
 
 msgid "Characters are case-sensitive"
 msgstr "Символы чувствительны к регистру"
@@ -197,7 +197,7 @@ msgid "Checking your order"
 msgstr "Проверка порядка слов"
 
 msgid "Checking..."
-msgstr ""
+msgstr "Проверка..."
 
 msgid "Choose an account"
 msgstr "Выберите аккаунт"
@@ -212,7 +212,7 @@ msgid "Choose method to continue"
 msgstr "Выберите способ входа"
 
 msgid "Choose which details you'd like to share"
-msgstr ""
+msgstr "Выберите, какими данными вы хотите поделиться"
 
 msgid "Clear all"
 msgstr "Очистить все"
@@ -230,10 +230,10 @@ msgid "Code copied to clipboard"
 msgstr "Код скопирован в буфер обмена"
 
 msgid "Company domain"
-msgstr ""
+msgstr "Домен компании"
 
 msgid "company.domain.com"
-msgstr ""
+msgstr "company.domain.com"
 
 msgid "Complete set-up"
 msgstr "Завершить настройку"
@@ -272,10 +272,10 @@ msgid "Continue with passkey"
 msgstr "Войти с ключом доступа"
 
 msgid "Continue with SSO"
-msgstr ""
+msgstr "Продолжить с SSO"
 
 msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr ""
+msgstr "Не удалось связаться с {domainInput}. Проверьте написание и подключение к сети."
 
 msgid "Create account"
 msgstr "Создать аккаунт"
@@ -320,7 +320,7 @@ msgid "Default"
 msgstr "По умолчанию"
 
 msgid "Deny All"
-msgstr ""
+msgstr "Отклонить все"
 
 msgid "Discoverable passkeys"
 msgstr "Вход без паролей"
@@ -344,7 +344,7 @@ msgid "Edit account"
 msgstr "Редактировать аккаунт"
 
 msgid "Email:"
-msgstr ""
+msgstr "Email:"
 
 msgid "Enable multiple accounts"
 msgstr "Включить несколько аккаунтов"
@@ -362,7 +362,7 @@ msgid "Enter recovery phrase"
 msgstr "Введите резервную фразу"
 
 msgid "Enter your company domain"
-msgstr ""
+msgstr "Введите домен вашей компании"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Всё, что нужно знать об Internet Identity — вашем приватном, безопасном и простом способе входа в приложения на Internet Computer."
@@ -534,7 +534,7 @@ msgid "Invalid code. Please check and try again."
 msgstr "Неверный код. Пожалуйста, проверьте и попробуйте снова."
 
 msgid "Invalid domain"
-msgstr ""
+msgstr "Недопустимый домен"
 
 msgid "Invalid recovery phrase"
 msgstr "Неверная резервная фраза"
@@ -603,7 +603,7 @@ msgid "Link copied to clipboard"
 msgstr "Ссылка скопирована в буфер обмена"
 
 msgid "Loading permissions"
-msgstr ""
+msgstr "Загрузка разрешений"
 
 msgid "Locked legacy recovery phrase"
 msgstr "Заблокированная устаревшая резервная фраза"
@@ -669,7 +669,7 @@ msgid "Name your identity"
 msgstr "Придумайте имя"
 
 msgid "Name:"
-msgstr ""
+msgstr "Имя:"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Никакие данные о том, в какие приложения вы входите с помощью Internet Identity, не передаются Google, Microsoft или Apple."
@@ -840,7 +840,7 @@ msgid "Return to application"
 msgstr "Вернуться к приложению"
 
 msgid "Review Permissions"
-msgstr ""
+msgstr "Проверить разрешения"
 
 msgid "Right now"
 msgstr "Прямо сейчас"
@@ -879,10 +879,10 @@ msgid "Set as default sign-in"
 msgstr "Установить как вход по умолчанию"
 
 msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr ""
+msgstr "Уже выполняется несколько SSO-входов. Подождите немного."
 
 msgid "Share {label}"
-msgstr ""
+msgstr "Поделиться: {label}"
 
 msgid "Show all"
 msgstr "Показать все"
@@ -903,7 +903,7 @@ msgid "Sign in with another identity"
 msgstr "Войти с другой учётной записью"
 
 msgid "Sign in with your {displayName} account from any device."
-msgstr ""
+msgstr "Входите со своего аккаунта {displayName} с любого устройства."
 
 msgid "Sign out"
 msgstr "Выйти"
@@ -937,22 +937,22 @@ msgid "Something is wrong!"
 msgstr "Что-то не так!"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
-msgstr ""
+msgstr "Что-то пошло не так при создании делегирования. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
-msgstr ""
+msgstr "Что-то пошло не так при передаче атрибутов. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
 
 msgid "Source code"
 msgstr "Исходный код"
 
 msgid "SSO"
-msgstr ""
+msgstr "SSO"
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
-msgstr ""
+msgstr "SSO для «{domainInput}» пока недоступен. Попросите администратора II зарегистрировать этот домен."
 
 msgid "SSO sign-in for {domainInput} failed. Please try again."
-msgstr ""
+msgstr "Не удалось выполнить вход через SSO для {domainInput}. Пожалуйста, попробуйте снова."
 
 msgid "Start over"
 msgstr "Начать заново"
@@ -1033,7 +1033,7 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Это приложение переехало на новую версию Internet Identity"
 
 msgid "This browser is not supported."
-msgstr ""
+msgstr "Этот браузер не поддерживается."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Эта учётная запись уже была обновлена до нового интерфейса."
@@ -1048,7 +1048,7 @@ msgid "This passkey is no longer associated with any identity."
 msgstr "Этот ключ доступа больше не связан ни с одной учётной записью."
 
 msgid "This SSO is already linked to your identity."
-msgstr ""
+msgstr "Этот SSO уже привязан к вашей учётной записи."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Этот YubiKey имеет старую прошивку (5.1), которая несовместима."
@@ -1087,7 +1087,7 @@ msgid "To finish setting up your passkey, follow the instructions shown on your 
 msgstr "Чтобы завершить настройку вашего ключа доступа, следуйте инструкциям, показанным на вашем <0>новом устройстве</0>."
 
 msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr ""
+msgstr "Слишком много недавних попыток для {domainInput}. Подождите несколько минут."
 
 msgid "Type each word in the correct order:"
 msgstr "Введите каждое слово в правильном порядке:"
@@ -1132,7 +1132,7 @@ msgid "Unsupported"
 msgstr "Не поддерживается"
 
 msgid "Unsupported browser"
-msgstr ""
+msgstr "Неподдерживаемый браузер"
 
 msgid "Unsupported Browser"
 msgstr "Неподдерживаемый браузер"

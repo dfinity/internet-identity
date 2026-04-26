@@ -23,28 +23,28 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} est passé à la nouvelle Internet Identity"
 
 msgid "{attribute}:"
-msgstr ""
+msgstr "{attribute} :"
 
 msgid "{displayName} account"
-msgstr ""
+msgstr "Compte {displayName}"
 
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
-msgstr ""
+msgstr "{domainInput} n’a pas publié /.well-known/ii-openid-configuration (HTTP {0})."
 
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
-msgstr ""
+msgstr "Le fichier /.well-known/ii-openid-configuration de {domainInput} est mal formé."
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
-msgstr ""
+msgstr "L’application SSO de {domainInput} n’autorise pas le flux OAuth hybride requis par II. Demandez à l’administrateur SSO d’activer le response_type « id_token code »."
 
 msgid "{domainInput}'s SSO denied the sign-in."
-msgstr ""
+msgstr "Le SSO de {domainInput} a refusé la connexion."
 
 msgid "{domainInput}'s SSO returned \"{0}\": {1}"
-msgstr ""
+msgstr "Le SSO de {domainInput} a renvoyé « {0} » : {1}"
 
 msgid "{domainInput}'s SSO returned error \"{0}\"."
-msgstr ""
+msgstr "Le SSO de {domainInput} a renvoyé l’erreur « {0} »."
 
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} a été supprimée de cet appareil."
@@ -56,13 +56,13 @@ msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# passkey} other {# passkeys}}"
 
 msgid "{providerName} {attribute}:"
-msgstr ""
+msgstr "{attribute} {providerName} :"
 
 msgid "{providerName} email:"
-msgstr ""
+msgstr "Adresse e-mail {providerName} :"
 
 msgid "{providerName} name:"
-msgstr ""
+msgstr "Nom {providerName} :"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Interface entièrement repensée :</0> Nous avons donné à Internet Identity une apparence moderne et renouvelée. Le nouveau design est intuitif et plus facile à parcourir, garantissant une expérience utilisateur plus fluide."
@@ -134,7 +134,7 @@ msgid "Advanced identity management"
 msgstr "Gestion avancée de l’identité"
 
 msgid "Allow to access this info"
-msgstr ""
+msgstr "Autoriser l’accès à ces informations"
 
 msgid "Are you sure?"
 msgstr "Êtes-vous sûr ?"
@@ -146,13 +146,13 @@ msgid "As you are currently signed in with this passkey, you will be signed out.
 msgstr "Comme vous êtes actuellement connecté avec cette passkey, vous allez être déconnecté."
 
 msgid "Attribute sharing failed"
-msgstr ""
+msgstr "Échec du partage des attributs"
 
 msgid "Authenticating..."
 msgstr "Authentification en cours..."
 
 msgid "Authentication failed"
-msgstr ""
+msgstr "Échec de l’authentification"
 
 msgid "Authentication successful"
 msgstr "Authentification réussie"
@@ -161,7 +161,7 @@ msgid "Authorize new device"
 msgstr "Autoriser un nouvel appareil"
 
 msgid "Back to sign-in options"
-msgstr ""
+msgstr "Retour aux options de connexion"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
 msgstr "Avant de commencer, trouvez un endroit privé et préparez votre phrase de récupération. Gardez-la confidentielle pour protéger votre identité."
@@ -182,7 +182,7 @@ msgid "CAPTCHA characters"
 msgstr "Caractères CAPTCHA"
 
 msgid "Change"
-msgstr ""
+msgstr "Modifier"
 
 msgid "Characters are case-sensitive"
 msgstr "Respectez les majuscules et minuscules"
@@ -197,7 +197,7 @@ msgid "Checking your order"
 msgstr "Vérification de votre ordre"
 
 msgid "Checking..."
-msgstr ""
+msgstr "Vérification..."
 
 msgid "Choose an account"
 msgstr "Choisissez un compte"
@@ -212,7 +212,7 @@ msgid "Choose method to continue"
 msgstr "Choisissez une méthode pour continuer"
 
 msgid "Choose which details you'd like to share"
-msgstr ""
+msgstr "Choisissez les informations que vous souhaitez partager"
 
 msgid "Clear all"
 msgstr "Tout effacer"
@@ -230,10 +230,10 @@ msgid "Code copied to clipboard"
 msgstr "Code copié dans le presse-papiers"
 
 msgid "Company domain"
-msgstr ""
+msgstr "Domaine de l’entreprise"
 
 msgid "company.domain.com"
-msgstr ""
+msgstr "entreprise.domaine.com"
 
 msgid "Complete set-up"
 msgstr "Configuration terminée"
@@ -272,10 +272,10 @@ msgid "Continue with passkey"
 msgstr "Continuer avec une passkey"
 
 msgid "Continue with SSO"
-msgstr ""
+msgstr "Continuer avec SSO"
 
 msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr ""
+msgstr "Impossible de joindre {domainInput}. Vérifiez l’orthographe et votre réseau."
 
 msgid "Create account"
 msgstr "Créer un compte"
@@ -320,7 +320,7 @@ msgid "Default"
 msgstr "Par défaut"
 
 msgid "Deny All"
-msgstr ""
+msgstr "Tout refuser"
 
 msgid "Discoverable passkeys"
 msgstr "Passkeys découvrables"
@@ -344,7 +344,7 @@ msgid "Edit account"
 msgstr "Modifier le compte"
 
 msgid "Email:"
-msgstr ""
+msgstr "Adresse e-mail :"
 
 msgid "Enable multiple accounts"
 msgstr "Activer plusieurs comptes"
@@ -362,7 +362,7 @@ msgid "Enter recovery phrase"
 msgstr "Saisir la phrase de récupération"
 
 msgid "Enter your company domain"
-msgstr ""
+msgstr "Saisissez le domaine de votre entreprise"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Tout ce que vous devez savoir sur Internet Identity, votre moyen privé, sécurisé et facile de vous connecter à des applications sur l’Internet Computer."
@@ -534,7 +534,7 @@ msgid "Invalid code. Please check and try again."
 msgstr "Code invalide. Veuillez vérifier et réessayer."
 
 msgid "Invalid domain"
-msgstr ""
+msgstr "Domaine invalide"
 
 msgid "Invalid recovery phrase"
 msgstr "Phrase de récupération invalide"
@@ -603,7 +603,7 @@ msgid "Link copied to clipboard"
 msgstr "Lien copié dans le presse-papiers"
 
 msgid "Loading permissions"
-msgstr ""
+msgstr "Chargement des autorisations"
 
 msgid "Locked legacy recovery phrase"
 msgstr "Ancienne phrase de récupération verrouillée"
@@ -669,7 +669,7 @@ msgid "Name your identity"
 msgstr "Nommez votre identité"
 
 msgid "Name:"
-msgstr ""
+msgstr "Nom :"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Aucune donnée n’est partagée avec Google, Microsoft ou Apple concernant les applications auxquelles vous vous connectez avec Internet Identity."
@@ -840,7 +840,7 @@ msgid "Return to application"
 msgstr "Retour à l’application"
 
 msgid "Review Permissions"
-msgstr ""
+msgstr "Vérifier les autorisations"
 
 msgid "Right now"
 msgstr "À l’instant"
@@ -879,10 +879,10 @@ msgid "Set as default sign-in"
 msgstr "Définir comme connexion par défaut"
 
 msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr ""
+msgstr "Plusieurs connexions SSO sont déjà en cours. Veuillez patienter un instant."
 
 msgid "Share {label}"
-msgstr ""
+msgstr "Partager {label}"
 
 msgid "Show all"
 msgstr "Tout afficher"
@@ -903,7 +903,7 @@ msgid "Sign in with another identity"
 msgstr "Se connecter avec une autre identité"
 
 msgid "Sign in with your {displayName} account from any device."
-msgstr ""
+msgstr "Connectez-vous avec votre compte {displayName} depuis n’importe quel appareil."
 
 msgid "Sign out"
 msgstr "Se déconnecter"
@@ -937,22 +937,22 @@ msgid "Something is wrong!"
 msgstr "Incorrect"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
-msgstr ""
+msgstr "Une erreur est survenue lors de la création de votre délégation. Veuillez réessayer ; si le problème persiste, contactez le support."
 
 msgid "Something went wrong while sharing attributes. Please try again; if the issue persists, contact support."
-msgstr ""
+msgstr "Une erreur est survenue lors du partage des attributs. Veuillez réessayer ; si le problème persiste, contactez le support."
 
 msgid "Source code"
 msgstr "Code source"
 
 msgid "SSO"
-msgstr ""
+msgstr "SSO"
 
 msgid "SSO is not available for \"{domainInput}\" yet. Ask an II admin to register this domain."
-msgstr ""
+msgstr "Le SSO n’est pas encore disponible pour « {domainInput} ». Demandez à un administrateur II d’enregistrer ce domaine."
 
 msgid "SSO sign-in for {domainInput} failed. Please try again."
-msgstr ""
+msgstr "La connexion SSO pour {domainInput} a échoué. Veuillez réessayer."
 
 msgid "Start over"
 msgstr "Recommencer"
@@ -1033,7 +1033,7 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Cette application est passée à la nouvelle Internet Identity"
 
 msgid "This browser is not supported."
-msgstr ""
+msgstr "Ce navigateur n’est pas pris en charge."
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Cette identité a déjà été mise à niveau vers la nouvelle expérience."
@@ -1048,7 +1048,7 @@ msgid "This passkey is no longer associated with any identity."
 msgstr "Cette passkey n’est plus associée à aucune identité."
 
 msgid "This SSO is already linked to your identity."
-msgstr ""
+msgstr "Ce SSO est déjà lié à votre identité."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.1) qui est incompatible."
@@ -1087,7 +1087,7 @@ msgid "To finish setting up your passkey, follow the instructions shown on your 
 msgstr "Pour terminer la configuration de votre passkey, suivez les instructions affichées sur votre <0>nouvel appareil</0>."
 
 msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr ""
+msgstr "Trop de tentatives récentes pour {domainInput}. Veuillez patienter quelques minutes."
 
 msgid "Type each word in the correct order:"
 msgstr "Tapez chaque mot dans le bon ordre :"
@@ -1132,7 +1132,7 @@ msgid "Unsupported"
 msgstr "Non pris en charge"
 
 msgid "Unsupported browser"
-msgstr ""
+msgstr "Navigateur non pris en charge"
 
 msgid "Unsupported Browser"
 msgstr "Navigateur non pris en charge"
