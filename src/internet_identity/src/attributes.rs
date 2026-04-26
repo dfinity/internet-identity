@@ -480,8 +480,9 @@ impl Anchor {
     /// hardcoded providers) and `sso:<domain>:<attr>` keys (from SSO
     /// discoverable providers) so the ICRC-3 frontend can intersect a
     /// dapp's requested keys against what the user actually has before
-    /// kicking off `prepare_icrc3_attributes` (which fail-fasts on
-    /// missing keys).
+    /// kicking off `prepare_icrc3_attributes` (which returns
+    /// `AttributeMismatch` if any requested key/value is missing or
+    /// mismatched).
     ///
     /// Legacy / non-ICRC-3 callers stay strictly `openid:`-only via
     /// the certification path: `ValidatedPrepareAttributeRequest` and
