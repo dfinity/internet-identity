@@ -39,25 +39,22 @@
 </script>
 
 {#snippet removeConfirmation(identity: LastUsedIdentity)}
-  {@const openIdProvider =
-    "openid" in identity.authMethod &&
-    identity.authMethod.openid.metadata !== undefined
-      ? openIdName(
-          identity.authMethod.openid.iss,
-          // `aud` not tracked on `LastUsedIdentity`; see #3795. Fall
-          // through to issuer-only `findConfig` — correct for direct
-          // providers. SSO entries take the `"sso" in authMethod`
-          // branch below instead.
-          undefined,
-          identity.authMethod.openid.metadata,
-          undefined,
-          undefined,
-        )
-      : undefined}
-  {@const ssoProvider =
+  {@const provider =
     "sso" in identity.authMethod
       ? (identity.authMethod.sso.name ?? identity.authMethod.sso.domain)
-      : undefined}
+      : "openid" in identity.authMethod &&
+          identity.authMethod.openid.metadata !== undefined
+        ? openIdName(
+            identity.authMethod.openid.iss,
+            // `aud` not tracked on `LastUsedIdentity`; see #3795. Fall
+            // through to issuer-only `findConfig` — correct for direct
+            // providers. SSO entries take the branch above.
+            undefined,
+            identity.authMethod.openid.metadata,
+            undefined,
+            undefined,
+          )
+        : undefined}
   <div class="flex flex-col gap-8">
     <div class="flex flex-col gap-4">
       <FeaturedIcon size="lg">
@@ -68,14 +65,9 @@
           {$t`Remove from this device`}
         </h2>
         <p class="text-text-tertiary text-base">
-          {#if ssoProvider !== undefined}
+          {#if provider !== undefined}
             <Trans>
-              You can add it back anytime by signing in with the same {ssoProvider}
-              SSO.
-            </Trans>
-          {:else if openIdProvider !== undefined}
-            <Trans>
-              You can add it back anytime by signing in with the same {openIdProvider}
+              You can add it back anytime by signing in with the same {provider}
               account.
             </Trans>
           {:else}

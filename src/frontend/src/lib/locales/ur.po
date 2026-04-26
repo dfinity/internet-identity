@@ -1248,10 +1248,7 @@ msgstr "آپ کا پہلے ہی ایک {name} اکاؤنٹ منسلک ہے"
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "آپ ID <0>{identityNumber}</0> کو اپ گریڈ کر رہے ہیں"
 
-msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr "آپ اسی {openIdProvider} اکاؤنٹ سے سائن اِن کر کے اسے کسی بھی وقت واپس شامل کر سکتے ہیں۔"
-
-msgid "You can add it back anytime by signing in with the same {ssoProvider} SSO."
+msgid "You can add it back anytime by signing in with the same {provider} account."
 msgstr ""
 
 msgid "You can add it back anytime by signing in with the same passkey."
