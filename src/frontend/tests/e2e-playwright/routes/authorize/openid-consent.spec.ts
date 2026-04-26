@@ -94,8 +94,9 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.accept();
+      await consent.accept();
     });
   });
 
@@ -133,12 +134,13 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.waitForVisible();
+      await consent.waitForVisible();
       // Exactly one picker row is shown (the merged "Email" row).
-      await expect(attributeConsentView.row("Email:")).toBeVisible();
-      await expect(attributeConsentView.rows).toHaveCount(1);
-      await attributeConsentView.continue();
+      await expect(consent.row("Email:")).toBeVisible();
+      await expect(consent.rows).toHaveCount(1);
+      await consent.continue();
     });
   });
 
@@ -179,13 +181,12 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.waitForVisible();
-      await expect(
-        attributeConsentView.row(`${providerName} email:`),
-      ).toBeVisible();
-      await expect(attributeConsentView.row("Email:")).toBeVisible();
-      await attributeConsentView.continue();
+      await consent.waitForVisible();
+      await expect(consent.row(`${providerName} email:`)).toBeVisible();
+      await expect(consent.row("Email:")).toBeVisible();
+      await consent.continue();
     });
   });
 
@@ -249,11 +250,12 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.waitForVisible();
+      await consent.waitForVisible();
       // The picker button is only rendered when the row has >1 option.
-      await expect(attributeConsentView.pickerButton).toBeVisible();
-      await attributeConsentView.continue();
+      await expect(consent.pickerButton).toBeVisible();
+      await consent.continue();
     });
   });
 
@@ -288,10 +290,11 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.waitForVisible();
-      await attributeConsentView.denyAll();
-      await attributeConsentView.continue();
+      await consent.waitForVisible();
+      await consent.denyAll();
+      await consent.continue();
     });
   });
 
@@ -326,10 +329,11 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.waitForVisible();
-      await attributeConsentView.uncheckRow("Email:");
-      await attributeConsentView.continue();
+      await consent.waitForVisible();
+      await consent.uncheckRow("Email:");
+      await consent.continue();
     });
   });
 
@@ -369,11 +373,12 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await attributeConsentView.waitForVisible();
-      await expect(attributeConsentView.row("Name:")).toBeVisible();
-      await expect(attributeConsentView.rows).toHaveCount(1);
-      await attributeConsentView.continue();
+      await consent.waitForVisible();
+      await expect(consent.row("Name:")).toBeVisible();
+      await expect(consent.rows).toHaveCount(1);
+      await consent.continue();
     });
   });
 
@@ -407,13 +412,14 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       // Handler auto-resolves → II window closes without ever rendering the
       // consent heading. The fixture waits for the window to close after the
       // test body returns; if the consent screen were ever shown, the
       // auto-close would block and this test would time out instead of the
       // assertion below firing.
-      await attributeConsentView.expectHidden();
+      await consent.expectHidden();
     });
   });
 
@@ -477,6 +483,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       identities,
       signInWithIdentity,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       // Sign the passkey identity into the dapp's authorize popup, then
       // hit the final "Continue" that triggers authorization — the consent
       // handler only wakes up once the user has authorized.
@@ -487,7 +494,7 @@ test.describe("Authorize with OpenID — explicit consent UI", () => {
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();
-      await attributeConsentView.accept();
+      await consent.accept();
     });
   });
 });

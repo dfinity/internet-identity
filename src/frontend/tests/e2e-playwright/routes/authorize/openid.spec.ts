@@ -291,12 +291,13 @@ test.describe("Authorize with direct OpenID", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       // Mixing 1-click-eligible keys with non-eligible / unknown ones takes
       // the consent path instead of 1-click. The defaults (all options
       // checked, first provider selected for the `name` picker) match the
       // assertions below — just accept.
-      await attributeConsentView.accept();
+      await consent.accept();
     });
   });
 

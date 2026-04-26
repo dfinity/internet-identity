@@ -160,6 +160,7 @@ test.describe("Authorize via SSO", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      const consent = attributeConsentView(authorizePage.page);
       const ssoPage = await openSsoPopup(authorizePage.page);
       const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(ssoPage, openIdUsers[0].id);
@@ -177,14 +178,14 @@ test.describe("Authorize via SSO", () => {
       // prefix instead of the bare-domain fallback. This exercises the
       // consent-screen frontend discovery: the lookup runs independently
       // per domain, regardless of how the user authenticated.
-      await attributeConsentView.waitForVisible();
+      await consent.waitForVisible();
       await expect(
-        attributeConsentView.row(`Test SSO ${SSO_OPENID_PORT} email:`),
+        consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
       ).toBeVisible();
       await expect(
-        attributeConsentView.row(`Test SSO ${SSO_OPENID_PORT} name:`),
+        consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
       ).toBeVisible();
-      await attributeConsentView.continue();
+      await consent.continue();
     });
   });
 
