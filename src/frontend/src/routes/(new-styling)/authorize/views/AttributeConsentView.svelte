@@ -48,27 +48,12 @@
   let ssoNamesByDomain = $state<Map<string, string>>(new Map());
   const ssoLookupsInFlight = new Set<string>();
 
-  /**
-   * Allowlist of SSO discovery hosts the canister has blessed. Required
-   * by `discoverSsoConfig` to relax the strict-HTTPS gate for loopback
-   * test domains (`localhost:11107`); production hosts are still
-   * required to use HTTPS.
-   */
-  // Lowercase defensively; matches the case-insensitive comparison the
-  // canister applies and keeps lookups working if a legacy install
-  // shipped mixed-case domains.
-  const allowlistedSsoHosts = new Set(
-    (backendCanisterConfig.sso_discoverable_domains[0] ?? []).map((host) =>
-      host.toLowerCase(),
-    ),
-  );
-
   const ensureSsoLookup = (domain: string): void => {
     if (ssoNamesByDomain.has(domain) || ssoLookupsInFlight.has(domain)) {
       return;
     }
     ssoLookupsInFlight.add(domain);
-    void discoverSsoConfig(domain, { allowlistedHosts: allowlistedSsoHosts })
+    void discoverSsoConfig(domain)
       .then((result) => {
         if (result.name !== undefined && result.name.length > 0) {
           ssoNamesByDomain = new Map(ssoNamesByDomain).set(domain, result.name);

@@ -29,17 +29,15 @@ export const load: PageLoad = ({ url }) => {
 
   if (ssoDomain !== null) {
     const trimmed = ssoDomain.trim().toLowerCase();
-    const allowlist = backendCanisterConfig.sso_discoverable_domains[0] ?? [];
-    if (
-      !allowlist.some((entry) => entry.toLowerCase() === trimmed) ||
-      trimmed.length === 0
-    ) {
-      // Mirror the OpenID fallback: an unallowlisted SSO domain should
-      // not silently kick off discovery. Drop back to the regular auth
-      // flow so the dapp surfaces its own retry path rather than us
-      // showing an error page on what's effectively a misconfigured URL.
+    if (trimmed.length === 0) {
       throw redirect(307, "/authorize");
     }
+    // No client-side allowlist check — the canister's
+    // `add_discoverable_oidc_config` is the trust boundary and traps on
+    // anything not on `sso_discoverable_domains`. A non-allowlisted
+    // `?sso=` URL surfaces as the error page rather than silently
+    // falling back, which is the right signal: the dapp built the URL
+    // pointing at a domain II hasn't blessed.
     return { flow: "sso-init" as const, domain: trimmed };
   }
 

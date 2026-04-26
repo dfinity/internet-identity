@@ -25,13 +25,15 @@
  *
  * Security — checks we still enforce:
  * - Domain input validated (DNS format, length limits) unless the host
- *   is on the canister's `sso_discoverable_domains` allowlist (e.g.
- *   `localhost:11107` for e2e tests), in which case the explicit
- *   admin opt-in carries the validation that the regex would.
+ *   is loopback (`localhost` / `127.0.0.1`, with optional port), which
+ *   is what makes e2e tests against `localhost:11107` work without
+ *   widening the regex.
  * - All three URLs (ii-openid-configuration, provider discovery, auth
- *   endpoint) must be HTTPS — the only exception is when the URL host
- *   is on the same allowlist, which is what makes loopback-only e2e
- *   testing work without weakening prod's strict-HTTPS posture.
+ *   endpoint) must be HTTPS — the only exception is loopback hosts,
+ *   which can use HTTP since there's no real network in play. The
+ *   canister's own `sso_discoverable_domains` allowlist remains the
+ *   trust boundary; this module is only consulted after the backend
+ *   has accepted the domain.
  * - Provider `issuer` hostname must match `openid_configuration` hostname
  *   exactly or as a true subdomain (prevents a tampered provider-discovery
  *   doc from bouncing auth off-host AFTER we've committed to a provider).
@@ -156,16 +158,12 @@ const hostnameMatchesAllowed = (hostname: string, expected: string): boolean =>
 
 /** Validate domain input format (DNS name).
  *
- * Allowlisted hosts skip the DNS-format check so that test setups can
- * register `localhost:11107` (single label, port-suffixed) without us
- * having to widen the regex for every caller. An entry has to be
- * explicitly blessed in the canister allowlist for the test bypass to
- * apply, so production hostnames still go through the strict DNS
- * validation path. */
-export const validateDomain = (
-  domain: string,
-  allowlistedHosts?: ReadonlySet<string>,
-): string => {
+ * Loopback hosts (`localhost` and `127.0.0.1`, with or without a port)
+ * skip the DNS-format check so e2e tests can register `localhost:11107`
+ * without us having to widen the regex for every caller. Production
+ * domains still go through the strict DNS validation path; the canister
+ * `sso_discoverable_domains` allowlist remains the actual trust gate. */
+export const validateDomain = (domain: string): string => {
   const trimmed = domain.trim().toLowerCase();
   if (trimmed.length === 0) {
     throw new Error("Domain cannot be empty");
@@ -173,7 +171,7 @@ export const validateDomain = (
   if (trimmed.length > MAX_DOMAIN_LENGTH) {
     throw new Error(`Domain too long (max ${MAX_DOMAIN_LENGTH} characters)`);
   }
-  if (allowlistedHosts?.has(trimmed) === true) {
+  if (isLoopbackHost(trimmed)) {
     return trimmed;
   }
   if (!DOMAIN_REGEX.test(trimmed)) {
@@ -194,54 +192,37 @@ export const validateDomain = (
 };
 
 /**
- * "host" or "host:port" portion of a URL, lowercased — the form admins
- * use when writing allowlist entries (`dfinity.org`, `localhost:11107`)
- * so equality checks don't need to account for default ports. IPv6
- * hosts are intentionally not handled: bracketed allowlist entries like
- * `[::1]:11107` won't match the `hostname + port` join produced here,
- * and the test setup only ever uses the hostname form.
+ * `localhost` / `127.0.0.1`, optionally followed by `:<port>`. IPv6
+ * loopback (`[::1]`, etc.) is intentionally not handled — the backend
+ * doesn't recognise it either, and the e2e setup uses the hostname
+ * form. Mirrors the backend's `scheme_for_allowlisted_host` loopback
+ * check.
  */
-const hostWithPort = (url: URL): string => {
-  const host = url.hostname.toLowerCase();
-  return url.port === "" ? host : `${host}:${url.port}`;
-};
-
-/**
- * Scheme to use when constructing the hop-1 URL. Allowlisted hosts that
- * resolve to the loopback (the e2e test provider, which can't serve TLS)
- * get `http`; everything else gets `https`. Only the hostname form of
- * loopback is recognised (`localhost`, `127.0.0.1`); IPv6 loopback in
- * the allowlist would still render as `https` and is out of scope.
- * Mirrors the backend's `scheme_for_allowlisted_host`.
- */
-const schemeForHost = (
-  host: string,
-  allowlistedHosts: ReadonlySet<string>,
-): "http" | "https" => {
-  if (!allowlistedHosts.has(host)) return "https";
+const isLoopbackHost = (host: string): boolean => {
   const bare = host.split(":", 1)[0]?.toLowerCase() ?? host;
-  return bare === "localhost" || bare === "127.0.0.1" ? "http" : "https";
+  return bare === "localhost" || bare === "127.0.0.1";
 };
 
 /**
- * `https` is always accepted; `http` is accepted only when the URL host
- * (with port, if any) is on the allowlist. The allowlist itself is the
- * trust gate — domains an II admin hasn't blessed never reach this
- * function, so relaxing the scheme there doesn't weaken prod's
- * strict-HTTPS posture.
+ * Scheme to use when fetching from `host`. Loopback gets `http` (the
+ * e2e provider can't serve TLS); everything else gets `https`. There's
+ * no admin-list gate here — the trust boundary is the canister's
+ * `add_discoverable_oidc_config` call, which has already happened by
+ * the time we reach this function.
  */
-const validateProviderUrl = (
-  url: string,
-  allowlistedHosts: ReadonlySet<string>,
-): URL => {
+const schemeForHost = (host: string): "http" | "https" =>
+  isLoopbackHost(host) ? "http" : "https";
+
+/**
+ * `https` is always accepted; `http` is accepted only for loopback
+ * hosts.
+ */
+const validateProviderUrl = (url: string): URL => {
   const parsed = new URL(url);
   if (parsed.protocol === "https:") {
     return parsed;
   }
-  if (
-    parsed.protocol === "http:" &&
-    allowlistedHosts.has(hostWithPort(parsed))
-  ) {
+  if (parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)) {
     return parsed;
   }
   throw new Error(
@@ -268,33 +249,24 @@ const parseOrThrow = <T>(
 };
 
 /** Validate the `ii-openid-configuration` response structure. */
-const validateIIConfig = (
-  data: unknown,
-  allowlistedHosts: ReadonlySet<string>,
-): IIOpenIdConfiguration => {
+const validateIIConfig = (data: unknown): IIOpenIdConfiguration => {
   const parsed = parseOrThrow(
     IIOpenIdConfigurationSchema,
     data,
     "ii-openid-configuration",
   );
-  validateProviderUrl(parsed.openid_configuration, allowlistedHosts);
+  validateProviderUrl(parsed.openid_configuration);
   return parsed;
 };
 
 /**
  * Variant of the issuer/auth-endpoint scheme check that mirrors
  * {@link validateProviderUrl}: HTTPS always passes; HTTP passes only
- * when the URL host is on the allowlist.
+ * for loopback hosts.
  */
-const requireHttpsOrAllowlisted = (
-  url: URL,
-  allowlistedHosts: ReadonlySet<string>,
-  label: string,
-): void => {
+const requireHttpsOrLoopback = (url: URL, label: string): void => {
   if (url.protocol === "https:") return;
-  if (url.protocol === "http:" && allowlistedHosts.has(hostWithPort(url))) {
-    return;
-  }
+  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return;
   throw new Error(`Provider ${label} must use HTTPS: ${url.toString()}`);
 };
 
@@ -302,7 +274,6 @@ const requireHttpsOrAllowlisted = (
 const validateProviderDiscovery = (
   data: unknown,
   expectedHostname: string,
-  allowlistedHosts: ReadonlySet<string>,
 ): OidcDiscoveryDocument => {
   const doc = parseOrThrow(
     OidcDiscoveryDocumentSchema,
@@ -313,7 +284,7 @@ const validateProviderDiscovery = (
   // Issuer hostname must match the expected provider host exactly or as a
   // true subdomain — this blocks look-alike attacks.
   const issuerUrl = new URL(doc.issuer);
-  requireHttpsOrAllowlisted(issuerUrl, allowlistedHosts, "issuer");
+  requireHttpsOrLoopback(issuerUrl, "issuer");
   if (!hostnameMatchesAllowed(issuerUrl.hostname, expectedHostname)) {
     throw new Error(
       `Provider issuer hostname mismatch: expected ${expectedHostname} or a subdomain, got ${issuerUrl.hostname}`,
@@ -325,11 +296,7 @@ const validateProviderDiscovery = (
   // enough, a tampered discovery response could otherwise bounce auth to an
   // attacker-controlled host.
   const authUrl = new URL(doc.authorization_endpoint);
-  requireHttpsOrAllowlisted(
-    authUrl,
-    allowlistedHosts,
-    "authorization endpoint",
-  );
+  requireHttpsOrLoopback(authUrl, "authorization endpoint");
   if (!hostnameMatchesAllowed(authUrl.hostname, expectedHostname)) {
     throw new Error(
       `Provider authorization endpoint hostname mismatch: expected ${expectedHostname} or a subdomain, got ${authUrl.hostname}`,
@@ -450,23 +417,13 @@ const fetchWithRetry = async (
  * `oidc_configs` — this function does no allowlist check of its own.
  *
  * @param domain - The organization domain (e.g., `dfinity.org`)
- * @param options.allowlistedHosts - Hosts the canister has blessed for
- *   SSO discovery. Used here for two narrow purposes: (1) accept
- *   non-DNS hostnames like `localhost:11107` in
- *   {@link validateDomain}, and (2) accept `http://` URLs for those
- *   hosts in the scheme checks. Defaults to an empty set, preserving
- *   strict-HTTPS for callers that haven't yet plumbed the allowlist
- *   through.
  * @returns The `client_id` and OIDC discovery document
  * @throws On validation failure, rate limit, timeout, or network error
  */
 export const discoverSsoConfig = async (
   domain: string,
-  options?: { allowlistedHosts?: ReadonlySet<string> },
 ): Promise<SsoDiscoveryResult> => {
-  const allowlistedHosts =
-    options?.allowlistedHosts ?? (new Set() as ReadonlySet<string>);
-  const validatedDomain = validateDomain(domain, allowlistedHosts);
+  const validatedDomain = validateDomain(domain);
 
   // Serve from cache if both hops are still fresh.
   const cachedIIConfig = iiConfigCache.get(validatedDomain);
@@ -523,7 +480,7 @@ export const discoverSsoConfig = async (
     // Raw fetch / JSON / validation errors are converted to
     // DomainNotConfiguredError so the UI can show one friendly message
     // regardless of how exactly the domain misbehaves.
-    const iiConfigUrl = `${schemeForHost(validatedDomain, allowlistedHosts)}://${validatedDomain}/.well-known/ii-openid-configuration`;
+    const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
     let iiConfigData: unknown;
     try {
       iiConfigData = await fetchWithRetry(iiConfigUrl, II_CONFIG_TIMEOUT_MS);
@@ -532,7 +489,7 @@ export const discoverSsoConfig = async (
     }
     let iiConfig: IIOpenIdConfiguration;
     try {
-      iiConfig = validateIIConfig(iiConfigData, allowlistedHosts);
+      iiConfig = validateIIConfig(iiConfigData);
     } catch (error) {
       // Response decoded but doesn't match the expected shape — from the
       // user's perspective the domain still isn't correctly configured.
@@ -570,7 +527,6 @@ export const discoverSsoConfig = async (
     const providerDoc = validateProviderDiscovery(
       providerData,
       providerUrl.hostname,
-      allowlistedHosts,
     );
 
     providerCache.set(iiConfig.openid_configuration, {

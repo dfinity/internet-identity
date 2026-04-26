@@ -42,7 +42,6 @@ const backendCanisterConfigIDL = IDL.Record({
       }),
     ),
   ),
-  sso_discoverable_domains: IDL.Opt(IDL.Vec(IDL.Text)),
 });
 
 // Types for above IDL definition
@@ -63,7 +62,6 @@ export interface OpenIdConfig {
 }
 export type BackendCanisterConfig = {
   openid_configs: [] | [OpenIdConfig[]];
-  sso_discoverable_domains: [] | [string[]];
 };
 
 export let canisterId: Principal;

@@ -42,7 +42,7 @@
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
-  import { anonymousActor, backendCanisterConfig } from "$lib/globals";
+  import { anonymousActor } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
   const { data }: PageProps = $props();
@@ -140,13 +140,10 @@
    * committed to a domain that's on the allowlist (gated in `+page.ts`).
    */
   const initiateSso = async (domain: string) => {
-    const allowlistedHosts = new Set(
-      backendCanisterConfig.sso_discoverable_domains[0] ?? [],
-    );
     await anonymousActor.add_discoverable_oidc_config({
       discovery_domain: domain,
     });
-    const result = await discoverSsoConfig(domain, { allowlistedHosts });
+    const result = await discoverSsoConfig(domain);
     // Stash the SSO discovery domain so `resumeOpenId` knows the
     // returning JWT belongs to a 1-click SSO flow rather than a 1-click
     // OpenID one. The flow type drives which auto-approve allowlist the
