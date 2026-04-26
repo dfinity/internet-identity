@@ -419,7 +419,7 @@ test.describe("Authorize — explicit consent UI", () => {
     });
   });
 
-  test.describe("with OpenID credential (passkey flow)", () => {
+  test.describe("with linked OpenID credential", () => {
     // User signs in via passkey, not 1-click OpenID — so `flow.type` is
     // "regular" and the 1-click OpenID fast-path never runs. Attributes are
     // still sourced from the OpenID credential that was linked to the anchor
@@ -494,7 +494,7 @@ test.describe("Authorize — explicit consent UI", () => {
     });
   });
 
-  test.describe("with SSO credential (wizard flow)", () => {
+  test.describe("with linked SSO credential", () => {
     // SSO credentials surface via `sso:<domain>:<key>`. The consent UI
     // resolves the domain's published name through the same two-hop
     // discovery the sign-in path uses, so the rows render with the
