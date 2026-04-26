@@ -419,7 +419,7 @@ test.describe("Authorize — explicit consent UI", () => {
     });
   });
 
-  test.describe("with linked OpenID credential (passkey flow)", () => {
+  test.describe("with OpenID credential (passkey flow)", () => {
     // User signs in via passkey, not 1-click OpenID — so `flow.type` is
     // "regular" and the 1-click OpenID fast-path never runs. Attributes are
     // still sourced from the OpenID credential that was linked to the anchor
@@ -473,7 +473,7 @@ test.describe("Authorize — explicit consent UI", () => {
       expect(entries.name).toBe(name);
     });
 
-    test("should certify linked attributes", async ({
+    test("should certify the credential's attributes", async ({
       attributeConsentView,
       authorizePage,
       identities,
@@ -494,7 +494,7 @@ test.describe("Authorize — explicit consent UI", () => {
     });
   });
 
-  test.describe("with SSO-sourced attributes", () => {
+  test.describe("with SSO credential (wizard flow)", () => {
     // SSO credentials surface via `sso:<domain>:<key>`. The consent UI
     // resolves the domain's published name through the same two-hop
     // discovery the sign-in path uses, so the rows render with the
@@ -528,7 +528,7 @@ test.describe("Authorize — explicit consent UI", () => {
       expect(entries[`sso:${SSO_DISCOVERY_DOMAIN}:email`]).toBe(email);
     });
 
-    test("should render SSO domain label in consent rows", async ({
+    test("should label rows with the SSO domain name", async ({
       attributeConsentView,
       authorizePage,
       openSsoPopup,
