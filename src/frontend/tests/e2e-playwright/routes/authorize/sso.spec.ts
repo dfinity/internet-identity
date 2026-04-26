@@ -48,47 +48,8 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   );
 }
 
-test.describe("Authorize with SSO", () => {
-  test.describe("without any attributes (wizard)", () => {
-    const name = "John Doe";
-
-    test.use({
-      openIdConfig: {
-        defaultPort: SSO_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name }, // Claim should not be returned without explicit request
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        useIcrc3Attributes: true,
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeUndefined();
-    });
-
-    test("should authenticate only", async ({
-      authorizePage,
-      openSsoPopup,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      const ssoPage = await openSsoPopup(authorizePage.page);
-      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
-      await signInWithOpenId(ssoPage, openIdUsers[0].id);
-      await closePromise;
-      await authorizePage.page
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-    });
-  });
-
-  test.describe("without any attributes (1-click)", () => {
+test.describe("Authorize with 1-click SSO", () => {
+  test.describe("without any attributes", () => {
     const name = "John Doe";
 
     test.use({
@@ -121,7 +82,7 @@ test.describe("Authorize with SSO", () => {
     });
   });
 
-  test.describe("with name and email attributes (wizard)", () => {
+  test.describe("with name and email attributes", () => {
     const name = "John Doe";
     const email = "john.doe@example.com";
 
@@ -136,6 +97,7 @@ test.describe("Authorize with SSO", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
@@ -183,73 +145,6 @@ test.describe("Authorize with SSO", () => {
     });
 
     test("should return attributes", async ({
-      authorizePage,
-      attributeConsentView,
-      openSsoPopup,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      const consent = attributeConsentView(authorizePage.page);
-      const ssoPage = await openSsoPopup(authorizePage.page);
-      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
-      await signInWithOpenId(ssoPage, openIdUsers[0].id);
-      await closePromise;
-      await authorizePage.page
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-      // Consent UI assertions live in the body (rather than afterEach)
-      // because the page must still be open to query the rows.
-      await consent.waitForVisible();
-      await expect(
-        consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
-      ).toBeVisible();
-      await expect(
-        consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
-      ).toBeVisible();
-      await consent.continue();
-    });
-  });
-
-  test.describe("with name and email attributes (1-click)", () => {
-    const name = "John Doe";
-    const email = "john.doe@example.com";
-
-    test.use({
-      openIdConfig: {
-        defaultPort: SSO_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name, email },
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        sso: SSO_DISCOVERY_DOMAIN,
-        useIcrc3Attributes: true,
-        attributes: [
-          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
-          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
-        ],
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeDefined();
-      if (authorizedIcrc3Attributes === undefined) {
-        return;
-      }
-      const textEntries = decodeIcrc3TextEntries(
-        authorizedIcrc3Attributes.data,
-      );
-      expect(textEntries).toMatchObject({
-        [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
-        [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
-      });
-    });
-
-    test("should auto-approve attributes", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
@@ -325,6 +220,7 @@ test.describe("Authorize with SSO", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
@@ -354,21 +250,16 @@ test.describe("Authorize with SSO", () => {
     });
 
     test("should omit attributes", async ({
-      authorizePage,
       attributeConsentView,
-      openSsoPopup,
+      authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
       const consent = attributeConsentView(authorizePage.page);
-      const ssoPage = await openSsoPopup(authorizePage.page);
-      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
-      await signInWithOpenId(ssoPage, openIdUsers[0].id);
-      await closePromise;
-      await authorizePage.page
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-      // Consent shows only the resolvable row; everything else is dropped.
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      // Mixing 1-click-eligible keys with non-eligible / unknown ones takes
+      // the consent path instead of 1-click. The defaults (only `name`
+      // available) match the assertions below — just accept.
       await consent.accept();
     });
   });
@@ -376,7 +267,7 @@ test.describe("Authorize with SSO", () => {
   test.describe("with verified_email attribute", () => {
     // PR #3805: the canister doesn't certify `verified_email` under
     // `sso:` yet, so `list_available_attributes` filters it out — the
-    // request resolves to an empty consent set and the certified payload
+    // consent path resolves to an empty set and the certified payload
     // carries no `verified_email`.
     const email = "john.doe@example.com";
 
@@ -391,6 +282,7 @@ test.describe("Authorize with SSO", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
         attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
       },
@@ -411,18 +303,12 @@ test.describe("Authorize with SSO", () => {
 
     test("should not return verified_email", async ({
       authorizePage,
-      openSsoPopup,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const ssoPage = await openSsoPopup(authorizePage.page);
-      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
-      await signInWithOpenId(ssoPage, openIdUsers[0].id);
-      await closePromise;
-      await authorizePage.page
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-      // No consent UI: empty groups auto-resolve to an empty consent set.
+      // Empty groups auto-resolve to an empty consent set; no consent UI
+      // interaction needed.
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
 

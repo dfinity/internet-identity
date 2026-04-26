@@ -5,6 +5,7 @@ import {
   ALTERNATE_OPENID_PORT,
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
+import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { fromBase64, II_URL } from "../../utils";
 
 // ---------------------------------------------------------------------------
@@ -490,6 +491,66 @@ test.describe("Authorize — explicit consent UI", () => {
         .getByRole("button", { name: "Continue", exact: true })
         .click();
       await consent.accept();
+    });
+  });
+
+  test.describe("with SSO-sourced attributes", () => {
+    // SSO credentials surface via `sso:<domain>:<key>`. The consent UI
+    // resolves the domain's published name through the same two-hop
+    // discovery the sign-in path uses, so the rows render with the
+    // friendly prefix (e.g. `Test SSO 11107 email:`) rather than the
+    // bare domain. We sign up via the wizard SSO flow inline since the
+    // canister has no SSO credential before this test.
+    const name = "Linked User";
+    const email = "linked@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { name, email } }],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        useIcrc3Attributes: true,
+        attributes: [
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) return;
+      const entries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(entries[`sso:${SSO_DISCOVERY_DOMAIN}:name`]).toBe(name);
+      expect(entries[`sso:${SSO_DISCOVERY_DOMAIN}:email`]).toBe(email);
+    });
+
+    test("should render SSO domain label in consent rows", async ({
+      attributeConsentView,
+      authorizePage,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      const consent = attributeConsentView(authorizePage.page);
+      const ssoPage = await openSsoPopup(authorizePage.page);
+      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(ssoPage, openIdUsers[0].id);
+      await closePromise;
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await consent.waitForVisible();
+      await expect(
+        consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
+      ).toBeVisible();
+      await expect(
+        consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
+      ).toBeVisible();
+      await consent.continue();
     });
   });
 });

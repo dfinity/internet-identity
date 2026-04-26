@@ -167,41 +167,42 @@ test("Authorize by signing in from another device", async ({
   }
 });
 
-test("Authorize by signing up with OpenID", async ({
-  page,
-  openIdUsers,
-  signInWithOpenId,
-}) => {
-  const userId = crypto.randomUUID();
-
-  // Set name claim
-  await fetch(`http://localhost:11105/account/${userId}/claims`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+test.describe("Sign up with OpenID", () => {
+  test.use({
+    openIdConfig: {
+      createUsers: [
+        {
+          claims: { name: DEFAULT_USER_NAME },
+        },
+      ],
     },
-    body: JSON.stringify({ name: DEFAULT_USER_NAME }),
   });
 
-  await authorize(page, async (authPage) => {
-    // Pick OpenID to continue
-    const pagePromise = authPage.context().waitForEvent("page");
-    await authPage
-      .getByRole("button", {
-        name: openIdUsers[0].issuer.name,
-      })
-      .click();
+  test("Authorize by signing up with OpenID", async ({
+    page,
+    openIdUsers,
+    signInWithOpenId,
+  }) => {
+    await authorize(page, async (authPage) => {
+      // Pick OpenID to continue
+      const pagePromise = authPage.context().waitForEvent("page");
+      await authPage
+        .getByRole("button", { name: openIdUsers[0].issuer.name })
+        .click();
 
-    // Authenticate and authorize with OpenID
-    const openIdPage = await pagePromise;
-    const closePromise = openIdPage.waitForEvent("close", { timeout: 15_000 });
-    await signInWithOpenId(openIdPage, openIdUsers[0].id);
-    await closePromise;
+      // Authenticate and authorize with OpenID
+      const openIdPage = await pagePromise;
+      const closePromise = openIdPage.waitForEvent("close", {
+        timeout: 15_000,
+      });
+      await signInWithOpenId(openIdPage, openIdUsers[0].id);
+      await closePromise;
 
-    // Continue to dapp
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
+      // Continue to dapp
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
   });
 });
 

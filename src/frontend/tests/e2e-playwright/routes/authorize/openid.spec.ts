@@ -45,7 +45,7 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   );
 }
 
-test.describe("Authorize with direct OpenID", () => {
+test.describe("Authorize with 1-click OpenID", () => {
   test.describe("without any attributes", () => {
     const name = "John Doe";
 
