@@ -243,9 +243,7 @@ test.describe("Authorize with 1-click SSO", () => {
       );
       // Only the available attribute is present.
       expect(textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:name`]).toBe(name);
-      expect(
-        textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:email`],
-      ).toBeUndefined();
+      expect(textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:email`]).toBeUndefined();
       expect(textEntries["favorite_food"]).toBeUndefined();
     });
 
