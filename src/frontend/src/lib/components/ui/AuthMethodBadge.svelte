@@ -2,10 +2,6 @@
   import PasskeyIcon from "../icons/PasskeyIcon.svelte";
   import SsoIcon from "../icons/SsoIcon.svelte";
 
-  // Discriminated union: each auth method draws something different and
-  // each carries different (or no) extra data. A flat `logo + isSso`
-  // pair would let a caller accidentally pass both — the union prevents
-  // that statically.
   export type AuthMethodBadgeVariant =
     | { type: "passkey" }
     | { type: "openid"; logo?: string }
