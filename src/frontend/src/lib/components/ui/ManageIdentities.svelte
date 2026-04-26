@@ -44,15 +44,19 @@
     identity.authMethod.openid.metadata !== undefined
       ? openIdName(
           identity.authMethod.openid.iss,
-          // `aud`, `ssoName`, `ssoDomain` not tracked on
-          // `LastUsedIdentity`; see #3795. Fall through to issuer-only
-          // `findConfig` — correct for direct providers, imprecise for
-          // SSO until that's fixed.
+          // `aud` not tracked on `LastUsedIdentity`; see #3795. Fall
+          // through to issuer-only `findConfig` — correct for direct
+          // providers. SSO entries take the `"sso" in authMethod`
+          // branch below instead.
           undefined,
           identity.authMethod.openid.metadata,
           undefined,
           undefined,
         )
+      : undefined}
+  {@const ssoProvider =
+    "sso" in identity.authMethod
+      ? (identity.authMethod.sso.name ?? identity.authMethod.sso.domain)
       : undefined}
   <div class="flex flex-col gap-8">
     <div class="flex flex-col gap-4">
@@ -64,7 +68,12 @@
           {$t`Remove from this device`}
         </h2>
         <p class="text-text-tertiary text-base">
-          {#if openIdProvider !== undefined}
+          {#if ssoProvider !== undefined}
+            <Trans>
+              You can add it back anytime by signing in with the same {ssoProvider}
+              SSO.
+            </Trans>
+          {:else if openIdProvider !== undefined}
             <Trans>
               You can add it back anytime by signing in with the same {openIdProvider}
               account.

@@ -39,6 +39,12 @@
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
   let isUpgrading = $state(false);
+  // True while a deferred SSO registration is awaiting the name-entry view
+  // (`setupNewIdentity`). Used by `handleCompleteOpenIdRegistration` to
+  // dispatch to `completeSsoRegistration` instead of the direct-provider
+  // counterpart. Plain `let` (no `$state`) — only read inside async event
+  // handlers, never in the template, so reactivity isn't needed.
+  let pendingSsoRegistration = false;
 
   const handleContinueWithExistingPasskey = async (): Promise<
     void | "cancelled"
@@ -84,6 +90,10 @@
         await onSignIn(result.identityNumber);
       } else if (result.name !== undefined) {
         await onSignUp(await authFlow.completeOpenIdRegistration(result.name));
+      } else {
+        // Deferred direct-OpenID sign-up: ensure the SSO flag is clear so
+        // the name-entry view dispatches to `completeOpenIdRegistration`.
+        pendingSsoRegistration = false;
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
@@ -104,9 +114,12 @@
       if (authResult.type === "signIn") {
         await onSignIn(authResult.identityNumber);
       } else if (authResult.name !== undefined) {
-        await onSignUp(
-          await authFlow.completeOpenIdRegistration(authResult.name),
-        );
+        await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
+      } else {
+        // The SSO IdP didn't supply a name — the wizard now drives the
+        // user to `setupNewIdentity`. Mark the deferred completion as
+        // SSO so the name-entry callback dispatches to the SSO path.
+        pendingSsoRegistration = true;
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
@@ -123,7 +136,12 @@
   ): Promise<void> => {
     try {
       isAuthenticating = true;
-      await onSignUp(await authFlow.completeOpenIdRegistration(name));
+      if (pendingSsoRegistration) {
+        await onSignUp(await authFlow.completeSsoRegistration(name));
+        pendingSsoRegistration = false;
+      } else {
+        await onSignUp(await authFlow.completeOpenIdRegistration(name));
+      }
     } catch (error) {
       onError(error); // Propagate unhandled errors to parent component
     } finally {
@@ -189,6 +207,7 @@
           if (isAuthenticating) {
             return;
           }
+          pendingSsoRegistration = false;
           authFlow.chooseMethod();
         }}
       >

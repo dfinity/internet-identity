@@ -1,12 +1,22 @@
 <script lang="ts">
   import PasskeyIcon from "../icons/PasskeyIcon.svelte";
+  import SsoIcon from "../icons/SsoIcon.svelte";
+
+  // Discriminated union: each auth method draws something different and
+  // each carries different (or no) extra data. A flat `logo + isSso`
+  // pair would let a caller accidentally pass both — the union prevents
+  // that statically.
+  export type AuthMethodBadgeVariant =
+    | { type: "passkey" }
+    | { type: "openid"; logo?: string }
+    | { type: "sso" };
 
   type Props = {
-    logo: string | undefined;
+    variant: AuthMethodBadgeVariant;
     size: "sm" | "lg";
   };
 
-  let { logo, size }: Props = $props();
+  let { variant, size }: Props = $props();
 </script>
 
 <span
@@ -17,11 +27,15 @@
       : "-inset-e-1.25 -bottom-1.25 size-5",
   ]}
 >
-  {#if logo !== undefined}
+  {#if variant.type === "sso"}
+    <SsoIcon
+      class={["text-fg-tertiary", size === "lg" ? "size-4.25!" : "size-3!"]}
+    />
+  {:else if variant.type === "openid" && variant.logo !== undefined}
     <span
       class={["text-fg-tertiary", size === "lg" ? "size-4.25" : "size-3.25"]}
     >
-      {@html logo}
+      {@html variant.logo}
     </span>
   {:else}
     <PasskeyIcon
