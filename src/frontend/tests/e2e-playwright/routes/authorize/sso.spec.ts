@@ -5,6 +5,11 @@ import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { fromBase64, II_URL } from "../../utils";
 
+// Attribute scope keys for SSO-sourced credentials are
+// `sso:<domain>:<name>`, distinct from the `openid:<issuer>:<name>` form
+// direct providers use. Asking for an SSO claim under the `openid:`
+// form would silently miss it (PR #3805).
+
 type Icrc3Value =
   | { Nat: bigint }
   | { Int: bigint }
@@ -43,18 +48,7 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   );
 }
 
-// SSO is just OpenID with a couple of extra wizard steps: click
-// "Continue with SSO", type the company domain, wait for the two-hop
-// discovery to resolve, then the IdP popup that opens is the same
-// `test_openid_provider` page direct-OpenID tests drive. The
-// 1-click-OpenID auto-approval path covered in `openid.spec.ts` is
-// intentionally not duplicated here.
-//
-// Attribute scope keys use the SSO form `sso:<domain>:<name>` rather
-// than the `openid:<issuer>:<name>` form direct providers use — see
-// PR #3805. SSO-sourced credentials are addressable via `sso:` only,
-// `openid:` would silently miss them.
-test.describe("Authorize via SSO", () => {
+test.describe("Authorize with SSO (wizard)", () => {
   test.describe("without any attributes", () => {
     const name = "John Doe";
 
@@ -63,15 +57,10 @@ test.describe("Authorize via SSO", () => {
         defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
-            // Claim should not be returned without explicit request,
-            // matching the analogous direct-OpenID scenario.
-            claims: { name },
+            claims: { name }, // Claim should not be returned without explicit request
           },
         ],
       },
-      // No `openid` hint here: that would route to the direct-OpenID
-      // flow for `Test OpenID 11107`. The SSO tests need the user to
-      // land on the full picker so they can click "Continue with SSO".
       authorizeConfig: {
         protocol: "icrc25",
         useIcrc3Attributes: true,
@@ -115,10 +104,6 @@ test.describe("Authorize via SSO", () => {
       authorizeConfig: {
         protocol: "icrc25",
         useIcrc3Attributes: true,
-        // SSO attributes use `sso:<domain>:<name>`. The `<domain>` is
-        // the discovery domain registered via
-        // `add_discoverable_oidc_config` (matches the credential's
-        // recorded discovery_domain), not the IdP's issuer URL.
         attributes: [
           `sso:${SSO_DISCOVERY_DOMAIN}:name`,
           `sso:${SSO_DISCOVERY_DOMAIN}:email`,
@@ -136,6 +121,8 @@ test.describe("Authorize via SSO", () => {
       expect(authorizedIcrc3Attributes.signature.length).toBeGreaterThan(0);
 
       const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
+
+      // Verify user attributes are Text
       const textEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
@@ -144,13 +131,22 @@ test.describe("Authorize via SSO", () => {
         [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
       });
 
+      // Verify implicit:origin is Text
       expect(map["implicit:origin"]).toHaveProperty("Text");
+
+      // Verify implicit:nonce is a 32-byte Blob
       expect(map["implicit:nonce"]).toHaveProperty("Blob");
       const { Blob: nonceBlob } = map["implicit:nonce"] as {
         Blob: number[];
       };
       expect(nonceBlob).toHaveLength(32);
+
+      // Verify implicit:issued_at_timestamp_ns is a Nat
       expect(map["implicit:issued_at_timestamp_ns"]).toHaveProperty("Nat");
+      const { Nat: timestamp } = map["implicit:issued_at_timestamp_ns"] as {
+        Nat: bigint;
+      };
+      expect(timestamp).toBeGreaterThan(BigInt(0));
     });
 
     test("should return attributes", async ({
@@ -165,19 +161,11 @@ test.describe("Authorize via SSO", () => {
       const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(ssoPage, openIdUsers[0].id);
       await closePromise;
-      // After the IdP popup closes, the wizard lands on ContinueView
-      // (selectedIdentity is set, $authorizedStore is not yet). Click
-      // Continue to commit the authorization — this triggers the consent
-      // pipeline that will render the SSO attribute rows.
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();
-      // The SSO consent rows are labelled with the published SSO name
-      // (`Test SSO 11107`, served by `test_openid_provider`'s hop-1
-      // response) — verify both the email and name rows render that
-      // prefix instead of the bare-domain fallback. This exercises the
-      // consent-screen frontend discovery: the lookup runs independently
-      // per domain, regardless of how the user authenticated.
+      // Consent UI assertions live in the body (rather than afterEach)
+      // because the page must still be open to query the rows.
       await consent.waitForVisible();
       await expect(
         consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
@@ -189,10 +177,7 @@ test.describe("Authorize via SSO", () => {
     });
   });
 
-  // 1-click SSO: the dapp passes `?sso=<domain>` on the authorize URL,
-  // II runs discovery + redirect immediately without showing the auth
-  // wizard. Mirrors the `?openid=<issuer>` 1-click for direct providers.
-  test.describe("1-click via ?sso= search param", () => {
+  test.describe("with unavailable attribute", () => {
     const name = "John Doe";
 
     test.use({
@@ -200,7 +185,124 @@ test.describe("Authorize via SSO", () => {
         defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
-            claims: { name },
+            claims: { name }, // No email claim — request below is unavailable
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        useIcrc3Attributes: true,
+        attributes: [
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`, // Unavailable scoped attribute
+          `sso:${SSO_DISCOVERY_DOMAIN}:favorite_color`, // Unknown scoped attribute
+          `favorite_food`, // Unknown unscoped attribute
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      // Only the available attribute is present.
+      expect(textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:name`]).toBe(name);
+      expect(
+        textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:email`],
+      ).toBeUndefined();
+      expect(textEntries["favorite_food"]).toBeUndefined();
+    });
+
+    test("should omit attributes", async ({
+      authorizePage,
+      attributeConsentView,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      const consent = attributeConsentView(authorizePage.page);
+      const ssoPage = await openSsoPopup(authorizePage.page);
+      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(ssoPage, openIdUsers[0].id);
+      await closePromise;
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      // Consent shows only the resolvable row; everything else is dropped.
+      await consent.accept();
+    });
+  });
+
+  test.describe("with verified_email attribute", () => {
+    // PR #3805: the canister doesn't certify `verified_email` under
+    // `sso:` yet, so `list_available_attributes` filters it out — the
+    // request resolves to an empty consent set and the certified payload
+    // carries no `verified_email`.
+    const email = "john.doe@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { email, email_verified: "true" },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        useIcrc3Attributes: true,
+        attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(
+        textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
+      ).toBeUndefined();
+    });
+
+    test("should not return verified_email", async ({
+      authorizePage,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      const ssoPage = await openSsoPopup(authorizePage.page);
+      const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(ssoPage, openIdUsers[0].id);
+      await closePromise;
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      // No consent UI: empty groups auto-resolve to an empty consent set.
+    });
+  });
+});
+
+test.describe("Authorize with SSO (1-click)", () => {
+  test.describe("without any attributes", () => {
+    const name = "John Doe";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name }, // Claim should not be returned without explicit request
           },
         ],
       },
@@ -211,28 +313,21 @@ test.describe("Authorize via SSO", () => {
       },
     });
 
-    test.afterEach(({ authorizedPrincipal }) => {
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeUndefined();
     });
 
-    test("redirects straight to the IdP without showing the wizard", async ({
+    test("should authenticate only", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      // The /authorize page in this case does NOT render the wizard —
-      // it kicks off the SSO redirect on mount. We end up on the IdP
-      // sign-in form directly, then come back to the auth page for the
-      // final Continue.
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
 
-  // 1-click SSO with attribute auto-approval: when every requested key
-  // is in the SSO auto-approve allowlist (`sso:<domain>:name`,
-  // `sso:<domain>:email`), II skips the consent UI just like the
-  // 1-click OpenID path does for `openid:<issuer>:<key>`.
-  test.describe("1-click via ?sso= with auto-approved attributes", () => {
+  test.describe("with name and email attributes", () => {
     const name = "John Doe";
     const email = "john.doe@example.com";
 
@@ -271,28 +366,76 @@ test.describe("Authorize via SSO", () => {
       });
     });
 
-    test("auto-approves name and email without consent UI", async ({
+    test("should auto-approve attributes", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      // No consent screen, no manual Continue — `signInWithOpenId`
-      // drives only the IdP popup, then the page closes itself once the
-      // 1-click handler certifies the attributes.
+      // No consent screen, no manual Continue — the 1-click handler
+      // certifies the auto-approve allowlist (`sso:<domain>:{name,email}`)
+      // and the popup closes itself.
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
 
+  test.describe("with app-supplied nonce", () => {
+    const name = "John Doe";
+    // prettier-ignore
+    const knownNonce = new Uint8Array([
+      80, 48, 222, 48, 28, 157, 149, 134, 236, 61, 19, 71, 200, 105, 53, 187,
+      44, 126, 9, 241, 76, 103, 217, 148, 12, 55, 90, 181, 33, 208, 99, 7,
+    ]);
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        sso: SSO_DISCOVERY_DOMAIN,
+        useIcrc3Attributes: true,
+        icrc3Nonce: knownNonce,
+        attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:name`],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
+      expect(map["implicit:nonce"]).toHaveProperty("Blob");
+      const { Blob: nonceBlob } = map["implicit:nonce"] as {
+        Blob: number[];
+      };
+      expect(Array.from(nonceBlob)).toEqual(Array.from(knownNonce));
+    });
+
+    test("should include the app-supplied nonce", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+});
+
+test.describe("Authorize entry-point conflicts", () => {
   // Both `?openid=` and `?sso=` set in one URL is a misconfigured
-  // sign-in URL. Rather than silently picking one entry point, II
-  // surfaces it as an "invalid request" via the existing ChannelError
-  // UI so the dapp gets a clear signal to fix the URL. We open the
-  // authorize popup directly here rather than going through the
-  // `authorizePage` fixture — that fixture ends with a
-  // `waitForEvent("close")`, but the channel-error view is a static
-  // page the user has to dismiss themselves, so it never closes on its
-  // own.
-  test("renders ChannelError when both ?openid and ?sso are set", async ({
+  // sign-in URL. We open the authorize page directly here rather than
+  // going through `authorizePage` — that fixture ends with
+  // `waitForEvent("close")`, but the channel-error view is static and
+  // never closes on its own.
+  test("should render ChannelError when both ?openid and ?sso are set", async ({
     page,
   }) => {
     const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
