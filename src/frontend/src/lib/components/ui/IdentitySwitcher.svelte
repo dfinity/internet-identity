@@ -128,6 +128,9 @@
             "email",
           ) ?? $t`Hidden email`}</span
         >
+      {:else if "sso" in selectedIdentity.authMethod}
+        {@const sso = selectedIdentity.authMethod.sso}
+        <span>{sso.email ?? sso.name ?? sso.domain}</span>
       {/if}
     </p>
     {#if onSignOut !== undefined}

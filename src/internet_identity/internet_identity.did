@@ -280,6 +280,12 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
+    // Allowlist of domains that may be registered as discoverable SSO
+    // providers via `add_discoverable_oidc_config`. When set, fully replaces
+    // the built-in defaults. When unset, falls back to `dfinity.org`
+    // (production) or `beta.dfinity.org` (everything else), keyed off
+    // `is_production`.
+    sso_discoverable_domains : opt vec text;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
     // Configuration to show dapps explorer or not

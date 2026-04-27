@@ -6,7 +6,7 @@ import {
 } from "../../fixtures/openid";
 import { II_URL } from "../../utils";
 
-test.describe("Authorize with direct OpenID (legacy attributes)", () => {
+test.describe("Authorize with 1-click OpenID (legacy attributes)", () => {
   test.describe("without any attributes", () => {
     const name = "John Doe";
 

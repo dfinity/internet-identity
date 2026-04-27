@@ -24,9 +24,16 @@
  *   (the canary-allowed domain itself).
  *
  * Security — checks we still enforce:
- * - Domain input validated (DNS format, length limits).
+ * - Domain input validated (DNS format, length limits) unless the host
+ *   is loopback (`localhost` / `127.0.0.1`, with optional port), which
+ *   is what makes e2e tests against `localhost:11107` work without
+ *   widening the regex.
  * - All three URLs (ii-openid-configuration, provider discovery, auth
- *   endpoint) must be HTTPS.
+ *   endpoint) must be HTTPS — the only exception is loopback hosts,
+ *   which can use HTTP since there's no real network in play. The
+ *   canister's own `sso_discoverable_domains` allowlist remains the
+ *   trust boundary; this module is only consulted after the backend
+ *   has accepted the domain.
  * - Provider `issuer` hostname must match `openid_configuration` hostname
  *   exactly or as a true subdomain (prevents a tampered provider-discovery
  *   doc from bouncing auth off-host AFTER we've committed to a provider).
@@ -67,13 +74,24 @@ export interface SsoDiscoveryResult {
    */
   domain: string;
   clientId: string;
+  /**
+   * Human-readable name for the SSO, as published by the domain at hop-1
+   * in the optional `name` field. Used by the consent UI to render
+   * `sso:<domain>:<key>` attribute rows with a friendly prefix
+   * (e.g. "DFINITY email:"); falls back to `domain` when absent.
+   */
+  name?: string;
   discovery: OidcDiscoveryDocument;
 }
 
-/** Response shape of `https://{domain}/.well-known/ii-openid-configuration`. */
+/** Response shape of `https://{domain}/.well-known/ii-openid-configuration`.
+ *
+ * `name` is optional: legacy / minimal deployments don't publish one
+ * and the FE falls back to the bare discovery domain for labelling. */
 const IIOpenIdConfigurationSchema = z.object({
   client_id: z.string().min(1),
   openid_configuration: z.string().min(1),
+  name: z.string().min(1).optional(),
 });
 type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
 
@@ -138,7 +156,13 @@ let activeFetches = 0;
 const hostnameMatchesAllowed = (hostname: string, expected: string): boolean =>
   hostname === expected || hostname.endsWith(`.${expected}`);
 
-/** Validate domain input format (DNS name). */
+/** Validate domain input format (DNS name).
+ *
+ * Loopback hosts (`localhost` and `127.0.0.1`, with or without a port)
+ * skip the DNS-format check so e2e tests can register `localhost:11107`
+ * without us having to widen the regex for every caller. Production
+ * domains still go through the strict DNS validation path; the canister
+ * `sso_discoverable_domains` allowlist remains the actual trust gate. */
 export const validateDomain = (domain: string): string => {
   const trimmed = domain.trim().toLowerCase();
   if (trimmed.length === 0) {
@@ -146,6 +170,9 @@ export const validateDomain = (domain: string): string => {
   }
   if (trimmed.length > MAX_DOMAIN_LENGTH) {
     throw new Error(`Domain too long (max ${MAX_DOMAIN_LENGTH} characters)`);
+  }
+  if (isLoopbackHost(trimmed)) {
+    return trimmed;
   }
   if (!DOMAIN_REGEX.test(trimmed)) {
     throw new Error("Invalid domain format");
@@ -165,21 +192,42 @@ export const validateDomain = (domain: string): string => {
 };
 
 /**
- * Validate the `openid_configuration` URL from hop 1 before we follow it.
- *
- * Only HTTPS is enforced here. Which IdP host the org uses is the org's
- * decision — we inherit that trust from the backend's canary allowlist,
- * which is what gated their ability to register in the first place. See
- * the trust-model note at the top of this file.
+ * `localhost` / `127.0.0.1`, optionally followed by `:<port>`. IPv6
+ * loopback (`[::1]`, etc.) is intentionally not handled — the backend
+ * doesn't recognise it either, and the e2e setup uses the hostname
+ * form. Mirrors the backend's `scheme_for_allowlisted_host` loopback
+ * check.
+ */
+const isLoopbackHost = (host: string): boolean => {
+  const bare = host.split(":", 1)[0]?.toLowerCase() ?? host;
+  return bare === "localhost" || bare === "127.0.0.1";
+};
+
+/**
+ * Scheme to use when fetching from `host`. Loopback gets `http` (the
+ * e2e provider can't serve TLS); everything else gets `https`. There's
+ * no admin-list gate here — the trust boundary is the canister's
+ * `add_discoverable_oidc_config` call, which has already happened by
+ * the time we reach this function.
+ */
+const schemeForHost = (host: string): "http" | "https" =>
+  isLoopbackHost(host) ? "http" : "https";
+
+/**
+ * `https` is always accepted; `http` is accepted only for loopback
+ * hosts.
  */
 const validateProviderUrl = (url: string): URL => {
   const parsed = new URL(url);
-  if (parsed.protocol !== "https:") {
-    throw new Error(
-      `Provider URL must use HTTPS: ${parsed.protocol}//${parsed.hostname}`,
-    );
+  if (parsed.protocol === "https:") {
+    return parsed;
   }
-  return parsed;
+  if (parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)) {
+    return parsed;
+  }
+  throw new Error(
+    `Provider URL must use HTTPS: ${parsed.protocol}//${parsed.hostname}`,
+  );
 };
 
 /** Zod parse with a prefixed error message for easier user-visible output. */
@@ -211,6 +259,17 @@ const validateIIConfig = (data: unknown): IIOpenIdConfiguration => {
   return parsed;
 };
 
+/**
+ * Variant of the issuer/auth-endpoint scheme check that mirrors
+ * {@link validateProviderUrl}: HTTPS always passes; HTTP passes only
+ * for loopback hosts.
+ */
+const requireHttpsOrLoopback = (url: URL, label: string): void => {
+  if (url.protocol === "https:") return;
+  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return;
+  throw new Error(`Provider ${label} must use HTTPS: ${url.toString()}`);
+};
+
 /** Validate an OIDC discovery document from the provider. */
 const validateProviderDiscovery = (
   data: unknown,
@@ -225,9 +284,7 @@ const validateProviderDiscovery = (
   // Issuer hostname must match the expected provider host exactly or as a
   // true subdomain — this blocks look-alike attacks.
   const issuerUrl = new URL(doc.issuer);
-  if (issuerUrl.protocol !== "https:") {
-    throw new Error(`Provider issuer must use HTTPS: ${doc.issuer}`);
-  }
+  requireHttpsOrLoopback(issuerUrl, "issuer");
   if (!hostnameMatchesAllowed(issuerUrl.hostname, expectedHostname)) {
     throw new Error(
       `Provider issuer hostname mismatch: expected ${expectedHostname} or a subdomain, got ${issuerUrl.hostname}`,
@@ -239,11 +296,7 @@ const validateProviderDiscovery = (
   // enough, a tampered discovery response could otherwise bounce auth to an
   // attacker-controlled host.
   const authUrl = new URL(doc.authorization_endpoint);
-  if (authUrl.protocol !== "https:") {
-    throw new Error(
-      `Provider authorization endpoint must use HTTPS: ${doc.authorization_endpoint}`,
-    );
-  }
+  requireHttpsOrLoopback(authUrl, "authorization endpoint");
   if (!hostnameMatchesAllowed(authUrl.hostname, expectedHostname)) {
     throw new Error(
       `Provider authorization endpoint hostname mismatch: expected ${expectedHostname} or a subdomain, got ${authUrl.hostname}`,
@@ -388,6 +441,7 @@ export const discoverSsoConfig = async (
       return {
         domain: validatedDomain,
         clientId: cachedIIConfig.config.client_id,
+        name: cachedIIConfig.config.name,
         discovery: cachedProvider.document,
       };
     }
@@ -426,7 +480,7 @@ export const discoverSsoConfig = async (
     // Raw fetch / JSON / validation errors are converted to
     // DomainNotConfiguredError so the UI can show one friendly message
     // regardless of how exactly the domain misbehaves.
-    const iiConfigUrl = `https://${validatedDomain}/.well-known/ii-openid-configuration`;
+    const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
     let iiConfigData: unknown;
     try {
       iiConfigData = await fetchWithRetry(iiConfigUrl, II_CONFIG_TIMEOUT_MS);
@@ -460,6 +514,7 @@ export const discoverSsoConfig = async (
       return {
         domain: validatedDomain,
         clientId: iiConfig.client_id,
+        name: iiConfig.name,
         discovery: cachedProviderDoc.document,
       };
     }
@@ -482,6 +537,7 @@ export const discoverSsoConfig = async (
     return {
       domain: validatedDomain,
       clientId: iiConfig.client_id,
+      name: iiConfig.name,
       discovery: providerDoc,
     };
   } finally {

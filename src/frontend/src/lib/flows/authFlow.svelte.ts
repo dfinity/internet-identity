@@ -22,6 +22,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import {
   CheckCaptchaError,
+  IdentityAnchorInfo,
   IdRegFinishError,
   IdRegStartError,
   OpenIdDelegationError,
@@ -60,6 +61,14 @@ export class AuthFlow {
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
+  // SSO sign-up state: kept separate from the direct-provider `#jwt` /
+  // `#configIssuer` pair so `completeSsoRegistration` (the SSO-specific
+  // counterpart to `completeOpenIdRegistration`) can reconstruct the
+  // `sso` LastUsedIdentity entry without leaking SSO awareness into the
+  // direct-provider methods.
+  #ssoJwt = $state<string>();
+  #ssoDomain = $state<string>();
+  #ssoName = $state<string>();
 
   get view() {
     return this.#view;
@@ -109,26 +118,53 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
-    const { clientId, discovery } = ssoResult;
+    const { clientId, discovery, domain, name: ssoName } = ssoResult;
+    authenticationV2Funnel.addProperties({ provider: "SSO" });
+    const result = await this.#openIdJwtSignIn({
+      clientId,
+      authURL: discovery.authorization_endpoint,
+      authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
+    });
+    if (result.type === "signIn") {
+      if (this.#options.trackLastUsed) {
+        // `email` is purely for display fallback in the identity row
+        // (email → name → domain); decoded fresh from the JWT here so
+        // the sso variant doesn't need to remember `iss`/`sub`.
+        const { email } = decodeJWT(result.jwt);
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber: result.identityNumber,
+          name: result.info.name[0],
+          authMethod: {
+            sso: {
+              domain,
+              name: ssoName,
+              email,
+              loginHint: result.loginHint,
+            },
+          },
+          createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+        });
+      }
+      return { identityNumber: result.identityNumber, type: "signIn" };
+    }
+    this.#ssoJwt = result.jwt;
+    this.#ssoDomain = domain;
+    this.#ssoName = ssoName;
+    return { name: result.suggestedName, type: "signUp" };
+  };
 
-    // Build a synthetic OpenIdConfig from SSO discovery result. The
-    // canister identifies the matching DiscoverableProvider by (iss,
-    // aud) and stamps `sso_domain` (+ optional `sso_name`) onto the
-    // credential when it verifies the JWT — the FE doesn't need to
-    // remember anything about this flow locally.
-    const syntheticConfig: OpenIdConfig = {
-      auth_uri: discovery.authorization_endpoint,
-      jwks_uri: "",
-      logo: "",
-      name: "SSO",
-      fedcm_uri: [],
-      email_verification: [],
-      issuer: discovery.issuer,
-      auth_scope: selectAuthScopes(discovery.scopes_supported),
-      client_id: clientId,
-    };
-
-    return await this.continueWithOpenId(syntheticConfig);
+  completeSsoRegistration = async (name: string): Promise<bigint> => {
+    if (this.#ssoJwt === undefined || this.#ssoDomain === undefined) {
+      throw new Error("SSO JWT or domain is missing");
+    }
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
+    await this.#startRegistration();
+    return this.#registerWithSso(
+      this.#ssoJwt,
+      name,
+      this.#ssoDomain,
+      this.#ssoName,
+    );
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
@@ -194,19 +230,70 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
+    authenticationV2Funnel.addProperties({ provider: config.name });
+    const result = await this.#openIdJwtSignIn(
+      {
+        clientId: config.client_id,
+        authURL: config.auth_uri,
+        authScope: config.auth_scope.join(" "),
+        configURL: config.fedcm_uri?.[0],
+      },
+      existingJwt,
+    );
+    if (result.type === "signIn") {
+      if (this.#options.trackLastUsed) {
+        const authnMethod = result.info.openid_credentials[0]?.find(
+          (method) => method.iss === result.iss,
+        );
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber: result.identityNumber,
+          name: result.info.name[0],
+          authMethod: {
+            openid: {
+              iss: result.iss,
+              sub: result.sub,
+              loginHint: result.loginHint,
+              metadata: authnMethod?.metadata,
+            },
+          },
+          createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+        });
+      }
+      return { identityNumber: result.identityNumber, type: "signIn" };
+    }
+    this.#jwt = result.jwt;
+    this.#configIssuer = config.issuer;
+    return { name: result.suggestedName, type: "signUp" };
+  };
+
+  // Shared core for `continueWithOpenId` / `continueWithSso`. Acquires the
+  // JWT (skipped when one is supplied), authenticates with II, and either
+  // returns sign-in details (with anchor info) or signals that registration
+  // is needed. Knows nothing about how either caller persists LastUsedIdentity
+  // — that's the caller's responsibility, so the OpenID and SSO variants
+  // don't bleed into each other.
+  #openIdJwtSignIn = async (
+    requestConfig: RequestConfig,
+    existingJwt?: string,
+  ): Promise<
+    | {
+        type: "signIn";
+        jwt: string;
+        iss: string;
+        sub: string;
+        loginHint?: string;
+        identityNumber: bigint;
+        info: IdentityAnchorInfo;
+      }
+    | {
+        type: "signUp";
+        jwt: string;
+        suggestedName?: string;
+      }
+  > => {
     let jwt: string | undefined = existingJwt;
-    // Convert OpenIdConfig to RequestConfig
-    const requestConfig: RequestConfig = {
-      clientId: config.client_id,
-      authURL: config.auth_uri,
-      authScope: config.auth_scope.join(" "),
-      configURL: config.fedcm_uri?.[0],
-    };
-    authenticationV2Funnel.addProperties({
-      provider: config.name,
-    });
     if (jwt === undefined) {
-      // Create two try-catch blocks to avoid double-triggering the analytics.
+      // Two try-catch blocks to avoid double-triggering the analytics.
       try {
         this.#systemOverlay = true;
         jwt = await requestJWT(requestConfig, {
@@ -218,7 +305,7 @@ export class AuthFlow {
         throw error;
       } finally {
         this.#systemOverlay = false;
-        // Moved after `requestJWT` to avoid Safari from blocking the popup.
+        // Moved after `requestJWT` to avoid Safari blocking the popup.
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.ContinueWithOpenID,
         );
@@ -231,10 +318,6 @@ export class AuthFlow {
         session: get(sessionStore),
         jwt,
       });
-      // If the previous call succeeds, it means the OpenID user already exists in II.
-      // Therefore, they are logging in.
-      // If the call fails, it means the OpenID user does not exist in II.
-      // In that case, we register them.
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       await authenticationStore.set({
         identity,
@@ -243,37 +326,28 @@ export class AuthFlow {
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-      const authnMethod = info.openid_credentials[0]?.find(
-        (method) => method.iss === iss,
-      );
-      if (this.#options.trackLastUsed) {
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name: info.name[0],
-          authMethod: {
-            openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
-          },
-          createdAtMillis: info.created_at.map(nanosToMillis)[0],
-        });
-      }
-      return { identityNumber, type: "signIn" };
+      return {
+        type: "signIn",
+        jwt,
+        iss,
+        sub,
+        loginHint,
+        identityNumber,
+        info,
+      };
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
-        error.type === "NoSuchAnchor" &&
-        jwt !== undefined
+        error.type === "NoSuchAnchor"
       ) {
-        this.#jwt = jwt;
-        this.#configIssuer = config.issuer;
         const { name } = decodeJWT(jwt);
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.RegisterWithOpenID,
         );
         if (name === undefined) {
-          // Show enter name screen to complete registration,
           this.#view = "setupNewIdentity";
         }
-        return { name, type: "signUp" };
+        return { type: "signUp", jwt, suggestedName: name };
       }
       throw error;
     }
@@ -416,6 +490,80 @@ export class AuthFlow {
     name: string,
     configIssuer: string,
   ): Promise<bigint> => {
+    const result = await this.#openIdRegistrationCommit(jwt, name);
+    if (this.#options.trackLastUsed) {
+      const { name: jwtName, email, ...restJWTClaims } = result.decodedJwt;
+      const metadata: MetadataMapV2 = [];
+      if (jwtName !== undefined) {
+        metadata.push(["name", { String: jwtName }]);
+      }
+      if (email !== undefined) {
+        metadata.push(["email", { String: email }]);
+      }
+      extractIssuerTemplateClaims(configIssuer).forEach((key) => {
+        if (restJWTClaims[key] !== undefined) {
+          metadata.push([key, { String: restJWTClaims[key] }]);
+        }
+      });
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber: result.identityNumber,
+        name,
+        authMethod: {
+          openid: {
+            iss: result.iss,
+            sub: result.sub,
+            loginHint: result.loginHint,
+            metadata,
+          },
+        },
+        createdAtMillis: Date.now(),
+      });
+    }
+    return result.identityNumber;
+  };
+
+  #registerWithSso = async (
+    jwt: string,
+    name: string,
+    domain: string,
+    ssoName: string | undefined,
+  ): Promise<bigint> => {
+    const result = await this.#openIdRegistrationCommit(jwt, name);
+    if (this.#options.trackLastUsed) {
+      // See `continueWithSso`: email is kept only for the identity-row
+      // display fallback chain (email → name → domain).
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber: result.identityNumber,
+        name,
+        authMethod: {
+          sso: {
+            domain,
+            name: ssoName,
+            email: result.decodedJwt.email,
+            loginHint: result.loginHint,
+          },
+        },
+        createdAtMillis: Date.now(),
+      });
+    }
+    return result.identityNumber;
+  };
+
+  // Shared core for `#registerWithOpenId` / `#registerWithSso`. Calls the
+  // canister-side `openid_identity_registration_finish` (with captcha-retry
+  // recursion), authenticates with the resulting delegation, and returns
+  // the credential identifiers + decoded JWT — leaving LastUsedIdentity
+  // recording to the variant-specific callers.
+  #openIdRegistrationCommit = async (
+    jwt: string,
+    name: string,
+  ): Promise<{
+    iss: string;
+    sub: string;
+    loginHint?: string;
+    identityNumber: bigint;
+    decodedJwt: ReturnType<typeof decodeJWT>;
+  }> => {
     try {
       await get(sessionStore)
         .actor.openid_identity_registration_finish({
@@ -424,14 +572,8 @@ export class AuthFlow {
           name,
         })
         .then(throwCanisterError);
-      const {
-        iss,
-        sub,
-        loginHint,
-        name: jwtName,
-        email,
-        ...restJWTClaims
-      } = decodeJWT(jwt);
+      const decodedJwt = decodeJWT(jwt);
+      const { iss, sub, loginHint } = decodedJwt;
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -445,28 +587,8 @@ export class AuthFlow {
         identityNumber,
         authMethod: { openid: { iss, sub } },
       });
-      const metadata: MetadataMapV2 = [];
-      if (jwtName !== undefined) {
-        metadata.push(["name", { String: jwtName }]);
-      }
-      if (email !== undefined) {
-        metadata.push(["email", { String: email }]);
-      }
-      extractIssuerTemplateClaims(configIssuer).forEach((key) => {
-        if (restJWTClaims[key] !== undefined) {
-          metadata.push([key, { String: restJWTClaims[key] }]);
-        }
-      });
-      if (this.#options.trackLastUsed) {
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name,
-          authMethod: { openid: { iss, sub, loginHint, metadata } },
-          createdAtMillis: Date.now(),
-        });
-      }
       this.#captcha = undefined;
-      return identityNumber;
+      return { iss, sub, loginHint, identityNumber, decodedJwt };
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -477,7 +599,7 @@ export class AuthFlow {
           await this.#solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
-          return this.#registerWithOpenId(jwt, name, configIssuer);
+          return this.#openIdRegistrationCommit(jwt, name);
         }
       }
       throw error;

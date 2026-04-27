@@ -170,9 +170,9 @@
     if (trimmed.length === 0) return;
 
     // Immediate format validation so bad input gets feedback without a
-    // backend round-trip. Only surface the error if the input looks like
-    // a complete domain (contains a dot); otherwise the user is still
-    // mid-typing.
+    // backend round-trip. Only surface the error once the input looks
+    // like a complete domain (contains a dot); otherwise the user is
+    // still mid-typing.
     try {
       validateDomain(trimmed);
     } catch (e) {

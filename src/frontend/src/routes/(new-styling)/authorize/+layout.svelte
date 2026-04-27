@@ -41,8 +41,20 @@
   // --- Flow detection (captured once, not reactive to URL changes) ---
   const flow = (() => {
     const url = new URL(window.location.href);
-    if (url.searchParams.has("openid")) {
+    const hasOpenid = url.searchParams.has("openid");
+    const hasSso = url.searchParams.has("sso");
+    if (hasOpenid && hasSso) {
+      // `?openid=` and `?sso=` pick mutually exclusive 1-click entry
+      // points; combining them is a misconfigured sign-in URL. Render
+      // the channel-error view directly without trying to establish a
+      // channel — the dapp side hasn't picked an entry point either.
+      return "error" as const;
+    }
+    if (hasOpenid) {
       return "openid-init" as const;
+    }
+    if (hasSso) {
+      return "sso-init" as const;
     }
     if (url.searchParams.get("flow") === "openid-resume") {
       return "openid-resume" as const;
@@ -52,7 +64,15 @@
 
   // --- Channel establishment ---
   $effect.pre(() => {
-    if (flow === "openid-init") {
+    if (flow === "error") {
+      channelErrorStore.set("invalid-request");
+      return;
+    }
+    if (flow === "openid-init" || flow === "sso-init") {
+      // Same lifecycle as direct OpenID 1-click: the page is going to
+      // redirect away to the IdP and come back, so the channel is
+      // established in `pending` mode and resumed via
+      // `ii-pending-channel-origin` after the JWT round-trip.
       channelStore.establish({ pending: true });
     } else if (flow === "openid-resume") {
       const pendingOrigin = sessionStorage.getItem("ii-pending-channel-origin");
@@ -85,13 +105,14 @@
     if (flow === "normal") {
       return $authorizationStore !== undefined;
     }
-    // OpenID flows gate on channel establishment
+    // OpenID/SSO 1-click flows gate on channel establishment
     return $channelStore !== undefined;
   });
   const showHeaderFooter = $derived(
     isReady &&
       $authorizedStore === undefined &&
       flow !== "openid-init" &&
+      flow !== "sso-init" &&
       flow !== "openid-resume",
   );
 

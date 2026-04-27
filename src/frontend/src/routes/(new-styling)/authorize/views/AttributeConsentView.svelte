@@ -7,6 +7,7 @@
   } from "$lib/stores/attributeConsent.store";
   import { extractScope } from "$lib/stores/channelHandlers/attributes";
   import { backendCanisterConfig } from "$lib/globals";
+  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
@@ -36,15 +37,59 @@
   const groupId = (group: { name: string; omitScope: boolean }): string =>
     `${group.name}:${group.omitScope ? "u" : "s"}`;
 
+  /**
+   * Per-render cache of the published name for each `sso:<domain>` we've
+   * seen in the consent groups. Populated by re-running the same
+   * frontend two-hop discovery the SSO sign-in path uses — the consent
+   * screen may render `sso:<domain>:<key>` rows even when the user
+   * authenticated through some other method (passkey, direct OpenID),
+   * so we can't rely on a name being threaded through from sign-in.
+   */
+  let ssoNamesByDomain = $state<Map<string, string>>(new Map());
+  const ssoLookupsInFlight = new Set<string>();
+
+  const ensureSsoLookup = (domain: string): void => {
+    if (ssoNamesByDomain.has(domain) || ssoLookupsInFlight.has(domain)) {
+      return;
+    }
+    ssoLookupsInFlight.add(domain);
+    void discoverSsoConfig(domain)
+      .then((result) => {
+        if (result.name !== undefined && result.name.length > 0) {
+          ssoNamesByDomain = new Map(ssoNamesByDomain).set(domain, result.name);
+        }
+      })
+      .catch((error) => {
+        // Non-fatal: the SSO label falls back to the bare domain.
+        // eslint-disable-next-line no-console
+        console.error(`Failed to discover SSO name for ${domain}`, error);
+      })
+      .finally(() => {
+        ssoLookupsInFlight.delete(domain);
+      });
+  };
+
   const getProviderName = (key: string): string | undefined => {
     const scope = extractScope(key);
-    if (scope === undefined || !scope.startsWith("openid:")) {
+    if (scope === undefined) {
       return undefined;
     }
-    const issuer = scope.slice("openid:".length);
-    return backendCanisterConfig.openid_configs[0]?.find(
-      (c) => c.issuer === issuer,
-    )?.name;
+    if (scope.startsWith("openid:")) {
+      const issuer = scope.slice("openid:".length);
+      return backendCanisterConfig.openid_configs[0]?.find(
+        (c) => c.issuer === issuer,
+      )?.name;
+    }
+    if (scope.startsWith("sso:")) {
+      const domain = scope.slice("sso:".length);
+      // Kick the per-domain discovery on first sight and fall back to
+      // the bare domain in the meantime — Svelte rerenders once the
+      // promise updates `ssoNamesByDomain`, upgrading the label from
+      // e.g. `dfinity.org email:` to `DFINITY email:` in place.
+      ensureSsoLookup(domain);
+      return ssoNamesByDomain.get(domain) ?? domain;
+    }
+    return undefined;
   };
 
   /** Merge AttributeGroups by (name, omitScope). Within each bucket, options

@@ -679,6 +679,7 @@ fn config() -> InternetIdentityInit {
         related_origins: persistent_state.related_origins.clone(),
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
+        sso_discoverable_domains: persistent_state.sso_discoverable_domains.clone(),
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -784,6 +785,20 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(openid_configs) = arg.openid_configs {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_configs = Some(openid_configs);
+            })
+        }
+        if let Some(sso_discoverable_domains) = arg.sso_discoverable_domains {
+            // Canonicalize at the boundary: trim whitespace and lowercase
+            // ASCII so allowlist lookups (case-insensitive on the canister
+            // via `eq_ignore_ascii_case`) and the value shipped through
+            // `/.config.did.bin` to the frontend (compared via case-
+            // sensitive `Set.has`) agree byte-for-byte.
+            let sso_discoverable_domains = sso_discoverable_domains
+                .into_iter()
+                .map(|domain| domain.trim().to_ascii_lowercase())
+                .collect();
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.sso_discoverable_domains = Some(sso_discoverable_domains);
             })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {

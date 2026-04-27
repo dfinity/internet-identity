@@ -475,19 +475,30 @@ impl Anchor {
         Ok(GetIcrc3AttributeResponse { signature })
     }
 
-    /// **Deprecated.** Legacy attribute-sharing flow — see
-    /// [`Anchor::get_attributes`] for the full context. New functionality goes
-    /// through the ICRC-3 flow.
+    /// Read-only listing of attribute keys + values available on this
+    /// anchor. Surfaces both `openid:<issuer>:<attr>` keys (from
+    /// hardcoded providers) and `sso:<domain>:<attr>` keys (from SSO
+    /// discoverable providers) so the ICRC-3 frontend can intersect a
+    /// dapp's requested keys against what the user actually has before
+    /// kicking off `prepare_icrc3_attributes` (which returns
+    /// `AttributeMismatch` if any requested key/value is missing or
+    /// mismatched).
     ///
-    /// Lists available `openid:<issuer>:<attr>` key/value pairs from stored
-    /// OpenID credentials. SSO-sourced credentials (matched to a
-    /// `DiscoverableProvider`) are not listed here — they're addressable only
-    /// through the ICRC-3 flow, and `sso:<domain>` filter keys are rejected at
-    /// the request-validation boundary.
+    /// Legacy / non-ICRC-3 callers stay strictly `openid:`-only via
+    /// the certification path: `ValidatedPrepareAttributeRequest` and
+    /// `ValidatedGetAttributesRequest` reject `sso:<domain>` scopes,
+    /// and `prepare_openid_attributes` skips SSO-sourced credentials
+    /// as defense-in-depth. SSO keys leaking through the listing here
+    /// are inert for those callers — they can't be certified — so
+    /// surfacing them doesn't expand the legacy path's surface area.
     ///
-    /// If `requested` is `None`, returns all available openid attributes.
-    /// If `requested` is `Some(keys)`, returns only attributes matching the
-    /// given keys. Unscoped keys (e.g., `"email"`) match all openid scopes;
+    /// `verified_email` is omitted under `sso:` because the canister
+    /// can't certify it there (PR #3805); listing it would only invite
+    /// an `AttributeMismatch` round-trip.
+    ///
+    /// If `requested` is `None`, returns all available attributes.
+    /// If `requested` is `Some(keys)`, returns only attributes matching
+    /// the given keys. Unscoped keys (e.g., `"email"`) match every scope;
     /// scoped keys match exactly. Response keys are always fully scoped.
     pub fn list_available_attributes(
         &self,
@@ -497,14 +508,27 @@ impl Anchor {
         let mut result = BTreeMap::new();
 
         for credential in &self.openid_credentials {
-            // Only openid: credentials are listed here; SSO-sourced credentials
-            // are routed through the ICRC-3 flow.
-            let scope = match credential.matched_attribute_scope() {
-                Some(scope @ AttributeScope::OpenId { .. }) => scope,
-                Some(AttributeScope::Sso { .. }) | None => continue,
+            // Match the credential to its single addressable scope. SSO
+            // credentials surface as `sso:<domain>:<name>`, direct OIDC
+            // credentials as `openid:<issuer>:<name>`. Unmatched
+            // credentials (no provider) are unreachable and skipped.
+            let Some(scope) = credential.matched_attribute_scope() else {
+                continue;
             };
 
             for &attr_name in all_attribute_names {
+                // `verified_email` isn't supported under `sso:` yet (PR
+                // #3805), so don't list it for SSO creds; the frontend
+                // would request it, the canister would `AttributeMismatch`
+                // on `prepare_icrc3_attributes`. Mirror the prepare-side
+                // exclusion here so the listing matches what's actually
+                // certifiable.
+                if matches!(&scope, AttributeScope::Sso { .. })
+                    && attr_name == AttributeName::VerifiedEmail
+                {
+                    continue;
+                }
+
                 let value = match attr_name {
                     AttributeName::Email => credential.get_email(),
                     AttributeName::Name => credential.get_name(),
@@ -2221,10 +2245,17 @@ mod tests {
             );
         }
 
-        // The legacy `list_available_attributes` omits SSO-sourced credentials
-        // entirely — they're addressable only through the ICRC-3 flow.
+        // `list_available_attributes` surfaces SSO-sourced credentials under
+        // their `sso:<domain>` scope so the ICRC-3 frontend filtering path
+        // (`prepare_icrc3_attributes` is fail-fast on missing keys) can
+        // intersect requested keys against what the user actually has.
+        // `verified_email` is omitted because it's not certifiable under
+        // `sso:` yet — listing it would only invite an `AttributeMismatch`
+        // round-trip. The legacy flow's own scope filter rejects `sso:`
+        // keys at request validation, so surfacing them here doesn't
+        // expand the legacy path's surface area.
         #[test]
-        fn list_available_attributes_omits_sso_credential() {
+        fn list_available_attributes_lists_sso_credential() {
             setup_sso_provider();
             let anchor =
                 anchor_with_openid_credentials(vec![
@@ -2232,11 +2263,14 @@ mod tests {
                 ]);
 
             let listed = anchor.list_available_attributes(None);
+            let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
 
             pretty_assert_eq!(
-                listed.len(),
-                0,
-                "sso credential should not be listed via the legacy flow"
+                keys,
+                BTreeSet::from([
+                    format!("sso:{}:email", SSO_DOMAIN),
+                    format!("sso:{}:name", SSO_DOMAIN),
+                ]),
             );
         }
 

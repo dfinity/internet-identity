@@ -65,11 +65,13 @@ const isOneClickOpenIdKey = (key: string, configIssuer: string): boolean =>
   key === `openid:${configIssuer}:email` ||
   key === `openid:${configIssuer}:verified_email`;
 
-/** Filters attribute keys to the 1-click OpenID auto-approve allowlist. */
-const filterOneClickOpenIdKeys = (
-  keys: string[],
-  configIssuer: string,
-): string[] => keys.filter((key) => isOneClickOpenIdKey(key, configIssuer));
+/** SSO equivalent of {@link isOneClickOpenIdKey}.
+ *  `verified_email` is intentionally excluded — the canister doesn't yet
+ *  support `sso:<domain>:verified_email` (see PR #3805 silent-drop
+ *  behaviour), so auto-approving it would be a no-op that hides a
+ *  consent the user should still see for any other requested key. */
+const isOneClickSsoKey = (key: string, domain: string): boolean =>
+  key === `sso:${domain}:name` || key === `sso:${domain}:email`;
 
 /** Resolve a single requested key against available attributes.
  *  An exact match (e.g. `openid:google:email` requested + available) yields
@@ -201,9 +203,8 @@ export const handleLegacyAttributes =
     );
 
     // Legacy attributes only certify the 1-click OpenID allowlist.
-    const oneClickKeys = filterOneClickOpenIdKeys(
-      paramsResult.data.attributes,
-      configIssuer,
+    const oneClickKeys = paramsResult.data.attributes.filter((key) =>
+      isOneClickOpenIdKey(key, configIssuer),
     );
 
     try {
@@ -488,9 +489,99 @@ export const handleIcrc3OneClickOpenIdAttributes =
   };
 
 /**
+ * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the
+ * user signed in via the `?sso=<domain>` 1-click entry and every requested
+ * key is in that domain's auto-approve allowlist, certify and send without
+ * showing the consent UI.
+ */
+export const handleIcrc3OneClickSsoAttributes =
+  (channel: Channel, onError: (error: ChannelError) => void) =>
+  async (request: JsonRequest) => {
+    if (request.id === undefined || request.method !== "ii-icrc3-attributes") {
+      return;
+    }
+    const requestId = request.id;
+
+    const paramsResult = Icrc3AttributesParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      // The consent handler reports parse failures; staying silent here
+      // avoids a duplicate JSON-RPC error.
+      return;
+    }
+
+    const requestedKeys = paramsResult.data.keys;
+    if (requestedKeys.length === 0) {
+      return;
+    }
+
+    const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
+    if (flow.type !== "1-click-sso") {
+      return;
+    }
+    const ssoDomain = flow.domain;
+    if (!requestedKeys.every((key) => isOneClickSsoKey(key, ssoDomain))) {
+      return;
+    }
+
+    try {
+      const { accountNumberPromise } = await waitForStore(authorizedStore);
+      const authenticated = await waitForStore(authenticationStore);
+
+      const validationResult = await validateDerivationOrigin({
+        requestOrigin: channel.origin,
+        derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+      });
+      if (validationResult.result === "invalid") {
+        onError("unverified-origin");
+        return;
+      }
+
+      const origin = remapToLegacyDomain(
+        paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
+      );
+
+      // Filter to keys the canister actually has — the user may have
+      // signed in with a subset of the allowlist (e.g. no email claim).
+      // `list_available_attributes` covers both `openid:<issuer>` and
+      // `sso:<domain>` scopes (`verified_email` is omitted under
+      // `sso:` because the canister can't certify it there).
+      const available = await authenticated.actor
+        .list_available_attributes({
+          identity_number: authenticated.identityNumber,
+          attributes: [],
+        })
+        .then(throwCanisterError);
+      const availableKeys = new Set(available.map(([key]) => key));
+      const attributeSpecs = requestedKeys
+        .filter((key) => availableKeys.has(key))
+        .map((key) => ({
+          key,
+          value: [] as [],
+          omit_scope: false,
+        }));
+
+      const accountNumber = await accountNumberPromise;
+      await certifyAndSend({
+        channel,
+        onError,
+        requestId,
+        nonce: paramsResult.data.nonce,
+        authenticated,
+        accountNumber,
+        origin,
+        attributeSpecs,
+      });
+    } catch (error) {
+      console.error(error);
+      onError("attributes-failed");
+    }
+  };
+
+/**
  * Handle `ii-icrc3-attributes` requests that require explicit consent (or
- * have nothing to certify). Pairs with `handleIcrc3OneClickOpenIdAttributes`:
- * returns early when that handler will take the request.
+ * have nothing to certify). Pairs with `handleIcrc3OneClickOpenIdAttributes`
+ * and `handleIcrc3OneClickSsoAttributes`: returns early when either of those
+ * handlers will take the request.
  */
 export const handleIcrc3ConsentAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -518,13 +609,19 @@ export const handleIcrc3ConsentAttributes =
     await serializeConsentRequest(async () => {
       try {
         // Wait for the flow — set eagerly by the authorize page — so we can
-        // bail out as soon as we know the 1-click OpenID handler will take
-        // this request.
+        // bail out as soon as we know one of the 1-click handlers will
+        // take this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
         const oneClickHandlerWillHandle =
-          flow.type === "1-click-openid" &&
           requestedKeys.length > 0 &&
-          requestedKeys.every((key) => isOneClickOpenIdKey(key, flow.issuer));
+          ((flow.type === "1-click-openid" &&
+            requestedKeys.every((key) =>
+              isOneClickOpenIdKey(key, flow.issuer),
+            )) ||
+            (flow.type === "1-click-sso" &&
+              requestedKeys.every((key) =>
+                isOneClickSsoKey(key, flow.domain),
+              )));
         if (oneClickHandlerWillHandle) {
           return;
         }

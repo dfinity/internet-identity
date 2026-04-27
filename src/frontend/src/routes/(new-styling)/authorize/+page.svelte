@@ -34,7 +34,7 @@
     authorizationContextStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
-  import { decodeJWT, findConfig } from "$lib/utils/openID";
+  import { decodeJWT, findConfig, selectAuthScopes } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import {
     DirectOpenIdEvents,
@@ -42,6 +42,8 @@
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
+  import { anonymousActor } from "$lib/globals";
+  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
   const { data }: PageProps = $props();
 
@@ -129,6 +131,38 @@
     window.location.assign(next);
   };
 
+  /**
+   * 1-click SSO equivalent of {@link initiateOpenId}: register the
+   * discovery domain with the canister, run two-hop discovery, then
+   * redirect through the same OpenID-redirect machinery as the direct
+   * flow. Distinct from the wizard `SignInWithSso` path only in that it
+   * has nothing to debounce or validate UI-side — the URL has already
+   * committed to a domain that's on the allowlist (gated in `+page.ts`).
+   */
+  const initiateSso = async (domain: string) => {
+    await anonymousActor.add_discoverable_oidc_config({
+      discovery_domain: domain,
+    });
+    const result = await discoverSsoConfig(domain);
+    // Stash the SSO discovery domain so `resumeOpenId` knows the
+    // returning JWT belongs to a 1-click SSO flow rather than a 1-click
+    // OpenID one. The flow type drives which auto-approve allowlist the
+    // attribute consent handler bypasses.
+    sessionStorage.setItem("ii-sso-1-click-domain", domain);
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: result.discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: "",
+      name: "SSO",
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: result.discovery.issuer,
+      auth_scope: selectAuthScopes(result.discovery.scopes_supported),
+      client_id: result.clientId,
+    };
+    initiateOpenId(syntheticConfig);
+  };
+
   /** Process the OpenID callback and authorize. */
   const resumeOpenId = async () => {
     const searchParams = new URLSearchParams(window.location.hash.slice(1));
@@ -151,18 +185,51 @@
     }
     const authFlow = new AuthFlow({ trackLastUsed: false });
     const { iss, aud, ...metadata } = decodeJWT(jwt);
-    const config = findConfig(
-      iss,
-      aud,
-      Object.entries(metadata).map(([key, value]) => [key, { String: value! }]),
-    );
-    if (config === undefined) {
-      return;
+    // The marker is set by `initiateSso` for the `?sso=<domain>` path.
+    // If present, treat the returning JWT as a 1-click SSO flow so the
+    // attribute consent handler auto-approves `sso:<domain>:<key>` keys
+    // instead of `openid:<issuer>:<key>` ones. Clear it so a stale
+    // marker can't leak into a subsequent direct-OpenID round-trip.
+    const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
+    sessionStorage.removeItem("ii-sso-1-click-domain");
+    let config: OpenIdConfig | undefined;
+    if (ssoDomain !== null) {
+      // SSO sign-in: there's no matching `openid_configs` entry to look
+      // up because the provider is registered as a `DiscoverableOidcConfig`
+      // on the canister, not a direct `OpenIdConfig`. Build a synthetic
+      // config from the JWT itself — `continueWithOpenId` only needs
+      // `name` (for analytics) and `client_id` / `issuer` here since
+      // the JWT is already in hand and the canister side picks the
+      // matching `DiscoverableProvider` by `(iss, aud)`.
+      config = {
+        auth_uri: "",
+        jwks_uri: "",
+        logo: "",
+        name: ssoDomain,
+        fedcm_uri: [],
+        email_verification: [],
+        issuer: iss,
+        auth_scope: [],
+        client_id: aud ?? "",
+      };
+      authorizationStore.setFlow({ type: "1-click-sso", domain: ssoDomain });
+    } else {
+      config = findConfig(
+        iss,
+        aud,
+        Object.entries(metadata).map(([key, value]) => [
+          key,
+          { String: value! },
+        ]),
+      );
+      if (config === undefined) {
+        return;
+      }
+      authorizationStore.setFlow({
+        type: "1-click-openid",
+        issuer: config.issuer,
+      });
     }
-    authorizationStore.setFlow({
-      type: "1-click-openid",
-      issuer: config.issuer,
-    });
     openIdResumeProcessing = true;
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
@@ -181,6 +248,10 @@
   onMount(() => {
     if (data.flow === "openid-init") {
       initiateOpenId(data.config);
+    } else if (data.flow === "sso-init") {
+      // Discovery + redirect runs async; the page renders nothing while
+      // it's in flight (mirrors the openid-init render branch).
+      initiateSso(data.domain).catch(handleError);
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
@@ -302,8 +373,8 @@
   </div>
 {/snippet}
 
-{#if data.flow === "openid-init"}
-  <!-- OpenID init — nothing to render, onMount redirects to provider. -->
+{#if data.flow === "openid-init" || data.flow === "sso-init"}
+  <!-- OpenID/SSO init — nothing to render, onMount redirects to provider. -->
 {:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
   <!-- Consent needed (or loading) — consent view handles its own loading state. -->
   {@render panelWrapper(attributeConsentContent)}

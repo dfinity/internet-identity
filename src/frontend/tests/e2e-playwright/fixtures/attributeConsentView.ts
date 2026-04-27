@@ -1,9 +1,8 @@
-import { expect, Locator, Page } from "@playwright/test";
-import { test as authorizeTest } from "./authorize";
+import { expect, Locator, Page, test as base } from "@playwright/test";
 
 /** Page-object for the explicit ICRC-3 attribute consent screen. Wraps the
  *  II authorize window so specs don't hand-roll role queries every time. */
-class AttributeConsentView {
+export class AttributeConsentView {
   // `AttributeConsentView.svelte` renders a different heading depending on
   // the flow variant: "Review Permissions" for OpenID 1-click and "Allow to
   // access this info" for the regular authorize flow. Match either so tests
@@ -81,10 +80,15 @@ class AttributeConsentView {
   }
 }
 
-export const test = authorizeTest.extend<{
-  attributeConsentView: AttributeConsentView;
+export const test = base.extend<{
+  attributeConsentView: (page: Page) => AttributeConsentView;
 }>({
-  attributeConsentView: async ({ authorizePage }, use) => {
-    await use(new AttributeConsentView(authorizePage.page));
+  // Factory rather than a pre-built instance: tests pass in the page they
+  // want to drive (typically `authorizePage.page`) so the consent view
+  // isn't tied to a fixture reference whose underlying Page may have been
+  // initialised at the wrong time in the test lifecycle.
+  // eslint-disable-next-line no-empty-pattern
+  attributeConsentView: async ({}, use) => {
+    await use((page: Page) => new AttributeConsentView(page));
   },
 });

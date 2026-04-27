@@ -1,4 +1,4 @@
-<p align="center"><a href="https://identity.internetcomputer.org" target="_blank" rel="noopener noreferrer"><img width="600" src="./ii-logo.png" alt="Internet Identity"/></a></p>
+<p align="center"><a href="https://id.ai" target="_blank" rel="noopener noreferrer"><img width="600" src="./ii-logo.png" alt="Internet Identity"/></a></p>
 
 <p align="center">
     <a href="https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml"><img src="https://github.com/dfinity/internet-identity/actions/workflows/canister-tests.yml/badge.svg" alt="Canister Tests" /></a>
@@ -8,12 +8,12 @@
 </p>
 
 <p align="center">
-    🔗 <a href="https://identity.internetcomputer.org">https://identity.internetcomputer.org</a> • 📜 <a href="https://internetcomputer.org/docs/current/references/ii-spec">Specification</a> <br/> ― <br/>📚 <a href="https://forum.dfinity.org/c/internet-identity/32">Forum</a> • 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> • 📞 <a href="https://discord.internetcomputer.org">Discord</a>
+    🔗 <a href="https://id.ai">https://id.ai</a> • 📜 <a href="https://internetcomputer.org/docs/current/references/ii-spec">Specification</a> <br/> ― <br/>📚 <a href="https://forum.dfinity.org/c/internet-identity/32">Forum</a> • 🚑 <a href="https://github.com/dfinity/internet-identity/issues/new">Report an Issue</a> • 📞 <a href="https://discord.internetcomputer.org">Discord</a>
 </p>
 
 ---
 
-Internet Identity is an authentication and identity service for the [Internet Computer][ic]. It enables hundreds of thousands of users to securely log in to dapps such as [OISY](https://oisy.com), [Caffeine](https://caffeine.ai), [NNS Dapp](https://nns.internetcomputer.org), [OpenChat](https://oc.app), and [many more](https://identity.internetcomputer.org).
+Internet Identity is an authentication and identity service for the [Internet Computer][ic]. It enables hundreds of thousands of users to securely log in to dapps such as [OISY](https://oisy.com), [Caffeine](https://caffeine.ai), [NNS Dapp](https://nns.internetcomputer.org), [OpenChat](https://oc.app), and [many more](https://id.ai).
 
 Internet Identity is:
 

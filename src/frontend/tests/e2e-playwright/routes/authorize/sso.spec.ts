@@ -1,11 +1,14 @@
 import { expect } from "@playwright/test";
 import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
-import {
-  ALTERNATE_OPENID_PORT,
-  DEFAULT_OPENID_PORT,
-} from "../../fixtures/openid";
+import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
+import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
 import { fromBase64, II_URL } from "../../utils";
+
+// Attribute scope keys for SSO-sourced credentials are
+// `sso:<domain>:<name>`, distinct from the `openid:<issuer>:<name>` form
+// direct providers use. Asking for an SSO claim under the `openid:`
+// form would silently miss it (PR #3805).
 
 type Icrc3Value =
   | { Nat: bigint }
@@ -45,13 +48,13 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   );
 }
 
-test.describe("Authorize with 1-click OpenID", () => {
+test.describe("Authorize with 1-click SSO", () => {
   test.describe("without any attributes", () => {
     const name = "John Doe";
 
     test.use({
       openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
+        defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
             claims: { name }, // Claim should not be returned without explicit request
@@ -60,7 +63,7 @@ test.describe("Authorize with 1-click OpenID", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
       },
     });
@@ -85,7 +88,7 @@ test.describe("Authorize with 1-click OpenID", () => {
 
     test.use({
       openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
+        defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
             claims: { name, email },
@@ -94,11 +97,11 @@ test.describe("Authorize with 1-click OpenID", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
         attributes: [
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
         ],
       },
     });
@@ -119,8 +122,8 @@ test.describe("Authorize with 1-click OpenID", () => {
         authorizedIcrc3Attributes.data,
       );
       expect(textEntries).toMatchObject({
-        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: name,
-        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`]: email,
+        [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
+        [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
       });
 
       // Verify implicit:origin is Text
@@ -146,6 +149,9 @@ test.describe("Authorize with 1-click OpenID", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
+      // No consent screen, no manual Continue — the 1-click handler
+      // certifies the auto-approve allowlist (`sso:<domain>:{name,email}`)
+      // and the popup closes itself.
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
@@ -160,7 +166,7 @@ test.describe("Authorize with 1-click OpenID", () => {
 
     test.use({
       openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
+        defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
             claims: { name },
@@ -169,10 +175,10 @@ test.describe("Authorize with 1-click OpenID", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
         icrc3Nonce: knownNonce,
-        attributes: [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
+        attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:name`],
       },
     });
 
@@ -184,8 +190,6 @@ test.describe("Authorize with 1-click OpenID", () => {
       }
 
       const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
-
-      // Verify the nonce in the ICRC-3 map matches the one we supplied
       expect(map["implicit:nonce"]).toHaveProperty("Blob");
       const { Blob: nonceBlob } = map["implicit:nonce"] as {
         Blob: number[];
@@ -203,63 +207,29 @@ test.describe("Authorize with 1-click OpenID", () => {
   });
 
   test.describe("with unavailable attribute", () => {
-    const defaultName = "John Doe";
-    const alternateName = "Jane Doe";
+    const name = "John Doe";
 
     test.use({
       openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
-            port: DEFAULT_OPENID_PORT,
-            claims: { name: defaultName },
-          },
-          {
-            port: ALTERNATE_OPENID_PORT,
-            claims: { name: alternateName },
+            claims: { name }, // No email claim — request below is unavailable
           },
         ],
       },
       authorizeConfig: {
         protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
         attributes: [
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown scoped attribute
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`, // Unavailable scoped attribute
+          `sso:${SSO_DISCOVERY_DOMAIN}:favorite_color`, // Unknown scoped attribute
           `favorite_food`, // Unknown unscoped attribute
-          `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Wrong issuer for 1-click OpenID auto-approval
         ],
       },
     });
-
-    // Link both OpenID provider users with identity first to ensure attributes from
-    // both providers are available, but only the active issuer's are auto-approved.
-    test.beforeEach(
-      async ({
-        page,
-        identities,
-        signInWithIdentity,
-        signInWithOpenId,
-        openIdUsers,
-      }) => {
-        await page.goto(II_URL + "/manage/access");
-        await signInWithIdentity(page, identities[0].identityNumber);
-
-        for (const user of openIdUsers) {
-          // Click "Add new" and pick OpenID provider
-          await page.getByRole("button", { name: "Add new" }).click();
-          const popupPromise = page.context().waitForEvent("page");
-          await page.getByRole("button", { name: user.issuer.name }).click();
-
-          // Sign in on OpenID page
-          const popup = await popupPromise;
-          const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
-          await signInWithOpenId(popup, user.id);
-          await closePromise;
-        }
-      },
-    );
 
     test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
@@ -268,21 +238,13 @@ test.describe("Authorize with 1-click OpenID", () => {
         return;
       }
 
-      const blobEntries = decodeIcrc3TextEntries(
+      const textEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
-      // Only the name from the default (active) provider — auto-approved
-      // via 1-click OpenID — should be present.
-      expect(
-        blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
-      ).toBe(defaultName);
-      expect(
-        blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`],
-      ).toBeUndefined();
-      expect(blobEntries["favorite_food"]).toBeUndefined();
-      expect(
-        blobEntries[`openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`],
-      ).toBeUndefined();
+      // Only the available attribute is present.
+      expect(textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:name`]).toBe(name);
+      expect(textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:email`]).toBeUndefined();
+      expect(textEntries["favorite_food"]).toBeUndefined();
     });
 
     test("should omit attributes", async ({
@@ -294,19 +256,22 @@ test.describe("Authorize with 1-click OpenID", () => {
       const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       // Mixing 1-click-eligible keys with non-eligible / unknown ones takes
-      // the consent path instead of 1-click. The defaults (all options
-      // checked, first provider selected for the `name` picker) match the
-      // assertions below — just accept.
+      // the consent path instead of 1-click. The defaults (only `name`
+      // available) match the assertions below — just accept.
       await consent.accept();
     });
   });
 
   test.describe("with verified_email attribute", () => {
+    // PR #3805: the canister doesn't certify `verified_email` under
+    // `sso:` yet, so `list_available_attributes` filters it out — the
+    // consent path resolves to an empty set and the certified payload
+    // carries no `verified_email`.
     const email = "john.doe@example.com";
 
     test.use({
       openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
+        defaultPort: SSO_OPENID_PORT,
         createUsers: [
           {
             claims: { email, email_verified: "true" },
@@ -315,37 +280,50 @@ test.describe("Authorize with 1-click OpenID", () => {
       },
       authorizeConfig: {
         protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        sso: SSO_DISCOVERY_DOMAIN,
         useIcrc3Attributes: true,
-        attributes: [
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`,
-        ],
+        attributes: [`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
       },
     });
 
     test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeDefined();
       if (authorizedIcrc3Attributes === undefined) {
         return;
       }
-
-      const blobEntries = decodeIcrc3TextEntries(
+      const textEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
       expect(
-        blobEntries[
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`
-        ],
-      ).toBe(email);
+        textEntries[`sso:${SSO_DISCOVERY_DOMAIN}:verified_email`],
+      ).toBeUndefined();
     });
 
-    test("should return verified email", async ({
+    test("should not return verified_email", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
+      // Empty groups auto-resolve to an empty consent set; no consent UI
+      // interaction needed.
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  test.describe("with conflicting ?openid and ?sso", () => {
+    // Misconfigured sign-in URL. We open the authorize page directly
+    // rather than going through `authorizePage` — that fixture ends with
+    // `waitForEvent("close")`, but the channel-error view is static and
+    // never closes on its own.
+    test("should render ChannelError", async ({ page }) => {
+      const issuer = `http://localhost:${DEFAULT_OPENID_PORT}`;
+      const url = new URL(II_URL + "/authorize");
+      url.searchParams.set("openid", issuer);
+      url.searchParams.set("sso", SSO_DISCOVERY_DOMAIN);
+      await page.goto(url.toString());
+      await expect(
+        page.getByRole("heading", { name: "Invalid request" }),
+      ).toBeVisible();
     });
   });
 });

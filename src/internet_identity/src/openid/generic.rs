@@ -230,24 +230,30 @@ impl Provider {
     }
 }
 
-/// CANARY: SSO via two-hop discovery is a proof-of-concept. Exactly one
-/// domain is currently accepted as a `discovery_domain`, and which one
-/// depends on whether this deployment self-identifies as production via
-/// the `is_production` init arg:
+/// Allowlist of domains accepted as `discovery_domain` by
+/// `add_discoverable_oidc_config`.
+///
+/// If the `sso_discoverable_domains` init arg is set, that list is used
+/// verbatim. Otherwise we fall back to the `is_production`-keyed defaults:
 ///
 /// * `is_production == Some(true)` (i.e. `id.ai`) → `dfinity.org`
 /// * otherwise (beta, staging, local dev, tests) → `beta.dfinity.org`
 ///
-/// Keeping the prod/beta allowlists disjoint means a DNS takeover of the
+/// Keeping the prod/beta defaults disjoint means a DNS takeover of the
 /// beta test domain can't backdoor the production canister, and lets us
 /// stage registration changes (e.g. a new IdP) on `beta.dfinity.org`
-/// without risking the production issuer. Widen this (or move it to
-/// canister config) once the feature exits canary.
-pub fn allowed_discovery_domains() -> &'static [&'static str] {
+/// without risking the production issuer. Deployments that need a different
+/// list (e.g. e2e tests pointing at `localhost:11107`) override via the
+/// init arg.
+pub fn allowed_discovery_domains() -> Vec<String> {
+    let configured = state::persistent_state(|ps| ps.sso_discoverable_domains.clone());
+    if let Some(domains) = configured {
+        return domains;
+    }
     let is_production = state::persistent_state(|ps| ps.is_production);
     match is_production {
-        Some(true) => &["dfinity.org"],
-        _ => &["beta.dfinity.org"],
+        Some(true) => vec!["dfinity.org".to_string()],
+        _ => vec!["beta.dfinity.org".to_string()],
     }
 }
 
@@ -255,6 +261,17 @@ pub fn is_allowed_discovery_domain(domain: &str) -> bool {
     allowed_discovery_domains()
         .iter()
         .any(|allowed| allowed.eq_ignore_ascii_case(domain))
+}
+
+/// True if `host` (the `host:port` portion of a URL) matches an allowlist
+/// entry. Used as the gate for relaxing the `https://` requirement: any
+/// domain explicitly blessed by an II admin via the init-arg allowlist
+/// MAY publish its discovery endpoints over plain HTTP, which is what
+/// makes e2e tests against `http://localhost:11107` work without
+/// weakening prod's strict-HTTPS posture for unblessed hosts.
+#[cfg(not(test))]
+fn is_allowlisted_host(host: &str) -> bool {
+    is_allowed_discovery_domain(host)
 }
 
 /// SSO provider that resolves its configuration via two-hop discovery.
@@ -469,10 +486,17 @@ async fn run_discovery_tasks() {
     let tasks: Vec<DiscoveryState> = DISCOVERY_TASKS.with_borrow(|tasks| tasks.clone());
 
     for task in tasks {
-        // Hop 1: fetch https://{domain}/.well-known/ii-openid-configuration,
-        // which is expected to return { client_id, openid_configuration }.
+        // Hop 1: fetch /.well-known/ii-openid-configuration. Default to
+        // https; for an allowlisted host whose name reads as a local-dev
+        // address (`localhost` / `127.0.0.1`, with optional port), fall
+        // back to http so the e2e test provider — which can't serve TLS
+        // — is reachable. The allowlist itself is the trust gate; an
+        // unblessed domain never reaches this code path. IPv6 loopback
+        // is intentionally not in scope; tests only ever use the
+        // hostname form.
+        let hop1_scheme = scheme_for_allowlisted_host(&task.discovery_domain);
         let hop1_url = format!(
-            "https://{}/.well-known/ii-openid-configuration",
+            "{hop1_scheme}://{}/.well-known/ii-openid-configuration",
             task.discovery_domain
         );
         let ii_config = match fetch_ii_openid_configuration(hop1_url.clone()).await {
@@ -482,9 +506,9 @@ async fn run_discovery_tasks() {
                 continue;
             }
         };
-        if !ii_config.openid_configuration.starts_with("https://") {
+        if let Err(err) = validate_discovery_url(&ii_config.openid_configuration) {
             ic_cdk::println!(
-                "II OpenID configuration from {hop1_url} has non-https openid_configuration URL"
+                "II OpenID configuration from {hop1_url} has invalid openid_configuration URL: {err}"
             );
             continue;
         }
@@ -509,8 +533,10 @@ async fn run_discovery_tasks() {
             continue;
         }
 
-        // Reject malformed / non-HTTPS jwks_uri before scheduling repeated outcalls.
-        if let Err(err) = validate_https_url(&doc.jwks_uri) {
+        // Reject malformed jwks_uri before scheduling repeated outcalls. HTTP
+        // is permitted only when the host is on the SSO allowlist (e2e
+        // tests); production hosts continue to require HTTPS.
+        if let Err(err) = validate_discovery_url(&doc.jwks_uri) {
             ic_cdk::println!(
                 "Invalid jwks_uri from {}: {err}",
                 ii_config.openid_configuration
@@ -540,14 +566,60 @@ async fn run_discovery_tasks() {
     }
 }
 
-/// Ensure a URL is syntactically valid and uses `https://`.
+/// Ensure a URL is syntactically valid and uses an acceptable scheme.
+/// `https` is always accepted; `http` is accepted only when the URL's
+/// host (with port, if any) is on the SSO allowlist — see
+/// `is_allowlisted_host` for the rationale.
 #[cfg(not(test))]
-fn validate_https_url(url: &str) -> Result<(), String> {
+fn validate_discovery_url(url: &str) -> Result<(), String> {
     let parsed = url::Url::parse(url).map_err(|e| format!("parse error: {e}"))?;
-    if parsed.scheme() != "https" {
-        return Err(format!("expected https scheme, got '{}'", parsed.scheme()));
+    match parsed.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            let host = host_with_port(&parsed)
+                .ok_or_else(|| format!("URL has no host: {url}"))?;
+            if is_allowlisted_host(&host) {
+                Ok(())
+            } else {
+                Err(format!("http scheme not allowed for non-allowlisted host '{host}'"))
+            }
+        }
+        other => Err(format!(
+            "expected http(s) scheme, got '{other}'"
+        )),
     }
-    Ok(())
+}
+
+/// "host" or "host:port" portion of a URL, lowercased. Mirrors how
+/// admins write allowlist entries (e.g. `dfinity.org`, `localhost:11107`)
+/// so equality checks are straightforward. IPv6 hosts are intentionally
+/// not handled — bracketed allowlist entries (`[::1]:11107`) wouldn't
+/// match the `host_str + port` join produced here, and we don't ship
+/// IPv6 in the test setup.
+#[cfg(not(test))]
+fn host_with_port(url: &url::Url) -> Option<String> {
+    let host = url.host_str()?.to_lowercase();
+    Some(match url.port() {
+        Some(p) => format!("{host}:{p}"),
+        None => host,
+    })
+}
+
+/// Scheme to use when constructing the hop-1 URL for an allowlisted
+/// domain. Allowlisted hosts whose name resolves to the loopback (the
+/// e2e test provider) get `http`; everything else gets `https`. Only
+/// the hostname form of loopback is recognised (`localhost`,
+/// `127.0.0.1`); allowlist entries written as bracketed IPv6
+/// (`[::1]:11107`) would still render as `https` and are not part of
+/// the supported test setup.
+#[cfg(not(test))]
+fn scheme_for_allowlisted_host(host: &str) -> &'static str {
+    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
+    if matches!(bare.as_str(), "localhost" | "127.0.0.1") {
+        "http"
+    } else {
+        "https"
+    }
 }
 
 /// Validates that the discovered `issuer` belongs to the same host as the
