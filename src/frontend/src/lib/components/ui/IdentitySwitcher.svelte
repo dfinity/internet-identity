@@ -20,11 +20,11 @@
     identities: LastUsedIdentity[];
     onSwitchIdentity: (identityNumber: bigint) => Promise<void>;
     onUseAnotherIdentity: () => void;
-    onManageIdentity?: () => Promise<void> | void;
+    onManageIdentity?: () => Promise<void>;
     onManageIdentities?: () => void;
     onError: (error: unknown) => void;
     onClose: () => void;
-    onSignOut?: () => Promise<void> | void;
+    onSignOut?: () => Promise<void>;
   };
 
   const {

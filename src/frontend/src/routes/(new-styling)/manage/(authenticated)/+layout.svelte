@@ -120,9 +120,10 @@
 
   // --- Sign out ---
 
-  const handleSignOut = () => {
+  const handleSignOut = (): Promise<void> => {
     isIdentityPopoverOpen = false;
     isSignOutDialogOpen = true;
+    return Promise.resolve();
   };
 
   const handleConfirmSignOut = () => {

@@ -264,9 +264,10 @@
                   isIdentityPopoverOpen = false;
                   isAuthDialogOpen = true;
                 }}
-                onManageIdentity={() => {
+                onManageIdentity={(): Promise<void> => {
                   isIdentityPopoverOpen = false;
                   window.open("/manage", "_blank");
+                  return Promise.resolve();
                 }}
                 onManageIdentities={() => {
                   isIdentityPopoverOpen = false;

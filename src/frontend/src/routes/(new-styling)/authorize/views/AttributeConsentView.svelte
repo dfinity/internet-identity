@@ -46,7 +46,7 @@
    * authenticated through some other method (passkey, direct OpenID),
    * so we can't rely on a name being threaded through from sign-in.
    */
-  let ssoNamesByDomain = $state<Map<string, string>>(new Map());
+  let ssoNamesByDomain = new SvelteMap<string, string>();
   const ssoLookupsInFlight = new SvelteSet<string>();
 
   const ensureSsoLookup = (domain: string): void => {
@@ -57,10 +57,7 @@
     void discoverSsoConfig(domain)
       .then((result) => {
         if (result.name !== undefined && result.name.length > 0) {
-          ssoNamesByDomain = new SvelteMap(ssoNamesByDomain).set(
-            domain,
-            result.name,
-          );
+          ssoNamesByDomain.set(domain, result.name);
         }
       })
       .catch((error) => {
