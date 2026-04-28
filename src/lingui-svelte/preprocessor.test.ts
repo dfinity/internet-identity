@@ -138,16 +138,16 @@ describe("sveltePreprocessor", () => {
   describe("<Trans> component", () => {
     it("should retain explicit id", () => {
       const source = '<Trans id="HELLO_WORLD">Hello world</Trans>';
-      const build = '<Trans id="HELLO_WORLD"></Trans>';
-      const dev = '<Trans id="HELLO_WORLD" message={"Hello world"}></Trans>';
+      const build = '<Trans id={"HELLO_WORLD"}></Trans>';
+      const dev = '<Trans id={"HELLO_WORLD"} message={"Hello world"}></Trans>';
       expect(svelteTransform(true, source).code).toEqual(build);
       expect(svelteTransform(false, source).code).toEqual(dev);
     });
 
     it("should omit optional context", () => {
       const source = '<Trans context="Greeting the world">Hello world</Trans>';
-      const build = '<Trans id="Yp3/Os"></Trans>';
-      const dev = '<Trans id="Yp3/Os" message={"Hello world"}></Trans>';
+      const build = '<Trans id={"Yp3/Os"}></Trans>';
+      const dev = '<Trans id={"Yp3/Os"} message={"Hello world"}></Trans>';
       expect(svelteTransform(true, source).code).toEqual(build);
       expect(svelteTransform(false, source).code).toEqual(dev);
     });
@@ -156,39 +156,39 @@ describe("sveltePreprocessor", () => {
       {
         case: "without variables",
         source: "<Trans>Hello world</Trans>",
-        build: '<Trans id="1nGWAC"></Trans>',
-        dev: '<Trans id="1nGWAC" message={"Hello world"}></Trans>',
+        build: '<Trans id={"1nGWAC"}></Trans>',
+        dev: '<Trans id={"1nGWAC"} message={"Hello world"}></Trans>',
       },
       {
         case: "with named variable",
         source: "<Trans>Hello {name}</Trans>",
-        build: '<Trans id="OVaF9k" values={{ name }}></Trans>',
-        dev: '<Trans id="OVaF9k" message={"Hello {name}"} values={{ name }}></Trans>',
+        build: '<Trans id={"OVaF9k"} values={{ name }}></Trans>',
+        dev: '<Trans id={"OVaF9k"} message={"Hello {name}"} values={{ name }}></Trans>',
       },
       {
         case: "with positional variable",
         source: '<Trans>Hello {"John"}</Trans>',
-        build: '<Trans id="Y7riaK" values={{ 0: "John" }}></Trans>',
-        dev: '<Trans id="Y7riaK" message={"Hello {0}"} values={{ 0: "John" }}></Trans>',
+        build: '<Trans id={"Y7riaK"} values={{ 0: "John" }}></Trans>',
+        dev: '<Trans id={"Y7riaK"} message={"Hello {0}"} values={{ 0: "John" }}></Trans>',
       },
       {
         case: "with named and positional variables",
         source: '<Trans>Hello {name}, {"John"}, {friend} and {"Jack"}</Trans>',
         build:
-          '<Trans id="EvFFeo" values={{ 0: "John", 1: "Jack", name, friend }}></Trans>',
-        dev: '<Trans id="EvFFeo" message={"Hello {name}, {0}, {friend} and {1}"} values={{ 0: "John", 1: "Jack", name, friend }}></Trans>',
+          '<Trans id={"EvFFeo"} values={{ 0: "John", 1: "Jack", name, friend }}></Trans>',
+        dev: '<Trans id={"EvFFeo"} message={"Hello {name}, {0}, {friend} and {1}"} values={{ 0: "John", 1: "Jack", name, friend }}></Trans>',
       },
       {
         case: "with tag",
         source: '<Trans>Click <a href="/upgrade">here</a> to upgrade</Trans>',
         build:
-          '<Trans id="RUiQ7+">' +
+          '<Trans id={"RUiQ7+"}>' +
           "{#snippet renderNode(__children, __index)}" +
           '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
           "{/snippet}" +
           "</Trans>",
         dev:
-          '<Trans id="RUiQ7+" message={"Click <0>here</0> to upgrade"}>' +
+          '<Trans id={"RUiQ7+"} message={"Click <0>here</0> to upgrade"}>' +
           "{#snippet renderNode(__children, __index)}" +
           '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
           "{/snippet}" +
@@ -198,13 +198,13 @@ describe("sveltePreprocessor", () => {
         case: "with self closing tag",
         source: "<Trans>Hello<br>World</Trans>",
         build:
-          '<Trans id="yajsv9">' +
+          '<Trans id={"yajsv9"}>' +
           "{#snippet renderNode(__children, __index)}" +
           "{#if __index === 0}<br>{/if}" +
           "{/snippet}" +
           "</Trans>",
         dev:
-          '<Trans id="yajsv9" message={"Hello<0/>World"}>' +
+          '<Trans id={"yajsv9"} message={"Hello<0/>World"}>' +
           "{#snippet renderNode(__children, __index)}" +
           "{#if __index === 0}<br>{/if}" +
           "{/snippet}" +
@@ -215,14 +215,14 @@ describe("sveltePreprocessor", () => {
         source:
           "<Trans>To continue, <strong>please <em>confirm</em></strong> your choice.</Trans>",
         build:
-          '<Trans id="iU3T6K">' +
+          '<Trans id={"iU3T6K"}>' +
           "{#snippet renderNode(__children, __index)}" +
           "{#if __index === 0}<em>{@render __children()}</em>{/if}" +
           "{#if __index === 1}<strong>{@render __children()}</strong>{/if}" +
           "{/snippet}" +
           "</Trans>",
         dev:
-          '<Trans id="iU3T6K" message={"To continue, <1>please <0>confirm</0></1> your choice."}>' +
+          '<Trans id={"iU3T6K"} message={"To continue, <1>please <0>confirm</0></1> your choice."}>' +
           "{#snippet renderNode(__children, __index)}" +
           "{#if __index === 0}<em>{@render __children()}</em>{/if}" +
           "{#if __index === 1}<strong>{@render __children()}</strong>{/if}" +
@@ -234,7 +234,7 @@ describe("sveltePreprocessor", () => {
         source:
           '<Trans>Hi {name}, please <a href="/profile"><strong>update</strong> your profile</a> or <em>contact {"support"}</em> for help.<br/>Thank you!</Trans>',
         build:
-          '<Trans id="+xfjDc" values={{ 0: "support", name }}>' +
+          '<Trans id={"+xfjDc"} values={{ 0: "support", name }}>' +
           "{#snippet renderNode(__children, __index)}" +
           "{#if __index === 0}<strong>{@render __children()}</strong>{/if}" +
           '{#if __index === 1}<a href="/profile">{@render __children()}</a>{/if}' +
@@ -243,7 +243,7 @@ describe("sveltePreprocessor", () => {
           "{/snippet}" +
           "</Trans>",
         dev:
-          '<Trans id="+xfjDc" message={"Hi {name}, please <1><0>update</0> your profile</1> or <2>contact {0}</2> for help.<3/>Thank you!"} values={{ 0: "support", name }}>' +
+          '<Trans id={"+xfjDc"} message={"Hi {name}, please <1><0>update</0> your profile</1> or <2>contact {0}</2> for help.<3/>Thank you!"} values={{ 0: "support", name }}>' +
           "{#snippet renderNode(__children, __index)}" +
           "{#if __index === 0}<strong>{@render __children()}</strong>{/if}" +
           '{#if __index === 1}<a href="/profile">{@render __children()}</a>{/if}' +
@@ -257,13 +257,13 @@ describe("sveltePreprocessor", () => {
         source:
           '<Trans><!-- Comment -->Click <a href="/upgrade"><!-- Comment -->here<!-- Comment --></a> to upgrade</Trans>',
         build:
-          '<Trans id="RUiQ7+">' +
+          '<Trans id={"RUiQ7+"}>' +
           "{#snippet renderNode(__children, __index)}" +
           '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
           "{/snippet}" +
           "</Trans>",
         dev:
-          '<Trans id="RUiQ7+" message={"Click <0>here</0> to upgrade"}>' +
+          '<Trans id={"RUiQ7+"} message={"Click <0>here</0> to upgrade"}>' +
           "{#snippet renderNode(__children, __index)}" +
           '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
           "{/snippet}" +
@@ -273,5 +273,60 @@ describe("sveltePreprocessor", () => {
       expect(svelteTransform(true, source).code).toEqual(build);
       expect(svelteTransform(false, source).code).toEqual(dev);
     });
+  });
+
+  describe("special character escaping", () => {
+    // Without proper escaping, output like `message: "Say "Hi""` is
+    // syntactically invalid JS/Svelte and breaks the dev build. These
+    // cases pin the expected escaped form so a regression in
+    // overwriteCall / overwriteComponent is caught at unit-test time.
+    it.each([
+      {
+        case: "$t with double quote",
+        source: "{$t`Say \"Hi\"`}",
+        build: '{$t({ id: "ID_PLACEHOLDER" })}',
+        dev: '{$t({ id: "ID_PLACEHOLDER", message: "Say \\"Hi\\"" })}',
+      },
+      {
+        case: "$t with backslash",
+        // Source `\\` in raw template form is two backslashes; JSON.stringify
+        // escapes each so the output has four backslashes in the JS source.
+        source: "{$t`Path C:\\\\foo`}",
+        build: '{$t({ id: "ID_PLACEHOLDER" })}',
+        dev: '{$t({ id: "ID_PLACEHOLDER", message: "Path C:\\\\\\\\foo" })}',
+      },
+      {
+        case: "$t with newline",
+        // `\n` in raw template form is the two-character sequence backslash+n,
+        // which JSON.stringify escapes to four characters in the output.
+        source: "{$t`Line1\\nLine2`}",
+        build: '{$t({ id: "ID_PLACEHOLDER" })}',
+        dev: '{$t({ id: "ID_PLACEHOLDER", message: "Line1\\\\nLine2" })}',
+      },
+      {
+        case: "Trans with double quote",
+        source: '<Trans>Say "Hi"</Trans>',
+        build: '<Trans id={"ID_PLACEHOLDER"}></Trans>',
+        dev: '<Trans id={"ID_PLACEHOLDER"} message={"Say \\"Hi\\""}></Trans>',
+      },
+      {
+        case: "Trans with backslash",
+        source: "<Trans>Path C:\\\\foo</Trans>",
+        build: '<Trans id={"ID_PLACEHOLDER"}></Trans>',
+        dev: '<Trans id={"ID_PLACEHOLDER"} message={"Path C:\\\\\\\\foo"}></Trans>',
+      },
+    ])(
+      "should transform code $case without breaking generated source",
+      ({ source, build, dev }) => {
+        const buildOutput = svelteTransform(true, source).code;
+        const devOutput = svelteTransform(false, source).code;
+        // Strip the generated id hash so the test doesn't depend on lingui's
+        // id-hashing scheme.
+        const stripId = (s: string) =>
+          s.replace(/(id: |id=\{)"[^"]+"(\}?)/g, '$1"ID_PLACEHOLDER"$2');
+        expect(stripId(buildOutput)).toEqual(build);
+        expect(stripId(devOutput)).toEqual(dev);
+      },
+    );
   });
 });
