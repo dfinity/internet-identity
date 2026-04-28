@@ -38,11 +38,11 @@
 
   const { effectiveOrigin, onAuthorize }: Props = $props();
 
-  const PRIMARY_ACCOUNT_NUMBER = undefined;
+  type PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
 
   let defaultAccountNumber = $state<
-    AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER | null
+    AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
@@ -56,7 +56,7 @@
 
   let isCreateAccountDialogVisible = $state(false);
   let isEditAccountDialogVisibleForNumber = $state<
-    AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER | null
+    AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
 
   const isEditAccountDialogVisibleFor = $derived(
@@ -112,7 +112,7 @@
     }
   };
   const handleContinueAs = (
-    accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
+    accountNumber: AccountNumber | PRIMARY_ACCOUNT_NUMBER,
   ) => {
     onAuthorize(Promise.resolve(accountNumber));
   };

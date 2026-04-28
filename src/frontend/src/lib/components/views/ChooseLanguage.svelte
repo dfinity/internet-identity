@@ -27,7 +27,7 @@
 <p class="text-text-tertiary mb-6 text-base">
   <Trans>choose language to continue</Trans>
 </p>
-{#each locales as locale, index}
+{#each locales as locale, index (locale)}
   {@const label = new Intl.DisplayNames([locale], {
     type: "language",
     style: "long",

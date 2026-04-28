@@ -139,7 +139,6 @@
    * fallback.
    */
   const setErrorFrom = (e: unknown, domainInput: string) => {
-    // eslint-disable-next-line no-console
     console.error("SSO sign-in failed", e);
     error =
       mapSubmitError(e, domainInput) ??
@@ -256,7 +255,7 @@
     class="flex flex-col items-stretch gap-6"
     onsubmit={(e) => {
       e.preventDefault();
-      handleSubmit();
+      void handleSubmit();
     }}
   >
     <Input

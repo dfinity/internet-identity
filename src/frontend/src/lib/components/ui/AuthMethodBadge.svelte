@@ -31,6 +31,7 @@
     <span
       class={["text-fg-tertiary", size === "lg" ? "size-4.25" : "size-3.25"]}
     >
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -- variant.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
       {@html variant.logo}
     </span>
   {:else}

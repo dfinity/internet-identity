@@ -77,7 +77,7 @@
   );
 
   // Handlers
-  const handleOpenIdLinked = async (openid: OpenIdCredential) => {
+  const handleOpenIdLinked = (openid: OpenIdCredential) => {
     isAddingAccessMethod = false;
     accessMethods = [{ openid } as const, ...accessMethods].sort(
       compareAccessMethods,
@@ -99,7 +99,7 @@
     });
     void invalidateAll();
   };
-  const handlePasskeyRegistered = async (passkey: AuthnMethodData) => {
+  const handlePasskeyRegistered = (passkey: AuthnMethodData) => {
     isAddingAccessMethod = false;
     accessMethods = [{ passkey } as const, ...accessMethods].sort(
       compareAccessMethods,
@@ -126,11 +126,11 @@
 
     void invalidateAll();
   };
-  const handleOtherDeviceRegistered = async () => {
+  const handleOtherDeviceRegistered = () => {
     isAddingAccessMethod = false;
     void invalidateAll();
   };
-  const handleOtherDeviceConfirmed = async () => {
+  const handleOtherDeviceConfirmed = () => {
     toaster.success({
       title: $t`Passkey has been registered from another device.`,
     });
@@ -345,7 +345,7 @@
       onError={(error) => {
         pendingRegistrationId = null;
         handleError(error);
-        goto(page.url.pathname, { replaceState: true }); // Remove searchParam
+        void goto(page.url.pathname, { replaceState: true });
       }}
     />
   </Dialog>

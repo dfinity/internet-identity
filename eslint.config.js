@@ -29,6 +29,7 @@ export default ts.config(
     languageOptions: {
       parserOptions: {
         parser: ts.parser,
+        extraFileExtensions: [".svelte"],
       },
     },
   },
@@ -36,6 +37,7 @@ export default ts.config(
     languageOptions: {
       parserOptions: {
         project: ["./tsconfig.eslint.json"],
+        extraFileExtensions: [".svelte"],
       },
     },
   },

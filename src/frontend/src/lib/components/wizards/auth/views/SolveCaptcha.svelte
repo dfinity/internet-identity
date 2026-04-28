@@ -30,13 +30,13 @@
   });
 
   $effect.pre(() => {
-    if (image) {
+    if (image.length > 0) {
       solution = "";
       loading = false;
       if (attempt > 0) {
         error = true;
       }
-      tick().then(() => {
+      void tick().then(() => {
         inputRef?.focus();
       });
     }
@@ -61,7 +61,7 @@
       alt={$t`CAPTCHA characters`}
     />
     <div
-      class={"bg-text-primary absolute inset-0 mix-blend-lighten dark:mix-blend-darken"}
+      class="bg-text-primary absolute inset-0 mix-blend-lighten dark:mix-blend-darken"
     ></div>
   </div>
   <Input

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteMap } from "svelte/reactivity";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -19,7 +20,7 @@
   let removingIdentity = $state<LastUsedIdentity>();
 
   const passkeyNameCounts = $derived.by(() => {
-    const counts = new Map<string | undefined, number>();
+    const counts = new SvelteMap<string | undefined, number>();
     for (const identity of identities) {
       if (!("passkey" in identity.authMethod)) {
         continue;
@@ -120,7 +121,7 @@
     </div>
 
     <ul class="flex flex-col">
-      {#each identities as identity, i}
+      {#each identities as identity, i (identity.identityNumber)}
         <li class="flex items-center gap-3 py-3">
           <IdentityListItem
             {identity}

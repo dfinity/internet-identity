@@ -35,7 +35,7 @@
     if (!isEntry || isReload) {
       return;
     }
-    goto("/", { replaceState: true });
+    void goto("/", { replaceState: true });
   };
 
   beforeNavigate(trackPageReload);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteURL } from "svelte/reactivity";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -13,7 +14,7 @@
       "ii-openid-authorize-state",
     );
     if (openIdAuthorizeState !== null) {
-      const next = new URL(window.location.href);
+      const next = new SvelteURL(window.location.href);
       next.pathname = "/authorize";
       next.searchParams.set("flow", "openid-resume");
       await goto(next);

@@ -6,6 +6,6 @@
   const { data }: PageProps = $props();
 
   onMount(() => {
-    goto("/", { state: { login: data.next }, replaceState: true });
+    void goto("/", { state: { login: data.next }, replaceState: true });
   });
 </script>

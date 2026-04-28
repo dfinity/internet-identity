@@ -1,6 +1,5 @@
 <script lang="ts">
   import FlairCanvas from "./FlairCanvas.svelte";
-  import { isMobile } from "$lib/state/UI/isMobile";
   import { onMount, onDestroy } from "svelte";
   import {
     registerAnimationTrigger,
@@ -13,7 +12,7 @@
   } = $props();
 
   onMount(() => {
-    if (triggerAnimation) {
+    if (triggerAnimation !== undefined) {
       registerAnimationTrigger(triggerAnimation, clearAnimation);
     }
   });

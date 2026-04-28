@@ -46,8 +46,8 @@
       lg: "btn-lg",
       xl: "btn-xl",
     }[size],
-    danger && "btn-danger",
-    iconOnly && "btn-icon",
+    danger === true && "btn-danger",
+    iconOnly === true && "btn-icon",
     className,
   ]}
 >

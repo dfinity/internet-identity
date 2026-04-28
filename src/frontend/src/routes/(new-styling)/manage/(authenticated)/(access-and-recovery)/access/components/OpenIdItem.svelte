@@ -59,6 +59,7 @@
       -->
       <SsoIcon class="size-6" />
     {:else}
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -- logo is a trusted SVG string sourced from the backend canister's openid_configs -->
       {@html logo}
     {/if}
     {#if isCurrentAccessMethod}

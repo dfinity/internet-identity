@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
-  import Badge from "$lib/components/ui/Badge.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";

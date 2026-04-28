@@ -75,17 +75,17 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   // --- Handlers ---
-  const handleAuthWizardSignIn = async (identityNumber: bigint) => {
+  const handleAuthWizardSignIn = (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
   };
-  const handleAuthWizardSignUp = async (identityNumber: bigint) => {
+  const handleAuthWizardSignUp = (identityNumber: bigint) => {
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
   };
-  const handleAuthWizardUpgrade = async () => {
+  const handleAuthWizardUpgrade = () => {
     upgradeSuccess = true;
   };
 
@@ -255,7 +255,7 @@
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
-      resumeOpenId();
+      resumeOpenId().catch(handleError);
     } else {
       authorizationStore.setFlow({ type: "regular" });
     }

@@ -13,17 +13,18 @@
     context?: string;
   }
 
+  // eslint-disable-next-line svelte/no-unused-props -- `context` is consumed by the lingui-svelte preprocessor at compile time, so the runtime component never receives it
   const { id, message, values, renderNode }: Props = $props();
 
   const chunks = $derived.by(() => {
-    $localeStore; // Re-run on locale changes
+    void $localeStore; // Re-run on locale changes
     const translated = i18n.t({ id: id!, message, values });
     return parseMessage(translated);
   });
 </script>
 
 {#snippet renderNodeRec(children: Chunk[])}
-  {#each children as chunk}
+  {#each children as chunk, i (i)}
     {#if chunk.type === "text"}
       {chunk.text}
     {:else}

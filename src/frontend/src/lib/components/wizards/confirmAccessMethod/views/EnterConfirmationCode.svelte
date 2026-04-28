@@ -25,7 +25,7 @@
     isConfirming = true;
     try {
       await confirm(confirmationCode);
-    } catch (error) {
+    } catch {
       isInvalidCode = true;
       confirmationCode = "";
     } finally {
@@ -34,7 +34,7 @@
   };
 
   $effect(() => {
-    if (confirmationCode) {
+    if (confirmationCode.length > 0) {
       isInvalidCode = false;
     }
   });
@@ -77,7 +77,7 @@
     error={isInvalidCode
       ? $t`Invalid code. Please check and try again.`
       : undefined}
-    hint={"\u00a0"}
+    hint="&nbsp;"
     disabled={isConfirming}
   />
   <Button

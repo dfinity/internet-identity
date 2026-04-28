@@ -46,8 +46,8 @@
   // switches, since the label prop is re-evaluated via `$t` on locale swap).
   $effect(() => {
     // Track the reactive inputs that can change text width.
-    label;
-    options[selectedIndex].displayValue;
+    void label;
+    void options[selectedIndex].displayValue;
     queueMicrotask(checkWrap);
   });
 
@@ -85,7 +85,6 @@
        chevron button; this click handler is mouse-only convenience. -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class={[
       "col-span-full row-start-1 grid grid-cols-subgrid items-center gap-x-3",
@@ -166,7 +165,7 @@
       role="listbox"
       aria-label={label}
     >
-      {#each options as option, index}
+      {#each options as option, index (option.key)}
         {@const providerName = getProviderName(option.key)}
         <button
           onclick={() => {

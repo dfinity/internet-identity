@@ -19,7 +19,7 @@
   let clearAnimation = $state<() => void>();
 
   $effect(() => {
-    triggerAnimation?.(DROP_WAVE_ANIMATION);
+    void triggerAnimation?.(DROP_WAVE_ANIMATION);
     return () => {
       clearAnimation?.();
     };

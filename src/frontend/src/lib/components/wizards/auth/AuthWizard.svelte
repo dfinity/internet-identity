@@ -17,9 +17,9 @@
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
   interface Props {
-    onSignIn: (identityNumber: bigint) => Promise<void>;
-    onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
+    onSignIn: (identityNumber: bigint) => Promise<void> | void;
+    onSignUp: (identityNumber: bigint) => Promise<void> | void;
+    onUpgrade: (identityNumber: bigint) => Promise<void> | void;
     onError: (error: unknown) => void;
     withinDialog?: boolean;
     children?: Snippet;
