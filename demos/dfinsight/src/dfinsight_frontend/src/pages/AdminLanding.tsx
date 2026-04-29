@@ -64,10 +64,9 @@ export function AdminLanding() {
     <section className="card">
       <h1>Dfinsight — Admin</h1>
       <p className="lede">
-        Admins can read every matter of interest with its upvote score,
-        delete spam, and post a public response (which closes voting on
-        that issue). Admins cannot post or upvote — that only happens
-        from the user page.
+        Admins can read every matter of interest with its upvote score, delete
+        spam, and post a public response (which closes voting on that issue).
+        Admins cannot post or upvote — that only happens from the user page.
       </p>
       <button onClick={onSignIn} disabled={busy} className="primary">
         {busy ? "Signing in…" : "Sign in as Dfinsight admin"}
@@ -91,11 +90,10 @@ export function AdminLanding() {
       <details className="info">
         <summary>How does this verify I'm an admin?</summary>
         <p>
-          Sign-in opens id.ai with the DFINITY SSO 1-click flow and
-          requests the verified <code>sso:dfinity.org:name</code>{" "}
-          attribute. The backend canister reads it via the IC's{" "}
-          <code>sender_info</code> mechanism (through{" "}
-          <code>mo:identity-attributes</code>) and checks the name
+          Sign-in opens id.ai with the DFINITY SSO 1-click flow and requests the
+          verified <code>sso:dfinity.org:name</code> attribute. The backend
+          canister reads it via the IC's <code>sender_info</code> mechanism
+          (through <code>mo:identity-attributes</code>) and checks the name
           against the allowlist.
         </p>
       </details>

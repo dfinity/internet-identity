@@ -28,7 +28,9 @@ export function AdminPanel() {
   const [issues, setIssues] = useState<IssueForAdmin[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [responseDraft, setResponseDraft] = useState<Record<string, string>>({});
+  const [responseDraft, setResponseDraft] = useState<Record<string, string>>(
+    {},
+  );
 
   useEffect(() => {
     if (!session || session.kind !== "admin") {
@@ -110,7 +112,9 @@ export function AdminPanel() {
           <li key={String(i.id)} className="issue admin">
             <header className="row">
               <span className="score">{String(i.upvotes)} upvotes</span>
-              <time>{new Date(Number(i.createdAt) / 1_000_000).toLocaleString()}</time>
+              <time>
+                {new Date(Number(i.createdAt) / 1_000_000).toLocaleString()}
+              </time>
             </header>
             <p className="body">{i.body}</p>
             {i.response.length === 1 ? (
@@ -132,7 +136,9 @@ export function AdminPanel() {
                 />
                 <button
                   className="primary"
-                  disabled={(responseDraft[String(i.id)] ?? "").trim().length === 0}
+                  disabled={
+                    (responseDraft[String(i.id)] ?? "").trim().length === 0
+                  }
                   onClick={() => void onRespond(i.id)}
                 >
                   Respond

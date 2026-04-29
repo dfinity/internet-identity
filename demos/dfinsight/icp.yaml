@@ -17,7 +17,7 @@ canisters:
         - type: script
           commands:
             - "scripts/build-backend.sh"
-            - "cp src/dfinsight_backend/.build/dfinsight_backend.wasm \"$ICP_WASM_OUTPUT_PATH\""
+            - 'cp src/dfinsight_backend/.build/dfinsight_backend.wasm "$ICP_WASM_OUTPUT_PATH"'
     # No init args — `rpOrigin` is a `var` inside the actor, set after
     # the first deploy via the controller-gated `setRpOrigin`. Edit
     # `main.mo` if you want to bake in a non-default origin instead.
@@ -28,6 +28,6 @@ canisters:
         - type: script
           commands:
             - "npm --prefix src/dfinsight_frontend run build"
-            - "cp -r src/dfinsight_frontend/dist/* \"$ICP_ASSETS_OUTPUT_PATH\"/"
+            - 'cp -r src/dfinsight_frontend/dist/* "$ICP_ASSETS_OUTPUT_PATH"/'
     dependencies:
       - dfinsight_backend

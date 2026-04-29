@@ -95,9 +95,7 @@ export function Issues() {
       return;
     }
     setIssues((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, upvoted: res.ok.upvoted } : i,
-      ),
+      prev.map((i) => (i.id === id ? { ...i, upvoted: res.ok.upvoted } : i)),
     );
   }
 

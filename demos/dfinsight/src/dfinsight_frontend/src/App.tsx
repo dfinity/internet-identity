@@ -17,7 +17,9 @@ export function App() {
         </Routes>
       </main>
       <footer>
-        <Link to="/admin" className="admin-link">Admin</Link>
+        <Link to="/admin" className="admin-link">
+          Admin
+        </Link>
       </footer>
     </div>
   );

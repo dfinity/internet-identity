@@ -8,10 +8,10 @@ post a public response that closes voting.
 
 ## How the auth works
 
-| Role  | Sign-in URL                                | Attributes requested  | Backend gate                          |
-|-------|--------------------------------------------|------------------------|---------------------------------------|
-| User  | `https://id.ai/authorize?sso=dfinity.org`  | none                   | `Principal.isAnonymous == false`      |
-| Admin | `https://id.ai/authorize?sso=dfinity.org`  | `sso:dfinity.org:name` | `mo:identity-attributes` `II.verify`  |
+| Role  | Sign-in URL                               | Attributes requested   | Backend gate                         |
+| ----- | ----------------------------------------- | ---------------------- | ------------------------------------ |
+| User  | `https://id.ai/authorize?sso=dfinity.org` | none                   | `Principal.isAnonymous == false`     |
+| Admin | `https://id.ai/authorize?sso=dfinity.org` | `sso:dfinity.org:name` | `mo:identity-attributes` `II.verify` |
 
 The user flow yields an SSO-scoped principal — stable per `(user, dapp)`
 pair, but anonymous in the sense that the dapp never learns the user's
@@ -114,12 +114,12 @@ Once an admin responds, voting on that issue is locked
 
 ## What's where
 
-| Concern                                | File                                           |
-|----------------------------------------|------------------------------------------------|
-| 24h post limit                         | `main.mo:createIssue` + `lastPostAt` map       |
-| Hidden scores                          | `main.mo:listIssuesForUser` (`upvotes : ?Nat`) |
-| Admin verify via `sender_info`         | `main.mo:verifyAdminAttributes`                |
-| 30-min admin session cache             | `main.mo:adminSessions`                        |
-| 1-click SSO                            | `auth.ts:signInAnonymous`                      |
-| 1-click SSO + name attribute           | `auth.ts:signInAdmin`                          |
-| Shuffle                                | `main.mo:shuffle`                              |
+| Concern                        | File                                           |
+| ------------------------------ | ---------------------------------------------- |
+| 24h post limit                 | `main.mo:createIssue` + `lastPostAt` map       |
+| Hidden scores                  | `main.mo:listIssuesForUser` (`upvotes : ?Nat`) |
+| Admin verify via `sender_info` | `main.mo:verifyAdminAttributes`                |
+| 30-min admin session cache     | `main.mo:adminSessions`                        |
+| 1-click SSO                    | `auth.ts:signInAnonymous`                      |
+| 1-click SSO + name attribute   | `auth.ts:signInAdmin`                          |
+| Shuffle                        | `main.mo:shuffle`                              |

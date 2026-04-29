@@ -27,8 +27,8 @@ export function Home() {
     <section className="card">
       <h1>Dfinsight</h1>
       <p className="lede">
-        Anonymously share and upvote the matters of interest you'd like
-        DFINITY to address.
+        Anonymously share and upvote the matters of interest you'd like DFINITY
+        to address.
       </p>
       <button onClick={onSignIn} disabled={busy} className="primary">
         {busy ? "Signing in…" : "Sign in anonymously"}
