@@ -59,7 +59,7 @@
       {$t`Continue with passkey`}
     </Button>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
-      {#each openIdProviders as provider (provider.client_id)}
+      {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
         <Tooltip
           label={$t`Interaction canceled. Please try again.`}
