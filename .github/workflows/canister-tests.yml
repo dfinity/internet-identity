@@ -530,6 +530,14 @@ jobs:
             npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
           done
 
+      # Render `src/internet_identity_frontend/local_test_arg.did` from
+      # the gitignored template so `icp.yaml`'s `init_args.path` resolves
+      # when icp-cli loads the project. CI overrides init args via
+      # `--args` at install time, so the rendered placeholder content is
+      # never parsed.
+      - name: "Render frontend init_args stub"
+        run: scripts/render-local-init-args
+
       - name: "Run icp-cli"
         run: icp network start -d
 
@@ -659,6 +667,14 @@ jobs:
         with:
           name: archive.wasm.gz
           path: .
+
+      # Render `src/internet_identity_frontend/local_test_arg.did` from
+      # the gitignored template so `icp.yaml`'s `init_args.path` resolves
+      # when icp-cli loads the project. This deploy targets mainnet via
+      # `--args` overrides, so the rendered placeholder content is never
+      # parsed.
+      - name: "Render frontend init_args stub"
+        run: scripts/render-local-init-args
 
       - name: "Install key"
         env:
