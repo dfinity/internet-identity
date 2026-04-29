@@ -47,7 +47,13 @@
    * so we can't rely on a name being threaded through from sign-in.
    */
   let ssoNamesByDomain = new SvelteMap<string, string>();
-  const ssoLookupsInFlight = new SvelteSet<string>();
+  // Plain Set (not SvelteSet): non-reactive guard against duplicate
+  // in-flight `discoverSsoConfig` calls. `ensureSsoLookup` reads and
+  // writes this synchronously inside `getProviderName`, which itself
+  // runs during render — a reactive Set would write while a read is
+  // being tracked and break the consent view's initial render.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const ssoLookupsInFlight = new Set<string>();
 
   const ensureSsoLookup = (domain: string): void => {
     if (ssoNamesByDomain.has(domain) || ssoLookupsInFlight.has(domain)) {
