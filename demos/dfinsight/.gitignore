@@ -1,0 +1,20 @@
+# node
+node_modules/
+dist/
+.vite/
+
+# icp / dfx
+.dfx/
+.icp-build/
+target/
+
+# motoko / mops
+.mops/
+
+# generated bindings (regen on build)
+src/dfinsight_frontend/src/declarations/
+
+# env / local
+.env
+.env.local
+.DS_Store

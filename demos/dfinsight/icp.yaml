@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.2.0/docs/schemas/icp-yaml-schema.json
+
+# Dfinsight: an SSO-gated "matters of interest" board.
+#
+# Two canisters:
+#   - dfinsight_backend  — Motoko, holds Issues, upvotes, admin verify
+#   - dfinsight_frontend — React+Vite asset canister
+#
+# trusted_attribute_signers MUST be set on dfinsight_backend at install
+# time to the II canister principal — otherwise the IC strips
+# `sender_info` and admin verification breaks. See README.
+
+canisters:
+  - name: dfinsight_backend
+    build:
+      steps:
+        - type: script
+          commands:
+            - "scripts/build-backend.sh"
+            - "cp src/dfinsight_backend/.build/dfinsight_backend.wasm \"$ICP_WASM_OUTPUT_PATH\""
+    # No init args — `rpOrigin` is a `var` inside the actor, set after
+    # the first deploy via the controller-gated `setRpOrigin`. Edit
+    # `main.mo` if you want to bake in a non-default origin instead.
+
+  - name: dfinsight_frontend
+    build:
+      steps:
+        - type: script
+          commands:
+            - "npm --prefix src/dfinsight_frontend run build"
+            - "cp -r src/dfinsight_frontend/dist/* \"$ICP_ASSETS_OUTPUT_PATH\"/"
+    dependencies:
+      - dfinsight_backend

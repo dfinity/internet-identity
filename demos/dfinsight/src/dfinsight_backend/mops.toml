@@ -1,0 +1,3 @@
+[dependencies]
+core = "2.5.0"
+identity-attributes = "0.1.0"

@@ -19,6 +19,7 @@ dist-showcase/
 lib
 !src/frontend/src/lib
 !src/try-ii/src/try-ii-frontend/src/lib
+!demos/dfinsight/src/dfinsight_frontend/src/lib
 /.svelte-kit
 
 # Cargo build output
