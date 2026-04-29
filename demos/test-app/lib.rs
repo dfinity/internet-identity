@@ -20,7 +20,32 @@ thread_local! {
 
 #[query]
 fn whoami() -> Principal {
-    api::caller()
+    api::msg_caller()
+}
+
+/// Returned by [`caller_attributes`].
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct CallerAttributes {
+    /// Canister that signed the attributes attached to the caller's
+    /// request. `None` when the caller is another canister or the
+    /// request didn't carry a `sender_info` field.
+    pub signer: Option<Principal>,
+    /// Raw attribute payload as provided by the signer. The format is
+    /// signer-defined; for II this is a Candid-encoded ICRC-3 `Value`.
+    pub data: ByteBuf,
+}
+
+/// Update entrypoint that echoes the caller's signed attributes back
+/// to the client. Together with `AttributeIdentity` on the frontend
+/// this lets e2e tests verify that a request originated by an II
+/// authorize flow can be replayed against an arbitrary canister with
+/// the attribute bundle still attached and validated by the IC.
+#[update]
+fn caller_attributes() -> CallerAttributes {
+    CallerAttributes {
+        signer: api::msg_caller_info_signer(),
+        data: ByteBuf::from(api::msg_caller_info_data()),
+    }
 }
 
 /// Function to update the asset /.well-known/ii-alternative-origins.
@@ -153,7 +178,7 @@ fn static_headers() -> Vec<HeaderField> {
 static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/dist");
 
 fn fixup_html(html: &str) -> String {
-    let canister_id = api::id();
+    let canister_id = api::canister_self();
 
     // the string we are replacing here is inserted by vite during the front-end build
     html.replace(
@@ -196,6 +221,6 @@ fn init_assets(alternative_origins: String) {
 
 fn update_root_hash() {
     ASSETS.with_borrow(|assets| {
-        api::set_certified_data(&assets.root_hash()[..]);
+        api::certified_data_set(&assets.root_hash()[..]);
     })
 }

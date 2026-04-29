@@ -56,6 +56,20 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
 // it's the simplest flow that lets us exercise every UI shape.
 
 test.describe("Authorize — explicit consent UI", () => {
+  // Round-trip verification: every test in this spec that exercises an
+  // ICRC-3 attribute flow must end with the same attributes echoed back
+  // from the test_app canister via `AttributeIdentity`. This proves the
+  // attribute bundle is propagated end-to-end (II → frontend →
+  // sender_info → IC verification → canister → response) and not just
+  // surfaced in the postMessage authorize response.
+  test.afterEach(
+    ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+      if (authorizedIcrc3Attributes === undefined) return;
+      const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+    },
+  );
+
   test.describe("with unscoped email", () => {
     // A single scoped `openid:issuer:email` would be auto-approved via
     // 1-click OpenID; a bare `email` never is, so the consent screen
