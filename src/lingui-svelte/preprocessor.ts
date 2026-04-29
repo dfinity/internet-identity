@@ -16,11 +16,11 @@ const overwriteCall = (
   msg: FoundMessage,
 ) => {
   // Include id in both development and build so translations can be found
-  let output = `${msg.tag}({ id: "${msg.id}"`;
+  let output = `${msg.tag}({ id: ${JSON.stringify(msg.id)}`;
   // Include message during development so latest is shown,
   // exclude during build to optimize the total bundle size.
-  if (!isBuild) {
-    output += `, message: "${msg.message}"`;
+  if (!isBuild && msg.message != null) {
+    output += `, message: ${JSON.stringify(msg.message)}`;
   }
   // Include values if they're found
   if (msg.values != null) {
@@ -42,11 +42,11 @@ const overwriteComponent = (
   msg: FoundMessage,
 ) => {
   // Include id in both development and build so translations can be found
-  let output = `<${msg.tag} id="${msg.id}"`;
+  let output = `<${msg.tag} id={${JSON.stringify(msg.id)}}`;
   // Include message during development so latest is shown,
   // exclude during build to optimize the total bundle size.
   if (!isBuild) {
-    output += ` message={"${msg.message}"}`;
+    output += ` message={${JSON.stringify(msg.message)}}`;
   }
   // Include values if they're found
   if (msg.values) {

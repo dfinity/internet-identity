@@ -1,7 +1,7 @@
 import { IDL } from "@icp-sdk/core/candid";
 import { Principal } from "@icp-sdk/core/principal";
 import { test as base, expect, type Page } from "@playwright/test";
-import { toBase64 } from "../utils";
+import { II_URL, toBase64 } from "../utils";
 
 export type AuthorizeConfig = {
   testAppURL: string;
@@ -202,7 +202,7 @@ export const test = base.extend<{
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      await page.goto("https://id.ai/");
+      await page.goto(II_URL);
       const id = await page.locator("body").getAttribute("data-canister-id");
       if (id === null || id === "") {
         throw new Error(
