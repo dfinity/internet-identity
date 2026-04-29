@@ -225,52 +225,6 @@ function build_canister() {
 }
 
 function build_internet_identity() {
-  if [ "$ONLY_DEPS" != "1" ]
-  then
-      DIST_DIR="$SCRIPTS_DIR/../dist"
-      
-      # Compile frontend assets to dist
-      echo Compiling internet_identity frontend assets
-      npm run build
-      
-      # Add preload links for all css files in every html file
-      CSS_LINKS=""
-      TMP_HTML_FILE=$(mktemp)
-      while IFS= read -r css_file; do
-          css_file_relative="/${css_file#$DIST_DIR/}"
-          CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">"
-      done < <(find "$DIST_DIR" -type f -name "*.css" | sort)
-      find "$DIST_DIR" -type f -name "*.html" | while read -r html_file; do
-        sed "s#</head>#${CSS_LINKS}</head>#" "$html_file" > "$TMP_HTML_FILE" && mv "$TMP_HTML_FILE" "$html_file"
-      done
-      
-      # II canister only supports one content type per resource. 
-      # That is why we only keep either compressed or uncompressed.
-      find "$DIST_DIR" -type f -name "*.gz" | while read -r gz_file; do
-          # Remove the .gz suffix to get the base filename
-          base_file="${gz_file%.gz}"
-          
-          # Generate the .br filename
-          br_file="${base_file}.br"
-      
-          # Delete the .br file if it exists
-          if [[ -f "$br_file" ]]; then
-              rm -f "$br_file"
-          fi
-          
-          # Keep files not ending in .js or .woff2 as uncompressed files
-          if [[ ! "$base_file" =~ \.(js|woff2)$ ]]; then
-              rm -f "$gz_file"
-              continue
-          fi
-      
-          # Delete the base file if it exists
-          if [[ -f "$base_file" ]]; then
-              rm -f "$base_file"
-          fi
-      done
-  fi
-
   build_canister "internet_identity"
 }
 
@@ -278,7 +232,12 @@ function build_internet_identity_frontend() {
   if [ "$ONLY_DEPS" != "1" ]
   then
       DIST_DIR="$SCRIPTS_DIR/../dist"
-      
+
+      # Clean dist before build — adapter-static's own rimraf
+      # intermittently fails with ENOTEMPTY on macOS when files
+      # remain from a previous run.
+      rm -rf "$DIST_DIR"
+
       # Compile frontend assets to dist
       echo Compiling internet_identity frontend assets
       npm run build

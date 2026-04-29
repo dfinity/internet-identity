@@ -1,0 +1,14 @@
+(
+  record {
+    backend_canister_id = principal "{{INTERNET_IDENTITY_ID}}";
+    backend_origin = "http://internet_identity.local.localhost:8000";
+    related_origins = opt vec {
+      "http://internet_identity_frontend.local.localhost:8000";
+      "http://{{INTERNET_IDENTITY_FRONTEND_ID}}.localhost:8000";
+    };
+    fetch_root_key = opt true;
+    analytics_config = null;
+    dummy_auth = null;
+    dev_csp = opt true;
+  },
+)

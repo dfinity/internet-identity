@@ -6,6 +6,7 @@ canisters:
       steps:
         - type: script
           commands:
+            - "scripts/render-local-init-args"
             - "II_FETCH_ROOT_KEY=1 scripts/build --frontend"
             - "cp internet_identity_frontend.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
     init_args:
@@ -18,7 +19,8 @@ canisters:
           commands:
             - "II_FETCH_ROOT_KEY=1 scripts/build"
             - "cp internet_identity.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
-    init_args: "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}; openid_google = opt opt record { client_id = \"775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com\" }; related_origins = opt vec { \"https://identity.internetcomputer.org\"; \"https://identity.ic0.app\" } })"
+    init_args:
+      path: src/internet_identity/local_test_arg.did
 
   - name: test_app
     build:
