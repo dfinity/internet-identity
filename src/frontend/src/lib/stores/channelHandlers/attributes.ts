@@ -114,7 +114,7 @@ const resolveKey = (
  * Groups results by attribute name for UI rendering.
  * Attributes with no available values are omitted.
  */
-const resolveAttributeGroups = (
+export const resolveAttributeGroups = (
   requestedKeys: string[],
   available: Array<[string, Uint8Array | number[]]>,
 ): AttributeGroup[] => {

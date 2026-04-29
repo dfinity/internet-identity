@@ -2,8 +2,6 @@
   import type {
     AttributeConsent,
     AttributeConsentContext,
-    AttributeGroup,
-    AvailableAttribute,
   } from "$lib/stores/attributeConsent.store";
   import { extractScope } from "$lib/stores/channelHandlers/attributes";
   import { backendCanisterConfig } from "$lib/globals";
@@ -12,6 +10,11 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import AttributePicker from "./AttributePicker.svelte";
+  import {
+    type MergedGroup,
+    groupId,
+    mergeGroups,
+  } from "./attributeConsentView.utils";
 
   interface Props {
     context: Promise<AttributeConsentContext>;
@@ -21,59 +24,49 @@
 
   const { context, variant, onConsent }: Props = $props();
 
-  type MergedOption = {
-    display: AvailableAttribute;
-    originals: AvailableAttribute[];
-  };
-  /** A MergedGroup maps to one AttributePicker row.
-   *  Scoped and unscoped requests for the same attribute produce separate
-   *  groups so each gets its own row (and label). */
-  type MergedGroup = {
-    name: string;
-    omitScope: boolean;
-    options: MergedOption[];
-  };
-
-  const groupId = (group: { name: string; omitScope: boolean }): string =>
-    `${group.name}:${group.omitScope ? "u" : "s"}`;
-
   /**
-   * Per-render cache of the published name for each `sso:<domain>` we've
-   * seen in the consent groups. Populated by re-running the same
-   * frontend two-hop discovery the SSO sign-in path uses — the consent
-   * screen may render `sso:<domain>:<key>` rows even when the user
-   * authenticated through some other method (passkey, direct OpenID),
-   * so we can't rely on a name being threaded through from sign-in.
+   * Cache of the published name for each `sso:<domain>` we've seen in
+   * the consent groups, populated by re-running the same frontend
+   * two-hop discovery the SSO sign-in path uses. The consent screen may
+   * render `sso:<domain>:<key>` rows even when the user authenticated
+   * through some other method (passkey, direct OpenID), so we can't
+   * rely on a name being threaded through from sign-in.
+   *
+   * Populated up-front during the skeleton so the first row paint has
+   * the discovered names — see the `prepared` promise below.
    */
   let ssoNamesByDomain = $state<Map<string, string>>(new Map());
-  const ssoLookupsInFlight = new Set<string>();
 
-  const ensureSsoLookup = (domain: string): void => {
-    if (ssoNamesByDomain.has(domain) || ssoLookupsInFlight.has(domain)) {
-      return;
+  const discoverSsoName = async (domain: string): Promise<void> => {
+    if (ssoNamesByDomain.has(domain)) return;
+    try {
+      const result = await discoverSsoConfig(domain);
+      if (result.name !== undefined && result.name.length > 0) {
+        ssoNamesByDomain = new Map(ssoNamesByDomain).set(domain, result.name);
+      }
+    } catch (error) {
+      // Non-fatal: the SSO label falls back to the bare domain.
+      // eslint-disable-next-line no-console
+      console.error(`Failed to discover SSO name for ${domain}`, error);
     }
-    ssoLookupsInFlight.add(domain);
-    void discoverSsoConfig(domain)
-      .then((result) => {
-        if (result.name !== undefined && result.name.length > 0) {
-          ssoNamesByDomain = new Map(ssoNamesByDomain).set(domain, result.name);
+  };
+
+  const ssoDomainsIn = (groups: MergedGroup[]): string[] => {
+    const domains = new Set<string>();
+    for (const group of groups) {
+      for (const opt of group.options) {
+        const scope = extractScope(opt.display.key);
+        if (scope?.startsWith("sso:")) {
+          domains.add(scope.slice("sso:".length));
         }
-      })
-      .catch((error) => {
-        // Non-fatal: the SSO label falls back to the bare domain.
-        // eslint-disable-next-line no-console
-        console.error(`Failed to discover SSO name for ${domain}`, error);
-      })
-      .finally(() => {
-        ssoLookupsInFlight.delete(domain);
-      });
+      }
+    }
+    return [...domains];
   };
 
   const getProviderName = (key: string): string | undefined => {
     const scope = extractScope(key);
-    if (scope === undefined) {
-      return undefined;
-    }
+    if (scope === undefined) return undefined;
     if (scope.startsWith("openid:")) {
       const issuer = scope.slice("openid:".length);
       return backendCanisterConfig.openid_configs[0]?.find(
@@ -81,181 +74,48 @@
       )?.name;
     }
     if (scope.startsWith("sso:")) {
-      const domain = scope.slice("sso:".length);
-      // Kick the per-domain discovery on first sight and fall back to
-      // the bare domain in the meantime — Svelte rerenders once the
-      // promise updates `ssoNamesByDomain`, upgrading the label from
-      // e.g. `dfinity.org email:` to `DFINITY email:` in place.
-      ensureSsoLookup(domain);
-      return ssoNamesByDomain.get(domain) ?? domain;
+      return ssoNamesByDomain.get(scope.slice("sso:".length));
     }
     return undefined;
   };
 
-  /** Merge AttributeGroups by (name, omitScope). Within each bucket, options
-   *  are deduped by scope so exact-duplicate requests collapse while keeping
-   *  all originals so every form is certified. */
-  const dedupeByFormAndName = (
-    groups: AttributeGroup[],
-  ): Map<
-    string,
-    {
-      name: string;
-      omitScope: boolean;
-      optionsByScope: Map<string | undefined, MergedOption>;
-    }
-  > => {
-    const result = new Map<
-      string,
-      {
-        name: string;
-        omitScope: boolean;
-        optionsByScope: Map<string | undefined, MergedOption>;
-      }
-    >();
-    for (const group of groups) {
-      if (group.options.length === 0) {
-        continue;
-      }
-      const omitScope = group.options[0].omitScope;
-      const id = groupId({ name: group.name, omitScope });
-      const entry = result.get(id) ?? {
-        name: group.name,
-        omitScope,
-        optionsByScope: new Map<string | undefined, MergedOption>(),
-      };
-      for (const option of group.options) {
-        const scope = extractScope(option.key);
-        const existing = entry.optionsByScope.get(scope);
-        if (existing !== undefined) {
-          existing.originals.push(option);
-        } else {
-          entry.optionsByScope.set(scope, {
-            display: option,
-            originals: [option],
-          });
-        }
-      }
-      result.set(id, entry);
-    }
-    return result;
-  };
-
-  const mergeGroups = (groups: AttributeGroup[]): MergedGroup[] => {
-    const deduped = dedupeByFormAndName(groups);
-
-    // Pre-scan: figure out which verified_email entries will be folded into
-    // a matching email group. We do this before iterating so that the
-    // folded-in verified_email is skipped regardless of whether its entry
-    // appears before or after the email entry in the request order.
-    const foldedVerifiedIds = new Set<string>();
-    for (const entry of deduped.values()) {
-      if (entry.name !== "email") continue;
-      const verifiedId = groupId({
-        name: "verified_email",
-        omitScope: entry.omitScope,
-      });
-      if (deduped.has(verifiedId)) {
-        foldedVerifiedIds.add(verifiedId);
-      }
-    }
-
-    // Iterate in request order so the UI preserves the dapp's key order.
-    const result: MergedGroup[] = [];
-    for (const [id, entry] of deduped) {
-      if (entry.name === "verified_email" && foldedVerifiedIds.has(id)) {
-        continue;
-      }
-      if (entry.name === "email") {
-        // Merge email + verified_email that share the same form
-        // (scoped/unscoped), intersecting by scope — so a matching verified
-        // option replaces the plain email for display but both originals get
-        // certified.
-        const verifiedId = groupId({
-          name: "verified_email",
-          omitScope: entry.omitScope,
-        });
-        const verified = deduped.get(verifiedId);
-        if (verified !== undefined) {
-          const options: MergedOption[] = [];
-          for (const [scope, emailOpt] of entry.optionsByScope) {
-            const verifiedOpt = verified.optionsByScope.get(scope);
-            options.push(
-              verifiedOpt !== undefined
-                ? {
-                    display: verifiedOpt.display,
-                    originals: [
-                      ...verifiedOpt.originals,
-                      ...emailOpt.originals,
-                    ],
-                  }
-                : emailOpt,
-            );
-          }
-          result.push({
-            name: "email",
-            omitScope: entry.omitScope,
-            options,
-          });
-        } else {
-          result.push({
-            name: "email",
-            omitScope: entry.omitScope,
-            options: [...entry.optionsByScope.values()],
-          });
-        }
-      } else {
-        result.push({
-          name: entry.name,
-          omitScope: entry.omitScope,
-          options: [...entry.optionsByScope.values()],
-        });
-      }
-    }
-
-    return result;
-  };
-
-  let mergedGroups = $state<MergedGroup[]>([]);
   let selections = $state(
     new Map<string, { checked: boolean; selectedIndex: number }>(),
   );
-  let effectiveOrigin = $state("");
-  // `ready` is flipped only after `mergedGroups`, `selections`, and
-  // `effectiveOrigin` have all been set from the resolved context — the UI
-  // below gates on it so a click can never submit with default-empty state.
-  let ready = $state(false);
 
-  $effect(() => {
-    context.then((ctx) => {
-      mergedGroups = mergeGroups(ctx.groups);
-      selections = new Map(
-        mergedGroups.map((group) => [
-          groupId(group),
-          { checked: true, selectedIndex: 0 },
-        ]),
-      );
-      effectiveOrigin = ctx.effectiveOrigin;
-      ready = true;
-    });
-  });
-
-  const handleDenyAll = () => {
+  /** Resolves only when the consent rows are fully ready to render:
+   *  attribute groups computed, SSO provider names discovered, and
+   *  `selections` initialised. Gating the template on this promise
+   *  (rather than `context`) means `{:then}` never sees an in-between
+   *  frame where a fast click could submit an empty consent result. */
+  const prepared = (async () => {
+    const ctx = await context;
+    const groups = mergeGroups(ctx.groups);
+    await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
     selections = new Map(
-      mergedGroups.map((group) => [
+      groups.map((group) => [
+        groupId(group),
+        { checked: true, selectedIndex: 0 },
+      ]),
+    );
+    return { groups, effectiveOrigin: ctx.effectiveOrigin };
+  })();
+
+  const handleDenyAll = (groups: MergedGroup[]) => {
+    selections = new Map(
+      groups.map((group) => [
         groupId(group),
         { checked: false, selectedIndex: 0 },
       ]),
     );
   };
 
-  const handleContinue = () => {
-    const attributes = mergedGroups
-      .filter((group) => selections.get(groupId(group))?.checked === true)
-      .flatMap((group) => {
-        const selection = selections.get(groupId(group))!;
-        return group.options[selection.selectedIndex].originals;
-      });
+  const handleContinue = (groups: MergedGroup[]) => {
+    const attributes = groups.flatMap((group) => {
+      const selection = selections.get(groupId(group));
+      if (selection === undefined || !selection.checked) return [];
+      return group.options[selection.selectedIndex].originals;
+    });
     onConsent({ attributes });
   };
 
@@ -268,13 +128,25 @@
   const PDI = String.fromCharCode(0x2069);
   const bidiIsolate = (value: string): string => `${FSI}${value}${PDI}`;
 
+  /** Always emit a non-empty label for scoped rows. Prefer the published
+   *  provider name (canister-configured for OpenID, two-hop discovery for
+   *  SSO); fall back to the bare issuer URL or domain when neither is
+   *  available so an explicitly scoped request never collapses into the
+   *  unscoped fan-out's bare "Name:" / "Email:" label. */
+  const scopedProviderLabel = (key: string): string | undefined => {
+    const named = getProviderName(key);
+    if (named !== undefined) return named;
+    const scope = extractScope(key);
+    if (scope === undefined) return undefined;
+    if (scope.startsWith("openid:")) return scope.slice("openid:".length);
+    if (scope.startsWith("sso:")) return scope.slice("sso:".length);
+    return scope;
+  };
+
   const labelForGroup = (group: MergedGroup): string => {
-    // For scoped single-provider rows, prefix with the provider's name so the
-    // user can tell it apart from the matching unscoped row.
-    const scopedProvider =
-      !group.omitScope && group.options.length === 1
-        ? getProviderName(group.options[0].display.key)
-        : undefined;
+    const scopedProvider = !group.omitScope
+      ? scopedProviderLabel(group.options[0].display.key)
+      : undefined;
     // Bind interpolations to named consts so Lingui extracts the id as the
     // placeholder name (rather than `{0}`), giving translators clear context.
     const attribute = bidiIsolate(group.name);
@@ -304,11 +176,7 @@
   };
 </script>
 
-{#if !ready}
-  <!-- Skeleton placeholder while the context promise resolves and state is
-       being initialized. Gating on `ready` (instead of `{#await context}`)
-       avoids a frame where `{:then}` renders with default-empty state and
-       a fast click could submit an empty consent result. -->
+{#await prepared}
   <div
     class="flex min-w-0 flex-1 flex-col"
     aria-busy="true"
@@ -326,9 +194,9 @@
     <div class="skeleton mb-6 h-4 w-16"></div>
     <div class="skeleton h-12 w-full rounded-lg"></div>
   </div>
-{:else}
+{:then data}
   <div class="flex min-w-0 flex-1 flex-col">
-    <AuthorizeHeader origin={effectiveOrigin} />
+    <AuthorizeHeader origin={data.effectiveOrigin} />
     <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
       {#if variant === "openid"}
         {$t`Review Permissions`}
@@ -341,7 +209,7 @@
     </p>
 
     <div class="mb-4 grid w-full grid-cols-[auto_auto_1fr_auto] gap-y-1">
-      {#each mergedGroups as group (groupId(group))}
+      {#each data.groups as group (groupId(group))}
         {@const id = groupId(group)}
         {@const selection = selections.get(id)}
         {#if selection !== undefined}
@@ -367,14 +235,18 @@
     </div>
 
     <button
-      onclick={handleDenyAll}
+      onclick={() => handleDenyAll(data.groups)}
       class="text-text-secondary mb-6 self-start text-sm font-medium hover:underline"
     >
       {$t`Deny All`}
     </button>
 
-    <Button onclick={handleContinue} size="xl" class="w-full">
+    <Button
+      onclick={() => handleContinue(data.groups)}
+      size="xl"
+      class="w-full"
+    >
       {$t`Continue`}
     </Button>
   </div>
-{/if}
+{/await}
