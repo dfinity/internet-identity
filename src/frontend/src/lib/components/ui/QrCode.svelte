@@ -47,7 +47,7 @@
 
   // Lazy load qr creator on component mount
   onMount(() => {
-    getQrCreator().then((value) => (qrCreator = value));
+    void getQrCreator().then((value) => (qrCreator = value));
   });
 </script>
 
@@ -62,7 +62,7 @@
     class="mix-blend-darken dark:mix-blend-lighten **:dark:invert"
   ></div>
   <div
-    class={"bg-text-primary absolute inset-0 mix-blend-lighten dark:mix-blend-darken"}
+    class="bg-text-primary absolute inset-0 mix-blend-lighten dark:mix-blend-darken"
   ></div>
 </div>
 

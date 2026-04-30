@@ -23,14 +23,14 @@
     }
   };
 
-  let interval: NodeJS.Timeout;
+  let interval: ReturnType<typeof setInterval>;
 
   onMount(() => {
     if (texts.length <= 1) return;
 
     const start = setTimeout(() => {
-      interval = setInterval(next, delayBetween + duration);
-      next();
+      interval = setInterval(() => void next(), delayBetween + duration);
+      void next();
     }, startDelay);
 
     return () => {

@@ -61,6 +61,14 @@ jobs:
       - name: Install icp-cli
         run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
+      # Render `src/internet_identity_frontend/local_test_arg.did` from
+      # the gitignored template so `icp.yaml`'s `init_args.path` resolves
+      # when icp-cli loads the project. This deploy targets mainnet via
+      # `--args` overrides, so the rendered placeholder content is never
+      # parsed.
+      - name: "Render frontend init_args stub"
+        run: scripts/render-local-init-args
+
       - name: "Install key"
         env:
           ICP_DEPLOY_KEY: ${{ secrets.DFX_DEPLOY_KEY }}

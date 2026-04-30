@@ -103,7 +103,9 @@
 
   onMount(() => {
     // Lazy load dictionary so this component doesn't include it in the bundle eagerly
-    import("bip39").then((bip39) => (dictionary = bip39.wordlists.english));
+    void import("bip39").then(
+      (bip39) => (dictionary = bip39.wordlists.english),
+    );
     // Focus on first empty input field, else fallback to first input
     focusInput(
       Math.max(
@@ -130,7 +132,7 @@
       className,
     ]}
   >
-    {#each value as word, index}
+    {#each value as word, index (index)}
       {@const position = index + 1}
       <label class="relative">
         <input

@@ -74,7 +74,7 @@
     class={["!w-max p-1.5 !shadow-lg", className]}
   >
     <div class="flex flex-col" role="menu">
-      {#each options as option, index}
+      {#each options as option, index (index)}
         <Tooltip
           label={option.tooltip ?? ""}
           hidden={option.tooltip === undefined ? true : undefined}
@@ -86,7 +86,8 @@
             variant="tertiary"
             class={[
               "justify-start gap-2.5 !px-3 text-start",
-              option.selected && "[ul:not(:hover)_&]:bg-bg-primary_hover",
+              option.selected === true &&
+                "[ul:not(:hover)_&]:bg-bg-primary_hover",
             ]}
             role="menuitem"
             aria-label={option.label}

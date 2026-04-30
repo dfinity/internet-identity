@@ -72,7 +72,7 @@
       onError(error);
     }
   };
-  const handleOtherDeviceRegistered = async () => {
+  const handleOtherDeviceRegistered = () => {
     onOtherDeviceRegistered();
   };
 </script>

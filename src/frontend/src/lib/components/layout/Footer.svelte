@@ -7,7 +7,7 @@
 
   type Props = HTMLAttributes<HTMLElement>;
 
-  const { children, class: className, ...props }: Props = $props();
+  const { class: className, ...props }: Props = $props();
 
   let isLanguageDialogOpen = $state(false);
 </script>
@@ -53,7 +53,7 @@
       value={$localeStore}
       onChange={(value) => {
         isLanguageDialogOpen = false;
-        localeStore.setOrReset(value);
+        void localeStore.setOrReset(value);
       }}
     />
   </Dialog>

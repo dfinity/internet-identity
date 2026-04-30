@@ -31,8 +31,8 @@
     {:else}
       <span>
         {$t`Passkey`}
-        {#if showCreatedAt && identity.createdAtMillis !== undefined}
-          {" | "}
+        {#if showCreatedAt === true && identity.createdAtMillis !== undefined}
+          |
           {$t`Created ${$formatRelative(new Date(identity.createdAtMillis), {
             style: "long",
           })}`}

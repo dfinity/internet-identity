@@ -83,7 +83,7 @@
   {/if}
   <div class="flex flex-col items-stretch gap-3">
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
-      {#each openIdProviders as provider}
+      {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
         <Tooltip
           label={$t`Interaction canceled. Please try again.`}
@@ -107,6 +107,7 @@
                 <ProgressRing />
               {:else if provider.logo}
                 <div class="size-6">
+                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
                   {@html provider.logo}
                 </div>
               {/if}
@@ -132,7 +133,7 @@
     </div>
     <Tooltip
       label={$t`You have reached the maximum number of passkeys`}
-      hidden={!maxPasskeysReached}
+      hidden={maxPasskeysReached !== true}
     >
       <Button
         onclick={continueWithPasskey}

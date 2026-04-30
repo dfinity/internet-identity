@@ -176,11 +176,11 @@
   <div
     {...props}
     bind:this={popoverRef}
-    popover={"manual"}
+    popover="manual"
     in:fade|global={{ duration: 1 }}
     out:fade|global={{ delay: 160, duration: 1 }}
     ontoggle={() => {
-      if (popoverRef?.matches(":popover-open")) {
+      if (popoverRef?.matches(":popover-open") === true) {
         return;
       }
       onClose?.();
@@ -190,7 +190,7 @@
     onfocusout={(e) => {
       if (
         e.relatedTarget instanceof Node &&
-        popoverRef?.contains(e.relatedTarget)
+        popoverRef?.contains(e.relatedTarget) === true
       ) {
         return;
       }

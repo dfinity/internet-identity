@@ -56,7 +56,7 @@
   >
     {#if position !== "start"}
       <span class="flex flex-1 flex-wrap justify-end">
-        {#each leftCharacters as character}
+        {#each leftCharacters as character, i (i)}
           <span>{character}</span>
         {/each}
       </span>
@@ -64,7 +64,7 @@
     <span>…</span>
     {#if position !== "end"}
       <span class="flex flex-1 flex-row-reverse flex-wrap justify-end">
-        {#each rightCharacters as character}
+        {#each rightCharacters as character, i (i)}
           <span>{character}</span>
         {/each}
       </span>

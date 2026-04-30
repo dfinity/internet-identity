@@ -11,6 +11,9 @@
 # icp-cli temporary files
 .icp/
 
+# Rendered from local_test_arg.did.template by scripts/render-local-init-args
+src/internet_identity_frontend/local_test_arg.did
+
 # frontend code
 node_modules/
 dist/

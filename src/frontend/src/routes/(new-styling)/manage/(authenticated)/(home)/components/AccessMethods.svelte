@@ -1,8 +1,6 @@
 <script lang="ts">
-  import Panel from "$lib/components/ui/Panel.svelte";
-  import { ChevronRightIcon, KeyRoundIcon, LockIcon } from "@lucide/svelte";
+  import { ChevronRightIcon, KeyRoundIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 

@@ -23,8 +23,8 @@
   viewBox="0 0 {elements} {elements}"
   class={["rounded-full", className]}
 >
-  {#each { length: elements } as _, x}
-    {#each { length: elements } as _, y}
+  {#each { length: elements } as _, x (x)}
+    {#each { length: elements } as _, y (y)}
       <rect
         {x}
         {y}

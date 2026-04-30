@@ -120,9 +120,10 @@
 
   // --- Sign out ---
 
-  const handleSignOut = async () => {
+  const handleSignOut = (): Promise<void> => {
     isIdentityPopoverOpen = false;
     isSignOutDialogOpen = true;
+    return Promise.resolve();
   };
 
   const handleConfirmSignOut = () => {
@@ -562,7 +563,7 @@
       value={$localeStore}
       onChange={(value) => {
         isLanguageDialogOpen = false;
-        localeStore.setOrReset(value);
+        void localeStore.setOrReset(value);
       }}
     />
   </Dialog>

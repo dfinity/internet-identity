@@ -6,6 +6,7 @@
     PlusIcon,
     PencilIcon,
   } from "@lucide/svelte";
+  import { SvelteMap } from "svelte/reactivity";
   import type { HTMLAttributes } from "svelte/elements";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import { t } from "$lib/stores/locale.store";
@@ -59,7 +60,7 @@
     ),
   );
   const passkeyNameCounts = $derived.by(() => {
-    const counts = new Map<string | undefined, number>();
+    const counts = new SvelteMap<string | undefined, number>();
 
     for (const identity of otherIdentities) {
       if (!("passkey" in identity.authMethod)) {
@@ -210,7 +211,7 @@
       class="flex flex-col gap-2 overflow-y-auto"
       style={`max-height: ${Math.max(2, Math.floor((windowHeight - 380) / 74)) * 74 - 41}px`}
     >
-      {#each otherIdentities as identity}
+      {#each otherIdentities as identity (identity.identityNumber)}
         {@render identityListItem(identity)}
       {/each}
     </ul>

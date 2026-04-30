@@ -1,20 +1,13 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import {
-    channelErrorStore,
-    channelStore,
-    establishedChannelStore,
-  } from "$lib/stores/channelStore";
+  import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
   import {
     authorizationContextStore,
     authorizationStore,
     authorizedStore,
   } from "$lib/stores/authorization.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import {
-    authenticationStore,
-    isAuthenticatedStore,
-  } from "$lib/stores/authentication.store";
+  import { authenticationStore } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import { handleError } from "$lib/components/utils/error";
@@ -89,7 +82,7 @@
   // --- Unsupported browser redirect ---
   $effect(() => {
     if ($channelErrorStore === "unsupported-browser") {
-      goto("/unsupported");
+      void goto("/unsupported");
     }
   });
 
@@ -271,9 +264,10 @@
                   isIdentityPopoverOpen = false;
                   isAuthDialogOpen = true;
                 }}
-                onManageIdentity={async () => {
+                onManageIdentity={(): Promise<void> => {
                   isIdentityPopoverOpen = false;
                   window.open("/manage", "_blank");
+                  return Promise.resolve();
                 }}
                 onManageIdentities={() => {
                   isIdentityPopoverOpen = false;

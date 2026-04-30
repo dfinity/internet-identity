@@ -32,7 +32,7 @@
     class={["my-8 grid grid-cols-3 gap-3", !isRevealed && "blur-md"]}
     aria-hidden={isRevealed ? "false" : "true"}
   >
-    {#each recoveryPhrase as word, index}
+    {#each recoveryPhrase as word, index (index)}
       <li
         class="border-border-primary flex h-7 flex-row items-center rounded-full border px-1.5"
       >

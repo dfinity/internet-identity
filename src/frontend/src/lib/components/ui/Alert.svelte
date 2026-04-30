@@ -6,7 +6,6 @@
     CircleAlertIcon,
     XIcon,
   } from "@lucide/svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
 

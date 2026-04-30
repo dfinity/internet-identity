@@ -10,7 +10,7 @@
 </script>
 
 <div {...props} class={["gap flex flex-row gap-4", className]}>
-  {#each Array.from({ length: total }) as _, index}
+  {#each Array.from({ length: total }) as _, index (index)}
     <div
       class={[
         "bg-border-tertiary h-1 flex-1",

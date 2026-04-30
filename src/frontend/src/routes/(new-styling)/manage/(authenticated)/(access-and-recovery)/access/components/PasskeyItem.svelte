@@ -88,7 +88,7 @@
   ]);
   onMount(() => {
     // Lazy load known providers data
-    import("$lib/assets/aaguid").then(
+    void import("$lib/assets/aaguid").then(
       (data) => (knownProviders = data.default),
     );
   });

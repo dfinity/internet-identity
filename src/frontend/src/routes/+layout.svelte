@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
+  import { initAnalytics } from "$lib/utils/analytics/analytics";
   import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
   import { onMount } from "svelte";
   import { page } from "$app/state";

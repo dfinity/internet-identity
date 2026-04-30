@@ -122,61 +122,54 @@
     !devices.some(
       (device) =>
         device.credential_id[0] !== undefined &&
-        device.origin[0]?.endsWith("id.ai"),
+        device.origin[0]?.endsWith("id.ai") === true,
     );
   const lookupByPasskey = async () => {
-    const identityResult = await new Promise<IdentityResult>(
-      async (resolve) => {
-        let identityNumber = BigInt(-1);
-        const passkeyIdentity = await DiscoverablePasskeyIdentity.useExisting({
-          getPublicKey: (result) =>
-            new Promise(async (resolve) => {
-              const lookupResult = (
-                await anonymousActor.lookup_device_key(
-                  new Uint8Array(result.rawId),
-                )
-              )[0];
-              if (lookupResult === undefined) {
-                toaster.error({
-                  title: $t`Identity not found`,
-                  description: $t`This passkey is no longer associated with any identity.`,
-                });
-                return;
-              }
-              identityNumber = lookupResult.anchor_number;
-              resolve(
-                CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey)),
-              );
-            }),
-        });
-        const sessionIdentity = await ECDSAKeyIdentity.generate();
-        const delegationChain = await DelegationChain.create(
-          passkeyIdentity,
-          sessionIdentity.getPublicKey(),
-        );
-        const delegationIdentity = DelegationIdentity.fromDelegation(
-          sessionIdentity,
-          delegationChain,
-        );
-        const agent = await HttpAgent.from(anonymousAgent);
-        agent.replaceIdentity(delegationIdentity);
-        const info = await anonymousActor.get_anchor_info.withOptions({
-          agent,
-        })(identityNumber);
-        resolve({
-          identityNumber,
-          legacy: missingUpgradedPasskey(info.devices),
-          devices: info.devices,
-          name: info.name[0],
-          lastUsed: Math.max(
-            ...info.devices
-              .map((device) => device.last_usage[0])
-              .filter((ns) => ns !== undefined)
-              .map((ns) => Number(ns / BigInt(1_000_000))),
-          ),
-        });
+    let identityNumber = BigInt(-1);
+    const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
+      getPublicKey: async (result) => {
+        const lookupResult = (
+          await anonymousActor.lookup_device_key(new Uint8Array(result.rawId))
+        )[0];
+        if (lookupResult === undefined) {
+          toaster.error({
+            title: $t`Identity not found`,
+            description: $t`This passkey is no longer associated with any identity.`,
+          });
+          // Hang intentionally so further sign-in code doesn't run after the
+          // toaster surfaces the not-found state.
+          return new Promise<CosePublicKey>(() => {});
+        }
+        identityNumber = lookupResult.anchor_number;
+        return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
       },
+    });
+    const sessionIdentity = await ECDSAKeyIdentity.generate();
+    const delegationChain = await DelegationChain.create(
+      passkeyIdentity,
+      sessionIdentity.getPublicKey(),
     );
+    const delegationIdentity = DelegationIdentity.fromDelegation(
+      sessionIdentity,
+      delegationChain,
+    );
+    const agent = await HttpAgent.from(anonymousAgent);
+    agent.replaceIdentity(delegationIdentity);
+    const info = await anonymousActor.get_anchor_info.withOptions({
+      agent,
+    })(identityNumber);
+    const identityResult: IdentityResult = {
+      identityNumber,
+      legacy: missingUpgradedPasskey(info.devices),
+      devices: info.devices,
+      name: info.name[0],
+      lastUsed: Math.max(
+        ...info.devices
+          .map((device) => device.last_usage[0])
+          .filter((ns) => ns !== undefined)
+          .map((ns) => Number(ns / BigInt(1_000_000))),
+      ),
+    };
     if (
       !identityResults.some(
         (result) => result.identityNumber === identityResult.identityNumber,
@@ -202,7 +195,7 @@
       handleError(error);
     }
   };
-  const exportJSON = async () => {
+  const exportJSON = () => {
     const date = Date.now();
     const json = JSON.stringify(
       {
@@ -239,12 +232,12 @@
 
   onMount(() => {
     // Lazy load known providers data
-    import("$lib/assets/aaguid").then(
+    void import("$lib/assets/aaguid").then(
       (data) => (knownProviders = data.default),
     );
     // Load identity numbers from storage (old and new),
     // and fetch all devices for each anchor in parallel.
-    readStorage()
+    void readStorage()
       .then((storage) => [
         ...Object.entries(storage.anchors ?? {})
           // Filter out old entries that are in new storage
@@ -310,7 +303,7 @@
       <hr class="bt-1 border-border-secondary my-4" />
       {#if identityResults.length > 0}
         <div class="mb-4 flex flex-col gap-4">
-          {#each [...identityResults].sort((a, b) => b.lastUsed - a.lastUsed) as identityResult}
+          {#each [...identityResults].sort((a, b) => b.lastUsed - a.lastUsed) as identityResult (identityResult.identityNumber)}
             {@const isRecoveryPhraseSetUp = identityResult.devices.some(
               (device) =>
                 "recovery" in device.purpose &&
@@ -399,7 +392,7 @@
         <div class="text-text-tertiary text-sm text-balance">
           <Trans>Check out the other domains:</Trans>
           <ul class="mt-1 flex flex-col gap-0.5">
-            {#each (frontendCanisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
+            {#each (frontendCanisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin (relatedOrigin)}
               <li>
                 <a
                   href={relatedOrigin + "/self-service"}
@@ -433,7 +426,7 @@
       <hr class="bt-1 border-border-secondary my-4" />
       {#if testResults.length > 0}
         <div class="flex flex-col gap-4">
-          {#each [...testResults].reverse() as testResult}
+          {#each [...testResults].reverse() as testResult (testResult.date)}
             {@const provider =
               knownProviders !== undefined && testResult.aaguid !== undefined
                 ? knownProviders[testResult.aaguid]

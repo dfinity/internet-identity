@@ -25,7 +25,7 @@
   import * as easingFunctions from "svelte/easing";
 
   let {
-    bgType = "dots",
+    bgType: _bgType = "dots",
     spacing = "medium",
     aspect = "wide",
     hoverAction = "none",
@@ -54,7 +54,9 @@
     customColor,
     customColorMode,
     containerHeight,
+    // eslint-disable-next-line no-useless-assignment -- $bindable() default is required so the parent's bind:triggerAnimation can propagate
     triggerAnimation = $bindable(),
+    // eslint-disable-next-line no-useless-assignment -- $bindable() default is required so the parent's bind:clearAnimation can propagate
     clearAnimation = $bindable(),
   }: FlairCanvasProps = $props();
 
@@ -74,8 +76,8 @@
   let lastPointerX = $state<number>(0);
   let lastPointerY = $state<number>(0);
   let lastPointerTime = $state<number>(0);
-  let pointerSpeed = $state<number>(0);
-  let pointerInside = $state<boolean>(false);
+  let _pointerSpeed = $state<number>(0);
+  let _pointerInside = $state<boolean>(false);
 
   let stiffness = $state(0.1);
   let damping = $state(0.5);
@@ -95,7 +97,7 @@
     });
   });
 
-  let motionNoiseScale = $state<number>(0.01);
+  let _motionNoiseScale = $state<number>(0.01);
 
   let backgroundInitialized = $state(false);
   let backgroundIsVisible = $state(true);
@@ -160,13 +162,13 @@
     large: 3,
   };
 
-  const stiffnessTable = {
+  const _stiffnessTable = {
     light: 0.1,
     medium: 0.5,
     strong: 1,
   };
 
-  const dampeningTable = {
+  const _dampeningTable = {
     light: 0.1,
     medium: 0.5,
     strong: 1,
@@ -219,7 +221,7 @@
   );
 
   let xPositions = $derived<number[]>(
-    clientWidth
+    clientWidth !== undefined && clientWidth > 0
       ? Array.from(
           { length: Math.max(1, Math.floor((clientWidth - 1) / xSpacing) + 2) }, // +2 instead of +1
           (_, i) => i * xSpacing,
@@ -228,7 +230,7 @@
   );
 
   let yPositions = $derived<number[]>(
-    clientHeight
+    clientHeight !== undefined && clientHeight > 0
       ? Array.from(
           {
             length: Math.max(1, Math.floor((clientHeight - 1) / ySpacing) + 2),
@@ -258,8 +260,10 @@
     getVignetteConfig(vignette, clientHeight, clientWidth),
   );
 
+  // eslint-disable-next-line no-useless-assignment -- assigned to bindable prop so parent reads it via bind:clearAnimation
   clearAnimation = async () => await clearWave(opacityWaveMotion, springs);
 
+  // eslint-disable-next-line no-useless-assignment -- assigned to bindable prop so parent reads it via bind:triggerAnimation
   triggerAnimation = async (opts) => {
     const {
       location,
@@ -272,11 +276,16 @@
       impulseEasing,
     } = opts;
 
-    let easingFunction = impulseEasing
-      ? easingFunctions[impulseEasing]
-      : undefined;
+    let easingFunction =
+      impulseEasing !== undefined ? easingFunctions[impulseEasing] : undefined;
 
-    if (target.includes("motion") && clientWidth && clientHeight) {
+    if (
+      target.includes("motion") &&
+      clientWidth !== undefined &&
+      clientWidth > 0 &&
+      clientHeight !== undefined &&
+      clientHeight > 0
+    ) {
       const { x, y } = getImpulseLocation(location, clientWidth, clientHeight);
       const promises: Promise<void>[] = [];
 
@@ -544,7 +553,7 @@
       }
 
       if (visibility === "maskwave") {
-        if (impulseEasing) {
+        if (impulseEasing !== undefined) {
           opacityWaveMotion = new Tween(0, {
             easing: easingFunctions[impulseEasing],
           });
@@ -561,7 +570,7 @@
         );
         promises.push(maskWave);
       } else if (visibility === "pausedmaskwave") {
-        if (impulseEasing) {
+        if (impulseEasing !== undefined) {
           opacityWaveMotion = new Tween(0, {
             easing: easingFunctions[impulseEasing],
           });
@@ -575,7 +584,7 @@
               ? maskWaveSpeedMultiplier
               : 1),
           0,
-          maskWavePauseValue || 1,
+          maskWavePauseValue ?? 1,
         );
         promises.push(maskWave);
       }
@@ -595,7 +604,7 @@
   };
 
   const handleReset = () => {
-    pointerInside = false;
+    _pointerInside = false;
     resetNodes(springs);
   };
 
@@ -618,7 +627,7 @@
       const dy = pointerY - prevY;
       const dt = now - prevTime;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      pointerSpeed = dist / dt; // px per ms
+      _pointerSpeed = dist / dt; // px per ms
     }
 
     if (now - prevTime > 60 && hoverAction !== "none") {
@@ -741,8 +750,10 @@
 
     if (
       visibility === "maskwave" &&
-      !!clientWidth &&
-      !!clientHeight &&
+      clientWidth !== undefined &&
+      clientWidth > 0 &&
+      clientHeight !== undefined &&
+      clientHeight > 0 &&
       maskWaveThickness !== undefined
     ) {
       drawMovingRingMask(
@@ -762,8 +773,10 @@
 
     if (
       visibility === "pausedmaskwave" &&
-      !!clientWidth &&
-      !!clientHeight &&
+      clientWidth !== undefined &&
+      clientWidth > 0 &&
+      clientHeight !== undefined &&
+      clientHeight > 0 &&
       maskWaveThickness !== undefined
     ) {
       drawMovingRingMask(
@@ -806,9 +819,9 @@
     }
     clearTimeout(resizeTimeout);
     if (backgroundIsVisible) {
-      canvasGlobalOpacity.set(0, { duration: 0 });
+      void canvasGlobalOpacity.set(0, { duration: 0 });
       resizeTimeout = setTimeout(() => {
-        canvasGlobalOpacity.set(100, { duration: 1000 });
+        void canvasGlobalOpacity.set(100, { duration: 1000 });
       }, 10);
     }
   };
@@ -834,8 +847,15 @@
   });
 
   $effect(() => {
-    if (canvasRef && ctx && clientWidth && clientHeight) {
-      dpr = window.devicePixelRatio || 1;
+    if (
+      canvasRef !== undefined &&
+      ctx !== null &&
+      clientWidth !== undefined &&
+      clientWidth > 0 &&
+      clientHeight !== undefined &&
+      clientHeight > 0
+    ) {
+      dpr = window.devicePixelRatio !== 0 ? window.devicePixelRatio : 1;
       canvasRef.width = clientWidth * dpr;
       canvasRef.height = clientHeight * dpr;
       canvasRef.style.width = clientWidth + "px";

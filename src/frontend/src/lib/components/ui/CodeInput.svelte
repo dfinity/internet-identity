@@ -13,6 +13,7 @@
 
   let {
     length,
+    // eslint-disable-next-line no-useless-assignment -- $bindable() default is required so the parent's bind:element can propagate
     element = $bindable(),
     value = $bindable(),
     hint,
@@ -58,7 +59,7 @@
 
 <div {...props} class={["flex flex-col gap-1", className]}>
   <div class="flex gap-2">
-    {#each { length } as _, index}
+    {#each { length } as _, index (index)}
       <Input
         bind:element={
           () => inputRefs[index], (element) => (inputRefs[index] = element)

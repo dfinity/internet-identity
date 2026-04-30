@@ -8,8 +8,11 @@
    *  dropdown when more than one option is available, helping the user
    *  tell same-name values apart by their source. The parent resolves
    *  it (canister-configured for OpenID, two-hop discovery for SSO,
-   *  bare issuer/domain otherwise) and passes the final string. */
+   *  bare issuer/domain otherwise) and passes the final string.
+   *  `id` is opaque to this component — used only as the `{#each}`
+   *  key so reordering / re-selection doesn't tear DOM nodes. */
   export interface PickerOption {
+    id: string;
     value: string;
     providerLabel?: string;
   }
@@ -68,9 +71,9 @@
   // switches, since the label prop is re-evaluated via `$t` on locale swap).
   $effect(() => {
     // Track the reactive inputs that can change text width.
-    label;
-    options[selectedIndex].value;
-    maxLabelWidth;
+    void label;
+    void options[selectedIndex].value;
+    void maxLabelWidth;
     queueMicrotask(checkWrap);
   });
 
@@ -118,7 +121,6 @@
        chevron button; this click handler is mouse-only convenience. -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class={[
       "col-span-full row-start-1 grid grid-cols-subgrid items-center gap-x-3",
@@ -196,7 +198,7 @@
       role="listbox"
       aria-label={label}
     >
-      {#each options as option, index}
+      {#each options as option, index (option.id)}
         <button
           onclick={() => {
             onSelect(index);

@@ -148,7 +148,7 @@
   let clearAnimation = $state<() => void>();
 
   $effect(() => {
-    triggerAnimation?.(DROP_WAVE_ANIMATION);
+    void triggerAnimation?.(DROP_WAVE_ANIMATION);
     return () => {
       clearAnimation?.();
     };
@@ -182,7 +182,7 @@
 
   // Close authentication funnel once completed
   beforeNavigate((navigation) => {
-    if (!navigation.to?.url.pathname.startsWith("/manage")) {
+    if (navigation.to?.url.pathname.startsWith("/manage") !== true) {
       return;
     }
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);

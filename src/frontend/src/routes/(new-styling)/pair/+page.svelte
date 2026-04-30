@@ -14,7 +14,7 @@
 
   let isUnableToComplete = $state(false);
 
-  const handleRegistered = async (identityNumber: bigint) => {
+  const handleRegistered = (identityNumber: bigint) => {
     toaster.success({
       title: $t`You're all set. Your passkey has been registered.`,
     });

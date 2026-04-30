@@ -8,6 +8,10 @@
   import { Trans } from "$lib/components/locale";
 
   const CODE_LENGTH = 6;
+  // Non-breaking space rendered through CodeInput's `hint` slot to reserve
+  // the line's vertical space when no error is shown — keeping the slot
+  // mounted prevents the layout from shifting when the error appears.
+  const HINT_PLACEHOLDER = " ";
 
   interface Props {
     confirm: (confirmationCode: string) => Promise<void>;
@@ -25,7 +29,7 @@
     isConfirming = true;
     try {
       await confirm(confirmationCode);
-    } catch (error) {
+    } catch {
       isInvalidCode = true;
       confirmationCode = "";
     } finally {
@@ -34,7 +38,7 @@
   };
 
   $effect(() => {
-    if (confirmationCode) {
+    if (confirmationCode.length > 0) {
       isInvalidCode = false;
     }
   });
@@ -77,7 +81,7 @@
     error={isInvalidCode
       ? $t`Invalid code. Please check and try again.`
       : undefined}
-    hint={"\u00a0"}
+    hint={HINT_PLACEHOLDER}
     disabled={isConfirming}
   />
   <Button

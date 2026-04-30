@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Render the frontend canister's local init args by substituting the local
+# canister IDs (assigned by icp-cli) into the .template file.
+#
+# Invoked from the `internet_identity_frontend` build step in icp.yaml so
+# `icp deploy` "just works" without the user needing to edit the .did file
+# whenever icp-cli hands out new principals (which it does whenever the
+# local network is recreated). The rendered file is git-ignored.
+#
+# First-time deploy on a fresh network: this script calls
+# `icp canister create` for each canister it depends on so the IDs file
+# exists by the time we read it. `icp canister create` is idempotent for
+# already-created canisters, so subsequent runs are a no-op.
+
+set -euo pipefail
+
+template="src/internet_identity_frontend/local_test_arg.did.template"
+output="src/internet_identity_frontend/local_test_arg.did"
+mappings=".icp/cache/mappings/local.ids.json"
+
+if [ ! -f "$template" ]; then
+  echo "error: $template not found" >&2
+  exit 1
+fi
+
+# Best-effort: ensure the canisters we reference exist so icp-cli has
+# assigned IDs. `icp canister create` only accepts one canister name at
+# a time and is idempotent for already-created canisters. We allow this
+# to fail silently — see the placeholder fallback below — so the script
+# can also be run in bootstrap contexts where the local network isn't up
+# yet (e.g. CI rendering the file before `icp network start` so the
+# `init_args.path` reference in `icp.yaml` resolves on project load).
+for c in internet_identity internet_identity_frontend; do
+  icp canister create "$c" >/dev/null 2>&1 || true
+done
+
+# Fall back to anonymous-principal placeholders when canister IDs aren't
+# yet assigned. The rendered file is only parsed by icp-cli at deploy
+# time, so a stub satisfies the file-exists validation icp-cli runs when
+# loading `icp.yaml`. CI overrides init args via `--args` at
+# `icp canister install`, so the placeholder content is never read there.
+ii_id="aaaaa-aa"
+iif_id="aaaaa-aa"
+if [ -f "$mappings" ]; then
+  ii_id=$(jq -er '.internet_identity' "$mappings")
+  iif_id=$(jq -er '.internet_identity_frontend' "$mappings")
+fi
+
+sed \
+  -e "s|{{INTERNET_IDENTITY_ID}}|$ii_id|g" \
+  -e "s|{{INTERNET_IDENTITY_FRONTEND_ID}}|$iif_id|g" \
+  "$template" \
+  > "$output"
+
+echo "Rendered $output (II=$ii_id, II_FE=$iif_id)"

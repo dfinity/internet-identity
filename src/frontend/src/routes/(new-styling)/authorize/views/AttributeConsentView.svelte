@@ -3,6 +3,7 @@
     AttributeConsent,
     AttributeConsentContext,
   } from "$lib/stores/attributeConsent.store";
+  import { SvelteMap } from "svelte/reactivity";
   import { extractScope } from "$lib/stores/channelHandlers/attributes";
   import { backendCanisterConfig } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
@@ -35,28 +36,28 @@
    * Populated up-front during the skeleton so the first row paint has
    * the discovered names — see the `prepared` promise below.
    */
-  let ssoNamesByDomain = $state<Map<string, string>>(new Map());
+  const ssoNamesByDomain = new SvelteMap<string, string>();
 
   const discoverSsoName = async (domain: string): Promise<void> => {
     if (ssoNamesByDomain.has(domain)) return;
     try {
       const result = await discoverSsoConfig(domain);
       if (result.name !== undefined && result.name.length > 0) {
-        ssoNamesByDomain = new Map(ssoNamesByDomain).set(domain, result.name);
+        ssoNamesByDomain.set(domain, result.name);
       }
     } catch (error) {
       // Non-fatal: the SSO label falls back to the bare domain.
-      // eslint-disable-next-line no-console
       console.error(`Failed to discover SSO name for ${domain}`, error);
     }
   };
 
   const ssoDomainsIn = (groups: MergedGroup[]): string[] => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const domains = new Set<string>();
     for (const group of groups) {
       for (const opt of group.options) {
         const scope = extractScope(opt.display.key);
-        if (scope?.startsWith("sso:")) {
+        if (scope !== undefined && scope.startsWith("sso:")) {
           domains.add(scope.slice("sso:".length));
         }
       }
@@ -79,9 +80,10 @@
     return undefined;
   };
 
-  let selections = $state(
-    new Map<string, { checked: boolean; selectedIndex: number }>(),
-  );
+  const selections = new SvelteMap<
+    string,
+    { checked: boolean; selectedIndex: number }
+  >();
 
   /** Widest label among rows whose `[checkbox][label][value][chevron]`
    *  natural single-line width fits in the picker. Threaded down to
@@ -125,22 +127,17 @@
     const ctx = await context;
     const groups = mergeGroups(ctx.groups);
     await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
-    selections = new Map(
-      groups.map((group) => [
-        groupId(group),
-        { checked: true, selectedIndex: 0 },
-      ]),
-    );
+    selections.clear();
+    for (const group of groups) {
+      selections.set(groupId(group), { checked: true, selectedIndex: 0 });
+    }
     return { groups, effectiveOrigin: ctx.effectiveOrigin };
   })();
 
   const handleDenyAll = (groups: MergedGroup[]) => {
-    selections = new Map(
-      groups.map((group) => [
-        groupId(group),
-        { checked: false, selectedIndex: 0 },
-      ]),
-    );
+    for (const group of groups) {
+      selections.set(groupId(group), { checked: false, selectedIndex: 0 });
+    }
   };
 
   const handleContinue = (groups: MergedGroup[]) => {
@@ -279,6 +276,7 @@
             label={labelForGroup(group)}
             {maxLabelWidth}
             options={group.options.map((o) => ({
+              id: o.display.key,
               value: o.display.displayValue,
               providerLabel: scopedProviderLabel(o.display.key),
             }))}
@@ -286,14 +284,12 @@
             checked={selection.checked}
             onCheck={(checked) => {
               selections.set(id, { ...selection, checked });
-              selections = new Map(selections);
             }}
             onSelect={(index) => {
               selections.set(id, {
                 ...selection,
                 selectedIndex: index,
               });
-              selections = new Map(selections);
             }}
           />
         {/if}

@@ -156,7 +156,7 @@
     {id}
     {...restProps}
     bind:this={tooltipRef}
-    popover={"manual"}
+    popover="manual"
     class="tooltip pointer-events-none fixed overflow-visible bg-transparent"
     role="tooltip"
   >

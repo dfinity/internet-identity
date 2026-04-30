@@ -5,8 +5,6 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import { HelpCircleIcon } from "@lucide/svelte";
-  import { II_SUPPORT_PRIVACY_SECURITY } from "$lib/config";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
