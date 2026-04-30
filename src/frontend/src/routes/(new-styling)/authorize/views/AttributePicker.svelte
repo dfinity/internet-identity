@@ -97,20 +97,9 @@
       class="col-start-1 row-start-1 my-3 ms-3"
       aria-label={$t`Share ${label}`}
     />
-    <!-- When the row's value wraps to a second line, the label spans
-         col 2-3 instead of sitting in col 2 alone — that way it does
-         NOT contribute to col 2's `auto`-sizing across the whole grid,
-         and shorter rows whose values fit can left-align their values
-         right after their own label rather than getting pushed by this
-         row's longer label. -->
-    <span
-      class={[
-        "text-text-secondary row-start-1 my-3 text-sm",
-        wrapped ? "col-span-2 col-start-2 me-3" : "col-start-2",
-      ]}
+    <span class="text-text-secondary col-start-2 row-start-1 my-3 text-sm"
+      >{label}</span
     >
-      {label}
-    </span>
 
     <!-- Invisible probe: always sits in col 3 (matching the unwrapped value's
          cell), so `probeEl.scrollWidth > probeEl.clientWidth` tells us
