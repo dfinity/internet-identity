@@ -72,8 +72,10 @@ type Bucket = {
  *  - Scoped requests bucket by their full requested key so distinct
  *    issuers (e.g. `openid:google:name` vs `openid:apple:name`) stay
  *    separate.
- *  Identical duplicate requests collapse here — their `originals` are
- *  appended to the same per-scope option. */
+ *  Identical duplicate requests collapse here — only the first copy of
+ *  any `(key, omitScope)` tuple makes it into `originals`. Dropping the
+ *  rest avoids sending duplicate specs to the canister, which rejects
+ *  the call with a "duplicate attribute" error otherwise. */
 const bucketize = (groups: AttributeGroup[]): Bucket[] => {
   const byId = new Map<string, Bucket>();
   for (const group of groups) {
@@ -89,7 +91,10 @@ const bucketize = (groups: AttributeGroup[]): Bucket[] => {
       const scope = extractScope(option.key);
       const existing = bucket.options.get(scope);
       if (existing !== undefined) {
-        existing.originals.push(option);
+        const isDuplicate = existing.originals.some(
+          (og) => og.key === option.key && og.omitScope === option.omitScope,
+        );
+        if (!isDuplicate) existing.originals.push(option);
         continue;
       }
       bucket.options.set(scope, { display: option, originals: [option] });

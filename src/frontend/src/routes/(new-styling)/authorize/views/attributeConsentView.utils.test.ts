@@ -102,8 +102,10 @@ describe("mergeGroups — request bucketing", () => {
     ]);
   });
 
-  it("collapses identical duplicate scoped requests but keeps all originals for certification", () => {
-    // A misbehaving dapp asks for the same scoped key twice.
+  it("dedupes identical duplicate scoped requests so the canister only sees one spec", () => {
+    // A misbehaving dapp asks for the same scoped key twice. Sending
+    // both as separate specs trips the canister's "duplicate attribute"
+    // check, so the second occurrence is dropped at bucketize time.
     const dupKey = `openid:${GOOGLE}:name`;
     const groups: AttributeGroup[] = [
       { name: "name", options: [option(dupKey, "Google Name", false)] },
@@ -113,7 +115,34 @@ describe("mergeGroups — request bucketing", () => {
       {
         name: "name",
         omitScope: false,
-        options: [{ display: "Google Name", certifies: [dupKey, dupKey] }],
+        options: [{ display: "Google Name", certifies: [dupKey] }],
+      },
+    ]);
+  });
+
+  it("dedupes identical duplicate unscoped requests across every fan-out scope", () => {
+    // The dapp asks for the same unscoped `email` twice. Without
+    // dedup, every scope the fan-out hits would carry two identical
+    // originals (same key + omit_scope: true), and the canister would
+    // reject the duplicates. Phase 3 collapses identical values across
+    // scopes too, so the final shape ends up at a single spec.
+    const groups = resolveAttributeGroups(
+      ["email", "email"],
+      [
+        [`openid:${GOOGLE}:email`, bytes("a@dfinity.org")],
+        [`sso:${SSO}:email`, bytes("a@dfinity.org")],
+      ],
+    );
+    expect(shape(mergeGroups(groups))).toEqual([
+      {
+        name: "email",
+        omitScope: true,
+        options: [
+          {
+            display: "a@dfinity.org",
+            certifies: [`openid:${GOOGLE}:email`],
+          },
+        ],
       },
     ]);
   });
