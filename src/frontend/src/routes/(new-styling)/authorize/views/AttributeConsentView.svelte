@@ -83,11 +83,13 @@
     new Map<string, { checked: boolean; selectedIndex: number }>(),
   );
 
-  /** Max label width across every consent row, in pixels. Threaded down
-   *  to each `AttributePicker` so its wrap probe simulates the worst-case
-   *  col 2 width — that way a short-label row whose own label fits but
-   *  whose value would still be clipped by the (wider) actual col 2
-   *  correctly chooses to wrap instead of ellipsizing. */
+  /** Widest label among rows whose `[checkbox][label][value][chevron]`
+   *  natural single-line width fits in the picker. Threaded down to
+   *  each `AttributePicker` so its wrap probe pads the label slot to
+   *  this width — matching the col 2 width the actual grid will give
+   *  rows once wrapped rows' labels span out of col 2. Computed only
+   *  from rows that actually fit, so a long label whose value won't fit
+   *  doesn't bloat the alignment column for everyone else. */
   let maxLabelWidth = $state(0);
   let labelProbeEl: HTMLDivElement | undefined = $state();
 
@@ -96,9 +98,14 @@
     if (probe === undefined) return;
     const recompute = () => {
       let max = 0;
-      for (const child of Array.from(probe.children)) {
-        if (child instanceof HTMLElement) {
-          max = Math.max(max, child.offsetWidth);
+      for (const row of Array.from(probe.children)) {
+        if (!(row instanceof HTMLElement)) continue;
+        // Row "fits" iff its natural single-line width is ≤ the panel's
+        // visible width — i.e. nothing overflows when rendered nowrap.
+        if (row.scrollWidth > row.clientWidth) continue;
+        const labelEl = row.querySelector("[data-label]");
+        if (labelEl instanceof HTMLElement) {
+          max = Math.max(max, labelEl.offsetWidth);
         }
       }
       maxLabelWidth = max;
@@ -234,18 +241,32 @@
       {$t`Choose which details you'd like to share`}
     </p>
 
-    <!-- Hidden probe panel: each label rendered with the same `text-sm`
-         styling and `whitespace-nowrap` so its `offsetWidth` is the
-         label's natural single-line width. The `$effect` above reads
-         these and threads `maxLabelWidth` down to every picker so its
-         wrap probe can simulate the actual (worst-case) col 2 width. -->
+    <!-- Hidden probe panel: one full row per group, mirroring picker
+         chrome (checkbox + label + value + optional chevron) on a
+         single nowrap line at the panel's full width. The `$effect`
+         above filters to rows whose natural width fits and takes the
+         max of *those* labels — long labels whose values won't fit
+         (so the row will wrap anyway) don't drive the alignment
+         column. -->
     <div
       bind:this={labelProbeEl}
       aria-hidden="true"
-      class="pointer-events-none invisible absolute h-0 overflow-hidden"
+      class="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
     >
       {#each data.groups as group (groupId(group))}
-        <span class="text-sm whitespace-nowrap">{labelForGroup(group)}</span>
+        <div
+          class="flex items-center gap-x-3 overflow-hidden px-3 whitespace-nowrap"
+        >
+          <span class="size-4 shrink-0"></span>
+          <span class="shrink-0 text-sm" data-label>{labelForGroup(group)}</span
+          >
+          <span class="shrink-0 text-sm font-medium">
+            {group.options[0].display.displayValue}
+          </span>
+          {#if group.options.length > 1}
+            <span class="ms-auto size-6 shrink-0"></span>
+          {/if}
+        </div>
       {/each}
     </div>
 
