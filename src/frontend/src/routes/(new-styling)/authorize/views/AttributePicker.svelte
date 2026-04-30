@@ -21,10 +21,22 @@
     checked: boolean;
     onCheck: (checked: boolean) => void;
     onSelect: (index: number) => void;
+    /** Widest label in the surrounding consent view, in pixels. The wrap
+     *  probe pads its label slot to this width so the row decides
+     *  "wraps?" against the same col 2 width the actual grid layout will
+     *  give it — independent of this row's own label length. */
+    maxLabelWidth: number;
   }
 
-  const { label, options, selectedIndex, checked, onCheck, onSelect }: Props =
-    $props();
+  const {
+    label,
+    options,
+    selectedIndex,
+    checked,
+    onCheck,
+    onSelect,
+    maxLabelWidth,
+  }: Props = $props();
 
   let isOpen = $state(false);
 
@@ -58,6 +70,7 @@
     // Track the reactive inputs that can change text width.
     label;
     options[selectedIndex].value;
+    maxLabelWidth;
     queueMicrotask(checkWrap);
   });
 
@@ -91,7 +104,9 @@
     class="pointer-events-none invisible absolute inset-x-0 top-0 flex h-0 items-center gap-x-3 overflow-hidden px-3 whitespace-nowrap"
   >
     <span class="size-4 shrink-0"></span>
-    <span class="text-sm">{label}</span>
+    <span class="shrink-0 text-sm" style:min-width="{maxLabelWidth}px"
+      >{label}</span
+    >
     <span class="text-sm font-medium">{options[selectedIndex].value}</span>
     {#if options.length > 1}
       <span class="ms-auto size-6 shrink-0"></span>

@@ -83,6 +83,32 @@
     new Map<string, { checked: boolean; selectedIndex: number }>(),
   );
 
+  /** Max label width across every consent row, in pixels. Threaded down
+   *  to each `AttributePicker` so its wrap probe simulates the worst-case
+   *  col 2 width — that way a short-label row whose own label fits but
+   *  whose value would still be clipped by the (wider) actual col 2
+   *  correctly chooses to wrap instead of ellipsizing. */
+  let maxLabelWidth = $state(0);
+  let labelProbeEl: HTMLDivElement | undefined = $state();
+
+  $effect(() => {
+    const probe = labelProbeEl;
+    if (probe === undefined) return;
+    const recompute = () => {
+      let max = 0;
+      for (const child of Array.from(probe.children)) {
+        if (child instanceof HTMLElement) {
+          max = Math.max(max, child.offsetWidth);
+        }
+      }
+      maxLabelWidth = max;
+    };
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(probe);
+    return () => ro.disconnect();
+  });
+
   /** Resolves only when the consent rows are fully ready to render:
    *  attribute groups computed, SSO provider names discovered, and
    *  `selections` initialised. Gating the template on this promise
@@ -208,6 +234,21 @@
       {$t`Choose which details you'd like to share`}
     </p>
 
+    <!-- Hidden probe panel: each label rendered with the same `text-sm`
+         styling and `whitespace-nowrap` so its `offsetWidth` is the
+         label's natural single-line width. The `$effect` above reads
+         these and threads `maxLabelWidth` down to every picker so its
+         wrap probe can simulate the actual (worst-case) col 2 width. -->
+    <div
+      bind:this={labelProbeEl}
+      aria-hidden="true"
+      class="pointer-events-none invisible absolute h-0 overflow-hidden"
+    >
+      {#each data.groups as group (groupId(group))}
+        <span class="text-sm whitespace-nowrap">{labelForGroup(group)}</span>
+      {/each}
+    </div>
+
     <div class="mb-4 grid w-full grid-cols-[auto_auto_1fr_auto] gap-y-1">
       {#each data.groups as group (groupId(group))}
         {@const id = groupId(group)}
@@ -215,6 +256,7 @@
         {#if selection !== undefined}
           <AttributePicker
             label={labelForGroup(group)}
+            {maxLabelWidth}
             options={group.options.map((o) => ({
               value: o.display.displayValue,
               providerLabel: scopedProviderLabel(o.display.key),
