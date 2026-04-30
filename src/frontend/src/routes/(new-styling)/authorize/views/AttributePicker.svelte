@@ -28,15 +28,17 @@
 
   let isOpen = $state(false);
 
-  /** True when the value doesn't fit in col 3 and should move below the
-   *  label on its own row. Decided by an invisible probe span kept in col 3
-   *  row 1 regardless of layout state; we compare its natural text width
-   *  (scrollWidth) to the column's rendered width (clientWidth). A
-   *  ResizeObserver on the row keeps this reactive to viewport changes,
-   *  locale changes, and value changes. */
+  /** True when the row's `[checkbox] [label] [value] [chevron?]` content
+   *  doesn't fit on a single line and the value should drop to its own
+   *  row. The probe mirrors the actual row's chrome and stays
+   *  `whitespace-nowrap`, so its `scrollWidth` is the natural single-
+   *  line width. Comparing to its `clientWidth` (= the picker's content
+   *  width) gives a wrap decision that depends only on the picker's
+   *  outer width — never on col 2's auto-sizing inside the grid — so
+   *  toggling `wrapped` doesn't feed back into the column widths and
+   *  trigger oscillation. */
   let wrapped = $state(false);
-  let rowEl: HTMLDivElement | undefined = $state();
-  let probeEl: HTMLSpanElement | undefined = $state();
+  let probeEl: HTMLDivElement | undefined = $state();
 
   const checkWrap = (): void => {
     if (probeEl === undefined) return;
@@ -44,9 +46,9 @@
   };
 
   $effect(() => {
-    if (rowEl === undefined) return;
+    if (probeEl === undefined) return;
     const ro = new ResizeObserver(checkWrap);
-    ro.observe(rowEl);
+    ro.observe(probeEl);
     return () => ro.disconnect();
   });
 
@@ -72,11 +74,30 @@
 </script>
 
 <div
-  bind:this={rowEl}
-  class="border-border-secondary col-span-full grid min-w-0 grid-cols-subgrid overflow-hidden rounded-lg border"
+  class="border-border-secondary relative col-span-full grid min-w-0 grid-cols-subgrid overflow-hidden rounded-lg border"
   role="group"
   aria-label={label}
 >
+  <!-- Wrap-detection probe: absolutely-positioned, takes the picker's full
+       inner width, mirrors the row's chrome (checkbox + label + value
+       + optional chevron) on a single nowrap line. `scrollWidth > clientWidth`
+       means the natural line is wider than the picker, so the value should
+       drop to its own row. The probe lives outside the grid so its size is
+       independent of col-2's auto-sizing — toggling `wrapped` can't feed
+       back into the column widths. -->
+  <div
+    bind:this={probeEl}
+    aria-hidden="true"
+    class="pointer-events-none invisible absolute inset-x-0 top-0 flex h-0 items-center gap-x-3 overflow-hidden px-3 whitespace-nowrap"
+  >
+    <span class="size-4 shrink-0"></span>
+    <span class="text-sm">{label}</span>
+    <span class="text-sm font-medium">{options[selectedIndex].value}</span>
+    {#if options.length > 1}
+      <span class="ms-auto size-6 shrink-0"></span>
+    {/if}
+  </div>
+
   <!-- Row-1 wrapper owns the hover/click, so the background doesn't bleed
        into the dropdown area below. Keyboard users toggle via the focusable
        chevron button; this click handler is mouse-only convenience. -->
@@ -97,22 +118,19 @@
       class="col-start-1 row-start-1 my-3 ms-3"
       aria-label={$t`Share ${label}`}
     />
-    <span class="text-text-secondary col-start-2 row-start-1 my-3 text-sm"
-      >{label}</span
-    >
-
-    <!-- Invisible probe: always sits in col 3 (matching the unwrapped value's
-         cell), so `probeEl.scrollWidth > probeEl.clientWidth` tells us
-         whether the value would overflow regardless of wrap state. -->
+    <!-- When this row's value drops to its own line, span the label across
+         cols 2-3 so it doesn't contribute to col-2's `auto`-sizing. Col 2
+         then sizes only from rows whose values fit on one line, and those
+         shorter rows can left-align their values right after their own
+         label. Safe from oscillation because the wrap probe above measures
+         independently of col-2 width. -->
     <span
-      bind:this={probeEl}
-      aria-hidden="true"
       class={[
-        "invisible col-start-3 row-start-1 h-0 overflow-hidden text-sm font-medium whitespace-nowrap",
-        options.length <= 1 && "col-span-2 me-3",
+        "text-text-secondary row-start-1 my-3 text-sm",
+        wrapped ? "col-span-2 col-start-2 me-3" : "col-start-2",
       ]}
     >
-      {options[selectedIndex].value}
+      {label}
     </span>
 
     {#if !wrapped}
