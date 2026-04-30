@@ -541,8 +541,15 @@ EOF
 }
 
 # -------------------------
-# icp install runner (honours DRY_RUN)
+# Wallet-proxied install runner (honours DRY_RUN)
 # -------------------------
+# Falls back to dfx for the actual upgrade because the staging canisters
+# are controlled by a dfx wallet (`cvthj-wyaaa-aaaad-aaaaq-cai`) that
+# routes via `wallet_call`. icp-cli's `--proxy` expects a custom proxy
+# canister exposing a `proxy` method instead, so pointing it at the
+# wallet trips `Canister has no update method 'proxy'`. See PR #3815
+# where the same pattern was applied to `make-upgrade-proposal`.
+#
 # Args: <canister_id> <wasm_path> <install_arg_candid_text>
 run_icp_install() {
     local canister_id="$1"
@@ -554,24 +561,14 @@ run_icp_install() {
         return 1
     fi
 
-    # `icp canister install` loads `icp.yaml`, which references
-    # `init_args.path: src/internet_identity_frontend/local_test_arg.did` —
-    # a gitignored file rendered from the `.template` by
-    # `scripts/render-local-init-args`. On a fresh checkout (CI artifacts,
-    # someone who's never run `icp deploy` locally, etc.) the file doesn't
-    # exist and the project fails to load. Render a stub up-front so the
-    # install can always parse the project; we override init args via
-    # `--args` below, so the stub's content is never read.
-    "$SCRIPTS_DIR/render-local-init-args" >/dev/null
-
     local cmd=(
-        icp canister
+        dfx canister
+            --network "$IC_NETWORK"
+            --wallet "$WALLET_CANISTER_ID"
             install "$canister_id"
-            -e "$IC_NETWORK"
-            --proxy "$WALLET_CANISTER_ID"
             --mode upgrade
             --wasm "$wasm_path"
-            --args "$install_arg"
+            --argument "$install_arg"
     )
 
     if [ "$DRY_RUN" = true ]; then
