@@ -84,8 +84,13 @@ fi
 echo "  PR #$PR_NUMBER → branch '$BRANCH'"
 
 echo "Fetching workflow runs for branch '$BRANCH'..."
+# `canister-tests.yml` only triggers on `push` for `main` and release tags;
+# every other branch goes through the `pull_request` event. Filtering the
+# API call by `event=push` therefore returns nothing for PR branches —
+# leave the event open and let the jq filter below pick the right
+# workflow by path, regardless of trigger.
 RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
-    "https://api.github.com/repos/$REPO/actions/runs?event=push&branch=$BRANCH&per_page=100" \
+    "https://api.github.com/repos/$REPO/actions/runs?branch=$BRANCH&per_page=100" \
     | jq -r --arg WF "$WORKFLOW_FILE" '
         [.workflow_runs[]
             | select(.path == (".github/workflows/" + $WF))
