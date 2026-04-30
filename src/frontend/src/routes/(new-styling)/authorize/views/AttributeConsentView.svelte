@@ -215,7 +215,10 @@
         {#if selection !== undefined}
           <AttributePicker
             label={labelForGroup(group)}
-            options={group.options.map((o) => o.display)}
+            options={group.options.map((o) => ({
+              value: o.display.displayValue,
+              providerLabel: scopedProviderLabel(o.display.key),
+            }))}
             selectedIndex={selection.selectedIndex}
             checked={selection.checked}
             onCheck={(checked) => {

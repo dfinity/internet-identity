@@ -1,14 +1,22 @@
 <script lang="ts">
-  import type { AvailableAttribute } from "$lib/stores/attributeConsent.store";
-  import { extractScope } from "$lib/stores/channelHandlers/attributes";
-  import { backendCanisterConfig } from "$lib/globals";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
 
+  /** One row in the picker. `value` is the user-visible string. The
+   *  optional `providerLabel` is shown as a secondary tag in the
+   *  dropdown when more than one option is available, helping the user
+   *  tell same-name values apart by their source. The parent resolves
+   *  it (canister-configured for OpenID, two-hop discovery for SSO,
+   *  bare issuer/domain otherwise) and passes the final string. */
+  export interface PickerOption {
+    value: string;
+    providerLabel?: string;
+  }
+
   interface Props {
     label: string;
-    options: AvailableAttribute[];
+    options: PickerOption[];
     selectedIndex: number;
     checked: boolean;
     onCheck: (checked: boolean) => void;
@@ -47,20 +55,9 @@
   $effect(() => {
     // Track the reactive inputs that can change text width.
     label;
-    options[selectedIndex].displayValue;
+    options[selectedIndex].value;
     queueMicrotask(checkWrap);
   });
-
-  const getProviderName = (key: string): string | undefined => {
-    const scope = extractScope(key);
-    if (scope === undefined || !scope.startsWith("openid:")) {
-      return undefined;
-    }
-    const issuer = scope.slice("openid:".length);
-    return backendCanisterConfig.openid_configs[0]?.find(
-      (c) => c.issuer === issuer,
-    )?.name;
-  };
 
   /** Toggle the dropdown when the click landed on a non-interactive part of
    *  the row (i.e. not on the checkbox, chevron, or a dropdown option). The
@@ -115,7 +112,7 @@
         options.length <= 1 && "col-span-2 me-3",
       ]}
     >
-      {options[selectedIndex].displayValue}
+      {options[selectedIndex].value}
     </span>
 
     {#if !wrapped}
@@ -125,7 +122,7 @@
           options.length <= 1 && "col-span-2 me-3",
         ]}
       >
-        {options[selectedIndex].displayValue}
+        {options[selectedIndex].value}
       </span>
     {/if}
 
@@ -155,7 +152,7 @@
       <span
         class="text-text-primary col-span-3 col-start-2 row-start-2 me-3 -mt-2 mb-3 text-sm font-medium break-all"
       >
-        {options[selectedIndex].displayValue}
+        {options[selectedIndex].value}
       </span>
     {/if}
   </div>
@@ -167,7 +164,6 @@
       aria-label={label}
     >
       {#each options as option, index}
-        {@const providerName = getProviderName(option.key)}
         <button
           onclick={() => {
             onSelect(index);
@@ -183,11 +179,11 @@
           aria-selected={index === selectedIndex}
         >
           <span class="text-text-primary text-sm font-medium">
-            {option.displayValue}
+            {option.value}
           </span>
-          {#if providerName !== undefined}
+          {#if option.providerLabel !== undefined}
             <span class="text-text-tertiary text-sm">
-              {providerName}
+              {option.providerLabel}
             </span>
           {/if}
           {#if index === selectedIndex}
