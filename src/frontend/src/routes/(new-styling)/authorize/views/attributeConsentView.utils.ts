@@ -157,24 +157,20 @@ const mergeEmailWithVerifiedEmail = (buckets: Bucket[]): Bucket[] => {
 
 /** Phase 3. Collapse an unscoped fan-out whose every option carries the
  *  same displayed value into a single option — picking between identical
- *  values isn't a meaningful choice for the user. All originals merge
- *  in so every scope still gets certified. */
+ *  values isn't a meaningful choice for the user. We keep the first
+ *  option as-is (display + originals) and drop the rest: every dropped
+ *  option would have produced the same canister output (same attribute
+ *  name + same `omit_scope: true` + same value, just from different
+ *  scopes), so certifying them all is wasteful and surprises the user
+ *  who only saw — and approved — one row. */
 const collapseIdenticalUnscopedValues = (buckets: Bucket[]): Bucket[] => {
   for (const bucket of buckets) {
     if (!bucket.omitScope || bucket.options.size <= 1) continue;
     const options = [...bucket.options.values()];
     const firstValue = options[0].display.displayValue;
     if (!options.every((o) => o.display.displayValue === firstValue)) continue;
-    const firstScope = [...bucket.options.keys()][0];
-    bucket.options = new Map([
-      [
-        firstScope,
-        {
-          display: options[0].display,
-          originals: options.flatMap((o) => o.originals),
-        },
-      ],
-    ]);
+    const [firstScope] = bucket.options.keys();
+    bucket.options = new Map([[firstScope, options[0]]]);
   }
   return buckets;
 };

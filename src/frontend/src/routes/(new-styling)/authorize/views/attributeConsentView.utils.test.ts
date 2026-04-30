@@ -385,7 +385,11 @@ describe("mergeGroups — identical-value collapse for unscoped fan-outs", () =>
   it("collapses an unscoped fan-out whose every scope returns the same value", () => {
     // The same email is published under three different scopes — picking
     // between three identical values isn't a meaningful choice, so the
-    // row collapses to one option that certifies all three originals.
+    // row collapses to one option. Only the first scope's original is
+    // certified: every dropped option would have produced the same
+    // canister output (`email = a@dfinity.org` with `omit_scope: true`),
+    // so sending all three would just be redundant work the user never
+    // implicitly approved (they only saw one row).
     const groups = resolveAttributeGroups(
       ["email"],
       [
@@ -401,11 +405,7 @@ describe("mergeGroups — identical-value collapse for unscoped fan-outs", () =>
         options: [
           {
             display: "a@dfinity.org",
-            certifies: [
-              `openid:${GOOGLE}:email`,
-              `openid:${APPLE}:email`,
-              `sso:${SSO}:email`,
-            ].sort(),
+            certifies: [`openid:${GOOGLE}:email`],
           },
         ],
       },
