@@ -14,9 +14,14 @@
 
 set -euo pipefail
 
-template="src/internet_identity_frontend/local_test_arg.did.template"
-output="src/internet_identity_frontend/local_test_arg.did"
-mappings=".icp/cache/mappings/local.ids.json"
+# Resolve paths relative to the repo root (this script's parent) so the
+# script works regardless of the caller's cwd — both `icp deploy`
+# (which invokes us from the project root) and the deploy helpers in
+# `scripts/deploy-*-to-beta` (which may not cd) end up in the right place.
+ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+template="$ROOT_DIR/src/internet_identity_frontend/local_test_arg.did.template"
+output="$ROOT_DIR/src/internet_identity_frontend/local_test_arg.did"
+mappings="$ROOT_DIR/.icp/cache/mappings/local.ids.json"
 
 if [ ! -f "$template" ]; then
   echo "error: $template not found" >&2

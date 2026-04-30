@@ -554,6 +554,16 @@ run_icp_install() {
         return 1
     fi
 
+    # `icp canister install` loads `icp.yaml`, which references
+    # `init_args.path: src/internet_identity_frontend/local_test_arg.did` —
+    # a gitignored file rendered from the `.template` by
+    # `scripts/render-local-init-args`. On a fresh checkout (CI artifacts,
+    # someone who's never run `icp deploy` locally, etc.) the file doesn't
+    # exist and the project fails to load. Render a stub up-front so the
+    # install can always parse the project; we override init args via
+    # `--args` below, so the stub's content is never read.
+    "$SCRIPTS_DIR/render-local-init-args" >/dev/null
+
     local cmd=(
         icp canister
             install "$canister_id"
