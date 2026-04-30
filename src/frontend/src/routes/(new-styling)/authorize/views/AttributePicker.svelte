@@ -152,8 +152,12 @@
     {/if}
 
     {#if wrapped}
+      <!-- Negative top margin pulls the value back toward the label.
+           Row-1's height is dictated by the checkbox's `my-3`, so a
+           naïve row-2 with no top margin still leaves ~12px of empty
+           space; -mt-2 shaves that down to a tight ~4px gap. -->
       <span
-        class="text-text-primary col-span-3 col-start-2 row-start-2 me-3 mb-3 text-sm font-medium break-all"
+        class="text-text-primary col-span-3 col-start-2 row-start-2 me-3 -mt-2 mb-3 text-sm font-medium break-all"
       >
         {options[selectedIndex].displayValue}
       </span>
