@@ -3,6 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils";
 import type { Identity, SignIdentity } from "@icp-sdk/core/agent";
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import {
+  AttributesIdentity,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -20,7 +21,6 @@ import {
   extractDelegation,
   Icrc3Attributes,
 } from "./auth";
-import { AttributeIdentity } from "./attributeIdentity";
 import { formatIcrc3Attributes } from "./icrc3";
 
 import "./main.css";
@@ -118,7 +118,7 @@ let delegationIdentity: DelegationIdentity | undefined = undefined;
 
 // The most recently received ICRC-3 attribute bundle, kept around so the
 // "Send attributes to canister" button can wrap the delegation identity in
-// `AttributeIdentity` and replay them against the test_app canister.
+// `AttributesIdentity` and replay them against the test_app canister.
 let latestIcrc3Attributes: Icrc3Attributes | undefined = undefined;
 
 // The local, ephemeral key-pair
@@ -519,7 +519,7 @@ sendAttributesBtn.addEventListener("click", async () => {
   }
 
   const canisterId = Principal.fromText(readCanisterId());
-  const identity = new AttributeIdentity({
+  const identity = new AttributesIdentity({
     inner: delegationIdentity,
     attributes: latestIcrc3Attributes,
     signer: { canisterId: Principal.fromText(iiCanisterIdText) },

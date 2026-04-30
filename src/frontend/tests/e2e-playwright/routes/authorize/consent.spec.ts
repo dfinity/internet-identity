@@ -58,7 +58,7 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
 test.describe("Authorize — explicit consent UI", () => {
   // Round-trip verification: every test in this spec that exercises an
   // ICRC-3 attribute flow must end with the same attributes echoed back
-  // from the test_app canister via `AttributeIdentity`. This proves the
+  // from the test_app canister via `AttributesIdentity`. This proves the
   // attribute bundle is propagated end-to-end (II → frontend →
   // sender_info → IC verification → canister → response) and not just
   // surfaced in the postMessage authorize response.

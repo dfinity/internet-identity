@@ -49,17 +49,17 @@ export const test = base.extend<{
    * frontend canister rewrites the served HTML to embed the backend
    * canister id there at request time). Used by
    * {@link canisterEchoedIcrc3Attributes} as the `signer` for the
-   * `AttributeIdentity` round-trip.
+   * `AttributesIdentity` round-trip.
    */
   iiBackendCanisterId: Principal;
   /**
    * Triggers the test_app's "Send attributes to canister" flow against
-   * the test_app canister using `AttributeIdentity` wrapping the
+   * the test_app canister using `AttributesIdentity` wrapping the
    * delegation identity. Returns the canister-echoed attribute map
    * (parsed from `caller_attributes`'s response) as plain string
    * entries, or `undefined` if the prior auth flow didn't produce an
    * ICRC-3 bundle. Makes the round-trip from II → frontend →
-   * AttributeIdentity → canister observable in tests so the consent
+   * AttributesIdentity → canister observable in tests so the consent
    * specs can assert end-to-end attribute delivery.
    */
   canisterEchoedIcrc3Attributes: Record<string, string> | undefined;
