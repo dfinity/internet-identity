@@ -294,10 +294,14 @@ test.describe("Authorize with 1-click OpenID", () => {
       const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       // Mixing 1-click-eligible keys with non-eligible / unknown ones takes
-      // the consent path instead of 1-click. The defaults (all options
-      // checked, first provider selected for the `name` picker) match the
-      // assertions below — just accept.
-      await consent.accept();
+      // the consent path instead of 1-click. The two scoped `name`
+      // requests render as separate rows (one per requested issuer); the
+      // user has to explicitly uncheck the alternate-issuer row to keep
+      // it out of the certified payload, which is what the assertions
+      // below verify.
+      await consent.waitForVisible();
+      await consent.uncheckRow(`Test OpenID ${ALTERNATE_OPENID_PORT} name:`);
+      await consent.continue();
     });
   });
 
