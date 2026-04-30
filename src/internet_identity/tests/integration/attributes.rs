@@ -599,6 +599,7 @@ fn should_get_icrc3_certified_attributes() {
         identity_number,
         origin: origin.to_string(),
         account_number: None,
+        unmapped_origin: None,
         attributes: vec![
             AttributeSpec {
                 key: "openid:https://accounts.google.com:email".into(),
@@ -752,6 +753,7 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
         identity_number,
         origin: origin.to_string(),
         account_number: None,
+        unmapped_origin: None,
         attributes: vec![
             AttributeSpec {
                 key: "openid:https://accounts.google.com:email".into(),
@@ -893,6 +895,7 @@ fn should_return_no_such_signature_for_unknown_message() {
         identity_number,
         origin: origin.to_string(),
         account_number: None,
+        unmapped_origin: None,
         attributes: vec![AttributeSpec {
             key: "openid:https://accounts.google.com:email".into(),
             value: None,
@@ -1123,6 +1126,7 @@ fn icrc3_test_vectors() {
             identity_number,
             origin: origin.to_string(),
             account_number: None,
+            unmapped_origin: None,
             attributes: attributes.clone(),
             nonce: nonce.clone(),
         };
@@ -1514,6 +1518,7 @@ fn should_return_error_for_unavailable_icrc3_attributes() {
         identity_number,
         origin: origin.to_string(),
         account_number: None,
+        unmapped_origin: None,
         attributes: vec![
             AttributeSpec {
                 key: "openid:https://accounts.google.com:email".into(),

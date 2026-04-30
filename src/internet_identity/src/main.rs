@@ -1465,6 +1465,7 @@ mod attribute_sharing {
         let ValidatedPrepareIcrc3AttributeRequest {
             identity_number,
             origin,
+            unmapped_origin,
             account_number,
             attributes,
             nonce,
@@ -1486,6 +1487,7 @@ mod attribute_sharing {
             attributes,
             nonce,
             origin,
+            unmapped_origin,
             issued_at_timestamp_ns,
             account,
         )?;

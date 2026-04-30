@@ -19,6 +19,40 @@ pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
 /// fully-qualified DNS name, only a reasonable cap.
 pub const SSO_DOMAIN_MAX_BYTES: usize = 253;
 
+/// Mirror of the frontend's `remapToLegacyDomain`: the frontend rewrites
+/// `https://<sub>.icp0.io` to `https://<sub>.ic0.app` before deriving a
+/// principal so users get the same principal across the two domains. The
+/// canister needs the same transformation to verify that an `unmapped_origin`
+/// supplied alongside the (legacy-mapped) `origin` is just the icp0.io form
+/// of the same site, not a different origin sneaking into the certified
+/// `implicit:origin`.
+///
+/// The accepted shape — `<subdomain>(.raw)?` containing only ASCII word
+/// characters or `-` — matches the regex `^https://([\w-]+(?:\.raw)?)\.icp0\.io$`
+/// used in the frontend.
+pub fn remap_to_legacy_domain(origin: &str) -> String {
+    const PREFIX: &str = "https://";
+    const ICP0_SUFFIX: &str = ".icp0.io";
+
+    let Some(rest) = origin.strip_prefix(PREFIX) else {
+        return origin.to_string();
+    };
+    let Some(subdomain) = rest.strip_suffix(ICP0_SUFFIX) else {
+        return origin.to_string();
+    };
+
+    let base = subdomain.strip_suffix(".raw").unwrap_or(subdomain);
+    let valid = !base.is_empty()
+        && base
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if !valid {
+        return origin.to_string();
+    }
+
+    format!("{PREFIX}{subdomain}.ic0.app")
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub enum AttributeName {
     Email,
@@ -606,6 +640,12 @@ pub const ICRC3_NONCE_BYTES: usize = 32;
 pub struct PrepareIcrc3AttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
+    /// The relying party's actual origin, before the legacy `icp0.io → ic0.app`
+    /// remap that `origin` may have gone through for principal stability. When
+    /// provided, this value is what gets certified as `implicit:origin`. The
+    /// canister verifies that mapping `unmapped_origin` through the same legacy
+    /// remap yields `origin`, so an RP can't certify an arbitrary value here.
+    pub unmapped_origin: Option<FrontendHostname>,
     pub account_number: Option<AccountNumber>,
     pub attributes: Vec<AttributeSpec>,
     pub nonce: Vec<u8>,
@@ -615,6 +655,7 @@ pub struct PrepareIcrc3AttributeRequest {
 pub struct ValidatedPrepareIcrc3AttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
+    pub unmapped_origin: Option<FrontendHostname>,
     pub account_number: Option<AccountNumber>,
     pub attributes: Vec<ValidatedAttributeSpec>,
     pub nonce: Vec<u8>,
@@ -627,6 +668,7 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
         let PrepareIcrc3AttributeRequest {
             identity_number,
             origin,
+            unmapped_origin,
             account_number,
             attributes: unparsed_attributes,
             nonce,
@@ -648,6 +690,21 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
                 origin.len(),
                 FRONTEND_HOSTNAME_MAX_BYTES
             ));
+        }
+
+        if let Some(ref unmapped) = unmapped_origin {
+            if unmapped.len() > FRONTEND_HOSTNAME_MAX_BYTES {
+                problems.push(format!(
+                    "Unmapped origin length {} exceeds limit of {} bytes",
+                    unmapped.len(),
+                    FRONTEND_HOSTNAME_MAX_BYTES
+                ));
+            } else if remap_to_legacy_domain(unmapped) != origin {
+                problems.push(format!(
+                    "Unmapped origin {} is not related to origin {}",
+                    unmapped, origin
+                ));
+            }
         }
 
         if unparsed_attributes.len() > MAX_ATTRIBUTES_PER_REQUEST {
@@ -694,6 +751,7 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
         Ok(Self {
             identity_number,
             origin,
+            unmapped_origin,
             account_number,
             attributes,
             nonce,
@@ -1828,6 +1886,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![make_spec(
                             "openid:https://google.com:email",
                             Some(b"user@example.com"),
@@ -1843,6 +1902,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![make_spec("openid:https://google.com:email", None, false)],
                         nonce: vec![0u8; 32],
                     },
@@ -1854,6 +1914,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![make_spec("openid:https://google.com:email", None, true)],
                         nonce: vec![0u8; 32],
                     },
@@ -1865,6 +1926,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: Some(42),
+                        unmapped_origin: None,
                         attributes: vec![
                             make_spec(
                                 "openid:https://google.com:email",
@@ -1883,6 +1945,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![],
                         nonce: vec![0u8; 32],
                     },
@@ -1908,6 +1971,7 @@ mod tests {
                 identity_number: 123,
                 origin: "example.com".to_string(),
                 account_number: None,
+                unmapped_origin: None,
                 attributes: vec![
                     make_spec("openid:https://google.com:email", None, true),
                     make_spec("openid:https://google.com:name", None, false),
@@ -1925,6 +1989,7 @@ mod tests {
                 identity_number: 123,
                 origin: "example.com".to_string(),
                 account_number: None,
+                unmapped_origin: None,
                 attributes: vec![
                     make_spec(
                         "openid:https://google.com:email",
@@ -1955,6 +2020,7 @@ mod tests {
                         identity_number: 123,
                         origin: long_origin.clone(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![],
                         nonce: vec![0u8; 32],
                     },
@@ -1970,6 +2036,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: (0..=MAX_ATTRIBUTES_PER_REQUEST)
                             .map(|_| make_spec("openid:https://google.com:email", None, false))
                             .collect(),
@@ -1987,6 +2054,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![make_spec("invalid_key", None, false)],
                         nonce: vec![0u8; 32],
                     },
@@ -1998,6 +2066,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![AttributeSpec {
                             key: "openid:https://google.com:email".to_string(),
                             value: Some(long_value.clone()),
@@ -2017,6 +2086,7 @@ mod tests {
                         identity_number: 123,
                         origin: long_origin.clone(),
                         account_number: None,
+                        unmapped_origin: None,
                         attributes: vec![make_spec("bad_key", None, false)],
                         nonce: vec![0u8; 32],
                     },
@@ -2053,6 +2123,158 @@ mod tests {
                     other => panic!("Expected validation error for {}, got {:?}", label, other),
                 }
             }
+        }
+
+        #[test]
+        fn test_unmapped_origin_accepted_when_remap_matches_origin() {
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "https://foo.ic0.app".to_string(),
+                unmapped_origin: Some("https://foo.icp0.io".to_string()),
+                account_number: None,
+                attributes: vec![],
+                nonce: vec![0u8; 32],
+            };
+            let validated =
+                ValidatedPrepareIcrc3AttributeRequest::try_from(request).expect("should validate");
+            pretty_assert_eq!(
+                validated.unmapped_origin,
+                Some("https://foo.icp0.io".to_string())
+            );
+        }
+
+        #[test]
+        fn test_unmapped_origin_accepted_when_equal_to_origin() {
+            // For non-icp0.io origins, the frontend's remap is a no-op, so
+            // `unmapped_origin == origin` is the expected case.
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "https://example.com".to_string(),
+                unmapped_origin: Some("https://example.com".to_string()),
+                account_number: None,
+                attributes: vec![],
+                nonce: vec![0u8; 32],
+            };
+            ValidatedPrepareIcrc3AttributeRequest::try_from(request).expect("should validate");
+        }
+
+        #[test]
+        fn test_unmapped_origin_rejected_when_unrelated_to_origin() {
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "https://foo.ic0.app".to_string(),
+                unmapped_origin: Some("https://evil.com".to_string()),
+                account_number: None,
+                attributes: vec![],
+                nonce: vec![0u8; 32],
+            };
+            let err = ValidatedPrepareIcrc3AttributeRequest::try_from(request).unwrap_err();
+            match err {
+                PrepareIcrc3AttributeError::ValidationError { problems } => {
+                    assert!(
+                        problems
+                            .iter()
+                            .any(|p| p.contains("not related to origin")),
+                        "expected 'not related to origin' problem, got {:?}",
+                        problems
+                    );
+                }
+                other => panic!("Expected ValidationError, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn test_unmapped_origin_too_long_rejected() {
+            let long = format!("https://{}.com", "x".repeat(FRONTEND_HOSTNAME_MAX_BYTES));
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "https://example.com".to_string(),
+                unmapped_origin: Some(long.clone()),
+                account_number: None,
+                attributes: vec![],
+                nonce: vec![0u8; 32],
+            };
+            let err = ValidatedPrepareIcrc3AttributeRequest::try_from(request).unwrap_err();
+            match err {
+                PrepareIcrc3AttributeError::ValidationError { problems } => {
+                    assert!(
+                        problems
+                            .iter()
+                            .any(|p| p.contains("Unmapped origin length")),
+                        "expected length problem, got {:?}",
+                        problems
+                    );
+                }
+                other => panic!("Expected ValidationError, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn test_unmapped_origin_none_is_accepted() {
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "https://foo.ic0.app".to_string(),
+                unmapped_origin: None,
+                account_number: None,
+                attributes: vec![],
+                nonce: vec![0u8; 32],
+            };
+            let validated =
+                ValidatedPrepareIcrc3AttributeRequest::try_from(request).expect("should validate");
+            assert!(validated.unmapped_origin.is_none());
+        }
+    }
+
+    mod remap_to_legacy_domain_tests {
+        use super::*;
+
+        #[test]
+        fn maps_icp0_io_subdomain_to_ic0_app() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://foo.icp0.io"),
+                "https://foo.ic0.app"
+            );
+        }
+
+        #[test]
+        fn maps_raw_subdomain() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://foo.raw.icp0.io"),
+                "https://foo.raw.ic0.app"
+            );
+        }
+
+        #[test]
+        fn allows_underscore_and_hyphen_in_subdomain() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://my-app_1.icp0.io"),
+                "https://my-app_1.ic0.app"
+            );
+        }
+
+        #[test]
+        fn leaves_non_icp0_origin_unchanged() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://example.com"),
+                "https://example.com"
+            );
+        }
+
+        #[test]
+        fn rejects_extra_subdomain_levels() {
+            // `foo.bar` is not `[\w-]+(?:\.raw)?`, so the input passes through.
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://foo.bar.icp0.io"),
+                "https://foo.bar.icp0.io"
+            );
+        }
+
+        #[test]
+        fn rejects_http_scheme() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("http://foo.icp0.io"),
+                "http://foo.icp0.io"
+            );
         }
     }
 
