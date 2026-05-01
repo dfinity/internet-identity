@@ -539,6 +539,7 @@ export const idlFactory = ({ IDL }) => {
     'omit_scope' : IDL.Bool,
   });
   const PrepareIcrc3AttributeRequest = IDL.Record({
+    'unmapped_origin' : IDL.Opt(FrontendHostname),
     'origin' : FrontendHostname,
     'account_number' : IDL.Opt(AccountNumber),
     'attributes' : IDL.Vec(AttributeSpec),

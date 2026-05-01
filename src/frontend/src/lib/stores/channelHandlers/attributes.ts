@@ -264,11 +264,16 @@ export const handleLegacyAttributes =
 /**
  * Everything the consent handler needs to drive the consent UI and, once
  * the user agrees, certify + send. Built by `resolveConsentPipeline`.
+ *
+ * `origin` is the legacy-remapped value used for principal derivation.
+ * `unmappedOrigin` is the dapp's actual origin (icp0.io, custom domain,
+ * etc.) and is what the canister will certify as `implicit:origin`.
  */
 type ConsentPipeline = {
   accountNumberPromise: Promise<bigint | undefined>;
   authenticated: Authenticated;
   origin: string;
+  unmappedOrigin: string;
   groups: AttributeGroup[];
 };
 
@@ -300,7 +305,8 @@ const resolveConsentPipeline = async (params: {
       return null;
     }
 
-    const origin = remapToLegacyDomain(derivationOrigin ?? channel.origin);
+    const unmappedOrigin = derivationOrigin ?? channel.origin;
+    const origin = remapToLegacyDomain(unmappedOrigin);
 
     // TODO: pass `[requestedKeys]` once the canister silently drops unknown
     // keys. Today it errors on anything it doesn't recognise, which would
@@ -320,6 +326,7 @@ const resolveConsentPipeline = async (params: {
       accountNumberPromise,
       authenticated,
       origin,
+      unmappedOrigin,
       groups: resolveAttributeGroups(requestedKeys, available),
     };
   } catch (error) {
@@ -344,6 +351,7 @@ const certifyAndSend = async (params: {
   authenticated: { identityNumber: bigint; actor: Authenticated["actor"] };
   accountNumber: bigint | undefined;
   origin: string;
+  unmappedOrigin: string;
   attributeSpecs: Array<{
     key: string;
     value: [] | [Uint8Array];
@@ -358,12 +366,14 @@ const certifyAndSend = async (params: {
     authenticated,
     accountNumber,
     origin,
+    unmappedOrigin,
     attributeSpecs,
   } = params;
   try {
     const { message } = await authenticated.actor
       .prepare_icrc3_attributes({
         origin,
+        unmapped_origin: [unmappedOrigin],
         account_number: accountNumber !== undefined ? [accountNumber] : [],
         identity_number: authenticated.identityNumber,
         attributes: attributeSpecs,
@@ -447,9 +457,9 @@ export const handleIcrc3OneClickOpenIdAttributes =
         return;
       }
 
-      const origin = remapToLegacyDomain(
-        paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
-      );
+      const unmappedOrigin =
+        paramsResult.data.icrc95DerivationOrigin ?? channel.origin;
+      const origin = remapToLegacyDomain(unmappedOrigin);
 
       // Filter to keys the canister actually has — the user may not have
       // granted every claim in the allowlist (e.g. missing verified_email).
@@ -480,6 +490,7 @@ export const handleIcrc3OneClickOpenIdAttributes =
         authenticated,
         accountNumber,
         origin,
+        unmappedOrigin,
         attributeSpecs,
       });
     } catch (error) {
@@ -536,9 +547,9 @@ export const handleIcrc3OneClickSsoAttributes =
         return;
       }
 
-      const origin = remapToLegacyDomain(
-        paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
-      );
+      const unmappedOrigin =
+        paramsResult.data.icrc95DerivationOrigin ?? channel.origin;
+      const origin = remapToLegacyDomain(unmappedOrigin);
 
       // Filter to keys the canister actually has — the user may have
       // signed in with a subset of the allowlist (e.g. no email claim).
@@ -569,6 +580,7 @@ export const handleIcrc3OneClickSsoAttributes =
         authenticated,
         accountNumber,
         origin,
+        unmappedOrigin,
         attributeSpecs,
       });
     } catch (error) {
@@ -682,6 +694,7 @@ export const handleIcrc3ConsentAttributes =
           authenticated: pipeline.authenticated,
           accountNumber,
           origin: pipeline.origin,
+          unmappedOrigin: pipeline.unmappedOrigin,
           attributeSpecs,
         });
       } finally {

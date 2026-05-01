@@ -286,6 +286,13 @@ impl Anchor {
         attribute_specs: Vec<ValidatedAttributeSpec>,
         nonce: Vec<u8>,
         origin: String,
+        // The relying party's actual origin, before the legacy `icp0.io →
+        // ic0.app` remap that `origin` may have gone through for principal
+        // stability. The validator (`ValidatedPrepareIcrc3AttributeRequest`)
+        // has already verified that `unmapped_origin` maps to `origin` under
+        // the same remap, so it's safe to certify here as `implicit:origin`.
+        // When `None`, falls back to `origin`.
+        unmapped_origin: Option<String>,
         issued_at_timestamp_ns: u64,
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
@@ -431,7 +438,10 @@ impl Anchor {
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), Icrc3Value::Blob(nonce));
-        certified_pairs.insert("implicit:origin".to_string(), Icrc3Value::Text(origin));
+        certified_pairs.insert(
+            "implicit:origin".to_string(),
+            Icrc3Value::Text(unmapped_origin.unwrap_or(origin)),
+        );
         certified_pairs.insert(
             "implicit:issued_at_timestamp_ns".to_string(),
             Icrc3Value::Nat(candid::Nat::from(issued_at_timestamp_ns)),
@@ -1783,6 +1793,7 @@ mod tests {
                 ],
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
+                None,
                 1_000_000_000,
                 account,
             );
@@ -1820,6 +1831,7 @@ mod tests {
                 }],
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
+                None,
                 1_000_000_000,
                 account,
             );
@@ -1853,6 +1865,7 @@ mod tests {
                 }],
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
+                None,
                 1_000_000_000,
                 account,
             );
@@ -1883,6 +1896,7 @@ mod tests {
                 ],
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
+                None,
                 1_000_000_000,
                 account,
             );
@@ -2310,6 +2324,7 @@ mod tests {
                 vec![verified_spec],
                 vec![0u8; 32],
                 "https://rp.example".to_string(),
+                None,
                 1_000_000_000,
                 account,
             );
@@ -2359,6 +2374,7 @@ mod tests {
                 vec![openid_spec],
                 vec![0u8; 32],
                 "https://rp.example".to_string(),
+                None,
                 1_000_000_000,
                 account,
             );
