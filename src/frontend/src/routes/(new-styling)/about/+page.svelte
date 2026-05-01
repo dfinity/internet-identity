@@ -27,7 +27,7 @@
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
-  <div class="sm absolute top-0 right-0 left-0 -z-1 h-[640px] max-md:hidden">
+  <div class="absolute top-0 right-0 left-0 -z-1 h-[640px] max-md:hidden">
     <FlairCanvas
       spacing="medium"
       aspect="ultrawide"
@@ -207,13 +207,13 @@
             <a
               href={INTERNET_COMPUTER_URL}
               class="text-text-primary underline"
-              target="_blank">Internet Computer</a
+              target="_blank" rel="noopener">Internet Computer</a
             >. Instead of traditional usernames and passwords, it uses keys
             created via
             <a
               href={FAQ_PASSKEY_URL}
               class="text-text-primary underline"
-              target="_blank">passkeys</a
+              target="_blank" rel="noopener">passkeys</a
             > or other authentication systems like Google, Microsoft or Apple.
           </Trans>
         </p>
@@ -261,7 +261,7 @@
             <a
               href={FAQ_PASSKEY_URL}
               class="text-text-primary underline"
-              target="_blank">Learn more.</a
+              target="_blank" rel="noopener">Learn more.</a
             >
           </Trans>
         </p>
