@@ -45,7 +45,7 @@ const CREDENTIAL_CREATE_HOOK_FLAG = "__iiCredentialCreateHookInstalled";
  * on P-256, so created credentials match fixture expectations.
  */
 const installCredentialCreateOverride = ({
-  hookName
+  hookName,
   installedFlag,
 }: {
   hookName: string;
