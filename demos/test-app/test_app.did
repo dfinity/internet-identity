@@ -20,8 +20,22 @@ type AlternativeOriginsMode = variant {
     Redirect: record { location: text; };
 }
 
+type CallerAttributes = record {
+    /// Canister that signed the attributes attached to the caller's
+    /// request (e.g. the Internet Identity canister). Empty when the
+    /// caller is another canister or no `sender_info` was attached.
+    signer: opt principal;
+    /// Raw attribute payload as provided by the signer. The format is
+    /// signer-defined; for II this is a Candid-encoded ICRC-3 `Value`.
+    data: blob;
+};
+
 service : {
   whoami: () -> (principal) query;
   update_alternative_origins: (text, AlternativeOriginsMode) -> ();
   http_request: (request: HttpRequest) -> (HttpResponse) query;
+  /// Echoes the caller's signed attributes back to the client so e2e
+  /// tests can verify the round-trip from II → frontend →
+  /// `AttributeIdentity` → canister.
+  caller_attributes: () -> (CallerAttributes);
 }

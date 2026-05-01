@@ -46,6 +46,15 @@ function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
 }
 
 test.describe("Authorize with 1-click OpenID", () => {
+  // Round-trip verification — see `consent.spec.ts` for rationale.
+  test.afterEach(
+    ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+      if (authorizedIcrc3Attributes === undefined) return;
+      const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+    },
+  );
+
   test.describe("without any attributes", () => {
     const name = "John Doe";
 
