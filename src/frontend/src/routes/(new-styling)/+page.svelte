@@ -198,7 +198,7 @@
     </a>
   </header>
 
-  {#if !building}
+  {#if browser}
     <div class="fade-in absolute inset-0 -z-1 hidden md:block">
       <div
         class={[
@@ -361,18 +361,16 @@
                   or sharing personal data.
                 </Trans>
               </p>
-              {#if browser}
-                <AuthWizard
-                  onSignIn={handleSignIn}
-                  onSignUp={handleSignUp}
-                  onUpgrade={handleUpgrade}
-                  onError={(error) => {
-                    isAuthenticating = false;
-                    handleError(error);
-                  }}
-                  withinDialog={false}
-                />
-              {/if}
+              <AuthWizard
+                onSignIn={handleSignIn}
+                onSignUp={handleSignUp}
+                onUpgrade={handleUpgrade}
+                onError={(error) => {
+                  isAuthenticating = false;
+                  handleError(error);
+                }}
+                withinDialog={false}
+              />
             </div>
           {/if}
         </div>
