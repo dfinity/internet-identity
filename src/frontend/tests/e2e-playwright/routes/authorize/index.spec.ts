@@ -92,13 +92,13 @@ test("Authorize by signing in from another device", async ({
         .waitFor();
       const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
 
-      // Switch to other device and authenticate after visiting link
+      // Switch to other device and authenticate after visiting link.
+      // The other device already has a stored identity from the earlier
+      // sign-in, so the landing page shows the welcome-back state with a
+      // single Continue button rather than the inline auth picker.
       await otherDevicePage.goto(linkToPair);
       await otherDevicePage
-        .getByRole("button", { name: "Continue with Passkey" })
-        .click();
-      await otherDevicePage
-        .getByRole("button", { name: "Use existing identity" })
+        .getByRole("button", { name: "Continue", exact: true })
         .click();
 
       // Switch to current device and get confirmation code

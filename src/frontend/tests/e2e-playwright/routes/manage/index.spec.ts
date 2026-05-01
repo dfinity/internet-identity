@@ -123,10 +123,7 @@ test.describe("Dashboard Navigation", () => {
       // Sign in to dashboard with first identity
       await page.goto(II_URL);
       await addAuthenticatorForIdentity(page, identities[0].identityNumber);
-      await page.getByRole("button", { name: "Switch identity" }).click();
-      await page
-        .getByRole("button", { name: "Manage your Internet Identity" })
-        .click();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
 
       // Verify we're at the dashboard and signed in as the first identity
       await managePage.assertVisible();
