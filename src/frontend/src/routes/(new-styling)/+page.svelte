@@ -199,7 +199,7 @@
   </header>
 
   {#if browser}
-    <div class="fade-in absolute inset-0 -z-1 hidden md:block">
+    <div class="fade-in absolute inset-0 -z-1 hidden opacity-0 md:block">
       <div
         class={[
           "absolute inset-e-0 top-0 h-screen w-[50vw] opacity-50",
