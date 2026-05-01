@@ -222,13 +222,13 @@ export class IdentityWizard {
   }
 
   /**
-   * Used to navigate to identity sign in/up view, attempts to click a sequence
-   * of buttons in order (if visible) to get to the intended view from any page.
+   * Used to navigate to the identity sign in/up view. The auth picker
+   * is rendered inline in the landing page's sign-up state, but on the
+   * welcome-back state and on `/authorize` it sits behind an "Add
+   * another identity" button (which opens a dialog containing it). On
+   * `/authorize` a "Switch identity" trigger also still exists.
    */
   async #goto(): Promise<void> {
-    const signInLocator = this.#page.getByRole("button", {
-      name: "Sign in",
-    });
     const switchIdentityLocator = this.#page.getByRole("button", {
       name: "Switch identity",
     });
@@ -238,8 +238,8 @@ export class IdentityWizard {
     const continueWithPasskeyLocator = this.#page.getByRole("button", {
       name: "Continue with passkey",
     });
-    await signInLocator
-      .or(switchIdentityLocator)
+    await switchIdentityLocator
+      .or(addAnotherIdentityLocator)
       .or(continueWithPasskeyLocator)
       .first()
       .waitFor();
@@ -249,13 +249,12 @@ export class IdentityWizard {
       await continueWithPasskeyLocator.click();
       return;
     }
-    // Or go first trough identity switcher/sign in if necessary
+    // Or open the picker via the identity switcher / "Add another
+    // identity" entry point first.
     if (await switchIdentityLocator.isVisible()) {
       await switchIdentityLocator.click();
-      await addAnotherIdentityLocator.click();
-    } else if (await signInLocator.isVisible()) {
-      await signInLocator.click();
     }
+    await addAnotherIdentityLocator.click();
     await continueWithPasskeyLocator.click();
   }
 }

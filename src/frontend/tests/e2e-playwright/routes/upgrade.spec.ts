@@ -100,17 +100,18 @@ test("Can upgrade identity", async ({ page, managePage, identities }) => {
       legacyCredential,
     );
 
-    // Open the sign-in dialog
+    // On the first attempt the sign-up state's auth picker is rendered
+    // inline on the landing page; on later attempts a last-used identity
+    // exists, so we open the picker via "Add another identity", which
+    // surfaces it inside a dialog.
     if (attempt > 0) {
-      await page.getByRole("button", { name: "Switch identity" }).click();
       await page.getByRole("button", { name: "Add another identity" }).click();
-    } else {
-      await page.getByRole("button", { name: "Sign in" }).click();
     }
 
-    // Select the passkey authentication method
+    // Select the passkey authentication method (page-scoped works for
+    // both: inline on first attempt, inside the dialog on later ones).
+    await page.getByRole("button", { name: "Continue with passkey" }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Continue with passkey" }).click();
     await dialog.getByRole("button", { name: "Upgrade" }).click();
 
     // Enter the identity number

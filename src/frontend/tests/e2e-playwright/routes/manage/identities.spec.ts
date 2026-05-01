@@ -131,7 +131,9 @@ test.describe("Sign out confirmation", () => {
       await confirmation.removeFromDevice();
     });
 
-    // No identities left — should see sign in button
-    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+    // No identities left — should see the inline sign-up auth picker
+    await expect(
+      page.getByRole("button", { name: "Continue with passkey" }),
+    ).toBeVisible();
   });
 });
