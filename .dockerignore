@@ -25,3 +25,6 @@ Dockerfile
 scripts/
 !scripts/build
 !scripts/bootstrap
+# Needed by the `postinstall` hook in package.json — it renders the
+# frontend canister's local init args before any `icp` command runs.
+!scripts/render-local-init-args
