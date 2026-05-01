@@ -85,6 +85,9 @@ msgstr "<0>Integrazione fluida delle passkey:</0> Continuiamo ad adottare le pas
 msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Un modo per riottenere l'accesso alla tua identità se dovessi perderla."
 
+msgid "About"
+msgstr ""
+
 msgid "Access and recovery"
 msgstr "Accesso e recupero"
 
@@ -123,6 +126,9 @@ msgstr "Aggiungi un'altra passkey"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Aggiungi un altro modo per accedere con una passkey o un account di terze parti per un accesso sicuro."
+
+msgid "Add identity"
+msgstr ""
 
 msgid "Add new"
 msgstr "Aggiungi nuovo"
@@ -500,6 +506,9 @@ msgstr "Errato. Riprova con il nuovo codice."
 msgid "Interaction canceled. Please try again."
 msgstr "Interazione annullata. Riprova."
 
+msgid "Internet Identity"
+msgstr ""
+
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>non</0> memorizza i tuoi dati biometrici. Restano sul tuo dispositivo. La tua identità funge da gestore sicuro di passkey."
 
@@ -710,6 +719,9 @@ msgstr "Apri nel browser per continuare"
 msgid "Open menu"
 msgstr "Apri menu"
 
+msgid "Or sign in with another identity"
+msgstr ""
+
 msgid "Pairing link"
 msgstr "Link di abbinamento"
 
@@ -893,8 +905,14 @@ msgstr "Accedi"
 msgid "Sign in again to continue where you left off."
 msgstr "Accedi di nuovo per riprendere da dove avevi interrotto."
 
+msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
+msgstr ""
+
 msgid "Sign in there."
 msgstr "Accedi lì."
+
+msgid "Sign in to manage your identity"
+msgstr ""
 
 msgid "Sign in using familiar methods"
 msgstr "Accedi utilizzando metodi familiari"

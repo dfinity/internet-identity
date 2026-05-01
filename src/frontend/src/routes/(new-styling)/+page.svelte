@@ -242,7 +242,7 @@
                 {$t`Internet Identity`}
               </h1>
               <p class="text-text-tertiary mb-10 max-w-md text-base md:text-lg">
-                <Trans>Sign in to manage your identity.</Trans>
+                <Trans>Sign in to manage your identity</Trans>
               </p>
 
               <div
@@ -379,8 +379,7 @@
       </div>
     </main>
   {/if}
-
-  <Footer />
+  <Footer class="mt-auto" />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
 
