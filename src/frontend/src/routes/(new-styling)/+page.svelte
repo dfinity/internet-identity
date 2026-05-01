@@ -142,15 +142,16 @@
     }
   };
 
-  // Automatically show sign-in when triggered by another page
+  // When another page (e.g. `/login`) redirects here with a `next`
+  // target in `page.state.login`, capture it so post-auth navigation
+  // returns the user where they were headed. The inline picker / the
+  // welcome-back card both already handle the sign-in flow; we don't
+  // need to additionally open the bottom Dialog (doing so would render
+  // two PickAuthenticationMethod instances on the sign-up state).
   afterNavigate(() => {
-    if (!("login" in page.state)) {
-      return;
-    }
     if (typeof page.state.login === "string") {
       next = page.state.login;
     }
-    isAuthDialogOpen = true;
   });
 
   // Pre-fetch passkey credential ids
