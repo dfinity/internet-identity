@@ -207,13 +207,15 @@
             <a
               href={INTERNET_COMPUTER_URL}
               class="text-text-primary underline"
-              target="_blank" rel="noopener">Internet Computer</a
+              target="_blank"
+              rel="noopener">Internet Computer</a
             >. Instead of traditional usernames and passwords, it uses keys
             created via
             <a
               href={FAQ_PASSKEY_URL}
               class="text-text-primary underline"
-              target="_blank" rel="noopener">passkeys</a
+              target="_blank"
+              rel="noopener">passkeys</a
             > or other authentication systems like Google, Microsoft or Apple.
           </Trans>
         </p>
@@ -261,7 +263,8 @@
             <a
               href={FAQ_PASSKEY_URL}
               class="text-text-primary underline"
-              target="_blank" rel="noopener">Learn more.</a
+              target="_blank"
+              rel="noopener">Learn more.</a
             >
           </Trans>
         </p>
