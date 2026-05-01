@@ -144,12 +144,9 @@
 
   // When another page (e.g. `/login`) redirects here with a `next`
   // target in `page.state.login`, capture it so post-auth navigation
-  // returns the user where they were headed. The inline picker / the
-  // welcome-back card both already handle the sign-in flow; we don't
-  // need to additionally open the bottom Dialog (doing so would render
-  // two PickAuthenticationMethod instances on the sign-up state).
+  // returns the user where they were headed.
   afterNavigate(() => {
-    if (typeof page.state.login === "string") {
+    if ("login" in page.state && typeof page.state.login === "string") {
       next = page.state.login;
     }
   });
@@ -189,7 +186,7 @@
   });
 </script>
 
-<div class="flex min-h-[100dvh] flex-col">
+<div class="flex min-h-dvh flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <header
     class="relative z-10 flex h-16 flex-row items-center px-4 md:px-6 lg:px-8"
@@ -403,7 +400,7 @@
       withinDialog={true}
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {selectedIdentity !== undefined ? $t`Add identity` : $t`Sign in`}
+        {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
         {$t`Choose method to continue`}
