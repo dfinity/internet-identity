@@ -29,13 +29,6 @@ export interface FlairAnimationOptions {
   size: "large" | "medium" | "small" | number;
   nImpulses: "single" | "double";
   impulseEasing?: keyof typeof easingFunctions;
-  // When true, omni-direction impulses (and the second impulse of
-  // `nImpulses: "double"`) are added on top of the dot's current
-  // spring target instead of replacing it. Used together with the
-  // `repel` hover mode so a click wave starts from the displaced
-  // positions and returns to them rather than snapping through the
-  // neutral grid.
-  additive?: boolean;
 }
 
 export interface FlairCanvasProps {
@@ -45,7 +38,7 @@ export interface FlairCanvasProps {
   visibility?: "always" | "moving" | "maskwave" | "pausedmaskwave";
   dotSize?: "large" | "medium" | "small" | number;
   vignette?: "center" | "top" | "left" | "right" | "bottom" | "none";
-  hoverAction?: "intense" | "minimal" | "repel" | "none";
+  hoverAction?: "intense" | "minimal" | "none";
   springOrTween?:
     | {
         type: "spring";

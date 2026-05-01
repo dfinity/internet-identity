@@ -4,7 +4,6 @@
     createContinuousWave,
     createDirectionalImpulse,
     createImpulse,
-    createRepelField,
     createTweenedWave,
     createPerlinImpulse,
     createRotationalImpulse,
@@ -74,7 +73,6 @@
 
   let pointerX = $state<number>(0);
   let pointerY = $state<number>(0);
-  let _pointerEverMoved = $state<boolean>(false);
   let lastPointerX = $state<number>(0);
   let lastPointerY = $state<number>(0);
   let lastPointerTime = $state<number>(0);
@@ -270,7 +268,6 @@
     const {
       location,
       target,
-      additive,
       motionType,
       speed,
       intensity,
@@ -517,7 +514,6 @@
             (typeof speed === "number" ? speed : speedTable[speed]),
           motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
           easingFunction,
-          additive,
         );
         promises.push(firstImpulse);
       }
@@ -549,7 +545,6 @@
                 (typeof speed === "number" ? speed : speedTable[speed]),
               motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
               easingFunction,
-              additive,
             );
             resolve();
           }, delay);
@@ -596,31 +591,6 @@
 
       await Promise.all(promises);
     }
-
-    // After a wave completes, re-establish the repel field at the
-    // current pointer position so the user doesn't have to wiggle
-    // the mouse to bring it back. Only do this if the cursor is still
-    // over the canvas — otherwise dots should rest at neutral.
-    if (
-      hoverAction === "repel" &&
-      _pointerInside &&
-      springs.length > 0 &&
-      springs[0]?.length > 0
-    ) {
-      createRepelField(
-        pointerX,
-        pointerY,
-        xPositions,
-        yPositions,
-        offsetX,
-        offsetY,
-        springs,
-        rippleRadius * 0.4,
-        0.6,
-        clientWidth ?? 0,
-        clientHeight ?? 0,
-      );
-    }
   };
 
   const createSpringsLocal = (xCount: number, yCount: number) => {
@@ -635,30 +605,17 @@
 
   const handleReset = () => {
     _pointerInside = false;
-    // Keep the field tracking the pointer in `repel` mode even when
-    // the cursor leaves the canvas, so edge dots follow the cursor
-    // smoothly across the boundary instead of snapping back to rest.
-    if (hoverAction === "repel") {
-      return;
-    }
     resetNodes(springs);
   };
 
   const handlePointerMove = (e: PointerEvent) => {
-    if (!backgroundRef) return;
-    const rect = backgroundRef.getBoundingClientRect();
     const now = performance.now();
     const prevX = lastPointerX;
     const prevY = lastPointerY;
     const prevTime = lastPointerTime;
 
-    // Translate viewport coordinates to canvas-local coordinates so
-    // distance math against `xPositions[i] + offsetX` (which lives in
-    // canvas-local space) produces correct ripple centers regardless of
-    // where the canvas sits on the page.
-    pointerX = e.clientX - rect.left;
-    pointerY = e.clientY - rect.top;
-    _pointerEverMoved = true;
+    pointerX = e.clientX;
+    pointerY = e.clientY;
 
     if (
       prevX !== null &&
@@ -673,28 +630,7 @@
       _pointerSpeed = dist / dt; // px per ms
     }
 
-    // `repel` runs every move (no throttle, no setTimeout chains) so
-    // the static field tracks the cursor smoothly. Pulse-based modes
-    // throttle to avoid stacking waves on top of each other.
-    if (
-      hoverAction === "repel" &&
-      springs.length > 0 &&
-      springs[0]?.length > 0
-    ) {
-      createRepelField(
-        pointerX,
-        pointerY,
-        xPositions,
-        yPositions,
-        offsetX,
-        offsetY,
-        springs,
-        rippleRadius * 0.4,
-        0.6,
-        clientWidth ?? 0,
-        clientHeight ?? 0,
-      );
-    } else if (now - prevTime > 60 && hoverAction !== "none") {
+    if (now - prevTime > 60 && hoverAction !== "none") {
       if (hoverAction === "minimal") {
         createContinuousWave(
           pointerX,
@@ -724,7 +660,7 @@
           xSpacing,
           ySpacing,
           rippleRadius * 0.618,
-          0.45,
+          0.3,
           waveSpeed * 3,
           impulseDuration,
           "xy",
@@ -865,14 +801,6 @@
 
   const handleGlobalPointerMove = (e: PointerEvent) => {
     if (!backgroundRef) return;
-    // In `repel` mode we always update the pointer position so dots
-    // near the edge keep tracking the cursor when it slides outside
-    // the canvas. Other hover modes are pulse-based and only make
-    // sense when the pointer is actually over the canvas.
-    if (hoverAction === "repel") {
-      handlePointerMove(e);
-      return;
-    }
     const rect = backgroundRef.getBoundingClientRect();
     if (
       e.clientX >= rect.left &&

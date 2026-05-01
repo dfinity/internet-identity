@@ -6,8 +6,6 @@
   import { Trans } from "$lib/components/locale";
   import { ArrowRightIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
-  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
-  import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
   import Logo from "$lib/components/ui/Logo.svelte";
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -144,10 +142,6 @@
     }
   };
 
-  let triggerAnimation =
-    $state<(opts: FlairAnimationOptions) => Promise<void>>();
-  let clearAnimation = $state<() => void>();
-
   // Automatically show sign-in when triggered by another page
   afterNavigate(() => {
     if (!("login" in page.state)) {
@@ -231,8 +225,6 @@
             stiffness: "high",
             dampening: "medium",
           }}
-          bind:triggerAnimation
-          bind:clearAnimation
         />
       </div>
     </div>

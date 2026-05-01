@@ -267,7 +267,6 @@ export async function createImpulse(
   impulseDuration: number,
   direction: "omni" | "x" | "y",
   impulseEasing?: EasingFunction,
-  additive?: boolean,
 ): Promise<void> {
   const promises: Promise<void>[] = [];
 
@@ -296,34 +295,12 @@ export async function createImpulse(
             let yVal = (dy / dist) * strength;
             if (direction === "x") yVal = 0;
             if (direction === "y") xVal = 0;
-            // In additive mode the impulse is layered on top of
-            // whatever target is already set (e.g. a static repel
-            // field), so the wave appears to start from the dot's
-            // current displaced position rather than snapping to a
-            // wave-shape relative to the neutral grid. The exit step
-            // subtracts the same delta so the underlying target is
-            // restored without resetting other contributions.
-            if (additive === true) {
-              const cur = springs[xIndex][yIndex].motion.target;
-              springs[xIndex][yIndex].motion.target = {
-                x: cur.x + xVal,
-                y: cur.y + yVal,
-              };
-              setTimeout(() => {
-                const cur2 = springs[xIndex][yIndex].motion.target;
-                springs[xIndex][yIndex].motion.target = {
-                  x: cur2.x - xVal,
-                  y: cur2.y - yVal,
-                };
-                resolve();
-              }, impulseDuration);
-            } else {
-              springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
-              setTimeout(() => {
-                springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
-                resolve();
-              }, impulseDuration);
-            }
+            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+
+            setTimeout(() => {
+              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
+              resolve();
+            }, impulseDuration);
           } else {
             resolve();
           }
@@ -651,62 +628,6 @@ export function createScalarImpulse(
           }, impulseDuration);
         }
       }, delay);
-    }
-  }
-}
-
-// Maintains a static repulsion field around (mouseX, mouseY): every dot
-// inside `mouseRadius` gets a target offset pointing radially outward,
-// scaled by a quadratic falloff. Dots outside the radius are reset to
-// rest. Unlike `createContinuousWave`, this does not pulse — the spring
-// targets are held while the pointer is hovering, so the field tracks
-// the cursor like a magnet repelling iron filings. Iterates every node
-// each call so dots no longer in the radius (because the pointer moved
-// away) snap back to rest immediately.
-export function createRepelField(
-  mouseX: number,
-  mouseY: number,
-  xPositions: number[],
-  yPositions: number[],
-  offsetX: number,
-  offsetY: number,
-  springs: NodeMotion[][],
-  mouseRadius: number,
-  mouseScalar: number,
-  canvasWidth: number,
-  canvasHeight: number,
-) {
-  for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
-    for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
-      const nodeX = xPositions[xIndex] + offsetX;
-      const nodeY = yPositions[yIndex] + offsetY;
-      // The grid generation pads with a +2 buffer, putting some
-      // dots just outside the visible canvas bounds. Those dots are
-      // clipped at rest, but if we displace them they slide into
-      // view and look like dots flying in from off-canvas. Skip
-      // them so only on-canvas dots can be displaced.
-      if (
-        nodeX < 0 ||
-        nodeX > canvasWidth ||
-        nodeY < 0 ||
-        nodeY > canvasHeight
-      ) {
-        continue;
-      }
-      const dx = nodeX - mouseX;
-      const dy = nodeY - mouseY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist < mouseRadius && dist > 0) {
-        const falloff = Math.pow(1 - dist / mouseRadius, 2);
-        const strength = falloff * mouseScalar * mouseRadius;
-        springs[xIndex][yIndex].motion.target = {
-          x: (dx / dist) * strength,
-          y: (dy / dist) * strength,
-        };
-      } else {
-        springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
-      }
     }
   }
 }
