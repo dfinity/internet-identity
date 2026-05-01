@@ -10,7 +10,7 @@ canisters:
             - "II_FETCH_ROOT_KEY=1 scripts/build --frontend"
             - "cp internet_identity_frontend.wasm.gz \"$ICP_WASM_OUTPUT_PATH\""
     init_args:
-      path: src/internet_identity_frontend/local_test_arg.did
+      path: .icp/cache/init-args/internet_identity_frontend.did
 
   - name: internet_identity
     build:
