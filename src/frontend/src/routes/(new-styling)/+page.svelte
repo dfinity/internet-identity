@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browser, building } from "$app/environment";
+  import { browser } from "$app/environment";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { manuallyReroute } from "$lib/utils/reroute";
   import { t } from "$lib/stores/locale.store";
