@@ -3,6 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils";
 import type { Identity, SignIdentity } from "@icp-sdk/core/agent";
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import {
+  AttributesIdentity,
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
@@ -97,11 +98,28 @@ const icrc3AttributesEl = document.getElementById(
 const icrc3AttributesDecodedEl = document.getElementById(
   "icrc3AttributesDecoded",
 ) as HTMLPreElement;
+const sendAttributesBtn = document.getElementById(
+  "sendAttributesBtn",
+) as HTMLButtonElement;
+const iiCanisterIdEl = document.getElementById(
+  "iiCanisterId",
+) as HTMLInputElement;
+const canisterEchoedAttributesEl = document.getElementById(
+  "canisterEchoedAttributes",
+) as HTMLPreElement;
+const canisterEchoedAttributesRawEl = document.getElementById(
+  "canisterEchoedAttributesRaw",
+) as HTMLPreElement;
 
 let iiProtocolTestWindow: Window | undefined;
 
 // The identity set by the authentication
 let delegationIdentity: DelegationIdentity | undefined = undefined;
+
+// The most recently received ICRC-3 attribute bundle, kept around so the
+// "Send attributes to canister" button can wrap the delegation identity in
+// `AttributesIdentity` and replay them against the test_app canister.
+let latestIcrc3Attributes: Icrc3Attributes | undefined = undefined;
 
 // The local, ephemeral key-pair
 let localIdentity_: SignIdentity | undefined = undefined;
@@ -131,6 +149,10 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
     Redirect: IDL.Record({ location: IDL.Text }),
     CertifiedContent: IDL.Null,
   });
+  const CallerAttributes = IDL.Record({
+    signer: IDL.Opt(IDL.Principal),
+    data: IDL.Vec(IDL.Nat8),
+  });
   return IDL.Service({
     http_request: IDL.Func([HttpRequest], [HttpResponse], ["query"]),
     update_alternative_origins: IDL.Func(
@@ -139,6 +161,7 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
       [],
     ),
     whoami: IDL.Func([], [IDL.Principal], ["query"]),
+    caller_attributes: IDL.Func([], [CallerAttributes], []),
   });
 };
 
@@ -213,7 +236,10 @@ const updateDelegationView = ({
       certifiedAttributesEl.innerText = "";
     }
 
-    // Display ICRC-3 attributes if available.
+    // Display ICRC-3 attributes if available, and stash the bundle so
+    // the canister round-trip button can consume it.
+    latestIcrc3Attributes = icrc3Attributes;
+    canisterEchoedAttributesEl.innerText = "";
     if (icrc3Attributes !== undefined) {
       icrc3AttributesEl.innerText = JSON.stringify({
         // @ts-ignore Not known in TS types yet but supported in all browsers
@@ -476,6 +502,61 @@ const init = async () => {
 };
 
 window.addEventListener("DOMContentLoaded", init);
+
+sendAttributesBtn.addEventListener("click", async () => {
+  if (delegationIdentity === undefined) {
+    showError("Sign in first");
+    return;
+  }
+  if (latestIcrc3Attributes === undefined) {
+    showError("No ICRC-3 attribute bundle from the last sign-in");
+    return;
+  }
+  const iiCanisterIdText = iiCanisterIdEl.value.trim();
+  if (iiCanisterIdText === "") {
+    showError("Set the II canister id (signer) first");
+    return;
+  }
+
+  const canisterId = Principal.fromText(readCanisterId());
+  const identity = new AttributesIdentity({
+    inner: delegationIdentity,
+    attributes: latestIcrc3Attributes,
+    signer: { canisterId: Principal.fromText(iiCanisterIdText) },
+  });
+  const agent = await HttpAgent.create({
+    host: hostUrlEl.value,
+    identity,
+    shouldFetchRootKey: true,
+  });
+  const actor = Actor.createActor(idlFactory, { agent, canisterId });
+
+  canisterEchoedAttributesEl.innerText = "Loading...";
+  canisterEchoedAttributesRawEl.innerText = "";
+  try {
+    const response = (await actor.caller_attributes()) as {
+      signer: [] | [Principal];
+      data: Uint8Array | number[];
+    };
+    const data =
+      response.data instanceof Uint8Array
+        ? response.data
+        : new Uint8Array(response.data);
+    canisterEchoedAttributesRawEl.innerText = JSON.stringify({
+      signer: response.signer.length === 0 ? null : response.signer[0].toText(),
+      // @ts-ignore Not known in TS types yet but supported in all browsers
+      data: data.toBase64(),
+    });
+    const formatted = formatIcrc3Attributes(data);
+    const signerText =
+      response.signer.length === 0 ? "(none)" : response.signer[0].toText();
+    canisterEchoedAttributesEl.innerText = `signer: ${signerText}\n${formatted}`;
+  } catch (err) {
+    canisterEchoedAttributesEl.innerText = `Failed: ${
+      err instanceof Error ? err.message : String(err)
+    }`;
+  }
+});
 
 whoamiBtn.addEventListener("click", async () => {
   const canisterId = Principal.fromText(readCanisterId());

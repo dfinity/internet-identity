@@ -1037,7 +1037,19 @@ export type PrepareIcrc3AttributeError = { 'AuthorizationError' : Principal } |
   { 'AttributeMismatch' : { 'problems' : Array<string> } };
 export interface PrepareIcrc3AttributeRequest {
   /**
-   * Origin of the relying party in the attribute sharing flow.
+   * The relying party's actual origin, before the legacy `icp0.io →
+   * ic0.app` remap that `origin` may have gone through. When set, this
+   * value is what gets certified as `implicit:origin` instead of `origin`,
+   * so that an RP signed in via the icp0.io domain sees its real origin
+   * in the certified message. The canister verifies that mapping
+   * `unmapped_origin` through the same legacy remap yields `origin`,
+   * so an RP can't certify an arbitrary value here.
+   */
+  'unmapped_origin' : [] | [FrontendHostname],
+  /**
+   * Origin of the relying party in the attribute sharing flow. May have
+   * been remapped from `<sub>.icp0.io` to `<sub>.ic0.app` for principal
+   * stability — see `unmapped_origin`.
    */
   'origin' : FrontendHostname,
   /**
