@@ -11,6 +11,7 @@
     "host": "II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 vite --host",
     "build": "npm run extract && tsc --noEmit && vite build",
     "preview": "vite preview",
+    "postinstall": "scripts/render-local-init-args",
     "prepare": "svelte-kit sync || echo ''",
     "check": "tsc --project ./tsconfig.all.json --noEmit && svelte-check check",
     "watch": "npm run check -- --watch",

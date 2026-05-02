@@ -2,10 +2,13 @@
 # Render the frontend canister's local init args by substituting the local
 # canister IDs (assigned by icp-cli) into the .template file.
 #
-# Invoked from the `internet_identity_frontend` build step in icp.yaml so
-# `icp deploy` "just works" without the user needing to edit the .did file
-# whenever icp-cli hands out new principals (which it does whenever the
-# local network is recreated). The rendered file is git-ignored.
+# Output lives under `.icp/cache/` (gitignored) so `icp deploy` re-renders
+# never dirty the working tree. Invoked from:
+#   - `npm install` (postinstall hook) so a fresh clone has a valid file
+#     before any `icp` command runs and `icp.yaml`'s `init_args.path`
+#     resolves on project load.
+#   - The `internet_identity_frontend` build step in `icp.yaml` so deploys
+#     pick up the real local IDs once they've been assigned.
 #
 # First-time deploy on a fresh network: this script calls
 # `icp canister create` for each canister it depends on so the IDs file
@@ -20,7 +23,7 @@ set -euo pipefail
 # `scripts/deploy-*-to-beta` (which may not cd) end up in the right place.
 ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 template="$ROOT_DIR/src/internet_identity_frontend/local_test_arg.did.template"
-output="$ROOT_DIR/src/internet_identity_frontend/local_test_arg.did"
+output="$ROOT_DIR/.icp/cache/init-args/internet_identity_frontend.did"
 mappings="$ROOT_DIR/.icp/cache/mappings/local.ids.json"
 
 if [ ! -f "$template" ]; then
@@ -51,6 +54,7 @@ if [ -f "$mappings" ]; then
   iif_id=$(jq -er '.internet_identity_frontend' "$mappings")
 fi
 
+mkdir -p "$(dirname "$output")"
 sed \
   -e "s|{{INTERNET_IDENTITY_ID}}|$ii_id|g" \
   -e "s|{{INTERNET_IDENTITY_FRONTEND_ID}}|$iif_id|g" \
