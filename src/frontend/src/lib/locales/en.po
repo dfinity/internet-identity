@@ -85,6 +85,9 @@ msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as 
 msgid "A way to regain access to your identity if you ever lose it."
 msgstr "A way to regain access to your identity if you ever lose it."
 
+msgid "About"
+msgstr "About"
+
 msgid "Access and recovery"
 msgstr "Access and recovery"
 
@@ -123,6 +126,9 @@ msgstr "Add another passkey"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Add another way to sign in with a passkey or third-party account for secure access."
+
+msgid "Add identity"
+msgstr "Add identity"
 
 msgid "Add new"
 msgstr "Add new"
@@ -500,6 +506,9 @@ msgstr "Incorrect. Try again with the new code."
 msgid "Interaction canceled. Please try again."
 msgstr "Interaction canceled. Please try again."
 
+msgid "Internet Identity"
+msgstr "Internet Identity"
+
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 
@@ -710,6 +719,9 @@ msgstr "Open in browser to continue"
 msgid "Open menu"
 msgstr "Open menu"
 
+msgid "Or sign in with another identity"
+msgstr "Or sign in with another identity"
+
 msgid "Pairing link"
 msgstr "Pairing link"
 
@@ -893,8 +905,14 @@ msgstr "Sign in"
 msgid "Sign in again to continue where you left off."
 msgstr "Sign in again to continue where you left off."
 
+msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
+msgstr "Sign in or create an identity to access apps without passwords or sharing personal data."
+
 msgid "Sign in there."
 msgstr "Sign in there."
+
+msgid "Sign in to manage your identity"
+msgstr "Sign in to manage your identity"
 
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"

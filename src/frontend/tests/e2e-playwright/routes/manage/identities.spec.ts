@@ -111,10 +111,8 @@ test.describe("Sign out confirmation", () => {
       await confirmation.keepIdentity();
     });
 
-    // Identity should still appear on the landing page header
-    await expect(
-      page.getByRole("button", { name: "Switch identity" }),
-    ).toContainText(identities[0].name);
+    // Identity should still appear on the landing page (welcome-back state)
+    await expect(page.getByText(identities[0].name)).toBeVisible();
   });
 
   test("sign out and remove from device", async ({
@@ -131,7 +129,9 @@ test.describe("Sign out confirmation", () => {
       await confirmation.removeFromDevice();
     });
 
-    // No identities left — should see sign in button
-    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+    // No identities left — should see the inline sign-up auth picker
+    await expect(
+      page.getByRole("button", { name: "Continue with passkey" }),
+    ).toBeVisible();
   });
 });

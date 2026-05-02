@@ -28,6 +28,14 @@
       {$localeStore}
     </button>
     <a
+      href="/about"
+      target="_blank"
+      rel="noopener"
+      class="outline-0 focus-visible:underline"
+    >
+      {$t`About`}
+    </a>
+    <a
       href={SUPPORT_URL}
       target="_blank"
       rel="noopener"
