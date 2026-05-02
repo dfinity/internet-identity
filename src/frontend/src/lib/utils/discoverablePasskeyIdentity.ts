@@ -20,13 +20,23 @@ import { getPrimaryOrigin } from "$lib/globals";
  * @returns The COSE key of the authData.
  */
 export function authDataToCose(authData: Uint8Array): Uint8Array {
+  // COSE key parameter labels used for signature verification.
+  // See https://www.iana.org/assignments/cose/cose.xhtml#key-common-parameters
+  // and https://www.iana.org/assignments/cose/cose.xhtml#key-type-parameters
+  const COSE_KEY_PARAMS = new Set([
+    1, // kty
+    3, // alg
+    -1, // crv (EC2) / n (RSA)
+    -2, // x (EC2) / e (RSA)
+    -3, // y (EC2)
+  ]);
+
   const view = new DataView(bufFromBufLike(authData));
   const coseKey = authData.slice(55 + view.getUint16(53, false));
   const decoded = borc.decodeFirst(coseKey);
   const cleaned = new Map();
   for (const [key, value] of decoded.entries()) {
-    if (typeof key === "number") {
-      // Only keep numeric keys, removing WebAuthn extension keys as a result
+    if (COSE_KEY_PARAMS.has(key)) {
       cleaned.set(key, value);
     }
   }
