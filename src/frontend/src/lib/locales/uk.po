@@ -86,7 +86,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Спосіб відновити доступ до вашого ідентифікатора, якщо ви його коли-небудь втратите."
 
 msgid "About"
-msgstr ""
+msgstr "Про сервіс"
 
 msgid "Access and recovery"
 msgstr "Доступ та відновлення"
@@ -126,9 +126,6 @@ msgstr "Додати інший ключ доступу"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Додайте ще один спосіб входу за допомогою ключа доступу або стороннього облікового запису для безпечного доступу."
-
-msgid "Add identity"
-msgstr ""
 
 msgid "Add new"
 msgstr "Додати новий"
@@ -507,7 +504,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "Взаємодія скасована. Будь ласка, спробуйте ще раз."
 
 msgid "Internet Identity"
-msgstr ""
+msgstr "Internet Identity"
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>не</0> зберігає ваші біометричні дані. Вони залишаються на вашому пристрої. Ваш ідентифікатор працює як менеджер безпечних ключів доступу."
@@ -720,7 +717,7 @@ msgid "Open menu"
 msgstr "Відкрити меню"
 
 msgid "Or sign in with another identity"
-msgstr ""
+msgstr "Або увійдіть з іншим ідентифікатором"
 
 msgid "Pairing link"
 msgstr "Посилання для сполучення"
@@ -906,13 +903,13 @@ msgid "Sign in again to continue where you left off."
 msgstr "Увійдіть знову, щоб продовжити з того місця, де ви зупинилися."
 
 msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr ""
+msgstr "Увійдіть або створіть ідентифікатор, щоб користуватися додатками без паролів і без передачі особистих даних."
 
 msgid "Sign in there."
 msgstr "Увійдіть там."
 
 msgid "Sign in to manage your identity"
-msgstr ""
+msgstr "Увійдіть, щоб керувати своїм ідентифікатором"
 
 msgid "Sign in using familiar methods"
 msgstr "Увійдіть за допомогою звичних методів"

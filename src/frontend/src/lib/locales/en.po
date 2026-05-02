@@ -127,9 +127,6 @@ msgstr "Add another passkey"
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Add another way to sign in with a passkey or third-party account for secure access."
 
-msgid "Add identity"
-msgstr "Add identity"
-
 msgid "Add new"
 msgstr "Add new"
 

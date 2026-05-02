@@ -86,7 +86,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Un moyen de retrouver l’accès à votre identité si jamais vous la perdez."
 
 msgid "About"
-msgstr ""
+msgstr "À propos"
 
 msgid "Access and recovery"
 msgstr "Accès et récupération"
@@ -126,9 +126,6 @@ msgstr "Ajouter une autre passkey"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Ajoutez un autre moyen de connexion avec une passkey ou un compte tiers pour un accès sécurisé."
-
-msgid "Add identity"
-msgstr ""
 
 msgid "Add new"
 msgstr "Ajouter"
@@ -507,7 +504,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "Interaction annulée. Veuillez réessayer."
 
 msgid "Internet Identity"
-msgstr ""
+msgstr "Internet Identity"
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>ne stocke pas</0> vos données biométriques. Elles restent sur votre appareil. Votre identité agit comme un gestionnaire sécurisé de passkeys."
@@ -720,7 +717,7 @@ msgid "Open menu"
 msgstr "Ouvrir le menu"
 
 msgid "Or sign in with another identity"
-msgstr ""
+msgstr "Ou se connecter avec une autre identité"
 
 msgid "Pairing link"
 msgstr "Lien d’appairage"
@@ -906,13 +903,13 @@ msgid "Sign in again to continue where you left off."
 msgstr "Reconnectez-vous pour reprendre là où vous vous étiez arrêté."
 
 msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr ""
+msgstr "Connectez-vous ou créez une identité pour accéder aux applications sans mots de passe ni partage de données personnelles."
 
 msgid "Sign in there."
 msgstr "Se connecter ici."
 
 msgid "Sign in to manage your identity"
-msgstr ""
+msgstr "Connectez-vous pour gérer votre identité"
 
 msgid "Sign in using familiar methods"
 msgstr "Se connecter avec des méthodes familières"

@@ -86,7 +86,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Cara untuk mendapatkan kembali akses ke identitas Anda jika Anda kehilangannya."
 
 msgid "About"
-msgstr ""
+msgstr "Tentang"
 
 msgid "Access and recovery"
 msgstr "Akses dan pemulihan"
@@ -126,9 +126,6 @@ msgstr "Tambahkan passkey lain"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Tambahkan cara lain untuk masuk dengan passkey atau akun pihak ketiga untuk akses aman."
-
-msgid "Add identity"
-msgstr ""
 
 msgid "Add new"
 msgstr "Tambah baru"
@@ -507,7 +504,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "Interaksi dibatalkan. Silakan coba lagi."
 
 msgid "Internet Identity"
-msgstr ""
+msgstr "Internet Identity"
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>tidak</0> menyimpan data biometrik Anda. Data tersebut tetap ada di perangkat Anda. Identitas Anda berfungsi sebagai pengelola passkey yang aman."
@@ -720,7 +717,7 @@ msgid "Open menu"
 msgstr "Buka menu"
 
 msgid "Or sign in with another identity"
-msgstr ""
+msgstr "Atau masuk dengan identitas lain"
 
 msgid "Pairing link"
 msgstr "Tautan penyambungan"
@@ -906,13 +903,13 @@ msgid "Sign in again to continue where you left off."
 msgstr "Masuk kembali untuk melanjutkan dari tempat terakhir Anda tinggalkan."
 
 msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr ""
+msgstr "Masuk atau buat identitas untuk mengakses aplikasi tanpa kata sandi atau berbagi data pribadi."
 
 msgid "Sign in there."
 msgstr "Masuk di sana."
 
 msgid "Sign in to manage your identity"
-msgstr ""
+msgstr "Masuk untuk mengelola identitas Anda"
 
 msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
