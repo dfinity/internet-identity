@@ -66,13 +66,11 @@
       <Logo class="text-fg-primary h-5.5" />
     </a>
   </header>
-  <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
+  <div class="flex h-[392px] w-full flex-row sm:h-[512px]">
     <div
-      class="fade-in flex w-full flex-col items-center justify-center opacity-0"
+      class="fade-in mx-auto flex w-full max-w-7xl flex-col items-start justify-center px-4 opacity-0 md:px-16"
     >
-      <h1
-        class="text-text-disabled mb-2 text-center text-4xl md:text-5xl lg:text-7xl"
-      >
+      <h1 class="text-text-disabled mb-2 text-4xl md:text-5xl lg:text-7xl">
         {$t({
           message: "Experience",
           context:
@@ -90,11 +88,9 @@
         delayBetween={2000}
         startDelay={2800}
         textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
-        containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center mb-6"
+        containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-start mb-6"
       />
-      <p
-        class="text-text-tertiary mb-6 max-w-[600px] text-center text-base text-balance"
-      >
+      <p class="text-text-tertiary mb-6 max-w-[600px] text-base text-balance">
         <Trans>
           Internet Identity lets you access apps and services securely, without
           creating passwords, sharing personal data, or giving up control.
@@ -161,20 +157,14 @@
   >
     <div class="flex flex-1 flex-col gap-5">
       <div class="flex flex-col gap-3">
-        <p
-          class="text-text-tertiary text-center text-xs md:text-start md:text-sm"
-        >
+        <p class="text-text-tertiary text-xs md:text-sm">
           {$t`Understanding Internet Identity`}
         </p>
-        <p
-          class="text-text-primary text-center text-3xl font-semibold md:text-start md:text-4xl"
-        >
+        <p class="text-text-primary text-3xl font-semibold md:text-4xl">
           {$t`FAQs`}
         </p>
       </div>
-      <p
-        class="text-text-tertiary text-center text-sm md:text-start md:text-lg"
-      >
+      <p class="text-text-tertiary text-sm md:text-lg">
         <Trans>
           Everything you need to know about Internet Identity, your private,
           secure, and easy way to log in to apps on the Internet Computer.
