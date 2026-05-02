@@ -186,7 +186,7 @@
   });
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex min-h-dvh flex-col bg-purple-700">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <header
     class="relative z-10 flex h-16 flex-row items-center px-4 md:px-6 lg:px-8"
