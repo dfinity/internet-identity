@@ -308,7 +308,10 @@
       size="xl"
       class="w-full"
     >
-      {$t`Continue`}
+      {$t({
+        message: "Continue",
+        context: "button label: proceed to next step",
+      })}
     </Button>
   </div>
 {/await}

@@ -178,8 +178,9 @@ msgstr "Włączając tę funkcję, możesz utworzyć więcej niż jedno konto dl
 msgid "Can't find your identity?"
 msgstr "Nie możesz znaleźć swojej tożsamości?"
 
+msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr "Anuluj"
+msgstr ""
 
 msgid "CAPTCHA characters"
 msgstr "Znaki CAPTCHA"
@@ -223,8 +224,9 @@ msgstr "Wyczyść wszystko"
 msgid "Click to reveal"
 msgstr "Kliknij, aby ujawnić"
 
+msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr "Zamknij"
+msgstr ""
 
 msgid "Close menu"
 msgstr "Zamknij menu"
@@ -261,6 +263,10 @@ msgstr "Połączenie zamknięte"
 
 msgid "Continue"
 msgstr "Kontynuuj"
+
+msgctxt "button label: proceed to next step"
+msgid "Continue"
+msgstr ""
 
 msgid "Continue on another device"
 msgstr "Kontynuuj na innym urządzeniu"
@@ -337,8 +343,9 @@ msgstr "Czy chcesz kontynuować?"
 msgid "Easy access"
 msgstr "Łatwy dostęp"
 
+msgctxt "button label: edit item"
 msgid "Edit"
-msgstr "Edytuj"
+msgstr ""
 
 msgid "Edit {name}"
 msgstr "Edytuj {name}"
@@ -791,8 +798,9 @@ msgstr "Fraza odzyskiwania niezweryfikowana"
 msgid "Recovery phrase set"
 msgstr "Fraza odzyskiwania ustawiona"
 
+msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr "Usuń"
+msgstr ""
 
 msgid "Remove from this device"
 msgstr "Usuń z tego urządzenia"
@@ -827,8 +835,9 @@ msgstr "Wymień go w dowolnym momencie"
 msgid "Requires unlocking before it can be reset."
 msgstr "Wymaga odblokowania przed zresetowaniem."
 
+msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr "Resetuj"
+msgstr ""
 
 msgid "Reset your recovery phrase?"
 msgstr "Zresetować frazę odzyskiwania?"
@@ -839,8 +848,9 @@ msgstr "Resetowanie frazy odzyskiwania..."
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 msgstr "Resetowanie unieważni Twoją obecną frazę odzyskiwania, pozostawiając tylko nową jako użyteczną."
 
+msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr "Ponów próbę"
+msgstr ""
 
 msgid "Return to app"
 msgstr "Powrót do aplikacji"
@@ -1155,8 +1165,9 @@ msgstr "Nieobsługiwana przeglądarka"
 msgid "Unverified origin"
 msgstr "Niezweryfikowane pochodzenie"
 
+msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr "Aktualizuj"
+msgstr ""
 
 msgid "Upgrade again"
 msgstr "Aktualizuj ponownie"
@@ -1182,8 +1193,9 @@ msgstr "Użyj urządzenia, które już posiada Twoją tożsamość, aby zeskanow
 msgid "Use existing identity"
 msgstr "Użyj istniejącej tożsamości"
 
+msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr "Zweryfikuj"
+msgstr ""
 
 msgid "Verify recovery to remove"
 msgstr "Zweryfikuj odzyskiwanie, aby usunąć"

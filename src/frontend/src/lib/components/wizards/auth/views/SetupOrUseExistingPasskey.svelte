@@ -79,7 +79,10 @@
       onclick={upgrade}
       class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      {$t`Upgrade`}
+      {$t({
+        message: "Upgrade",
+        context: "button label: upgrade identity or passkey",
+      })}
     </button>
   </div>
 </div>

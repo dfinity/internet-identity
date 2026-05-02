@@ -178,8 +178,9 @@ msgstr "Wenn Sie diese Funktion aktivieren, können Sie mehr als ein Konto für 
 msgid "Can't find your identity?"
 msgstr "Finden Sie Ihre Identität nicht?"
 
+msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr "Abbrechen"
+msgstr ""
 
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-Zeichen"
@@ -223,8 +224,9 @@ msgstr "Alle löschen"
 msgid "Click to reveal"
 msgstr "Klicken zum Anzeigen"
 
+msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr "Schließen"
+msgstr ""
 
 msgid "Close menu"
 msgstr "Menü schließen"
@@ -261,6 +263,10 @@ msgstr "Verbindung geschlossen"
 
 msgid "Continue"
 msgstr "Weiter"
+
+msgctxt "button label: proceed to next step"
+msgid "Continue"
+msgstr ""
 
 msgid "Continue on another device"
 msgstr "Auf einem anderen Gerät fortfahren"
@@ -337,8 +343,9 @@ msgstr "Möchten Sie fortfahren?"
 msgid "Easy access"
 msgstr "Einfacher Zugang"
 
+msgctxt "button label: edit item"
 msgid "Edit"
-msgstr "Bearbeiten"
+msgstr ""
 
 msgid "Edit {name}"
 msgstr "{name} bearbeiten"
@@ -791,8 +798,9 @@ msgstr "Wiederherstellungsphrase nicht verifiziert"
 msgid "Recovery phrase set"
 msgstr "Wiederherstellungsphrase festgelegt"
 
+msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr "Entfernen"
+msgstr ""
 
 msgid "Remove from this device"
 msgstr "Von diesem Gerät entfernen"
@@ -827,8 +835,9 @@ msgstr "Jederzeit ersetzen"
 msgid "Requires unlocking before it can be reset."
 msgstr "Erfordert Entsperrung, bevor ein Zurücksetzen möglich ist."
 
+msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr "Zurücksetzen"
+msgstr ""
 
 msgid "Reset your recovery phrase?"
 msgstr "Wiederherstellungsphrase zurücksetzen?"
@@ -839,8 +848,9 @@ msgstr "Wiederherstellungsphrase wird zurückgesetzt..."
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 msgstr "Das Zurücksetzen macht Ihre aktuelle Wiederherstellungsphrase ungültig; nur die neue bleibt nutzbar."
 
+msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr "Wiederholen"
+msgstr ""
 
 msgid "Return to app"
 msgstr "Zurück zur App"
@@ -1155,8 +1165,9 @@ msgstr "Nicht unterstützter Browser"
 msgid "Unverified origin"
 msgstr "Unverifizierter Ursprung"
 
+msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr "Aktualisieren"
+msgstr ""
 
 msgid "Upgrade again"
 msgstr "Erneut aktualisieren"
@@ -1182,8 +1193,9 @@ msgstr "Nutzen Sie ein Gerät mit Ihrer Identität, um die URL zu scannen oder z
 msgid "Use existing identity"
 msgstr "Bestehende Identität verwenden"
 
+msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr "Überprüfen"
+msgstr ""
 
 msgid "Verify recovery to remove"
 msgstr "Wiederherstellung verifizieren, um zu entfernen"

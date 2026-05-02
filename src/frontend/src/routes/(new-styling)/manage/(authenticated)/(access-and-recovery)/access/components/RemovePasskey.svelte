@@ -74,7 +74,10 @@
       size="lg"
       disabled={isRemoving}
     >
-      {$t`Cancel`}
+      {$t({
+        message: "Cancel",
+        context: "button label: dismiss or abort current action",
+      })}
     </Button>
   </div>
 </div>

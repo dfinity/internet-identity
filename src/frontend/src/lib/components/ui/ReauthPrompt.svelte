@@ -69,7 +69,10 @@
       class="btn btn-tertiary w-full"
       disabled={isReauthenticating}
     >
-      {$t`Cancel`}
+      {$t({
+        message: "Cancel",
+        context: "button label: dismiss or abort current action",
+      })}
     </button>
   </div>
 </div>

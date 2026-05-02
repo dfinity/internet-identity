@@ -295,7 +295,12 @@
         <ProgressRing />
         <span>{$t`Checking...`}</span>
       {:else}
-        <span>{$t`Continue`}</span>
+        <span
+          >{$t({
+            message: "Continue",
+            context: "button label: proceed to next step",
+          })}</span
+        >
       {/if}
     </Button>
     <button

@@ -275,7 +275,10 @@
                   disabled={isAuthenticating}
                   class="btn btn-primary order-last w-full gap-2 md:order-0 md:ms-auto md:w-auto md:shrink-0"
                 >
-                  {$t`Continue`}
+                  {$t({
+                    message: "Continue",
+                    context: "button label: proceed to next step",
+                  })}
                   {#if switchingToIdentity === selectedIdentity.identityNumber}
                     <ProgressRing class="size-4" />
                   {:else}
@@ -297,7 +300,12 @@
                     class="btn btn-tertiary btn-icon btn-sm ms-auto rounded-full"
                   >
                     <PencilIcon class="size-4" />
-                    <span>{$t`Edit`}</span>
+                    <span
+                      >{$t({
+                        message: "Edit",
+                        context: "button label: edit item",
+                      })}</span
+                    >
                   </button>
                 </div>
                 <ul class="flex flex-col gap-2">

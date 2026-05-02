@@ -156,7 +156,12 @@
       class="btn btn-tertiary btn-sm btn-icon absolute inset-e-2 top-2 rounded-full"
     >
       <XIcon class="size-5" />
-      <span>{$t`Close`}</span>
+      <span
+        >{$t({
+          message: "Close",
+          context: "button label: close or dismiss panel",
+        })}</span
+      >
     </button>
   </div>
 {/snippet}
@@ -203,7 +208,9 @@
           class="btn btn-tertiary btn-icon btn-sm ms-auto me-2 rounded-full"
         >
           <PencilIcon class="size-4" />
-          <span>{$t`Edit`}</span>
+          <span
+            >{$t({ message: "Edit", context: "button label: edit item" })}</span
+          >
         </button>
       {/if}
     </div>

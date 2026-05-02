@@ -121,7 +121,10 @@
           {$t`Get started`}
         </button>
         <a href="/" class="btn btn-secondary btn-xl">
-          {$t`Cancel`}
+          {$t({
+            message: "Cancel",
+            context: "button label: dismiss or abort current action",
+          })}
         </a>
       </div>
     </AuthPanel>

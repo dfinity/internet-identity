@@ -101,7 +101,12 @@
         <ProgressRing />
         <span>{$t`Authenticating...`}</span>
       {:else}
-        <span>{$t`Continue`}</span>
+        <span
+          >{$t({
+            message: "Continue",
+            context: "button label: proceed to next step",
+          })}</span
+        >
       {/if}
     </button>
   </Tooltip>

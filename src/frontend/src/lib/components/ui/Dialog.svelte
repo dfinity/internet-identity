@@ -181,7 +181,10 @@
               <button
                 class="btn btn-tertiary btn-lg btn-icon absolute inset-e-2 top-2 z-2 rounded-full!"
                 onclick={onClose}
-                aria-label={$t`Close`}
+                aria-label={$t({
+                  message: "Close",
+                  context: "button label: close or dismiss panel",
+                })}
               >
                 <XIcon class="size-5" aria-hidden="true" />
               </button>

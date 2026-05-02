@@ -87,7 +87,12 @@
       <ProgressRing />
       <span>{$t`Verifying...`}</span>
     {:else}
-      <span>{$t`Verify`}</span>
+      <span
+        >{$t({
+          message: "Verify",
+          context: "button label: verify or confirm step",
+        })}</span
+      >
     {/if}
   </Button>
 </form>

@@ -178,8 +178,9 @@ msgstr "Al activar esta función, puedes crear más de una cuenta por app. Cambi
 msgid "Can't find your identity?"
 msgstr "¿No encuentras tu identidad?"
 
+msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr "Cancelar"
+msgstr ""
 
 msgid "CAPTCHA characters"
 msgstr "Caracteres del CAPTCHA"
@@ -223,8 +224,9 @@ msgstr "Borrar todo"
 msgid "Click to reveal"
 msgstr "Haz clic para mostrar"
 
+msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr "Cerrar"
+msgstr ""
 
 msgid "Close menu"
 msgstr "Cerrar menú"
@@ -261,6 +263,10 @@ msgstr "Conexión cerrada"
 
 msgid "Continue"
 msgstr "Continuar"
+
+msgctxt "button label: proceed to next step"
+msgid "Continue"
+msgstr ""
 
 msgid "Continue on another device"
 msgstr "Continuar en otro dispositivo"
@@ -337,8 +343,9 @@ msgstr "¿Quieres continuar?"
 msgid "Easy access"
 msgstr "Fácil acceso"
 
+msgctxt "button label: edit item"
 msgid "Edit"
-msgstr "Editar"
+msgstr ""
 
 msgid "Edit {name}"
 msgstr "Editar {name}"
@@ -791,8 +798,9 @@ msgstr "Frase de recuperación no verificada"
 msgid "Recovery phrase set"
 msgstr "Frase de recuperación establecida"
 
+msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr "Eliminar"
+msgstr ""
 
 msgid "Remove from this device"
 msgstr "Eliminar de este dispositivo"
@@ -827,8 +835,9 @@ msgstr "Reemplázala en cualquier momento"
 msgid "Requires unlocking before it can be reset."
 msgstr "Debe desbloquearse antes de poder restablecerse."
 
+msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr "Restablecer"
+msgstr ""
 
 msgid "Reset your recovery phrase?"
 msgstr "¿Restablecer tu frase de recuperación?"
@@ -839,8 +848,9 @@ msgstr "Restableciendo la frase de recuperación..."
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 msgstr "Restablecer invalidará tu frase de recuperación actual, dejando solo la nueva como utilizable."
 
+msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr "Reintentar"
+msgstr ""
 
 msgid "Return to app"
 msgstr "Volver a la app"
@@ -1155,8 +1165,9 @@ msgstr "Navegador no compatible"
 msgid "Unverified origin"
 msgstr "Origen no verificado"
 
+msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr "Actualizar"
+msgstr ""
 
 msgid "Upgrade again"
 msgstr "Actualizar de nuevo"
@@ -1182,8 +1193,9 @@ msgstr "Usa un dispositivo que ya tenga tu identidad para escanear o abrir la UR
 msgid "Use existing identity"
 msgstr "Usar identidad existente"
 
+msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr "Verificar"
+msgstr ""
 
 msgid "Verify recovery to remove"
 msgstr "Verifica la recuperación para eliminar"

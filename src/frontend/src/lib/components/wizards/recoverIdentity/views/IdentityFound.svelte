@@ -72,12 +72,20 @@
   {#if continueInProgress}
     <ProgressRing />
   {/if}
-  <span>{$t`Continue`}</span>
+  <span
+    >{$t({
+      message: "Continue",
+      context: "button label: proceed to next step",
+    })}</span
+  >
 </button>
 <button
   onclick={onCancel}
   disabled={continueInProgress}
   class="btn btn-tertiary btn-lg"
 >
-  {$t`Cancel`}
+  {$t({
+    message: "Cancel",
+    context: "button label: dismiss or abort current action",
+  })}
 </button>

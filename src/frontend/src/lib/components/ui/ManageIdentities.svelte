@@ -89,13 +89,19 @@
 
     <div class="flex flex-col gap-3">
       <button onclick={handleConfirmRemove} class="btn btn-danger w-full">
-        {$t`Remove`}
+        {$t({
+          message: "Remove",
+          context: "button label: delete or remove item",
+        })}
       </button>
       <button
         onclick={() => (removingIdentity = undefined)}
         class="btn btn-tertiary w-full"
       >
-        {$t`Cancel`}
+        {$t({
+          message: "Cancel",
+          context: "button label: dismiss or abort current action",
+        })}
       </button>
     </div>
   </div>
@@ -151,7 +157,12 @@
                 class="btn btn-tertiary btn-icon size-8! shrink-0 rounded-full"
               >
                 <Trash2Icon class="size-5" />
-                <span>{$t`Remove`}</span>
+                <span
+                  >{$t({
+                    message: "Remove",
+                    context: "button label: delete or remove item",
+                  })}</span
+                >
               </button>
             </Tooltip>
           </div>

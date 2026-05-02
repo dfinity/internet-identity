@@ -51,7 +51,12 @@
     <ProgressRing />
     <span>{$t`Resetting recovery phrase...`}</span>
   {:else}
-    <span>{$t`Reset`}</span>
+    <span
+      >{$t({
+        message: "Reset",
+        context: "button label: reset recovery phrase",
+      })}</span
+    >
   {/if}
 </Button>
 <Button
@@ -60,5 +65,8 @@
   size="lg"
   disabled={isGeneratingPhrase}
 >
-  {$t`Cancel`}
+  {$t({
+    message: "Cancel",
+    context: "button label: dismiss or abort current action",
+  })}
 </Button>

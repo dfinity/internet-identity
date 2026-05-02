@@ -22,8 +22,11 @@
   <Trans>One or more words are wrong or out of order.</Trans>
 </p>
 <button onclick={onRetry} class="btn btn-lg mb-3">
-  {$t`Retry`}
+  {$t({ message: "Retry", context: "button label: retry failed operation" })}
 </button>
 <button onclick={onCancel} class="btn btn-tertiary btn-lg">
-  {$t`Cancel`}
+  {$t({
+    message: "Cancel",
+    context: "button label: dismiss or abort current action",
+  })}
 </button>

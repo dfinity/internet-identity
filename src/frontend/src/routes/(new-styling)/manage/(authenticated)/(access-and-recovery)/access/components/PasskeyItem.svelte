@@ -72,7 +72,10 @@
     ...(onRemove !== undefined
       ? [
           {
-            label: $t`Remove`,
+            label: $t({
+              message: "Remove",
+              context: "button label: delete or remove item",
+            }),
             icon: Trash2Icon,
             disabled: isLegacy && recoveryPhraseStatus !== "verified",
             tooltip:

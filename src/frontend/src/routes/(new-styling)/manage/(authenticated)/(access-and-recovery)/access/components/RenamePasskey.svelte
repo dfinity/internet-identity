@@ -104,7 +104,10 @@
         {/if}
       </Button>
       <Button onclick={onCancel} variant="tertiary" size="lg">
-        {$t`Cancel`}
+        {$t({
+          message: "Cancel",
+          context: "button label: dismiss or abort current action",
+        })}
       </Button>
     </div>
   </fieldset>

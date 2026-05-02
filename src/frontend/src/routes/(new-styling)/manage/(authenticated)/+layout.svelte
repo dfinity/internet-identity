@@ -317,7 +317,10 @@
         onclick={() => goto("/manage/recovery", { state: { verify: true } })}
         class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
       >
-        {$t`Verify`}
+        {$t({
+          message: "Verify",
+          context: "button label: verify or confirm step",
+        })}
       </button>
     </div>
   {/if}

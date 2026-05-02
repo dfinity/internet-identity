@@ -62,7 +62,12 @@
       ]}
     >
       <XIcon class=" size-5" />
-      <span>{$t`Close`}</span>
+      <span
+        >{$t({
+          message: "Close",
+          context: "button label: close or dismiss panel",
+        })}</span
+      >
     </button>
   {/if}
   <div

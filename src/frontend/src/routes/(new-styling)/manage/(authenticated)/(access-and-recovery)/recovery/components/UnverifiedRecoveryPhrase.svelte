@@ -56,10 +56,16 @@
       ]}
     >
       <Button onclick={onReset} danger variant="secondary" size="sm">
-        {$t`Reset`}
+        {$t({
+          message: "Reset",
+          context: "button label: reset recovery phrase",
+        })}
       </Button>
       <Button onclick={onVerify} size="sm">
-        {$t`Verify`}
+        {$t({
+          message: "Verify",
+          context: "button label: verify or confirm step",
+        })}
       </Button>
     </div>
   </section>

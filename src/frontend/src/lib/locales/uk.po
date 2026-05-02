@@ -178,8 +178,9 @@ msgstr "Увімкнувши цю функцію, ви можете створи
 msgid "Can't find your identity?"
 msgstr "Не можете знайти свій ідентифікатор?"
 
+msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr "Скасувати"
+msgstr ""
 
 msgid "CAPTCHA characters"
 msgstr "Символи CAPTCHA"
@@ -223,8 +224,9 @@ msgstr "Очистити все"
 msgid "Click to reveal"
 msgstr "Натисніть, щоб показати"
 
+msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr "Закрити"
+msgstr ""
 
 msgid "Close menu"
 msgstr "Закрити меню"
@@ -261,6 +263,10 @@ msgstr "З'єднання закрито"
 
 msgid "Continue"
 msgstr "Продовжити"
+
+msgctxt "button label: proceed to next step"
+msgid "Continue"
+msgstr ""
 
 msgid "Continue on another device"
 msgstr "Продовжити на іншому пристрої"
@@ -337,8 +343,9 @@ msgstr "Ви хочете продовжити?"
 msgid "Easy access"
 msgstr "Легкий доступ"
 
+msgctxt "button label: edit item"
 msgid "Edit"
-msgstr "Редагувати"
+msgstr ""
 
 msgid "Edit {name}"
 msgstr "Редагувати {name}"
@@ -791,8 +798,9 @@ msgstr "Фраза відновлення не перевірена"
 msgid "Recovery phrase set"
 msgstr "Фраза відновлення встановлена"
 
+msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr "Видалити"
+msgstr ""
 
 msgid "Remove from this device"
 msgstr "Видалити з цього пристрою"
@@ -827,8 +835,9 @@ msgstr "Замініть його будь-коли"
 msgid "Requires unlocking before it can be reset."
 msgstr "Потребує розблокування перед скиданням."
 
+msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr "Скинути"
+msgstr ""
 
 msgid "Reset your recovery phrase?"
 msgstr "Скинути вашу фразу відновлення?"
@@ -839,8 +848,9 @@ msgstr "Скидання фрази відновлення..."
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 msgstr "Скидання призведе до втрати чинності вашої поточної фрази відновлення, залишаючи придатною лише нову."
 
+msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr "Спробувати ще раз"
+msgstr ""
 
 msgid "Return to app"
 msgstr "Повернутися до застосунку"
@@ -1155,8 +1165,9 @@ msgstr "Непідтримуваний браузер"
 msgid "Unverified origin"
 msgstr "Непідтверджене джерело"
 
+msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr "Оновити"
+msgstr ""
 
 msgid "Upgrade again"
 msgstr "Оновити знову"
@@ -1182,8 +1193,9 @@ msgstr "Використовуйте пристрій, який вже має в
 msgid "Use existing identity"
 msgstr "Використати існуючий ідентифікатор"
 
+msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr "Перевірити"
+msgstr ""
 
 msgid "Verify recovery to remove"
 msgstr "Перевірити відновлення для видалення"

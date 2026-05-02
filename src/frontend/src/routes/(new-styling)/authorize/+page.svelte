@@ -313,7 +313,10 @@
       <button
         onclick={() => (isUpgradeCollapsed = true)}
         class="btn btn-tertiary btn-lg btn-icon absolute end-2 top-2 !rounded-full hover:!bg-black/5 dark:hover:!bg-white/3"
-        aria-label={$t`Close`}
+        aria-label={$t({
+          message: "Close",
+          context: "button label: close or dismiss panel",
+        })}
       >
         <XIcon class="size-5" aria-hidden="true" />
       </button>
@@ -335,7 +338,10 @@
         onclick={() => (isUpgrading = true)}
         class="me-6 border-none text-sm font-semibold text-black/70 outline-none hover:underline focus-visible:underline dark:text-white/70"
       >
-        {$t`Upgrade`}
+        {$t({
+          message: "Upgrade",
+          context: "button label: upgrade identity or passkey",
+        })}
       </button>
     </div>
   </div>

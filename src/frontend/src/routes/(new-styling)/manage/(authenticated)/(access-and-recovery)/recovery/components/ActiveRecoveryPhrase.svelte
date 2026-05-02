@@ -106,7 +106,12 @@
           <LockKeyholeIcon class="size-4" />
           <span>{$t`Unlock and reset`}</span>
         {:else}
-          <span>{$t`Reset`}</span>
+          <span
+            >{$t({
+              message: "Reset",
+              context: "button label: reset recovery phrase",
+            })}</span
+          >
         {/if}
       </Button>
     </Tooltip>

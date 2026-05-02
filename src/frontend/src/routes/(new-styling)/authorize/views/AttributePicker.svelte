@@ -166,7 +166,10 @@
         <button
           onclick={() => (isOpen = false)}
           class="btn btn-tertiary btn-sm btn-icon col-start-4 row-start-1 my-3 me-3 size-6! shrink-0 justify-self-end"
-          aria-label={$t`Close`}
+          aria-label={$t({
+            message: "Close",
+            context: "button label: close or dismiss panel",
+          })}
           aria-expanded="true"
         >
           <ChevronUpIcon class="size-4" />
