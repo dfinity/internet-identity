@@ -86,7 +86,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "اگر آپ اپنی شناخت تک رسائی کھو دیں تو اسے دوبارہ حاصل کرنے کا ایک طریقہ۔"
 
 msgid "About"
-msgstr ""
+msgstr "تعارف"
 
 msgid "Access and recovery"
 msgstr "رسائی اور ریکوری"
@@ -126,9 +126,6 @@ msgstr "ایک اور پاس کی شامل کریں"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "محفوظ رسائی کے لیے پاس کی یا تھرڈ پارٹی اکاؤنٹ کے ذریعے سائن اِن کرنے کا ایک اور طریقہ شامل کریں۔"
-
-msgid "Add identity"
-msgstr ""
 
 msgid "Add new"
 msgstr "نیا شامل کریں"
@@ -507,7 +504,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "عمل منسوخ کر دیا گیا۔ براہ کرم دوبارہ کوشش کریں۔"
 
 msgid "Internet Identity"
-msgstr ""
+msgstr "Internet Identity"
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity آپ کا بائیومیٹرک ڈیٹا <0>ذخیرہ نہیں کرتی</0>۔ یہ آپ کی ڈیوائس پر ہی رہتا ہے۔ آپ کی شناخت ایک محفوظ پاس کی مینیجر کے طور پر کام کرتی ہے۔"
@@ -720,7 +717,7 @@ msgid "Open menu"
 msgstr "مینو کھولیں"
 
 msgid "Or sign in with another identity"
-msgstr ""
+msgstr "یا کسی دوسری شناخت سے سائن اِن کریں"
 
 msgid "Pairing link"
 msgstr "پیئرنگ لنک"
@@ -906,13 +903,13 @@ msgid "Sign in again to continue where you left off."
 msgstr "جہاں آپ نے چھوڑا تھا وہاں سے جاری رکھنے کے لیے دوبارہ سائن ان کریں۔"
 
 msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr ""
+msgstr "بغیر پاس ورڈز یا ذاتی ڈیٹا شیئر کیے ایپس تک رسائی کے لیے سائن اِن کریں یا شناخت بنائیں۔"
 
 msgid "Sign in there."
 msgstr "وہاں سائن اِن کریں۔"
 
 msgid "Sign in to manage your identity"
-msgstr ""
+msgstr "اپنی شناخت کا انتظام کرنے کے لیے سائن اِن کریں"
 
 msgid "Sign in using familiar methods"
 msgstr "مانوس طریقوں سے سائن اِن کریں"

@@ -86,7 +86,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Een manier om weer toegang te krijgen tot uw identiteit als u deze ooit verliest."
 
 msgid "About"
-msgstr ""
+msgstr "Over"
 
 msgid "Access and recovery"
 msgstr "Toegang en herstel"
@@ -126,9 +126,6 @@ msgstr "Voeg een andere passkey toe"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Voeg een andere manier toe om in te loggen met een passkey of account van derden voor veilige toegang."
-
-msgid "Add identity"
-msgstr ""
 
 msgid "Add new"
 msgstr "Voeg nieuw toe"
@@ -507,7 +504,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "Interactie geannuleerd. Probeer het opnieuw."
 
 msgid "Internet Identity"
-msgstr ""
+msgstr "Internet Identity"
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity slaat uw biometrische gegevens <0>niet</0> op. Deze blijven op uw apparaat. Uw identiteit fungeert als een veilige passkey-manager."
@@ -720,7 +717,7 @@ msgid "Open menu"
 msgstr "Menu openen"
 
 msgid "Or sign in with another identity"
-msgstr ""
+msgstr "Of log in met een andere identiteit"
 
 msgid "Pairing link"
 msgstr "Koppelingslink"
@@ -906,13 +903,13 @@ msgid "Sign in again to continue where you left off."
 msgstr "Log opnieuw in om verder te gaan waar u gebleven was."
 
 msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr ""
+msgstr "Log in of maak een identiteit aan om toegang te krijgen tot apps zonder wachtwoorden of het delen van persoonlijke gegevens."
 
 msgid "Sign in there."
 msgstr "Log daar in."
 
 msgid "Sign in to manage your identity"
-msgstr ""
+msgstr "Log in om uw identiteit te beheren"
 
 msgid "Sign in using familiar methods"
 msgstr "Inloggen met vertrouwde methoden"
