@@ -208,7 +208,7 @@
           `self-service (Test passkey – safe to delete)`,
           rpId,
         ),
-        getPublicKey: async (result) => {
+        getPublicKey: (result) => {
           if (result.response.attestationObject === undefined) {
             throw new Error("Was expecting an attestation response.");
           }
@@ -217,7 +217,7 @@
           );
           const authData = new Uint8Array(attObject.authData);
           debug = authDataToCoseDebug(authData);
-          return new CosePublicKey(debug.cleanedCose);
+          return Promise.resolve(new CosePublicKey(debug.cleanedCose));
         },
       });
       await identity.sign(
