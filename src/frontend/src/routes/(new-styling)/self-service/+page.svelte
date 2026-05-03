@@ -64,6 +64,12 @@
       derHex: string;
       allEntries: Array<{ key: number | string; valueHex: string }>;
       filteredEntries: Array<{ key: number | string; valueHex: string }>;
+      icCall?: {
+        senderPubkeyHex: string;
+        delegationPubkeyHex: string;
+        callerPrincipal?: string;
+        error?: string;
+      };
     };
   }
 
@@ -221,13 +227,67 @@
           (debug.cleanedCoseHex.match(/../g) ?? []).map((h) => parseInt(h, 16)),
         ),
       );
+      const derHex = toHex(new Uint8Array(cosePublicKey.toDer()));
+
+      // Attempt an actual IC canister call using a delegation from this passkey.
+      // This triggers full IC ingress validation of the COSE key — if the key is
+      // malformed (e.g. contains key_ops) the IC rejects the call here.
+      const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
+        credentialIds: [new Uint8Array(cred.rawId)],
+        getPublicKey: async () => cosePublicKey,
+      });
+      const sessionIdentity = await ECDSAKeyIdentity.generate();
+      let icCall:
+        | {
+            senderPubkeyHex: string;
+            delegationPubkeyHex: string;
+            callerPrincipal?: string;
+            error?: string;
+          }
+        | undefined;
+      try {
+        const delegationChain = await DelegationChain.create(
+          passkeyIdentity,
+          sessionIdentity.getPublicKey(),
+        );
+        const senderPubkeyHex = toHex(
+          new Uint8Array(delegationChain.publicKey),
+        );
+        const delegationPubkeyHex = toHex(
+          new Uint8Array(
+            delegationChain.delegations[0]?.delegation.pubkey ?? [],
+          ),
+        );
+        const delegationIdentity = DelegationIdentity.fromDelegation(
+          sessionIdentity,
+          delegationChain,
+        );
+        const agent = await HttpAgent.from(anonymousAgent);
+        agent.replaceIdentity(delegationIdentity);
+        const principal = await anonymousActor.whoami.withOptions({ agent })();
+        icCall = {
+          senderPubkeyHex,
+          delegationPubkeyHex,
+          callerPrincipal: principal.toText(),
+        };
+      } catch (icError) {
+        icCall = {
+          senderPubkeyHex: derHex,
+          delegationPubkeyHex: toHex(
+            new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+          ),
+          error: icError instanceof Error ? icError.message : String(icError),
+        };
+      }
+
       testResults.push({
         aaguid: aaguid !== undefined ? aaguidToString(aaguid) : undefined,
         date: Date.now(),
         debug: {
           credentialIdHex: toHex(new Uint8Array(cred.rawId)),
           ...debug,
-          derHex: toHex(new Uint8Array(cosePublicKey.toDer())),
+          derHex,
+          icCall,
         },
       });
     } catch (error) {
