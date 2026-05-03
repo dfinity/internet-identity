@@ -65,7 +65,10 @@ test.describe("Self-service passkey debugging", () => {
           cleanedCoseHex: string;
           derHex: string;
           allEntries: Array<{ key: number | string; valueCborHex: string }>;
-          filteredEntries: Array<{ key: number | string; valueCborHex: string }>;
+          filteredEntries: Array<{
+            key: number | string;
+            valueCborHex: string;
+          }>;
           icCall?: {
             senderPubkeyHex: string;
             delegationPubkeyHex: string;
@@ -162,7 +165,10 @@ test.describe("Self-service passkey debugging", () => {
     const json = JSON.parse(fs.readFileSync(filePath!, "utf-8")) as {
       tests: Array<{
         debug?: {
-          filteredEntries: Array<{ key: number | string; valueCborHex: string }>;
+          filteredEntries: Array<{
+            key: number | string;
+            valueCborHex: string;
+          }>;
           allEntries: Array<{ key: number | string; valueCborHex: string }>;
         };
       }>;
