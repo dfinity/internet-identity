@@ -220,9 +220,7 @@
           return Promise.resolve(new CosePublicKey(debug.cleanedCose));
         },
       });
-      await identity.sign(
-        Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
-      );
+      await identity.sign(Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)));
       if (debug === undefined) throw new Error("Debug info missing");
       const credentialId = identity.getCredentialId()!;
       const aaguid = identity.getAaguid();
