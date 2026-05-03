@@ -230,7 +230,7 @@
       // malformed (e.g. contains key_ops) the IC rejects the call here.
       const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
         credentialIds: [new Uint8Array(cred.rawId)],
-        getPublicKey: async () => cosePublicKey,
+        getPublicKey: () => Promise.resolve(cosePublicKey),
       });
       const sessionIdentity = await ECDSAKeyIdentity.generate();
       let icCall:
