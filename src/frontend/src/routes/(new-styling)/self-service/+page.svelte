@@ -9,7 +9,6 @@
     PlayIcon,
     CheckIcon,
     XIcon,
-    TriangleAlertIcon,
     CircleXIcon,
     CircleCheckIcon,
   } from "@lucide/svelte";
@@ -73,65 +72,14 @@
     };
   }
 
-  const verifiedSupportedProviders = [
-    "6028b017-b1d4-4c02-b4b3-afcdafc96bb2", // Windows Hello
-    "9ddd1817-af5a-4672-a2b9-3e3dd95000a9", // Windows Hello
-    "08987058-cadc-4b81-b6e1-30de50dcbe96", // Windows Hello
-    "fbfc3007-154e-4ecc-8c0b-6e020557d7bd", // Apple Passwords
-    "d548826e-79b4-db40-a3d8-11116f7e8349", // Bitwarden
-    "bada5566-a7aa-401f-bd96-45619a55120d", // 1Password
-    "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4", // Google Password Manager
-    "53414d53-554e-4700-0000-000000000000", // Samsung Pass
-    "a25342c0-3cdc-4414-8e46-f4807fca511c", // YubiKey latest firmware (5.7)
-    "d7781e5d-e353-46aa-afe2-3ca49f13332a", // YubiKey latest firmware (5.7)
-    "662ef48a-95e2-4aaa-a6c1-5b9c40375824", // YubiKey latest firmware (5.7)
-    "19083c3d-8383-4b18-bc03-8f1c9ab2fd1b", // YubiKey latest firmware (5.7)
-    "ff4dac45-ede8-4ec2-aced-cf66103f4335", // YubiKey latest firmware (5.7)
-    "a02167b9-ae71-4ac7-9a07-06432ebb6f1c", // YubiKey latest firmware (5.7)
-    "24673149-6c86-42e7-98d9-433fb5b73296", // YubiKey latest firmware (5.7)
-    "fcc0118f-cd45-435b-8da1-9782b2da0715", // YubiKey latest firmware (5.7)
-    "57f7de54-c807-4eab-b1c6-1c9be7984e92", // YubiKey latest firmware (5.7)
-    "7b96457d-e3cd-432b-9ceb-c9fdd7ef7432", // YubiKey latest firmware (5.7)
-    "dd86a2da-86a0-4cbe-b462-4bd31f57bc6f", // YubiKey latest firmware (5.7)
-    "7409272d-1ff9-4e10-9fc9-ac0019c124fd", // YubiKey latest firmware (5.7)
-    "90636e1f-ef82-43bf-bdcf-5255f139d12f", // YubiKey latest firmware (5.7)
-    "34744913-4f57-4e6e-a527-e9ec3c4b94e6", // YubiKey latest firmware (5.7)
-    "e77e3c64-05e3-428b-8824-0cbeb04b829d", // YubiKey latest firmware (5.7)
-    "b7d3f68e-88a6-471e-9ecf-2df26d041ede", // YubiKey latest firmware (5.7)
-    "47ab2fb4-66ac-4184-9ae1-86be814012d5", // YubiKey latest firmware (5.7)
-    "ed042a3a-4b22-4455-bb69-a267b652ae7e", // YubiKey latest firmware (5.7)
-  ];
-  const verifiedUnsupportedProviders: Record<string, string> = {
-    "cb69481e-8ff7-4039-93ec-0a2729a154a8": $t`This YubiKey has older firmware (5.1) that's incompatible.`,
-    "fa2b99dc-9e39-4257-8f92-4a30d23c4118": $t`This YubiKey has older firmware (5.1) that's incompatible.`,
-    "f8a011f3-8c0a-4d15-8006-17111f9edc7d": $t`This YubiKey has older firmware (5.1) that's incompatible.`,
-    "531126d6-e717-415c-9320-3d9aa6981239": $t`Dashlane has been confirmed to be incompatible.`,
-    "b84e4048-15dc-4dd0-8640-f4f60813c8af": $t`NordPass has been confirmed to be incompatible.`,
-    "6e24d385-004a-16a0-7bfe-efd963845b34": $t`Ledger has been confirmed to be incompatible.`,
-    "341e4da9-3c2e-8103-5a9f-aad887135200": $t`Ledger has been confirmed to be incompatible.`,
-    "58b44d0b-0a7c-f33a-fd48-f7153c871352": $t`Ledger has been confirmed to be incompatible.`,
-    "1d8cac46-47a1-3386-af50-e88ae46fe802": $t`Ledger has been confirmed to be incompatible.`,
-    "fcb1bcb4-f370-078c-6993-bc24d0ae3fbe": $t`Ledger has been confirmed to be incompatible.`,
-  };
-  const possiblyUnsupportedProviders: Record<string, string> = {
-    "b92c3f9a-c014-4056-887f-140a2501163b": $t`This YubiKey has older firmware (5.2) that might be incompatible.`,
-    "ee882879-721c-4913-9775-3dfcce97072a": $t`This YubiKey has older firmware (5.2 - 5.4) that might be incompatible.`,
-    "2fc0579f-8113-47ea-b116-bb5a8db9202a": $t`This YubiKey has older firmware (5.2 - 5.4) that might be incompatible.`,
-    "c5ef55ff-ad9a-4b9f-b580-adebafe026d0": $t`This YubiKey has older firmware (5.2 - 5.4) that might be incompatible.`,
-    "149a2021-8ef6-4133-96b8-81f8d5b7f1f5": $t`This YubiKey has older firmware (5.2 - 5.4) that might be incompatible.`,
-    "c1f9a0bc-1dd2-404a-b27f-8e29047a43fd": $t`This YubiKey has older firmware (5.4) that might be incompatible.`,
-    "73bb0cd4-e502-49b8-9c6f-b59445bf720b": $t`This YubiKey has older firmware (5.4) that might be incompatible.`,
-    "85203421-48f9-4355-9bc8-8a53846e5083": $t`This YubiKey has older firmware (5.4) that might be incompatible.`,
-    "a4e9fc6d-4cbe-4758-b8ba-37598bb5bbaa": $t`This YubiKey has older firmware (5.4) that might be incompatible.`,
-    "0bb43545-fd2c-4185-87dd-feb0b2916ace": $t`This YubiKey has older firmware (5.4) that might be incompatible.`,
-    "d8522d9f-575b-4866-88a9-ba99fa02f35b": $t`This YubiKey has older firmware (5.5 - 5.6) that might be incompatible.`,
-    "7d1351a6-e097-4852-b8bf-c9ac5c9ce4a3": $t`This YubiKey has older firmware (5.6) that might be incompatible.`,
-  };
-
   let identityResults = $state<IdentityResult[]>([]);
   let knownProviders = $state<Record<string, Provider>>({});
   let testResults = $state<TestResult[]>([]);
   let highlightIdentity = $state<bigint>();
+  const knownCredentials = new Map<
+    string,
+    { publicKey: CosePublicKey; aaguid?: string }
+  >();
 
   const missingUpgradedPasskey = (devices: DeviceData[]) =>
     // Has at least one passkey (else likely OpenID sign-in identity)
@@ -285,8 +233,14 @@
         };
       }
 
+      const resolvedAaguid =
+        aaguid !== undefined ? aaguidToString(aaguid) : undefined;
+      knownCredentials.set(toHex(new Uint8Array(credentialId)), {
+        publicKey: cosePublicKey,
+        aaguid: resolvedAaguid,
+      });
       testResults.push({
-        aaguid: aaguid !== undefined ? aaguidToString(aaguid) : undefined,
+        aaguid: resolvedAaguid,
         date: Date.now(),
         debug: {
           credentialIdHex: toHex(credentialId),
@@ -294,6 +248,103 @@
           cleanedCoseHex: debug.cleanedCoseHex,
           allEntries: debug.allEntries,
           filteredEntries: debug.filteredEntries,
+          derHex,
+          icCall,
+        },
+      });
+    } catch (error) {
+      handleError(error);
+    }
+  };
+  const testDiscoverableAuth = async () => {
+    try {
+      let resolvedCredential:
+        | { publicKey: CosePublicKey; aaguid?: string }
+        | undefined;
+      const discoverableIdentity = DiscoverablePasskeyIdentity.useExisting({
+        getPublicKey: (result) => {
+          const credHex = toHex(new Uint8Array(result.rawId));
+          resolvedCredential = knownCredentials.get(credHex);
+          if (resolvedCredential === undefined) {
+            throw new Error(
+              "Run 'Test passkey support' first to register this passkey.",
+            );
+          }
+          return Promise.resolve(resolvedCredential.publicKey);
+        },
+      });
+      await discoverableIdentity.sign(
+        Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+      );
+      if (resolvedCredential === undefined)
+        throw new Error("Credential not resolved");
+      const credentialId = discoverableIdentity.getCredentialId()!;
+      const cosePublicKey = resolvedCredential.publicKey;
+      const derHex = toHex(new Uint8Array(cosePublicKey.toDer()));
+
+      const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
+        credentialIds: [credentialId],
+        getPublicKey: () => Promise.resolve(cosePublicKey),
+      });
+      const sessionIdentity = await ECDSAKeyIdentity.generate();
+      let icCall:
+        | {
+            senderPubkeyHex: string;
+            delegationPubkeyHex: string;
+            callerPrincipal?: string;
+            error?: string;
+          }
+        | undefined;
+      try {
+        const delegationChain = await DelegationChain.create(
+          passkeyIdentity,
+          sessionIdentity.getPublicKey(),
+        );
+        const senderPubkeyHex = toHex(
+          new Uint8Array(delegationChain.publicKey),
+        );
+        const delegationPubkeyHex = toHex(
+          new Uint8Array(
+            delegationChain.delegations[0]?.delegation.pubkey ?? [],
+          ),
+        );
+        const delegationIdentity = DelegationIdentity.fromDelegation(
+          sessionIdentity,
+          delegationChain,
+        );
+        const agent = await HttpAgent.from(anonymousAgent);
+        agent.replaceIdentity(delegationIdentity);
+        const principal = await anonymousActor.whoami.withOptions({ agent })();
+        icCall = {
+          senderPubkeyHex,
+          delegationPubkeyHex,
+          callerPrincipal: principal.toText(),
+        };
+      } catch (icError) {
+        if (
+          icError instanceof DOMException &&
+          icError.name === "NotAllowedError"
+        ) {
+          throw icError;
+        }
+        icCall = {
+          senderPubkeyHex: derHex,
+          delegationPubkeyHex: toHex(
+            new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+          ),
+          error: icError instanceof Error ? icError.message : String(icError),
+        };
+      }
+
+      testResults.push({
+        aaguid: resolvedCredential.aaguid,
+        date: Date.now(),
+        debug: {
+          credentialIdHex: toHex(credentialId),
+          rawCoseHex: "",
+          cleanedCoseHex: toHex(cosePublicKey.getCose()),
+          allEntries: [],
+          filteredEntries: [],
           derHex,
           icCall,
         },
@@ -526,10 +577,19 @@
       <p class="text-text-tertiary mb-6 text-base text-pretty">
         <Trans>Test passkey support and view authenticator details</Trans>
       </p>
-      <button onclick={testPasskeyCreation} class="btn gap-2 max-sm:w-full">
-        <PlayIcon class="size-5" />
-        <span>{$t`Test passkey support`}</span>
-      </button>
+      <div class="flex flex-wrap gap-3">
+        <button onclick={testPasskeyCreation} class="btn gap-2 max-sm:w-full">
+          <PlayIcon class="size-5" />
+          <span>{$t`Test passkey support`}</span>
+        </button>
+        <button
+          onclick={testDiscoverableAuth}
+          class="btn btn-secondary gap-2 max-sm:w-full"
+        >
+          <PlayIcon class="size-5" />
+          <span>{$t`Test sign-in`}</span>
+        </button>
+      </div>
       <hr class="bt-1 border-border-secondary my-4" />
       {#if testResults.length > 0}
         <div class="flex flex-col gap-4">
@@ -548,28 +608,12 @@
                 <Badge class="ms-auto !flex flex-row items-center gap-1">
                   {#if testResult.debug?.icCall?.error !== undefined}
                     <XIcon class="text-text-error-primary size-5" />
-                    <span class="text-text-error-primary">
-                      {$t`Error`}
-                    </span>
-                  {:else if testResult.aaguid === undefined}
-                    <span>{$t`Unknown`}</span>
-                  {:else if verifiedSupportedProviders.includes(testResult.aaguid)}
-                    <CheckIcon class="text-text-success-primary size-5" />
-                    <span class="text-text-success-primary">
-                      {$t`Supported`}
-                    </span>
-                  {:else if testResult.aaguid in verifiedUnsupportedProviders}
-                    <XIcon class="text-text-error-primary size-5" />
-                    <span class="text-text-error-primary">
-                      {$t`Unsupported`}
-                    </span>
-                  {:else if testResult.aaguid in possiblyUnsupportedProviders}
-                    <TriangleAlertIcon
-                      class="text-text-warning-primary size-5"
-                    />
-                    <span class="text-text-warning-primary">{$t`Warning`}</span>
+                    <span class="text-text-error-primary">{$t`Error`}</span>
                   {:else}
-                    <span>{$t`Unknown`}</span>
+                    <CheckIcon class="text-text-success-primary size-5" />
+                    <span class="text-text-success-primary"
+                      >{$t`Supported`}</span
+                    >
                   {/if}
                 </Badge>
               </div>
@@ -580,12 +624,6 @@
                 <div class="text-text-primary text-xs">
                   {#if testResult.debug?.icCall?.error !== undefined}
                     {$t`This passkey seems to have issues, please share the export with support.`}
-                  {:else if testResult.aaguid === undefined}
-                    {$t`The passkey could not be identified, support unknown.`}
-                  {:else if testResult.aaguid in verifiedUnsupportedProviders}
-                    {verifiedUnsupportedProviders[testResult.aaguid]}
-                  {:else if testResult.aaguid in possiblyUnsupportedProviders}
-                    {possiblyUnsupportedProviders[testResult.aaguid]}
                   {:else if provider?.type === "cloud"}
                     {provider.platform === undefined
                       ? $t`Stored in your ${provider.account} account and synced across your devices.`
