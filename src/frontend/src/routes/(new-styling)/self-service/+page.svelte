@@ -23,7 +23,7 @@
     getRpId,
   } from "$lib/utils/discoverablePasskeyIdentity";
   import borc from "borc";
-  import { aaguidToString, extractAAGUID } from "$lib/utils/webAuthn";
+  import { aaguidToString } from "$lib/utils/webAuthn";
   import Badge from "$lib/components/ui/Badge.svelte";
   import type { Provider } from "$lib/assets/aaguid";
   import { onMount } from "svelte";
@@ -201,35 +201,39 @@
   };
   const testPasskeyCreation = async () => {
     try {
+      let debug: ReturnType<typeof authDataToCoseDebug> | undefined;
       const rpId = getRpId();
-      const options = creationOptions(
-        `self-service (Test passkey – safe to delete)`,
-        rpId,
-      );
-      const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-      const credential = await navigator.credentials.create({
-        ...options,
-        publicKey: { ...options.publicKey, challenge },
+      const identity = new DiscoverablePasskeyIdentity({
+        credentialCreationOptions: creationOptions(
+          `self-service (Test passkey – safe to delete)`,
+          rpId,
+        ),
+        getPublicKey: async (result) => {
+          if (result.response.attestationObject === undefined) {
+            throw new Error("Was expecting an attestation response.");
+          }
+          const attObject = borc.decodeFirst(
+            new Uint8Array(result.response.attestationObject),
+          );
+          const authData = new Uint8Array(attObject.authData);
+          debug = authDataToCoseDebug(authData);
+          return new CosePublicKey(debug.cleanedCose);
+        },
       });
-      if (credential === null)
-        throw new Error("WebAuthn credential is missing");
-      const cred = credential as PublicKeyCredential & {
-        response: AuthenticatorAttestationResponse;
-      };
-      const attObject = borc.decodeFirst(
-        new Uint8Array(cred.response.attestationObject),
+      await identity.sign(
+        Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
       );
-      const authData = new Uint8Array(attObject.authData);
-      const aaguid = extractAAGUID(authData);
-      const debug = authDataToCoseDebug(authData);
-      const cosePublicKey = new CosePublicKey(debug.cleanedCose);
+      if (debug === undefined) throw new Error("Debug info missing");
+      const credentialId = identity.getCredentialId()!;
+      const aaguid = identity.getAaguid();
+      const cosePublicKey = identity.getPublicKey() as CosePublicKey;
       const derHex = toHex(new Uint8Array(cosePublicKey.toDer()));
 
       // Attempt an actual IC canister call using a delegation from this passkey.
       // This triggers full IC ingress validation of the COSE key — if the key is
       // malformed (e.g. contains key_ops) the IC rejects the call here.
       const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
-        credentialIds: [new Uint8Array(cred.rawId)],
+        credentialIds: [credentialId],
         getPublicKey: () => Promise.resolve(cosePublicKey),
       });
       const sessionIdentity = await ECDSAKeyIdentity.generate();
@@ -280,7 +284,7 @@
         aaguid: aaguid !== undefined ? aaguidToString(aaguid) : undefined,
         date: Date.now(),
         debug: {
-          credentialIdHex: toHex(new Uint8Array(cred.rawId)),
+          credentialIdHex: toHex(credentialId),
           rawCoseHex: debug.rawCoseHex,
           cleanedCoseHex: debug.cleanedCoseHex,
           allEntries: debug.allEntries,
