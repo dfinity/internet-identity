@@ -269,6 +269,13 @@
           callerPrincipal: principal.toText(),
         };
       } catch (icError) {
+        // Re-throw user cancellations — the test was not completed
+        if (
+          icError instanceof DOMException &&
+          icError.name === "NotAllowedError"
+        ) {
+          throw icError;
+        }
         icCall = {
           senderPubkeyHex: derHex,
           delegationPubkeyHex: toHex(
@@ -539,7 +546,12 @@
                   {provider?.name ?? $t`Unknown`}
                 </div>
                 <Badge class="ms-auto !flex flex-row items-center gap-1">
-                  {#if testResult.aaguid === undefined}
+                  {#if testResult.debug?.icCall?.error !== undefined}
+                    <XIcon class="text-text-error-primary size-5" />
+                    <span class="text-text-error-primary">
+                      {$t`Unsupported`}
+                    </span>
+                  {:else if testResult.aaguid === undefined}
                     <span>{$t`Unknown`}</span>
                   {:else if verifiedSupportedProviders.includes(testResult.aaguid)}
                     <CheckIcon class="text-text-success-primary size-5" />
