@@ -18,11 +18,15 @@
   import {
     CosePublicKey,
     DiscoverablePasskeyIdentity,
+    authDataToCoseDebug,
+    creationOptions,
+    getRpId,
   } from "$lib/utils/discoverablePasskeyIdentity";
+  import borc from "borc";
+  import { aaguidToString, extractAAGUID } from "$lib/utils/webAuthn";
   import Badge from "$lib/components/ui/Badge.svelte";
   import type { Provider } from "$lib/assets/aaguid";
   import { onMount } from "svelte";
-  import { aaguidToString } from "$lib/utils/webAuthn";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import {
     anonymousActor,
@@ -53,6 +57,14 @@
   interface TestResult {
     aaguid?: string;
     date: number;
+    debug?: {
+      credentialIdHex: string;
+      rawCoseHex: string;
+      cleanedCoseHex: string;
+      derHex: string;
+      allEntries: Array<{ key: number | string; valueHex: string }>;
+      filteredEntries: Array<{ key: number | string; valueHex: string }>;
+    };
   }
 
   const verifiedSupportedProviders = [
@@ -183,13 +195,40 @@
   };
   const testPasskeyCreation = async () => {
     try {
-      const identity = await DiscoverablePasskeyIdentity.createNew(
+      const rpId = getRpId();
+      const options = creationOptions(
         `self-service (Test passkey – safe to delete)`,
+        rpId,
       );
-      const aaguid = await identity.getAaguid();
+      const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+      const credential = await navigator.credentials.create({
+        ...options,
+        publicKey: { ...options.publicKey, challenge },
+      });
+      if (credential === null)
+        throw new Error("WebAuthn credential is missing");
+      const cred = credential as PublicKeyCredential & {
+        response: AuthenticatorAttestationResponse;
+      };
+      const attObject = borc.decodeFirst(
+        new Uint8Array(cred.response.attestationObject),
+      );
+      const authData = new Uint8Array(attObject.authData);
+      const aaguid = extractAAGUID(authData);
+      const debug = authDataToCoseDebug(authData);
+      const cosePublicKey = new CosePublicKey(
+        Uint8Array.from(
+          (debug.cleanedCoseHex.match(/../g) ?? []).map((h) => parseInt(h, 16)),
+        ),
+      );
       testResults.push({
         aaguid: aaguid !== undefined ? aaguidToString(aaguid) : undefined,
         date: Date.now(),
+        debug: {
+          credentialIdHex: toHex(new Uint8Array(cred.rawId)),
+          ...debug,
+          derHex: toHex(new Uint8Array(cosePublicKey.toDer())),
+        },
       });
     } catch (error) {
       handleError(error);
