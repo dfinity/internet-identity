@@ -44,6 +44,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { toHex, waitFor } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
+  import { SvelteMap } from "svelte/reactivity";
 
   interface IdentityResult {
     identityNumber: bigint;
@@ -76,7 +77,7 @@
   let knownProviders = $state<Record<string, Provider>>({});
   let testResults = $state<TestResult[]>([]);
   let highlightIdentity = $state<bigint>();
-  const knownCredentials = new Map<
+  const knownCredentials = new SvelteMap<
     string,
     { publicKey: CosePublicKey; aaguid?: string }
   >();
