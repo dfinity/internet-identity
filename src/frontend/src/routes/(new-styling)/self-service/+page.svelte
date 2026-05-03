@@ -549,7 +549,7 @@
                   {#if testResult.debug?.icCall?.error !== undefined}
                     <XIcon class="text-text-error-primary size-5" />
                     <span class="text-text-error-primary">
-                      {$t`Unsupported`}
+                      {$t`Error`}
                     </span>
                   {:else if testResult.aaguid === undefined}
                     <span>{$t`Unknown`}</span>
@@ -578,7 +578,9 @@
               </div>
               <div class="flex flex-col items-end gap-4 sm:flex-row">
                 <div class="text-text-primary text-xs">
-                  {#if testResult.aaguid === undefined}
+                  {#if testResult.debug?.icCall?.error !== undefined}
+                    {$t`This passkey seems to have issues, please share the export with support.`}
+                  {:else if testResult.aaguid === undefined}
                     {$t`The passkey could not be identified, support unknown.`}
                   {:else if testResult.aaguid in verifiedUnsupportedProviders}
                     {verifiedUnsupportedProviders[testResult.aaguid]}
