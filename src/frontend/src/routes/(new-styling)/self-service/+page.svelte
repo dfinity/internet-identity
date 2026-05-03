@@ -62,8 +62,8 @@
       rawCoseHex: string;
       cleanedCoseHex: string;
       derHex: string;
-      allEntries: Array<{ key: number | string; valueHex: string }>;
-      filteredEntries: Array<{ key: number | string; valueHex: string }>;
+      allEntries: Array<{ key: number | string; valueCborHex: string }>;
+      filteredEntries: Array<{ key: number | string; valueCborHex: string }>;
       icCall?: {
         senderPubkeyHex: string;
         delegationPubkeyHex: string;
@@ -222,11 +222,7 @@
       const authData = new Uint8Array(attObject.authData);
       const aaguid = extractAAGUID(authData);
       const debug = authDataToCoseDebug(authData);
-      const cosePublicKey = new CosePublicKey(
-        Uint8Array.from(
-          (debug.cleanedCoseHex.match(/../g) ?? []).map((h) => parseInt(h, 16)),
-        ),
-      );
+      const cosePublicKey = new CosePublicKey(debug.cleanedCose);
       const derHex = toHex(new Uint8Array(cosePublicKey.toDer()));
 
       // Attempt an actual IC canister call using a delegation from this passkey.
@@ -285,7 +281,10 @@
         date: Date.now(),
         debug: {
           credentialIdHex: toHex(new Uint8Array(cred.rawId)),
-          ...debug,
+          rawCoseHex: debug.rawCoseHex,
+          cleanedCoseHex: debug.cleanedCoseHex,
+          allEntries: debug.allEntries,
+          filteredEntries: debug.filteredEntries,
           derHex,
           icCall,
         },

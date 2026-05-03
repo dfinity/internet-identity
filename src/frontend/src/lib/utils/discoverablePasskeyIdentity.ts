@@ -36,22 +36,26 @@ export function authDataToCose(authData: Uint8Array): Uint8Array {
 }
 
 export function authDataToCoseDebug(authData: Uint8Array): {
+  cleanedCose: Uint8Array;
   rawCoseHex: string;
   cleanedCoseHex: string;
-  allEntries: Array<{ key: number | string; valueHex: string }>;
-  filteredEntries: Array<{ key: number | string; valueHex: string }>;
+  allEntries: Array<{ key: number | string; valueCborHex: string }>;
+  filteredEntries: Array<{ key: number | string; valueCborHex: string }>;
 } {
   const view = new DataView(bufFromBufLike(authData));
   const coseKey = authData.slice(55 + view.getUint16(53, false));
   const decoded = borc.decodeFirst(coseKey);
 
-  const allEntries: Array<{ key: number | string; valueHex: string }> = [];
-  const filteredEntries: Array<{ key: number | string; valueHex: string }> = [];
+  const allEntries: Array<{ key: number | string; valueCborHex: string }> = [];
+  const filteredEntries: Array<{ key: number | string; valueCborHex: string }> =
+    [];
   const cleaned = new Map();
 
   for (const [key, value] of decoded.entries()) {
-    const encoded = borc.encode(value);
-    const entry = { key, valueHex: toHex(new Uint8Array(encoded)) };
+    const entry = {
+      key,
+      valueCborHex: toHex(new Uint8Array(borc.encode(value))),
+    };
     allEntries.push(entry);
     if (COSE_KEY_PARAMS.has(key)) {
       filteredEntries.push(entry);
@@ -59,9 +63,11 @@ export function authDataToCoseDebug(authData: Uint8Array): {
     }
   }
 
+  const cleanedCose = new Uint8Array(borc.encode(cleaned));
   return {
+    cleanedCose,
     rawCoseHex: toHex(new Uint8Array(coseKey)),
-    cleanedCoseHex: toHex(new Uint8Array(borc.encode(cleaned))),
+    cleanedCoseHex: toHex(cleanedCose),
     allEntries,
     filteredEntries,
   };
