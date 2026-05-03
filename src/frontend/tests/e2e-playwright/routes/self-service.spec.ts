@@ -145,6 +145,29 @@ test.describe("Self-service passkey debugging", () => {
     expect(icCall!.delegationPubkeyHex).toMatch(/^[0-9a-f]+$/);
   });
 
+  test("Test sign-in updates existing card badge to Sign-up · Sign-in", async ({
+    page,
+  }) => {
+    await addVirtualAuthenticator(page);
+    await page.goto(SELF_SERVICE_URL);
+
+    // Run creation test first
+    await page.getByRole("button", { name: "Test passkey support" }).click();
+    await expect(page.getByText("No passkey tests yet")).toBeHidden();
+
+    // Run sign-in test — should reuse the passkey created above (single prompt)
+    await page.getByRole("button", { name: "Test sign-in" }).click();
+
+    // Badge should update to show both Sign-up and Sign-in check marks
+    await expect(page.getByText("Sign-in").first()).toBeVisible();
+
+    // Still only one result card — sign-in updates existing, not adds new
+    const resultCards = page.locator(
+      ".border-border-secondary.bg-bg-tertiary.rounded-xl",
+    );
+    await expect(resultCards).toHaveCount(1);
+  });
+
   test("COSE filteredEntries only contain the standard IC-accepted key parameters", async ({
     page,
   }) => {

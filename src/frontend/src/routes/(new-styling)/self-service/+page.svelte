@@ -261,6 +261,7 @@
   const testDiscoverableAuth = async () => {
     try {
       let resolvedCredHex: string | undefined;
+      const sessionIdentity = await ECDSAKeyIdentity.generate();
       const discoverableIdentity = DiscoverablePasskeyIdentity.useExisting({
         getPublicKey: (result) => {
           const credHex = toHex(new Uint8Array(result.rawId));
@@ -274,13 +275,22 @@
           return Promise.resolve(known.publicKey);
         },
       });
-      await discoverableIdentity.sign(
-        Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+      // Single WebAuthn prompt: DelegationChain.create calls discoverableIdentity.sign() once
+      const delegationChain = await DelegationChain.create(
+        discoverableIdentity,
+        sessionIdentity.getPublicKey(),
       );
+      const delegationIdentity = DelegationIdentity.fromDelegation(
+        sessionIdentity,
+        delegationChain,
+      );
+      const agent = await HttpAgent.from(anonymousAgent);
+      agent.replaceIdentity(delegationIdentity);
+      await anonymousActor.whoami.withOptions({ agent })();
+
       if (resolvedCredHex === undefined)
         throw new Error("Credential not resolved");
 
-      // Mark the existing creation result for this credential as sign-in verified
       const existing = testResults.find(
         (r) => r.debug?.credentialIdHex === resolvedCredHex,
       );
