@@ -57,6 +57,7 @@
   interface TestResult {
     aaguid?: string;
     date: number;
+    signInVerified?: boolean;
     debug?: {
       credentialIdHex: string;
       rawCoseHex: string;
@@ -259,97 +260,33 @@
   };
   const testDiscoverableAuth = async () => {
     try {
-      let resolvedCredential:
-        | { publicKey: CosePublicKey; aaguid?: string }
-        | undefined;
+      let resolvedCredHex: string | undefined;
       const discoverableIdentity = DiscoverablePasskeyIdentity.useExisting({
         getPublicKey: (result) => {
           const credHex = toHex(new Uint8Array(result.rawId));
-          resolvedCredential = knownCredentials.get(credHex);
-          if (resolvedCredential === undefined) {
+          const known = knownCredentials.get(credHex);
+          if (known === undefined) {
             throw new Error(
-              "Run 'Test passkey support' first to register this passkey.",
+              "Run 'Test passkey support' first for this passkey.",
             );
           }
-          return Promise.resolve(resolvedCredential.publicKey);
+          resolvedCredHex = credHex;
+          return Promise.resolve(known.publicKey);
         },
       });
       await discoverableIdentity.sign(
         Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
       );
-      if (resolvedCredential === undefined)
+      if (resolvedCredHex === undefined)
         throw new Error("Credential not resolved");
-      const credentialId = discoverableIdentity.getCredentialId()!;
-      const cosePublicKey = resolvedCredential.publicKey;
-      const derHex = toHex(new Uint8Array(cosePublicKey.toDer()));
 
-      const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
-        credentialIds: [credentialId],
-        getPublicKey: () => Promise.resolve(cosePublicKey),
-      });
-      const sessionIdentity = await ECDSAKeyIdentity.generate();
-      let icCall:
-        | {
-            senderPubkeyHex: string;
-            delegationPubkeyHex: string;
-            callerPrincipal?: string;
-            error?: string;
-          }
-        | undefined;
-      try {
-        const delegationChain = await DelegationChain.create(
-          passkeyIdentity,
-          sessionIdentity.getPublicKey(),
-        );
-        const senderPubkeyHex = toHex(
-          new Uint8Array(delegationChain.publicKey),
-        );
-        const delegationPubkeyHex = toHex(
-          new Uint8Array(
-            delegationChain.delegations[0]?.delegation.pubkey ?? [],
-          ),
-        );
-        const delegationIdentity = DelegationIdentity.fromDelegation(
-          sessionIdentity,
-          delegationChain,
-        );
-        const agent = await HttpAgent.from(anonymousAgent);
-        agent.replaceIdentity(delegationIdentity);
-        const principal = await anonymousActor.whoami.withOptions({ agent })();
-        icCall = {
-          senderPubkeyHex,
-          delegationPubkeyHex,
-          callerPrincipal: principal.toText(),
-        };
-      } catch (icError) {
-        if (
-          icError instanceof DOMException &&
-          icError.name === "NotAllowedError"
-        ) {
-          throw icError;
-        }
-        icCall = {
-          senderPubkeyHex: derHex,
-          delegationPubkeyHex: toHex(
-            new Uint8Array(sessionIdentity.getPublicKey().toDer()),
-          ),
-          error: icError instanceof Error ? icError.message : String(icError),
-        };
-      }
-
-      testResults.push({
-        aaguid: resolvedCredential.aaguid,
-        date: Date.now(),
-        debug: {
-          credentialIdHex: toHex(credentialId),
-          rawCoseHex: "",
-          cleanedCoseHex: toHex(cosePublicKey.getCose()),
-          allEntries: [],
-          filteredEntries: [],
-          derHex,
-          icCall,
-        },
-      });
+      // Mark the existing creation result for this credential as sign-in verified
+      const existing = testResults.find(
+        (r) => r.debug?.credentialIdHex === resolvedCredHex,
+      );
+      if (existing === undefined)
+        throw new Error("No creation test found for this credential.");
+      existing.signInVerified = true;
     } catch (error) {
       handleError(error);
     }
@@ -608,13 +545,17 @@
                 </div>
                 <Badge class="ms-auto !flex flex-row items-center gap-1">
                   {#if testResult.debug?.icCall?.error !== undefined}
-                    <XIcon class="text-text-error-primary size-5" />
+                    <XIcon class="text-text-error-primary size-4" />
                     <span class="text-text-error-primary">{$t`Error`}</span>
+                  {:else if testResult.signInVerified}
+                    <CheckIcon class="text-text-success-primary size-4" />
+                    <span class="text-text-success-primary">{$t`Sign-up`}</span>
+                    <span class="text-text-tertiary">·</span>
+                    <CheckIcon class="text-text-success-primary size-4" />
+                    <span class="text-text-success-primary">{$t`Sign-in`}</span>
                   {:else}
-                    <CheckIcon class="text-text-success-primary size-5" />
-                    <span class="text-text-success-primary"
-                      >{$t`Supported`}</span
-                    >
+                    <CheckIcon class="text-text-success-primary size-4" />
+                    <span class="text-text-success-primary">{$t`Sign-up`}</span>
                   {/if}
                 </Badge>
               </div>
