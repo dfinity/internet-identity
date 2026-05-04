@@ -303,7 +303,12 @@ type InternetIdentityInit = record {
     // that verifies DNS records against the IANA-rooted DNSSEC chain
     // (currently the email-recovery DKIM/DMARC flow). See
     // `docs/ongoing/email-recovery.md` §7.5.
-    dnssec_config : opt DnssecConfig;
+    //
+    // Wrapped in `opt opt` to match the same set/clear pattern as
+    // `analytics_config` / `dummy_auth`: outer null keeps the previously
+    // stored value across an upgrade, `opt null` clears it, `opt opt c`
+    // sets it to `c`.
+    dnssec_config : opt opt DnssecConfig;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS

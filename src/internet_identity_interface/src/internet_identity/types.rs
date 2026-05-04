@@ -273,7 +273,12 @@ pub struct InternetIdentityInit {
     /// DNSSEC trust anchors for any feature that verifies DNS records
     /// against the IANA-rooted DNSSEC chain (currently the email-recovery
     /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).
-    pub dnssec_config: Option<DnssecConfig>,
+    ///
+    /// Wrapped in `Option<Option<...>>` to match the same set/clear pattern
+    /// as `analytics_config` and `dummy_auth`: outer `None` keeps the
+    /// previously-stored value across an upgrade, `Some(None)` clears it,
+    /// `Some(Some(c))` sets it to `c`.
+    pub dnssec_config: Option<Option<DnssecConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

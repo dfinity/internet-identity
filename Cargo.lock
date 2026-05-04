@@ -2193,10 +2193,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "internet_identity_email_test_vectors"
-version = "0.1.0"
-
-[[package]]
 name = "internet_identity_frontend"
 version = "0.1.0"
 dependencies = [
