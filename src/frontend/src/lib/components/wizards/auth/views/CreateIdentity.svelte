@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
@@ -70,10 +69,9 @@
         <Trans>You <b>cannot</b> rename this once it is set.</Trans>
       {/snippet}
     </Input>
-    <Button
+    <button
+      class="btn btn-primary btn-lg"
       onclick={handleCreate}
-      variant="primary"
-      size="lg"
       type="submit"
       disabled={name.length === 0 || name.length > 64 || isCreating}
     >
@@ -83,7 +81,7 @@
       {:else}
         <span>{$t`Create identity`}</span>
       {/if}
-    </Button>
+    </button>
   </div>
 </form>
 

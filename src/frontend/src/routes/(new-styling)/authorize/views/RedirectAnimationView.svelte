@@ -6,7 +6,6 @@
   import { cubicOut } from "svelte/easing";
   import Logo from "$lib/components/ui/Logo.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { waitFor } from "$lib/utils/utils";
@@ -124,10 +123,10 @@
       <p class="text-text-tertiary mb-6 text-base font-medium">
         {$t`You may close this page.`}
       </p>
-      <Button onclick={() => window.close()} variant="secondary">
+      <button class="btn btn-secondary" onclick={() => window.close()}>
         <RotateCcwIcon class="size-4" />
         <span>{$t`Return to app`}</span>
-      </Button>
+      </button>
     </Dialog>
   {/await}
 </div>

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { ShieldIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -55,12 +54,12 @@
         "@xl:my-auto @xl:ms-auto @xl:flex-row @xl:gap-4",
       ]}
     >
-      <Button onclick={onReset} danger variant="secondary" size="sm">
+      <button class="btn btn-secondary btn-sm btn-danger" onclick={onReset}>
         {$t`Reset`}
-      </Button>
-      <Button onclick={onVerify} size="sm">
+      </button>
+      <button class="btn btn-primary btn-sm" onclick={onVerify}>
         {$t`Verify`}
-      </Button>
+      </button>
     </div>
   </section>
 </div>

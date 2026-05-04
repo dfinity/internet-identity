@@ -12,7 +12,6 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
-  import Button from "$lib/components/ui/Button.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import {
@@ -274,17 +273,14 @@
           <Badge size="sm">{$t`Default`}</Badge>
         {/if}
       </button>
-      <Button
+      <button
+        class="btn btn-tertiary btn-sm btn-icon my-3 me-3 shrink-0"
         onclick={() =>
           (isEditAccountDialogVisibleForNumber = account.account_number[0])}
-        variant="tertiary"
-        size="sm"
-        iconOnly
-        class="my-3 me-3 shrink-0"
         aria-label={$t`Edit ${name}`}
       >
         <PencilIcon class="size-5" />
-      </Button>
+      </button>
     </div>
   </div>
 {/snippet}
@@ -312,15 +308,14 @@
             hidden={!isAccountLimitReached}
           >
             <div class="mt-3 shrink-0">
-              <Button
+              <button
+                class="btn btn-tertiary w-full"
                 onclick={() => (isCreateAccountDialogVisible = true)}
-                variant="tertiary"
                 disabled={isAccountLimitReached}
-                class="w-full"
               >
                 <PlusIcon class="size-5" />
                 {$t`Add another account`}
-              </Button>
+              </button>
             </div>
           </Tooltip>
         </div>
@@ -334,10 +329,9 @@
     class="col-start-1 row-start-1 pb-6"
     in:fade={{ duration: 200, delay: 100 }}
   >
-    <Button
+    <button
+      class="btn btn-primary btn-xl w-full"
       onclick={handleContinueDefault}
-      size="xl"
-      class="w-full"
       disabled={isAuthenticatingDefault}
     >
       {#if isAuthenticatingDefault}
@@ -346,7 +340,7 @@
       {:else}
         <span>{$t`Continue`}</span>
       {/if}
-    </Button>
+    </button>
   </div>
 {/snippet}
 
@@ -398,15 +392,12 @@
       offset="0rem"
       class="max-w-80"
     >
-      <Button
-        variant="tertiary"
-        iconOnly
-        size="sm"
-        class="ms-auto !cursor-default !rounded-full"
+      <button
+        class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
         aria-label={$t`More information about multiple accounts`}
       >
         <HelpCircleIcon class="size-5" />
-      </Button>
+      </button>
     </Tooltip>
   </div>
 </div>
