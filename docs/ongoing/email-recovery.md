@@ -751,7 +751,7 @@ Two design points worth pinning down:
 
 ### 8.6 UX screen mockups
 
-Layout expressed as ASCII so the flow is reviewable inside this doc; visual styling matches the existing recovery-method components and is decided in implementation, not in a separate design phase.
+Layout expressed as ASCII so the flow is reviewable inside this doc.
 
 **Manage page — Recovery methods card, inactive email** (lives at `(access-and-recovery)/recovery/+page.svelte`)
 
