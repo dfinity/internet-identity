@@ -915,14 +915,14 @@ PR scope: ~3000 lines net, plus `mail-auth` as a dep.
 ### Phase 1 — Beta email recovery
 
 4. Add `EmailRecoveryCredential` storage + Candid surface (§8.2, §8.3).
-5. Add registration and recovery flows behind an `email_recovery_enabled` feature flag in `IdentityInfo.metadata`.
+5. Add registration and recovery flows behind a frontend feature flag — register an `EMAIL_RECOVERY` entry in `src/frontend/src/lib/state/featureFlags.ts` with the existing `createFeatureFlagStore(...)` helper (default `false`). Existing flags like `DISCOVERABLE_PASSKEY_FLOW` and `GUIDED_UPGRADE` use this same store; values persist in `localStorage` under `ii-localstorage-feature-flags__EMAIL_RECOVERY` and can be flipped from the browser console via `window.__featureFlags.EMAIL_RECOVERY.set(true)`. The setup and recovery wizard entry points subscribe to the store and render only when the flag is on.
 6. Add the off-chain SMTP gateway forwarder service. Stateless w.r.t. canister; ~5-minute in-memory buffer per challenge.
-7. Internal-only beta: dfinity-employee anchors get the flag flipped on, exercise both flows.
+7. Internal beta: developers and trusted testers turn the flag on locally to exercise both flows; nothing is exposed to general users.
 8. Telemetry: success rates by mailbox provider, DNSSEC failure rates, time-to-completion percentiles.
 
 ### Phase 2 — Public beta
 
-9. Flip the flag for all anchors created after a cutoff date; existing users see "Add email" in the Recovery methods card on Manage.
+9. Change `EMAIL_RECOVERY`'s default value to `true` in `featureFlags.ts` so the flag ships on for all users; "Add email" appears in the Recovery methods card on Manage.
 10. Add the email entry in `RecoverIdentityWizard` (§8.9).
 
 ### Phase 3 — GA
