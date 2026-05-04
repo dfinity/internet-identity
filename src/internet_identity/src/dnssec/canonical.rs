@@ -83,14 +83,8 @@ pub fn rrsig_rdata_for_signing(rrsig: &Rrsig) -> Vec<u8> {
 
 /// Build the canonical-form serialization of one RR (used for both
 /// signed-data construction and DS digest input).
-fn rr_canonical(
-    name_canonical: &[u8],
-    rtype: u16,
-    original_ttl: u32,
-    rdata: &[u8],
-) -> Vec<u8> {
-    let mut out =
-        Vec::with_capacity(name_canonical.len() + 2 + 2 + 4 + 2 + rdata.len());
+fn rr_canonical(name_canonical: &[u8], rtype: u16, original_ttl: u32, rdata: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(name_canonical.len() + 2 + 2 + 4 + 2 + rdata.len());
     out.extend_from_slice(name_canonical);
     out.extend_from_slice(&rtype.to_be_bytes());
     out.extend_from_slice(&CLASS_IN.to_be_bytes());

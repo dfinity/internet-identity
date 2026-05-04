@@ -4,8 +4,9 @@
 //! See `scripts/capture-dnssec-chain.py` for the producing side. The JSON
 //! format mirrors `DnsProofBundle` field-for-field, with byte fields
 //! hex-encoded (so the file is grep-friendly and diff-clean).
-
-#![cfg(test)]
+//!
+//! This module is gated `#[cfg(test)]` at its declaration in
+//! `dnssec/mod.rs`, so no inner gate is needed here.
 
 use super::types::{DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
 use internet_identity_interface::internet_identity::types::DnssecRootAnchor;

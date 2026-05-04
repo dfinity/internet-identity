@@ -15,9 +15,7 @@
 
 use super::canonical::build_signed_data;
 use super::signature::{ds_matches_dnskey, verify_signature_for_alg};
-use super::types::{
-    DelegationLink, DnsProofBundle, DnssecError, SignedRRset, VerifiedRecord,
-};
+use super::types::{DelegationLink, DnsProofBundle, DnssecError, SignedRRset, VerifiedRecord};
 use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
 
 /// Tolerance applied around the canister clock when comparing RRSIG
@@ -83,12 +81,20 @@ pub fn verify(
     verify_with_clock(bundle, trust_anchors, current_time_secs())
 }
 
-#[cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))]
+#[cfg(all(
+    target_arch = "wasm32",
+    target_vendor = "unknown",
+    target_os = "unknown"
+))]
 fn current_time_secs() -> u64 {
     ic_cdk::api::time() / 1_000_000_000
 }
 
-#[cfg(not(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown")))]
+#[cfg(not(all(
+    target_arch = "wasm32",
+    target_vendor = "unknown",
+    target_os = "unknown"
+)))]
 fn current_time_secs() -> u64 {
     // On non-wasm targets (unit tests, doc-tests) we don't have access
     // to the IC system API. Return 0; tests should call
@@ -276,8 +282,7 @@ mod tests {
     /// the freshness check uses the validity window the captured RRSIGs
     /// were signed against.
     fn frozen_now() -> u64 {
-        let bundle: serde_json::Value =
-            serde_json::from_str(CLOUDFLARE_COM_CHAIN_JSON).unwrap();
+        let bundle: serde_json::Value = serde_json::from_str(CLOUDFLARE_COM_CHAIN_JSON).unwrap();
         bundle["_meta"]["captured_at_unix"].as_u64().unwrap()
     }
 
@@ -331,7 +336,10 @@ mod tests {
         bundle.root_dnskey.rdata[0][100] ^= 0x01;
         match verify_with_clock(&bundle, &anchors, frozen_now()) {
             Err(DnssecError::RootAnchorMismatch) | Err(DnssecError::BadSignature) => {}
-            other => panic!("expected RootAnchorMismatch or BadSignature, got {:?}", other),
+            other => panic!(
+                "expected RootAnchorMismatch or BadSignature, got {:?}",
+                other
+            ),
         }
     }
 

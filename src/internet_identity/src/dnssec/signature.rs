@@ -52,9 +52,7 @@ pub fn verify_signature_for_alg(
     let public_key = dnskey_public_key(dnskey_rdata)?;
     match algorithm {
         ALG_RSA_SHA256 => verify_rsa_sha256(signed_data, signature, public_key),
-        ALG_ECDSA_P256_SHA256 => {
-            verify_ecdsa_p256_sha256(signed_data, signature, public_key)
-        }
+        ALG_ECDSA_P256_SHA256 => verify_ecdsa_p256_sha256(signed_data, signature, public_key),
         ALG_ED25519 => verify_ed25519(signed_data, signature, public_key),
         other => Err(DnssecError::UnsupportedAlgorithm(other)),
     }
@@ -183,11 +181,7 @@ fn verify_ed25519(
 /// Returns true iff:
 /// - the digest_type matches one we support (currently only SHA-256);
 /// - the digest of `(canonical_owner_name | dnskey_rdata)` matches the DS digest.
-pub fn ds_matches_dnskey(
-    child_zone_name: &[u8],
-    dnskey_rdata: &[u8],
-    ds_rdata: &[u8],
-) -> bool {
+pub fn ds_matches_dnskey(child_zone_name: &[u8], dnskey_rdata: &[u8], ds_rdata: &[u8]) -> bool {
     if ds_rdata.len() < 4 {
         return false;
     }
