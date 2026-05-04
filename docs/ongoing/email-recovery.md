@@ -753,7 +753,7 @@ Two design points worth pinning down:
 
 These are wireframes; final visual design lives in Figma. Layout expressed as ASCII so the flow is reviewable inside this doc.
 
-**Manage page — Recovery methods card** (lives at `(access-and-recovery)/recovery/+page.svelte`)
+**Manage page — Recovery methods card, inactive email** (lives at `(access-and-recovery)/recovery/+page.svelte`)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -771,6 +771,37 @@ These are wireframes; final visual design lives in Figma. Layout expressed as AS
 │  │     Receive sign-in by sending a signed email.         │  │
 │  │                                          [ Add email ] │  │
 │  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Manage page — Recovery email card, active**
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ ✉️   Recovery email                       [ Active ]       │
+│     alice@gmail.com                                        │
+│     Added 12 May 2026.                                     │
+│                                  [ Replace ]  [ Remove ]   │
+└────────────────────────────────────────────────────────────┘
+```
+
+`Replace` re-enters the setup wizard; on success the new address atomically replaces the current one (§8.2) and the user keeps the old one until verification completes. `Remove` opens a confirmation modal (next mockup) and, on confirm, makes a single authenticated call to `email_recovery_credential_remove`.
+
+Note this is a deliberate divergence from the recovery-phrase card, which has no `Remove`. A recovery phrase is a secret the user can effectively burn by resetting it and then forgetting the new value. An email address is a real-world identity that exists outside II — there is nothing to "burn" — so a user who decides they no longer want email recovery needs an explicit way to detach it.
+
+**Manage page — remove confirmation modal**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Remove email recovery?                                      │
+│                                                              │
+│  alice@gmail.com will no longer be able to sign in to        │
+│  your identity. Your passkeys and recovery phrase are        │
+│  unaffected.                                                 │
+│                                                              │
+│  You can add a recovery email again at any time.             │
+│                                                              │
+│                              [ Cancel ]  [ Remove email ]    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -898,7 +929,7 @@ If telemetry later shows abuse the canister can't compute-throttle (e.g. someone
 
 The current management surface lives at `src/frontend/src/routes/(new-styling)/manage/(authenticated)/(access-and-recovery)/recovery/+page.svelte` and today only renders the recovery-phrase card. The recovery (sign-in) flow lives at `src/frontend/src/routes/(new-styling)/recovery/+page.svelte` and uses `RecoverIdentityWizard`.
 
-- **Manage page** — rename the page heading from "Recovery phrase" to **"Recovery methods"** (see §8.6 mockup) and split it into two cards: the existing `ActiveRecoveryPhrase` / `InactiveRecoveryPhrase` / `UnverifiedRecoveryPhrase` card (no functional change), and a new `EmailRecovery` card with `Active` / `Inactive` states, an "Add email" wizard, and remove confirmation. New svelte components live in the same `recovery/components/` directory next to the phrase ones.
+- **Manage page** — rename the page heading from "Recovery phrase" to **"Recovery methods"** (see §8.6 mockup) and split it into two cards: the existing `ActiveRecoveryPhrase` / `InactiveRecoveryPhrase` / `UnverifiedRecoveryPhrase` card (no functional change), and a new `EmailRecovery` card with `Active` / `Inactive` states, an "Add email" wizard for inactive, and `Replace` / `Remove` actions for active. The `Remove` path goes through a confirmation modal (see §8.6) and calls `email_recovery_credential_remove` once; on success the card flips back to inactive. Unlike the phrase card, removal is a first-class action — see the §8.6 note on why email recovery diverges from phrase UX. New svelte components live in the same `recovery/components/` directory next to the phrase ones.
 - **Recovery sign-in page** — extend `RecoverIdentityWizard` with a second top-level option, "Recover with email", alongside the existing phrase entry. The email path drives a new `RecoverWithEmailWizard` component implementing the three-step flow from §8.6: enter address → send-the-magic-email instructions screen with a live poll spinner → signed-in.
 
 DNSSEC bundle assembly (see §7.4) lives in `src/frontend/src/lib/utils/dnssec/` and is reused by both wizards.
