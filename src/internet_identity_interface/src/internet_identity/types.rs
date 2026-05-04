@@ -21,12 +21,14 @@ pub type AccountNumber = u64;
 
 mod api_v2;
 pub mod attributes;
+pub mod dnssec;
 pub mod icrc3;
 pub mod openid;
 pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
+pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::openid::*;
 pub use api_v2::*;
 
@@ -268,6 +270,10 @@ pub struct InternetIdentityInit {
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// DNSSEC trust anchors for any feature that verifies DNS records
+    /// against the IANA-rooted DNSSEC chain (currently the email-recovery
+    /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).
+    pub dnssec_config: Option<DnssecConfig>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

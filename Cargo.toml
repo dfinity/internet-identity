@@ -2,6 +2,7 @@
 members = [
     "src/asset_util",
     "src/internet_identity",
+    "src/internet_identity_email_test_vectors",
     "src/internet_identity_frontend",
     "src/canister_tests",
     "src/internet_identity_interface",
@@ -20,6 +21,7 @@ opt-level = 'z'
 # local dependencies
 asset_util = { path = "src/asset_util" }
 canister_tests = { path = "src/canister_tests" }
+internet_identity_email_test_vectors = { path = "src/internet_identity_email_test_vectors" }
 internet_identity_interface = { path = "src/internet_identity_interface" }
 
 # ic dependencies

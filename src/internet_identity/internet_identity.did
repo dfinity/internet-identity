@@ -299,6 +299,30 @@ type InternetIdentityInit = record {
     backend_canister_id : opt principal;
     // Backend origin, needed to sync configuration with frontend.
     backend_origin : opt text;
+    // DNSSEC verification configuration. Trust anchors used by any feature
+    // that verifies DNS records against the IANA-rooted DNSSEC chain
+    // (currently the email-recovery DKIM/DMARC flow). See
+    // `docs/ongoing/email-recovery.md` §7.5.
+    dnssec_config : opt DnssecConfig;
+};
+
+// DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
+// records consumes the same anchors; not specific to email recovery.
+type DnssecConfig = record {
+    // IANA root KSK trust anchors. Multiple are accepted simultaneously so
+    // KSK rollover is a single config change in the next upgrade arg.
+    root_anchors : vec DnssecRootAnchor;
+};
+
+// One IANA root KSK trust anchor, in the same shape IANA publishes at
+// `data.iana.org/root-anchors/root-anchors.xml`. Only `digest_type = 2`
+// (SHA-256) is accepted; the legacy SHA-1 form is rejected at the
+// verifier boundary.
+type DnssecRootAnchor = record {
+    key_tag : nat16;
+    algorithm : nat8;
+    digest_type : nat8;
+    digest : blob;
 };
 
 type ChallengeKey = text;

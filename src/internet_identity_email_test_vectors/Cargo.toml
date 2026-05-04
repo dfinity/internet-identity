@@ -1,0 +1,7 @@
+[package]
+name = "internet_identity_email_test_vectors"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
