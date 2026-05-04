@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
@@ -49,15 +48,14 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
-    <Button
+    <button
+      class="btn btn-secondary btn-xl"
       onclick={setupOrUseExistingPasskey}
       disabled={!supportsPasskeys || authenticatingProviderId !== undefined}
-      size="xl"
-      variant="secondary"
     >
       <PasskeyIcon />
       {$t`Continue with passkey`}
-    </Button>
+    </button>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
@@ -66,12 +64,10 @@
           hidden={cancelledProviderId !== provider.client_id}
           manual
         >
-          <Button
+          <button
+            class="btn btn-secondary btn-xl flex-1"
             onclick={() => handleContinueWithOpenId(provider)}
-            variant="secondary"
             disabled={authenticatingProviderId !== undefined}
-            size="xl"
-            class="flex-1"
             aria-label={$t`Continue with ${name}`}
           >
             {#if authenticatingProviderId === provider.client_id}
@@ -82,7 +78,7 @@
                 {@html provider.logo}
               </div>
             {/if}
-          </Button>
+          </button>
         </Tooltip>
       {/each}
       <!--
@@ -95,16 +91,14 @@
         here — we keep this option visible so users know the mechanism
         exists.
       -->
-      <Button
+      <button
+        class="btn btn-secondary btn-xl flex-1"
         onclick={signInWithSso}
-        variant="secondary"
         disabled={authenticatingProviderId !== undefined}
-        size="xl"
-        class="flex-1"
         aria-label={$t`Continue with SSO`}
       >
         <SsoIcon class="size-6" />
-      </Button>
+      </button>
     </div>
   </div>
   <div class="border-border-tertiary border-t"></div>

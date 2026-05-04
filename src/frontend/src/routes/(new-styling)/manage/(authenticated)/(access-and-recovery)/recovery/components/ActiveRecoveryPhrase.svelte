@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { ShieldCheckIcon, LockKeyholeIcon } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -95,12 +94,13 @@
       align="end"
       offset="0rem"
     >
-      <Button
+      <button
+        class={[
+          "btn btn-secondary btn-sm btn-danger",
+          "@max-xl:mt-5",
+          "@xl:my-auto",
+        ]}
         onclick={onReset}
-        danger
-        variant="secondary"
-        size="sm"
-        class={["@max-xl:mt-5", "@xl:my-auto"]}
       >
         {#if isProtected}
           <LockKeyholeIcon class="size-4" />
@@ -108,7 +108,7 @@
         {:else}
           <span>{$t`Reset`}</span>
         {/if}
-      </Button>
+      </button>
     </Tooltip>
   </section>
 </div>

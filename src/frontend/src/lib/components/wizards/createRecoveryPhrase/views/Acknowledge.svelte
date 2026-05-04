@@ -1,7 +1,6 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { Trans } from "$lib/components/locale";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
@@ -42,10 +41,10 @@
   size="sm"
   class="mb-8"
 />
-<Button
+<button
+  class="btn btn-primary btn-lg"
   onclick={handleAcknowledge}
   disabled={!isAcknowledged || isGeneratingPhrase}
-  size="lg"
 >
   {#if isGeneratingPhrase}
     <ProgressRing />
@@ -53,4 +52,4 @@
   {:else}
     <span>{$t`Continue`}</span>
   {/if}
-</Button>
+</button>

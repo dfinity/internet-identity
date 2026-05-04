@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import CodeInput from "$lib/components/ui/CodeInput.svelte";
@@ -84,13 +83,11 @@
     hint={HINT_PLACEHOLDER}
     disabled={isConfirming}
   />
-  <Button
+  <button
+    class="btn btn-primary btn-xl mb-3"
     onclick={handleSubmit}
-    variant="primary"
-    size="xl"
     type="submit"
     disabled={confirmationCode.length < CODE_LENGTH || isConfirming}
-    class="mb-3"
   >
     {#if isConfirming}
       <ProgressRing />
@@ -98,16 +95,15 @@
     {:else}
       <span>{$t`Confirm sign-in`}</span>
     {/if}
-  </Button>
-  <Button
+  </button>
+  <button
+    class="btn btn-secondary btn-xl"
     onclick={restart}
-    variant="secondary"
-    size="xl"
     disabled={isConfirming}
   >
     <RotateCcwIcon class="size-5" />
     <span>{$t`Start over`}</span>
-  </Button>
+  </button>
 </form>
 
 <style>

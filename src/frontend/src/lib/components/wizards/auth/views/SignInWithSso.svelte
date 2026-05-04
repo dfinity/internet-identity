@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -279,9 +278,8 @@
         {$t`This SSO is already linked to your identity.`}
       </p>
     {/if}
-    <Button
-      variant="primary"
-      size="lg"
+    <button
+      class="btn btn-primary btn-lg"
       type="submit"
       disabled={preparedResult === undefined ||
         isSubmitting ||
@@ -297,7 +295,7 @@
       {:else}
         <span>{$t`Continue`}</span>
       {/if}
-    </Button>
+    </button>
     <button
       type="button"
       onclick={goBack}

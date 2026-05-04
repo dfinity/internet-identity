@@ -1,7 +1,6 @@
 <script lang="ts">
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { InfoIcon, LockIcon } from "@lucide/svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -30,12 +29,10 @@
     offset="0rem"
     class="!max-w-72"
   >
-    <Button
-      variant="tertiary"
-      iconOnly
-      class="ms-auto !cursor-default !rounded-full"
+    <button
+      class="btn btn-tertiary btn-icon ms-auto !cursor-default !rounded-full"
     >
       <InfoIcon class="size-5" />
-    </Button>
+    </button>
   </Tooltip>
 </div>
