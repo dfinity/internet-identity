@@ -7,16 +7,19 @@
 //! init/upgrade arg. There are no HTTP outcalls anywhere in the
 //! email-recovery stack (see `docs/ongoing/email-recovery.md` §7).
 //!
-//! PR #1 lands the scaffold (types + a stub `verify` returning
-//! `NotImplemented`). The real RRSIG/DS/DNSKEY checks land in PR #1b — see
-//! `verify.rs` for the per-step TODO list.
-// PR 1 lands the scaffold without callers (PR 2's DKIM verifier and PRs
-// 6+'s recovery methods are the first consumers). Allow `dead_code` on this
-// module until those land so the wasm build stays warning-clean. Narrow on
-// purpose: anything else (e.g. `unused_imports`) should still warn so a
-// real issue isn't masked when the verifier implementation lands.
+//! Algorithm coverage: RFC 8624 MUST set — alg 8 (RSA-SHA256), alg 13
+//! (ECDSA-P256-SHA256), alg 15 (Ed25519). Anything else is rejected
+//! with `DnssecError::UnsupportedAlgorithm`.
+
+// No callers in this PR (PR 2's DKIM verifier and PR 6+'s recovery
+// methods are the first consumers). Suppress dead-code warnings for
+// the public surface until consumers land.
 #![allow(dead_code)]
 
+mod canonical;
+mod signature;
+#[cfg(test)]
+mod test_vectors;
 mod types;
 mod verify;
 
@@ -25,4 +28,4 @@ pub use types::{
     DelegationLink, DnsName, DnsProofBundle, DnssecError, Rrsig, SignedRRset, VerifiedRecord,
 };
 #[allow(unused_imports)]
-pub use verify::verify;
+pub use verify::{verify, verify_with_clock};

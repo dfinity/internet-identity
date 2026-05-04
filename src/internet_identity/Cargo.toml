@@ -19,6 +19,11 @@ base64.workspace = true
 rsa.workspace = true
 minicbor = { workspace = true, features = ["std", "derive"] }
 
+# DNSSEC verifier deps
+domain.workspace = true
+p256.workspace = true
+ed25519-dalek.workspace = true
+
 # Captcha deps
 lodepng = "*"
 

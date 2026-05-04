@@ -74,10 +74,6 @@ pub struct VerifiedRecord {
 /// straight from the variant.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DnssecError {
-    /// The verifier hasn't been implemented yet — PR #1 scaffolds the type
-    /// machinery; PR #1b lands the RRSIG/DS/DNSKEY logic.
-    NotImplemented,
-
     /// No trust anchors are configured. The deploy/upgrade arg must include
     /// `dnssec_config.root_anchors` before any verification can succeed.
     NoTrustAnchors,

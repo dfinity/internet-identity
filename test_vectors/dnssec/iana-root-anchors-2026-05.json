@@ -1,0 +1,23 @@
+{
+  "_comment": "IANA root KSK trust anchors as published at https://data.iana.org/root-anchors/root-anchors.xml. Captured 2026-05-04. Update when the upstream XML changes (rare — KSK rollovers are signalled months in advance). The 19036 key is past its validUntil (2019) and is included for historical-vector tests only; production deployments should configure 20326 + 38696.",
+  "anchors": [
+    {
+      "id": "Klajeyz",
+      "valid_from": "2017-02-02",
+      "valid_until": null,
+      "key_tag": 20326,
+      "algorithm": 8,
+      "digest_type": 2,
+      "digest_hex": "E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D"
+    },
+    {
+      "id": "Kmyv6jo",
+      "valid_from": "2024-07-18",
+      "valid_until": null,
+      "key_tag": 38696,
+      "algorithm": 8,
+      "digest_type": 2,
+      "digest_hex": "683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A4C0FB2B16"
+    }
+  ]
+}

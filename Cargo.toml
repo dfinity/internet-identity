@@ -47,6 +47,11 @@ sha2 = "0.10"
 rsa = "0.9.7"
 minicbor = "1.0.0"
 
+# DNSSEC verifier deps (PR 1b on docs/ongoing/email-recovery.md §7)
+domain = { version = "0.12", default-features = false }
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "sha256"] }
+ed25519-dalek = { version = "2.2", default-features = false }
+
 # Certification
 ic-asset-certification = "3.0.3"
 ic-certification = "3.0.3"
