@@ -500,11 +500,19 @@ pub struct EmailRecoveryCredential {
 }
 ```
 
-A new stable map indexes `lowercase(address) → AnchorNumber` to support the recovery lookup. Memory ID 24 (next free). Per §3.1, the index is enumerable only to attackers who already control the queried mailbox, so it's stored unsalted.
+Two stable maps store registered credentials, mirroring the shape of the OpenID storage so the same future-proofing applies:
 
-**One registered email per anchor.** For v1 each anchor holds at most one verified `EmailRecoveryCredential`. A second `email_recovery_credential_prepare_add` for an anchor that already has a verified email is allowed; on `smtp_request` success the canister atomically drops the previously registered address and writes the new one. The replace happens at *verification time*, not at prepare time — so a user who starts a swap and abandons the wizard mid-flow keeps their existing recovery channel. There is no separate "remove first, then add" UX.
+- **Per-anchor index**, memory ID 24 (next free): `(AnchorNumber, lowercase(address)) → EmailRecoveryCredential`. Composite key allows prefix-iteration over all addresses on a given anchor.
+- **Reverse address index**, memory ID 25: `(lowercase(address), AnchorNumber) → ()`. Composite key allows prefix-iteration over all anchors bound to a given address; used at recovery time to resolve `From:` to an anchor.
 
-A second, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry carries:
+The structural shape is many-to-many on purpose. The v1 API enforces 1-to-1 (see invariants below), but the storage layout doesn't bake that constraint in — relaxing the API later (e.g. multiple emails per anchor for redundancy, or guided UX for shared mailboxes) won't require a breaking storage migration. Per §3.1, neither index is hashed or salted; the lookup is gated by DKIM and is enumerable only to attackers who already control the queried mailbox.
+
+**v1 API invariants** (enforced in canister code, not in storage):
+
+- *One verified email per anchor.* A second `email_recovery_credential_prepare_add` for an anchor that already has a verified email is allowed; on `smtp_request` success the canister atomically drops the previously registered address and writes the new one. The replace happens at *verification time*, not at prepare time — so a user who starts a swap and abandons the wizard mid-flow keeps their existing recovery channel. No separate "remove first, then add" UX.
+- *One anchor per address.* `smtp_request` rejects a register-flow email with `AddressAlreadyRegistered` if the verified `From:` is already bound to a different anchor. If bound to the caller's own anchor (re-confirm) the call is a no-op success.
+
+A third, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry carries:
 
 - `kind`: `Register { anchor }` or `Recover { session_pk }`,
 - the claimed lowercased address,
@@ -513,7 +521,7 @@ A second, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry 
 - a `status: Pending | Succeeded { outcome } | Failed { error }`,
 - a 30-minute expiry.
 
-Entries flip from `Pending` to `Succeeded`/`Failed` on `smtp_request`. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 25.
+Entries flip from `Pending` to `Succeeded`/`Failed` on `smtp_request`. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 26.
 
 We do **not** store any inbound email body, header bytes, or DKIM verification artefacts past the moment `smtp_request` returns. The cached `session_pk` for recovery is the only piece that survives between prepare and the eventual delegation issuance.
 
@@ -738,7 +746,7 @@ sequenceDiagram
 Two design points worth pinning down:
 
 - **No address pre-lookup.** The address typed by the user is sent to the canister at prepare time only as part of the DNS proof, not as a lookup key. The anchor isn't resolved until `smtp_request`, when the verified `From:` of the email picks it. If the user typed the wrong address (or doesn't actually own it), the FE just times out polling — there's no leaky lookup-hint round trip.
-- **One anchor per address, one address per anchor.** The lookup table is `address → anchor` (not `address → vec<anchor>`): the same address cannot be registered to two different anchors, because at recovery time the user's email proof would otherwise not uniquely identify which identity they meant. Symmetrically, each anchor holds at most one registered address (§8.2). `smtp_request` rejects a register-flow email with `AddressAlreadyRegistered` if the address is already bound to a *different* anchor; if the address is already bound to the caller's *own* anchor (a re-confirm) the call is a no-op success. Swapping email A for email B on the same anchor is supported by submitting a new prepare for B and verifying — the swap commits atomically when `smtp_request` succeeds.
+- **One anchor per address, one address per anchor.** v1 API constraints (§8.2): the same address cannot be registered to two different anchors, because at recovery time the user's email proof would otherwise not uniquely identify which identity they meant; and each anchor holds at most one registered address. The underlying storage is structurally many-to-many (§8.2) so these are pure API checks — relaxing them later doesn't require a storage migration. `smtp_request` rejects a register-flow email with `AddressAlreadyRegistered` if the address is already bound to a *different* anchor; if it's already bound to the caller's *own* anchor (a re-confirm) the call is a no-op success. Swapping email A for email B on the same anchor is supported by submitting a new prepare for B and verifying — the swap commits atomically when `smtp_request` succeeds.
 - **Retries on recovery work the same as on setup.** A second `email_recovery_prepare_delegation` for the same address creates a *second* pending entry under a fresh nonce; both co-exist. Whichever nonce the user emails resolves. We deliberately don't overwrite-by-address — see §8.8 for the threat-model reason.
 
 ### 8.6 UX screen mockups
