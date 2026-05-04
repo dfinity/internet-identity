@@ -502,6 +502,8 @@ pub struct EmailRecoveryCredential {
 
 A new stable map indexes `lowercase(address) → AnchorNumber` to support the recovery lookup. Memory ID 24 (next free). Per §3.1, the index is enumerable only to attackers who already control the queried mailbox, so it's stored unsalted.
 
+**One registered email per anchor.** For v1 each anchor holds at most one verified `EmailRecoveryCredential`. A second `email_recovery_credential_prepare_add` for an anchor that already has a verified email is allowed; on `smtp_request` success the canister atomically drops the previously registered address and writes the new one. The replace happens at *verification time*, not at prepare time — so a user who starts a swap and abandons the wizard mid-flow keeps their existing recovery channel. There is no separate "remove first, then add" UX.
+
 A second, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry carries:
 
 - `kind`: `Register { anchor }` or `Recover { session_pk }`,
@@ -663,7 +665,7 @@ sequenceDiagram
 
     Note over GW,II: 5 — Gateway forwards email straight to the canister (PoC surface)
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce from canonicalized signed body,<br/>look up pending challenge by nonce,<br/>verify DKIM signature vs cached pubkey (selector matches),<br/>check DMARC alignment vs cached policy,<br/>verify From matches the address,<br/>bind address → anchor and mark challenge Succeeded
+    II->>II: extract nonce from canonicalized signed body,<br/>look up pending challenge by nonce,<br/>verify DKIM signature vs cached pubkey (selector matches),<br/>check DMARC alignment vs cached policy,<br/>verify From matches the address,<br/>atomically replace any prior registered email on this anchor,<br/>bind address → anchor and mark challenge Succeeded
 
     Note over FE,II: 6 — FE polls the canister and shows result
     loop until terminal status
@@ -680,6 +682,7 @@ Notes:
 - **What if the provider rotates between prepare and send.** Rare in practice — providers announce rotations weeks in advance and keep both selectors live during the transition. If it does happen, `smtp_request` returns `SelectorMismatch` and the FE re-probes and retries.
 - The nonce is searched as a case-insensitive substring inside the canonicalized signed-prefix bytes (§5.3). Mailbox providers that append signatures or footers don't break the check as long as the nonce sits inside the DKIM-signed body window.
 - `smtp_request` is open: anyone can call it, but the only effect is to verify a DKIM-signed email against an already-cached challenge. A malicious gateway can withhold or duplicate calls, but cannot forge state changes.
+- **Retries are concurrent, not overwriting.** A user who closes the wizard and starts again gets a fresh nonce; both pending entries co-exist in the map. Whichever nonce the user actually emails resolves; the other times out at TTL. There is no overwrite-by-anchor or overwrite-by-address — see §8.8 for why.
 - Polling cadence: the FE backs off from 1 s to 5 s; after `expires_at` it stops polling and shows the timeout state.
 
 ### 8.5 Recovery flow
@@ -735,7 +738,8 @@ sequenceDiagram
 Two design points worth pinning down:
 
 - **No address pre-lookup.** The address typed by the user is sent to the canister at prepare time only as part of the DNS proof, not as a lookup key. The anchor isn't resolved until `smtp_request`, when the verified `From:` of the email picks it. If the user typed the wrong address (or doesn't actually own it), the FE just times out polling — there's no leaky lookup-hint round trip.
-- **One anchor per address.** The lookup table is `address → anchor`, not `address → vec<anchor>`. We do not allow the same address on two anchors: at recovery time, the user's email proof would otherwise not uniquely identify which identity they meant, and users do not generally know their anchor number. `smtp_request` returns `AddressAlreadyRegistered` (when processing a register-flow email) if the address is already bound to any anchor, including the caller's own.
+- **One anchor per address, one address per anchor.** The lookup table is `address → anchor` (not `address → vec<anchor>`): the same address cannot be registered to two different anchors, because at recovery time the user's email proof would otherwise not uniquely identify which identity they meant. Symmetrically, each anchor holds at most one registered address (§8.2). `smtp_request` rejects a register-flow email with `AddressAlreadyRegistered` if the address is already bound to a *different* anchor; if the address is already bound to the caller's *own* anchor (a re-confirm) the call is a no-op success. Swapping email A for email B on the same anchor is supported by submitting a new prepare for B and verifying — the swap commits atomically when `smtp_request` succeeds.
+- **Retries on recovery work the same as on setup.** A second `email_recovery_prepare_delegation` for the same address creates a *second* pending entry under a fresh nonce; both co-exist. Whichever nonce the user emails resolves. We deliberately don't overwrite-by-address — see §8.8 for the threat-model reason.
 
 ### 8.6 UX screen mockups
 
@@ -872,7 +876,11 @@ What we *do* keep are bounded-state caps, which actually protect the canister:
 | Bound | Mechanism |
 |---|---|
 | Pending-challenge map size | Fixed-capacity `StableBTreeMap` with 30-min TTL and oldest-first eviction. Capacity is sized above the per-TTL fill rate the canister can reach (see below). |
-| Registered addresses per anchor | Hard cap of 3, enforced at `email_recovery_credential_prepare_add` time. |
+| Registered addresses per anchor | Hard cap of 1. A second verified email atomically replaces the prior one at `smtp_request` success time (§8.2). |
+
+**Why nonce-only keying matters.** Pending entries are keyed by the canister-issued `nonce` and *only* by the nonce — not by the claimed address, not by the anchor. This gives email recovery the same untargetability property as II's existing "Continue from another device" QR flow: the random session ID there, like the random nonce here, is unguessable to anyone except the FE that just received it, so an attacker cannot evict a *specific* user's pending entry. The only thing an attacker can do is fill the whole map past its capacity, and the eviction analysis below bounds that.
+
+If we instead let a new prepare call overwrite an existing pending entry keyed by anchor or address — the attacker would only need to know the victim's email or anchor number (much more knowable than a fresh random nonce) to hold the legitimate entry permanently evicted. We deliberately don't do that. Concurrent retries co-exist; whichever nonce the user actually emails resolves, the others time out.
 
 The eviction policy is safe against denial-of-recovery via map-flooding because every prepare call requires a full DNSSEC chain validation — a CPU-bound operation on the single replica that executes the call. Capping the map above what the canister can actually fill within a 30-minute TTL means an attacker cannot evict a legitimate pending entry without first being throttled by the canister's own compute rate. We do not need to *know* the rate cap to set a safe capacity; we just need it to be larger than `max_validations_per_second × ttl`, with a comfortable margin.
 
