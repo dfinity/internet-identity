@@ -9,24 +9,25 @@
 
 ## 1. Background
 
-Internet Identity currently offers two recovery options when a user can no longer authenticate with any of their registered passkeys:
+Internet Identity currently offers one recovery channel when a user can no longer authenticate with any of their registered passkeys:
 
-1. **Recovery phrase** — a BIP-39-style seed phrase the user is responsible for storing offline.
-2. **Recovery device** — a separate WebAuthn key bound to the same anchor.
+- **Recovery phrase** — a BIP-39-style seed phrase the user is responsible for storing offline.
 
-Both require the user to have *prepared* a recovery method before losing access, and both require the user to retain *something* (paper, hardware) outside the device that is now unusable. We hear from users that both fall through in practice — phrases get lost, recovery devices live next to the primary device and are lost together.
+(Earlier versions exposed a "Recovery device" flow as well; that surface is no longer offered to end users.)
 
-Email is the recovery channel almost every user already has and almost every user can reach from any browser. The PoC PR [#3760](https://github.com/dfinity/internet-identity/pull/3760) added enough plumbing to *receive* DKIM-signed emails inside the canister and view them in a "Postbox" tab, but it deliberately did not wire emails into the recovery surface, and several DKIM/DMARC correctness items were deferred.
+Recovery phrases require the user to *prepare* a recovery method before losing access, and to retain something — paper, password manager, hardware — outside the device that is now unusable. We hear from users that this falls through in practice: phrases get lost, password managers get locked out, paper backups end up next to the primary device and disappear together.
+
+Email is the recovery channel almost every user already has and almost every user can reach from any browser. The PoC PR [#3760](https://github.com/dfinity/internet-identity/pull/3760) added enough plumbing to *receive* DKIM-signed emails inside the canister and view them in a "Postbox" tab; that postbox surface is **out of scope** for this design. We borrow the DKIM verification primitive from the PoC, reshape it to verify a single email *in flight* without persisting the message, and use it as the building block for a recovery-only feature.
 
 This doc proposes the production design that supersedes the PoC. The PoC PR will be closed; the work below should land as a fresh PR series against `main`.
 
 ### What the PoC got right
 
-- Candid surface for the SMTP gateway (`smtp_request`, `smtp_request_validate`).
-- Stable storage layout for received messages (`smtp_postbox`, memory ID 23).
-- Per-anchor pruning, recipient-format validation, body/header bounds.
 - A first-pass DKIM verifier with a `DkimCheck` step-by-step result so the UI can show *why* a signature did or didn't verify.
 - The shape of `DkimVerificationStatus { Verified | Unverified | Pending }` decoupled from storage.
+- Recipient-format and body/header bounds checks usable as input validation.
+
+(The Postbox storage layout, the `smtp_postbox` stable map, per-anchor email pruning, and the `smtp_request` Candid surface for *delivering* mail to the canister are not carried forward — see §2 non-goals.)
 
 ### What the PoC explicitly deferred
 
@@ -58,12 +59,13 @@ This document covers all of the above plus two architectural changes the PoC did
 - DMARC alignment is checked and enforced according to the sender's published policy.
 - The canister's DKIM/DMARC verification is **fully deterministic** and does not depend on HTTPS outcalls during the recovery flow.
 - A registered email holder can prove control of that address with a single signed email; the canister does not have to trust the SMTP gateway for *anything other than message delivery*.
-- The Postbox feature can ride on the same primitives but is gated independently.
+- **The canister never persists incoming email contents.** The signed email and its DNSSEC bundle are passed in as a single call argument, verified, and acted on synchronously; only the small persistent state described in §8 is written to stable memory.
 
 **Non-goals**
 
+- The PoC's "Postbox" mailbox feature (storing inbound email per anchor for later viewing). The PoC's storage layout, push-notification path, and inbound-mail UI are not part of this design and will not be carried forward as part of email recovery.
 - Sending email *from* the canister. Outbound (e.g., notifications, recovery codes) is delivered by an off-chain service that need not be in the trust path.
-- Replacing existing recovery options. Email recovery is an *additional* `AuthnMethodPurpose::Recovery` method; users can still register phrases and recovery devices.
+- Replacing the existing recovery option. Email recovery is an *additional* `AuthnMethodPurpose::Recovery` method; users can still register a recovery phrase.
 - Protecting against a fully compromised mailbox provider. If Google's DKIM signing key is exfiltrated, every Gmail-recovery anchor is at risk; we accept that and document it.
 - Verifying *encrypted* (S/MIME, PGP) email contents. We verify DKIM-signed envelopes only.
 
@@ -86,10 +88,16 @@ This document covers all of the above plus two architectural changes the PoC did
 **Attacker capabilities we defend against**
 
 1. *Spoofed `From:` header* — defended by DMARC alignment with verified DKIM `d=`.
-2. *DKIM signature replay* — defended by `x=` expiration plus an ingest-time freshness window plus a per-anchor used-nonce set during recovery.
-3. *DNS poisoning* — defended by DNSSEC validation against the bundled root KSK.
-4. *Length-extension via `l=` tag* — defended by retaining only the signed prefix in storage.
-5. *Mass enumeration of email→anchor mappings* — defended by storing only a salted hash and never returning anchors by email lookup over a public surface.
+2. *DKIM signature replay* — defended by `x=` expiration plus an ingest-time freshness window plus a single-use challenge nonce embedded in the email body and burned on first acceptance.
+3. *DNS poisoning* — defended by DNSSEC validation against the IANA root KSK trust anchor (delivered as a deploy/upgrade arg, see §7.5).
+4. *Length-extension via `l=` tag* — defended by ignoring any unsigned tail (see §5.3).
+5. *Mass enumeration of email→anchor mappings* — gated by DKIM verification: an attacker cannot probe the index without a DKIM-valid email from the address being probed (see §3.1).
+
+### 3.1 Why the email→anchor index does not need salted hashing
+
+The index that maps a verified sender address to an anchor number is a public-shape concern (an attacker could in principle iterate addresses to discover whether a friend has an II account). In practice the lookup is gated by DKIM: the canister never accepts an `email_recovery_*` call without a DKIM-valid email signed by the queried domain on behalf of the queried address. An attacker who controls `mallory@gmail.com` can probe whether `mallory@gmail.com` is registered, but cannot probe `alice@gmail.com` without first compromising Alice's mailbox or Gmail's DKIM key — at which point they already have full mailbox control.
+
+We therefore key the lookup index by `lowercase(local-part) + "@" + lowercase(domain)` directly. No per-anchor salt is needed. If a UX flaw later surfaces (e.g., the FE displaying the queried address back unmasked) we add a captcha or rate limit on top; we do *not* try to make the index itself unenumerable.
 
 **Attacker capabilities we do *not* defend against**
 
@@ -103,27 +111,32 @@ This document covers all of the above plus two architectural changes the PoC did
 
 ```mermaid
 flowchart LR
-    User[User browser] -- "1. send email + nonce" --> MX[SMTP gateway<br/>off-chain]
-    User -- "2. fetch DNSSEC<br/>chain for sender domain" --> DNS[Authoritative<br/>DNS]
-    User -- "3. submit { email bytes, DNSSEC bundle }" --> II[II canister]
-    MX -- "(also submits inbound copy<br/>for Postbox)" --> II
-    II -- "verify DKIM,<br/>verify DMARC,<br/>verify DNSSEC" --> II
-    II -- "issue delegation" --> User
+    User[User browser] -- "1. send signed email + nonce" --> MX[SMTP gateway<br/>off-chain, stateless<br/>relative to canister]
+    User -- "2. poll gateway<br/>for raw email" --> MX
+    User -- "3. fetch DNSSEC<br/>chain for sender domain<br/>via DoH" --> DNS[Authoritative<br/>DNS]
+    User -- "4. submit { email bytes,<br/>DNSSEC bundle }" --> II[II canister]
+    II -- "verify DNSSEC,<br/>verify DKIM,<br/>verify DMARC,<br/>burn nonce" --> II
+    II -- "register address /<br/>issue delegation" --> User
 ```
 
-The key architectural shift versus the PoC is the path through which the canister learns the sender's DKIM/DMARC DNS records. The PoC fetched them via an HTTPS outcall to `dns.google` with a transform function for replica consensus. The new design has the *caller* fetch DNS, fetch the DNSSEC proof chain, and pass both to the canister, which validates the chain cryptographically.
+The architecture is built around two ideas:
+
+- The user's browser (not the canister) fetches the sender domain's DKIM/DMARC TXT records *along with the full DNSSEC chain* and submits them as a single call argument. The canister validates the chain cryptographically, with no HTTPS outcall.
+- The signed email itself is also passed in as a call argument. The canister never stores the email; it verifies it in flight, takes the action (register an address, or issue a delegation), and discards the bytes.
+
+The SMTP gateway exists only to *receive* the user's email and hand it back to the user's own browser session over HTTP. It does not call the canister itself, does not need the canister's trust, and does not persist messages beyond a short forwarding window (~5 minutes per challenge).
 
 This buys us:
 
-- **Determinism without consensus tricks.** No HTTP transform, no `max_response_bytes`, no boundary-node trust.
+- **Determinism without consensus tricks.** No HTTP transform, no `max_response_bytes`, no boundary-node trust on the DNS path.
 - **No cycles spent on outcalls** during recovery, which is the latency-sensitive path.
-- **Full transparency.** The DNS records the canister verified are part of the audit trail; the gateway/user can replay the call against any node.
-- **Recovery works even if all DoH providers go down.** The user's browser fetches DNS via the OS resolver; we just need a DNSSEC-aware client (a small WASM library, see §7.4).
+- **No persistent inbox state on chain.** The only stable-memory state added is the registered email→anchor index and a small TTL'd map of pending challenge nonces.
+- **Full transparency.** The DNS records and signed email the canister verified are part of the call's audit trail; anyone can replay the call against any replica.
 
 We pay for it in:
 
-- **Caller complexity.** The user's browser (or the SMTP gateway, for Postbox) has to assemble the DNSSEC chain. We ship a TS library that wraps this.
-- **No DNSSEC, no email recovery.** Domains that don't sign their zones cannot be used. As of 2026-05, this includes ~25% of mainstream consumer mailbox domains. We surface this clearly in the UI at registration time.
+- **Caller complexity.** The browser has to assemble the DNSSEC chain by walking the delegation from root down. This is straightforward TypeScript on top of DoH (see §7.4), no separate library or WASM module needed.
+- **No DNSSEC, no email recovery.** Domains that don't sign their zones cannot be used. As of 2026-05, this includes a non-trivial slice of mainstream consumer mailbox domains. We surface this clearly in the UI at registration time and let the user pick a different address or fall back to a recovery phrase.
 
 ---
 
@@ -138,7 +151,7 @@ The PoC's `src/internet_identity/src/dkim.rs` will be replaced rather than incre
 - Pure Rust, no `std::net` dependencies, builds for `wasm32-unknown-unknown`.
 - Exposes a `Resolver` trait we can implement against pre-fetched `(name, type) → bytes` records — perfect fit for §7's DNSSEC-arg pattern.
 - Implements DKIM (RFC 6376), DMARC (RFC 7489), and ARC; we get items A, B, and the multi-signature behaviour the PoC already added.
-- Test corpus from the project plus our own from §10.
+- Test corpus from the project plus our own from §9.
 
 **Rejected alternatives**
 
@@ -163,13 +176,17 @@ type SmtpMessage = record {
 
 The interface keeps a parsed accessor (`SmtpMessageParsed`) for non-cryptographic UI use, but the verifier always operates on the raw blobs. A small parser inside the canister extracts `From:`, `To:`, `Subject:`, etc. for display — but the bytes that go to DKIM are untouched.
 
-### 5.3 Trusted-body retention (`l=`)
+### 5.3 Trusted-body handling (`l=`)
 
 When a DKIM signature includes `l=N`, only the first N bytes of the canonicalized body are signed. Anything past byte N is unauthenticated and could have been appended by a forwarder or an attacker.
 
-**Storage rule:** `StorableEmail::body` is the *signed prefix* only, decanonicalized back to displayable text. The unsigned tail is dropped. If multiple signatures verify, we keep the prefix covered by the longest of them. We also persist `body_signed_len: Option<u32>` so the UI can show "(message truncated; remaining bytes were not signed)".
+Email recovery does not store inbound email at all (see §2 non-goals), so this is a *verification-time* concern rather than a storage-time concern:
 
-This also closes a subtle storage-bound issue: the PoC's `MAX_BODY_BYTES` was checked against the raw body, but `from_utf8_lossy` could expand U+FFFD past the bound. Operating on the canonicalized signed prefix sidesteps that entirely; aterga's `truncate_at_char_boundary` helper from the PoC remains the safety net at storage time.
+- The DKIM verifier hashes only the first N bytes of the canonicalized body, exactly as RFC 6376 §3.4.5 requires.
+- The challenge-nonce search (see §8) operates on the same signed-prefix bytes — the canonicalized first N. We do *not* search the unsigned tail. The mapping back to "which raw input bytes were signed" is intentionally not performed: relaxed canonicalization is not byte-reversible (whitespace runs collapse, trailing whitespace is stripped), so we search inside the canonicalized prefix and accept it if the nonce string appears there in any case-insensitive form.
+- A signature with `l=` smaller than the location of the nonce is rejected as "nonce missing"; the user is told to resend without the trailing-content footer their mailbox provider may have appended.
+
+The PoC's storage truncation (`truncate_at_char_boundary`) becomes irrelevant once the canister stops persisting the body, but we keep the same byte bound (`MAX_BODY_BYTES`) as an upper limit on the canister-call argument so a malformed caller cannot exhaust the message's argument budget.
 
 ### 5.4 Tag enforcement
 
@@ -178,7 +195,7 @@ Beyond the cryptographic check, the verifier rejects:
 - `v != 1`.
 - `a` outside the supported algorithm set: `rsa-sha256`, `ed25519-sha256`. (PoC supported `rsa-sha256` only.)
 - `t > now + skew_window` — future-dated signatures (PoC parsed but did not enforce).
-- `x < now` — expired signatures (PoC enforces this since `3137585324`).
+- `x < now` — expired signatures (the PoC's late round of fixes already enforces this; see [aterga's reply](https://github.com/dfinity/internet-identity/pull/3760#discussion_r3137585324) on the PoC review).
 - `i=` — must end in `@d` or `.d` where `d` is the `d=` value. Soft-fail if the DNS `t=s` flag is set.
 - DNS-side `k=` — defaults to `rsa`, must match the signature's algorithm.
 - DNS-side `t=y` — testing flag; we treat the signature as Unverified with a `TestingMode` reason.
@@ -275,13 +292,11 @@ pub enum DmarcOutcome {
 }
 ```
 
-For the **recovery flow**, we only accept emails where `DmarcOutcome` is `Aligned` *or* `NoRecord` with `dkim_domain == from_domain` (i.e., the DKIM domain matches the From: domain exactly even without an explicit DMARC record).
-
-For the **Postbox flow**, we store all three; misaligned mail gets a "spoofing suspected" UI banner but is not dropped.
+For the recovery and registration flows, we only accept emails where `DmarcOutcome` is `Aligned` *or* `NoRecord` with `dkim_domain == from_domain` (i.e., the DKIM domain matches the From: domain exactly even without an explicit DMARC record). Misaligned mail is rejected outright; there is no "spoofing suspected" middle state because the call has no value if it's not a usable proof.
 
 ### 6.7 Renaming
 
-`DkimVerificationStatus` and `DkimCheck` are misnamed once DMARC enters; rename to `EmailVerificationStatus` and the wire-level `dkim_status` field to `verification_status`. This is a breaking Candid change; do it in the same PR as the gateway contract change in §5.2.
+`DkimVerificationStatus` and `DkimCheck` are misnamed once DMARC enters; rename to `EmailVerificationStatus` and the wire-level `dkim_status` field to `verification_status`. The PoC types are not stable Candid; renaming during the rewrite is free.
 
 ---
 
@@ -311,18 +326,16 @@ pub struct DnsProofBundle {
     /// `selector._domainkey.example.com`.
     pub leaf: SignedRRset,
 
-    /// The DNSKEY RRset of the zone that signs `leaf`, with its own RRSIG.
-    pub zone_dnskey: SignedRRset,
+    /// The signed root DNSKEY RRset (every link in `chain` is verified
+    /// up to here). Validated by checking that one of its KSK DNSKEYs
+    /// hashes to a DS digest in the trust anchor stored on the canister.
+    pub root_dnskey: SignedRRset,
 
-    /// Walk up the delegation chain. Each entry is the DS RRset in the
-    /// parent zone (signed by the parent's DNSKEY) plus the parent's
-    /// DNSKEY RRset (signed by the grandparent), all the way to root.
+    /// Walk down the delegation chain from root toward `leaf`. Each
+    /// entry is the DS RRset published in the parent zone (signed by
+    /// the parent's DNSKEY) plus the DNSKEY RRset of the child zone
+    /// (self-signed by the child's KSK and DS-pinned by the parent).
     pub chain: Vec<DelegationLink>,
-
-    /// Optional: the signed root DNSKEY RRset, validated against the
-    /// bundled IANA KSK trust anchor. If `None`, the canister uses its
-    /// own bundled current root DNSKEY copy.
-    pub root_dnskey: Option<SignedRRset>,
 }
 
 pub struct SignedRRset {
@@ -341,53 +354,77 @@ pub struct DelegationLink {
 
 ### 7.3 Verification algorithm
 
+The trust anchor stored on the canister is a *DS-style digest* of the IANA root KSK — exactly the same shape IANA publishes at `data.iana.org/root-anchors/root-anchors.xml` (an algorithm + digest-type + hex digest). It is **not** a DNSKEY itself; the root DNSKEY RRset is supplied by the caller and validated against the digest at verification time.
+
 ```
 verify(bundle):
-    # 1. anchor
-    root_keys = bundle.root_dnskey.unwrap_or(BUNDLED_ROOT_DNSKEY)
-    verify_rrsig(root_keys.rrsig, root_keys.rdata, IANA_ROOT_KSK)
+    # 1. Validate the root DNSKEY RRset against the bundled trust anchor.
+    #    The trust anchor is a DS digest (algo, digest-type, digest-bytes).
+    #    Pick the DNSKEY in `bundle.root_dnskey.rdata` whose KSK digest
+    #    matches the trust anchor; this is the root KSK we trust this
+    #    call. Then verify the root DNSKEY RRset's RRSIG using that KSK.
+    root_ksk = pick_dnskey_matching_ds(bundle.root_dnskey.rdata, TRUST_ANCHOR_DS)
+    verify_rrsig(bundle.root_dnskey.rrsig, bundle.root_dnskey.rdata, root_ksk)
 
-    # 2. walk down the chain
-    parent_keys = root_keys
+    # 2. Walk down the delegation chain.
+    parent_keys = bundle.root_dnskey.rdata    # the validated root DNSKEY RRset
     for link in bundle.chain:
+        # Parent's DS RRset is signed by the parent's DNSKEY.
         verify_rrsig(link.child_ds.rrsig, link.child_ds.rdata, parent_keys)
-        verify_ds_matches_dnskey(link.child_ds, link.child_dnskey)
-        verify_rrsig(link.child_dnskey.rrsig, link.child_dnskey.rdata, link.child_dnskey)
-        parent_keys = link.child_dnskey
+        # Parent's DS digest matches one of the child's KSK DNSKEYs.
+        child_ksk = pick_dnskey_matching_ds(link.child_dnskey.rdata, link.child_ds)
+        # Child's DNSKEY RRset is self-signed by its KSK.
+        verify_rrsig(link.child_dnskey.rrsig, link.child_dnskey.rdata, child_ksk)
+        parent_keys = link.child_dnskey.rdata
 
-    # 3. leaf
+    # 3. Leaf RRset is signed by the deepest zone's DNSKEY.
     verify_rrsig(bundle.leaf.rrsig, bundle.leaf.rdata, parent_keys)
 
-    # 4. freshness
+    # 4. Freshness — every RRSIG's [inception, expiration] window must
+    #    contain the verifier's clock (±clock_skew).
     now = ic_cdk::time()
-    for rrsig in [root_keys.rrsig, *every link rrsig*, leaf.rrsig]:
+    for rrsig in all_rrsigs(bundle):
         require rrsig.inception <= now + clock_skew
         require rrsig.expiration >= now - clock_skew
 ```
 
-`verify_rrsig` uses RFC 4034 §3.1.8.1 canonical form (lowercase owner names, RDATA in canonical order) and the algorithm code (RSA/SHA-256, ECDSA P-256, Ed25519). We support algs 8 (RSA-SHA256), 13 (ECDSA-P256-SHA256), 15 (Ed25519). Anything older (RSA-SHA1) is rejected.
+`verify_rrsig` uses RFC 4034 §3.1.8.1 canonical form (lowercase owner names, RDATA in canonical order) and the algorithm code from the RRSIG. We support algorithms 8 (RSA-SHA256), 13 (ECDSA-P256-SHA256), and 15 (Ed25519) — RFC 8624 "MUST" implementations. Anything older (RSA-SHA1, RSA-MD5) is rejected.
 
-### 7.4 Caller-side helper
+### 7.4 Caller-side bundle assembly
 
-We ship a TypeScript library `@dfinity/dnssec-bundle` that:
+The browser assembles `DnsProofBundle` directly in TypeScript. No separate library or WASM module is required:
 
-- Takes a domain name and a record type.
-- Resolves via DoH (`dns.google` or `cloudflare-dns.com`, picked at random) requesting `do=1` for DNSSEC RRSIGs.
-- Walks the delegation chain by querying the DS at each parent.
-- Returns a `DnsProofBundle` ready to pass to the canister.
+- Issue DoH queries with `do=1` (request DNSSEC) and `cd=1` (don't validate, give us raw RRSIGs) to a public resolver. `dns.google` and `cloudflare-dns.com` both expose this; the FE can fall back between them. Browsers without OS-level DNS APIs cannot reach the authoritative servers directly, so DoH is the practical path.
+- Walk the delegation chain by querying the DS RRset at each parent zone (root → TLD → registered domain → `_domainkey` subdomain).
+- Stop at root, where the DNSKEY RRset is validated against the trust anchor stored on the canister rather than against another DS lookup.
 
-This library is identical regardless of whether the caller is the SMTP gateway (assembling Postbox bundles) or the user's browser (assembling recovery bundles).
+The earlier draft mentioned "the OS resolver" as a fallback when DoH providers are unavailable; in practice browsers don't expose the OS resolver, so the practical fallback is between multiple DoH endpoints, not to the OS. Domains for which DoH refuses to return RRSIGs are treated the same as domains without DNSSEC (§7.6).
 
-### 7.5 Root anchor management
+This is a small TS module (~300 lines, no dependencies beyond `fetch`) living in `src/frontend/src/lib/utils/dnssec/`. There is no separate WASM module; the canister already has a Rust DNSSEC verifier and the FE only needs to *gather* the records, not verify them.
 
-The IANA root KSK is rotated rarely (once between 2010 and 2018, then again pending). We bundle the current root DNSKEY plus the IANA-published root anchor (a SHA-256 over the KSK DS).
+### 7.5 Root anchor management — deploy-arg, not bundled
 
-Rotation strategy:
+The trust anchor (the DS digest of the IANA root KSK) lives in the canister's persistent state, set on every deploy via the `init`/`post_upgrade` arg:
 
-1. When IANA announces a rollover, an upgrade proposal updates the bundled trust anchor to include both old and new keys.
-2. Once the rollover is complete, a second proposal removes the retired key.
+```candid
+type EmailRecoveryConfig = record {
+    dnssec_root_anchors : vec record {
+        // Per `data.iana.org/root-anchors/root-anchors.xml`.
+        key_tag      : nat16;
+        algorithm    : nat8;       // 8 / 13 / 15
+        digest_type  : nat8;       // 1 (SHA-1) or 2 (SHA-256). We only ship type 2.
+        digest       : blob;       // 32 bytes for SHA-256
+    };
+};
+```
 
-We record the trust anchor's IANA `id="..."` in the WASM build metadata so the active anchor is auditable from the canister's `http_request("/.well-known/ii-dnssec-anchor")` endpoint.
+Multiple anchors are accepted simultaneously to make rollover trivial — during a key transition both the retiring and the incoming KSK digests live in `dnssec_root_anchors`. This is the same shape IANA publishes when both old and new KSKs are valid.
+
+II is deployed at least weekly, so refreshing the anchor list on every deploy is essentially free; we don't need a separate governance mechanism for it.
+
+**Rollover frequency.** In practice the IANA root KSK rolls *very rarely*: once in DNSSEC's history, in October 2018 (the "KSK rollover from 2010 to 2017 KSK"). No further rollover has happened or is publicly scheduled at the time of writing. IANA publishes signed announcements months in advance when one is upcoming. We keep the deploy-arg shape so that when the next rollover does happen (announced anchor publication updates), it's a one-line config change in the next weekly deploy rather than a code change.
+
+The active anchor list is exposed at `http_request("/.well-known/ii-dnssec-anchors")` for auditability.
 
 ### 7.6 Domains without DNSSEC
 
@@ -402,9 +439,7 @@ A small helper page lists the major consumer providers and their DNSSEC status.
 DNSSEC RRSIGs have inception and expiration timestamps but the typical validity window is days to weeks — too coarse for our needs. We add two more layers:
 
 - **DKIM `x=`** — mandatory ceiling enforced by §5.4.
-- **Per-anchor recovery nonce** — issued by the canister at the start of a recovery attempt, embedded in the body of the challenge email, single-use, valid for 30 minutes. A replayed signed email contains a stale nonce and is rejected.
-
-For Postbox, only the DNSSEC and DKIM windows apply.
+- **Per-flow recovery nonce** — issued by the canister at the start of a registration or recovery attempt, embedded in the body of the challenge email, single-use, valid for 30 minutes. A replayed signed email contains a stale or already-burned nonce and is rejected.
 
 ---
 
@@ -416,66 +451,102 @@ Email recovery shares the most code with the OpenID flow (`src/internet_identity
 
 ```rust
 pub struct EmailRecoveryCredential {
-    /// Salted SHA-256 of `lowercase(local-part) + "@" + lowercase(domain)`.
-    /// We never store the plaintext address.
-    pub address_hash: [u8; 32],
+    /// Lowercased canonical form: `lowercase(local-part) + "@" + lowercase(domain)`.
+    /// Stored verbatim (not hashed) so the user can see it back in the
+    /// management UI; it's exactly what they typed at registration.
+    pub address: String,
 
-    /// Display hint shown in the recovery UI: only the domain plus
-    /// the first 2 chars of the local part, e.g., "al***@gmail.com".
-    pub display_hint: String,
-
-    /// Unix-seconds timestamps.
+    /// Unix-seconds.
     pub created_at: u64,
     pub last_used: Option<u64>,
-
-    /// One-time challenges that have already been consumed during
-    /// recovery. Bounded; oldest is dropped when the cap is reached.
-    pub burned_nonces: BoundedSet<[u8; 16]>,
 }
 ```
 
-The salt is per-anchor (already stored as `anchor.salt`), so two anchors with the same email produce different `address_hash` values. This frustrates trivial enumeration.
+A new stable map indexes `lowercase(address) → AnchorNumber` to support the recovery lookup. Memory ID 24 (next free). Per §3.1, the index is enumerable only to attackers who already control the queried mailbox, so it's stored unsalted.
 
-A new stable map indexes `address_hash → AnchorNumber` to support the recovery lookup. Memory ID 24 (next free).
+A second, ephemeral map holds *pending challenges* — entries created by `email_recovery_prepare_*` and consumed once on `email_recovery_register` / `email_recovery_prepare_delegation`. Each entry is small (kind tag + nonce + expiry + optional anchor) and is dropped after either consumption or its 30-minute TTL. This is the only "email-related" state with high turnover; it lives in a memory-bounded `StableBTreeMap` with size cap and oldest-first eviction. Memory ID 25.
+
+We do **not** store any inbound email body, header bytes, or DKIM verification artefacts. Verification is in-flight only (§4).
 
 ### 8.2 Candid surface
 
+A single `EmailRecoveryProof` struct carries everything the verifier needs, and is shared between registration and recovery to avoid drift. The earlier draft named it `EmailRecoveryRegisterArg`, which was confusing once the same shape powers the recovery delegation.
+
 ```candid
-type EmailRecoveryRegisterArg = record {
-    // The challenge was issued via `email_recovery_prepare_register`.
-    challenge_id : blob;
-    // The signed email from the user's address proving control.
+type EmailRecoveryProof = record {
+    // Issued by `email_recovery_prepare_register` (logged-in setup) or
+    // `email_recovery_prepare_recovery` (anonymous recovery). Bound to
+    // a specific kind, address, and (for setup) anchor number.
+    challenge_id  : blob;
+
+    // Raw signed email from the user's address.
     email_message : SmtpMessage;
-    // DNSSEC-validated DNS records used to verify DKIM/DMARC.
-    dns_proof : DnsProofBundle;
+
+    // DNSSEC-validated DKIM and DMARC TXT records, plus the DNSSEC
+    // chain to the IANA root anchor (see §7).
+    dns_proof     : DnsProofBundle;
 };
 
-type EmailRecoveryRegisterError = variant {
-    Unauthorized : principal;
+type EmailRecoveryError = variant {
+    Unauthorized              : principal;
     ChallengeUnknown;
     ChallengeExpired;
-    EmailVerificationFailed : VerificationStatus;
+    EmailVerificationFailed   : VerificationStatus;
+    NonceMissing;          // signed-prefix body did not contain the nonce
+    AddressMismatch;       // From: did not match the address we expected
     AddressAlreadyRegistered;
+    AddressNotRegistered;
+    InternalCanisterError     : text;
 };
 
 service : {
-    // Step 1 of registration: get a nonce to embed in the email body.
-    email_recovery_prepare_register : (IdentityNumber)
-        -> (variant { Ok : record { challenge_id : blob; nonce : text;
-                                    mailbox : text; expires_at : nat64 };
-                       Err : EmailRecoveryRegisterError });
+    // --- Setup (caller is the authenticated identity) ---
 
-    // Step 2: submit the signed reply.
-    email_recovery_register : (IdentityNumber, EmailRecoveryRegisterArg)
-        -> (variant { Ok; Err : EmailRecoveryRegisterError });
+    // Step 1: issue a nonce + a recipient mailbox `register-<challenge_id>@id.ai`.
+    // The challenge is bound to (anchor, claimed_address). Anchors may have at
+    // most one pending registration challenge at a time.
+    email_recovery_prepare_register :
+        (IdentityNumber, record { address : text })
+        -> (variant {
+               Ok : record { challenge_id : blob; nonce : text;
+                             mailbox : text; expires_at : nat64 };
+               Err : EmailRecoveryError });
 
-    // Recovery (no caller identity required).
-    email_recovery_prepare_delegation : (EmailRecoveryRegisterArg, SessionKey)
-        -> (variant { Ok : OpenIdPrepareDelegationResponse;
-                       Err : EmailRecoveryDelegationError });
-    email_recovery_get_delegation : (record { ... }) -> (...) query;
+    // Step 2: submit the signed reply once the user has sent it.
+    email_recovery_register : (IdentityNumber, EmailRecoveryProof)
+        -> (variant { Ok; Err : EmailRecoveryError });
 
-    email_recovery_remove : (IdentityNumber, blob) -> (variant { Ok; Err });
+    // Remove a registered recovery address.
+    email_recovery_remove : (IdentityNumber, text)
+        -> (variant { Ok; Err : EmailRecoveryError });
+
+    // --- Recovery (no caller identity required) ---
+
+    // Step 1: anonymous caller asks for a fresh recovery challenge.
+    // No anchor lookup happens here; the address typed by the user
+    // is *not* sent to the canister at this stage. The challenge
+    // is anchor-agnostic and resolves to whichever anchor is bound
+    // to the verified address in step 2. The mailbox returned is
+    // `recover-<challenge_id>@id.ai`.
+    email_recovery_prepare_recovery : ()
+        -> (variant {
+               Ok : record { challenge_id : blob; nonce : text;
+                             mailbox : text; expires_at : nat64 };
+               Err : EmailRecoveryError });
+
+    // Step 2: submit the signed reply + session key. Verifies the email,
+    // looks up the anchor by lowercased address, and prepares a delegation.
+    email_recovery_prepare_delegation : (EmailRecoveryProof, SessionKey)
+        -> (variant {
+               Ok : OpenIdPrepareDelegationResponse;
+               Err : EmailRecoveryError });
+
+    // Query: fetch the delegation produced by step 2.
+    email_recovery_get_delegation : (record {
+        challenge_id : blob;
+        session_key  : SessionKey;
+        expiration   : Timestamp;
+    }) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
 }
 ```
 
@@ -483,35 +554,39 @@ The shape of `prepare_delegation` / `get_delegation` mirrors the existing `openi
 
 ### 8.3 Setup flow
 
+The SMTP gateway is a stateless forwarder: it receives an email at `register-<challenge_id>@id.ai`, holds it in memory keyed by `challenge_id`, and serves it back to whichever HTTP client polls for that key. It never calls the canister.
+
 ```mermaid
 sequenceDiagram
     participant U as User (logged in)
     participant FE as II frontend
     participant II as II canister
-    participant DNS as User's DNS resolver (DoH)
+    participant DNS as Public DoH resolver
     participant Mail as User's mailbox
-    participant GW as SMTP gateway
+    participant GW as SMTP gateway<br/>(off-chain)
 
     U->>FE: "Add email recovery", types alice@gmail.com
-    FE->>II: email_recovery_prepare_register(anchor)
-    II->>FE: { challenge_id, nonce: "II-Recovery-A1B2C3...", mailbox: "register-<anchor>@id.ai", expires }
-    FE->>U: "Send an email containing II-Recovery-A1B2C3 to register-12345@id.ai from alice@gmail.com"
+    FE->>II: email_recovery_prepare_register(anchor, { address: "alice@gmail.com" })
+    II->>FE: { challenge_id, nonce: "II-Recovery-A1B2C3...", mailbox: "register-<challenge_id>@id.ai", expires }
+    FE->>U: "Send an email containing II-Recovery-A1B2C3 to register-<challenge_id>@id.ai from alice@gmail.com"
     U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA
-    GW->>FE: forwards { email_message, hint=challenge_id }
-    FE->>DNS: fetch DKIM TXT + DMARC TXT + DNSSEC chain for gmail.com
+    FE->>GW: HTTP poll for challenge_id
+    GW->>FE: raw email bytes (when received)
+    FE->>DNS: fetch DKIM TXT for selector._domainkey.gmail.com,<br/>DMARC TXT for _dmarc.gmail.com,<br/>plus DNSSEC chain (DoH cd=1, do=1)
     DNS->>FE: bundle
     FE->>II: email_recovery_register(anchor, { challenge_id, email_message, dns_proof })
-    II->>II: verify DNSSEC, verify DKIM, verify DMARC alignment, verify nonce in body
+    II->>II: verify DNSSEC, verify DKIM, verify DMARC alignment,<br/>verify nonce in signed body, verify From: == claimed address,<br/>burn nonce
     II->>FE: Ok
     FE->>U: "alice@gmail.com is now a recovery method."
 ```
 
 Notes:
 
-- The challenge mailbox `register-<anchor>@id.ai` reuses the existing SMTP gateway plumbing from §5; the gateway recognises this prefix, decodes the `<anchor>`, and routes to the FE polling endpoint (which polls `smtp_request_validate` style).
-- The FE *never* has to upload the email and DNS bundle separately — the gateway already passes them through together.
-- The FE displays the nonce as a string the user copies into the email body. We accept it anywhere in the body (case-insensitive substring search on the verified-prefix bytes from §5.3).
+- The challenge_id is opaque (16 random bytes, base32). Embedding the anchor number in the gateway address would leak it; using a per-challenge id avoids that.
+- The FE assembles the DNSSEC bundle in plain TS using DoH (§7.4); no library dependency, no WASM.
+- The nonce is searched as a case-insensitive substring inside the canonicalized signed-prefix bytes (§5.3). Mailbox providers that append signatures or footers don't break the check as long as the nonce sits inside the DKIM-signed body window.
+- Once `email_recovery_register` returns `Ok`, the gateway entry expires; the canister has no further state about the message.
 
 ### 8.4 Recovery flow
 
@@ -525,68 +600,59 @@ sequenceDiagram
     participant GW
 
     U->>FE: "Recover with email", enters alice@gmail.com
-    FE->>II: email_recovery_lookup_hint(salted_hash(alice@gmail.com))
-    II->>FE: anchor matches: yes/no (no anchor number leaked)
-    FE->>II: email_recovery_prepare_challenge(salted_hash)
-    II->>FE: { challenge_id, nonce, mailbox: "recover-<challenge_id>@id.ai" }
-    FE->>U: instructions
-    U->>Mail: send signed email with nonce
-    Mail->>GW->>FE: forwarded
-    FE->>DNS: DNSSEC bundle
+    FE->>II: email_recovery_prepare_recovery()
+    II->>FE: { challenge_id, nonce, mailbox: "recover-<challenge_id>@id.ai", expires }
+    FE->>U: "Send a signed email containing II-Recovery-... to recover-<challenge_id>@id.ai from alice@gmail.com"
+    U->>Mail: send signed email
+    Mail->>GW: SMTP DATA
+    FE->>GW: HTTP poll for challenge_id
+    GW->>FE: raw email bytes
+    FE->>DNS: DNSSEC bundle for sender domain
+    DNS->>FE: bundle
     FE->>II: email_recovery_prepare_delegation({ challenge_id, email_message, dns_proof }, session_key)
-    II->>II: verify; recover anchor by address_hash lookup
+    II->>II: verify DNSSEC, DKIM, DMARC, nonce; lookup anchor by lowercase(From: address);<br/>burn nonce
     II->>FE: { user_key, expiration }
-    FE->>II: email_recovery_get_delegation(...)
+    FE->>II: email_recovery_get_delegation({ challenge_id, session_key, expiration })
     II->>FE: SignedDelegation
     FE->>U: signed in
 ```
 
-The lookup uses `address_hash` so we never accept a plaintext address as the index, but we *do* require the user to type their address to derive the lookup key — preventing pure-anchor-number enumeration of recovery emails.
+Two design points worth pinning down:
+
+- **No address pre-lookup.** The FE never sends the typed address to the canister before the user has produced a DKIM-signed email from it. The recovery challenge is anchor-agnostic; the anchor is derived from the verified `From:` of the email submitted in step 2. The user has already typed their address in their mail client to send the email, so this loses no UX. Until a valid signed email arrives, the FE just polls the gateway and shows a "waiting…" spinner; if the user typed the wrong address (or doesn't actually own it), the FE will time out at the gateway poll, not after a leaky lookup-hint round trip.
+- **One anchor per address.** The lookup table is `address → anchor`, not `address → vec<anchor>`. We do not allow the same address on two anchors: at recovery time, the user's email proof would otherwise not uniquely identify which identity they meant, and users do not generally know their anchor number. `email_recovery_register` returns `AddressAlreadyRegistered` if the same address is already bound to any anchor, including the caller's own.
 
 ### 8.5 Delegation issuance
 
-The delegation is produced via the same canister-signature path as OpenID. The session inputs are the canister-signature seed (anchor || `email-recovery` || address_hash) and the session key supplied by the caller. Expiration is the standard 30 minutes (`OPENID_SESSION_DURATION_NS`).
+The delegation is produced via the same canister-signature path as OpenID. The session inputs are the canister-signature seed (anchor || `email-recovery` || lowercase_address) and the session key supplied by the caller. Expiration is the standard 30 minutes (`OPENID_SESSION_DURATION_NS`).
 
 ### 8.6 Rate limits
 
 | Surface | Limit | Reason |
 |---|---|---|
 | `email_recovery_prepare_register` per anchor | 5 / hour | UX cost of sending an email is asymmetric — we don't need fast retries |
-| `email_recovery_prepare_delegation` per address_hash | 5 / 15 min | Slow attacker who controls an inbox |
+| `email_recovery_prepare_recovery` per IP (boundary node) | 30 / hour | Anonymous; abuse is per-IP since no anchor is known yet |
+| `email_recovery_prepare_delegation` per challenge | 1 (single-use) | Burned on success; rejected after first failed attempt |
 | `email_recovery_register` per anchor | max 3 active addresses | Bounded storage |
-| Total stored emails per anchor | unchanged from PoC (10) | Postbox |
 
-Limits are enforced in-memory in `state` with stable-memory backed counters keyed by `(anchor, hour_bucket)`; the existing rate-limiter module is reused.
+Limits are enforced in-memory in `state` with stable-memory backed counters keyed by `(anchor, hour_bucket)` or `(ip, hour_bucket)`; the existing rate-limiter module is reused.
 
 ### 8.7 Frontend changes
 
-- **Manage page**: a new "Email recovery" row alongside "Recovery phrase" and "Recovery device". Standard add/remove buttons.
-- **`promptRecovery` screen** (see `FLOWS.mdx`): a third option, "Recover with email", sits next to "Recover with phrase" and "Recover with device".
-- **`recoverWithEmail` screen**: address entry → instructions to send → spinner that polls the gateway → success.
+The current management surface lives at `src/frontend/src/routes/(new-styling)/manage/(authenticated)/(access-and-recovery)/recovery/+page.svelte` and today only renders the recovery-phrase card. The recovery (sign-in) flow lives at `src/frontend/src/routes/(new-styling)/recovery/+page.svelte` and uses `RecoverIdentityWizard`.
 
-### 8.8 Removed: PoC web push notification path
+- **Manage page** — rename the page heading from "Recovery phrase" to **"Recovery methods"** and split it into two cards:
+  - the existing `ActiveRecoveryPhrase` / `InactiveRecoveryPhrase` / `UnverifiedRecoveryPhrase` card (no functional change), and
+  - a new `EmailRecovery` card with `Active` / `Inactive` states, an "Add email" wizard, and remove confirmation. New svelte components live in the same `recovery/components/` directory next to the phrase ones.
+- **Recovery sign-in page** — extend `RecoverIdentityWizard` with a second top-level option, "Recover with email", alongside the existing phrase entry. The email path drives a new `RecoverWithEmailWizard` component: enter address → instructions screen → poll-the-gateway spinner → submit-proof step → signed-in.
 
-The PoC's `web_push.rs` and service-worker `postMessage` handler are *not* part of the email-recovery delivery. Push notifications are nice-to-have for Postbox but introduce the CodeQL alert (#127) and 700+ lines of code. Push lands in a separate PR; recovery does not depend on it.
+There is no "recover with device" flow in the current frontend; the older `FLOWS.mdx` references are stale and should be ignored. All routing and component additions go directly into the svelte routes above.
 
----
-
-## 9. Postbox revisited
-
-The Postbox feature does still have value (anchor-as-mailbox for app-to-user comms, future ICRC-style notifications), but it stops being a load-bearing first deliverable.
-
-The new shape:
-
-- Postbox uses the same `SmtpMessage` + `DnsProofBundle` ingest path described above.
-- The SMTP gateway fetches DNSSEC bundles and includes them with each delivery.
-- Trusted-body retention (§5.3) governs what is stored.
-- `EmailVerificationStatus` is the single source of truth for both Postbox and recovery.
-- Postbox ships behind an off-by-default flag in `IdentityInfo.metadata` until UX has settled.
-
-The PoC's stable map at memory ID 23 keeps its layout.
+There is no `web_push.rs` / service-worker integration in scope here — push notifications were a Postbox feature and are out of scope (§2 non-goals).
 
 ---
 
-## 10. Test corpus
+## 9. Test corpus
 
 A new crate `internet_identity_email_test_vectors` carries:
 
@@ -602,51 +668,49 @@ CI runs the corpus against the PocketIC-hosted canister to catch wasm-only regre
 
 ---
 
-## 11. Migration & rollout
+## 10. Migration & rollout
 
 ### Phase 0 — Land foundations (no user-visible change)
 
-1. Replace `dkim.rs` with `mail-auth`-backed module.
-2. Add the DNSSEC verifier as a standalone library crate.
-3. Update the SMTP gateway Candid to take raw header bytes and a `DnsProofBundle`.
-4. Wire the new verifier into the existing PoC postbox path (still gated off in production).
-5. Land the test corpus.
+1. Replace `dkim.rs` with a `mail-auth`-backed module that takes raw header bytes and a `DnsProofBundle` instead of doing DoH outcalls.
+2. Add the DNSSEC verifier as a module under `src/internet_identity/src/dnssec/`, with the trust-anchor list wired through the canister init/upgrade arg (§7.5).
+3. Land the test corpus (§9).
 
-PR scope: ~3000 lines net, plus the `mail-auth` and DNSSEC crates as deps.
+PR scope: ~3000 lines net, plus `mail-auth` as a dep.
 
 ### Phase 1 — Beta email recovery
 
-6. Add `EmailRecoveryCredential` storage + Candid surface.
-7. Add registration and recovery flows behind an `email_recovery_enabled` feature flag in `IdentityInfo.metadata`.
-8. Internal-only beta: dfinity-employee anchors get the flag flipped on, exercise both flows.
-9. Telemetry: success rates by mailbox provider, DNSSEC failure rates, time-to-completion percentiles.
+4. Add `EmailRecoveryCredential` storage + Candid surface (§8.1, §8.2).
+5. Add registration and recovery flows behind an `email_recovery_enabled` feature flag in `IdentityInfo.metadata`.
+6. Add the off-chain SMTP gateway forwarder service. Stateless w.r.t. canister; ~5-minute in-memory buffer per challenge.
+7. Internal-only beta: dfinity-employee anchors get the flag flipped on, exercise both flows.
+8. Telemetry: success rates by mailbox provider, DNSSEC failure rates, time-to-completion percentiles.
 
 ### Phase 2 — Public beta
 
-10. Flip the flag for all anchors created after a cutoff date; existing users see "Add email recovery (beta)" in Manage.
-11. Add the Recovery flow entry in the FE's `promptRecovery` screen.
+9. Flip the flag for all anchors created after a cutoff date; existing users see "Add email" in the Recovery methods card on Manage.
+10. Add the email entry in `RecoverIdentityWizard` (§8.7).
 
 ### Phase 3 — GA
 
-12. Remove the beta label; remove the feature flag.
-13. Land the Postbox UI (now just a consumer of the same primitives).
+11. Remove the beta label; remove the feature flag.
 
 We do **not** keep PoC PR #3760's WASM in any release. Its branch closes when Phase 0 lands.
 
 ---
 
-## 12. Open questions
+## 11. Open questions
 
-- **DNSSEC root key in WASM vs. governance.** Bundling the root anchor in the WASM means any rollover requires a canister upgrade. An alternative is to store the trust anchor in the canister's persistent state, mutable only through a governance proposal. This is more flexible but introduces another governable parameter; ii doesn't have many today. *Default: bundle in WASM; revisit if rollover proves painful.*
-- **Email aliases.** Should `alice+ii@gmail.com` and `alice@gmail.com` collapse to one `address_hash`? Gmail treats them as the same mailbox; Outlook does not. *Default: do not collapse — store the address the user typed, verbatim and lowercased; let the user pick.*
-- **Lost mailbox.** If a user's email account is gone (provider closed, domain expired), recovery is unrecoverable through this channel. Surface clearly; document that email recovery is *one* of multiple parallel recovery options.
-- **Privacy: enumeration.** A naïve `email_recovery_lookup_hint` lets an attacker test arbitrary addresses. We mitigate with rate limiting and salted hashing; should we also gate the lookup behind a captcha for unauthenticated callers? *Default: rate limit only, capture metrics, add captcha if abuse appears.*
-- **Multi-anchor per address.** Do we allow the same email on two anchors? OpenID currently does not. *Default: same — `EmailRecoveryRegisterError::AddressAlreadyRegistered`.*
-- **Internationalised domains (IDN).** A-label vs U-label canonicalization matters for both the local-part and domain. *Default: ASCII lowercase the A-label form everywhere; reject U-label inputs at the Candid boundary.*
+- **DNSSEC root anchor on rotation.** Settled — the trust anchor list is a deploy/upgrade arg (§7.5), refreshed alongside any IANA rollover in the next weekly deploy. KSK rollovers happen approximately once a decade; ZSK rolls don't affect the anchor.
+- **Email aliases.** `alice+ii@gmail.com` and `alice@gmail.com` are kept as **distinct** addresses. Gmail treats them as the same mailbox, but other providers don't, and we do not want to bake provider-specific aliasing rules into the canister. The user registers exactly the address they typed, lowercased.
+- **Lost mailbox.** If a user's email account is gone (provider closed, domain expired), recovery via this channel is unrecoverable. *Out of scope for this design.* Email recovery is one of several recovery surfaces; users with stronger guarantees should still keep a recovery phrase.
+- **Privacy: enumeration.** Settled — addressed by §3.1. The lookup is gated by a DKIM-valid email signed for the queried address, so an attacker cannot probe addresses they do not already control. UX-level rate limiting on `email_recovery_prepare_recovery` keeps churn bounded.
+- **Multi-anchor per address.** Not allowed — `email_recovery_register` returns `AddressAlreadyRegistered` if any anchor already has the address bound. Recovery looks up by address, and users do not generally know their anchor number, so the mapping must be functional (§8.4).
+- **Internationalised domains (IDN).** A-label vs U-label canonicalization matters for both the local-part and domain. ASCII-lowercase the A-label form everywhere and reject U-label inputs at the Candid boundary. Acceptable for v1; revisit if user reports surface IDN-mailbox cases we missed.
 
 ---
 
-## 13. References
+## 12. References
 
 - RFC 6376 — DomainKeys Identified Mail (DKIM) Signatures
 - RFC 8301 — Cryptographic Algorithms and Key Usage for DKIM
