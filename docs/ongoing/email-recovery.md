@@ -441,7 +441,7 @@ II is deployed at least weekly, so refreshing the anchor list on every deploy is
 
 **Rollover frequency.** In practice the IANA root KSK rolls *very rarely*: once in DNSSEC's history, in October 2018 (the "KSK rollover from 2010 to 2017 KSK"). No further rollover has happened or is publicly scheduled at the time of writing. IANA publishes signed announcements months in advance when one is upcoming. We keep the deploy-arg shape so that when the next rollover does happen (announced anchor publication updates), it's a one-line config change in the next weekly deploy rather than a code change.
 
-The active anchor list is exposed at `http_request("/.well-known/ii-dnssec-anchors")` for auditability.
+The currently configured anchor list is recoverable from the canister's last upgrade arg via the IC management canister; we do not expose a separate auditing endpoint for it.
 
 ### 7.6 Domains without DNSSEC
 
