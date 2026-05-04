@@ -264,15 +264,13 @@ The "organizational domain" is computed via the [Public Suffix List](https://pub
 
 ### 6.4 Public Suffix List delivery
 
-The PSL is ~190 KB compressed and updated frequently. Two options:
+The PSL drives `adkim=r` alignment computation. The canister fetches it via a **weekly HTTP outcall** to `https://publicsuffix.org/list/public_suffix_list.dat` from a recurring timer, normalises the response in a `transform` function (strip headers, LF line endings, trim trailing whitespace), and caches the bytes in stable memory. The previous successful fetch is retained if a refresh fails; alignment is never blocked on the network at verification time.
 
-**Option 1 (recommended): bundle a snapshot, refresh by upgrade proposal.** Ship the PSL inline in the WASM, source it from `publicsuffix.org/list/public_suffix_list.dat` at build time. The list changes slowly; quarterly or biannual refresh via canister upgrade is acceptable. The downside is registrars adding new TLDs see them late; the upside is zero runtime cost and a totally deterministic alignment computation.
+The fetch is **off the hot path** — it runs at most once per timer tick, never during an `email_recovery_*` call. Cost is negligible (~30B cycles per fetch × ~52 fetches/year). This is the only HTTP outcall in the email-recovery stack; per-verification DNS is delivered via the DNSSEC argument bundle (§7).
 
-**Option 2: PSL-via-DNSSEC-arg.** Have the caller fetch and submit the PSL line for the relevant TLD as part of the verification bundle. Smaller WASM, but adds another input the caller has to assemble. Defer.
+**Bootstrap.** A snapshot is bundled in the WASM at build time so the canister has a working PSL immediately after deploy, before the first timer tick. After deploy, the weekly outcall keeps it fresh.
 
-We'll start with Option 1.
-
-**Stricter fallback if PSL bundling is delayed:** treat `adkim=r` as "X equals Y or is a subdomain of Y." This is *more permissive* than the spec for cases like `mail.example.com` signing for `example.com` (good), and *less permissive* for `gmail.com` and `googlemail.com` style multi-domain orgs (acceptable; they almost always sign with `d=gmail.com` and align strict). We deploy this as Day-0 if Option 1 PSL bundling slips.
+**Fallback alignment if the PSL is genuinely unavailable** (corrupt bundle and every outcall has failed since deploy): treat `adkim=r` as "X equals Y or X is a subdomain of Y." Stricter than spec for multi-domain orgs (e.g. `gmail.com` / `googlemail.com`), but covers every consumer mailbox provider we care about and is safe to deploy as a Day-0 safety net.
 
 ### 6.5 SPF: not checked
 
@@ -330,6 +328,8 @@ The PoC's `fetch_dkim_public_key` makes a `https://dns.google/resolve?...` outca
 - We trust dns.google (or whichever DoH provider) to honestly reflect the authoritative response.
 - It does not work for the recovery hot path: ingress message size has a 2 MB ceiling and outcall latency is multi-second.
 - For the *recovery* call specifically, whose argument already includes a signed email, having the canister go fetch DNS adds another round trip after the user already had to ship something to it.
+
+The one outcall the email-recovery stack does keep is the weekly PSL refresh in §6.4 — it's off the verification hot path, infrequent, and updates a small public reference dataset with no per-call cost.
 
 ### 7.2 The DNSSEC-arg pattern
 
