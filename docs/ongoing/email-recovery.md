@@ -128,7 +128,7 @@ flowchart LR
 
 The architecture is built around three ideas:
 
-- **DNSSEC validation happens once, up front, in the prepare call.** The user's browser figures out the active DKIM selector for the user's email provider (built-in selector map, see §8.4 notes), fetches the DKIM TXT record for that selector + the DMARC TXT record + the DNSSEC chain via DoH, and submits everything as a single call argument. The canister validates the chain cryptographically against the IANA root anchor (no HTTPS outcall), extracts the verified DKIM public key + DMARC policy, and stores them in a pending-challenge entry keyed by the canister-issued nonce, with a 30-minute TTL. The session public key the FE wants the eventual delegation bound to is also passed in here. The canister returns the nonce and the gateway recipient mailbox.
+- **DNSSEC validation happens once, up front, in the prepare call.** The user's browser discovers the active DKIM selector for the user's email provider by probing common selector names via DoH (see §8.4 notes), fetches the DKIM TXT record for that selector + the DMARC TXT record + the DNSSEC chain via DoH, and submits everything as a single call argument. The canister validates the chain cryptographically against the IANA root anchor (no HTTPS outcall), extracts the verified DKIM public key + DMARC policy, and stores them in a pending-challenge entry keyed by the canister-issued nonce, with a 30-minute TTL. The session public key the FE wants the eventual delegation bound to is also passed in here. The canister returns the nonce and the gateway recipient mailbox.
 - **The user actually emails the nonce.** They send a fresh email from the address they typed, with the nonce in the body, to `recover@id.ai` (or `register@id.ai` for setup). The recipient is a single static mailbox per kind — there is no per-challenge id in the address; the canister identifies the challenge by looking up the nonce.
 - **The SMTP gateway forwards the email to the canister via `smtp_request`** — exactly the PoC's surface, no shape change. The canister extracts the nonce from the DKIM-signed body, looks up the pending challenge by nonce, verifies the DKIM signature against the cached public key, checks DMARC alignment against the cached policy, verifies the `From:` matches the address in the original prepare call, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). Until that update lands, the FE polls the canister with `email_recovery_status(nonce)` and shows a "waiting for your email…" spinner. Once the status flips, the FE retrieves the delegation (recovery) or shows "all set" (setup).
 
@@ -460,7 +460,7 @@ Email recovery shares the most code with the OpenID flow (`src/internet_identity
 
 The whole feature, both setup and recovery, fits in three steps the user sees:
 
-1. **Enter your email.** The FE asks for the address. Behind the scenes the FE figures out which DKIM selector is currently active for the user's email provider (see §8.4 notes), fetches the DKIM TXT record for that selector plus the DMARC TXT record plus the DNSSEC chain to root, and submits everything to the canister in one prepare call. For recovery it also generates a fresh ECDSA keypair locally and sends the public key as part of the same call — that key is what the eventual delegation will be bound to.
+1. **Enter your email.** The FE asks for the address. Behind the scenes the FE discovers the active DKIM selector for the user's domain by probing common selector names via DoH (see §8.4 notes), fetches the DKIM TXT record for that selector plus the DMARC TXT record plus the DNSSEC chain to root, and submits everything to the canister in one prepare call. For recovery it also generates a fresh ECDSA keypair locally and sends the public key as part of the same call — that key is what the eventual delegation will be bound to.
 2. **Send a magic email.** The canister issues a one-line token (e.g. `II-Recovery-A1B2C3D4`); the FE asks the user to send a fresh email containing that token to `recover@id.ai` (or `register@id.ai` for setup).
 3. **Done.** The SMTP gateway forwards the email straight to the canister, the canister verifies it, and the FE's polling spinner flips to either "all set" (setup) or "signed in" (recovery, with the delegation it can use immediately).
 
@@ -523,7 +523,8 @@ type EmailRecoveryChallenge = record {
 
 // What the FE submits at prepare time. Carries the DNS proof for the one
 // active DKIM selector for the user's domain plus the DMARC record. The
-// FE figures out the active selector before calling (see §8.4 notes).
+// FE discovers the active selector via DoH probing before calling
+// (see §8.4 notes).
 type EmailRecoveryDnsProof = record {
     address      : text;                       // lowercase canonical form
     dkim_record  : record {
@@ -636,24 +637,27 @@ sequenceDiagram
     Note over U,FE: 1 — User enters email
     U->>FE: "Add email recovery", types alice@gmail.com
 
-    Note over FE,II: 2 — FE figures out the active selector, assembles DNS proof, prepares the challenge
-    FE->>FE: look up gmail.com → "20230601" in built-in selector map
+    Note over FE,DNS: 2 — FE discovers the active selector via DoH probing
+    FE->>DNS: probe TXT &lt;candidate&gt;._domainkey.gmail.com<br/>for candidates: selector1, selector2, s1, s2,<br/>default, dkim, google, k1, …
+    DNS->>FE: TXT records for selectors that exist (e.g. "20230601")
+
+    Note over FE,II: 3 — FE assembles the DNSSEC-proven bundle and prepares the challenge
     FE->>DNS: DKIM TXT for 20230601._domainkey.gmail.com,<br/>DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain (DoH cd=1, do=1)
     DNS->>FE: signed RRsets + RRSIGs + DS chain
     FE->>II: email_recovery_credential_prepare_add(anchor, EmailRecoveryDnsProof)
     II->>II: verify DNSSEC chain; extract DKIM pubkey for that selector;<br/>parse DMARC policy; store pending challenge keyed by nonce (TTL 30 min)
     II->>FE: { nonce: "II-Recovery-A1B2C3D4", mailbox: "register@id.ai", expires_at }
 
-    Note over U,Mail: 3 — User emails the magic token
+    Note over U,Mail: 4 — User emails the magic token
     FE->>U: "Send an email containing II-Recovery-A1B2C3D4<br/>to register@id.ai from alice@gmail.com"
     U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA (DKIM-signed by gmail.com)
 
-    Note over GW,II: 4 — Gateway forwards email straight to the canister (PoC surface)
+    Note over GW,II: 5 — Gateway forwards email straight to the canister (PoC surface)
     GW->>II: smtp_request(SmtpRequest)
     II->>II: extract nonce from canonicalized signed body;<br/>look up pending challenge by nonce;<br/>verify DKIM signature vs cached pubkey (selector matches);<br/>check DMARC alignment vs cached policy;<br/>verify From: matches the address;<br/>bind address → anchor; mark challenge Succeeded
 
-    Note over FE,II: 5 — FE polls the canister and shows result
+    Note over FE,II: 6 — FE polls the canister and shows result
     loop until terminal status
         FE->>II: email_recovery_status(nonce)
         II->>FE: Pending / RegistrationSucceeded / Failed / Expired
@@ -664,8 +668,8 @@ sequenceDiagram
 Notes:
 
 - **Single selector per email.** A DKIM-signed email carries exactly one signature over exactly one selector — the value of the `s=` tag in the `DKIM-Signature` header. Verifying that one email therefore needs exactly one DKIM TXT record (the one for that selector), and one DNSSEC chain to prove it. We don't need to upload multiple selectors at prepare time; we just need to know which one the email *will* be signed under, which is the provider's currently active selector.
-- **How the FE learns the selector.** A built-in map ships in the FE: `gmail.com → "20230601"`, `outlook.com → "selector1"`, `icloud.com → "1a1hai"`, etc., listing the *current active* selector for each supported provider. The map is small (a few KB), changes rarely, and is updated alongside ordinary FE deploys. For unknown domains, the prepare step shows an error like "We don't have `example.com` in our supported-providers list yet — try a different address." A future iteration can add a fallback that lets advanced users enter the selector manually.
-- **What if the provider rotates between prepare and send.** Rare in practice — providers announce rotations weeks in advance and keep both selectors live during the transition. If it does happen, `smtp_request` returns `SelectorMismatch` and the FE retries with an updated map.
+- **How the FE discovers the selector.** DKIM has no native enumeration mechanism — you can't query "list all selectors at `_domainkey.<domain>`". But you *can* probe specific names: a DoH query for `<candidate>._domainkey.<domain>` returns a TXT record if and only if that selector is published. The FE ships a small list of common selector patterns (around 20 names: `selector1`, `selector2`, `s1`, `s2`, `default`, `dkim`, `google`, `mail`, `k1`, `k2`, `protonmail`, `protonmail2`, `protonmail3`, `sig1`, `default._domainkey`, plus current-year date-style names like `20240101`, `20230601`, `20221208` for Google), fires them all in parallel via DoH (each query is tiny and cacheable), and keeps whichever names return a valid `v=DKIM1; k=rsa; p=...` record. The list is data, not code, and updates by ordinary frontend deploys when a new provider naming pattern shows up. For domains where no candidate resolves, the FE shows an error suggesting the user try a different address; a future iteration can offer "advanced — enter your selector manually" as a fallback.
+- **What if the provider rotates between prepare and send.** Rare in practice — providers announce rotations weeks in advance and keep both selectors live during the transition. If it does happen, `smtp_request` returns `SelectorMismatch` and the FE re-probes and retries.
 - The nonce is searched as a case-insensitive substring inside the canonicalized signed-prefix bytes (§5.3). Mailbox providers that append signatures or footers don't break the check as long as the nonce sits inside the DKIM-signed body window.
 - `smtp_request` is open: anyone can call it, but the only effect is to verify a DKIM-signed email against an already-cached challenge. A malicious gateway can withhold or duplicate calls, but cannot forge state changes.
 - Polling cadence: the FE backs off from 1 s to 5 s; after `expires_at` it stops polling and shows the timeout state.
@@ -690,24 +694,27 @@ sequenceDiagram
     U->>FE: "Recover with email", types alice@gmail.com
     FE->>FE: generate session ECDSA keypair (session_pk + session_sk)
 
-    Note over FE,II: 2 — FE looks up active selector, assembles DNS proof, prepares the challenge
-    FE->>FE: look up gmail.com → "20230601" in built-in selector map
+    Note over FE,DNS: 2 — FE discovers the active selector via DoH probing
+    FE->>DNS: probe TXT &lt;candidate&gt;._domainkey.gmail.com<br/>for candidates in the FE's name list
+    DNS->>FE: TXT records for selectors that exist
+
+    Note over FE,II: 3 — FE assembles the DNSSEC-proven bundle and prepares the challenge
     FE->>DNS: DKIM TXT for that selector, DMARC TXT, DNSSEC chain
     DNS->>FE: bundle
     FE->>II: email_recovery_prepare_delegation(EmailRecoveryDnsProof, session_pk)
     II->>II: verify DNSSEC; extract pubkey; parse policy;<br/>store pending challenge by nonce (TTL 30 min);<br/>anchor resolved later on smtp_request
     II->>FE: { nonce, mailbox: "recover@id.ai", expires_at }
 
-    Note over U,Mail: 3 — User emails the magic token
+    Note over U,Mail: 4 — User emails the magic token
     FE->>U: "Send an email containing II-Recovery-…<br/>to recover@id.ai from alice@gmail.com"
     U->>Mail: send signed email
     Mail->>GW: SMTP DATA
 
-    Note over GW,II: 4 — Gateway forwards email straight to the canister
+    Note over GW,II: 5 — Gateway forwards email straight to the canister
     GW->>II: smtp_request(SmtpRequest)
     II->>II: extract nonce; look up pending challenge by nonce;<br/>verify DKIM + DMARC + From:;<br/>look up anchor by lowercase(From: address);<br/>stamp delegation seed bound to cached session_pk;<br/>mark challenge Succeeded
 
-    Note over FE,II: 5 — FE polls and retrieves the delegation
+    Note over FE,II: 6 — FE polls and retrieves the delegation
     loop until terminal status
         FE->>II: email_recovery_status(nonce)
         II->>FE: Pending / RecoveryReady { user_key, expiration } / Failed / Expired
