@@ -180,7 +180,7 @@ msgstr "Finden Sie Ihre Identität nicht?"
 
 msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr ""
+msgstr "Abbrechen"
 
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-Zeichen"
@@ -226,7 +226,7 @@ msgstr "Klicken zum Anzeigen"
 
 msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr ""
+msgstr "Schließen"
 
 msgid "Close menu"
 msgstr "Menü schließen"
@@ -266,7 +266,7 @@ msgstr "Weiter"
 
 msgctxt "button label: proceed to next step"
 msgid "Continue"
-msgstr ""
+msgstr "Weiter"
 
 msgid "Continue on another device"
 msgstr "Auf einem anderen Gerät fortfahren"
@@ -345,7 +345,7 @@ msgstr "Einfacher Zugang"
 
 msgctxt "button label: edit item"
 msgid "Edit"
-msgstr ""
+msgstr "Bearbeiten"
 
 msgid "Edit {name}"
 msgstr "{name} bearbeiten"
@@ -800,7 +800,7 @@ msgstr "Wiederherstellungsphrase festgelegt"
 
 msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr ""
+msgstr "Entfernen"
 
 msgid "Remove from this device"
 msgstr "Von diesem Gerät entfernen"
@@ -837,7 +837,7 @@ msgstr "Erfordert Entsperrung, bevor ein Zurücksetzen möglich ist."
 
 msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr ""
+msgstr "Zurücksetzen"
 
 msgid "Reset your recovery phrase?"
 msgstr "Wiederherstellungsphrase zurücksetzen?"
@@ -850,7 +850,7 @@ msgstr "Das Zurücksetzen macht Ihre aktuelle Wiederherstellungsphrase ungültig
 
 msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr ""
+msgstr "Wiederholen"
 
 msgid "Return to app"
 msgstr "Zurück zur App"
@@ -1167,7 +1167,7 @@ msgstr "Unverifizierter Ursprung"
 
 msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr ""
+msgstr "Aktualisieren"
 
 msgid "Upgrade again"
 msgstr "Erneut aktualisieren"
@@ -1195,7 +1195,7 @@ msgstr "Bestehende Identität verwenden"
 
 msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr ""
+msgstr "Überprüfen"
 
 msgid "Verify recovery to remove"
 msgstr "Wiederherstellung verifizieren, um zu entfernen"

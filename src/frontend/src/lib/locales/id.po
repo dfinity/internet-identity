@@ -180,7 +180,7 @@ msgstr "Tidak dapat menemukan identitas Anda?"
 
 msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr ""
+msgstr "Batal"
 
 msgid "CAPTCHA characters"
 msgstr "Karakter CAPTCHA"
@@ -226,7 +226,7 @@ msgstr "Klik untuk menampilkan"
 
 msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr ""
+msgstr "Tutup"
 
 msgid "Close menu"
 msgstr "Tutup menu"
@@ -266,7 +266,7 @@ msgstr "Lanjutkan"
 
 msgctxt "button label: proceed to next step"
 msgid "Continue"
-msgstr ""
+msgstr "Lanjutkan"
 
 msgid "Continue on another device"
 msgstr "Lanjutkan di perangkat lain"
@@ -345,7 +345,7 @@ msgstr "Akses mudah"
 
 msgctxt "button label: edit item"
 msgid "Edit"
-msgstr ""
+msgstr "Edit"
 
 msgid "Edit {name}"
 msgstr "Edit {name}"
@@ -800,7 +800,7 @@ msgstr "Frasa pemulihan diatur"
 
 msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr ""
+msgstr "Hapus"
 
 msgid "Remove from this device"
 msgstr "Hapus dari perangkat ini"
@@ -837,7 +837,7 @@ msgstr "Memerlukan pembukaan kunci sebelum dapat disetel ulang."
 
 msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr ""
+msgstr "Setel ulang"
 
 msgid "Reset your recovery phrase?"
 msgstr "Setel ulang frasa pemulihan Anda?"
@@ -850,7 +850,7 @@ msgstr "Penyetelan ulang akan membatalkan frasa pemulihan Anda saat ini, sehingg
 
 msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr ""
+msgstr "Coba lagi"
 
 msgid "Return to app"
 msgstr "Kembali ke aplikasi"
@@ -1167,7 +1167,7 @@ msgstr "Asal tidak terverifikasi"
 
 msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr ""
+msgstr "Tingkatkan"
 
 msgid "Upgrade again"
 msgstr "Tingkatkan lagi"
@@ -1195,7 +1195,7 @@ msgstr "Gunakan identitas yang ada"
 
 msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr ""
+msgstr "Verifikasi"
 
 msgid "Verify recovery to remove"
 msgstr "Verifikasi pemulihan untuk menghapus"

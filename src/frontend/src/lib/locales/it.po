@@ -180,7 +180,7 @@ msgstr "Non riesci a trovare la tua identità?"
 
 msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr ""
+msgstr "Annulla"
 
 msgid "CAPTCHA characters"
 msgstr "Caratteri CAPTCHA"
@@ -226,7 +226,7 @@ msgstr "Clicca per rivelare"
 
 msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr ""
+msgstr "Chiudi"
 
 msgid "Close menu"
 msgstr "Chiudi menu"
@@ -266,7 +266,7 @@ msgstr "Continua"
 
 msgctxt "button label: proceed to next step"
 msgid "Continue"
-msgstr ""
+msgstr "Continua"
 
 msgid "Continue on another device"
 msgstr "Continua da un altro dispositivo"
@@ -345,7 +345,7 @@ msgstr "Accesso facile"
 
 msgctxt "button label: edit item"
 msgid "Edit"
-msgstr ""
+msgstr "Modifica"
 
 msgid "Edit {name}"
 msgstr "Modifica {name}"
@@ -800,7 +800,7 @@ msgstr "Frase di recupero impostata"
 
 msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr ""
+msgstr "Rimuovi"
 
 msgid "Remove from this device"
 msgstr "Rimuovi da questo dispositivo"
@@ -837,7 +837,7 @@ msgstr "Richiede lo sblocco prima che possa essere reimpostata."
 
 msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr ""
+msgstr "Reimposta"
 
 msgid "Reset your recovery phrase?"
 msgstr "Reimpostare la tua frase di recupero?"
@@ -850,7 +850,7 @@ msgstr "La reimpostazione invaliderà la tua frase di recupero corrente, lascian
 
 msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr ""
+msgstr "Riprova"
 
 msgid "Return to app"
 msgstr "Torna all'app"
@@ -1167,7 +1167,7 @@ msgstr "Origine non verificata"
 
 msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr ""
+msgstr "Aggiorna"
 
 msgid "Upgrade again"
 msgstr "Aggiorna di nuovo"
@@ -1195,7 +1195,7 @@ msgstr "Usa identità esistente"
 
 msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr ""
+msgstr "Verifica"
 
 msgid "Verify recovery to remove"
 msgstr "Verifica recupero per rimuovere"

@@ -180,7 +180,7 @@ msgstr "¿No encuentras tu identidad?"
 
 msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr ""
+msgstr "Cancelar"
 
 msgid "CAPTCHA characters"
 msgstr "Caracteres del CAPTCHA"
@@ -226,7 +226,7 @@ msgstr "Haz clic para mostrar"
 
 msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr ""
+msgstr "Cerrar"
 
 msgid "Close menu"
 msgstr "Cerrar menú"
@@ -266,7 +266,7 @@ msgstr "Continuar"
 
 msgctxt "button label: proceed to next step"
 msgid "Continue"
-msgstr ""
+msgstr "Continuar"
 
 msgid "Continue on another device"
 msgstr "Continuar en otro dispositivo"
@@ -345,7 +345,7 @@ msgstr "Fácil acceso"
 
 msgctxt "button label: edit item"
 msgid "Edit"
-msgstr ""
+msgstr "Editar"
 
 msgid "Edit {name}"
 msgstr "Editar {name}"
@@ -800,7 +800,7 @@ msgstr "Frase de recuperación establecida"
 
 msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr ""
+msgstr "Eliminar"
 
 msgid "Remove from this device"
 msgstr "Eliminar de este dispositivo"
@@ -837,7 +837,7 @@ msgstr "Debe desbloquearse antes de poder restablecerse."
 
 msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr ""
+msgstr "Restablecer"
 
 msgid "Reset your recovery phrase?"
 msgstr "¿Restablecer tu frase de recuperación?"
@@ -850,7 +850,7 @@ msgstr "Restablecer invalidará tu frase de recuperación actual, dejando solo l
 
 msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr ""
+msgstr "Reintentar"
 
 msgid "Return to app"
 msgstr "Volver a la app"
@@ -1167,7 +1167,7 @@ msgstr "Origen no verificado"
 
 msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr ""
+msgstr "Actualizar"
 
 msgid "Upgrade again"
 msgstr "Actualizar de nuevo"
@@ -1195,7 +1195,7 @@ msgstr "Usar identidad existente"
 
 msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr ""
+msgstr "Verificar"
 
 msgid "Verify recovery to remove"
 msgstr "Verifica la recuperación para eliminar"

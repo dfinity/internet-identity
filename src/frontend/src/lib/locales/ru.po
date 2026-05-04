@@ -180,7 +180,7 @@ msgstr "Не получилось зайти?"
 
 msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr ""
+msgstr "Отмена"
 
 msgid "CAPTCHA characters"
 msgstr "Символы CAPTCHA"
@@ -226,7 +226,7 @@ msgstr "Нажмите, чтобы показать"
 
 msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr ""
+msgstr "Закрыть"
 
 msgid "Close menu"
 msgstr "Закрыть меню"
@@ -266,7 +266,7 @@ msgstr "Продолжить"
 
 msgctxt "button label: proceed to next step"
 msgid "Continue"
-msgstr ""
+msgstr "Продолжить"
 
 msgid "Continue on another device"
 msgstr "Продолжить на другом устройстве"
@@ -345,7 +345,7 @@ msgstr "Простой вход"
 
 msgctxt "button label: edit item"
 msgid "Edit"
-msgstr ""
+msgstr "Редактировать"
 
 msgid "Edit {name}"
 msgstr "Редактировать {name}"
@@ -800,7 +800,7 @@ msgstr "Резервная фраза установлена"
 
 msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr ""
+msgstr "Удалить"
 
 msgid "Remove from this device"
 msgstr "Удалить с этого устройства"
@@ -837,7 +837,7 @@ msgstr "Требует разблокировки перед сбросом."
 
 msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr ""
+msgstr "Сбросить"
 
 msgid "Reset your recovery phrase?"
 msgstr "Сбросить вашу резервную фразу?"
@@ -850,7 +850,7 @@ msgstr "Сброс аннулирует вашу текущую резервну
 
 msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr ""
+msgstr "Повторить"
 
 msgid "Return to app"
 msgstr "Вернуться в приложение"
@@ -1167,7 +1167,7 @@ msgstr "Непроверенный источник"
 
 msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr ""
+msgstr "Начать обновление"
 
 msgid "Upgrade again"
 msgstr "Обновить снова"
@@ -1195,7 +1195,7 @@ msgstr "Уже есть аккаунт? Войти"
 
 msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr ""
+msgstr "Проверить"
 
 msgid "Verify recovery to remove"
 msgstr "Чтобы удалить, сначала подтвердите резервную фразу"

@@ -180,7 +180,7 @@ msgstr "Nie możesz znaleźć swojej tożsamości?"
 
 msgctxt "button label: dismiss or abort current action"
 msgid "Cancel"
-msgstr ""
+msgstr "Anuluj"
 
 msgid "CAPTCHA characters"
 msgstr "Znaki CAPTCHA"
@@ -226,7 +226,7 @@ msgstr "Kliknij, aby ujawnić"
 
 msgctxt "button label: close or dismiss panel"
 msgid "Close"
-msgstr ""
+msgstr "Zamknij"
 
 msgid "Close menu"
 msgstr "Zamknij menu"
@@ -266,7 +266,7 @@ msgstr "Kontynuuj"
 
 msgctxt "button label: proceed to next step"
 msgid "Continue"
-msgstr ""
+msgstr "Kontynuuj"
 
 msgid "Continue on another device"
 msgstr "Kontynuuj na innym urządzeniu"
@@ -345,7 +345,7 @@ msgstr "Łatwy dostęp"
 
 msgctxt "button label: edit item"
 msgid "Edit"
-msgstr ""
+msgstr "Edytuj"
 
 msgid "Edit {name}"
 msgstr "Edytuj {name}"
@@ -800,7 +800,7 @@ msgstr "Fraza odzyskiwania ustawiona"
 
 msgctxt "button label: delete or remove item"
 msgid "Remove"
-msgstr ""
+msgstr "Usuń"
 
 msgid "Remove from this device"
 msgstr "Usuń z tego urządzenia"
@@ -837,7 +837,7 @@ msgstr "Wymaga odblokowania przed zresetowaniem."
 
 msgctxt "button label: reset recovery phrase"
 msgid "Reset"
-msgstr ""
+msgstr "Resetuj"
 
 msgid "Reset your recovery phrase?"
 msgstr "Zresetować frazę odzyskiwania?"
@@ -850,7 +850,7 @@ msgstr "Resetowanie unieważni Twoją obecną frazę odzyskiwania, pozostawiają
 
 msgctxt "button label: retry failed operation"
 msgid "Retry"
-msgstr ""
+msgstr "Ponów próbę"
 
 msgid "Return to app"
 msgstr "Powrót do aplikacji"
@@ -1167,7 +1167,7 @@ msgstr "Niezweryfikowane pochodzenie"
 
 msgctxt "button label: upgrade identity or passkey"
 msgid "Upgrade"
-msgstr ""
+msgstr "Aktualizuj"
 
 msgid "Upgrade again"
 msgstr "Aktualizuj ponownie"
@@ -1195,7 +1195,7 @@ msgstr "Użyj istniejącej tożsamości"
 
 msgctxt "button label: verify or confirm step"
 msgid "Verify"
-msgstr ""
+msgstr "Zweryfikuj"
 
 msgid "Verify recovery to remove"
 msgstr "Zweryfikuj odzyskiwanie, aby usunąć"
