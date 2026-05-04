@@ -46,6 +46,7 @@ RUN wasm-pack --version
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY src/internet_identity/Cargo.toml src/internet_identity/Cargo.toml
+COPY src/internet_identity_email_test_vectors/Cargo.toml src/internet_identity_email_test_vectors/Cargo.toml
 COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/Cargo.toml
 COPY src/archive/Cargo.toml src/archive/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
@@ -56,6 +57,8 @@ ENV CARGO_TARGET_DIR=/cargo_target
 COPY ./scripts/build ./scripts/build
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
+    && mkdir -p src/internet_identity_email_test_vectors/src \
+    && touch src/internet_identity_email_test_vectors/src/lib.rs \
     && mkdir -p src/internet_identity_interface/src \
     && touch src/internet_identity_interface/src/lib.rs \
     && mkdir -p src/archive/src \

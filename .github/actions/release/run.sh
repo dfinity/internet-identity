@@ -114,6 +114,7 @@ done <<< "$INPUT_ASSETS"
 # Source paths for filtering commits by canister
 BACKEND_PATHS=(
   src/internet_identity/
+  src/internet_identity_email_test_vectors/
   src/internet_identity_interface/
   src/archive/
   src/asset_util/
