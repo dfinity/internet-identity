@@ -859,17 +859,24 @@ These are wireframes; final visual design lives in Figma. Layout expressed as AS
 
 The delegation is produced via the same canister-signature path as OpenID. At `email_recovery_prepare_delegation` time the FE supplies a fresh ECDSA `session_pk` which the canister parks inside the pending-challenge entry. When `smtp_request` processes the recovery email successfully, the canister stamps the delegation seed using `(anchor || "email-recovery" || lowercase_address)` and the cached `session_pk`; both `user_key` and `expiration` are returned via `email_recovery_status` once the challenge is `RecoveryReady`. The FE then makes one query call to `email_recovery_get_delegation` to retrieve the SignedDelegation. Expiration is the standard 30 minutes (`OPENID_SESSION_DURATION_NS`).
 
-### 8.8 Rate limits
+### 8.8 Bounded state, not rate limits
 
-| Surface | Limit | Reason |
-|---|---|---|
-| `email_recovery_credential_prepare_add` per anchor | 5 / hour | UX cost of sending an email is asymmetric — we don't need fast retries |
-| `smtp_request` per challenge | 1 effective (single-use) | Idempotent on terminal status; further calls are no-ops |
-| `email_recovery_register` (active addresses) per anchor | max 3 | Bounded storage |
+We deliberately don't add per-anchor or per-address rate limits to the recovery flows. The keys we'd reach for don't survive review:
 
-There are no per-IP limits — II does not currently track per-IP state and that's out of scope here. Anonymous abuse of `email_recovery_prepare_delegation` is bounded by the canister-side message-size and cycles cost; the heavy DNSSEC validation cost makes it self-rate-limiting under sustained load. Revisit if telemetry shows abuse.
+- **Per-anchor on setup.** `email_recovery_credential_prepare_add` is authenticated and the caller is their own anchor — spamming yourself has no upside.
+- **Per-address on recovery.** `email_recovery_prepare_delegation` is anonymous and the canister has no IP visibility. Keying a limit by claimed address would create a denial-of-recovery vector: an attacker who knows Alice's email could keep submitting prepare calls for `alice@gmail.com` and lock Alice out of her own recovery channel for the limit window.
+- **`smtp_request` per challenge.** This is idempotency, not a rate limit — terminal status flips once and further calls are no-ops.
 
-Per-anchor limits are enforced with stable-memory backed counters keyed by `(anchor, hour_bucket)`; the existing rate-limiter module is reused.
+What we *do* keep are bounded-state caps, which actually protect the canister:
+
+| Bound | Mechanism |
+|---|---|
+| Pending-challenge map size | Fixed-capacity `StableBTreeMap` with 30-min TTL and oldest-first eviction. Capacity is sized above the per-TTL fill rate the canister can reach (see below). |
+| Registered addresses per anchor | Hard cap of 3, enforced at `email_recovery_credential_prepare_add` time. |
+
+The eviction policy is safe against denial-of-recovery via map-flooding because every prepare call requires a full DNSSEC chain validation — a CPU-bound operation on the single replica that executes the call. Capping the map above what the canister can actually fill within a 30-minute TTL means an attacker cannot evict a legitimate pending entry without first being throttled by the canister's own compute rate. We do not need to *know* the rate cap to set a safe capacity; we just need it to be larger than `max_validations_per_second × ttl`, with a comfortable margin.
+
+If telemetry later shows abuse the canister can't compute-throttle (e.g. someone caching valid DNS bundles and replaying them cheaply), the response is a frontend-side captcha on `email_recovery_prepare_delegation`, not a per-key rate limit. That's reactive, not a precondition for shipping.
 
 ### 8.9 Frontend changes
 
