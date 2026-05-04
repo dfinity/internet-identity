@@ -2,7 +2,6 @@
   import type { ChannelError } from "$lib/stores/channelStore";
   import { t } from "$lib/stores/locale.store";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
@@ -66,10 +65,10 @@
       <p class="text-text-tertiary mb-6 text-base font-medium">
         {messages.description}
       </p>
-      <Button onclick={() => window.close()} variant="secondary">
+      <button class="btn btn-secondary" onclick={() => window.close()}>
         <RotateCcwIcon class="size-4" />
         <span>{$t`Return to app`}</span>
-      </Button>
+      </button>
     </AuthPanel>
   </div>
   <Footer />

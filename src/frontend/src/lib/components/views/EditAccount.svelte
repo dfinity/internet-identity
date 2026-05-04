@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { PencilIcon } from "@lucide/svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import { t } from "$lib/stores/locale.store";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
@@ -97,10 +96,9 @@
     {/if}
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">
-    <Button
+    <button
+      class="btn btn-primary btn-lg"
       onclick={handleSubmit}
-      variant="primary"
-      size="lg"
       type="submit"
       disabled={name.trim().length === 0 ||
         name.length > 32 ||
@@ -120,6 +118,6 @@
           {account === undefined ? $t`Create account` : $t`Save changes`}
         </span>
       {/if}
-    </Button>
+    </button>
   </div>
 </form>

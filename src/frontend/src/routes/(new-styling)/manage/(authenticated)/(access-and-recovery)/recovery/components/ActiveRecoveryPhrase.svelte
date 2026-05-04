@@ -75,7 +75,18 @@
       description={$t`Requires unlocking before it can be reset.`}
       hidden={!isProtected}
     >
+<<<<<<< HEAD
       <button class="btn btn-secondary btn-sm btn-danger" onclick={onReset}>
+=======
+      <button
+        class={[
+          "btn btn-secondary btn-sm btn-danger",
+          "@max-xl:mt-5",
+          "@xl:my-auto",
+        ]}
+        onclick={onReset}
+      >
+>>>>>>> f859c0a6 (refactor(fe): remove deprecated Button component (#3837))
         {#if isProtected}
           <LockKeyholeIcon class="size-4" />
           <span>{$t`Unlock and reset`}</span>

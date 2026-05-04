@@ -1,6 +1,5 @@
 <script lang="ts">
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { SUPPORT_URL } from "$lib/config";
   import { onMount } from "svelte";
   import {
@@ -50,21 +49,19 @@
     </div>
   </div>
   <div class="flex flex-col items-stretch gap-4">
-    <Button
+    <a
+      class="btn btn-secondary btn-lg"
       href={SUPPORT_URL}
       target="_blank"
       rel="noopener noreferrer"
-      variant="secondary"
-      size="lg"
     >
       {$t`Help & FAQ`}
-    </Button>
-    <Button
+    </a>
+    <button
+      class="btn btn-tertiary btn-lg"
       onclick={() => onUpgradeAgain(attachElement)}
-      variant="tertiary"
-      size="lg"
     >
       {$t`Upgrade again`}
-    </Button>
+    </button>
   </div>
 </div>

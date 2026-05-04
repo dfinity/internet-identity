@@ -21,7 +21,6 @@
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
@@ -224,11 +223,10 @@
       <div class="h-[env(safe-area-inset-top)]"></div>
       <Header>
         {#if selectedIdentity !== undefined}
-          <Button
-            bind:element={identityButtonRef}
+          <button
+            bind:this={identityButtonRef}
+            class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
             onclick={() => (isIdentityPopoverOpen = true)}
-            variant="tertiary"
-            class="ms-auto gap-2.5 pe-3 md:-me-3"
             aria-label="Switch identity"
           >
             <Avatar size="xs">
@@ -238,7 +236,7 @@
               >{selectedIdentity.name ?? selectedIdentity.identityNumber}</span
             >
             <ChevronDownIcon class="size-4" />
-          </Button>
+          </button>
           {#if isIdentityPopoverOpen}
             <Popover
               anchor={identityButtonRef}

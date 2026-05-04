@@ -1,6 +1,5 @@
 <script lang="ts">
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import { PencilIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
@@ -88,9 +87,9 @@
       />
     </div>
     <div class="mt-auto flex flex-col items-stretch gap-3">
-      <Button
+      <button
+        class="btn btn-primary btn-lg"
         type="submit"
-        size="lg"
         onclick={handleSubmit}
         disabled={(providerName === undefined && name.trim().length === 0) ||
           name.length > 32 ||
@@ -102,10 +101,10 @@
         {:else}
           <span>{$t`Save changes`}</span>
         {/if}
-      </Button>
-      <Button onclick={onCancel} variant="tertiary" size="lg">
+      </button>
+      <button class="btn btn-tertiary btn-lg" onclick={onCancel}>
         {$t`Cancel`}
-      </Button>
+      </button>
     </div>
   </fieldset>
 </form>
