@@ -646,8 +646,8 @@ sequenceDiagram
     U->>FE: "Add email recovery", types alice@gmail.com
 
     Note over FE,DNS: 2 — FE discovers the active selector via DoH probing
-    FE->>DNS: probe TXT &lt;candidate&gt;._domainkey.gmail.com<br/>for candidates: selector1, selector2, s1, s2,<br/>default, dkim, google, k1, …
-    DNS->>FE: TXT records for selectors that exist (e.g. "20230601")
+    FE->>DNS: probe TXT records at candidate._domainkey.gmail.com<br/>for candidates selector1, selector2, s1, s2,<br/>default, dkim, google, k1, etc.
+    DNS->>FE: TXT records for any selectors that exist (e.g. 20230601)
 
     Note over FE,II: 3 — FE assembles the DNSSEC-proven bundle and prepares the challenge
     FE->>DNS: DKIM TXT for 20230601._domainkey.gmail.com,<br/>DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain (DoH cd=1, do=1)
@@ -703,8 +703,8 @@ sequenceDiagram
     FE->>FE: generate session ECDSA keypair (session_pk + session_sk)
 
     Note over FE,DNS: 2 — FE discovers the active selector via DoH probing
-    FE->>DNS: probe TXT &lt;candidate&gt;._domainkey.gmail.com<br/>for candidates in the FE's name list
-    DNS->>FE: TXT records for selectors that exist
+    FE->>DNS: probe TXT records at candidate._domainkey.gmail.com<br/>for candidates in the FE's name list
+    DNS->>FE: TXT records for any selectors that exist
 
     Note over FE,II: 3 — FE assembles the DNSSEC-proven bundle and prepares the challenge
     FE->>DNS: DKIM TXT for that selector, DMARC TXT, DNSSEC chain
