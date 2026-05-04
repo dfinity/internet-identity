@@ -951,7 +951,7 @@ There is no `web_push.rs` / service-worker integration in scope here — push no
 
 ## 9. Test corpus
 
-A new crate `internet_identity_email_test_vectors` carries:
+A `test_vectors/email_recovery/` directory at the repo root carries plain `.eml`, `.json` (DNSSEC chains), and `.txt` (DKIM/DMARC TXT records) files. Both the canister-side unit tests in `internet_identity` and the PocketIC integration tests in `canister_tests` load them via `include_bytes!` (or `std::fs::read` for tests that aren't compiled into the wasm). No separate crate is needed — the data is just bytes shared between two consumers, not a library with behaviour. Categories carried:
 
 - **DKIM happy path**: 100+ real signed messages from each major provider (Gmail, iCloud, Outlook, Fastmail, Proton, SES, SendGrid, Mailgun, Postmark, Tutanota), recorded once and committed as `.eml` + DNS bundle pairs.
 - **DKIM tampering**: each happy-path vector mutated in 8+ ways (header bit flip, body byte flip, signature truncation, key swap, …) — every mutation must Unverify.
