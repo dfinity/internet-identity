@@ -431,8 +431,8 @@ This is a small TS module (~300 lines, no dependencies beyond `fetch`) living in
 The trust anchor (the DS digest of the IANA root KSK) lives in the canister's persistent state, set on every deploy via the `init`/`post_upgrade` arg:
 
 ```candid
-type EmailRecoveryConfig = record {
-    dnssec_root_anchors : vec record {
+type DnssecConfig = record {
+    root_anchors : vec record {
         // Per `data.iana.org/root-anchors/root-anchors.xml`.
         key_tag      : nat16;
         algorithm    : nat8;       // 8 / 13 / 15
@@ -442,7 +442,9 @@ type EmailRecoveryConfig = record {
 };
 ```
 
-Multiple anchors are accepted simultaneously to make rollover trivial — during a key transition both the retiring and the incoming KSK digests live in `dnssec_root_anchors`. This is the same shape IANA publishes when both old and new KSKs are valid.
+The config sits at the top of `InternetIdentityInit` as `dnssec_config: Option<DnssecConfig>`; it isn't email-recovery-specific. Any future feature that needs DNSSEC-verified DNS (DANE, ACME, MX-pin, …) consumes the same trust anchors.
+
+Multiple anchors are accepted simultaneously to make rollover trivial — during a key transition both the retiring and the incoming KSK digests live in `root_anchors`. This is the same shape IANA publishes when both old and new KSKs are valid.
 
 II is deployed at least weekly, so refreshing the anchor list on every deploy is essentially free; we don't need a separate governance mechanism for it.
 
