@@ -111,32 +111,41 @@ We therefore key the lookup index by `lowercase(local-part) + "@" + lowercase(do
 
 ```mermaid
 flowchart LR
-    User[User browser] -- "1. send signed email + nonce" --> MX[SMTP gateway<br/>off-chain, stateless<br/>relative to canister]
-    User -- "2. poll gateway<br/>for raw email" --> MX
-    User -- "3. fetch DNSSEC<br/>chain for sender domain<br/>via DoH" --> DNS[Authoritative<br/>DNS]
-    User -- "4. submit { email bytes,<br/>DNSSEC bundle }" --> II[II canister]
-    II -- "verify DNSSEC,<br/>verify DKIM,<br/>verify DMARC,<br/>burn nonce" --> II
-    II -- "register address /<br/>issue delegation" --> User
+    User[User browser]
+    DNS[Public DoH resolver]
+    II[II canister]
+    Mail[User's mailbox<br/>e.g. Gmail]
+    GW[SMTP gateway<br/>off-chain]
+
+    User -- "1. fetch DKIM/DMARC TXT<br/>+ DNSSEC chain" --> DNS
+    User -- "2. prepare { addr, dns_proof, session_pk }" --> II
+    II -- "3. challenge { id, nonce, mailbox }" --> User
+    User -- "4. compose & send email<br/>to recover-&lt;id&gt;@id.ai<br/>containing the nonce" --> Mail
+    Mail -- "5. SMTP DATA" --> GW
+    GW -- "6. deliver { challenge_id,<br/>raw email bytes }" --> II
+    II -- "7. status / delegation" --> User
 ```
 
-The architecture is built around two ideas:
+The architecture is built around three ideas:
 
-- The user's browser (not the canister) fetches the sender domain's DKIM/DMARC TXT records *along with the full DNSSEC chain* and submits them as a single call argument. The canister validates the chain cryptographically, with no HTTPS outcall.
-- The signed email itself is also passed in as a call argument. The canister never stores the email; it verifies it in flight, takes the action (register an address, or issue a delegation), and discards the bytes.
+- **DNSSEC validation happens once, up front, in the prepare call.** The user's browser fetches the sender domain's DKIM/DMARC TXT records *along with the full DNSSEC chain* via DoH and submits everything as a single call argument. The canister validates the chain cryptographically against the IANA root anchor (no HTTPS outcall), extracts the verified DKIM public keys + DMARC policy, and stores them under an opaque `challenge_id` with a 30-minute TTL. The session public key the FE wants the eventual delegation bound to is also passed in here. The canister returns the challenge nonce and the gateway recipient mailbox.
+- **The user actually emails the nonce.** They send a fresh email from the address they typed, with the nonce in the body, to `recover-<challenge_id>@id.ai` (or `register-<challenge_id>@id.ai` for setup). The user does this in their normal mail client; the FE just shows instructions.
+- **The SMTP gateway forwards the email to the canister.** When the gateway receives an email at one of its `register-*` / `recover-*` recipient addresses, it parses out the `challenge_id`, then calls `email_recovery_deliver(challenge_id, raw_email_bytes)` on the canister. The canister verifies the DKIM signature against the cached public key, checks DMARC alignment against the cached policy, finds the nonce in the signed body, verifies the `From:` matches the address in the original prepare call, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). Until that update lands, the FE polls the canister with `email_recovery_status(challenge_id)` and shows a "waiting for your email…" spinner. Once the status flips, the FE retrieves the delegation (recovery) or shows "all set" (setup).
 
-The SMTP gateway exists only to *receive* the user's email and hand it back to the user's own browser session over HTTP. It does not call the canister itself, does not need the canister's trust, and does not persist messages beyond a short forwarding window (~5 minutes per challenge).
+The SMTP gateway is *partially trusted*: it can drop, delay, or fabricate calls to `email_recovery_deliver`. It cannot fake a DKIM signature for a domain it doesn't control, so the worst it can do is withhold delivery (a DoS that's acceptable for a recovery channel users only hit when locked out).
 
 This buys us:
 
 - **Determinism without consensus tricks.** No HTTP transform, no `max_response_bytes`, no boundary-node trust on the DNS path.
 - **No cycles spent on outcalls** during recovery, which is the latency-sensitive path.
-- **No persistent inbox state on chain.** The only stable-memory state added is the registered email→anchor index and a small TTL'd map of pending challenge nonces.
-- **Full transparency.** The DNS records and signed email the canister verified are part of the call's audit trail; anyone can replay the call against any replica.
+- **No persistent inbox state on chain.** The only stable-memory state added is the registered email→anchor index and a small TTL'd map of pending challenge entries.
+- **No raw email upload from the user's browser.** The FE never has to fetch and re-upload a multi-KB email — the gateway delivers the bytes once, directly to the canister. The FE only sees the verification *outcome* via polling.
 
 We pay for it in:
 
 - **Caller complexity.** The browser has to assemble the DNSSEC chain by walking the delegation from root down. This is straightforward TypeScript on top of DoH (see §7.4), no separate library or WASM module needed.
 - **No DNSSEC, no email recovery.** Domains that don't sign their zones cannot be used. As of 2026-05, this includes a non-trivial slice of mainstream consumer mailbox domains. We surface this clearly in the UI at registration time and let the user pick a different address or fall back to a recovery phrase.
+- **Trust the gateway to deliver.** A malicious or down gateway can stall recovery, but cannot fabricate or alter outcomes (every cryptographic check is on the canister side).
 
 ---
 
@@ -451,18 +460,22 @@ Email recovery shares the most code with the OpenID flow (`src/internet_identity
 
 The whole feature, both setup and recovery, fits in three steps the user sees:
 
-1. **Enter your email.** The FE asks for the address.
+1. **Enter your email.** The FE asks for the address. Behind the scenes the FE fetches the DNSSEC chain for the domain and submits everything to the canister in one prepare call. For recovery it also generates a fresh ECDSA keypair locally and sends the public key as part of the same call — that key is what the eventual delegation will be bound to.
 2. **Send a magic email.** The canister issues a one-line token (e.g. `II-Recovery-A1B2C3D4`); the FE asks the user to send a fresh email containing that token to `recover-<challenge>@id.ai` (or `register-<challenge>@id.ai` for setup).
-3. **Done.** Once the canister receives, verifies, and matches the email, the action completes — registered (setup) or signed-in (recovery).
+3. **Done.** The SMTP gateway forwards the email straight to the canister, the canister verifies it, and the FE's polling spinner flips to either "all set" (setup) or "signed in" (recovery, with the delegation it can use immediately).
 
-Steps 1 and 2 are a single canister call from the FE: `prepare(...)` accepts the address *plus* the DNSSEC-validated DNS records for that domain, validates the DNS proof immediately, caches the verified DKIM public key + DMARC policy under a `challenge_id`, and returns the token + recipient mailbox. Step 3 is a second call: the FE picks up the email from the SMTP gateway and submits it to `finalize(...)`, which only has to verify the DKIM signature against the cached public key, check the nonce, and finalize.
+The shape is one canister call up front, then waiting:
+
+- `prepare_register(anchor, addr, dns_proof)` / `prepare_recover(addr, dns_proof, session_pk)` — the FE assembles the DNSSEC chain via DoH and ships it together with the address (and, for recovery, the FE-generated session public key). The canister validates the DNSSEC chain immediately, extracts the verified DKIM public keys + DMARC policy, and caches them under an opaque `challenge_id`. Returns `{ challenge_id, nonce, mailbox, expires_at }`.
+- The gateway calls `deliver(challenge_id, raw_email_bytes)` when the email arrives. The canister DKIM-verifies against the cached key, checks DMARC + nonce + `From:`, and either binds the address (setup) or stamps a delegation seed for the cached `session_pk` (recovery). The FE is **not** involved here — no upload from the browser.
+- The FE polls `status(challenge_id)` while the user composes/sends the email. Once status flips to `Succeeded`, recovery flows then call `get_delegation(...)` (a query) for the SignedDelegation; setup flows just show "all set".
 
 This shape gives us:
 
 - Heavy work (DNSSEC chain validation) happens once, up front, before the user has to do anything irreversible.
-- The final call is small — just `(challenge_id, raw email bytes)` — well under any argument-size concern.
 - Errors are localized: a domain whose DNSSEC chain doesn't validate, or whose DMARC policy is missing, fails at step 1 with a clear message ("we can't accept email from `example.com` because the domain isn't DNSSEC-signed"). The user finds out *before* sending an email.
-- The FE never needs to know the DKIM selector in advance — the prepare call uploads DKIM records for the well-known selectors of common providers (built-in map, see §8.6), and the canister picks the one matching the eventual email's `DKIM-Signature` header.
+- The browser never re-uploads a multi-KB email — the gateway hands the raw bytes directly to the canister.
+- The FE never needs to know the DKIM selector in advance — the prepare call uploads DKIM records for the well-known selectors of common providers (built-in map, see §8.4 notes), and the canister picks the one matching the eventual email's `DKIM-Signature` header.
 
 ### 8.2 Storage model
 
@@ -481,9 +494,19 @@ pub struct EmailRecoveryCredential {
 
 A new stable map indexes `lowercase(address) → AnchorNumber` to support the recovery lookup. Memory ID 24 (next free). Per §3.1, the index is enumerable only to attackers who already control the queried mailbox, so it's stored unsalted.
 
-A second, ephemeral map holds *pending challenges* — entries created by `email_recovery_prepare_*` and consumed once on `email_recovery_finalize_*`. Each entry carries the verified DKIM public key(s), the DMARC policy, the kind tag (setup / recovery), the nonce, the optional anchor (for setup), and a 30-minute expiry. Dropped after either consumption or TTL. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 25.
+A second, ephemeral map holds *pending challenges* keyed by `challenge_id`. Each entry carries:
 
-We do **not** store any inbound email body, header bytes, or DKIM verification artefacts past the moment finalize returns. Verification is in-flight only (§4).
+- `kind`: `Register { anchor }` or `Recover { session_pk }`,
+- the claimed lowercased address,
+- the verified DKIM public keys keyed by selector,
+- the verified DMARC policy,
+- the human-readable nonce,
+- a `status: Pending | Succeeded { outcome } | Failed { error }`,
+- a 30-minute expiry.
+
+Entries flip from `Pending` to `Succeeded`/`Failed` on `email_recovery_deliver`. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 25.
+
+We do **not** store any inbound email body, header bytes, or DKIM verification artefacts past the moment `deliver` returns. The cached `session_pk` for recovery is the only piece that survives between prepare and the eventual delegation issuance.
 
 ### 8.3 Candid surface
 
@@ -499,14 +522,14 @@ type EmailRecoveryChallenge = record {
 // What the FE submits at prepare time. Carries the DNS proofs for every
 // candidate DKIM selector the FE expects the email to be signed under,
 // plus the DMARC record. The canister DNSSEC-validates each entry and
-// keeps a map { selector → public_key } for the finalize call.
+// keeps a map { selector → public_key } for the deliver call.
 type EmailRecoveryDnsProof = record {
-    address          : text;                   // lowercase canonical form
-    dkim_records     : vec record {            // 1..=N candidate selectors
-        selector  : text;
-        proof     : DnsProofBundle;            // RRset + chain to root
+    address      : text;                       // lowercase canonical form
+    dkim_records : vec record {                // 1..=N candidate selectors
+        selector : text;
+        proof    : DnsProofBundle;             // RRset + chain to root
     };
-    dmarc_record     : DnsProofBundle;         // _dmarc.<domain>
+    dmarc_record : DnsProofBundle;             // _dmarc.<domain>
 };
 
 type EmailRecoveryError = variant {
@@ -523,56 +546,72 @@ type EmailRecoveryError = variant {
     InternalCanisterError     : text;
 };
 
-service : {
-    // ---------- Setup (caller is the authenticated identity) ----------
+// Polling result.
+type EmailRecoveryStatus = variant {
+    Pending;
+    SucceededRegister;                                              // setup done
+    SucceededRecover : record { user_key : UserKey;                 // recovery ready
+                                expiration : Timestamp };
+    Failed   : EmailRecoveryError;
+    Expired;
+};
 
-    // Validate DNS, cache verified key + policy, return a challenge.
+service : {
+    // ---------- Prepare (creates a challenge) ----------
+
+    // Setup: caller is the authenticated identity. Validate DNS, cache
+    // verified key + policy, return a challenge bound to (anchor, address).
     email_recovery_prepare_register :
         (IdentityNumber, EmailRecoveryDnsProof)
         -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
 
-    // Verify the email against the cached challenge and bind the address
-    // to this identity. The email_message is the raw signed email the
-    // SMTP gateway received.
-    email_recovery_finalize_register :
-        (IdentityNumber, record { challenge_id : blob; email_message : SmtpMessage })
+    // Recovery: anonymous. Same as setup-prepare plus session_pk that the
+    // eventual delegation will be bound to. The anchor is resolved later
+    // from the verified From: of the email.
+    email_recovery_prepare_recover :
+        (EmailRecoveryDnsProof, SessionKey)
+        -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+
+    // ---------- Deliver (called by the SMTP gateway) ----------
+
+    // Open call: anyone can submit, but only DKIM-valid emails matching a
+    // known challenge_id move state. The recipient address embeds the
+    // challenge_id (e.g. recover-7f3a9c2e@id.ai), so the gateway extracts
+    // it before calling. Idempotent: a second call for the same challenge
+    // is a no-op once the challenge is in a terminal status.
+    email_recovery_deliver :
+        (record { challenge_id : blob; email_message : SmtpMessage })
         -> (variant { Ok; Err : EmailRecoveryError });
+
+    // ---------- Poll + retrieve ----------
+
+    // FE polls this while the user is sending the email. Returns the
+    // current status of the challenge; once Succeeded* the FE acts on it.
+    email_recovery_status :
+        (blob)
+        -> (EmailRecoveryStatus) query;
+
+    // After SucceededRecover, the FE fetches the SignedDelegation. The
+    // session_key + expiration must match what was stored at prepare time
+    // (the FE sent session_pk; the canister returns the matching SignedDelegation).
+    email_recovery_get_delegation :
+        (record { challenge_id : blob; session_key : SessionKey; expiration : Timestamp })
+        -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
+
+    // ---------- Manage ----------
 
     // Remove a registered recovery address.
     email_recovery_remove :
         (IdentityNumber, text)
         -> (variant { Ok; Err : EmailRecoveryError });
-
-    // ---------- Recovery (no caller identity required) ----------
-
-    // Same shape as setup-prepare, but anonymous and bound to no anchor.
-    // The anchor is resolved at finalize time from the verified From:
-    // address, looked up against the address → anchor index.
-    email_recovery_prepare_recover :
-        (EmailRecoveryDnsProof)
-        -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
-
-    // Verify the email, look up the anchor by lowercase(From:), prepare
-    // the delegation. Mirrors openid_prepare_delegation.
-    email_recovery_finalize_recover :
-        (record { challenge_id : blob; email_message : SmtpMessage; session_key : SessionKey })
-        -> (variant {
-               Ok : OpenIdPrepareDelegationResponse;
-               Err : EmailRecoveryError });
-
-    // Query: fetch the delegation produced by finalize_recover.
-    email_recovery_get_delegation :
-        (record { challenge_id : blob; session_key : SessionKey; expiration : Timestamp })
-        -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError })
-        query;
 }
 ```
 
-`email_recovery_finalize_recover` / `email_recovery_get_delegation` mirror the existing `openid_*` calls in `src/internet_identity/src/main.rs:1313-1357`. The verification result becomes the input to `prepare_jwt_delegation`-equivalent logic.
+`email_recovery_get_delegation` mirrors the existing `openid_get_delegation` in `src/internet_identity/src/main.rs:1357`. The delegation seed produced at `deliver` time becomes the input to `prepare_jwt_delegation`-equivalent logic.
 
 ### 8.4 Setup flow
 
-The SMTP gateway is a stateless forwarder: it receives an email at `register-<challenge_id>@id.ai`, holds it in memory keyed by `challenge_id` for the challenge's lifetime, and serves it back to whichever HTTP client polls for that key. It never calls the canister.
+The SMTP gateway listens on `*-@id.ai`. When it receives an email at `register-<id>@id.ai` it parses out the `challenge_id`, then submits the raw bytes to the canister via `email_recovery_deliver`. It does not store the email beyond the brief in-memory hold needed for the call.
 
 ```mermaid
 sequenceDiagram
@@ -584,26 +623,29 @@ sequenceDiagram
     participant GW as SMTP gateway<br/>(off-chain)
 
     Note over U,FE: 1 — User enters email
-    U->>FE: types alice@gmail.com
+    U->>FE: "Add email recovery", types alice@gmail.com
 
-    Note over FE,II: 2 — FE submits address + DNS records, gets a challenge
-    FE->>DNS: DKIM TXT for known gmail.com selectors,<br/>DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain to root (DoH cd=1, do=1)
+    Note over FE,II: 2 — FE assembles DNS proof and prepares the challenge
+    FE->>DNS: DKIM TXT for known gmail.com selectors,<br/>DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain (DoH cd=1, do=1)
     DNS->>FE: signed RRsets + RRSIGs + DS chain
     FE->>II: email_recovery_prepare_register(anchor, EmailRecoveryDnsProof)
-    II->>II: verify DNSSEC chain to root anchor;<br/>extract DKIM public keys per selector;<br/>parse DMARC policy;<br/>store under challenge_id (TTL 30 min)
-    II->>FE: { challenge_id, nonce, mailbox: "register-&lt;id&gt;@id.ai", expires_at }
+    II->>II: verify DNSSEC; extract DKIM pubkeys per selector;<br/>parse DMARC policy; store under challenge_id (TTL 30 min)
+    II->>FE: { challenge_id, nonce, mailbox: "register-<id>@id.ai", expires_at }
 
     Note over U,Mail: 3 — User emails the magic token
-    FE->>U: "Send an email containing II-Recovery-A1B2C3D4<br/>to register-&lt;id&gt;@id.ai from alice@gmail.com"
-    U->>Mail: composes and sends from alice@gmail.com
+    FE->>U: "Send an email containing II-Recovery-A1B2C3D4<br/>to register-<id>@id.ai from alice@gmail.com"
+    U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA (DKIM-signed by gmail.com)
 
-    Note over FE,II: 4 — FE picks up the email and finalizes
-    FE->>GW: HTTP poll for challenge_id
-    GW->>FE: raw email bytes
-    FE->>II: email_recovery_finalize_register(anchor, { challenge_id, email_message })
-    II->>II: verify DKIM signature against cached pubkey;<br/>check DMARC alignment vs cached policy;<br/>find nonce in signed prefix;<br/>verify From: matches the address;<br/>bind address → anchor; burn nonce
-    II->>FE: Ok
+    Note over GW,II: 4 — Gateway forwards email straight to the canister
+    GW->>II: email_recovery_deliver({ challenge_id, email_message })
+    II->>II: verify DKIM signature vs cached pubkey;<br/>check DMARC alignment vs cached policy;<br/>find nonce in signed prefix;<br/>verify From: matches the address;<br/>bind address → anchor; mark challenge Succeeded
+
+    Note over FE,II: 5 — FE polls the canister and shows result
+    loop until terminal status
+        FE->>II: email_recovery_status(challenge_id)
+        II->>FE: Pending / SucceededRegister / Failed / Expired
+    end
     FE->>U: "alice@gmail.com is now a recovery method."
 ```
 
@@ -613,11 +655,15 @@ Notes:
 - The FE assembles the DNSSEC bundle in plain TS using DoH (§7.4); no library dependency, no WASM.
 - "Known selectors" comes from a built-in FE map for common providers (Gmail, iCloud, Outlook, Fastmail, Proton, …). Domains outside the map fall back to "advanced — enter your selector manually" or fail at prepare time with a copy-pastable error.
 - The nonce is searched as a case-insensitive substring inside the canonicalized signed-prefix bytes (§5.3). Mailbox providers that append signatures or footers don't break the check as long as the nonce sits inside the DKIM-signed body window.
-- Once `email_recovery_finalize_register` returns `Ok`, the gateway entry expires and the challenge entry is dropped from the canister.
+- `email_recovery_deliver` is open: anyone can call it, but the only effect is to verify a DKIM-signed email against an already-cached challenge. A malicious gateway can withhold or duplicate calls, but cannot forge state changes.
+- Polling cadence: the FE backs off from 1 s to 5 s; after `expires_at` it stops polling and shows the timeout state.
 
 ### 8.5 Recovery flow
 
-Same shape, with two differences: the prepare call is anonymous (no anchor), and finalize produces a delegation instead of binding an address.
+Same shape, with three differences:
+- `prepare_recover` is anonymous and additionally takes `session_pk` (a fresh ECDSA public key the FE generated locally).
+- On `deliver`, the canister looks up the anchor from the verified `From:` address and stamps the delegation seed bound to that `session_pk`.
+- After polling sees `SucceededRecover`, the FE makes a final query call to `get_delegation` for the actual `SignedDelegation`.
 
 ```mermaid
 sequenceDiagram
@@ -630,25 +676,29 @@ sequenceDiagram
 
     Note over U,FE: 1 — User enters email
     U->>FE: "Recover with email", types alice@gmail.com
+    FE->>FE: generate session ECDSA keypair (session_pk + session_sk)
 
-    Note over FE,II: 2 — FE submits address + DNS records, gets a challenge
+    Note over FE,II: 2 — FE submits DNS proof + session_pk, gets challenge
     FE->>DNS: DKIM TXT (known selectors), DMARC TXT, DNSSEC chain
     DNS->>FE: bundle
-    FE->>II: email_recovery_prepare_recover(EmailRecoveryDnsProof)
-    II->>II: verify DNSSEC; extract pubkeys; parse policy;<br/>store under challenge_id (TTL 30 min)<br/>NOTE: anchor not resolved yet
-    II->>FE: { challenge_id, nonce, mailbox: "recover-&lt;id&gt;@id.ai", expires_at }
+    FE->>II: email_recovery_prepare_recover(EmailRecoveryDnsProof, session_pk)
+    II->>II: verify DNSSEC; extract pubkeys; parse policy;<br/>store under challenge_id (TTL 30 min);<br/>anchor will be resolved on deliver
+    II->>FE: { challenge_id, nonce, mailbox: "recover-<id>@id.ai", expires_at }
 
     Note over U,Mail: 3 — User emails the magic token
-    FE->>U: "Send an email containing II-Recovery-…<br/>to recover-&lt;id&gt;@id.ai from alice@gmail.com"
+    FE->>U: "Send an email containing II-Recovery-…<br/>to recover-<id>@id.ai from alice@gmail.com"
     U->>Mail: send signed email
     Mail->>GW: SMTP DATA
 
-    Note over FE,II: 4 — FE picks up the email and finalizes (gets delegation)
-    FE->>GW: HTTP poll
-    GW->>FE: raw email bytes
-    FE->>II: email_recovery_finalize_recover({ challenge_id, email_message, session_key })
-    II->>II: verify DKIM + DMARC + nonce + From: against cached challenge;<br/>look up anchor by lowercase(From: address);<br/>burn nonce; prepare delegation
-    II->>FE: { user_key, expiration }
+    Note over GW,II: 4 — Gateway forwards email straight to the canister
+    GW->>II: email_recovery_deliver({ challenge_id, email_message })
+    II->>II: verify DKIM + DMARC + nonce + From:;<br/>look up anchor by lowercase(From: address);<br/>stamp delegation seed bound to cached session_pk;<br/>mark challenge Succeeded
+
+    Note over FE,II: 5 — FE polls and retrieves the delegation
+    loop until terminal status
+        FE->>II: email_recovery_status(challenge_id)
+        II->>FE: Pending / SucceededRecover { user_key, expiration } / Failed / Expired
+    end
     FE->>II: email_recovery_get_delegation({ challenge_id, session_key, expiration })
     II->>FE: SignedDelegation
     FE->>U: signed in
@@ -656,8 +706,8 @@ sequenceDiagram
 
 Two design points worth pinning down:
 
-- **No address pre-lookup.** The address typed by the user is sent to the canister at prepare time only as part of the DNS proof, not as a lookup key. The anchor isn't resolved until finalize, when the verified `From:` of the email picks it. If the user typed the wrong address (or doesn't actually own it), the FE just times out polling the gateway — there's no leaky lookup-hint round trip.
-- **One anchor per address.** The lookup table is `address → anchor`, not `address → vec<anchor>`. We do not allow the same address on two anchors: at recovery time, the user's email proof would otherwise not uniquely identify which identity they meant, and users do not generally know their anchor number. `email_recovery_finalize_register` returns `AddressAlreadyRegistered` if the same address is already bound to any anchor, including the caller's own.
+- **No address pre-lookup.** The address typed by the user is sent to the canister at prepare time only as part of the DNS proof, not as a lookup key. The anchor isn't resolved until `deliver`, when the verified `From:` of the email picks it. If the user typed the wrong address (or doesn't actually own it), the FE just times out polling — there's no leaky lookup-hint round trip.
+- **One anchor per address.** The lookup table is `address → anchor`, not `address → vec<anchor>`. We do not allow the same address on two anchors: at recovery time, the user's email proof would otherwise not uniquely identify which identity they meant, and users do not generally know their anchor number. `email_recovery_deliver` returns `AddressAlreadyRegistered` (during a register-deliver) if the address is already bound to any anchor, including the caller's own.
 
 ### 8.6 UX screen mockups
 
@@ -779,18 +829,19 @@ These are wireframes; final visual design lives in Figma. Layout expressed as AS
 
 ### 8.7 Delegation issuance
 
-The delegation is produced via the same canister-signature path as OpenID. The session inputs are the canister-signature seed (anchor || `email-recovery` || lowercase_address) and the session key supplied by the caller. Expiration is the standard 30 minutes (`OPENID_SESSION_DURATION_NS`).
+The delegation is produced via the same canister-signature path as OpenID. At `prepare_recover` time the FE supplies a fresh ECDSA `session_pk` which the canister parks inside the pending-challenge entry. When `deliver` succeeds, the canister stamps the delegation seed using `(anchor || "email-recovery" || lowercase_address)` and the cached `session_pk`; both `user_key` and `expiration` are returned via `email_recovery_status` once the challenge is `SucceededRecover`. The FE then makes one query call to `email_recovery_get_delegation` to retrieve the SignedDelegation. Expiration is the standard 30 minutes (`OPENID_SESSION_DURATION_NS`).
 
 ### 8.8 Rate limits
 
 | Surface | Limit | Reason |
 |---|---|---|
 | `email_recovery_prepare_register` per anchor | 5 / hour | UX cost of sending an email is asymmetric — we don't need fast retries |
-| `email_recovery_prepare_recover` per IP (boundary node) | 30 / hour | Anonymous; abuse is per-IP since no anchor is known yet |
-| `email_recovery_finalize_*` per challenge | 1 (single-use) | Burned on success; rejected after first failed attempt |
-| `email_recovery_finalize_register` per anchor | max 3 active addresses | Bounded storage |
+| `email_recovery_deliver` per challenge | 1 effective (single-use) | Idempotent on terminal status; further calls are no-ops |
+| `email_recovery_register` (active addresses) per anchor | max 3 | Bounded storage |
 
-Limits are enforced in-memory in `state` with stable-memory backed counters keyed by `(anchor, hour_bucket)` or `(ip, hour_bucket)`; the existing rate-limiter module is reused.
+There are no per-IP limits — II does not currently track per-IP state and that's out of scope here. Anonymous abuse of `email_recovery_prepare_recover` is bounded by the canister-side message-size and cycles cost; the heavy DNSSEC validation cost makes it self-rate-limiting under sustained load. Revisit if telemetry shows abuse.
+
+Per-anchor limits are enforced with stable-memory backed counters keyed by `(anchor, hour_bucket)`; the existing rate-limiter module is reused.
 
 ### 8.9 Frontend changes
 
@@ -860,7 +911,7 @@ We do **not** keep PoC PR #3760's WASM in any release. Its branch closes when Ph
 - **Email aliases.** `alice+ii@gmail.com` and `alice@gmail.com` are kept as **distinct** addresses. Gmail treats them as the same mailbox, but other providers don't, and we do not want to bake provider-specific aliasing rules into the canister. The user registers exactly the address they typed, lowercased.
 - **Lost mailbox.** If a user's email account is gone (provider closed, domain expired), recovery via this channel is unrecoverable. *Out of scope for this design.* Email recovery is one of several recovery surfaces; users with stronger guarantees should still keep a recovery phrase.
 - **Privacy: enumeration.** Settled — addressed by §3.1. The lookup is gated by a DKIM-valid email signed for the queried address, so an attacker cannot probe addresses they do not already control. UX-level rate limiting on `email_recovery_prepare_recover` keeps churn bounded.
-- **Multi-anchor per address.** Not allowed — `email_recovery_finalize_register` returns `AddressAlreadyRegistered` if any anchor already has the address bound. Recovery looks up by address, and users do not generally know their anchor number, so the mapping must be functional (§8.5).
+- **Multi-anchor per address.** Not allowed — `email_recovery_deliver` returns `AddressAlreadyRegistered` (during a register-deliver) if any anchor already has the address bound. Recovery looks up by address, and users do not generally know their anchor number, so the mapping must be functional (§8.5).
 - **Internationalised domains (IDN).** A-label vs U-label canonicalization matters for both the local-part and domain. ASCII-lowercase the A-label form everywhere and reject U-label inputs at the Candid boundary. Acceptable for v1; revisit if user reports surface IDN-mailbox cases we missed.
 
 ---
