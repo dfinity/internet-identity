@@ -38,7 +38,7 @@ From the PR review thread (sea-snake's comments and aterga's replies) the follow
 | Trusted body retention (`l=`) | Stores full body, hashes only signed prefix | Storage may include bytes not covered by the signature |
 | DKIM-Signature parser | Naive split on `;` and `=` | RFC 6376 §3.5 allows folding, arbitrary whitespace, multiple `b=`-like substrings inside other tag values |
 | DNS TXT record parser | Tolerant of `P=` casing only | RFC 6376 §3.6.2.2 allows folding across multiple TXT chunks, arbitrary whitespace |
-| Header canonicalization | "simple" rebuilt from parsed `(name, value)` | RFC 6376 §3.4.1 requires the *exact original* bytes; gateway contract change required |
+| Header canonicalization | "simple" rebuilt from parsed `(name, value)` | Constrain verifier to `c=relaxed/*`, reject `c=simple/*` (see §5.2) |
 | Policy tags `i=`, `k=`, future-dated `t=` | Not enforced | RFC 6376 §3.5 / §3.6.1 |
 | DMARC alignment | Not implemented | RFC 7489 §3 |
 | Service worker `postMessage` origin check | Missing | CodeQL alert #127 |
@@ -175,23 +175,22 @@ The PoC's `src/internet_identity/src/dkim.rs` will be replaced rather than incre
 - `cfdkim` — solid but tightly coupled to `tokio-trust-dns`, hard to unhook from network IO.
 - Continue rolling our own — every reviewer comment in the PoC PR is some shape of "you can't safely roll your own canonicalization parser." Agree.
 
-### 5.2 Gateway contract change: raw header bytes
+### 5.2 Header canonicalization with the existing gateway contract
 
-DKIM "simple" canonicalization signs the *exact original bytes* of each signed header line. The PoC SMTP gateway delivers headers as `(name: String, value: String)` pairs, which loses the original whitespace, folding, and the exact byte sequence after the colon.
+DKIM "simple" header canonicalization signs the *exact original bytes* of each signed header line. The existing SMTP gateway from PoC #3760 delivers headers as parsed `(name: String, value: String)` pairs (the PoC's `SmtpHeader`), which loses the original whitespace, folding, and the exact byte sequence after the colon — so the canister cannot verify simple-header signatures against this shape.
 
-The new Candid contract:
+We accept the current gateway contract unchanged and constrain the canister-side verifier to `c=relaxed/*` for the *header* canonicalization side. The relaxed algorithm (RFC 6376 §3.4.2) lowercases names, unfolds continuations, collapses runs of whitespace to a single SP, and strips WSP around the colon — every transformation is destructive of the same information the gateway's parser already discarded, so the relaxed-canonical form is reconstructible from `(name, value)` pairs by re-emitting them as `name + b": " + value + b"\r\n"` and feeding the result to `mail-auth`.
 
-```candid
-// Replaces SmtpHeader { name; value } with the original header line.
-type SmtpHeaderRaw = blob;  // exact bytes of "Name: value\r\n", folding preserved
+In practice every mainstream sender we care about (Gmail, iCloud, Outlook, Fastmail, Proton, ProtonMail, AWS SES, SendGrid, Postmark, Mailgun) signs with `c=relaxed/relaxed` or `c=relaxed/simple`. Niche senders that sign with `c=simple/*` are rejected with reason `UnsupportedCanonicalization` and the user is asked to register a different address. We accept this surface loss in exchange for not blocking on a gateway-side change.
 
-type SmtpMessage = record {
-    headers : vec SmtpHeaderRaw;  // in receipt order, top to bottom
-    body    : blob;               // exact bytes after CRLF CRLF separator
-};
-```
+Body canonicalization is unaffected — the gateway delivers the body as a raw `blob`, so both `*/relaxed` and `*/simple` body modes verify byte-for-byte.
 
-The interface keeps a parsed accessor (`SmtpMessageParsed`) for non-cryptographic UI use, but the verifier always operates on the raw blobs. A small parser inside the canister extracts `From:`, `To:`, `Subject:`, etc. for display — but the bytes that go to DKIM are untouched.
+Two assumptions on the gateway-side parser, currently true of the PoC implementation, that this approach depends on:
+
+- **Header values are passed as raw bytes**, not RFC 2047-decoded. Encoded-words like `=?utf-8?B?...?=` must reach the canister in their wire form so the relaxed canonicalization sees the same bytes the signer hashed.
+- **Header order is preserved** in receipt order, with no deduplication. DKIM picks signed headers from the bottom up per `h=` tag (RFC 6376 §5.4), and signatures over duplicated headers fail if order is lost.
+
+The canister extracts `From:`, `To:`, `Subject:`, etc. from the same parsed pairs for display and dispatch — there is no separate "raw" path.
 
 ### 5.3 Trusted-body handling (`l=`)
 
@@ -214,6 +213,7 @@ Beyond the cryptographic check, the verifier rejects:
 - `t > now + skew_window` — future-dated signatures (PoC parsed but did not enforce).
 - `x < now` — expired signatures (the PoC's late round of fixes already enforces this; see [aterga's reply](https://github.com/dfinity/internet-identity/pull/3760#discussion_r3137585324) on the PoC review).
 - `i=` — must end in `@d` or `.d` where `d` is the `d=` value. Soft-fail if the DNS `t=s` flag is set.
+- `c=` — header side must be `relaxed`. Body side may be `simple` or `relaxed`. Signatures with `c=simple/*` are rejected with reason `UnsupportedCanonicalization` (see §5.2).
 - DNS-side `k=` — defaults to `rsa`, must match the signature's algorithm.
 - DNS-side `t=y` — testing flag; we treat the signature as Unverified with a `TestingMode` reason.
 
@@ -892,6 +892,7 @@ A new crate `internet_identity_email_test_vectors` carries:
 
 - **DKIM happy path**: 100+ real signed messages from each major provider (Gmail, iCloud, Outlook, Fastmail, Proton, SES, SendGrid, Mailgun, Postmark, Tutanota), recorded once and committed as `.eml` + DNS bundle pairs.
 - **DKIM tampering**: each happy-path vector mutated in 8+ ways (header bit flip, body byte flip, signature truncation, key swap, …) — every mutation must Unverify.
+- **DKIM canonicalization rejection**: at least one captured signature each at `c=simple/simple` and `c=simple/relaxed` — both must Unverify with reason `UnsupportedCanonicalization` (see §5.2).
 - **DMARC alignment**: matrix of `(d=, From:)` × `(adkim=s, adkim=r)` × `(under PSL same org, different org)`.
 - **DNSSEC**: 20 chains, including ECDSA-only and Ed25519-only; intentionally broken chains for negative tests.
 - **Replay/expiry**: signatures with `x=` in the past, future-dated `t=`.
