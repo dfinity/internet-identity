@@ -255,22 +255,29 @@ DMARC tags we honour:
 
 ### 6.3 Alignment check
 
-Each verified DKIM `d=` (call it X) is checked for alignment with the `From:` domain (Y):
+Each verified DKIM `d=` (call it X) is checked for alignment with the `From:` domain (Y), both ASCII-lowercased:
 
-- **`adkim=s`** — X must equal Y, byte-for-byte ASCII-lowercased.
-- **`adkim=r`** — X and Y must share an organizational domain.
+- **`adkim=s`** — X must equal Y.
+- **`adkim=r`** — X must equal Y, *or* X is a subdomain of Y (i.e. Y is a label-aligned suffix of X). Examples: `mail.example.com` aligns with `example.com` ✓; `evil.com` aligns with `example.com` ✗; `gmail.com` aligns with `googlemail.com` ✗.
 
-The "organizational domain" is computed via the [Public Suffix List](https://publicsuffix.org/) (PSL). For example, `mail.gmail.com` and `gmail.com` align under PSL because both reduce to `gmail.com`; `gmail.co.uk` and `gmail.com` do not.
+This is *stricter* than RFC-7489-compliant relaxed alignment, which uses the [Public Suffix List](https://publicsuffix.org/) (PSL) to compute "organizational domain" — under that algorithm, `gmail.com` and `googlemail.com` would align if they were listed as the same org, and `mail.example.com` aligns with `example.com` because both reduce to `example.com` regardless of subdomain depth. We accept the second case (covered by the subdomain rule) but reject the first. §6.4 explains why we deviate.
 
-### 6.4 Public Suffix List delivery
+### 6.4 Why we don't use the Public Suffix List
 
-The PSL drives `adkim=r` alignment computation. The canister fetches it via a **weekly HTTP outcall** to `https://publicsuffix.org/list/public_suffix_list.dat` from a recurring timer, normalises the response in a `transform` function (strip headers, LF line endings, trim trailing whitespace), and caches the bytes in stable memory. The previous successful fetch is retained if a refresh fails; alignment is never blocked on the network at verification time.
+The PSL is the de-facto reference for DMARC's "organizational domain" computation. We deliberately don't use it in the recovery flow.
 
-The fetch is **off the hot path** — it runs at most once per timer tick, never during an `email_recovery_*` call. Cost is negligible (~30B cycles per fetch × ~52 fetches/year). This is the only HTTP outcall in the email-recovery stack; per-verification DNS is delivered via the DNSSEC argument bundle (§7).
+**Trust expansion.** Email recovery currently trusts the user's mailbox provider (DKIM signing key), the DNSSEC chain (IANA root + delegations), and the user's own custody of their inbox. The PSL is community-maintained on GitHub (`publicsuffix/list`); anyone can submit a PR. Using it for alignment would add Mozilla and the broader reviewer set as a new trust point — thousands of entries, frequent merges, large surface area.
 
-**Bootstrap.** A snapshot is bundled in the WASM at build time so the canister has a working PSL immediately after deploy, before the first timer tick. After deploy, the weekly outcall keeps it fresh.
+**Asymmetric failure mode.** A *missing* entry fails closed: we'd reject mail that a spec-compliant verifier would accept (denial of recovery, not a compromise). An *added* entry fails *open*: e.g. if `co.uk` were ever incorrectly removed from the list, `evil.co.uk` and `victim.co.uk` would alias under relaxed alignment, and an attacker controlling the former could sign mail aligning with `From: victim.co.uk`. That's an account-compromise vector with a wide blast radius. The probability is low but the consequences are bad enough to avoid by construction.
 
-**Fallback alignment if the PSL is genuinely unavailable** (corrupt bundle and every outcall has failed since deploy): treat `adkim=r` as "X equals Y or X is a subdomain of Y." Stricter than spec for multi-domain orgs (e.g. `gmail.com` / `googlemail.com`), but covers every consumer mailbox provider we care about and is safe to deploy as a Day-0 safety net.
+**Marginal benefit for this surface.** Every mainstream consumer mailbox we list in §2 (Gmail, iCloud, Outlook, Fastmail, Proton) signs `d=` exactly equal to the From-header domain — strict alignment, PSL never consulted. The cases where PSL helps:
+
+- Multi-domain orgs (`gmail.com` ↔ `googlemail.com`): users register the address they actually send from, so the From and the registered address share a single domain. Not relevant.
+- Subdomain sending (`d=mg.example.com` for `From: alice@example.com`): handled by the subdomain rule in §6.3 without the PSL.
+
+The remaining gap (multi-domain orgs that *don't* share a registrable suffix) fails closed under our policy. If the test corpus surfaces a real consumer mailbox provider that needs PSL-style alignment to verify, we revisit then. As of design time, none does.
+
+**Net effect on the design.** No PSL bundle in the WASM, no weekly outcall, no transform function for PSL responses, no Mozilla/community-list trust dependency. The email-recovery stack has *zero* HTTP outcalls — every per-verification check uses material the caller supplied (DNSSEC bundle) or material baked into the canister at deploy (DNSSEC root anchors).
 
 ### 6.5 SPF: not checked
 
@@ -329,7 +336,7 @@ The PoC's `fetch_dkim_public_key` makes a `https://dns.google/resolve?...` outca
 - It does not work for the recovery hot path: ingress message size has a 2 MB ceiling and outcall latency is multi-second.
 - For the *recovery* call specifically, whose argument already includes a signed email, having the canister go fetch DNS adds another round trip after the user already had to ship something to it.
 
-The one outcall the email-recovery stack does keep is the weekly PSL refresh in §6.4 — it's off the verification hot path, infrequent, and updates a small public reference dataset with no per-call cost.
+The email-recovery stack ends up with **zero HTTP outcalls** — every per-verification check uses caller-supplied material (DNSSEC bundle) or canister-baked-at-deploy material (DNSSEC root anchors, §7.5). See §6.4 for why we don't pull the PSL either.
 
 ### 7.2 The DNSSEC-arg pattern
 
@@ -947,7 +954,7 @@ A new crate `internet_identity_email_test_vectors` carries:
 - **DKIM happy path**: 100+ real signed messages from each major provider (Gmail, iCloud, Outlook, Fastmail, Proton, SES, SendGrid, Mailgun, Postmark, Tutanota), recorded once and committed as `.eml` + DNS bundle pairs.
 - **DKIM tampering**: each happy-path vector mutated in 8+ ways (header bit flip, body byte flip, signature truncation, key swap, …) — every mutation must Unverify.
 - **DKIM canonicalization rejection**: at least one captured signature each at `c=simple/simple` and `c=simple/relaxed` — both must Unverify with reason `UnsupportedCanonicalization` (see §5.2).
-- **DMARC alignment**: matrix of `(d=, From:)` × `(adkim=s, adkim=r)` × `(under PSL same org, different org)`.
+- **DMARC alignment**: matrix of `(d=, From:)` × `(adkim=s, adkim=r)` × `(equal / X-subdomain-of-Y / unrelated)`. Includes a "PSL would have aligned but we don't" vector (e.g. `d=googlemail.com`, `From: @gmail.com` with `adkim=r`) — must Unverify under our policy (§6.3).
 - **DNSSEC**: 20 chains, including ECDSA-only and Ed25519-only; intentionally broken chains for negative tests.
 - **Replay/expiry**: signatures with `x=` in the past, future-dated `t=`.
 
