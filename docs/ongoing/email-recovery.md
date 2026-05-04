@@ -110,20 +110,28 @@ We therefore key the lookup index by `lowercase(local-part) + "@" + lowercase(do
 ## 4. High-level architecture
 
 ```mermaid
-flowchart LR
-    User[User browser]
-    DNS[Public DoH resolver]
-    II[II canister]
-    Mail[User's mailbox<br/>e.g. Gmail]
-    GW[SMTP gateway<br/>off-chain]
+sequenceDiagram
+    participant User as User browser
+    participant DNS as Public DoH resolver
+    participant II as II canister
+    participant Mail as User's mailbox<br/>(e.g. Gmail)
+    participant GW as SMTP gateway<br/>(off-chain)
 
-    User -- "1. fetch DKIM TXT (one selector)<br/>+ DMARC TXT + DNSSEC chain" --> DNS
-    User -- "2. prepare { addr, dns_proof, session_pk }" --> II
-    II -- "3. challenge { nonce, mailbox }" --> User
-    User -- "4. compose & send email to<br/>recover@id.ai (or register@id.ai)<br/>containing the nonce" --> Mail
-    Mail -- "5. SMTP DATA" --> GW
-    GW -- "6. smtp_request(SmtpRequest)" --> II
-    II -- "7. status / delegation" --> User
+    User->>DNS: 1. probe selector candidates,<br/>fetch DKIM TXT + DMARC TXT,<br/>fetch full DNSSEC chain to root
+    DNS-->>User: signed RRsets + RRSIGs
+
+    User->>II: 2. prepare { addr, dns_proof, session_pk }
+    II-->>User: 3. challenge { nonce, mailbox }
+
+    User->>Mail: 4. compose and send email to<br/>recover@id.ai or register@id.ai,<br/>with the nonce in the body
+    Mail->>GW: 5. SMTP DATA
+    GW->>II: 6. smtp_request(SmtpRequest)
+
+    loop while waiting
+        User->>II: 7. email_recovery_status(nonce)
+        II-->>User: Pending → … → Succeeded
+    end
+    II-->>User: 8. SignedDelegation (recovery only)
 ```
 
 The architecture is built around three ideas:
@@ -645,7 +653,7 @@ sequenceDiagram
     FE->>DNS: DKIM TXT for 20230601._domainkey.gmail.com,<br/>DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain (DoH cd=1, do=1)
     DNS->>FE: signed RRsets + RRSIGs + DS chain
     FE->>II: email_recovery_credential_prepare_add(anchor, EmailRecoveryDnsProof)
-    II->>II: verify DNSSEC chain; extract DKIM pubkey for that selector;<br/>parse DMARC policy; store pending challenge keyed by nonce (TTL 30 min)
+    II->>II: verify DNSSEC chain, extract DKIM pubkey for that selector,<br/>parse DMARC policy, store pending challenge keyed by nonce (TTL 30 min)
     II->>FE: { nonce: "II-Recovery-A1B2C3D4", mailbox: "register@id.ai", expires_at }
 
     Note over U,Mail: 4 — User emails the magic token
@@ -655,7 +663,7 @@ sequenceDiagram
 
     Note over GW,II: 5 — Gateway forwards email straight to the canister (PoC surface)
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce from canonicalized signed body;<br/>look up pending challenge by nonce;<br/>verify DKIM signature vs cached pubkey (selector matches);<br/>check DMARC alignment vs cached policy;<br/>verify From: matches the address;<br/>bind address → anchor; mark challenge Succeeded
+    II->>II: extract nonce from canonicalized signed body,<br/>look up pending challenge by nonce,<br/>verify DKIM signature vs cached pubkey (selector matches),<br/>check DMARC alignment vs cached policy,<br/>verify From matches the address,<br/>bind address → anchor and mark challenge Succeeded
 
     Note over FE,II: 6 — FE polls the canister and shows result
     loop until terminal status
@@ -702,7 +710,7 @@ sequenceDiagram
     FE->>DNS: DKIM TXT for that selector, DMARC TXT, DNSSEC chain
     DNS->>FE: bundle
     FE->>II: email_recovery_prepare_delegation(EmailRecoveryDnsProof, session_pk)
-    II->>II: verify DNSSEC; extract pubkey; parse policy;<br/>store pending challenge by nonce (TTL 30 min);<br/>anchor resolved later on smtp_request
+    II->>II: verify DNSSEC, extract pubkey, parse policy,<br/>store pending challenge by nonce (TTL 30 min),<br/>anchor resolved later on smtp_request
     II->>FE: { nonce, mailbox: "recover@id.ai", expires_at }
 
     Note over U,Mail: 4 — User emails the magic token
@@ -712,7 +720,7 @@ sequenceDiagram
 
     Note over GW,II: 5 — Gateway forwards email straight to the canister
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce; look up pending challenge by nonce;<br/>verify DKIM + DMARC + From:;<br/>look up anchor by lowercase(From: address);<br/>stamp delegation seed bound to cached session_pk;<br/>mark challenge Succeeded
+    II->>II: extract nonce, look up pending challenge by nonce,<br/>verify DKIM and DMARC and From,<br/>look up anchor by lowercase(From address),<br/>stamp delegation seed bound to cached session_pk,<br/>mark challenge Succeeded
 
     Note over FE,II: 6 — FE polls and retrieves the delegation
     loop until terminal status
