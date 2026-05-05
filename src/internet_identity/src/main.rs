@@ -56,6 +56,7 @@ mod dkim;
 mod dmarc;
 mod dnssec;
 mod doh;
+mod email_recovery;
 mod http;
 mod ii_domain;
 
