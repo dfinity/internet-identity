@@ -640,6 +640,10 @@ pub struct EmailRecoveryCredential {
     /// Lowercased canonical form: `lowercase(local-part) + "@" + lowercase(domain)`.
     /// Stored verbatim (not hashed) so the user can see it back in the
     /// management UI; it's exactly what they typed at registration.
+    /// Bounded by RFC 5321 §4.5.3.1: local-part ≤ 64 bytes, domain ≤
+    /// 255 bytes, addr-spec ≤ 254 bytes. The same caps are enforced
+    /// at every address-handling boundary (`prepare_add` validation,
+    /// verified-`From:` extraction at `smtp_request` time).
     #[n(0)]
     pub address: String,
 
@@ -663,7 +667,7 @@ Anchor storage already uses `minicbor-derive`, which is forward/backward compati
 
 One additional stable map exists alongside this:
 
-- **Reverse address index**, memory ID 24 (next free): `lowercase(address) → AnchorNumber`. Used at recovery time to resolve a verified `From:` to an anchor. Required because we can't efficiently scan all anchors to find one bound to a given address. Per §3.1, the lookup is gated by DKIM and is enumerable only to attackers who already control the queried mailbox, so it's stored verbatim — no salt or hash.
+- **Reverse address index**, memory ID 24 (next free): `SHA-256(lowercase(address)) → AnchorNumber`. Used at recovery time to resolve a verified `From:` to an anchor. Required because we can't efficiently scan all anchors to find one bound to a given address. The address itself already lives on the anchor (`Anchor.email_recovery.address`), so there is no reason to store it in the index too — the index just answers "which anchor does this address belong to?". A fixed-size hashed key keeps the index entry bounded by construction (32 bytes regardless of address length) and removes one variable-length-key surface from stable memory. Per §3.1, the lookup is gated by DKIM and is enumerable only to attackers who already control the queried mailbox, so the hash is unsalted.
 
 **v1 API invariants** (enforced in canister code, not in storage):
 
