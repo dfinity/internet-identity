@@ -57,6 +57,23 @@ pub const SETUP_RECIPIENT_USER: &str = "register";
 /// Recipient mailbox name for the recovery flow (reserved — handled
 /// by the recovery follow-up PR).
 pub const RECOVERY_RECIPIENT_USER: &str = "recover";
+/// The domain on which both flows expect to receive mail. The
+/// gateway operator chooses this — `id.ai` is the design-doc
+/// example. Future enhancement: lift this into a deploy-arg.
+pub const SETUP_RECIPIENT_DOMAIN: &str = "id.ai";
+
+/// Whether `to` matches `<user>@<domain>` exactly, case-insensitive
+/// on both halves. Defence-in-depth against a direct caller
+/// constructing an SmtpRequest with `to.user="register"` but a
+/// different domain to bypass recipient dispatch.
+fn recipient_matches(
+    to: &internet_identity_interface::internet_identity::types::smtp::SmtpAddress,
+    expected_user: &str,
+    expected_domain: &str,
+) -> bool {
+    to.user.eq_ignore_ascii_case(expected_user)
+        && to.domain.eq_ignore_ascii_case(expected_domain)
+}
 
 /// Outcome the canister method in `main.rs` returns to the gateway.
 /// We only ever return `Ok` for verification results — see the
@@ -71,13 +88,15 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
 
     // Recipient dispatch. Setup is the only flow wired up in this
     // PR; recovery is reserved (and silently no-ops, see module
-    // note).
+    // note). We match on the *full* recipient address (user +
+    // domain), case-insensitively, so a direct caller can't bypass
+    // dispatch by spoofing just the user-part with a different
+    // domain — `smtp_request` is an open update.
     let envelope = match request.envelope.as_ref() {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-    let recipient_user = envelope.to.user.to_ascii_lowercase();
-    if recipient_user != SETUP_RECIPIENT_USER {
+    if !recipient_matches(&envelope.to, SETUP_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN) {
         // Drop with Ok — we don't emit a per-recipient signal back
         // to the gateway.
         return SmtpResponse::Ok {};
@@ -225,7 +244,7 @@ async fn verify_setup_email(
 
     let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain)
         .await
-        .map_err(|e| EmailRecoveryError::DohFetchFailed(format!("dkim: {e:?}")))?;
+        .map_err(|e| map_doh_error(e, &domain))?;
     // DMARC is optional in our model: if the lookup fails for any
     // reason (no record published, transient quorum miss), we tell
     // the verifier `None`, which forces the strict "DKIM d= must
@@ -308,6 +327,42 @@ fn extract_from_address(
     ))
 }
 
+/// Map a `DohError` to the appropriate `EmailRecoveryError` for the
+/// FE poll. Configuration-level failures (allowlist miss, missing
+/// `DohConfig`) become `DomainNotAllowlisted` so the FE shows
+/// "operator hasn't enabled this domain"; transport-level failures
+/// (quorum miss, all providers down, malformed responses) become
+/// `DohFetchFailed` so the FE shows "transient error, try again";
+/// caller-bug variants (`InvalidName`, `NameOutsideRegisteredDomain`)
+/// surface as `InternalCanisterError` because they shouldn't reach
+/// here in practice (`prepare_add` already validates the inputs).
+fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
+    use crate::doh::DohError;
+    match err {
+        DohError::DomainNotAllowed | DohError::NotConfigured => {
+            EmailRecoveryError::DomainNotAllowlisted(domain.to_string())
+        }
+        DohError::AllProvidersFailed => {
+            EmailRecoveryError::DohFetchFailed("all DoH providers failed".into())
+        }
+        DohError::QuorumFailed { agreeing, total } => EmailRecoveryError::DohFetchFailed(format!(
+            "DoH quorum failed: {agreeing} of {total} providers agreed",
+        )),
+        DohError::ResponseMalformed(msg) => {
+            EmailRecoveryError::DohFetchFailed(format!("DoH response malformed: {msg}"))
+        }
+        DohError::InvalidName(msg) => EmailRecoveryError::InternalCanisterError(format!(
+            "DoH rejected query name: {msg}"
+        )),
+        DohError::NameOutsideRegisteredDomain {
+            name,
+            registered_domain,
+        } => EmailRecoveryError::InternalCanisterError(format!(
+            "DoH rejected name {name:?} as outside registered domain {registered_domain:?}"
+        )),
+    }
+}
+
 /// Write the verified credential to the anchor named in the pending
 /// challenge. Inline rather than going through
 /// `anchor_operation_with_authz_check` because there's no caller to
@@ -320,8 +375,9 @@ fn bind_credential_to_anchor(
     let mut anchor = state::anchor(snapshot.anchor);
     anchor.email_recovery = Some(EmailRecoveryCredential {
         address: snapshot.claimed_address.clone(),
-        // Convert to nanoseconds for consistency with the rest of
-        // II's `Timestamp` field encoding.
+        // `Timestamp` is nanoseconds since epoch (see
+        // `internet_identity_interface::types::Timestamp`). We work
+        // in seconds internally; convert at the boundary.
         created_at: now_secs.saturating_mul(1_000_000_000),
         last_used: None,
     });

@@ -67,10 +67,15 @@ pub async fn prepare_add(
             .unwrap_or(false)
     });
     if !allowlisted {
-        // The FE doesn't need to distinguish "DNSSEC unavailable AND
-        // DoH not allowlisted" from "neither path applies" — both
-        // collapse to "we can't accept email from this domain."
-        return Err(EmailRecoveryError::DomainNotSupported(registered_domain));
+        // Use the dedicated variant so the FE can distinguish "this
+        // domain isn't on the operator's DoH allowlist" (an
+        // operator-config issue) from `DomainNotSupported` (which
+        // is reserved for genuinely unsupported domain shapes).
+        // Once the DNSSEC path lands, the choice between
+        // `DomainNotAllowlisted` and `DomainNotSupported` will key
+        // on whether DNSSEC was attempted-but-failed vs not
+        // attempted at all.
+        return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
     }
 
     // Selector sanity. DKIM selectors are themselves DNS labels (RFC
@@ -128,7 +133,12 @@ pub async fn prepare_add(
     Ok(EmailRecoveryChallenge {
         nonce,
         mailbox: super::SETUP_MAILBOX.into(),
-        expires_at: now_secs.saturating_add(super::CHALLENGE_TTL_SECS),
+        // `Timestamp` is nanoseconds since epoch in this crate (see
+        // `internet_identity_interface::types`). We work in seconds
+        // internally for the TTL math and convert at the wire boundary.
+        expires_at: now_secs
+            .saturating_add(super::CHALLENGE_TTL_SECS)
+            .saturating_mul(1_000_000_000),
     })
 }
 
@@ -226,8 +236,8 @@ mod tests {
             100,
         ));
         match result {
-            Err(EmailRecoveryError::DomainNotSupported(d)) => assert_eq!(d, "example.com"),
-            other => panic!("expected DomainNotSupported, got {other:?}"),
+            Err(EmailRecoveryError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
+            other => panic!("expected DomainNotAllowlisted, got {other:?}"),
         }
     }
 
@@ -242,7 +252,7 @@ mod tests {
         ));
         assert!(matches!(
             result,
-            Err(EmailRecoveryError::DomainNotSupported(_))
+            Err(EmailRecoveryError::DomainNotAllowlisted(_))
         ));
     }
 
@@ -295,9 +305,11 @@ mod tests {
 
         assert!(challenge.nonce.starts_with(super::super::NONCE_PREFIX));
         assert_eq!(challenge.mailbox, super::super::SETUP_MAILBOX);
+        // expires_at is in nanoseconds since epoch; we passed
+        // now_secs = 1_000.
         assert_eq!(
             challenge.expires_at,
-            1_000 + super::super::CHALLENGE_TTL_SECS
+            (1_000 + super::super::CHALLENGE_TTL_SECS) * 1_000_000_000
         );
 
         // The pending entry stores the lowercased address (input was
