@@ -226,12 +226,28 @@ fn verify_dnssec_chain(
                     "DNSSEC bundle has duplicate DKIM leaf".into(),
                 ));
             }
+            if txt.len() > super::MAX_DKIM_TXT_BYTES {
+                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                    "DKIM TXT record at {leaf_name:?} is {} bytes; \
+                     refusing to cache more than {} bytes per pending entry",
+                    txt.len(),
+                    super::MAX_DKIM_TXT_BYTES,
+                )));
+            }
             dkim = Some(txt);
         } else if leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
             if dmarc.is_some() {
                 return Err(EmailRecoveryError::EmailVerificationFailed(
                     "DNSSEC bundle has duplicate DMARC leaf".into(),
                 ));
+            }
+            if txt.len() > super::MAX_DMARC_TXT_BYTES {
+                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                    "DMARC TXT record at {leaf_name:?} is {} bytes; \
+                     refusing to cache more than {} bytes per pending entry",
+                    txt.len(),
+                    super::MAX_DMARC_TXT_BYTES,
+                )));
             }
             dmarc = Some(txt);
         } else {
