@@ -29,6 +29,7 @@
 mod canonicalize;
 mod dns_record;
 mod parse;
+mod signature;
 mod types;
 
 #[allow(unused_imports)]
