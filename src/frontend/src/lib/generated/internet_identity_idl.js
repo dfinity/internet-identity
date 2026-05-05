@@ -1136,6 +1136,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
+    'whoami' : IDL.Func([], [IDL.Principal], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],

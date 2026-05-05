@@ -1838,6 +1838,7 @@ export interface _SERVICE {
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
+  'whoami' : ActorMethod<[], Principal>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
