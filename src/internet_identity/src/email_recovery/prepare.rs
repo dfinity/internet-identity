@@ -276,7 +276,10 @@ fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecoveryError> {
 }
 
 /// Decode a wire-format DNS name (length-prefixed labels) into a
-/// dotted ASCII-lowercased string with a trailing dot.
+/// dotted ASCII-lowercased string with a trailing dot. The root
+/// terminator (`\x00`) is *not* an extra label — the trailing dot
+/// comes from the final non-root label; reaching the terminator just
+/// stops the walk.
 fn decode_dns_name_lowercase(wire: &[u8]) -> String {
     let mut out = String::new();
     let mut i = 0;
@@ -284,7 +287,6 @@ fn decode_dns_name_lowercase(wire: &[u8]) -> String {
         let len = wire[i] as usize;
         i += 1;
         if len == 0 {
-            out.push('.');
             break;
         }
         if i + len > wire.len() {
