@@ -84,3 +84,18 @@ pub const SETUP_MAILBOX: &str = "register@id.ai";
 /// the follow-up PR; declared here so the constant lives next to its
 /// peer and the surface is committed.
 pub const RECOVERY_MAILBOX: &str = "recover@id.ai";
+
+/// RFC 5321 §4.5.3.1 limits, applied at every address-handling
+/// boundary (prepare-time validation, verified-`From:` extraction):
+///
+/// - `MAX_LOCAL_PART` — local-part SMTP limit (§4.5.3.1.1).
+/// - `MAX_DOMAIN` — domain SMTP limit (§4.5.3.1.2).
+/// - `MAX_ADDRESS` — addr-spec limit derived from the path limit
+///   (§4.5.3.1.3) minus the `<` and `>` framing.
+///
+/// Without these caps a caller could submit a multi-KB string and
+/// inflate the heap-resident pending-challenge map (and, post-PR-7,
+/// the stable address→anchor reverse index).
+pub const MAX_LOCAL_PART: usize = 64;
+pub const MAX_DOMAIN: usize = 255;
+pub const MAX_ADDRESS: usize = 254;

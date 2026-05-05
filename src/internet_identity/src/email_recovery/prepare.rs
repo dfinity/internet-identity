@@ -314,8 +314,20 @@ fn normalize_address(input: &str) -> Option<String> {
     if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
         return None;
     }
+    // Reject before splitting: the addr-spec must fit RFC 5321
+    // §4.5.3.1.3's path limit minus the `<>` framing. This caps
+    // pending-entry heap use against a caller passing in a multi-KB
+    // string. The local/domain caps below are stricter than this for
+    // valid addresses but we check the total first so we don't waste
+    // a `split_once` on obviously-oversized input.
+    if trimmed.len() > super::MAX_ADDRESS {
+        return None;
+    }
     let (local, domain) = trimmed.split_once('@')?;
     if local.is_empty() || domain.is_empty() {
+        return None;
+    }
+    if local.len() > super::MAX_LOCAL_PART || domain.len() > super::MAX_DOMAIN {
         return None;
     }
     Some(format!(
@@ -432,6 +444,32 @@ mod tests {
             assert!(
                 matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
                 "expected DomainNotSupported for {bad:?}, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_oversized_address() {
+        // Addresses longer than RFC 5321's effective addr-spec cap
+        // (254 bytes) or with local/domain parts past their own
+        // sub-caps (64 / 255) are rejected at prepare time so the
+        // pending-challenge map can't be inflated.
+        super::super::pending::reset_for_tests();
+        install_doh_allowlist(&["example.com"]);
+
+        let oversized_total = format!("{}@example.com", "a".repeat(250));
+        let oversized_local = format!("{}@example.com", "a".repeat(65));
+        let oversized_domain = format!("alice@{}.com", "b".repeat(252));
+
+        for bad in &[
+            oversized_total.as_str(),
+            oversized_local.as_str(),
+            oversized_domain.as_str(),
+        ] {
+            let result = block_on(prepare_add(1, doh_input(bad, "default"), 100));
+            assert!(
+                matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
+                "expected DomainNotSupported for oversized {bad:?}, got {result:?}"
             );
         }
     }
