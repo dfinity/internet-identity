@@ -29,7 +29,13 @@ pub fn extract_from_domain(message: &SmtpMessage) -> Result<String, String> {
         .headers
         .iter()
         .filter(|h| h.name.eq_ignore_ascii_case(FROM_HEADER));
+<<<<<<< HEAD
     let from = iter.next().ok_or_else(|| "no From: header".to_string())?;
+=======
+    let from = iter
+        .next()
+        .ok_or_else(|| "no From: header".to_string())?;
+>>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
     if iter.next().is_some() {
         return Err("multiple From: headers".to_string());
     }
@@ -96,6 +102,7 @@ fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
     let mut in_quotes = false;
     let mut angle_start: Option<usize> = None;
     let mut angle_end: Option<usize> = None;
+<<<<<<< HEAD
     let mut i = 0;
     while i < bytes.len() {
         let b = bytes[i];
@@ -115,6 +122,14 @@ fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
         }
         if in_quotes {
             i += 1;
+=======
+    for (i, &b) in bytes.iter().enumerate() {
+        if b == b'"' {
+            in_quotes = !in_quotes;
+            continue;
+        }
+        if in_quotes {
+>>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
             continue;
         }
         if b == b'<' {
@@ -125,7 +140,10 @@ fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
                 return Err("'<' after '>' in From: value".to_string());
             }
             angle_start = Some(i + 1);
+<<<<<<< HEAD
             i += 1;
+=======
+>>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
             continue;
         }
         if b == b'>' {
@@ -136,12 +154,18 @@ fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
                 return Err("multiple '>' in From: value".to_string());
             }
             angle_end = Some(i);
+<<<<<<< HEAD
             i += 1;
+=======
+>>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
             continue;
         }
         if angle_start.is_some() && angle_end.is_none() {
             // Inside angle brackets — anything goes (no further checks).
+<<<<<<< HEAD
             i += 1;
+=======
+>>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
             continue;
         }
         // Outside angle brackets (or after the closing `>`): only
@@ -156,7 +180,10 @@ fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
         if b == b':' {
             return Err("From: contains group syntax, not a single mailbox".to_string());
         }
+<<<<<<< HEAD
         i += 1;
+=======
+>>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
     }
 
     if let (Some(start), Some(end)) = (angle_start, angle_end) {
