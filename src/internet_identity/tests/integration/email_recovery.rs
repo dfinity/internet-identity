@@ -98,17 +98,19 @@ fn prepare_add_returns_well_formed_challenge() {
         challenge.nonce
     );
     assert_eq!(challenge.mailbox, "register@id.ai");
-    // expires_at is 30 minutes from now; can't pin it precisely
-    // because PocketIC's clock advances during the call. Check it's
-    // in the right ballpark.
-    let now_secs = time(&env) / 1_000_000_000;
-    let half_hour = 30 * 60;
+    // expires_at is 30 minutes from now in nanoseconds (matches the
+    // rest of II's `Timestamp` encoding). Can't pin it precisely
+    // because PocketIC's clock advances during the call; check it's
+    // within ±5s of now+30min.
+    let now_ns = time(&env);
+    let half_hour_ns: u64 = 30 * 60 * 1_000_000_000;
+    let slack_ns: u64 = 5 * 1_000_000_000;
     assert!(
-        challenge.expires_at >= now_secs + half_hour - 5
-            && challenge.expires_at <= now_secs + half_hour + 5,
+        challenge.expires_at >= now_ns + half_hour_ns - slack_ns
+            && challenge.expires_at <= now_ns + half_hour_ns + slack_ns,
         "expires_at = {} not within ±5s of now+30min ({})",
         challenge.expires_at,
-        now_secs + half_hour,
+        now_ns + half_hour_ns,
     );
 }
 
@@ -551,7 +553,7 @@ struct SignedEmail {
 // the canister code.
 
 mod dkim_signer {
-    use rsa::pkcs1::EncodeRsaPublicKey;
+    use rsa::pkcs8::EncodePublicKey;
     use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
     use sha2::{Digest, Sha256};
 
@@ -578,16 +580,16 @@ mod dkim_signer {
             }
         }
 
-        /// `v=DKIM1; k=rsa; p={base64-DER-of-RSAPublicKey}` — the
-        /// shape the canister-side parser (`dkim::dns_record`) reads.
+        /// `v=DKIM1; k=rsa; p={base64-SPKI-DER}` — the shape the
+        /// canister-side verifier expects (X.509 SubjectPublicKeyInfo
+        /// per RFC 5280 §4.1, NOT PKCS#1 RSAPublicKey). Real DKIM
+        /// records publish keys this way too.
         pub fn public_txt_record(&self) -> Vec<u8> {
-            let der = self
+            let spki = self
                 .public_key
-                .to_pkcs1_der()
-                .expect("RSA public key DER")
-                .as_bytes()
-                .to_vec();
-            let p_b64 = base64_encode(&der);
+                .to_public_key_der()
+                .expect("RSA SPKI DER");
+            let p_b64 = base64_encode(spki.as_bytes());
             format!("v=DKIM1; k=rsa; p={p_b64}").into_bytes()
         }
 

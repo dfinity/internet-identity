@@ -17,11 +17,13 @@ pub struct StorableEmailRecoveryCredential {
     /// [`EmailRecoveryCredential::address`].
     #[n(0)]
     pub address: String,
-    /// Unix-seconds.
+    /// Nanoseconds since the Unix epoch (matches the rest of II's
+    /// `Timestamp` field encoding).
     #[n(1)]
     pub created_at: Timestamp,
-    /// Unix-seconds — `None` until the first `smtp_request` actually
-    /// uses this credential to authorise a recovery.
+    /// Same encoding as `created_at`; `None` until the first
+    /// `smtp_request` actually uses this credential to authorise
+    /// a recovery.
     #[n(2)]
     pub last_used: Option<Timestamp>,
 }

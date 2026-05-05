@@ -15,7 +15,7 @@
 //! whose DKIM key it trusts. The trust comes from one of two paths:
 //!
 //! 1. **DoH allowlist** — for major mailbox providers (Gmail, Outlook,
-//!    iCloud, …) the canister fetches the DKIM TXT via a 5-of-3 quorum
+//!    iCloud, …) the canister fetches the DKIM TXT via a 3-of-5 quorum
 //!    across independent DoH providers (`crate::doh::fetch_txt`).
 //!    Restricted to a deploy-arg allowlist. **This is the only path
 //!    supported in the initial cut.**
@@ -44,8 +44,11 @@ pub struct EmailRecoveryCredential {
     /// registration.
     pub address: String,
 
-    /// Unix-seconds.
+    /// Nanoseconds since the Unix epoch (matches the rest of II's
+    /// `Timestamp` field encoding).
     pub created_at: Timestamp,
+    /// Same encoding as `created_at`; `None` until the credential
+    /// is actually used to authorise a recovery.
     pub last_used: Option<Timestamp>,
 }
 
@@ -59,15 +62,15 @@ pub struct EmailRecoveryCredential {
 pub struct EmailRecoveryChallenge {
     /// Human-typeable token the user must include verbatim in the
     /// `Subject:` of their challenge email. Format: `II-Recovery-`
-    /// followed by ~16 base32 characters from a canister-side
-    /// ChaCha20Rng PRNG seeded once via `raw_rand`.
+    /// followed by 16 lowercase hex characters (8 random bytes from
+    /// a canister-side ChaCha20Rng PRNG seeded once via `raw_rand`).
     pub nonce: String,
     /// Where the user should send the email — `register@id.ai` for
     /// setup, `recover@id.ai` for recovery. The canister identifies
     /// the challenge from the `nonce` in the `Subject:`, not from
     /// the recipient address.
     pub mailbox: String,
-    /// Unix seconds. 30 minutes after issue.
+    /// Nanoseconds since the Unix epoch. 30 minutes after issue.
     pub expires_at: Timestamp,
 }
 
