@@ -1,9 +1,14 @@
 //! `email_recovery_credential_remove` — detach the recovery email.
 //!
-//! Wrapped in `anchor_operation_with_authz_check` at the canister-
-//! method layer (`main.rs::email_recovery_api`), so by the time we
-//! get here the caller is verified, the anchor is loaded, and we
-//! just need to clear the field.
+//! Called from `main.rs::email_recovery_api::email_recovery_credential_remove`
+//! after that method has done its own authz check (via
+//! `crate::authz_utils::check_authorization`) and loaded the anchor.
+//! The canister-method layer inlines the auth + write rather than
+//! going through `anchor_operation_with_authz_check`, because that
+//! helper's `E: From<IdentityUpdateError>` bound is awkward to
+//! satisfy for an interface-crate error type (orphan rule). So by
+//! the time we get here the caller is verified, the anchor is
+//! loaded, and we just need to clear the field.
 //!
 //! Two design notes:
 //!
