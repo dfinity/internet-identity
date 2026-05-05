@@ -52,6 +52,7 @@ mod attributes;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
+mod dkim;
 mod dnssec;
 mod http;
 mod ii_domain;
