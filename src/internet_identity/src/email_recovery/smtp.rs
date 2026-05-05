@@ -339,9 +339,24 @@ fn extract_from_address(
     } else {
         value
     };
+    // Apply the same RFC 5321 §4.5.3.1 caps as `prepare_add` did
+    // when accepting the claimed address. Defense in depth: a real
+    // SMTP path won't deliver an oversized address (RFC 5321 line
+    // limits stop it well before us), but we don't want to rely on
+    // the gateway to enforce that.
+    if addr_spec.len() > super::MAX_ADDRESS {
+        return Err(EmailRecoveryError::AddressMismatch);
+    }
     let (local, domain) = addr_spec
         .split_once('@')
         .ok_or(EmailRecoveryError::AddressMismatch)?;
+    if local.is_empty()
+        || domain.is_empty()
+        || local.len() > super::MAX_LOCAL_PART
+        || domain.len() > super::MAX_DOMAIN
+    {
+        return Err(EmailRecoveryError::AddressMismatch);
+    }
     Ok(format!(
         "{}@{}",
         local.to_ascii_lowercase(),
