@@ -78,11 +78,7 @@ thread_local! {
 ///
 /// Both operations are O(n) in current map size, but the map is
 /// capped at `MAX_PENDING_CHALLENGES` so the constant is small.
-pub fn insert_with_eviction(
-    nonce: String,
-    challenge: PendingChallenge,
-    now_secs: u64,
-) {
+pub fn insert_with_eviction(nonce: String, challenge: PendingChallenge, now_secs: u64) {
     PENDING.with(|cell| {
         let mut map = cell.borrow_mut();
 
@@ -252,11 +248,7 @@ mod tests {
         let t0 = 1_000;
         let ttl = super::super::CHALLENGE_TTL_SECS;
         insert_with_eviction("old".into(), challenge("a@x.com", t0), t0);
-        insert_with_eviction(
-            "older".into(),
-            challenge("b@x.com", t0 - 100),
-            t0,
-        );
+        insert_with_eviction("older".into(), challenge("b@x.com", t0 - 100), t0);
 
         // Insert at t = t0 + ttl + 1 → both prior entries should be
         // swept by the TTL sweep.
@@ -278,11 +270,7 @@ mod tests {
         // a short prefix of the cap by manually invoking eviction.
         let t0 = 1_000;
         for i in 0..5 {
-            insert_with_eviction(
-                format!("n{i}"),
-                challenge("a@x.com", t0 + i),
-                t0 + i,
-            );
+            insert_with_eviction(format!("n{i}"), challenge("a@x.com", t0 + i), t0 + i);
         }
         assert_eq!(len_for_tests(), 5);
         // Force a manual eviction of the oldest.
