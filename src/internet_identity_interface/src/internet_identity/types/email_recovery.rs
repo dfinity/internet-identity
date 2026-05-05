@@ -73,25 +73,27 @@ pub struct EmailRecoveryChallenge {
 
 /// What the FE submits at prepare time.
 ///
-/// Currently only the `DohAllowlist` variant is wired up; the
-/// `Dnssec` variant exists in the type so the API shape is stable for
-/// the FE, but the canister rejects calls that use it (the DNSSEC
-/// verifier integration is the immediately-next PR after this).
+/// The FE never decides which verification path to use — it just
+/// passes the address and selector it discovered via DoH probing.
+/// The canister picks the path:
+///
+/// - If the FE was able to walk the DNSSEC delegation chain to root
+///   for this domain, a follow-up PR will let it pass the resulting
+///   bundle as an additional optional field on this record. The
+///   canister then validates the chain synchronously and uses the
+///   DKIM key from the bundle.
+/// - Otherwise, the canister checks the registered domain against
+///   `DohConfig.allowed_domains` (deploy-arg) and resolves the DKIM
+///   TXT via `crate::doh::fetch_txt` at `smtp_request` time.
+/// - If neither path applies, prepare fails with
+///   `DomainNotSupported`.
+///
+/// The frontend deliberately doesn't need to know which domains are
+/// on the DoH allowlist — that's operator config, not user-visible
+/// state. It just calls prepare and reads back any `Domain*` error
+/// to render an actionable message.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum EmailRecoveryDnsInput {
-    /// DoH-allowlist path. The canister checks the registered domain
-    /// against `DohConfig.allowed_domains`, defers the actual DKIM-
-    /// key fetch to `smtp_request` time, and resolves it via
-    /// `crate::doh::fetch_txt` (heap-cached after the first lookup
-    /// per provider per TTL window).
-    DohAllowlist(DohAllowlistDnsInput),
-    /// DNSSEC path — reserved. Calls using this variant currently
-    /// return `EmailRecoveryError::DnssecPathNotYetSupported`.
-    Dnssec,
-}
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct DohAllowlistDnsInput {
+pub struct EmailRecoveryDnsInput {
     /// Lowercased canonical form: `lowercase(local-part) + "@" +
     /// lowercase(domain)`.
     pub address: String,
@@ -100,6 +102,10 @@ pub struct DohAllowlistDnsInput {
     /// know which TXT record to fetch via `doh::fetch_txt` when an
     /// email actually arrives.
     pub selector: String,
+    // Future shape (DNSSEC follow-up PR will add):
+    //     pub dns_proof: Option<DnsProofBundle>,
+    // Adding optional fields to Candid records is forward-compatible
+    // — older callers that omit it deserialize cleanly with `None`.
 }
 
 /// Errors surfaced by every email-recovery flow method.
@@ -140,9 +146,6 @@ pub enum EmailRecoveryError {
     AddressAlreadyRegistered,
     /// Tried to remove a credential the anchor doesn't have.
     AddressNotRegistered,
-    /// The DNSSEC path of the API is not yet wired up — caller should
-    /// retry on the DoH path or wait for a later release.
-    DnssecPathNotYetSupported,
     InternalCanisterError(String),
 }
 

@@ -6,15 +6,17 @@
 //! that nonce. Returns the user-visible challenge (nonce + mailbox +
 //! expiry) so the FE can render the "send a magic email" screen.
 //!
-//! See `docs/ongoing/email-recovery.md` §8.4. The DNSSEC variant is
-//! recognised by the type but rejected with
-//! `DnssecPathNotYetSupported` — it lands in a follow-up PR.
+//! See `docs/ongoing/email-recovery.md` §8.4. The DNSSEC path lands
+//! in a follow-up PR (it adds an optional `dns_proof` field on
+//! `EmailRecoveryDnsInput` that the canister validates synchronously
+//! when present, falling through to the DoH allowlist check below
+//! when absent).
 
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
 use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce};
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    DohAllowlistDnsInput, EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
+    EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
 };
 use internet_identity_interface::internet_identity::types::AnchorNumber;
 
@@ -34,15 +36,7 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-    // Variant-dispatch — only the DoH-allowlist path is wired up in
-    // this PR. The DNSSEC variant gets a clean rejection so the FE
-    // can fall back without guessing what went wrong.
-    let DohAllowlistDnsInput { address, selector } = match dns_input {
-        EmailRecoveryDnsInput::DohAllowlist(input) => input,
-        EmailRecoveryDnsInput::Dnssec => {
-            return Err(EmailRecoveryError::DnssecPathNotYetSupported);
-        }
-    };
+    let EmailRecoveryDnsInput { address, selector } = dns_input;
 
     // Sanity check the address shape. Detailed RFC 5321/5322 validation
     // is the verifier's job; here we just want to fail fast on the
@@ -54,9 +48,14 @@ pub async fn prepare_add(
     let registered_domain = registered_domain_of(&address)
         .ok_or_else(|| EmailRecoveryError::DomainNotSupported(address.clone()))?;
 
-    // DoH allowlist gate. Same lookup the `doh::fetch_txt` path will
-    // perform later, but checking it up front gives the FE a precise,
-    // actionable error before the user composes any email.
+    // Path picker. In this PR only the DoH-allowlist path is wired
+    // up, so we check the allowlist directly. The DNSSEC follow-up
+    // PR adds an optional `dns_proof` field on `EmailRecoveryDnsInput`
+    // — when supplied, this branch shifts to "validate chain and
+    // use it"; the allowlist check below moves to the `else` arm.
+    //
+    // The FE doesn't need to know which path was picked; it just
+    // gets a clean nonce or a clean error.
     let allowlisted = state::persistent_state(|p| {
         p.doh_config
             .as_ref()
@@ -68,9 +67,10 @@ pub async fn prepare_add(
             .unwrap_or(false)
     });
     if !allowlisted {
-        return Err(EmailRecoveryError::DomainNotAllowlisted(
-            registered_domain,
-        ));
+        // The FE doesn't need to distinguish "DNSSEC unavailable AND
+        // DoH not allowlisted" from "neither path applies" — both
+        // collapse to "we can't accept email from this domain."
+        return Err(EmailRecoveryError::DomainNotSupported(registered_domain));
     }
 
     // Selector sanity. DKIM selectors are themselves DNS labels (RFC
@@ -149,7 +149,11 @@ fn normalize_address(input: &str) -> Option<String> {
     if local.is_empty() || domain.is_empty() {
         return None;
     }
-    Some(format!("{}@{}", local.to_ascii_lowercase(), domain.to_ascii_lowercase()))
+    Some(format!(
+        "{}@{}",
+        local.to_ascii_lowercase(),
+        domain.to_ascii_lowercase()
+    ))
 }
 
 /// Pull the registered domain out of an already-normalised address.
@@ -188,10 +192,10 @@ mod tests {
     }
 
     fn doh_input(addr: &str, selector: &str) -> EmailRecoveryDnsInput {
-        EmailRecoveryDnsInput::DohAllowlist(DohAllowlistDnsInput {
+        EmailRecoveryDnsInput {
             address: addr.to_string(),
             selector: selector.to_string(),
-        })
+        }
     }
 
     fn block_on<F: std::future::Future>(mut f: F) -> F::Output {
@@ -206,23 +210,10 @@ mod tests {
         let mut f = unsafe { Pin::new_unchecked(&mut f) };
         let waker = Waker::from(Arc::new(Noop));
         let mut cx = Context::from_waker(&waker);
-        loop {
-            match Future::poll(f.as_mut(), &mut cx) {
-                Poll::Ready(out) => return out,
-                Poll::Pending => panic!("test future returned Pending"),
-            }
+        match Future::poll(f.as_mut(), &mut cx) {
+            Poll::Ready(out) => out,
+            Poll::Pending => panic!("test future returned Pending"),
         }
-    }
-
-    #[test]
-    fn dnssec_variant_returns_not_yet_supported() {
-        super::super::pending::reset_for_tests();
-        install_doh_allowlist(&["gmail.com"]);
-        let result = block_on(prepare_add(1, EmailRecoveryDnsInput::Dnssec, 100));
-        assert!(matches!(
-            result,
-            Err(EmailRecoveryError::DnssecPathNotYetSupported)
-        ));
     }
 
     #[test]
@@ -235,8 +226,8 @@ mod tests {
             100,
         ));
         match result {
-            Err(EmailRecoveryError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
-            other => panic!("expected DomainNotAllowlisted, got {other:?}"),
+            Err(EmailRecoveryError::DomainNotSupported(d)) => assert_eq!(d, "example.com"),
+            other => panic!("expected DomainNotSupported, got {other:?}"),
         }
     }
 
@@ -251,7 +242,7 @@ mod tests {
         ));
         assert!(matches!(
             result,
-            Err(EmailRecoveryError::DomainNotAllowlisted(_))
+            Err(EmailRecoveryError::DomainNotSupported(_))
         ));
     }
 
@@ -259,7 +250,14 @@ mod tests {
     fn rejects_obviously_malformed_address() {
         super::super::pending::reset_for_tests();
         install_doh_allowlist(&["gmail.com"]);
-        for bad in &["", " ", "no-at-sign", "@nolocal.com", "nolocal@", "a b@c.com"] {
+        for bad in &[
+            "",
+            " ",
+            "no-at-sign",
+            "@nolocal.com",
+            "nolocal@",
+            "a b@c.com",
+        ] {
             let result = block_on(prepare_add(1, doh_input(bad, "default"), 100));
             assert!(
                 matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
@@ -307,7 +305,10 @@ mod tests {
         super::super::pending::with_mut(&challenge.nonce, 1_001, |c| {
             assert_eq!(c.claimed_address, "alice@gmail.com");
             assert_eq!(c.selector, "20230601");
-            matches!(c.kind, super::super::pending::PendingKind::Register { anchor: 42 });
+            matches!(
+                c.kind,
+                super::super::pending::PendingKind::Register { anchor: 42 }
+            );
         })
         .expect("entry should exist");
     }
