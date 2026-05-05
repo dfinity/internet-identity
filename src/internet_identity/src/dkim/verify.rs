@@ -13,9 +13,10 @@
 //!
 //! `dkim_txt` is the (already-trusted) content of the DKIM TXT record
 //! at `<selector>._domainkey.<domain>` — in production it comes from
-//! PR 1's DNSSEC verifier (`VerifiedRecord`) for DNSSEC-signed domains
-//! or from PR 4's DoH fallback otherwise. PR 2 takes it as input and
-//! does no DNS work itself.
+//! the DNSSEC verifier (`VerifiedRecord`, cached on the pending
+//! challenge at prepare time) for DNSSEC-signed domains, or from
+//! `crate::doh::fetch_txt` at email-arrival time otherwise. This
+//! module does no DNS work itself; the caller delivers the bytes.
 //!
 //! Multi-signature behaviour (RFC 6376 §5.5 / design §5.5): an email
 //! may carry multiple `DKIM-Signature` headers. The verifier accepts

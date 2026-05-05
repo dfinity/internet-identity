@@ -1,10 +1,10 @@
 //! End-to-end tests for the combined DKIM + DMARC verifier.
 //!
-//! Reuses the synthetic `.eml` fixtures committed for PR 2 (DKIM
-//! verifier) — they all sign `d=test.example.com` with `From:
-//! alice@test.example.com`, so we get exact-match alignment regardless
-//! of the published DMARC mode. The corresponding DKIM TXT record is
-//! also reused; we synthesise the DMARC TXT inline.
+//! Reuses the synthetic `.eml` fixtures from `crate::dkim::test_vectors`
+//! — they all sign `d=test.example.com` with `From: alice@test.example.com`,
+//! so we get exact-match alignment regardless of the published DMARC
+//! mode. The corresponding DKIM TXT record is also reused; we
+//! synthesise the DMARC TXT inline.
 
 use super::types::{AlignmentMode, DmarcOutcome, DmarcPolicy, EmailVerificationStatus};
 use super::verify::verify_email;
@@ -27,10 +27,10 @@ fn frozen_now() -> u64 {
 }
 
 /// Parse the synth RSA `.eml` into the gateway-shaped `SmtpRequest`,
-/// reusing the loader we wrote for PR 2's tests. We can't `pub use`
-/// it from `crate::dkim::test_vectors` (it's in `#[cfg(test)]`), so
-/// the implementation is duplicated here. Both copies parse the same
-/// way; the duplication is contained to test code.
+/// mirroring the loader in `crate::dkim::test_vectors`. We can't
+/// `pub use` from there (it's in `#[cfg(test)]`), so the implementation
+/// is duplicated. Both copies parse the same way; the duplication is
+/// contained to test code.
 fn parse_eml(raw: &[u8]) -> SmtpRequest {
     let mut header_end = 0;
     while header_end + 4 <= raw.len() {
