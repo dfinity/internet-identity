@@ -31,9 +31,12 @@ mod dns_record;
 mod parse;
 mod signature;
 mod types;
+mod verify;
 
 #[allow(unused_imports)]
 pub use types::{
     Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus,
     EmailVerificationStatus, HeaderCanon, VerificationFailReason,
 };
+#[allow(unused_imports)]
+pub use verify::verify;
