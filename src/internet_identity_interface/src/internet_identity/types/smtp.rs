@@ -324,9 +324,6 @@ mod tests {
             message: None,
             gateway_flags: None,
         };
-        assert!(matches!(
-            validate_smtp_request(&req),
-            Ok(()) | Err(SmtpResponse::Ok { .. })
-        ));
+        assert!(validate_smtp_request(&req).is_ok());
     }
 }
