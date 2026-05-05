@@ -309,6 +309,11 @@ type InternetIdentityInit = record {
     // stored value across an upgrade, `opt null` clears it, `opt opt c`
     // sets it to `c`.
     dnssec_config : opt opt DnssecConfig;
+    // DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
+    // domains for which the canister may fetch DKIM/DMARC TXT records
+    // via HTTP outcalls when no DNSSEC chain is available — see
+    // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
+    doh_config : opt opt DohConfig;
 };
 
 // DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -328,6 +333,17 @@ type DnssecRootAnchor = record {
     algorithm : nat8;
     digest_type : nat8;
     digest : blob;
+};
+
+// DoH (DNS-over-HTTPS) fallback configuration.
+//
+// The canister will only fetch DKIM/DMARC TXT records via HTTP outcalls
+// for an FQDN whose registered domain is in `allowed_domains`. Cache
+// entries are populated on demand and re-used until `max_cache_age_secs`
+// elapses (default 3600s when null, capped at 24h).
+type DohConfig = record {
+    allowed_domains : vec text;
+    max_cache_age_secs : opt nat64;
 };
 
 type ChallengeKey = text;
