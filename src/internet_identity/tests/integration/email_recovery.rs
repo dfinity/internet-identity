@@ -1,10 +1,27 @@
 //! Integration tests for the email-recovery setup flow.
 //!
-//! End-to-end coverage of the prepare → smtp_request → status flow,
-//! plus the negative paths (allowlist gate, authz, unknown nonce,
-//! TTL expiry). The DKIM-signed email is generated at test time
-//! against a fresh RSA keypair, and the canister's DoH outcalls are
-//! mocked to return the matching public-key TXT.
+//! Covers both verification paths end-to-end (prepare → smtp_request
+//! → status):
+//!
+//! - **DoH path** — `prepare_add` is called without a `dns_proof`, so
+//!   `smtp_request` resolves the DKIM (and DMARC) TXT records via
+//!   DoH outcalls at email-arrival time. Tests fan out to fulfil
+//!   each provider's outcall with a synthesized DNS response built
+//!   around the test's RSA keypair.
+//! - **DNSSEC path** — `prepare_add` is given a fresh DNSSEC chain
+//!   (`dnssec_signer` below) carrying both DKIM and DMARC leaves,
+//!   pre-validated synchronously. `smtp_request` then issues *zero*
+//!   DoH outcalls — verified by an explicit assertion in the
+//!   happy-path test.
+//!
+//! The DKIM-signed email is generated at test time against a fresh
+//! RSA keypair (`dkim_signer` below); both paths use the same email,
+//! so the canister-side verification logic is the same — only the
+//! TXT-source plumbing differs.
+//!
+//! Negative paths (allowlist gate, authz, unknown nonce, TTL expiry,
+//! malformed DNSSEC bundle, …) are tested separately at the top of
+//! the file.
 //!
 //! See `docs/ongoing/email-recovery.md` and the feature module at
 //! `crate::email_recovery` for the design.
@@ -345,19 +362,25 @@ fn remove_credential_rejects_when_nothing_bound() {
 }
 
 // ===================================================================
-// DNSSEC path tests
+// DNSSEC path: full end-to-end setup flow + protocol-shape checks
 // ===================================================================
 //
-// `prepare_add` accepts an optional `dns_proof: Option<DnsProofBundle>`.
-// When supplied, the canister validates the DNSSEC chain synchronously
-// and caches the verified DKIM TXT bytes on the pending challenge,
-// skipping the DoH outcall fan-out at `smtp_request` time.
+// `prepare_add` is called with a `dns_proof` carrying the signed DKIM
+// (and optionally DMARC) TXT records. The canister validates the
+// chain synchronously against its configured trust anchors and caches
+// the verified bytes on the pending challenge, so `smtp_request`
+// issues zero DoH outcalls at email-arrival time. Mirror of the DoH
+// e2e flow further down the file.
 //
-// Coverage here:
-// - `dnssec_path_rejects_when_no_trust_anchors_configured` — config gate
-// - `dnssec_path_takes_precedence_over_doh_allowlist` — path-picker
-// - `full_setup_flow_via_dnssec_path` — happy path with a freshly
-//   generated chain (signer in `dnssec_signer` below).
+// Coverage:
+// - `full_setup_flow_via_dnssec_path` — happy path: freshly-signed
+//   chain (Ed25519, see `dnssec_signer` below), DKIM + DMARC bundled,
+//   asserts no DoH outcalls are observed.
+// - `dnssec_path_rejects_when_no_trust_anchors_configured` — config
+//   gate: the canister refuses to validate without anchors set.
+// - `dnssec_path_takes_precedence_over_doh_allowlist` — path picker:
+//   even when the domain is on the DoH allowlist, supplying a
+//   `dns_proof` forces the DNSSEC branch.
 
 #[test]
 fn dnssec_path_rejects_when_no_trust_anchors_configured() {
@@ -638,16 +661,17 @@ fn assert_no_doh_outcalls(env: &PocketIc) {
 }
 
 // ===================================================================
-// Full end-to-end test: prepare → sign → smtp_request → status
+// DoH path: full end-to-end setup flow
 // ===================================================================
 //
-// This one does the real work: a freshly-generated RSA keypair signs
-// an email whose Subject contains the canister-issued nonce; the
-// canister's DoH outcalls are mocked to return the matching public
-// key as a TXT record; the verifier accepts the email; status flips
-// to RegistrationSucceeded.
-//
-// See `dkim_signer` below for the in-test DKIM signing logic.
+// `prepare_add` is called without a `dns_proof`, so the canister
+// caches no TXT bytes and `smtp_request` falls through to DoH at
+// email-arrival time. The test fans out, fulfilling each of the 5
+// provider outcalls with a synthesized DNS response carrying the
+// test signer's DKIM TXT (DMARC is answered with 404 → strict
+// alignment fallback). Mirror of `full_setup_flow_via_dnssec_path`
+// above for the DNSSEC path. See `dkim_signer` below for the
+// signing logic shared between both flows.
 
 #[test]
 fn full_setup_flow_binds_credential_to_anchor() {
