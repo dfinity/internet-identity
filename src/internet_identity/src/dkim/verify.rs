@@ -479,13 +479,16 @@ fn at_tag_start(bytes: &[u8], i: usize) -> bool {
 }
 
 /// `simple` body canonicalisation (RFC 6376 §3.4.3): identity, except
-/// the body must end with a single `\r\n`. Empty body → empty output
-/// (no synthetic CRLF). We support this only because the body side of
-/// a `c=relaxed/simple` signature uses it; the header side is rejected
-/// upstream.
+/// trailing empty lines are stripped and the body must end with a
+/// single `\r\n`. RFC §3.4.3 explicitly: "a completely empty or
+/// missing body is canonicalized as a single 'CRLF'; that is, the
+/// canonicalized length will be 2 octets" — so empty body → `\r\n`,
+/// not the empty buffer. We support this only because the body side
+/// of a `c=relaxed/simple` signature uses it; the header side is
+/// rejected upstream.
 fn simple_body(body: &[u8]) -> Vec<u8> {
     if body.is_empty() {
-        return Vec::new();
+        return b"\r\n".to_vec();
     }
     let mut out = body.to_vec();
     // Strip trailing empty lines (`\r\n\r\n` → `\r\n`).

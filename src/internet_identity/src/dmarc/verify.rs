@@ -131,7 +131,6 @@ fn compute_outcome(dkim_domain: &str, from_domain: &str, dmarc_txt: Option<&str>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dkim::{DkimCheck, DkimCheckName, DkimCheckStatus};
     use internet_identity_interface::internet_identity::types::smtp::{
         SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage,
     };
@@ -242,22 +241,9 @@ mod tests {
         }
     }
 
-    /// Sanity check: a "DKIM verified, no DMARC, exact d=From" case
-    /// should accept end-to-end.
-    #[test]
-    fn end_to_end_accepts_when_dkim_equals_from_no_dmarc() {
-        // Synthesize a fake DKIM-passed result by going through the
-        // wrapper with a DKIM TXT that resolves correctly only if a
-        // synth fixture is provided. Here we just check the alignment
-        // logic via the lower-level helper, which is what the unit
-        // tests above exercise. End-to-end with a real captured email
-        // is in the `test_vectors` test module.
-        let _checks: Vec<DkimCheck> = vec![DkimCheck {
-            name: DkimCheckName::SignatureValid,
-            status: DkimCheckStatus::Pass,
-            detail: None,
-        }];
-        // This documents the intended shape; real cryptographic round-
-        // trip lives in test_vectors::*.
-    }
+    // Note: the "DKIM verified, no DMARC, exact d=From" end-to-end path
+    // is covered by the cryptographic round-trip tests in
+    // `crate::dmarc::test_vectors` (which load real `.eml` fixtures and
+    // run the full `verify_email`). The unit tests in this module
+    // exercise the orchestration in isolation via lower-level helpers.
 }

@@ -82,10 +82,27 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     {
         return Err(DohError::DomainNotAllowed);
     }
+    // Defence-in-depth: the allowlist gate above only checks the
+    // registered_domain the caller hands us — but `name` is what we'd
+    // actually query. A caller bug or future regression that decoupled
+    // the two could pass an allowlisted registered_domain alongside a
+    // completely unrelated name (e.g., `evil.com`) and we'd happily
+    // outcall for it. Insist that `name` sits inside `registered_domain`
+    // with a label-anchored suffix match.
+    if !name_within_domain(name, registered_domain) {
+        return Err(DohError::NameOutsideRegisteredDomain {
+            name: name.to_string(),
+            registered_domain: registered_domain.to_string(),
+        });
+    }
     let max_age = config
         .max_cache_age_secs
         .unwrap_or(DEFAULT_CACHE_AGE_SECS)
         .min(MAX_CACHE_AGE_SECS);
+
+    // Build the query early so an InvalidName failure short-circuits
+    // before we touch the cache or claim a Fetch token.
+    let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
 
     // Cache lookup. We must release the borrow before awaiting — the
     // canister is single-threaded but futures across yields can re-
@@ -99,7 +116,6 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     };
 
     // Fan out to every provider in parallel, then decide.
-    let query = build_txt_query(name);
     let outcall_results = fetch_all(&query).await;
     let outcomes: Vec<Outcome> = outcall_results
         .into_iter()
@@ -119,6 +135,30 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
             .publish(name, token, result.clone(), expires_at, now)
     });
     result
+}
+
+/// Whether a queried FQDN sits inside `registered_domain` (case-
+/// insensitive, label-anchored).
+///
+/// Returns true iff `name == registered_domain` or `name` ends with
+/// `.<registered_domain>`. The dot anchor is what stops
+/// `evilexample.com` from passing as inside `example.com`. A trailing
+/// dot on either side (root marker) is normalised away first.
+fn name_within_domain(name: &str, registered_domain: &str) -> bool {
+    let n = name.trim_end_matches('.');
+    let d = registered_domain.trim_end_matches('.');
+    if d.is_empty() {
+        return false;
+    }
+    if n.eq_ignore_ascii_case(d) {
+        return true;
+    }
+    if n.len() <= d.len() + 1 {
+        return false;
+    }
+    let suffix = &n[n.len() - d.len()..];
+    let dot_idx = n.len() - d.len() - 1;
+    suffix.eq_ignore_ascii_case(d) && n.as_bytes()[dot_idx] == b'.'
 }
 
 #[cfg(not(test))]
@@ -167,10 +207,18 @@ mod prod {
 
     pub(super) const HTTP_STATUS_OK: u8 = 200;
 
-    /// Sentinel body returned by the transform when the wire response
-    /// is malformed. The async path treats anything that isn't a
-    /// genuine TXT-bytes payload as a failure for that provider.
-    pub(super) const MALFORMED_SENTINEL: &[u8] = b"!!doh-malformed";
+    /// HTTP status the transform returns when the wire-format DNS
+    /// response can't be parsed down to a TXT RDATA. We deliberately
+    /// signal failure via the *status code*, not via a sentinel body
+    /// string, because any TXT-bytes body the transform might emit
+    /// could collide with a real DKIM/DMARC payload (a sentinel like
+    /// `b"!!doh-malformed"` is bytes-equal to a (legal-but-unusual)
+    /// TXT record). 422 ("Unprocessable Entity") is a defensible
+    /// bucket for "you sent us bytes we can't make sense of"; what
+    /// actually matters is the IC-replica consensus on a non-200,
+    /// which the existing `if response.status != HTTP_STATUS_OK`
+    /// branch in [`outcall`] turns into an `Err`.
+    pub(super) const HTTP_STATUS_TRANSFORM_PARSE_FAILED: u16 = 422;
 
     pub(super) async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
         let futures: Vec<_> = super::PROVIDERS.iter().map(|p| outcall(p, query)).collect();
@@ -207,9 +255,6 @@ mod prod {
         if response.status != HTTP_STATUS_OK {
             return Err(format!("HTTP {}", response.status));
         }
-        if response.body == MALFORMED_SENTINEL {
-            return Err("malformed DNS response".into());
-        }
         Ok(response.body)
     }
 
@@ -222,17 +267,19 @@ mod prod {
     /// which depend only on the resolver's cached answer (stable
     /// within a given TTL bucket), so all replicas converge.
     ///
-    /// On parse failure we surface a sentinel string in the body
-    /// rather than dropping the response — that way consensus still
-    /// succeeds (all replicas see the same sentinel) and the async
-    /// path counts this provider's contribution as a failure.
+    /// On parse failure we signal the failure out-of-band via a non-
+    /// 200 status code (with empty body) rather than encoding it in
+    /// the body. An in-band sentinel string would risk colliding with
+    /// a legitimate (if unusual) TXT payload and silently turning a
+    /// valid record into a "malformed" failure for the quorum.
     #[allow(clippy::needless_pass_by_value)]
     pub(super) fn transform_doh(response: HttpResponse) -> HttpResponse {
         use candid::Nat;
         if response.status != HTTP_STATUS_OK {
-            // Non-200 responses are passed through untouched (status
-            // and empty body) — replicas converge on the status code
-            // even if their bodies originally differed.
+            // Non-200 upstream responses are passed through untouched
+            // (status preserved, body emptied for consensus) —
+            // replicas converge on the status code even if their
+            // original bodies differed.
             return HttpResponse {
                 status: response.status,
                 headers: vec![],
@@ -246,9 +293,10 @@ mod prod {
                 body: txt,
             },
             Err(_) => HttpResponse {
-                status: Nat::from(HTTP_STATUS_OK),
+                // Out-of-band failure signal: see `HTTP_STATUS_TRANSFORM_PARSE_FAILED`.
+                status: Nat::from(HTTP_STATUS_TRANSFORM_PARSE_FAILED as u32),
                 headers: vec![],
-                body: MALFORMED_SENTINEL.to_vec(),
+                body: vec![],
             },
         }
     }
@@ -494,5 +542,64 @@ mod tests {
         set_now(types::MAX_CACHE_AGE_SECS + 1);
         let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
         assert_eq!(call_count(), 2, "cache must respect MAX_CACHE_AGE_SECS");
+    }
+
+    #[test]
+    fn rejects_name_outside_registered_domain() {
+        install_config(&["gmail.com"], None);
+        reset_cache();
+        // Allowlisted registered_domain, but `name` doesn't sit inside
+        // it — should fail closed without an outcall.
+        let r = block_on(fetch_txt("selector._domainkey.evil.com", "gmail.com"));
+        match r {
+            Err(DohError::NameOutsideRegisteredDomain {
+                name,
+                registered_domain,
+            }) => {
+                assert_eq!(name, "selector._domainkey.evil.com");
+                assert_eq!(registered_domain, "gmail.com");
+            }
+            other => panic!("expected NameOutsideRegisteredDomain, got {other:?}"),
+        }
+        assert_eq!(call_count(), 0, "no outcall should have been attempted");
+    }
+
+    #[test]
+    fn label_anchored_suffix_blocks_evilexample_com() {
+        install_config(&["example.com"], None);
+        reset_cache();
+        let r = block_on(fetch_txt("evilexample.com", "example.com"));
+        assert!(matches!(
+            r,
+            Err(DohError::NameOutsideRegisteredDomain { .. })
+        ));
+    }
+
+    #[test]
+    fn name_within_domain_helper_cases() {
+        assert!(name_within_domain("gmail.com", "gmail.com"));
+        assert!(name_within_domain("Gmail.COM", "gmail.com"));
+        assert!(name_within_domain(
+            "selector._domainkey.gmail.com",
+            "gmail.com"
+        ));
+        assert!(name_within_domain("a.b.c.gmail.com.", "gmail.com"));
+        assert!(!name_within_domain("evilgmail.com", "gmail.com"));
+        assert!(!name_within_domain("gmail.com.evil.com", "gmail.com"));
+        assert!(!name_within_domain("", "gmail.com"));
+    }
+
+    #[test]
+    fn rejects_invalid_qname() {
+        install_config(&["example.com"], None);
+        reset_cache();
+        // 64-byte label busts the per-label cap; should be rejected
+        // before any outcall is attempted (and before any cache state
+        // is mutated).
+        let oversize = "a".repeat(64);
+        let name = format!("{oversize}.example.com");
+        let r = block_on(fetch_txt(&name, "example.com"));
+        assert!(matches!(r, Err(DohError::InvalidName(_))));
+        assert_eq!(call_count(), 0);
     }
 }

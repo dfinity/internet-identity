@@ -2,12 +2,12 @@
 
 /// One DoH provider in the quorum.
 ///
-/// All three providers below run free public DoH endpoints as a public
-/// service (not a commercial product), so we don't expect a-rate-
-/// limit-killed-our-canister failure mode. Each is operated in a
-/// different jurisdiction; we deliberately don't lean on a single
-/// political/legal regime for the answer to "what does Gmail's DKIM
-/// key look like right now".
+/// All five providers run free public DoH endpoints as a public service
+/// rather than a commercial product, so we don't expect a "rate limit
+/// killed our canister" failure mode. Each is operated in a different
+/// jurisdiction (with the deliberate exception of two US providers,
+/// see [`PROVIDERS`]); we don't lean on a single political/legal regime
+/// for the answer to "what does Gmail's DKIM key look like right now".
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DohProvider {
     /// Display name for diagnostics / logging.
@@ -80,7 +80,8 @@ pub enum DohError {
     /// The queried registered domain isn't on `allowed_domains`. The
     /// verifier will not go to the internet for arbitrary domains.
     DomainNotAllowed,
-    /// All three outcalls failed (network error / non-200 / etc).
+    /// Every provider's outcall failed (network error / non-200 / etc).
+    /// "Every" means all of `PROVIDERS.len()` — currently five.
     AllProvidersFailed,
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
@@ -93,6 +94,19 @@ pub enum DohError {
     /// The deploy/upgrade arg never set a `DohConfig`, or the config
     /// was cleared via `Some(None)`. The DoH fallback is disabled.
     NotConfigured,
+    /// The FQDN we were asked to look up isn't a valid wire-format
+    /// DNS name (label > 63 octets, name > 255 octets, or empty
+    /// label). We refuse to silently truncate, so this is a
+    /// caller-visible failure rather than a quietly-different lookup.
+    InvalidName(String),
+    /// The FQDN doesn't sit inside the registered domain that the
+    /// caller passed for the allowlist check. Usually a caller bug;
+    /// we fail closed rather than make an outcall for an unrelated
+    /// name.
+    NameOutsideRegisteredDomain {
+        name: String,
+        registered_domain: String,
+    },
 }
 
 #[cfg(test)]

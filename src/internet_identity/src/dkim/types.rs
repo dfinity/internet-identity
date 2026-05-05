@@ -128,7 +128,8 @@ pub enum VerificationFailReason {
 /// one* signature passes the cryptographic check.
 ///
 /// The combined DKIM + DMARC verdict (what callers actually want) is
-/// `DkimVerifyResult`, returned by `dmarc::verify_email`.
+/// [`crate::dmarc::EmailVerificationStatus`], returned by
+/// `dmarc::verify_email`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DkimVerifyResult {
     /// At least one signature passed.
