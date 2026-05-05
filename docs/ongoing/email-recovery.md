@@ -11,13 +11,15 @@ still planned.
 
 | Component | Status | Where |
 |---|---|---|
-| DKIM verifier (§5) | Merged | PR [#3838](https://github.com/dfinity/internet-identity/pull/3838) |
-| DMARC alignment (§6) | Merged | PR [#3840](https://github.com/dfinity/internet-identity/pull/3840) |
-| DNSSEC verifier (§7) | Merged | folded into PR [#3842](https://github.com/dfinity/internet-identity/pull/3842) |
-| DoH fallback (§7.6) | Merged | PR [#3841](https://github.com/dfinity/internet-identity/pull/3841) |
+| DNSSEC verifier (§7) | In review | PR [#3838](https://github.com/dfinity/internet-identity/pull/3838) |
+| DKIM verifier (§5) | In review | PR [#3839](https://github.com/dfinity/internet-identity/pull/3839) |
+| DMARC alignment (§6) | In review | PR [#3840](https://github.com/dfinity/internet-identity/pull/3840) |
+| DoH fallback (§7.6) | In review | PR [#3841](https://github.com/dfinity/internet-identity/pull/3841) |
 | Setup flow (§8.4): `prepare_add` → `smtp_request` → `status` → `credential_remove` | In review | PR [#3842](https://github.com/dfinity/internet-identity/pull/3842) |
 | Recovery flow (§8.5): `prepare_delegation`, delegation issuance, `get_delegation` | **Planned** | not yet implemented |
 | Frontend wizards (§8.6, §8.10) | **Planned** | not yet implemented |
+
+Nothing in this stack is merged to `main` yet; all PRs are open and stacked on each other.
 
 ---
 
@@ -285,7 +287,7 @@ The PoC's `src/internet_identity/src/dkim.rs` is replaced rather than incrementa
 
 **Rejected alternatives**
 
-- [`mail-auth`](https://github.com/stalwartlabs/mail-auth) (Apache-2.0, used by Stalwart) — was the original recommendation. Drops out because its dependency tree pulls a non-optional `hickory-resolver` (DNS via tokio sockets) that doesn't compile to `wasm32-unknown-unknown`. Forking it to vendor a no-net resolver shim would be larger than rolling the verifier from the RFC. (`mail-auth` may still be useful for ad-hoc cross-checks of ambiguous test vectors when capturing the corpus, but it isn't a build-time or runtime dep — see §9.)
+- [`mail-auth`](https://github.com/stalwartlabs/mail-auth) (Apache-2.0, used by Stalwart) — was the original recommendation. Drops out because its dependency tree pulls a non-optional `hickory-resolver` (DNS via tokio sockets) that doesn't compile to `wasm32-unknown-unknown`. Forking it to vendor a no-net resolver shim would be larger than rolling the verifier from the RFC.
 - `cfdkim` — solid but tightly coupled to `tokio-trust-dns`, hard to unhook from network IO.
 - Continue with the PoC's parser — every reviewer comment in the PoC PR is some shape of "you can't safely roll your own canonicalization parser." Agreed; the rewrite this section describes is the answer, just from-scratch rather than library-backed.
 
@@ -1196,7 +1198,7 @@ A `test_vectors/email_recovery/` directory at the repo root carries plain `.eml`
 - **DNSSEC**: 20 chains, including ECDSA-only and Ed25519-only; intentionally broken chains for negative tests.
 - **Replay/expiry**: signatures with `x=` in the past, future-dated `t=`.
 
-Vectors are committed alongside the expected verdict (`Verified` / `Unverified { reason }`); the canister's hand-rolled verifier asserts that verdict per-vector. Where a captured `.eml` is genuinely ambiguous, an off-canister sanity check against another implementation (e.g. spinning up `mail-auth` ad hoc on a host) is used to break the tie before the vector is committed — but there is no committed cross-check tool.
+Vectors are committed alongside the expected verdict (`Verified` / `Unverified { reason }`); the canister's hand-rolled verifier asserts that verdict per-vector.
 
 CI runs the corpus against the PocketIC-hosted canister to catch wasm-only regressions.
 
@@ -1206,17 +1208,15 @@ CI runs the corpus against the PocketIC-hosted canister to catch wasm-only regre
 
 ### Phase 0 — Land foundations (no user-visible change)
 
-Split into a stack of focused PRs against `main`:
+Split into a stack of focused PRs against `main`. None are merged yet; the stack is reviewed bottom-up.
 
-1. **PR 1 — DKIM verifier rewrite** ([#3838](https://github.com/dfinity/internet-identity/pull/3838) and follow-ups). Hand-rolled, in `src/internet_identity/src/dkim/` (see §5.1). Replaces the PoC's parser; takes raw header bytes + a DKIM TXT record string + the canister clock and emits an `EmailVerificationStatus`.
-2. **PR 2 — DMARC verifier** ([#3840](https://github.com/dfinity/internet-identity/pull/3840)). Alignment check + combined DKIM+DMARC entry point in `crate::dmarc`.
-3. **PR 3 — DNSSEC verifier** (folded into PR 4 below for the no-outcall path; verifier itself lives in `src/internet_identity/src/dnssec/` with the trust-anchor list wired through the canister init/upgrade arg, §7.5).
-4. **PR 4 — DoH fallback** ([#3841](https://github.com/dfinity/internet-identity/pull/3841)). 3-of-5 provider quorum + heap cache + dedup, gated by the deploy-arg allowlist (§7.6).
-5. **PR 5 + 6 (combined) — email-recovery setup flow** ([#3842](https://github.com/dfinity/internet-identity/pull/3842), in flight as of this writing). On-anchor `EmailRecoveryCredential`, `prepare_add` → `smtp_request` → `status` plumbing, both verification paths, PocketIC integration tests covering both happy paths.
-6. **PR 7+ — recovery flow** (planned). `prepare_delegation` (anonymous), delegation-stamping at `smtp_request` time, `email_recovery_get_delegation` query.
+1. **DNSSEC verifier scaffold** ([#3838](https://github.com/dfinity/internet-identity/pull/3838)). The chain-validation primitive in `src/internet_identity/src/dnssec/`, with the trust-anchor list wired through the canister init/upgrade arg (§7.5).
+2. **DKIM verifier** ([#3839](https://github.com/dfinity/internet-identity/pull/3839)). Hand-rolled, in `src/internet_identity/src/dkim/` (see §5.1). Replaces the PoC's parser; takes raw header bytes + a DKIM TXT record string + the canister clock and emits an `EmailVerificationStatus`.
+3. **DMARC verifier** ([#3840](https://github.com/dfinity/internet-identity/pull/3840)). Alignment check + combined DKIM+DMARC entry point in `crate::dmarc`.
+4. **DoH fallback** ([#3841](https://github.com/dfinity/internet-identity/pull/3841)). 3-of-5 provider quorum + heap cache + dedup, gated by the deploy-arg allowlist (§7.6).
+5. **Email-recovery setup flow** ([#3842](https://github.com/dfinity/internet-identity/pull/3842)). On-anchor `EmailRecoveryCredential`, `prepare_add` → `smtp_request` → `status` plumbing, both verification paths, PocketIC integration tests covering both happy paths.
+6. **Recovery flow** (planned, not yet opened). `prepare_delegation` (anonymous), delegation-stamping at `smtp_request` time, `email_recovery_get_delegation` query.
 7. **Test corpus** lands incrementally with the PRs above.
-
-`mail-auth` is **not** a runtime dependency of the canister (see §5.1). It may be invoked ad-hoc when capturing or debugging individual test vectors, but no committed tooling depends on it.
 
 ### Phase 1 — Beta email recovery
 
@@ -1259,6 +1259,5 @@ We do **not** keep PoC PR #3760's WASM in any release. Its branch closes when Ph
 - RFC 4033/4034/4035 — DNSSEC
 - RFC 8624 — Algorithm Implementation Requirements and Usage Guidance for DNSSEC
 - [Public Suffix List](https://publicsuffix.org/)
-- [`mail-auth` crate](https://github.com/stalwartlabs/mail-auth)
 - [IANA DNSSEC root anchors](https://www.iana.org/dnssec/files)
 - PoC PR [#3760](https://github.com/dfinity/internet-identity/pull/3760)
