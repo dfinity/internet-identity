@@ -14,7 +14,7 @@
 //! public key) live in `test_vectors/dkim/`. See that directory's
 //! README for the regeneration procedure.
 
-use super::types::{EmailVerificationStatus, VerificationFailReason};
+use super::types::{DkimVerifyResult, VerificationFailReason};
 use super::verify::verify;
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest,
@@ -177,7 +177,7 @@ fn verifies_synthetic_rsa_relaxed_relaxed() {
     let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
     match result {
-        EmailVerificationStatus::Verified { dkim_domain, .. } => {
+        DkimVerifyResult::Verified { dkim_domain, .. } => {
             assert_eq!(dkim_domain, "test.example.com");
         }
         other => panic!("expected Verified, got {:?}", other),
@@ -189,7 +189,7 @@ fn verifies_synthetic_rsa_relaxed_simple_body() {
     let req = parse_eml(SYNTH_RSA_RELAXED_SIMPLE);
     let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
     match result {
-        EmailVerificationStatus::Verified { dkim_domain, .. } => {
+        DkimVerifyResult::Verified { dkim_domain, .. } => {
             assert_eq!(dkim_domain, "test.example.com");
         }
         other => panic!("expected Verified, got {:?}", other),
@@ -201,7 +201,7 @@ fn rejects_simple_simple_canonicalization() {
     let req = parse_eml(SYNTH_RSA_SIMPLE_SIMPLE);
     let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
     match result {
-        EmailVerificationStatus::Unverified { reason, .. } => {
+        DkimVerifyResult::Unverified { reason, .. } => {
             assert_eq!(reason, VerificationFailReason::UnsupportedCanonicalization);
         }
         other => panic!(
@@ -223,7 +223,7 @@ fn rejects_flipped_body_byte() {
     message.body = ByteBuf::from(body);
     let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
     match result {
-        EmailVerificationStatus::Unverified { reason, .. } => {
+        DkimVerifyResult::Unverified { reason, .. } => {
             assert_eq!(reason, VerificationFailReason::BodyHashMismatch);
         }
         other => panic!("expected BodyHashMismatch, got {:?}", other),
@@ -257,7 +257,7 @@ fn rejects_flipped_signature_byte() {
     assert!(
         matches!(
             result,
-            EmailVerificationStatus::Unverified {
+            DkimVerifyResult::Unverified {
                 reason: VerificationFailReason::SignatureInvalid
                     | VerificationFailReason::SignatureMalformed(_)
                     | VerificationFailReason::BodyHashMismatch,
@@ -279,7 +279,7 @@ fn rejects_wrong_public_key() {
     assert!(
         matches!(
             result,
-            EmailVerificationStatus::Unverified {
+            DkimVerifyResult::Unverified {
                 reason: VerificationFailReason::SignatureInvalid
                     | VerificationFailReason::DnsRecordMalformed(_),
                 ..
@@ -302,7 +302,7 @@ fn no_dkim_signature_header() {
     let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
     assert!(matches!(
         result,
-        EmailVerificationStatus::Unverified {
+        DkimVerifyResult::Unverified {
             reason: VerificationFailReason::NoSignature,
             ..
         }
