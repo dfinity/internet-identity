@@ -528,6 +528,40 @@ type EmailRecoveryChallenge = record {
 type EmailRecoveryDnsInput = record {
     address : text;
     selector : text;
+    dns_proof : opt DnsProofBundle;
+};
+
+// DNSSEC proof bundle and supporting types — see
+// `internet_identity_interface::types::dnssec`.
+type Rrsig = record {
+    type_covered : nat16;
+    algorithm : nat8;
+    labels : nat8;
+    original_ttl : nat32;
+    expiration : nat32;
+    inception : nat32;
+    key_tag : nat16;
+    signer_name : blob;
+    signature : blob;
+};
+
+type SignedRRset = record {
+    name : blob;
+    rtype : nat16;
+    rdata : vec blob;
+    ttl : nat32;
+    rrsig : Rrsig;
+};
+
+type DelegationLink = record {
+    child_ds : SignedRRset;
+    child_dnskey : SignedRRset;
+};
+
+type DnsProofBundle = record {
+    leaf : SignedRRset;
+    root_dnskey : SignedRRset;
+    chain : vec DelegationLink;
 };
 
 type EmailRecoveryError = variant {

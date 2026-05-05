@@ -71,8 +71,7 @@ fn recipient_matches(
     expected_user: &str,
     expected_domain: &str,
 ) -> bool {
-    to.user.eq_ignore_ascii_case(expected_user)
-        && to.domain.eq_ignore_ascii_case(expected_domain)
+    to.user.eq_ignore_ascii_case(expected_user) && to.domain.eq_ignore_ascii_case(expected_domain)
 }
 
 /// Outcome the canister method in `main.rs` returns to the gateway.
@@ -126,6 +125,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             anchor: *anchor,
             claimed_address: c.claimed_address.clone(),
             selector: c.selector.clone(),
+            cached_dkim_txt: c.cached_dkim_txt.clone(),
         }),
     }) {
         Some(Some(s)) => s,
@@ -172,6 +172,11 @@ struct PendingSnapshot {
     /// Lowercased canonical form (matches what `prepare_add` stored).
     claimed_address: String,
     selector: String,
+    /// Pre-validated DKIM TXT bytes from the DNSSEC path. `Some`
+    /// means `prepare_add` already validated the chain; we skip the
+    /// DoH outcall fan-out and feed these bytes straight into the
+    /// DKIM verifier. `None` means we go through DoH at email time.
+    cached_dkim_txt: Option<Vec<u8>>,
 }
 
 /// Look up the `Subject:` header and find a `II-Recovery-…` nonce
@@ -236,15 +241,22 @@ async fn verify_setup_email(
             EmailRecoveryError::InternalCanisterError("stored claimed address has no '@'".into())
         })?;
 
-    // Fetch DKIM TXT and DMARC TXT (best-effort) via DoH. The DoH
-    // module's heap cache means repeat traffic for the same
-    // selector + domain is a microsecond cache hit.
-    let dkim_fqdn = format!("{}._domainkey.{}", snapshot.selector, domain);
+    // Source the DKIM TXT bytes. Two paths:
+    //
+    // - **DNSSEC path** — `prepare_add` already validated the chain
+    //   and cached the verified TXT bytes on the pending challenge.
+    //   No outcall needed.
+    // - **DoH path** — fetch via the 3-of-5 quorum module. Cache-
+    //   served after the first lookup per provider per TTL window.
     let dmarc_fqdn = format!("_dmarc.{}", domain);
-
-    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain)
-        .await
-        .map_err(|e| map_doh_error(e, &domain))?;
+    let dkim_bytes = if let Some(cached) = snapshot.cached_dkim_txt.clone() {
+        cached
+    } else {
+        let dkim_fqdn = format!("{}._domainkey.{}", snapshot.selector, domain);
+        crate::doh::fetch_txt(&dkim_fqdn, &domain)
+            .await
+            .map_err(|e| map_doh_error(e, &domain))?
+    };
     // DMARC is optional in our model: if the lookup fails for any
     // reason (no record published, transient quorum miss), we tell
     // the verifier `None`, which forces the strict "DKIM d= must
@@ -351,9 +363,9 @@ fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError 
         DohError::ResponseMalformed(msg) => {
             EmailRecoveryError::DohFetchFailed(format!("DoH response malformed: {msg}"))
         }
-        DohError::InvalidName(msg) => EmailRecoveryError::InternalCanisterError(format!(
-            "DoH rejected query name: {msg}"
-        )),
+        DohError::InvalidName(msg) => {
+            EmailRecoveryError::InternalCanisterError(format!("DoH rejected query name: {msg}"))
+        }
         DohError::NameOutsideRegisteredDomain {
             name,
             registered_domain,

@@ -36,6 +36,13 @@ pub struct PendingChallenge {
     /// Unix-seconds at which `prepare_add` ran. Used for TTL expiry
     /// and as the basis for `expires_at` shipped to the FE.
     pub created_at_secs: u64,
+    /// Cached DKIM TXT record bytes from the DNSSEC path. `None`
+    /// means the FE didn't supply a `dns_proof`, so `smtp_request`
+    /// will resolve the TXT via `crate::doh::fetch_txt` instead.
+    /// `Some(bytes)` means the canister has already validated the
+    /// DNSSEC chain at prepare time and can skip the outcall fan-out
+    /// entirely.
+    pub cached_dkim_txt: Option<Vec<u8>>,
     /// Status the FE polls. Flips from `Pending` to a terminal
     /// variant on `smtp_request`; sticky thereafter (the FE reads
     /// once and ends the wizard).
@@ -197,6 +204,7 @@ mod tests {
             claimed_address: addr.into(),
             selector: "20230601".into(),
             created_at_secs: now,
+            cached_dkim_txt: None,
             status: PendingStatus::Pending,
         }
     }

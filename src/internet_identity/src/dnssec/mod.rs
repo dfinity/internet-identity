@@ -46,7 +46,7 @@ mod canonical;
 mod signature;
 #[cfg(test)]
 mod test_vectors;
-mod types;
+pub(crate) mod types;
 mod verify;
 mod wire;
 
