@@ -130,8 +130,8 @@ fn prepare_add_rejects_non_allowlisted_domain() {
         .expect("call failed")
         .expect_err("expected failure for non-allowlisted domain");
     match err {
-        EmailRecoveryError::DomainNotSupported(d) => assert_eq!(d, "evil.com"),
-        other => panic!("expected DomainNotSupported, got {other:?}"),
+        EmailRecoveryError::DomainNotAllowlisted(d) => assert_eq!(d, "evil.com"),
+        other => panic!("expected DomainNotAllowlisted, got {other:?}"),
     }
 }
 
