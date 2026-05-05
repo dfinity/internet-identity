@@ -25,8 +25,9 @@ use internet_identity_interface::internet_identity::types::smtp::SmtpRequest;
 /// Inputs:
 /// - `email` — the parsed `SmtpRequest` the gateway delivered.
 /// - `dkim_txt` — the (already-trusted) DKIM TXT record content. In
-///   production this comes from PR 1's DNSSEC verifier or PR 4's DoH
-///   fallback. PR 3 takes it as input and does no DNS work itself.
+///   production this comes from `crate::dnssec` (cached on the
+///   pending challenge at prepare time) or from `crate::doh::fetch_txt`
+///   at email-arrival time. This function does no DNS work itself.
 /// - `dmarc_txt` — the (already-trusted) DMARC TXT record content,
 ///   or `None` if the From-header domain has no published DMARC
 ///   record. When `None`, the verifier still requires DKIM `d=` to

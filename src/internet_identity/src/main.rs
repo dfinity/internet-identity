@@ -1424,11 +1424,12 @@ mod email_recovery_api {
     };
 
     /// Authenticated. Validates the caller owns `identity_number`,
-    /// validates the DNS input shape (DoH path only in this PR), and
-    /// issues a fresh nonce. The nonce is stored alongside the
-    /// claimed address + selector + anchor in the heap pending-
-    /// challenge map; an inbound email with that nonce in `Subject:`
-    /// completes the binding via `smtp_request`.
+    /// validates the DNS input shape (DNSSEC bundle if supplied,
+    /// otherwise DoH allowlist gate), and issues a fresh nonce. The
+    /// nonce is stored alongside the claimed address + selector +
+    /// anchor in the heap pending-challenge map; an inbound email
+    /// with that nonce in `Subject:` completes the binding via
+    /// `smtp_request`.
     #[update]
     async fn email_recovery_credential_prepare_add(
         identity_number: IdentityNumber,

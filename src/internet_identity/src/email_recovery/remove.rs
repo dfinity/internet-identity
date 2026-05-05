@@ -20,11 +20,10 @@
 //!   honest if it ever caches a stale list.
 //! - We emit a typed `Operation::EmailRecoveryRemove` for the archive
 //!   stream so removals show up in the audit log alongside passkey /
-//!   recovery-phrase removals. *(Marked TODO until the operation
-//!   variant lands in the archive types — for this PR we use a
-//!   placeholder that maps onto the existing
-//!   `Operation::IdentityMetadataReplace` so the archive call still
-//!   succeeds.)*
+//!   recovery-phrase removals. *(TODO: until that operation variant
+//!   lands in the archive types, we map onto the existing
+//!   `Operation::IdentityMetadataReplace` placeholder so the archive
+//!   call still succeeds.)*
 
 use crate::storage::anchor::Anchor;
 use internet_identity_interface::archive::types::Operation;
