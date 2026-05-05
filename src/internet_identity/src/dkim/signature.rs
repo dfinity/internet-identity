@@ -16,10 +16,10 @@ use super::types::Algorithm;
 use rsa::pkcs1v15::Signature as RsaSignature;
 use rsa::pkcs1v15::VerifyingKey as RsaVerifyingKey;
 use rsa::pkcs8::DecodePublicKey;
-use rsa::traits::PublicKeyParts;
-use rsa::RsaPublicKey;
 #[allow(unused_imports)]
 use rsa::signature::Verifier as RsaVerifierTrait;
+use rsa::traits::PublicKeyParts;
+use rsa::RsaPublicKey;
 use sha2::{Digest, Sha256};
 
 /// Verification outcome for a single signature.
@@ -100,11 +100,7 @@ fn verify_rsa_sha256(key_bytes: &[u8], signed_data: &[u8], signature: &[u8]) -> 
     }
 }
 
-fn verify_ed25519_sha256(
-    key_bytes: &[u8],
-    signed_data: &[u8],
-    signature: &[u8],
-) -> VerifyOutcome {
+fn verify_ed25519_sha256(key_bytes: &[u8], signed_data: &[u8], signature: &[u8]) -> VerifyOutcome {
     use ed25519_dalek::{Signature as Ed25519Signature, Verifier as _, VerifyingKey};
 
     let key_array: [u8; 32] = match key_bytes.try_into() {
@@ -167,8 +163,13 @@ mod tests {
     #[test]
     fn algorithm_mismatch_short_circuits() {
         // RSA signature against ed25519 key
-        let outcome =
-            verify_signature(Algorithm::RsaSha256, KeyType::Ed25519, &[0u8; 32], b"x", &[0u8; 64]);
+        let outcome = verify_signature(
+            Algorithm::RsaSha256,
+            KeyType::Ed25519,
+            &[0u8; 32],
+            b"x",
+            &[0u8; 64],
+        );
         assert_eq!(outcome, VerifyOutcome::AlgorithmMismatch);
 
         // Ed25519 signature against rsa key
@@ -187,9 +188,8 @@ mod tests {
         let body = b"hello\r\n";
         let h = body_hash_sha256(body, None);
         // Cross-checked via `printf 'hello\r\n' | sha256sum`.
-        let expected: [u8; 32] = hex_literal(
-            "cd2eca3535741f27a8ae40c31b0c41d4057a7a7b912b33b9aed86485d1c84676",
-        );
+        let expected: [u8; 32] =
+            hex_literal("cd2eca3535741f27a8ae40c31b0c41d4057a7a7b912b33b9aed86485d1c84676");
         assert_eq!(h, expected);
     }
 

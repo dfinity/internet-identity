@@ -123,10 +123,7 @@ pub fn truncate_at_char_boundary(s: &mut String, max_bytes: usize) {
 
 // --- Validation ---
 
-pub fn validate_address_bounds(
-    addr: &SmtpAddress,
-    label: &str,
-) -> Result<(), SmtpResponse> {
+pub fn validate_address_bounds(addr: &SmtpAddress, label: &str) -> Result<(), SmtpResponse> {
     if addr.user.len() > MAX_EMAIL_USER_BYTES {
         return Err(smtp_err(
             SMTP_ERR_SYNTAX_ERROR,

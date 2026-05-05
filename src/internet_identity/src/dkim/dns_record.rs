@@ -27,8 +27,8 @@
 //! per RFC 6376 §3.6.2.1. Ed25519 keys are 32 raw bytes.
 
 use super::types::Algorithm;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 
 /// Parsed DKIM DNS TXT record.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,11 +54,10 @@ pub enum KeyType {
 
 impl KeyType {
     pub fn matches_signature_alg(&self, alg: Algorithm) -> bool {
-        match (self, alg) {
-            (KeyType::Rsa, Algorithm::RsaSha256) => true,
-            (KeyType::Ed25519, Algorithm::Ed25519Sha256) => true,
-            _ => false,
-        }
+        matches!(
+            (self, alg),
+            (KeyType::Rsa, Algorithm::RsaSha256) | (KeyType::Ed25519, Algorithm::Ed25519Sha256)
+        )
     }
 }
 
@@ -98,8 +97,7 @@ pub fn parse_dkim_txt(record: &str) -> Result<DkimDnsRecord, String> {
                 };
             }
             "p" => {
-                let stripped: String =
-                    raw_value.chars().filter(|c| !c.is_whitespace()).collect();
+                let stripped: String = raw_value.chars().filter(|c| !c.is_whitespace()).collect();
                 let decoded = BASE64
                     .decode(stripped.as_bytes())
                     .map_err(|e| format!("invalid base64 in p=: {e}"))?;
