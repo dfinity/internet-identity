@@ -84,13 +84,9 @@ pub async fn prepare_add(
     //   resolves the TXT via `crate::doh::fetch_txt`.
     // - Neither: reject — the FE will surface a "we can't accept
     //   email from this domain" error.
-    let cached_dkim_txt = if let Some(proof) = dns_proof {
-        Some(verify_dnssec_chain(
-            proof,
-            &selector,
-            &registered_domain,
-            now_secs,
-        )?)
+    let (cached_dkim_txt, cached_dmarc_txt) = if let Some(proof) = dns_proof {
+        let extracted = verify_dnssec_chain(proof, &selector, &registered_domain, now_secs)?;
+        (Some(extracted.dkim), extracted.dmarc)
     } else {
         // No DNSSEC bundle → DoH allowlist gate.
         let allowlisted = state::persistent_state(|p| {
@@ -106,7 +102,7 @@ pub async fn prepare_add(
         if !allowlisted {
             return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
         }
-        None
+        (None, None)
     };
 
     // Now we can mutate state. The async raw_rand fetch happens at
@@ -142,6 +138,7 @@ pub async fn prepare_add(
         selector,
         created_at_secs: now_secs,
         cached_dkim_txt,
+        cached_dmarc_txt,
         status: PendingStatus::Pending,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
@@ -158,21 +155,36 @@ pub async fn prepare_add(
     })
 }
 
+/// Output of a successful DNSSEC bundle verification — the TXT bytes
+/// for DKIM (required) plus DMARC (optional, included when the FE
+/// supplied a DMARC leaf in the bundle). When `dmarc` is `None`, the
+/// canister treats the domain as "no DMARC published" and uses the
+/// strict `d=` alignment fallback at email-arrival time.
+struct DnssecExtractedTxt {
+    dkim: Vec<u8>,
+    dmarc: Option<Vec<u8>>,
+}
+
 /// Validate a caller-supplied DNSSEC proof bundle against the
-/// canister's configured trust anchors and extract the TXT bytes for
-/// the DKIM record at `<selector>._domainkey.<registered_domain>`.
+/// canister's configured trust anchors and extract the DKIM (required)
+/// and DMARC (optional) TXT bytes from the verified leaves.
 ///
-/// On success, returns the TXT RDATA bytes ready to feed into
-/// `dkim::verify_dkim` at `smtp_request` time. On failure, surfaces
-/// the typed reason — `DomainNotSupported` for malformed inputs and
-/// `EmailVerificationFailed` for cryptographic failures (the FE
-/// shows the variant name to the user).
+/// The bundle is allowed to carry one or two leaves:
+/// - exactly one TXT RRset at `<selector>._domainkey.<registered_domain>`
+///   (DKIM) — required.
+/// - at most one TXT RRset at `_dmarc.<registered_domain>` (DMARC) —
+///   optional. If the FE includes it we cache the bytes so
+///   `smtp_request` can skip the DoH outcall.
+///
+/// Other leaves are an error: an attacker who got a chain validated
+/// for an arbitrary TXT record at the same zone shouldn't be able to
+/// smuggle it into a recovery flow.
 fn verify_dnssec_chain(
     proof: internet_identity_interface::internet_identity::types::DnsProofBundle,
     selector: &str,
     registered_domain: &str,
     now_secs: u64,
-) -> Result<Vec<u8>, EmailRecoveryError> {
+) -> Result<DnssecExtractedTxt, EmailRecoveryError> {
     let trust_anchors = state::persistent_state(|p| {
         p.dnssec_config
             .as_ref()
@@ -193,29 +205,60 @@ fn verify_dnssec_chain(
     let verified = crate::dnssec::verify_with_clock(&bundle, &trust_anchors, now_secs)
         .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
 
-    // The verified leaf must actually be a TXT record at the expected
-    // `<selector>._domainkey.<registered_domain>` name. Otherwise an
-    // attacker who got a chain validated for *some* TXT record could
-    // bind that record's content as if it were the DKIM key.
-    if verified.rtype != crate::dnssec::types::TYPE_TXT {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-            "DNSSEC bundle leaf is not TXT (got rtype {})",
-            verified.rtype
-        )));
-    }
-    let expected_fqdn = format!("{selector}._domainkey.{registered_domain}.");
-    let leaf_name = decode_dns_name_lowercase(&verified.name.0);
-    if leaf_name.eq_ignore_ascii_case(&expected_fqdn).not() {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-            "DNSSEC bundle leaf name {leaf_name:?} doesn't match expected {expected_fqdn:?}"
-        )));
+    let dkim_fqdn = format!("{selector}._domainkey.{registered_domain}.");
+    let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
+
+    let mut dkim: Option<Vec<u8>> = None;
+    let mut dmarc: Option<Vec<u8>> = None;
+
+    for rec in &verified {
+        if rec.rtype != crate::dnssec::types::TYPE_TXT {
+            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                "DNSSEC bundle leaf is not TXT (got rtype {})",
+                rec.rtype
+            )));
+        }
+        let leaf_name = decode_dns_name_lowercase(&rec.name.0);
+        let txt = parse_txt_rdata(&rec.rdata)?;
+        if leaf_name.eq_ignore_ascii_case(&dkim_fqdn) {
+            if dkim.is_some() {
+                return Err(EmailRecoveryError::EmailVerificationFailed(
+                    "DNSSEC bundle has duplicate DKIM leaf".into(),
+                ));
+            }
+            dkim = Some(txt);
+        } else if leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
+            if dmarc.is_some() {
+                return Err(EmailRecoveryError::EmailVerificationFailed(
+                    "DNSSEC bundle has duplicate DMARC leaf".into(),
+                ));
+            }
+            dmarc = Some(txt);
+        } else {
+            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                "DNSSEC bundle leaf name {leaf_name:?} matches neither DKIM \
+                 ({dkim_fqdn:?}) nor DMARC ({dmarc_fqdn:?})"
+            )));
+        }
     }
 
-    // TXT RDATA is one or more `<character-string>`s, each prefixed by
-    // a length octet. Concatenate the strings (sans length prefix) to
-    // form what the DKIM verifier expects to read.
-    let mut txt_bytes: Vec<u8> = Vec::new();
-    for rec in &verified.rdata {
+    let dkim = dkim.ok_or_else(|| {
+        EmailRecoveryError::EmailVerificationFailed(format!(
+            "DNSSEC bundle missing required DKIM leaf at {dkim_fqdn:?}"
+        ))
+    })?;
+
+    Ok(DnssecExtractedTxt { dkim, dmarc })
+}
+
+/// Concatenate one or more TXT character-strings (each prefixed by a
+/// length octet) into the bytes the DKIM/DMARC verifier expects.
+/// `rdata` is `Vec<Vec<u8>>` because TXT RRsets can carry multiple
+/// records — but for DKIM/DMARC there's exactly one record made of
+/// multiple chunks.
+fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecoveryError> {
+    let mut txt_bytes = Vec::new();
+    for rec in rdata {
         let mut i = 0;
         while i < rec.len() {
             let len = rec[i] as usize;
@@ -254,15 +297,6 @@ fn decode_dns_name_lowercase(wire: &[u8]) -> String {
         i += len;
     }
     out
-}
-
-trait NotExt {
-    fn not(self) -> bool;
-}
-impl NotExt for bool {
-    fn not(self) -> bool {
-        !self
-    }
 }
 
 /// Normalise an email address to the canonical `lowercase(local) +

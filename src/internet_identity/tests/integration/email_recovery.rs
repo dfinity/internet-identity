@@ -194,8 +194,12 @@ fn status_flips_to_expired_after_ttl() {
             .expect("call failed")
             .expect("prepare_add failed");
 
-    // Advance past the 30-minute TTL.
+    // Advance past the 30-minute TTL. `tick()` forces the round to
+    // roll over so the subsequent query call reads `time()` after the
+    // advance — without it, PocketIC's query path can still see the
+    // pre-advance clock.
     env.advance_time(Duration::from_secs(31 * 60));
+    env.tick();
 
     let status =
         api::email_recovery_status(&env, canister_id, &challenge.nonce).expect("call failed");
@@ -347,11 +351,13 @@ fn remove_credential_rejects_when_nothing_bound() {
 // `prepare_add` accepts an optional `dns_proof: Option<DnsProofBundle>`.
 // When supplied, the canister validates the DNSSEC chain synchronously
 // and caches the verified DKIM TXT bytes on the pending challenge,
-// skipping the DoH outcall fan-out at `smtp_request` time. These tests
-// exercise the plumbing through to the verifier; a happy-path DNSSEC
-// e2e test (with a `_domainkey`-targeting test vector signed at test
-// time) is a follow-up — generating a real DNSSEC chain in Rust is a
-// multi-hundred-line signer.
+// skipping the DoH outcall fan-out at `smtp_request` time.
+//
+// Coverage here:
+// - `dnssec_path_rejects_when_no_trust_anchors_configured` — config gate
+// - `dnssec_path_takes_precedence_over_doh_allowlist` — path-picker
+// - `full_setup_flow_via_dnssec_path` — happy path with a freshly
+//   generated chain (signer in `dnssec_signer` below).
 
 #[test]
 fn dnssec_path_rejects_when_no_trust_anchors_configured() {
@@ -386,7 +392,7 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
         rrsig: stub_rrsig.clone(),
     };
     let proof = DnsProofBundle {
-        leaf: stub_rrset.clone(),
+        leaves: vec![stub_rrset.clone()],
         root_dnskey: stub_rrset,
         chain: vec![DelegationLink {
             child_ds: SignedRRset {
@@ -463,7 +469,7 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
         rrsig: stub_rrsig.clone(),
     };
     let proof = DnsProofBundle {
-        leaf: stub_rrset.clone(),
+        leaves: vec![stub_rrset.clone()],
         root_dnskey: stub_rrset,
         chain: vec![DelegationLink {
             child_ds: SignedRRset {
@@ -501,6 +507,134 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
         "DNSSEC path should not fall through to DoH when dns_proof \
          is supplied; got {err:?}"
     );
+}
+
+#[test]
+fn full_setup_flow_via_dnssec_path() {
+    use internet_identity_interface::internet_identity::types::DnssecConfig;
+
+    // Generate the DKIM keypair first; we need both the TXT record
+    // (to embed in the DNSSEC leaf) and the private key (to sign the
+    // inbound email).
+    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let dkim_txt = dkim.public_txt_record();
+
+    // Build the DNSSEC chain. RRSIG validity windows are constructed
+    // around PocketIC's default initial clock — it's a wall-clock
+    // value (around 2021) so we use a fixed `now_secs` that comfortably
+    // brackets it.
+    let env = env();
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC initial time fits in u32");
+    // Bundle both DKIM and DMARC so the canister can short-circuit
+    // every DoH outcall — even DMARC, which would otherwise still
+    // fan out at email-arrival time. `p=none` is the most permissive
+    // DMARC policy and still satisfies alignment given DKIM `d=` ==
+    // From: domain in this test.
+    let dmarc_txt = b"v=DMARC1; p=none;";
+    let chain = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        &dkim_txt,
+        Some(dmarc_txt),
+        now_secs,
+    );
+
+    // Stand up the canister with both the DoH allowlist (so the
+    // domain check on the DoH path would pass too — proving we're
+    // actually exercising the DNSSEC branch) and the trust anchor.
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        dnssec_config: Some(Some(DnssecConfig {
+            root_anchors: vec![chain.anchor],
+        })),
+        canister_creation_cycles_cost: Some(0),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    // 1. prepare_add with the DNS proof bundle. This synchronously
+    //    walks the chain and caches the leaf TXT bytes on the
+    //    pending challenge.
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        selector: TEST_SELECTOR.into(),
+        dns_proof: Some(chain.bundle),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("prepare_add call failed")
+        .expect("DNSSEC happy-path prepare_add should succeed");
+
+    // 2. Sign an email matching the issued nonce.
+    let signed = dkim.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: time(&env) / 1_000_000_000,
+    });
+
+    // 3. Submit smtp_request. Because both DKIM and DMARC TXTs are
+    //    pre-cached via DNSSEC, the canister should issue NO DoH
+    //    outcalls at all. We drive PocketIC forward and assert.
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+
+    assert_no_doh_outcalls(&env);
+
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    // 4. Status flips to RegistrationSucceeded.
+    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded, got {status:?}",
+    );
+
+    // 5. Removal works → confirms the credential actually persisted
+    //    to the anchor.
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+}
+
+/// Drive PocketIC forward and panic if any DoH outcall is observed.
+/// Used by the DNSSEC happy-path test to prove that bundling DKIM +
+/// DMARC into a single proof eliminates the DoH fan-out entirely.
+fn assert_no_doh_outcalls(env: &PocketIc) {
+    const MAX_TICKS: u32 = 30;
+    for _ in 0..MAX_TICKS {
+        env.tick();
+        let outcalls = env.get_canister_http();
+        assert!(
+            outcalls.is_empty(),
+            "expected zero DoH outcalls on the DNSSEC happy path, got {} ({:?})",
+            outcalls.len(),
+            outcalls.iter().map(|r| &r.url).collect::<Vec<_>>(),
+        );
+    }
 }
 
 // ===================================================================
@@ -967,6 +1101,341 @@ mod dkim_signer {
         }
         if out.last() == Some(&b' ') {
             out.pop();
+        }
+        out
+    }
+}
+
+// ===================================================================
+// In-test DNSSEC signer (Ed25519, single-link chain)
+// ===================================================================
+//
+// Builds a fully-signed `DnsProofBundle` (root DNSKEY → leaf-zone
+// DS+DNSKEY → leaf TXT) plus the matching `DnssecRootAnchor`. Each
+// RRset is signed using `ed25519_dalek` against bytes constructed by
+// the same canonicalisation rules the canister-side verifier
+// implements in `crate::dnssec::canonical`. We replicate those rules
+// here rather than depending on `internet_identity::dnssec` directly
+// so the test stays self-contained.
+//
+// The chain is intentionally minimal — one delegation link (root →
+// `<domain>`), one RRSIG per RRset, one Ed25519 key per zone. That
+// keeps the signer compact while still exercising every verifier
+// branch that matters for happy-path validation.
+
+mod dnssec_signer {
+    use ed25519_dalek::{Signer, SigningKey};
+    use internet_identity_interface::internet_identity::types::dnssec::{
+        DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
+    };
+    use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
+    use serde_bytes::ByteBuf;
+    use sha2::{Digest, Sha256};
+
+    const ALG_ED25519: u8 = 15;
+    const PROTOCOL_DNSSEC: u8 = 3;
+    /// SEP (bit 0) | ZONE (bit 8). The verifier's KSK match only
+    /// requires SEP, but real DNSKEYs always set ZONE alongside.
+    const FLAGS_KSK_ZONE: u16 = 0x0001 | 0x0100;
+    const TYPE_TXT: u16 = 16;
+    const TYPE_DS: u16 = 43;
+    const TYPE_DNSKEY: u16 = 48;
+    const CLASS_IN: u16 = 1;
+    const DIGEST_TYPE_SHA256: u8 = 2;
+
+    pub struct ChainOut {
+        pub anchor: DnssecRootAnchor,
+        pub bundle: DnsProofBundle,
+    }
+
+    /// Build a one-link chain (root → `<domain>`) that signs a TXT
+    /// record at `<selector>._domainkey.<domain>` carrying `dkim_txt`,
+    /// plus — when `dmarc_txt` is `Some` — a second TXT record at
+    /// `_dmarc.<domain>`. Both leaves are signed under the same zone
+    /// DNSKEY. `now_secs` is the wall-clock baseline; RRSIGs are
+    /// valid from 60 s before to 7 d after.
+    pub fn build_chain(
+        domain: &str,
+        selector: &str,
+        dkim_txt: &[u8],
+        dmarc_txt: Option<&[u8]>,
+        now_secs: u32,
+    ) -> ChainOut {
+        let inception = now_secs.saturating_sub(60);
+        let expiration = now_secs.saturating_add(7 * 24 * 3600);
+
+        let root_key = ZoneKey::new(b"\x00".to_vec(), [1u8; 32]);
+        let zone_wire = encode_dns_name(domain);
+        let zone_key = ZoneKey::new(zone_wire.clone(), [2u8; 32]);
+
+        let root_dnskey = sign_rrset(
+            &root_key,
+            &root_key.owner_name,
+            TYPE_DNSKEY,
+            vec![root_key.dnskey_rdata()],
+            0,
+            inception,
+            expiration,
+        );
+
+        let child_ds = sign_rrset(
+            &root_key,
+            &zone_wire,
+            TYPE_DS,
+            vec![ds_rdata_for(&zone_key)],
+            count_labels(&zone_wire),
+            inception,
+            expiration,
+        );
+
+        let child_dnskey = sign_rrset(
+            &zone_key,
+            &zone_wire,
+            TYPE_DNSKEY,
+            vec![zone_key.dnskey_rdata()],
+            count_labels(&zone_wire),
+            inception,
+            expiration,
+        );
+
+        let dkim_owner = encode_dns_name(&format!("{selector}._domainkey.{domain}"));
+        let dkim_leaf = sign_rrset(
+            &zone_key,
+            &dkim_owner,
+            TYPE_TXT,
+            vec![pack_txt_rdata(dkim_txt)],
+            count_labels(&dkim_owner),
+            inception,
+            expiration,
+        );
+
+        let mut leaves = vec![dkim_leaf];
+        if let Some(dmarc) = dmarc_txt {
+            let dmarc_owner = encode_dns_name(&format!("_dmarc.{domain}"));
+            leaves.push(sign_rrset(
+                &zone_key,
+                &dmarc_owner,
+                TYPE_TXT,
+                vec![pack_txt_rdata(dmarc)],
+                count_labels(&dmarc_owner),
+                inception,
+                expiration,
+            ));
+        }
+
+        ChainOut {
+            anchor: make_anchor(&root_key),
+            bundle: DnsProofBundle {
+                leaves,
+                root_dnskey,
+                chain: vec![DelegationLink {
+                    child_ds,
+                    child_dnskey,
+                }],
+            },
+        }
+    }
+
+    struct ZoneKey {
+        signing_key: SigningKey,
+        public_key: [u8; 32],
+        owner_name: Vec<u8>,
+    }
+
+    impl ZoneKey {
+        fn new(owner_name: Vec<u8>, secret: [u8; 32]) -> Self {
+            let signing_key = SigningKey::from_bytes(&secret);
+            let public_key = signing_key.verifying_key().to_bytes();
+            Self {
+                signing_key,
+                public_key,
+                owner_name,
+            }
+        }
+
+        fn dnskey_rdata(&self) -> Vec<u8> {
+            let mut out = Vec::with_capacity(36);
+            out.extend_from_slice(&FLAGS_KSK_ZONE.to_be_bytes());
+            out.push(PROTOCOL_DNSSEC);
+            out.push(ALG_ED25519);
+            out.extend_from_slice(&self.public_key);
+            out
+        }
+
+        fn key_tag(&self) -> u16 {
+            dnskey_key_tag(&self.dnskey_rdata())
+        }
+    }
+
+    fn sign_rrset(
+        signer: &ZoneKey,
+        owner_name: &[u8],
+        rtype: u16,
+        rdatas: Vec<Vec<u8>>,
+        labels: u8,
+        inception: u32,
+        expiration: u32,
+    ) -> SignedRRset {
+        let mut rrsig = Rrsig {
+            type_covered: rtype,
+            algorithm: ALG_ED25519,
+            labels,
+            original_ttl: 3600,
+            expiration,
+            inception,
+            key_tag: signer.key_tag(),
+            signer_name: ByteBuf::from(signer.owner_name.clone()),
+            signature: ByteBuf::from(Vec::new()),
+        };
+        let signed_data = build_signed_data(owner_name, rtype, &rrsig, &rdatas);
+        let sig = signer.signing_key.sign(&signed_data);
+        rrsig.signature = ByteBuf::from(sig.to_bytes().to_vec());
+        SignedRRset {
+            name: ByteBuf::from(owner_name.to_vec()),
+            rtype,
+            rdata: rdatas.into_iter().map(ByteBuf::from).collect(),
+            ttl: 3600,
+            rrsig,
+        }
+    }
+
+    fn ds_rdata_for(child: &ZoneKey) -> Vec<u8> {
+        let dnskey_rdata = child.dnskey_rdata();
+        let canon = canonicalize_name(&child.owner_name);
+        let mut digest_input = Vec::with_capacity(canon.len() + dnskey_rdata.len());
+        digest_input.extend_from_slice(&canon);
+        digest_input.extend_from_slice(&dnskey_rdata);
+        let digest = Sha256::digest(&digest_input);
+
+        let mut out = Vec::with_capacity(4 + 32);
+        out.extend_from_slice(&child.key_tag().to_be_bytes());
+        out.push(ALG_ED25519);
+        out.push(DIGEST_TYPE_SHA256);
+        out.extend_from_slice(&digest);
+        out
+    }
+
+    fn make_anchor(root: &ZoneKey) -> DnssecRootAnchor {
+        let dnskey_rdata = root.dnskey_rdata();
+        let canon = canonicalize_name(&root.owner_name);
+        let mut digest_input = Vec::with_capacity(canon.len() + dnskey_rdata.len());
+        digest_input.extend_from_slice(&canon);
+        digest_input.extend_from_slice(&dnskey_rdata);
+        let digest = Sha256::digest(&digest_input);
+
+        DnssecRootAnchor {
+            key_tag: dnskey_key_tag(&dnskey_rdata),
+            algorithm: ALG_ED25519,
+            digest_type: DIGEST_TYPE_SHA256,
+            digest: ByteBuf::from(digest.to_vec()),
+        }
+    }
+
+    // -------- canonicalisation (mirrors crate::dnssec::canonical) --------
+
+    fn build_signed_data(
+        owner_name: &[u8],
+        rtype: u16,
+        rrsig: &Rrsig,
+        rdatas: &[Vec<u8>],
+    ) -> Vec<u8> {
+        let canon_name = canonicalize_name(owner_name);
+        let mut sorted: Vec<&Vec<u8>> = rdatas.iter().collect();
+        sorted.sort_by(|a, b| a.as_slice().cmp(b.as_slice()));
+
+        let mut out = rrsig_rdata_for_signing(rrsig);
+        for rdata in sorted {
+            out.extend_from_slice(&rr_canonical(&canon_name, rtype, rrsig.original_ttl, rdata));
+        }
+        out
+    }
+
+    fn rrsig_rdata_for_signing(rrsig: &Rrsig) -> Vec<u8> {
+        let mut out = Vec::with_capacity(18 + rrsig.signer_name.len());
+        out.extend_from_slice(&rrsig.type_covered.to_be_bytes());
+        out.push(rrsig.algorithm);
+        out.push(rrsig.labels);
+        out.extend_from_slice(&rrsig.original_ttl.to_be_bytes());
+        out.extend_from_slice(&rrsig.expiration.to_be_bytes());
+        out.extend_from_slice(&rrsig.inception.to_be_bytes());
+        out.extend_from_slice(&rrsig.key_tag.to_be_bytes());
+        out.extend_from_slice(&canonicalize_name(&rrsig.signer_name));
+        out
+    }
+
+    fn rr_canonical(name_canonical: &[u8], rtype: u16, original_ttl: u32, rdata: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(name_canonical.len() + 10 + rdata.len());
+        out.extend_from_slice(name_canonical);
+        out.extend_from_slice(&rtype.to_be_bytes());
+        out.extend_from_slice(&CLASS_IN.to_be_bytes());
+        out.extend_from_slice(&original_ttl.to_be_bytes());
+        out.extend_from_slice(&(rdata.len() as u16).to_be_bytes());
+        out.extend_from_slice(rdata);
+        out
+    }
+
+    fn canonicalize_name(wire: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(wire.len());
+        let mut i = 0;
+        while i < wire.len() {
+            let len = wire[i];
+            out.push(len);
+            if len == 0 {
+                return out;
+            }
+            let label_end = i + 1 + (len as usize);
+            for &b in &wire[i + 1..label_end] {
+                out.push(b.to_ascii_lowercase());
+            }
+            i = label_end;
+        }
+        out
+    }
+
+    fn dnskey_key_tag(dnskey_rdata: &[u8]) -> u16 {
+        let mut acc: u32 = 0;
+        for (i, &b) in dnskey_rdata.iter().enumerate() {
+            if i & 1 == 0 {
+                acc = acc.wrapping_add((b as u32) << 8);
+            } else {
+                acc = acc.wrapping_add(b as u32);
+            }
+        }
+        acc = acc.wrapping_add((acc >> 16) & 0xFFFF);
+        (acc & 0xFFFF) as u16
+    }
+
+    fn count_labels(wire: &[u8]) -> u8 {
+        let mut count = 0u8;
+        let mut i = 0;
+        while i < wire.len() {
+            let len = wire[i] as usize;
+            if len == 0 {
+                break;
+            }
+            count = count.saturating_add(1);
+            i += 1 + len;
+        }
+        count
+    }
+
+    fn encode_dns_name(s: &str) -> Vec<u8> {
+        let s = s.trim_end_matches('.');
+        let mut out = Vec::new();
+        for label in s.split('.') {
+            assert!(label.len() <= 63, "DNS label too long");
+            out.push(label.len() as u8);
+            out.extend_from_slice(label.as_bytes());
+        }
+        out.push(0);
+        out
+    }
+
+    fn pack_txt_rdata(text: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        for chunk in text.chunks(255) {
+            out.push(chunk.len() as u8);
+            out.extend_from_slice(chunk);
         }
         out
     }

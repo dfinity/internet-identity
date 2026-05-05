@@ -126,6 +126,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             claimed_address: c.claimed_address.clone(),
             selector: c.selector.clone(),
             cached_dkim_txt: c.cached_dkim_txt.clone(),
+            cached_dmarc_txt: c.cached_dmarc_txt.clone(),
         }),
     }) {
         Some(Some(s)) => s,
@@ -177,6 +178,13 @@ struct PendingSnapshot {
     /// DoH outcall fan-out and feed these bytes straight into the
     /// DKIM verifier. `None` means we go through DoH at email time.
     cached_dkim_txt: Option<Vec<u8>>,
+    /// Pre-validated DMARC TXT bytes. Only consulted when
+    /// `cached_dkim_txt.is_some()` (i.e. the DNSSEC path). On the
+    /// DNSSEC path, `Some(bytes)` means the FE included a DMARC leaf
+    /// in the bundle; `None` means it didn't and we use the strict
+    /// `d=` alignment fallback. On the DoH path the DMARC TXT is
+    /// fetched at email time.
+    cached_dmarc_txt: Option<Vec<u8>>,
 }
 
 /// Look up the `Subject:` header and find a `II-Recovery-…` nonce
@@ -241,28 +249,30 @@ async fn verify_setup_email(
             EmailRecoveryError::InternalCanisterError("stored claimed address has no '@'".into())
         })?;
 
-    // Source the DKIM TXT bytes. Two paths:
+    // Source the DKIM and DMARC TXT bytes. Two paths:
     //
-    // - **DNSSEC path** — `prepare_add` already validated the chain
-    //   and cached the verified TXT bytes on the pending challenge.
-    //   No outcall needed.
-    // - **DoH path** — fetch via the 3-of-5 quorum module. Cache-
-    //   served after the first lookup per provider per TTL window.
-    let dmarc_fqdn = format!("_dmarc.{}", domain);
-    let dkim_bytes = if let Some(cached) = snapshot.cached_dkim_txt.clone() {
-        cached
+    // - **DNSSEC path** (`cached_dkim_txt.is_some()`) — `prepare_add`
+    //   already validated the chain. The DKIM TXT is always cached;
+    //   the DMARC TXT is cached when the FE included a DMARC leaf in
+    //   the bundle (otherwise `None`, treated as "no DMARC published"
+    //   → strict `d=` alignment fallback). No outcalls at all.
+    // - **DoH path** — fetch both via the 3-of-5 quorum module.
+    //   DMARC is optional in this model: if the lookup fails for any
+    //   reason (no record published, transient quorum miss), we tell
+    //   the verifier `None`, which forces the strict "DKIM d= must
+    //   equal From domain" alignment rule. Logged, but not surfaced
+    //   as a hard error.
+    let (dkim_bytes, dmarc_bytes_opt) = if let Some(cached) = snapshot.cached_dkim_txt.clone() {
+        (cached, snapshot.cached_dmarc_txt.clone())
     } else {
         let dkim_fqdn = format!("{}._domainkey.{}", snapshot.selector, domain);
-        crate::doh::fetch_txt(&dkim_fqdn, &domain)
+        let dmarc_fqdn = format!("_dmarc.{}", domain);
+        let dkim = crate::doh::fetch_txt(&dkim_fqdn, &domain)
             .await
-            .map_err(|e| map_doh_error(e, &domain))?
+            .map_err(|e| map_doh_error(e, &domain))?;
+        let dmarc = (crate::doh::fetch_txt(&dmarc_fqdn, &domain).await).ok();
+        (dkim, dmarc)
     };
-    // DMARC is optional in our model: if the lookup fails for any
-    // reason (no record published, transient quorum miss), we tell
-    // the verifier `None`, which forces the strict "DKIM d= must
-    // equal From domain" alignment rule. Logged, but not surfaced
-    // as a hard error.
-    let dmarc_bytes_opt = (crate::doh::fetch_txt(&dmarc_fqdn, &domain).await).ok();
 
     let dkim_txt = std::str::from_utf8(&dkim_bytes)
         .map_err(|_| EmailRecoveryError::DohFetchFailed("DKIM TXT is not valid UTF-8".into()))?;
