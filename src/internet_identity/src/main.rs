@@ -1399,6 +1399,98 @@ mod openid_api {
     }
 }
 
+/// Email-based identity recovery — setup half (binding flow only).
+///
+/// See `docs/ongoing/email-recovery.md` (PR #3836) for the full
+/// design, and `crate::email_recovery` for the per-flow logic. The
+/// canister methods below are thin wrappers that handle:
+///
+/// - Authorization (`prepare_add` / `credential_remove` are
+///   authenticated; `status` is anonymous since the nonce is the
+///   only secret needed to poll).
+/// - Wall-clock injection (`now_secs` lifted out of
+///   `ic_cdk::api::time` so the inner functions stay testable).
+///
+/// The recovery half (`prepare_delegation` / `get_delegation` /
+/// `recover@id.ai` dispatch in `smtp_request`) is intentionally not
+/// part of this PR — it needs a stable reverse address index that
+/// is best landed on its own.
+mod email_recovery_api {
+    use super::*;
+    use crate::authz_utils::check_authorization;
+    use crate::email_recovery;
+    use internet_identity_interface::internet_identity::types::email_recovery::{
+        EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus,
+    };
+
+    /// Authenticated. Validates the caller owns `identity_number`,
+    /// validates the DNS input shape (DoH path only in this PR), and
+    /// issues a fresh nonce. The nonce is stored alongside the
+    /// claimed address + selector + anchor in the heap pending-
+    /// challenge map; an inbound email with that nonce in `Subject:`
+    /// completes the binding via `smtp_request`.
+    #[update]
+    async fn email_recovery_credential_prepare_add(
+        identity_number: IdentityNumber,
+        dns_input: EmailRecoveryDnsInput,
+    ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+        check_authorization(identity_number)
+            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::prepare_add(identity_number, dns_input, now_secs).await
+    }
+
+    /// Anonymous. The FE polls this with the nonce returned from
+    /// `prepare_add` to drive its "waiting for your email" spinner.
+    /// Polling at 1–5 s cadence is the FE's responsibility; this
+    /// query is cheap.
+    ///
+    /// Returns `EmailRecoveryStatus::Expired` for unknown nonces —
+    /// observably indistinguishable from "the canister forgot it",
+    /// which is exactly what we want (the FE shows "timed out, try
+    /// again" in either case).
+    #[query]
+    fn email_recovery_status(nonce: String) -> EmailRecoveryStatus {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::pending_status(&nonce, now_secs)
+    }
+
+    /// Authenticated. Detaches the recovery email from the anchor.
+    /// The FE's "Remove" action calls this once; on success the
+    /// management page flips back to the inactive card. Removing a
+    /// recovery email the anchor doesn't have is surfaced as
+    /// `AddressNotRegistered` so the FE can show a meaningful error
+    /// if it got into an inconsistent state.
+    #[update]
+    fn email_recovery_credential_remove(
+        identity_number: IdentityNumber,
+        address: String,
+    ) -> Result<(), EmailRecoveryError> {
+        // Inlined auth + write rather than going through
+        // `anchor_operation_with_authz_check` because that helper's
+        // `E: From<IdentityUpdateError>` bound is awkward to satisfy
+        // for an interface-crate error type (orphan rule).
+        let (mut anchor, authz_key) = crate::authz_utils::check_authorization(identity_number)
+            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+        crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);
+
+        let operation = email_recovery::remove_credential(&mut anchor, &address)
+            .map_err(|err| match err {
+                crate::email_recovery::RemoveError::NotRegistered => {
+                    EmailRecoveryError::AddressNotRegistered
+                }
+            })?;
+
+        crate::state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
+            EmailRecoveryError::InternalCanisterError(format!("{err:?}"))
+        })?;
+
+        crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
+        Ok(())
+    }
+}
+
 mod attribute_sharing {
     use internet_identity_interface::internet_identity::types::attributes::{
         Attribute, CertifiedAttributes, GetAttributesError, GetAttributesRequest,
