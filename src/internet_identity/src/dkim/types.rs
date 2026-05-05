@@ -1,7 +1,7 @@
 //! Type definitions for the DKIM verifier.
 //!
 //! Mirrors the result-shape design from `docs/ongoing/email-recovery.md`
-//! §6.6: a [`EmailVerificationStatus`] is the verifier's externally
+//! §6.6: a [`DkimVerifyResult`] is the verifier's externally
 //! visible verdict, carrying a per-step breakdown so the UI can show
 //! *why* a signature failed when one did.
 
@@ -108,19 +108,29 @@ pub enum VerificationFailReason {
     /// DNS record's `t=y` testing flag is set; the verifier treats every
     /// signature from such a record as inconclusive.
     TestingMode,
+    /// `From:` header missing, malformed, or carrying more than one
+    /// mailbox (RFC 7489 §3.1.1 requires exactly one). The string
+    /// carries a parser diagnostic.
+    MalformedFromHeader(String),
+    /// DMARC TXT record was supplied but couldn't be parsed.
+    DmarcMalformed(String),
+    /// DKIM signed `d=` doesn't align with the From-header domain
+    /// under the published `adkim=` mode (or, when no DMARC record
+    /// exists, doesn't equal it exactly).
+    DmarcMisaligned,
 }
 
-/// Overall verifier verdict.
+/// DKIM-only verdict, the result of [`super::verify::verify`].
 ///
 /// Per RFC 6376 §5.5 / design §5.5, an email may carry multiple
 /// `DKIM-Signature` headers (e.g. original sender + mailing list
-/// forwarder). The verifier accepts the email as soon as *any one*
-/// signature passes; it returns `Verified` together with the `d=` of the
-/// signature that won. If all signatures fail, it returns `Unverified`
-/// with a single best-fit reason and the per-check breakdown for every
-/// signature it tried.
+/// forwarder). The DKIM verifier accepts the email as soon as *any
+/// one* signature passes the cryptographic check.
+///
+/// The combined DKIM + DMARC verdict (what callers actually want) is
+/// `DkimVerifyResult`, returned by `dmarc::verify_email`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum EmailVerificationStatus {
+pub enum DkimVerifyResult {
     /// At least one signature passed.
     Verified {
         /// The `d=` of the signature that verified.
@@ -139,8 +149,8 @@ pub enum EmailVerificationStatus {
     },
 }
 
-impl EmailVerificationStatus {
+impl DkimVerifyResult {
     pub fn is_verified(&self) -> bool {
-        matches!(self, EmailVerificationStatus::Verified { .. })
+        matches!(self, DkimVerifyResult::Verified { .. })
     }
 }
