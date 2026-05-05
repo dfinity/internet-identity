@@ -53,6 +53,7 @@ mod attributes;
 mod conversions;
 mod delegation;
 mod dkim;
+mod dmarc;
 mod dnssec;
 mod http;
 mod ii_domain;
