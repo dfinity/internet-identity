@@ -507,6 +507,62 @@ type OpenIdPrepareDelegationResponse = record {
     anchor_number : UserNumber;
 };
 
+// Email-recovery types
+// ====================
+// See `docs/ongoing/email-recovery.md` for the full design. This PR
+// only ships the setup half (binding flow); the recovery half lands
+// next.
+
+type EmailRecoveryCredential = record {
+    address : text;
+    created_at : Timestamp;
+    last_used : opt Timestamp;
+};
+
+type EmailRecoveryChallenge = record {
+    nonce : text;
+    mailbox : text;
+    expires_at : Timestamp;
+};
+
+type DohAllowlistDnsInput = record {
+    address : text;
+    selector : text;
+};
+
+type EmailRecoveryDnsInput = variant {
+    DohAllowlist : DohAllowlistDnsInput;
+    Dnssec;
+};
+
+type EmailRecoveryError = variant {
+    Unauthorized : principal;
+    NonceUnknown;
+    NonceExpired;
+    DomainNotAllowlisted : text;
+    DohFetchFailed : text;
+    DomainNotSupported : text;
+    EmailVerificationFailed : text;
+    SelectorMismatch;
+    AddressMismatch;
+    SubjectNotSigned;
+    AddressAlreadyRegistered;
+    AddressNotRegistered;
+    DnssecPathNotYetSupported;
+    InternalCanisterError : text;
+};
+
+type EmailRecoveryStatus = variant {
+    Pending;
+    RegistrationSucceeded;
+    RecoveryReady : record {
+        user_key : UserKey;
+        expiration : Timestamp;
+    };
+    Failed : EmailRecoveryError;
+    Expired;
+};
+
 // API V2 specific types
 // WARNING: These type are experimental and may change in the future.
 type IdentityNumber = nat64;
@@ -1274,6 +1330,14 @@ service : (opt InternetIdentityInit) -> {
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
     openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
+
+    // Email-recovery protocol — setup half
+    // ====================================
+    // See `docs/ongoing/email-recovery.md`. The recovery half (prepare
+    // a delegation from a verified email) lands in a follow-up PR.
+    email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_status : (text) -> (EmailRecoveryStatus) query;
+    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 
     // HTTP Gateway protocol
     // =====================

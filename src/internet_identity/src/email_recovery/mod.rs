@@ -31,9 +31,21 @@
 
 mod pending;
 mod prepare;
+mod remove;
 mod rng;
 
 pub use prepare::prepare_add;
+pub use remove::{remove_credential, RemoveError};
+
+/// Wrapper around `pending::status_of` so the canister method in
+/// `main.rs` doesn't need to know which submodule the heap state
+/// lives in.
+pub fn pending_status(
+    nonce: &str,
+    now_secs: u64,
+) -> internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryStatus {
+    pending::status_of(nonce, now_secs)
+}
 
 #[allow(unused_imports)]
 pub use pending::{PendingChallenge, PendingKind, PendingStatus};
