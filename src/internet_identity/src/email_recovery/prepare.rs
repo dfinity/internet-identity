@@ -1,16 +1,22 @@
 //! `email_recovery_credential_prepare_add` — start a new binding flow.
 //!
-//! Authenticated entry point that validates the FE's input, makes
-//! sure the registered domain is on the DoH allowlist, draws a fresh
-//! nonce from the heap PRNG, and parks a `PendingChallenge` keyed by
-//! that nonce. Returns the user-visible challenge (nonce + mailbox +
-//! expiry) so the FE can render the "send a magic email" screen.
+//! Authenticated entry point that validates the FE's input, picks
+//! the verification path (DNSSEC if a proof bundle is supplied, DoH
+//! allowlist otherwise), draws a fresh nonce from the heap PRNG,
+//! and parks a `PendingChallenge` keyed by that nonce. Returns the
+//! user-visible challenge (nonce + mailbox + expiry) so the FE can
+//! render the "send a magic email" screen.
 //!
-//! See `docs/ongoing/email-recovery.md` §8.4. The DNSSEC path lands
-//! in a follow-up PR (it adds an optional `dns_proof` field on
-//! `EmailRecoveryDnsInput` that the canister validates synchronously
-//! when present, falling through to the DoH allowlist check below
-//! when absent).
+//! See `docs/ongoing/email-recovery.md` §8.4. Path picker:
+//!
+//! - **DNSSEC**: when `dns_proof` is supplied, validate the chain
+//!   synchronously against the canister's configured trust anchors,
+//!   verify the bundle's leaf is at `<selector>._domainkey.<domain>`,
+//!   and cache the verified TXT bytes on the pending challenge so
+//!   `smtp_request` can skip the DoH outcall fan-out entirely.
+//! - **DoH allowlist**: when `dns_proof` is absent, the registered
+//!   domain must be in `DohConfig.allowed_domains`. The DKIM key is
+//!   resolved via `crate::doh::fetch_txt` at email-arrival time.
 
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
 use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce};
@@ -36,7 +42,11 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-    let EmailRecoveryDnsInput { address, selector } = dns_input;
+    let EmailRecoveryDnsInput {
+        address,
+        selector,
+        dns_proof,
+    } = dns_input;
 
     // Sanity check the address shape. Detailed RFC 5321/5322 validation
     // is the verifier's job; here we just want to fail fast on the
@@ -47,36 +57,6 @@ pub async fn prepare_add(
         .ok_or_else(|| EmailRecoveryError::DomainNotSupported(address.clone()))?;
     let registered_domain = registered_domain_of(&address)
         .ok_or_else(|| EmailRecoveryError::DomainNotSupported(address.clone()))?;
-
-    // Path picker. In this PR only the DoH-allowlist path is wired
-    // up, so we check the allowlist directly. The DNSSEC follow-up
-    // PR adds an optional `dns_proof` field on `EmailRecoveryDnsInput`
-    // — when supplied, this branch shifts to "validate chain and
-    // use it"; the allowlist check below moves to the `else` arm.
-    //
-    // The FE doesn't need to know which path was picked; it just
-    // gets a clean nonce or a clean error.
-    let allowlisted = state::persistent_state(|p| {
-        p.doh_config
-            .as_ref()
-            .map(|c| {
-                c.allowed_domains
-                    .iter()
-                    .any(|d| d.eq_ignore_ascii_case(&registered_domain))
-            })
-            .unwrap_or(false)
-    });
-    if !allowlisted {
-        // Use the dedicated variant so the FE can distinguish "this
-        // domain isn't on the operator's DoH allowlist" (an
-        // operator-config issue) from `DomainNotSupported` (which
-        // is reserved for genuinely unsupported domain shapes).
-        // Once the DNSSEC path lands, the choice between
-        // `DomainNotAllowlisted` and `DomainNotSupported` will key
-        // on whether DNSSEC was attempted-but-failed vs not
-        // attempted at all.
-        return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
-    }
 
     // Selector sanity. DKIM selectors are themselves DNS labels (RFC
     // 6376 §3.6.2.1), so they share the label-validity rules. We
@@ -93,6 +73,41 @@ pub async fn prepare_add(
             "invalid DKIM selector: {selector:?}"
         )));
     }
+
+    // Path picker. The FE never decides the path — it sends whatever
+    // it could gather, and we choose:
+    //
+    // - DNSSEC path: if `dns_proof` is supplied, validate the chain
+    //   synchronously and cache the verified DKIM TXT for
+    //   `smtp_request` to consume. No outcall fan-out at email time.
+    // - DoH path: fall through to the allowlist check; `smtp_request`
+    //   resolves the TXT via `crate::doh::fetch_txt`.
+    // - Neither: reject — the FE will surface a "we can't accept
+    //   email from this domain" error.
+    let cached_dkim_txt = if let Some(proof) = dns_proof {
+        Some(verify_dnssec_chain(
+            proof,
+            &selector,
+            &registered_domain,
+            now_secs,
+        )?)
+    } else {
+        // No DNSSEC bundle → DoH allowlist gate.
+        let allowlisted = state::persistent_state(|p| {
+            p.doh_config
+                .as_ref()
+                .map(|c| {
+                    c.allowed_domains
+                        .iter()
+                        .any(|d| d.eq_ignore_ascii_case(&registered_domain))
+                })
+                .unwrap_or(false)
+        });
+        if !allowlisted {
+            return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
+        }
+        None
+    };
 
     // Now we can mutate state. The async raw_rand fetch happens at
     // most once per canister lifetime (see `rng::ensure_seeded`).
@@ -126,6 +141,7 @@ pub async fn prepare_add(
         claimed_address: address,
         selector,
         created_at_secs: now_secs,
+        cached_dkim_txt,
         status: PendingStatus::Pending,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
@@ -140,6 +156,113 @@ pub async fn prepare_add(
             .saturating_add(super::CHALLENGE_TTL_SECS)
             .saturating_mul(1_000_000_000),
     })
+}
+
+/// Validate a caller-supplied DNSSEC proof bundle against the
+/// canister's configured trust anchors and extract the TXT bytes for
+/// the DKIM record at `<selector>._domainkey.<registered_domain>`.
+///
+/// On success, returns the TXT RDATA bytes ready to feed into
+/// `dkim::verify_dkim` at `smtp_request` time. On failure, surfaces
+/// the typed reason — `DomainNotSupported` for malformed inputs and
+/// `EmailVerificationFailed` for cryptographic failures (the FE
+/// shows the variant name to the user).
+fn verify_dnssec_chain(
+    proof: internet_identity_interface::internet_identity::types::DnsProofBundle,
+    selector: &str,
+    registered_domain: &str,
+    now_secs: u64,
+) -> Result<Vec<u8>, EmailRecoveryError> {
+    let trust_anchors = state::persistent_state(|p| {
+        p.dnssec_config
+            .as_ref()
+            .map(|c| c.root_anchors.clone())
+            .unwrap_or_default()
+    });
+    if trust_anchors.is_empty() {
+        return Err(EmailRecoveryError::DomainNotSupported(
+            "DNSSEC trust anchors not configured".into(),
+        ));
+    }
+
+    // Convert the Candid-friendly bundle to the verifier's internal
+    // representation. (See `crate::dnssec::types::interface_conversions`
+    // for the From<> impls.)
+    let bundle: crate::dnssec::DnsProofBundle = proof.into();
+
+    let verified = crate::dnssec::verify_with_clock(&bundle, &trust_anchors, now_secs)
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
+
+    // The verified leaf must actually be a TXT record at the expected
+    // `<selector>._domainkey.<registered_domain>` name. Otherwise an
+    // attacker who got a chain validated for *some* TXT record could
+    // bind that record's content as if it were the DKIM key.
+    if verified.rtype != crate::dnssec::types::TYPE_TXT {
+        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            "DNSSEC bundle leaf is not TXT (got rtype {})",
+            verified.rtype
+        )));
+    }
+    let expected_fqdn = format!("{selector}._domainkey.{registered_domain}.");
+    let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+    if leaf_name.eq_ignore_ascii_case(&expected_fqdn).not() {
+        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            "DNSSEC bundle leaf name {leaf_name:?} doesn't match expected {expected_fqdn:?}"
+        )));
+    }
+
+    // TXT RDATA is one or more `<character-string>`s, each prefixed by
+    // a length octet. Concatenate the strings (sans length prefix) to
+    // form what the DKIM verifier expects to read.
+    let mut txt_bytes: Vec<u8> = Vec::new();
+    for rec in &verified.rdata {
+        let mut i = 0;
+        while i < rec.len() {
+            let len = rec[i] as usize;
+            i += 1;
+            if i + len > rec.len() {
+                return Err(EmailRecoveryError::EmailVerificationFailed(
+                    "DNSSEC TXT RDATA truncated".into(),
+                ));
+            }
+            txt_bytes.extend_from_slice(&rec[i..i + len]);
+            i += len;
+        }
+    }
+    Ok(txt_bytes)
+}
+
+/// Decode a wire-format DNS name (length-prefixed labels) into a
+/// dotted ASCII-lowercased string with a trailing dot.
+fn decode_dns_name_lowercase(wire: &[u8]) -> String {
+    let mut out = String::new();
+    let mut i = 0;
+    while i < wire.len() {
+        let len = wire[i] as usize;
+        i += 1;
+        if len == 0 {
+            out.push('.');
+            break;
+        }
+        if i + len > wire.len() {
+            return out;
+        }
+        for &b in &wire[i..i + len] {
+            out.push(b.to_ascii_lowercase() as char);
+        }
+        out.push('.');
+        i += len;
+    }
+    out
+}
+
+trait NotExt {
+    fn not(self) -> bool;
+}
+impl NotExt for bool {
+    fn not(self) -> bool {
+        !self
+    }
 }
 
 /// Normalise an email address to the canonical `lowercase(local) +
@@ -205,6 +328,7 @@ mod tests {
         EmailRecoveryDnsInput {
             address: addr.to_string(),
             selector: selector.to_string(),
+            dns_proof: None,
         }
     }
 
