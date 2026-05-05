@@ -17,9 +17,9 @@ The output JSON looks like this:
 Where each <SignedRRset> is:
 
     {
-      "name": "<hex bytes of canonical wire form>",
+      "name_hex": "<hex bytes of canonical wire form>",
       "rtype": 16,
-      "rdata": ["<hex>", "<hex>", ...],     # one per RR
+      "rdata_hex": ["<hex>", "<hex>", ...],     # one per RR
       "ttl": 3600,
       "rrsig": {
         "type_covered": 16,
@@ -30,7 +30,7 @@ Where each <SignedRRset> is:
         "inception": 1799000000,
         "key_tag": 12345,
         "signer_name": "<hex>",
-        "signature": "<hex>"
+        "signature_hex": "<hex>"
       }
     }
 
@@ -200,7 +200,7 @@ def main() -> int:
     parser.add_argument(
         "--resolver",
         default="https://1.1.1.1/dns-query",
-        help="DoH endpoint (default: cloudflare-dns.com)",
+        help="DoH endpoint (default: https://1.1.1.1/dns-query)",
     )
     args = parser.parse_args()
 
