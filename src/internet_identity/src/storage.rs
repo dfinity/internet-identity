@@ -680,6 +680,10 @@ impl<M: Memory + Clone> Storage<M> {
                 // The following fields do not require merging.
                 created_at_ns: _,
                 name: _,
+                // email_recovery is overwritten on every write — there's
+                // a single optional credential, no per-anchor index to
+                // sync, so no merge is needed.
+                email_recovery: _,
             }) = previous_anchor_maybe
             {
                 (
