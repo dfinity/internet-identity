@@ -25,12 +25,12 @@
 mod alignment;
 mod from_header;
 mod parse;
+#[cfg(test)]
+mod test_vectors;
 mod types;
 mod verify;
 
 #[allow(unused_imports)]
-pub use types::{
-    AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord, EmailVerificationStatus,
-};
+pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord, EmailVerificationStatus};
 #[allow(unused_imports)]
 pub use verify::verify_email;

@@ -118,11 +118,7 @@ mod tests {
             "googlemail.com",
             AlignmentMode::Relaxed
         ));
-        assert!(!aligns(
-            "example.com",
-            "evil.com",
-            AlignmentMode::Relaxed
-        ));
+        assert!(!aligns("example.com", "evil.com", AlignmentMode::Relaxed));
     }
 
     #[test]
