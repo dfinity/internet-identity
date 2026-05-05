@@ -37,8 +37,8 @@ mod verify;
 
 #[allow(unused_imports)]
 pub use types::{
-    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus,
-    EmailVerificationStatus, HeaderCanon, VerificationFailReason,
+    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, EmailVerificationStatus,
+    HeaderCanon, VerificationFailReason,
 };
 #[allow(unused_imports)]
 pub use verify::verify;

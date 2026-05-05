@@ -21,18 +21,14 @@ use internet_identity_interface::internet_identity::types::smtp::{
 };
 use serde_bytes::ByteBuf;
 
-const SYNTH_RSA_RELAXED_RELAXED: &[u8] = include_bytes!(
-    "../../../../test_vectors/dkim/synth-rsa-relaxed-relaxed.eml"
-);
-const SYNTH_RSA_RELAXED_SIMPLE: &[u8] = include_bytes!(
-    "../../../../test_vectors/dkim/synth-rsa-relaxed-simple.eml"
-);
-const SYNTH_RSA_SIMPLE_SIMPLE: &[u8] = include_bytes!(
-    "../../../../test_vectors/dkim/synth-rsa-simple-simple.eml"
-);
-const SYNTH_RSA_TXT: &str = include_str!(
-    "../../../../test_vectors/dkim/synth-rsa-test1._domainkey.test.example.com.txt"
-);
+const SYNTH_RSA_RELAXED_RELAXED: &[u8] =
+    include_bytes!("../../../../test_vectors/dkim/synth-rsa-relaxed-relaxed.eml");
+const SYNTH_RSA_RELAXED_SIMPLE: &[u8] =
+    include_bytes!("../../../../test_vectors/dkim/synth-rsa-relaxed-simple.eml");
+const SYNTH_RSA_SIMPLE_SIMPLE: &[u8] =
+    include_bytes!("../../../../test_vectors/dkim/synth-rsa-simple-simple.eml");
+const SYNTH_RSA_TXT: &str =
+    include_str!("../../../../test_vectors/dkim/synth-rsa-test1._domainkey.test.example.com.txt");
 
 /// Parse a raw RFC 5322 message into the `SmtpRequest` shape the gateway
 /// produces. Continuation lines (those starting with WSP) are unfolded

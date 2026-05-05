@@ -47,11 +47,7 @@ const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
 /// Verify an `SmtpRequest` against an already-trusted DKIM TXT record.
 ///
 /// `now_secs` is Unix seconds — passed in so unit tests can pin time.
-pub fn verify(
-    email: &SmtpRequest,
-    dkim_txt: &str,
-    now_secs: u64,
-) -> EmailVerificationStatus {
+pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> EmailVerificationStatus {
     let message = match email.message.as_ref() {
         Some(m) => m,
         None => {
@@ -101,10 +97,7 @@ pub fn verify(
 }
 
 #[allow(non_snake_case)]
-fn Unverified(
-    reason: VerificationFailReason,
-    checks: Vec<DkimCheck>,
-) -> EmailVerificationStatus {
+fn Unverified(reason: VerificationFailReason, checks: Vec<DkimCheck>) -> EmailVerificationStatus {
     EmailVerificationStatus::Unverified { reason, checks }
 }
 
@@ -332,11 +325,7 @@ fn try_verify_signature(
     }
 }
 
-fn check(
-    name: DkimCheckName,
-    status: DkimCheckStatus,
-    detail: Option<String>,
-) -> DkimCheck {
+fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -> DkimCheck {
     DkimCheck {
         name,
         status,
@@ -405,7 +394,10 @@ fn build_header_hash_input(
         }
         if let Some(idx) = chosen {
             consumed.push(idx);
-            out.extend_from_slice(&relaxed_header(&all_headers[idx].name, &all_headers[idx].value));
+            out.extend_from_slice(&relaxed_header(
+                &all_headers[idx].name,
+                &all_headers[idx].value,
+            ));
         }
         // Else: "header named in h= but not present" — contributes empty
         // string to the hash input per RFC 6376 §3.7.
@@ -508,21 +500,13 @@ mod tests {
     #[test]
     fn auid_aligns_subdomain_when_not_strict() {
         assert!(auid_aligns("alice@mail.example.com", "example.com", false));
-        assert!(!auid_aligns(
-            "alice@mail.example.com",
-            "example.com",
-            true
-        ));
+        assert!(!auid_aligns("alice@mail.example.com", "example.com", true));
     }
 
     #[test]
     fn auid_does_not_match_evil_suffix() {
         // evilexample.com must not match example.com via suffix.
-        assert!(!auid_aligns(
-            "alice@evilexample.com",
-            "example.com",
-            false
-        ));
+        assert!(!auid_aligns("alice@evilexample.com", "example.com", false));
     }
 
     #[test]
