@@ -29,9 +29,7 @@ pub fn extract_from_domain(message: &SmtpMessage) -> Result<String, String> {
         .headers
         .iter()
         .filter(|h| h.name.eq_ignore_ascii_case(FROM_HEADER));
-    let from = iter
-        .next()
-        .ok_or_else(|| "no From: header".to_string())?;
+    let from = iter.next().ok_or_else(|| "no From: header".to_string())?;
     if iter.next().is_some() {
         return Err("multiple From: headers".to_string());
     }
