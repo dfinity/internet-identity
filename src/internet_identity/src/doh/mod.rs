@@ -10,22 +10,489 @@
 //!   demand the first time a real `smtp_request` arrives for a listed
 //!   domain.
 //! - **Quorum across independent operators.** Every cache miss fires
-//!   parallel outcalls to three providers from three jurisdictions
-//!   (Cloudflare 🇺🇸, Quad9 🇨🇭, CIRA Canadian Shield 🇨🇦) and accepts
-//!   the result iff at least 2-of-3 agree on the TXT bytes. No single
-//!   operator is trusted; one provider being down or returning forged
-//!   bytes never breaks the verifier.
+//!   parallel outcalls to five providers across four jurisdictions
+//!   (Cloudflare 🇺🇸, Google 🇺🇸, Quad9 🇨🇭, CIRA Canadian Shield 🇨🇦,
+//!   IIJ 🇯🇵) and accepts the result iff at least 3-of-5 agree on the
+//!   TXT bytes. No single operator is trusted; one provider being down
+//!   or returning forged bytes never breaks the verifier.
 //! - **In-flight dedup.** Multiple concurrent verification requests
-//!   for the same domain share one outcall fan-out, not three each.
+//!   for the same domain share one outcall fan-out, not five each.
 //! - **Heap cache.** Fast and cheap. Keys are re-fetchable, so an
 //!   upgrade rebuilding the cache from scratch is fine.
+//!
+//! ## Replica-consensus shape
+//!
+//! HTTP outcalls run on every replica of the subnet (typically 13).
+//! For consensus, every replica must observe the same response bytes,
+//! which raw DoH responses don't satisfy: TTLs decrement second by
+//! second, so two replicas making the query a few hundred ms apart
+//! see different bytes. We attach a `transform` query function that
+//! parses the wire-format DNS response down to the TXT RDATA — that
+//! reduction is deterministic, so all replicas converge on the same
+//! bytes and consensus succeeds.
 
 #![allow(dead_code)]
 
+mod cache;
 mod parser;
+mod quorum;
 mod types;
 
+use std::cell::RefCell;
+
+use cache::{CacheLookup, DohCache};
+use parser::build_txt_query;
+use quorum::{decide_quorum, Outcome};
+
 #[allow(unused_imports)]
-pub use parser::{build_txt_query, parse_txt_response, ParseError};
+pub use parser::{parse_txt_response, ParseError};
 #[allow(unused_imports)]
 pub use types::{DohError, DohProvider, PROVIDERS};
+
+use types::{DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
+
+thread_local! {
+    /// Per-canister DoH cache. Heap-only — losing it on upgrade is
+    /// fine, the next `smtp_request` for an affected domain just
+    /// re-fetches.
+    static DOH_CACHE: RefCell<DohCache> = RefCell::new(DohCache::default());
+}
+
+/// Public entry point. Returns the TXT bytes for `name` if at least
+/// the quorum threshold of providers agree.
+///
+/// `name` is the full FQDN (e.g., `selector1._domainkey.gmail.com`);
+/// `registered_domain` (e.g., `gmail.com`) is what the allowlist gate
+/// checks. The caller — the DKIM/DMARC code — already extracts the
+/// registered domain when validating From-header alignment, so we
+/// don't re-implement that here.
+///
+/// The function never panics on misconfiguration: if `DohConfig` is
+/// absent, returns [`DohError::NotConfigured`] without touching the
+/// network.
+pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, DohError> {
+    let config = match crate::state::persistent_state(|p| p.doh_config.clone()) {
+        Some(c) => c,
+        None => return Err(DohError::NotConfigured),
+    };
+    if !config
+        .allowed_domains
+        .iter()
+        .any(|d| d.eq_ignore_ascii_case(registered_domain))
+    {
+        return Err(DohError::DomainNotAllowed);
+    }
+    let max_age = config
+        .max_cache_age_secs
+        .unwrap_or(DEFAULT_CACHE_AGE_SECS)
+        .min(MAX_CACHE_AGE_SECS);
+
+    // Cache lookup. We must release the borrow before awaiting — the
+    // canister is single-threaded but futures across yields can re-
+    // enter the same `RefCell`, which would trap.
+    let now = now_secs();
+    let lookup = DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now));
+    let token = match lookup {
+        CacheLookup::Hit(bytes) => return Ok(bytes),
+        CacheLookup::Wait(fut) => return fut.await,
+        CacheLookup::Fetch(token) => token, // First arrival; we own this fetch.
+    };
+
+    // Fan out to every provider in parallel, then decide.
+    let query = build_txt_query(name);
+    let outcall_results = fetch_all(&query).await;
+    let outcomes: Vec<Outcome> = outcall_results
+        .into_iter()
+        .map(|r| match r {
+            Ok(txt_bytes) => Outcome::Txt(txt_bytes),
+            Err(e) => Outcome::FetchError(e),
+        })
+        .collect();
+    let result = decide_quorum(&outcomes);
+
+    // Publish: stores on success, removes the pending entry, wakes any
+    // dedup subscribers. The expires-at uses the timestamp we captured
+    // before the await so multiple subscribers see consistent freshness.
+    let expires_at = now.saturating_add(max_age);
+    DOH_CACHE.with(|c| {
+        c.borrow_mut()
+            .publish(name, token, result.clone(), expires_at, now)
+    });
+    result
+}
+
+#[cfg(not(test))]
+fn now_secs() -> u64 {
+    ic_cdk::api::time() / 1_000_000_000
+}
+
+/// Test-time clock. The canister-time accessor traps outside a real
+/// canister, so under `cfg(test)` we read from a thread-local the test
+/// can advance.
+#[cfg(test)]
+fn now_secs() -> u64 {
+    test_support::TEST_NOW_SECS.with(|t| *t.borrow())
+}
+
+// =====================================================================
+// Production outcall path (cfg(not(test)) only).
+//
+// Each cache miss fans out to all PROVIDERS in parallel via
+// `futures::future::join_all`. Each individual outcall:
+//   - POSTs the wire-format query to the provider's /dns-query.
+//   - Caps response size at 4 KiB (cycles charged on cap, not actual).
+//   - Attaches a transform that reduces the wire response to its TXT
+//     RDATA so replicas converge.
+//   - Attaches a fixed cycle budget per outcall.
+// =====================================================================
+
+#[cfg(not(test))]
+mod prod {
+    use ic_cdk::api::management_canister::http_request::{
+        http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
+        HttpResponse,
+    };
+
+    /// 4 KiB upper bound on a DoH response. A typical DKIM-SHA256 TXT
+    /// record (RSA-2048) sits well under 1 KiB; allowing four times
+    /// that gives slack for multi-string TXT and oversized
+    /// experimental keys without paying 2 MiB worth of cycles.
+    pub(super) const MAX_DOH_RESPONSE_BYTES: u64 = 4096;
+
+    /// Per-outcall cycle budget. Mirrors the OIDC discovery path's
+    /// budget (`30_000_000_000`) — generous enough to cover the 13-
+    /// replica fan-out plus the transform invocation, with refund of
+    /// unused cycles. Each cache miss spends ~5× this in total.
+    pub(super) const DOH_CALL_CYCLES: u128 = 30_000_000_000;
+
+    pub(super) const HTTP_STATUS_OK: u8 = 200;
+
+    /// Sentinel body returned by the transform when the wire response
+    /// is malformed. The async path treats anything that isn't a
+    /// genuine TXT-bytes payload as a failure for that provider.
+    pub(super) const MALFORMED_SENTINEL: &[u8] = b"!!doh-malformed";
+
+    pub(super) async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+        let futures: Vec<_> = super::PROVIDERS.iter().map(|p| outcall(p, query)).collect();
+        futures::future::join_all(futures).await
+    }
+
+    async fn outcall(provider: &super::DohProvider, query: &[u8]) -> Result<Vec<u8>, String> {
+        let request = CanisterHttpRequestArgument {
+            url: provider.url.to_string(),
+            method: HttpMethod::POST,
+            body: Some(query.to_vec()),
+            max_response_bytes: Some(MAX_DOH_RESPONSE_BYTES),
+            // The closure-based call below carries the transform; we
+            // leave this field None and pass `transform_doh` directly.
+            transform: None,
+            headers: vec![
+                HttpHeader {
+                    name: "Accept".into(),
+                    value: "application/dns-message".into(),
+                },
+                HttpHeader {
+                    name: "Content-Type".into(),
+                    value: "application/dns-message".into(),
+                },
+                HttpHeader {
+                    name: "User-Agent".into(),
+                    value: "internet_identity_canister".into(),
+                },
+            ],
+        };
+        let (response,) = http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh)
+            .await
+            .map_err(|(_, err)| err)?;
+        if response.status != HTTP_STATUS_OK {
+            return Err(format!("HTTP {}", response.status));
+        }
+        if response.body == MALFORMED_SENTINEL {
+            return Err("malformed DNS response".into());
+        }
+        Ok(response.body)
+    }
+
+    /// Transform query for replica consensus.
+    ///
+    /// DoH wire-format responses contain TTLs that decrement once a
+    /// second, so replicas making the same query a few hundred ms
+    /// apart can observe different bytes — consensus then fails. The
+    /// transform reduces the response to just the parsed TXT bytes,
+    /// which depend only on the resolver's cached answer (stable
+    /// within a given TTL bucket), so all replicas converge.
+    ///
+    /// On parse failure we surface a sentinel string in the body
+    /// rather than dropping the response — that way consensus still
+    /// succeeds (all replicas see the same sentinel) and the async
+    /// path counts this provider's contribution as a failure.
+    #[allow(clippy::needless_pass_by_value)]
+    pub(super) fn transform_doh(response: HttpResponse) -> HttpResponse {
+        use candid::Nat;
+        if response.status != HTTP_STATUS_OK {
+            // Non-200 responses are passed through untouched (status
+            // and empty body) — replicas converge on the status code
+            // even if their bodies originally differed.
+            return HttpResponse {
+                status: response.status,
+                headers: vec![],
+                body: vec![],
+            };
+        }
+        match super::parse_txt_response(&response.body) {
+            Ok(txt) => HttpResponse {
+                status: Nat::from(HTTP_STATUS_OK),
+                headers: vec![],
+                body: txt,
+            },
+            Err(_) => HttpResponse {
+                status: Nat::from(HTTP_STATUS_OK),
+                headers: vec![],
+                body: MALFORMED_SENTINEL.to_vec(),
+            },
+        }
+    }
+}
+
+#[cfg(not(test))]
+async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+    prod::fetch_all(query).await
+}
+
+// =====================================================================
+// Test path: routes outcalls through a thread-local mock so the same
+// `fetch_txt` body can be exercised end-to-end without the IC
+// management canister. The mock returns *already-parsed* TXT bytes —
+// matching the shape of what `transform_doh` produces in production.
+// =====================================================================
+
+#[cfg(test)]
+async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+    test_support::run_mock(query)
+}
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::*;
+    use std::collections::HashMap;
+
+    thread_local! {
+        pub(super) static TEST_NOW_SECS: RefCell<u64> = const { RefCell::new(1_700_000_000) };
+        pub(super) static MOCK_RESPONSES: RefCell<
+            HashMap<&'static str, Result<Vec<u8>, String>>,
+        > = RefCell::new(HashMap::new());
+        pub(super) static MOCK_CALL_COUNT: RefCell<usize> = const { RefCell::new(0) };
+    }
+
+    pub(crate) fn set_now(t: u64) {
+        TEST_NOW_SECS.with(|c| *c.borrow_mut() = t);
+    }
+
+    pub(crate) fn set_mock(responses: &[(&'static str, Result<Vec<u8>, String>)]) {
+        MOCK_RESPONSES.with(|m| {
+            let mut m = m.borrow_mut();
+            m.clear();
+            for (url, r) in responses {
+                m.insert(*url, r.clone());
+            }
+        });
+    }
+
+    pub(crate) fn call_count() -> usize {
+        MOCK_CALL_COUNT.with(|c| *c.borrow())
+    }
+
+    /// Wipes both cache + counter so each test starts from a known
+    /// state. Call this at the top of every test that asserts on
+    /// `call_count`.
+    pub(crate) fn reset_cache() {
+        DOH_CACHE.with(|c| *c.borrow_mut() = DohCache::default());
+        MOCK_CALL_COUNT.with(|c| *c.borrow_mut() = 0);
+    }
+
+    pub(super) fn run_mock(_query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+        MOCK_CALL_COUNT.with(|c| *c.borrow_mut() += 1);
+        MOCK_RESPONSES.with(|m| {
+            let m = m.borrow();
+            PROVIDERS
+                .iter()
+                .map(|p| {
+                    m.get(p.url)
+                        .cloned()
+                        .unwrap_or_else(|| Err("no canned response".into()))
+                })
+                .collect()
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::*;
+    use super::*;
+    use crate::state::{persistent_state_mut, PersistentState};
+    use internet_identity_interface::internet_identity::types::DohConfig;
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::Arc;
+    use std::task::{Context, Poll, Wake, Waker};
+
+    /// Minimal block-on. The async futures in these tests complete in
+    /// a single poll (the mock fetcher is synchronous, the cache path
+    /// is synchronous, and we don't exercise the dedup `Wait` arm
+    /// here). Pulling in `futures::executor` would force the
+    /// `executor` + `std` features and bloat the wasm build, so we
+    /// poll by hand.
+    struct NoopWaker;
+    impl Wake for NoopWaker {
+        fn wake(self: Arc<Self>) {}
+    }
+    fn block_on<F: Future>(mut f: F) -> F::Output {
+        // SAFETY: `f` is on the stack and we don't move it out.
+        let mut f = unsafe { Pin::new_unchecked(&mut f) };
+        let waker = Waker::from(Arc::new(NoopWaker));
+        let mut cx = Context::from_waker(&waker);
+        match f.as_mut().poll(&mut cx) {
+            Poll::Ready(out) => out,
+            // No I/O drives these futures from outside; if a single
+            // poll returns Pending in test, the test setup is wrong.
+            Poll::Pending => panic!("test future returned Pending — test setup is incorrect"),
+        }
+    }
+
+    fn install_config(domains: &[&str], max_age: Option<u64>) {
+        persistent_state_mut(|p: &mut PersistentState| {
+            p.doh_config = Some(DohConfig {
+                allowed_domains: domains.iter().map(|d| (*d).to_string()).collect(),
+                max_cache_age_secs: max_age,
+            });
+        });
+    }
+
+    fn clear_config() {
+        persistent_state_mut(|p| p.doh_config = None);
+    }
+
+    /// The mock-side equivalent of `transform_doh`'s output: just the
+    /// TXT bytes a real provider would have parsed out.
+    fn ok(bytes: &[u8]) -> Result<Vec<u8>, String> {
+        Ok(bytes.to_vec())
+    }
+    fn fail(s: &str) -> Result<Vec<u8>, String> {
+        Err(s.into())
+    }
+
+    fn agreeing_dkim() -> Vec<(&'static str, Result<Vec<u8>, String>)> {
+        // Three provider responses agree, two disagree — quorum (3-of-
+        // 5) hits.
+        vec![
+            (PROVIDERS[0].url, ok(b"v=DKIM1; k=rsa; p=...")),
+            (PROVIDERS[1].url, ok(b"v=DKIM1; k=rsa; p=...")),
+            (PROVIDERS[2].url, ok(b"v=DKIM1; k=rsa; p=...")),
+            (PROVIDERS[3].url, fail("network down")),
+            (PROVIDERS[4].url, fail("403")),
+        ]
+    }
+
+    #[test]
+    fn returns_not_configured_without_doh_config() {
+        clear_config();
+        reset_cache();
+        let r = block_on(fetch_txt("selector._domainkey.example.com", "example.com"));
+        assert_eq!(r, Err(DohError::NotConfigured));
+    }
+
+    #[test]
+    fn rejects_unallowed_domain() {
+        install_config(&["gmail.com"], None);
+        reset_cache();
+        let r = block_on(fetch_txt("selector._domainkey.evil.com", "evil.com"));
+        assert_eq!(r, Err(DohError::DomainNotAllowed));
+    }
+
+    #[test]
+    fn allowlist_match_is_case_insensitive() {
+        install_config(&["GMAIL.com"], None);
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        let r = block_on(fetch_txt("selector._domainkey.gmail.com", "gmail.com"));
+        assert!(r.is_ok(), "expected Ok, got {r:?}");
+    }
+
+    #[test]
+    fn first_fetch_runs_outcalls_and_caches() {
+        install_config(&["example.com"], Some(3600));
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        set_now(1_000);
+
+        let r1 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(r1, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        assert_eq!(call_count(), 1, "first call should hit the network");
+
+        // Second call within TTL: cache hit, no outcall.
+        set_now(1_500);
+        let r2 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        assert_eq!(call_count(), 1, "second call should be cache-served");
+    }
+
+    #[test]
+    fn refetches_after_ttl_expires() {
+        install_config(&["example.com"], Some(60));
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        set_now(1_000);
+
+        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(call_count(), 1);
+
+        // Advance past the TTL — the cache should be cold again.
+        set_now(1_000 + 60 + 1);
+        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(call_count(), 2, "should re-fetch after TTL");
+    }
+
+    #[test]
+    fn quorum_failure_is_not_cached() {
+        install_config(&["example.com"], Some(3600));
+        reset_cache();
+        // Five distinct answers — biggest bucket is 1, well short of
+        // the 3-of-5 threshold.
+        set_mock(&[
+            (PROVIDERS[0].url, ok(b"a")),
+            (PROVIDERS[1].url, ok(b"b")),
+            (PROVIDERS[2].url, ok(b"c")),
+            (PROVIDERS[3].url, ok(b"d")),
+            (PROVIDERS[4].url, ok(b"e")),
+        ]);
+        set_now(1_000);
+
+        let r1 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert!(matches!(r1, Err(DohError::QuorumFailed { .. })));
+
+        // Failure must NOT poison the cache: a follow-up call (with
+        // different mock) should re-fetch and now succeed.
+        set_mock(&agreeing_dkim());
+        set_now(1_001);
+        let r2 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        assert_eq!(call_count(), 2);
+    }
+
+    #[test]
+    fn max_cache_age_is_capped() {
+        // Asking for 999_999s caps at MAX_CACHE_AGE_SECS (24h).
+        install_config(&["example.com"], Some(999_999));
+        reset_cache();
+        set_mock(&agreeing_dkim());
+        set_now(0);
+
+        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+
+        // Day after the cap (24h+1s): cache must have expired.
+        set_now(types::MAX_CACHE_AGE_SECS + 1);
+        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(call_count(), 2, "cache must respect MAX_CACHE_AGE_SECS");
+    }
+}

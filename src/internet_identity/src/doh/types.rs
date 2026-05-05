@@ -18,12 +18,24 @@ pub struct DohProvider {
     pub url: &'static str,
 }
 
-/// The three providers we query in parallel for every cache miss.
+/// The five providers we query in parallel for every cache miss.
 ///
-/// Picked for jurisdictional diversity (CH / CA / US), public-service
-/// rather than commercial operation, and continuous uptime under their
-/// current foundations / non-profits as of 2026-05.
+/// Picked for jurisdictional diversity (US ×2, CH, CA, JP), a mix of
+/// operator types (commercial telcos, non-profit foundation, ISP), and
+/// continuous uptime under their current operators as of 2026-05. Two
+/// US providers are tolerable here only because the quorum requires
+/// 3-of-5 — a single jurisdiction can't reach the threshold on its own.
 pub const PROVIDERS: &[DohProvider] = &[
+    DohProvider {
+        name: "Cloudflare",
+        jurisdiction: "United States",
+        url: "https://cloudflare-dns.com/dns-query",
+    },
+    DohProvider {
+        name: "Google",
+        jurisdiction: "United States",
+        url: "https://dns.google/dns-query",
+    },
     DohProvider {
         name: "Quad9",
         jurisdiction: "Switzerland",
@@ -35,15 +47,19 @@ pub const PROVIDERS: &[DohProvider] = &[
         url: "https://private.canadianshield.cira.ca/dns-query",
     },
     DohProvider {
-        name: "Cloudflare",
-        jurisdiction: "United States",
-        url: "https://cloudflare-dns.com/dns-query",
+        name: "IIJ",
+        jurisdiction: "Japan",
+        url: "https://public.dns.iij.jp/dns-query",
     },
 ];
 
 /// Quorum threshold: we accept the response iff at least this many of
 /// `PROVIDERS.len()` returned identical TXT bytes.
-pub const QUORUM_THRESHOLD: usize = 2;
+///
+/// 3-of-5 is a strict majority (>n/2) and tolerates up to 2 providers
+/// being down, slow, or returning different bytes — including both US
+/// providers being subpoenaed to lie in the same direction.
+pub const QUORUM_THRESHOLD: usize = 3;
 
 /// Default cache TTL when the deploy arg doesn't override it. One hour
 /// is short enough that a key rotation is picked up the next time mail
@@ -84,20 +100,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn three_providers_three_jurisdictions() {
-        assert_eq!(PROVIDERS.len(), 3);
+    fn five_providers_four_jurisdictions() {
+        assert_eq!(PROVIDERS.len(), 5);
+        // We allow two US providers (Cloudflare + Google) but want at
+        // least 4 distinct jurisdictions so no single jurisdiction has
+        // anywhere near the agreeing threshold of 3.
         let mut seen: Vec<&str> = PROVIDERS.iter().map(|p| p.jurisdiction).collect();
         seen.sort();
         seen.dedup();
-        assert_eq!(seen.len(), 3, "providers must span 3 jurisdictions");
+        assert!(
+            seen.len() >= 4,
+            "providers must span at least 4 jurisdictions"
+        );
+    }
+
+    #[test]
+    fn no_jurisdiction_alone_can_reach_quorum() {
+        // The whole point of 3-of-5 with mixed jurisdictions is that no
+        // single legal/political regime — including a 2-provider one
+        // like the US — can on its own force a "quorum". If this
+        // assertion ever fires, we've over-concentrated.
+        let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for p in PROVIDERS {
+            *counts.entry(p.jurisdiction).or_default() += 1;
+        }
+        let max_per_jurisdiction = counts.values().copied().max().unwrap_or(0);
+        assert!(
+            max_per_jurisdiction < QUORUM_THRESHOLD,
+            "no single jurisdiction may reach quorum on its own"
+        );
     }
 
     #[test]
     fn quorum_strictly_above_minority() {
-        // 2-of-3 is a Byzantine-tolerant majority: any one provider
-        // failing or lying still leaves a majority of two honest
-        // providers agreeing. If we accidentally relax to 1-of-3, a
-        // single dishonest provider could drive verification.
+        // 3-of-5 is a strict majority. If we accidentally relax to
+        // 2-of-5, two split-bucket factions could each claim "quorum".
         assert!(QUORUM_THRESHOLD * 2 > PROVIDERS.len());
     }
 

@@ -114,8 +114,7 @@ pub fn parse_txt_response(bytes: &[u8]) -> Result<Vec<u8>, ParseError> {
         }
         let rtype = u16::from_be_bytes([bytes[pos], bytes[pos + 1]]);
         // class (2) + ttl (4)
-        let rdlength =
-            u16::from_be_bytes([bytes[pos + 8], bytes[pos + 9]]) as usize;
+        let rdlength = u16::from_be_bytes([bytes[pos + 8], bytes[pos + 9]]) as usize;
         pos += 10;
         if pos + rdlength > bytes.len() {
             return Err(ParseError::Truncated);
@@ -215,10 +214,7 @@ mod tests {
         assert_eq!(&bytes[2..4], &[0x01, 0x00]);
         assert_eq!(&bytes[4..6], &[0, 1]);
         // Question: 7example3com0 + type 16 + class 1
-        assert_eq!(
-            &bytes[12..],
-            b"\x07example\x03com\x00\x00\x10\x00\x01"
-        );
+        assert_eq!(&bytes[12..], b"\x07example\x03com\x00\x00\x10\x00\x01");
     }
 
     #[test]

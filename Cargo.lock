@@ -2212,6 +2212,7 @@ dependencies = [
  "captcha",
  "ed25519-dalek",
  "flate2",
+ "futures",
  "getrandom 0.2.16",
  "hex",
  "ic-canister-sig-creation",

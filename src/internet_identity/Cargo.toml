@@ -36,6 +36,12 @@ captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255
 identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false }
 url = { version = "2.5", default-features = false, features = ["std"] }
 
+# DoH fallback fan-out: pulled in only for `future::join_all`, which
+# lets us await all 5 provider outcalls concurrently rather than
+# serially. `default-features = false` keeps the wasm32 build lean
+# (no executor / threading code).
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
+
 # All IC deps
 candid.workspace = true
 ic-cdk = { workspace = true, features = ["transform-closure"] }
