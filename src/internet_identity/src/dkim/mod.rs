@@ -37,8 +37,8 @@ mod verify;
 
 #[allow(unused_imports)]
 pub use types::{
-    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult,
-    HeaderCanon, VerificationFailReason,
+    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
+    VerificationFailReason,
 };
 // Re-exported as `verify_dkim` so downstream callers (the dmarc layer)
 // don't have to deal with both a `dkim::verify` and `dmarc::verify`

@@ -16,8 +16,8 @@ use super::alignment::aligns;
 use super::from_header::extract_from_domain;
 use super::parse::parse_dmarc_txt;
 use super::types::{DmarcOutcome, DmarcRecord, EmailVerificationStatus};
-use crate::dkim::{DkimVerifyResult, VerificationFailReason};
 use crate::dkim::verify_dkim;
+use crate::dkim::{DkimVerifyResult, VerificationFailReason};
 use internet_identity_interface::internet_identity::types::smtp::SmtpRequest;
 
 /// Verify an `SmtpRequest` end-to-end: DKIM signature + DMARC alignment.
@@ -58,9 +58,7 @@ pub fn verify_email(
         Some(m) => m,
         None => {
             return EmailVerificationStatus::Unverified {
-                reason: VerificationFailReason::MalformedFromHeader(
-                    "message body missing".into(),
-                ),
+                reason: VerificationFailReason::MalformedFromHeader("message body missing".into()),
                 checks: dkim_checks,
             };
         }
@@ -109,11 +107,7 @@ pub fn verify_email(
     }
 }
 
-fn compute_outcome(
-    dkim_domain: &str,
-    from_domain: &str,
-    dmarc_txt: Option<&str>,
-) -> DmarcOutcome {
+fn compute_outcome(dkim_domain: &str, from_domain: &str, dmarc_txt: Option<&str>) -> DmarcOutcome {
     let txt = match dmarc_txt {
         None => return DmarcOutcome::NoRecord,
         Some(t) => t,
