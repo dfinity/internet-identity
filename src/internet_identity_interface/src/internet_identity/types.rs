@@ -24,12 +24,14 @@ pub mod attributes;
 pub mod dnssec;
 pub mod icrc3;
 pub mod openid;
+pub mod smtp;
 pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::openid::*;
+pub use crate::internet_identity::types::smtp::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
