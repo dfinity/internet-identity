@@ -99,3 +99,17 @@ pub const RECOVERY_MAILBOX: &str = "recover@id.ai";
 pub const MAX_LOCAL_PART: usize = 64;
 pub const MAX_DOMAIN: usize = 255;
 pub const MAX_ADDRESS: usize = 254;
+
+/// Caps on the cached TXT-record bytes the DNSSEC path stores on
+/// each pending challenge. A real DKIM RSA-2048 record is ~430 bytes
+/// (`p=` is base64 of a ~270-byte SPKI); RSA-4096 is ~770 bytes;
+/// realistic published DMARC records are well under 500 bytes.
+/// These caps are an order of magnitude above realistic values
+/// without being so generous that an attacker who controls a signed
+/// zone could pump multi-KB into every pending entry.
+///
+/// RFC 6376 / 7489 don't specify a maximum length for the records
+/// themselves; these are pragmatic limits for the email-recovery
+/// flow, not a protocol-level claim.
+pub const MAX_DKIM_TXT_BYTES: usize = 4096;
+pub const MAX_DMARC_TXT_BYTES: usize = 1024;
