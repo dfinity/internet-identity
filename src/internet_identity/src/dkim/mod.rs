@@ -27,6 +27,7 @@
 #![allow(dead_code)]
 
 mod canonicalize;
+mod dns_record;
 mod parse;
 mod types;
 
