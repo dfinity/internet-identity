@@ -88,16 +88,30 @@ This document covers all of the above plus two architectural changes the PoC did
 **Attacker capabilities we defend against**
 
 1. *Spoofed `From:` header* — defended by DMARC alignment with verified DKIM `d=`.
-2. *DKIM signature replay* — defended by `x=` expiration plus an ingest-time freshness window plus a single-use challenge nonce embedded in the email body and burned on first acceptance.
+2. *DKIM signature replay* — defended by `x=` expiration plus an ingest-time freshness window plus a single-use challenge nonce embedded in the email's `Subject:` and burned on first acceptance.
 3. *DNS poisoning* — defended by DNSSEC validation against the IANA root KSK trust anchor (delivered as a deploy/upgrade arg, see §7.5).
 4. *Length-extension via `l=` tag* — defended by ignoring any unsigned tail (see §5.3).
 5. *Mass enumeration of email→anchor mappings* — gated by DKIM verification: an attacker cannot probe the index without a DKIM-valid email from the address being probed (see §3.1).
+6. *Recovery phishing — attacker prepares a challenge, then tricks the victim into emailing the resulting nonce.* See §3.2 for the analysis. Defended by (a) the rotating random nonce, which kills async/mass phishing because by the time a phishing message reaches the victim the nonce has expired; (b) the token living in the email's `Subject:` rather than the body, so the user sees the recovery intent (`II-Recovery-…`) at compose time; (c) the legitimate token only ever appears on the real II recovery page in the user's own browser — a phisher who can place a token in front of the user has already phished them onto a fake II domain, which is the standard website-phishing problem we don't try to solve in this layer.
 
 ### 3.1 Why the email→anchor index does not need salted hashing
 
 The index that maps a verified sender address to an anchor number is a public-shape concern (an attacker could in principle iterate addresses to discover whether a friend has an II account). In practice the lookup is gated by DKIM: the canister never accepts an `email_recovery_*` call without a DKIM-valid email signed by the queried domain on behalf of the queried address. An attacker who controls `mallory@gmail.com` can probe whether `mallory@gmail.com` is registered, but cannot probe `alice@gmail.com` without first compromising Alice's mailbox or Gmail's DKIM key — at which point they already have full mailbox control.
 
 We therefore key the lookup index by `lowercase(local-part) + "@" + lowercase(domain)` directly. No per-anchor salt is needed. If a UX flaw later surfaces (e.g., the FE displaying the queried address back unmasked) we add a captcha or rate limit on top; we do *not* try to make the index itself unenumerable.
+
+### 3.2 Recovery phishing: the prepare-then-trick attack
+
+`email_recovery_prepare_delegation` is anonymous (it has to be — the user has lost every authn method by the time they reach for it). That means an attacker can call it for *anyone's* email, get a fresh nonce, and bind it to an attacker-controlled `session_pk`. If the attacker can then convince the victim to send an email containing that nonce from the victim's own address, the canister will mark the challenge `Succeeded`, stamp a delegation for the attacker's `session_pk`, and the attacker signs in as the victim.
+
+This is structurally the same attack as classic email-recovery phishing ("send your verification code to support@…"). We do not have outbound email in scope (§2 non-goals), so we cannot ship a confirmation-reply round trip that lives inside the victim's inbox. The defenses we *do* layer:
+
+- **The nonce rotates.** It exists only inside one pending entry with a 30-minute TTL. Phishing scripts blasted out at scale are useless: by the time a generic "send this to recover your account" message reaches a victim, the embedded nonce has likely expired, and the attacker would need to be running real-time interactive phishing on each target individually to keep nonces fresh.
+- **The nonce lives in `Subject:`, not the body.** The user sees `Subject: II-Recovery-A1B2C3D4` at compose time, which is harder to misinterpret as "support help". Keeping the prefix verbose (`II-Recovery-…`) is deliberate — every legitimate UI surface says exactly the same prefix, so a token without it is an immediate tell.
+- **The legitimate token only ever appears on the real II recovery page** in the user's own browser session. An attacker who can place a token in front of the user has already convinced them to visit a phishing site impersonating II — at which point the email step is the *least* of the user's worries. We treat website phishing as a separate layer and do not try to make the email recovery flow robust against a successfully-impersonated frontend.
+- **UX explicitness in step 2.** The wizard's send-the-magic-email screen (§8.6) names the action plainly: "*This will sign you in to your existing Internet Identity*", with a warning callout: "*Only continue if you started this recovery yourself, just now, on this page.*" This is the canister-stack equivalent of the "is this you?" sticker on a hardware wallet — it doesn't stop a determined social engineer, but it is the place a careful user notices something is wrong.
+
+What we explicitly *don't* try to do is gate the prepare endpoint behind a captcha or per-address rate limit (see §8.8 for why per-address rate limiting is itself a denial-of-recovery vector). The nonce-rotation + UX-clarity stack is the practical ceiling for an inbound-only, no-stored-state-per-user flow. The natural upgrade path, when outbound email becomes available, is to add an inbox-side confirmation step — see §11 ("Open questions").
 
 **Attacker capabilities we do *not* defend against**
 
@@ -123,7 +137,7 @@ sequenceDiagram
     User->>II: 2. prepare { addr, dns_proof, session_pk }
     II-->>User: 3. challenge { nonce, mailbox }
 
-    User->>Mail: 4. compose and send email to<br/>recover@id.ai or register@id.ai,<br/>with the nonce in the body
+    User->>Mail: 4. compose and send email to<br/>recover@id.ai or register@id.ai,<br/>with the nonce in Subject:
     Mail->>GW: 5. SMTP DATA
     GW->>II: 6. smtp_request(SmtpRequest)
 
@@ -137,8 +151,8 @@ sequenceDiagram
 The architecture is built around three ideas:
 
 - **DNSSEC validation happens once, up front, in the prepare call.** The user's browser discovers the active DKIM selector for the user's email provider by probing common selector names via DoH (see §8.4 notes), fetches the DKIM TXT record for that selector + the DMARC TXT record + the DNSSEC chain via DoH, and submits everything as a single call argument. The canister validates the chain cryptographically against the IANA root anchor (no HTTPS outcall), extracts the verified DKIM public key + DMARC policy, and stores them in a pending-challenge entry keyed by the canister-issued nonce, with a 30-minute TTL. The session public key the FE wants the eventual delegation bound to is also passed in here. The canister returns the nonce and the gateway recipient mailbox.
-- **The user actually emails the nonce.** They send a fresh email from the address they typed, with the nonce in the body, to `recover@id.ai` (or `register@id.ai` for setup). The recipient is a single static mailbox per kind — there is no per-challenge id in the address; the canister identifies the challenge by looking up the nonce.
-- **The SMTP gateway forwards the email to the canister via `smtp_request`** — exactly the PoC's surface, no shape change. The canister extracts the nonce from the DKIM-signed body, looks up the pending challenge by nonce, verifies the DKIM signature against the cached public key, checks DMARC alignment against the cached policy, verifies the `From:` matches the address in the original prepare call, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). Until that update lands, the FE polls the canister with `email_recovery_status(nonce)` and shows a "waiting for your email…" spinner. Once the status flips, the FE retrieves the delegation (recovery) or shows "all set" (setup).
+- **The user actually emails the nonce.** They send a fresh email from the address they typed, with the nonce in the `Subject:` (e.g. `Subject: II-Recovery-A1B2C3D4`), to `recover@id.ai` (or `register@id.ai` for setup). The recipient is a single static mailbox per kind — there is no per-challenge id in the address; the canister identifies the challenge by looking up the nonce. Keeping the token in `Subject:` rather than the body is deliberate: the user sees the recovery intent (`II-Recovery-…`) at compose time, which is the cheapest defence against the prepare-then-phish attack discussed in §3.2.
+- **The SMTP gateway forwards the email to the canister via `smtp_request`** — exactly the PoC's surface, no shape change. The canister extracts the nonce from the DKIM-signed `Subject:` header, looks up the pending challenge by nonce, verifies the DKIM signature against the cached public key, checks DMARC alignment against the cached policy, verifies the `From:` matches the address in the original prepare call, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). Until that update lands, the FE polls the canister with `email_recovery_status(nonce)` and shows a "waiting for your email…" spinner. Once the status flips, the FE retrieves the delegation (recovery) or shows "all set" (setup).
 
 The SMTP gateway is *partially trusted*: it can drop, delay, or fabricate calls to `smtp_request`. It cannot fake a DKIM signature for a domain it doesn't control, so the worst it can do is withhold delivery (a DoS that's acceptable for a recovery channel users only hit when locked out).
 
@@ -199,8 +213,7 @@ When a DKIM signature includes `l=N`, only the first N bytes of the canonicalize
 Email recovery does not store inbound email at all (see §2 non-goals), so this is a *verification-time* concern rather than a storage-time concern:
 
 - The DKIM verifier hashes only the first N bytes of the canonicalized body, exactly as RFC 6376 §3.4.5 requires.
-- The challenge-nonce search (see §8) operates on the same signed-prefix bytes — the canonicalized first N. We do *not* search the unsigned tail. The mapping back to "which raw input bytes were signed" is intentionally not performed: relaxed canonicalization is not byte-reversible (whitespace runs collapse, trailing whitespace is stripped), so we search inside the canonicalized prefix and accept it if the nonce string appears there in any case-insensitive form.
-- A signature with `l=` smaller than the location of the nonce is rejected as "nonce missing"; the user is told to resend without the trailing-content footer their mailbox provider may have appended.
+- The challenge nonce lives in the `Subject:` header, which is signed (see §5.4), so `l=` does not affect the nonce search at all — the nonce is always covered by the cryptographic check regardless of body truncation.
 
 The PoC's storage truncation (`truncate_at_char_boundary`) becomes irrelevant once the canister stops persisting the body, but we keep the same byte bound (`MAX_BODY_BYTES`) as an upper limit on the canister-call argument so a malformed caller cannot exhaust the message's argument budget.
 
@@ -214,6 +227,7 @@ Beyond the cryptographic check, the verifier rejects:
 - `x < now` — expired signatures (the PoC's late round of fixes already enforces this; see [aterga's reply](https://github.com/dfinity/internet-identity/pull/3760#discussion_r3137585324) on the PoC review).
 - `i=` — must end in `@d` or `.d` where `d` is the `d=` value. Soft-fail if the DNS `t=s` flag is set.
 - `c=` — header side must be `relaxed`. Body side may be `simple` or `relaxed`. Signatures with `c=simple/*` are rejected with reason `UnsupportedCanonicalization` (see §5.2).
+- `h=` — must include `From` (RFC 6376 §5.4 already requires this) **and** `Subject`. The `Subject` requirement is recovery-specific: the challenge nonce lives in `Subject:` (§8), so a signature that doesn't cover it would let a man-in-the-middle (a malicious gateway, a forwarder, a transparent proxy) rewrite the nonce on a legitimately-signed email and either DoS recovery or — worse — replace the nonce with one bound to an attacker's pending challenge. Every mainstream sender we care about already signs `Subject` by default; rejecting the rare niche signer that doesn't is the right tradeoff. Surfaces as reason `SubjectNotSigned`.
 - DNS-side `k=` — defaults to `rsa`, must match the signature's algorithm.
 - DNS-side `t=y` — testing flag; we treat the signature as Unverified with a `TestingMode` reason.
 
@@ -484,7 +498,7 @@ The whole feature, both setup and recovery, fits in three steps the user sees:
 The shape is one canister call up front, then waiting:
 
 - `email_recovery_credential_prepare_add(anchor, dns_proof)` / `email_recovery_prepare_delegation(dns_proof, session_pk)` — the FE assembles the DNSSEC chain via DoH and ships it together with the address (and, for recovery, the FE-generated session public key). The canister validates the DNSSEC chain immediately, extracts the verified DKIM public key + DMARC policy, and stores them in a pending-challenge entry keyed by the issued nonce. Returns `{ nonce, mailbox, expires_at }`.
-- The gateway calls `smtp_request(SmtpRequest)` when the email arrives — exactly the PoC's surface, unchanged. The canister extracts the nonce from the DKIM-signed body, looks up the pending challenge, DKIM-verifies the email against the cached key, checks DMARC + `From:` alignment, and either binds the address (setup) or stamps a delegation seed for the cached `session_pk` (recovery). The FE is **not** involved here — no upload from the browser.
+- The gateway calls `smtp_request(SmtpRequest)` when the email arrives — exactly the PoC's surface, unchanged. The canister extracts the nonce from the DKIM-signed `Subject:`, looks up the pending challenge, DKIM-verifies the email against the cached key, checks DMARC + `From:` alignment + `Subject` is in `h=`, and either binds the address (setup) or stamps a delegation seed for the cached `session_pk` (recovery). The FE is **not** involved here — no upload from the browser.
 - The FE polls `email_recovery_status(nonce)` while the user composes/sends the email. Once status flips to `RegistrationSucceeded` / `RecoveryReady`, recovery flows then call `email_recovery_get_delegation(...)` (a query) for the SignedDelegation; setup flows just show "all set".
 
 This shape gives us:
@@ -492,7 +506,7 @@ This shape gives us:
 - Heavy work (DNSSEC chain validation) happens once, up front, before the user has to do anything irreversible.
 - Errors are localized: a domain whose DNSSEC chain doesn't validate, or whose DMARC policy is missing, fails at step 1 with a clear message ("we can't accept email from `example.com` because the domain isn't DNSSEC-signed"). The user finds out *before* sending an email.
 - The browser never re-uploads a multi-KB email — the gateway hands the raw bytes directly to the canister.
-- One nonce per challenge, one challenge per nonce. The nonce is the only identifier — both the human-typeable string the user pastes into the email body, and the lookup key the FE polls and the canister uses to match the inbound email. There is no separate `challenge_id`.
+- One nonce per challenge, one challenge per nonce. The nonce is the only identifier — both the human-typeable string the user types into the email's `Subject:`, and the lookup key the FE polls and the canister uses to match the inbound email. There is no separate `challenge_id`.
 
 ### 8.2 Storage model
 
@@ -538,12 +552,14 @@ We do **not** store any inbound email body, header bytes, or DKIM verification a
 
 ```candid
 // Returned by every prepare_* call. The nonce uniquely identifies the
-// challenge — both as the human-typeable string the user pastes into the
-// email body, and as the canister-side lookup key. We don't carry a
-// separate challenge_id.
+// challenge — both as the human-typeable string the user types into the
+// email's Subject:, and as the canister-side lookup key. We don't carry
+// a separate challenge_id.
 type EmailRecoveryChallenge = record {
     nonce      : text;       // e.g. "II-Recovery-A1B2C3D4"; canister keys
-                             //  pending challenges by this value
+                             //  pending challenges by this value, and the
+                             //  user puts it verbatim in the Subject:
+                             //  header of the email they send.
     mailbox    : text;       // canonical: "register@id.ai" or "recover@id.ai"
     expires_at : nat64;      // Unix seconds; 30 minutes after issue
 };
@@ -570,6 +586,7 @@ type EmailRecoveryError = variant {
     EmailVerificationFailed   : VerificationStatus;
     SelectorMismatch;                          // email used a selector other than the one in the prepare proof
     AddressMismatch;                           // From: did not match
+    SubjectNotSigned;                          // h= didn't include Subject (§5.4)
     AddressAlreadyRegistered;
     AddressNotRegistered;
     InternalCanisterError     : text;
@@ -632,8 +649,8 @@ service : {
     //   recover@id.ai  → email-recovery delegation completion
     //
     // No id is encoded in the address. The canister looks up the pending
-    // challenge by the nonce found in the DKIM-signed body of the email,
-    // then dispatches based on the kind stored under that nonce.
+    // challenge by the nonce found in the email's DKIM-signed Subject
+    // header, then dispatches based on the kind stored under that nonce.
     //
     // The signature mirrors the PoC's gateway-protocol Candid (SmtpRequest /
     // SmtpResponse types defined in
@@ -650,7 +667,7 @@ service : {
 
 ### 8.4 Setup flow
 
-The SMTP gateway calls `smtp_request` for every inbound message — exactly the PoC's surface, no canister-side shape change. For email-recovery setups the recipient is `register@id.ai` (one fixed mailbox, no per-challenge id). The canister extracts the DKIM nonce from the signed body of the email, looks up the pending challenge by that nonce, and runs the setup-completion path. The gateway itself does not store the email beyond the brief in-memory hold needed for the canister call.
+The SMTP gateway calls `smtp_request` for every inbound message — exactly the PoC's surface, no canister-side shape change. For email-recovery setups the recipient is `register@id.ai` (one fixed mailbox, no per-challenge id). The canister extracts the DKIM nonce from the signed `Subject:` header of the email, looks up the pending challenge by that nonce, and runs the setup-completion path. The gateway itself does not store the email beyond the brief in-memory hold needed for the canister call.
 
 ```mermaid
 sequenceDiagram
@@ -676,13 +693,13 @@ sequenceDiagram
     II->>FE: { nonce: "II-Recovery-A1B2C3D4", mailbox: "register@id.ai", expires_at }
 
     Note over U,Mail: 4 — User emails the magic token
-    FE->>U: "Send an email containing II-Recovery-A1B2C3D4<br/>to register@id.ai from alice@gmail.com"
+    FE->>U: "Send an email with Subject: II-Recovery-A1B2C3D4<br/>to register@id.ai from alice@gmail.com"
     U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA (DKIM-signed by gmail.com)
 
     Note over GW,II: 5 — Gateway forwards email straight to the canister (PoC surface)
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce from canonicalized signed body,<br/>look up pending challenge by nonce,<br/>verify DKIM signature vs cached pubkey (selector matches),<br/>check DMARC alignment vs cached policy,<br/>verify From matches the address,<br/>atomically replace any prior registered email on this anchor,<br/>bind address → anchor and mark challenge Succeeded
+    II->>II: extract nonce from signed Subject header,<br/>look up pending challenge by nonce,<br/>verify DKIM signature vs cached pubkey (selector matches),<br/>check DMARC alignment vs cached policy,<br/>verify From matches the address,<br/>verify Subject is in the signed h= list,<br/>atomically replace any prior registered email on this anchor,<br/>bind address → anchor and mark challenge Succeeded
 
     Note over FE,II: 6 — FE polls the canister and shows result
     loop until terminal status
@@ -697,7 +714,7 @@ Notes:
 - **Single selector per email.** A DKIM-signed email carries exactly one signature over exactly one selector — the value of the `s=` tag in the `DKIM-Signature` header. Verifying that one email therefore needs exactly one DKIM TXT record (the one for that selector), and one DNSSEC chain to prove it. We don't need to upload multiple selectors at prepare time; we just need to know which one the email *will* be signed under, which is the provider's currently active selector.
 - **How the FE discovers the selector.** DKIM has no native enumeration mechanism — you can't query "list all selectors at `_domainkey.<domain>`". But you *can* probe specific names: a DoH query for `<candidate>._domainkey.<domain>` returns a TXT record if and only if that selector is published. The FE ships a small list of common selector patterns (around 20 names: `selector1`, `selector2`, `s1`, `s2`, `default`, `dkim`, `google`, `mail`, `k1`, `k2`, `protonmail`, `protonmail2`, `protonmail3`, `sig1`, `default._domainkey`, plus current-year date-style names like `20240101`, `20230601`, `20221208` for Google), fires them all in parallel via DoH (each query is tiny and cacheable), and keeps whichever names return a valid `v=DKIM1; k=rsa; p=...` record. The list is data, not code, and updates by ordinary frontend deploys when a new provider naming pattern shows up. For domains where no candidate resolves, the FE shows an error suggesting the user try a different address; a future iteration can offer "advanced — enter your selector manually" as a fallback.
 - **What if the provider rotates between prepare and send.** Rare in practice — providers announce rotations weeks in advance and keep both selectors live during the transition. If it does happen, `smtp_request` returns `SelectorMismatch` and the FE re-probes and retries.
-- The nonce is searched as a case-insensitive substring inside the canonicalized signed-prefix bytes (§5.3). Mailbox providers that append signatures or footers don't break the check as long as the nonce sits inside the DKIM-signed body window.
+- The nonce is searched as a case-insensitive substring inside the canonicalized `Subject:` header value, after confirming `Subject` is in the signature's `h=` list (§5.4). The body is not searched at all — moving the nonce out of the body removes the entire class of "is the nonce inside the `l=` window?" edge cases (§5.3).
 - `smtp_request` is open: anyone can call it, but the only effect is to verify a DKIM-signed email against an already-cached challenge. A malicious gateway can withhold or duplicate calls, but cannot forge state changes.
 - **Retries are concurrent, not overwriting.** A user who closes the wizard and starts again gets a fresh nonce; both pending entries co-exist in the map. Whichever nonce the user actually emails resolves; the other times out at TTL. There is no overwrite-by-anchor or overwrite-by-address — see §8.8 for why.
 - Polling cadence: the FE backs off from 1 s to 5 s; after `expires_at` it stops polling and shows the timeout state.
@@ -734,13 +751,13 @@ sequenceDiagram
     II->>FE: { nonce, mailbox: "recover@id.ai", expires_at }
 
     Note over U,Mail: 4 — User emails the magic token
-    FE->>U: "Send an email containing II-Recovery-…<br/>to recover@id.ai from alice@gmail.com"
+    FE->>U: "Send an email with Subject: II-Recovery-…<br/>to recover@id.ai from alice@gmail.com"
     U->>Mail: send signed email
     Mail->>GW: SMTP DATA
 
     Note over GW,II: 5 — Gateway forwards email straight to the canister
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce, look up pending challenge by nonce,<br/>verify DKIM and DMARC and From,<br/>look up anchor by lowercase(From address),<br/>stamp delegation seed bound to cached session_pk,<br/>mark challenge Succeeded
+    II->>II: extract nonce from signed Subject,<br/>look up pending challenge by nonce,<br/>verify DKIM and DMARC and From and h=Subject,<br/>look up anchor by lowercase(From address),<br/>stamp delegation seed bound to cached session_pk,<br/>mark challenge Succeeded
 
     Note over FE,II: 6 — FE polls and retrieves the delegation
     loop until terminal status
@@ -838,16 +855,24 @@ Note this is a deliberate divergence from the recovery-phrase card, which has no
 ┌──────────────────────────────────────────────────────────────┐
 │  Add email recovery — 2 of 3                                 │
 │                                                              │
+│  This will register alice@gmail.com as a recovery method     │
+│  for your Internet Identity. Only continue if you started    │
+│  this just now, on this page.                                │
+│                                                              │
 │  Send an email from your inbox with these contents:          │
 │                                                              │
 │   ┌──────────────────────────────────────────────────────┐   │
 │   │  To:       register@id.ai                   [ copy ] │   │
 │   │  From:     alice@gmail.com                           │   │
-│   │  Subject:  (anything)                                │   │
-│   │  Body:     II-Recovery-A1B2C3D4              [ copy ]│   │
+│   │  Subject:  II-Recovery-A1B2C3D4              [ copy ]│   │
+│   │  Body:     (anything)                                │   │
 │   └──────────────────────────────────────────────────────┘   │
 │                                                              │
-│  Don't change the recipient or token. The link expires       │
+│  Or just open it in your mail app:                           │
+│                                                              │
+│            [ ✉  Open in mail app ]                           │
+│                                                              │
+│  Don't change the recipient or subject. The link expires     │
 │  in 29:42.                                                   │
 │                                                              │
 │           ⏳ Waiting for your email to arrive…               │
@@ -855,6 +880,8 @@ Note this is a deliberate divergence from the recovery-phrase card, which has no
 │                                       [ Cancel ]  [ Resend ] │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+The "Open in mail app" button is a `mailto:` link with `to`, `subject`, and an empty `body` pre-filled, so the user can complete step 2 in one click on platforms whose mail client honours `mailto:`.
 
 **Setup wizard — step 3: done**
 
@@ -1005,6 +1032,7 @@ We do **not** keep PoC PR #3760's WASM in any release. Its branch closes when Ph
 - **Privacy: enumeration.** Settled — addressed by §3.1. The lookup is gated by a DKIM-valid email signed for the queried address, so an attacker cannot probe addresses they do not already control. UX-level rate limiting on `email_recovery_prepare_delegation` keeps churn bounded.
 - **Multi-anchor per address.** Not allowed — `smtp_request` returns `AddressAlreadyRegistered` (during a register-deliver) if any anchor already has the address bound. Recovery looks up by address, and users do not generally know their anchor number, so the mapping must be functional (§8.5).
 - **Internationalised domains (IDN).** A-label vs U-label canonicalization matters for both the local-part and domain. ASCII-lowercase the A-label form everywhere and reject U-label inputs at the Candid boundary. Acceptable for v1; revisit if user reports surface IDN-mailbox cases we missed.
+- **Outbound email confirmation.** Open. The natural upgrade path against the prepare-then-phish attack (§3.2) is to let the gateway send a confirmation email back to the bound address ("click this link to complete recovery") so the security-relevant action lives in the user's inbox, where a phisher can't reach it. The current design relies on the rotating-nonce + Subject-visibility stack (§3.2), which is the inbound-only ceiling. When outbound is built, we revisit recovery to add the confirmation step; the binding flow could move it earlier.
 
 ---
 
