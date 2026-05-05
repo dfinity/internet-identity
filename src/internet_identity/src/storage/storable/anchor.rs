@@ -1,3 +1,4 @@
+use crate::storage::storable::email_recovery_credential::StorableEmailRecoveryCredential;
 use crate::storage::storable::openid_credential::StorableOpenIdCredential;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -19,6 +20,13 @@ pub struct StorableAnchor {
     pub passkey_credentials: Option<Vec<StorablePasskeyCredential>>,
     #[n(4)]
     pub recovery_keys: Option<Vec<StorableRecoveryKey>>,
+    /// Bound recovery email, if the user has one set up (see
+    /// `docs/ongoing/email-recovery.md` PR #3836). `Option` so old
+    /// anchors decoded under the previous schema deserialize cleanly
+    /// — minicbor `#[cbor(map)]` skips fields not present in the
+    /// encoded bytes, leaving them as their `Default`.
+    #[n(5)]
+    pub email_recovery: Option<StorableEmailRecoveryCredential>,
 }
 
 impl Storable for StorableAnchor {
