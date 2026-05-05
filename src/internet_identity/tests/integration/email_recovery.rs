@@ -38,6 +38,7 @@ fn dns_input() -> EmailRecoveryDnsInput {
     EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
         selector: TEST_SELECTOR.into(),
+        dns_proof: None,
     }
 }
 
@@ -123,6 +124,7 @@ fn prepare_add_rejects_non_allowlisted_domain() {
     let bad_input = EmailRecoveryDnsInput {
         address: "bob@evil.com".into(),
         selector: "default".into(),
+        dns_proof: None,
     };
     let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, bad_input)
         .expect("call failed")
@@ -336,6 +338,169 @@ fn remove_credential_rejects_when_nothing_bound() {
         .expect("call failed")
         .expect_err("expected AddressNotRegistered");
     assert!(matches!(err, EmailRecoveryError::AddressNotRegistered));
+}
+
+// ===================================================================
+// DNSSEC path tests
+// ===================================================================
+//
+// `prepare_add` accepts an optional `dns_proof: Option<DnsProofBundle>`.
+// When supplied, the canister validates the DNSSEC chain synchronously
+// and caches the verified DKIM TXT bytes on the pending challenge,
+// skipping the DoH outcall fan-out at `smtp_request` time. These tests
+// exercise the plumbing through to the verifier; a happy-path DNSSEC
+// e2e test (with a `_domainkey`-targeting test vector signed at test
+// time) is a follow-up — generating a real DNSSEC chain in Rust is a
+// multi-hundred-line signer.
+
+#[test]
+fn dnssec_path_rejects_when_no_trust_anchors_configured() {
+    use internet_identity_interface::internet_identity::types::dnssec::{
+        DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
+    };
+    use serde_bytes::ByteBuf;
+
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    // A minimal-but-shape-valid bundle. The canister rejects before
+    // it even validates because no trust anchors are configured for
+    // this canister (we only set `doh_config` in `setup_canister`).
+    let stub_rrsig = Rrsig {
+        type_covered: 16,
+        algorithm: 8,
+        labels: 2,
+        original_ttl: 3600,
+        expiration: 4_000_000_000,
+        inception: 0,
+        key_tag: 1,
+        signer_name: ByteBuf::from(vec![0u8]),
+        signature: ByteBuf::from(vec![0u8; 256]),
+    };
+    let stub_rrset = SignedRRset {
+        name: ByteBuf::from(b"\x07example\x03com\x00".to_vec()),
+        rtype: 16,
+        rdata: vec![ByteBuf::from(b"\x09v=DKIM1;k=rsa;p=AAAA".to_vec())],
+        ttl: 3600,
+        rrsig: stub_rrsig.clone(),
+    };
+    let proof = DnsProofBundle {
+        leaf: stub_rrset.clone(),
+        root_dnskey: stub_rrset,
+        chain: vec![DelegationLink {
+            child_ds: SignedRRset {
+                name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                rtype: 43,
+                rdata: vec![ByteBuf::from(vec![0u8; 36])],
+                ttl: 3600,
+                rrsig: stub_rrsig.clone(),
+            },
+            child_dnskey: SignedRRset {
+                name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                rtype: 48,
+                rdata: vec![ByteBuf::from(vec![0u8; 64])],
+                ttl: 3600,
+                rrsig: stub_rrsig,
+            },
+        }],
+    };
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        selector: TEST_SELECTOR.into(),
+        dns_proof: Some(proof),
+    };
+    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect_err("expected DNSSEC rejection");
+    // Without `dnssec_config.root_anchors`, prepare returns the
+    // "DNSSEC trust anchors not configured" message via
+    // `DomainNotSupported`. The DoH allowlist isn't consulted at all
+    // when `dns_proof` is supplied.
+    match err {
+        EmailRecoveryError::DomainNotSupported(msg) => {
+            assert!(
+                msg.contains("trust anchors"),
+                "expected trust-anchors message, got {msg:?}",
+            );
+        }
+        other => panic!("expected DomainNotSupported, got {other:?}"),
+    }
+}
+
+#[test]
+fn dnssec_path_takes_precedence_over_doh_allowlist() {
+    use internet_identity_interface::internet_identity::types::dnssec::{
+        DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
+    };
+    use serde_bytes::ByteBuf;
+
+    // Even when the registered domain *is* on the DoH allowlist,
+    // supplying a `dns_proof` puts us on the DNSSEC path. This test
+    // confirms that by sending a malformed DNSSEC bundle and
+    // checking we get a DNSSEC error rather than the call falling
+    // through to the DoH happy path.
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let stub_rrsig = Rrsig {
+        type_covered: 16,
+        algorithm: 8,
+        labels: 2,
+        original_ttl: 3600,
+        expiration: 4_000_000_000,
+        inception: 0,
+        key_tag: 1,
+        signer_name: ByteBuf::from(vec![0u8]),
+        signature: ByteBuf::from(vec![0u8; 256]),
+    };
+    let stub_rrset = SignedRRset {
+        name: ByteBuf::from(b"\x07example\x03com\x00".to_vec()),
+        rtype: 16,
+        rdata: vec![ByteBuf::from(b"\x09v=DKIM1;k=rsa;p=AAAA".to_vec())],
+        ttl: 3600,
+        rrsig: stub_rrsig.clone(),
+    };
+    let proof = DnsProofBundle {
+        leaf: stub_rrset.clone(),
+        root_dnskey: stub_rrset,
+        chain: vec![DelegationLink {
+            child_ds: SignedRRset {
+                name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                rtype: 43,
+                rdata: vec![ByteBuf::from(vec![0u8; 36])],
+                ttl: 3600,
+                rrsig: stub_rrsig.clone(),
+            },
+            child_dnskey: SignedRRset {
+                name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                rtype: 48,
+                rdata: vec![ByteBuf::from(vec![0u8; 64])],
+                ttl: 3600,
+                rrsig: stub_rrsig,
+            },
+        }],
+    };
+    let input = EmailRecoveryDnsInput {
+        // test.example.com IS on the allowlist — but the DNSSEC path
+        // takes precedence.
+        address: TEST_ADDRESS.into(),
+        selector: TEST_SELECTOR.into(),
+        dns_proof: Some(proof),
+    };
+    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect_err("expected DNSSEC rejection");
+    // Without trust anchors configured, prepare bails with
+    // `DomainNotSupported("…trust anchors…")`. Crucially, NOT
+    // a `DohFetchFailed` or successful nonce — confirming the
+    // canister never fell through to DoH.
+    assert!(
+        matches!(err, EmailRecoveryError::DomainNotSupported(_)),
+        "DNSSEC path should not fall through to DoH when dns_proof \
+         is supplied; got {err:?}"
+    );
 }
 
 // ===================================================================
@@ -585,10 +750,7 @@ mod dkim_signer {
         /// per RFC 5280 §4.1, NOT PKCS#1 RSAPublicKey). Real DKIM
         /// records publish keys this way too.
         pub fn public_txt_record(&self) -> Vec<u8> {
-            let spki = self
-                .public_key
-                .to_public_key_der()
-                .expect("RSA SPKI DER");
+            let spki = self.public_key.to_public_key_der().expect("RSA SPKI DER");
             let p_b64 = base64_encode(spki.as_bytes());
             format!("v=DKIM1; k=rsa; p={p_b64}").into_bytes()
         }

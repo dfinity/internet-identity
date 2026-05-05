@@ -25,7 +25,7 @@
 //!    that publishes DNSSEC, once shipped. The Candid type below
 //!    leaves room for this variant.
 
-use crate::internet_identity::types::{Timestamp, UserKey};
+use crate::internet_identity::types::{DnsProofBundle, Timestamp, UserKey};
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
@@ -105,10 +105,22 @@ pub struct EmailRecoveryDnsInput {
     /// know which TXT record to fetch via `doh::fetch_txt` when an
     /// email actually arrives.
     pub selector: String,
-    // Future shape (DNSSEC follow-up PR will add):
-    //     pub dns_proof: Option<DnsProofBundle>,
-    // Adding optional fields to Candid records is forward-compatible
-    // — older callers that omit it deserialize cleanly with `None`.
+    /// Optional DNSSEC proof bundle. Present iff the FE was able to
+    /// walk the DNSSEC delegation chain from root to the DKIM TXT.
+    /// When supplied, the canister:
+    ///
+    /// 1. Synchronously validates the chain against its configured
+    ///    `DnssecConfig.root_anchors` at prepare time.
+    /// 2. Caches the verified DKIM public key + DMARC policy on the
+    ///    pending challenge so `smtp_request` can reuse them
+    ///    without an outcall.
+    ///
+    /// When absent, the canister falls back to the DoH-allowlist
+    /// path (the registered domain must be in
+    /// `DohConfig.allowed_domains`). The FE doesn't need to know
+    /// which path the canister chose; it just submits whatever it
+    /// could gather and reads back the typed error variants.
+    pub dns_proof: Option<DnsProofBundle>,
 }
 
 /// Errors surfaced by every email-recovery flow method.
