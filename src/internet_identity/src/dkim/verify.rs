@@ -416,55 +416,66 @@ fn build_header_hash_input(
 }
 
 /// Blank the value of the `b=` tag in a DKIM-Signature header value
-/// while preserving the surrounding structure. RFC 6376 §3.7 says we
-/// leave the tag and its `=` in place but drop the value bytes.
+/// while preserving the surrounding structure verbatim.
+///
+/// RFC 6376 §3.7 step 2 says the verifier hashes the DKIM-Signature
+/// header "with the value of the 'b=' tag (including all surrounding
+/// whitespace) deleted (i.e., treated as the empty string)". The bytes
+/// **outside** the value — the tag name, any whitespace between the
+/// name and `=`, the `=` itself, and everything that follows the next
+/// `;` — must come through unchanged. With relaxed header canonicalisation
+/// downstream collapsing whitespace and case anyway, the difference is
+/// often invisible; with `B=` (uppercase) or `b\t=` (tab between name
+/// and `=`), preserving original bytes is what keeps the relaxed-canon
+/// hash matching the signer's input.
 fn blank_b_tag_value(value: &str) -> String {
-    // Walk the value, copying everything verbatim until we hit a
-    // `b=` tag at a structural position. The structural-position check
-    // is: at start, or preceded by `;` plus optional WSP.
-    let mut out = String::with_capacity(value.len());
     let bytes = value.as_bytes();
+    let mut out = String::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        let at_start_of_tag = i == 0 || {
-            // Look back for the previous `;`, allowing only WSP between.
-            let mut j = i;
-            while j > 0 {
-                let c = bytes[j - 1];
-                if c == b';' {
-                    break;
-                }
-                if !c.is_ascii_whitespace() {
-                    break;
-                }
-                j -= 1;
-            }
-            j > 0 && bytes[j - 1] == b';'
-        };
-
-        // Try to match `b` (case-insensitive) at position i, followed
-        // by optional WSP, `=`, then the value to blank.
-        if at_start_of_tag && (bytes[i] == b'b' || bytes[i] == b'B') {
-            let mut j = i + 1;
-            while j < bytes.len() && bytes[j].is_ascii_whitespace() {
-                j += 1;
-            }
-            if j < bytes.len() && bytes[j] == b'=' {
-                // Found a `b=` tag at structural position. Emit "b=" and
-                // skip its value up to the next `;` (or end).
-                out.push_str("b=");
-                let mut k = j + 1;
-                while k < bytes.len() && bytes[k] != b';' {
-                    k += 1;
-                }
-                i = k;
-                continue;
-            }
+        if !at_tag_start(bytes, i) || (bytes[i] != b'b' && bytes[i] != b'B') {
+            out.push(bytes[i] as char);
+            i += 1;
+            continue;
         }
-        out.push(bytes[i] as char);
-        i += 1;
+        // Possible `b=` tag head. Look ahead past optional WSP to the
+        // `=`. If the `=` isn't there, this isn't actually a `b` tag —
+        // just emit `b`/`B` and continue.
+        let mut eq_idx = i + 1;
+        while eq_idx < bytes.len() && bytes[eq_idx].is_ascii_whitespace() {
+            eq_idx += 1;
+        }
+        if eq_idx >= bytes.len() || bytes[eq_idx] != b'=' {
+            out.push(bytes[i] as char);
+            i += 1;
+            continue;
+        }
+        // Confirmed: `b...=` at structural position. Copy original bytes
+        // verbatim from `i` through `eq_idx` so case (`B=`) and any
+        // whitespace between the tag name and `=` (`b\t=`) survive.
+        out.push_str(&value[i..=eq_idx]);
+        // Drop the value: skip everything from after `=` to the next
+        // `;` (or end-of-string).
+        let mut k = eq_idx + 1;
+        while k < bytes.len() && bytes[k] != b';' {
+            k += 1;
+        }
+        i = k;
     }
     out
+}
+
+/// Whether index `i` in `bytes` is the start of a tag — either at the
+/// very beginning, or preceded by `;` with only WSP in between.
+fn at_tag_start(bytes: &[u8], i: usize) -> bool {
+    if i == 0 {
+        return true;
+    }
+    let mut j = i;
+    while j > 0 && bytes[j - 1].is_ascii_whitespace() {
+        j -= 1;
+    }
+    j > 0 && bytes[j - 1] == b';'
 }
 
 /// `simple` body canonicalisation (RFC 6376 §3.4.3): identity, except
@@ -544,6 +555,34 @@ mod tests {
         let s = "v=1; bh=Yj1ub3RhdGFn; b=ZGVm";
         let blanked = blank_b_tag_value(s);
         assert_eq!(blanked, "v=1; bh=Yj1ub3RhdGFn; b=");
+    }
+
+    #[test]
+    fn blank_b_tag_preserves_uppercase_b() {
+        // RFC 6376 §3.5: tag names are case-insensitive. A signer that
+        // emits `B=` (uppercase) is valid; we must keep the casing so
+        // the relaxed-canon header hash matches the signer's input.
+        let s = "v=1; B=YWJj; bh=ZGVm";
+        let blanked = blank_b_tag_value(s);
+        assert_eq!(blanked, "v=1; B=; bh=ZGVm");
+    }
+
+    #[test]
+    fn blank_b_tag_preserves_wsp_before_equals() {
+        // FWS is allowed between the tag name and `=` (RFC 6376 §3.2).
+        // We must preserve those bytes — relaxed canon collapses them
+        // later, but if we replaced them with `b=` here we'd be lying
+        // to the canonicalizer about what bytes existed.
+        let s = "v=1; b\t=YWJj; bh=ZGVm";
+        let blanked = blank_b_tag_value(s);
+        assert_eq!(blanked, "v=1; b\t=; bh=ZGVm");
+    }
+
+    #[test]
+    fn blank_b_tag_preserves_space_before_equals() {
+        let s = "v=1; b =YWJj; bh=ZGVm";
+        let blanked = blank_b_tag_value(s);
+        assert_eq!(blanked, "v=1; b =; bh=ZGVm");
     }
 
     #[test]

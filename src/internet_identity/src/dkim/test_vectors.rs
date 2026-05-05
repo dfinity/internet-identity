@@ -7,12 +7,12 @@
 //! per-header `(name, value)` pairs with continuation lines unfolded,
 //! plus the body bytes verbatim.
 //!
-//! Synthetic vectors are produced offline by `scripts/sign-dkim.py`
-//! using `dkimpy` against a freshly-generated 2048-bit RSA key. The
-//! private key is committed alongside the fixtures *only* because it
-//! is a throwaway used solely by this test corpus — it never signs
-//! anything outside the test suite. (The TXT record contains the
-//! corresponding public key.)
+//! Synthetic vectors were produced offline (in the sandbox host) using
+//! [`dkimpy`](https://launchpad.net/dkimpy) against a freshly-generated
+//! 2048-bit RSA key. **The private key is not committed**: only the
+//! signed `.eml` files and the matching DKIM TXT record (containing the
+//! public key) live in `test_vectors/dkim/`. See that directory's
+//! README for the regeneration procedure.
 
 use super::types::{EmailVerificationStatus, VerificationFailReason};
 use super::verify::verify;
