@@ -525,14 +525,9 @@ type EmailRecoveryChallenge = record {
     expires_at : Timestamp;
 };
 
-type DohAllowlistDnsInput = record {
+type EmailRecoveryDnsInput = record {
     address : text;
     selector : text;
-};
-
-type EmailRecoveryDnsInput = variant {
-    DohAllowlist : DohAllowlistDnsInput;
-    Dnssec;
 };
 
 type EmailRecoveryError = variant {
@@ -548,7 +543,6 @@ type EmailRecoveryError = variant {
     SubjectNotSigned;
     AddressAlreadyRegistered;
     AddressNotRegistered;
-    DnssecPathNotYetSupported;
     InternalCanisterError : text;
 };
 
@@ -561,6 +555,45 @@ type EmailRecoveryStatus = variant {
     };
     Failed : EmailRecoveryError;
     Expired;
+};
+
+// SMTP gateway types — see `internet_identity_interface::smtp`. Carried
+// forward from PoC #3760 surface (the existing gateway can target this
+// canister without changes).
+type SmtpHeader = record {
+    name : text;
+    value : text;
+};
+
+type SmtpMessage = record {
+    headers : vec SmtpHeader;
+    body : blob;
+};
+
+type SmtpAddress = record {
+    user : text;
+    domain : text;
+};
+
+type SmtpEnvelope = record {
+    from : SmtpAddress;
+    to : SmtpAddress;
+};
+
+type SmtpRequest = record {
+    message : opt SmtpMessage;
+    envelope : opt SmtpEnvelope;
+    gateway_flags : opt vec text;
+};
+
+type SmtpRequestError = record {
+    code : nat64;
+    message : text;
+};
+
+type SmtpResponse = variant {
+    Ok : record {};
+    Err : SmtpRequestError;
 };
 
 // API V2 specific types
@@ -1338,6 +1371,16 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
+
+    // SMTP gateway protocol
+    // =====================
+    // The off-chain SMTP gateway forwards every inbound message via
+    // smtp_request. The canister verifies the email cryptographically
+    // and dispatches by recipient (register@id.ai → setup completion).
+    // Always returns Ok — the gateway shouldn't get a per-message
+    // verification signal back. The FE sees outcomes via the polling
+    // status query.
+    smtp_request : (SmtpRequest) -> (SmtpResponse);
 
     // HTTP Gateway protocol
     // =====================

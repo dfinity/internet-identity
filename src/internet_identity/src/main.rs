@@ -1436,6 +1436,24 @@ mod email_recovery_api {
         email_recovery::prepare_add(identity_number, dns_input, now_secs).await
     }
 
+    /// Open update. Called by the off-chain SMTP gateway for every
+    /// inbound message. The canister verifies DKIM + DMARC, looks
+    /// up the pending challenge by the nonce in the `Subject:`
+    /// header, and on success binds the credential to the anchor
+    /// from the pending entry.
+    ///
+    /// We always return `Ok` regardless of the verification verdict
+    /// — the gateway gets no useful signal from per-message
+    /// "verification failed" answers, and emitting one would let it
+    /// probe the canister for which nonces exist. The FE sees the
+    /// outcome via its `email_recovery_status(nonce)` poll.
+    #[update]
+    async fn smtp_request(
+        request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
+    ) -> internet_identity_interface::internet_identity::types::smtp::SmtpResponse {
+        email_recovery::handle_smtp_request(request).await
+    }
+
     /// Anonymous. The FE polls this with the nonce returned from
     /// `prepare_add` to drive its "waiting for your email" spinner.
     /// Polling at 1–5 s cadence is the FE's responsibility; this
@@ -1470,16 +1488,15 @@ mod email_recovery_api {
             .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
         crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);
 
-        let operation = email_recovery::remove_credential(&mut anchor, &address)
-            .map_err(|err| match err {
+        let operation =
+            email_recovery::remove_credential(&mut anchor, &address).map_err(|err| match err {
                 crate::email_recovery::RemoveError::NotRegistered => {
                     EmailRecoveryError::AddressNotRegistered
                 }
             })?;
 
-        crate::state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
-            EmailRecoveryError::InternalCanisterError(format!("{err:?}"))
-        })?;
+        crate::state::storage_borrow_mut(|storage| storage.write(anchor))
+            .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;
 
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
         Ok(())
