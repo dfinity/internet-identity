@@ -21,13 +21,14 @@
 //!    (`II-Recovery-…`) inside it.
 //! 2. Look up the pending challenge by nonce. Reject if missing or
 //!    expired (the FE will see `Expired` on its next poll).
-//! 3. For the DoH path stored on the pending challenge, async-fetch
-//!    `<selector>._domainkey.<domain>` via `crate::doh::fetch_txt`,
-//!    along with `_dmarc.<domain>`.
-//! 4. Run `crate::dmarc::verify_email` against the fetched TXT
-//!    records. This does the full DKIM signature check + DMARC
-//!    alignment + `Subject` in `h=` enforcement (the `h=` check was
-//!    added during the PR 5 review).
+//! 3. Source the DKIM and DMARC TXT bytes — for the DNSSEC path
+//!    they're already cached on the pending challenge, so no DNS
+//!    work happens here; for the DoH path async-fetch
+//!    `<selector>._domainkey.<domain>` and `_dmarc.<domain>` via
+//!    `crate::doh::fetch_txt`.
+//! 4. Run `crate::dmarc::verify_email` against those TXT records.
+//!    This does the full DKIM signature check + DMARC alignment +
+//!    `Subject` in `h=` enforcement.
 //! 5. Verify the verified `From:` matches the address claimed at
 //!    prepare time. The two could diverge if the user typed the
 //!    wrong address into the wizard but sent from a different one.
@@ -131,8 +132,9 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     }) {
         Some(Some(s)) => s,
         // Either nonce is unknown / expired (None), or the pending
-        // entry is for a flow this PR doesn't handle yet
-        // (Some(None)). Drop silently — see module note.
+        // entry is for a flow not yet wired up here (Some(None) —
+        // currently the `Recover` variant; lands with the recovery
+        // flow). Drop silently — see module note.
         _ => return SmtpResponse::Ok {},
     };
 

@@ -17,9 +17,10 @@
 //!   design doc §6.4).
 //! - `verify` — orchestration; the public entry point lives here.
 
-// PR 3 lands the verifier without an in-canister consumer (PR 8's
-// `smtp_request` dispatch is the first caller). Suppress dead-code
-// warnings for the public surface until consumers land.
+// `crate::email_recovery::smtp::verify_setup_email` is the in-canister
+// consumer; some less-used variants in the public surface (e.g.
+// fine-grained `EmailVerificationStatus` reasons) aren't yet
+// pattern-matched. Suppress dead-code warnings until those land.
 #![allow(dead_code)]
 
 mod alignment;

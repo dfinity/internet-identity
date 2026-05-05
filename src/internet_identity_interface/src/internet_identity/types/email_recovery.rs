@@ -12,18 +12,20 @@
 //!   fresh session keypair.
 //!
 //! Both flows hinge on the canister verifying a DKIM-signed email
-//! whose DKIM key it trusts. The trust comes from one of two paths:
+//! whose DKIM key it trusts. The trust comes from one of two paths,
+//! picked by the canister per call:
 //!
-//! 1. **DoH allowlist** — for major mailbox providers (Gmail, Outlook,
-//!    iCloud, …) the canister fetches the DKIM TXT via a 3-of-5 quorum
-//!    across independent DoH providers (`crate::doh::fetch_txt`).
-//!    Restricted to a deploy-arg allowlist. **This is the only path
-//!    supported in the initial cut.**
-//! 2. **DNSSEC** *(deferred to a follow-up PR)* — the FE walks the
-//!    DNSSEC chain from root to the DKIM TXT, the canister validates
-//!    the chain synchronously at prepare time. Default for any zone
-//!    that publishes DNSSEC, once shipped. The Candid type below
-//!    leaves room for this variant.
+//! 1. **DNSSEC** — when the FE supplies a `DnsProofBundle` carrying
+//!    the DKIM TXT (and optionally DMARC), the canister validates the
+//!    chain synchronously at prepare time against its configured
+//!    `DnssecConfig.root_anchors`, caches the verified TXT bytes on
+//!    the pending challenge, and skips DoH entirely.
+//! 2. **DoH allowlist** — when no bundle is supplied, the canister
+//!    checks the registered domain against `DohConfig.allowed_domains`
+//!    (deploy-arg). Used for the major consumer mailbox providers
+//!    (Gmail, Outlook, iCloud, …) that don't publish DNSSEC. The
+//!    DKIM TXT is resolved via a 3-of-5 DoH quorum
+//!    (`crate::doh::fetch_txt`) at `smtp_request` time.
 
 use crate::internet_identity::types::{DnsProofBundle, Timestamp, UserKey};
 use candid::{CandidType, Deserialize};
@@ -77,16 +79,13 @@ pub struct EmailRecoveryChallenge {
 /// What the FE submits at prepare time.
 ///
 /// The FE never decides which verification path to use — it just
-/// passes the address and selector it discovered via DoH probing.
-/// The canister picks the path:
+/// passes the address, selector, and (when it could assemble one) a
+/// DNSSEC proof bundle. The canister picks the path:
 ///
-/// - If the FE was able to walk the DNSSEC delegation chain to root
-///   for this domain, a follow-up PR will let it pass the resulting
-///   bundle as an additional optional field on this record. The
-///   canister then validates the chain synchronously and uses the
-///   DKIM key from the bundle.
-/// - Otherwise, the canister checks the registered domain against
-///   `DohConfig.allowed_domains` (deploy-arg) and resolves the DKIM
+/// - If `dns_proof` is `Some`, take the DNSSEC path: validate the
+///   chain synchronously and use the DKIM key from the bundle.
+/// - Otherwise, check the registered domain against
+///   `DohConfig.allowed_domains` (deploy-arg) and resolve the DKIM
 ///   TXT via `crate::doh::fetch_txt` at `smtp_request` time.
 /// - If neither path applies, prepare fails with
 ///   `DomainNotSupported`.
