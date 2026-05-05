@@ -180,7 +180,7 @@ This document covers all of the above plus two architectural changes the PoC did
 
 The index that maps a verified sender address to an anchor number is a public-shape concern (an attacker could in principle iterate addresses to discover whether a friend has an II account). In practice the lookup is gated by DKIM: the canister never accepts an `email_recovery_*` call without a DKIM-valid email signed by the queried domain on behalf of the queried address. An attacker who controls `mallory@gmail.com` can probe whether `mallory@gmail.com` is registered, but cannot probe `alice@gmail.com` without first compromising Alice's mailbox or Gmail's DKIM key — at which point they already have full mailbox control.
 
-We therefore key the lookup index by `lowercase(local-part) + "@" + lowercase(domain)` directly. No per-anchor salt is needed. If a UX flaw later surfaces (e.g., the FE displaying the queried address back unmasked) we add a captcha or rate limit on top; we do *not* try to make the index itself unenumerable.
+We therefore key the lookup index by `lowercase(local-part) + "@" + lowercase(domain)` directly. No per-anchor salt is needed; we do *not* try to make the index itself unenumerable.
 
 ### 3.2 Recovery phishing: the prepare-then-trick attack
 
