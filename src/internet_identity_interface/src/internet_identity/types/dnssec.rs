@@ -86,12 +86,18 @@ pub struct DelegationLink {
     pub child_dnskey: SignedRRset,
 }
 
-/// The full proof: leaf RRset + delegation chain to the root + the root
-/// DNSKEY RRset (which is in turn validated against the canister's
-/// configured `DnssecRootAnchor`s).
+/// The full proof: one or more leaf RRsets + delegation chain to the
+/// root + the root DNSKEY RRset (which is in turn validated against
+/// the canister's configured `DnssecRootAnchor`s).
+///
+/// All leaves in `leaves` are validated under the same chain — each is
+/// verified against the deepest zone's DNSKEY RRset. This is what makes
+/// it cheap to bundle DKIM and DMARC into a single proof on the email-
+/// recovery path: both records live under the same zone, so the chain
+/// (root → … → `<domain>`) only needs to be walked once.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DnsProofBundle {
-    pub leaf: SignedRRset,
+    pub leaves: Vec<SignedRRset>,
     pub root_dnskey: SignedRRset,
     pub chain: Vec<DelegationLink>,
 }

@@ -559,7 +559,7 @@ type DelegationLink = record {
 };
 
 type DnsProofBundle = record {
-    leaf : SignedRRset;
+    leaves : vec SignedRRset;
     root_dnskey : SignedRRset;
     chain : vec DelegationLink;
 };

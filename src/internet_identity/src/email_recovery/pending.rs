@@ -41,8 +41,19 @@ pub struct PendingChallenge {
     /// will resolve the TXT via `crate::doh::fetch_txt` instead.
     /// `Some(bytes)` means the canister has already validated the
     /// DNSSEC chain at prepare time and can skip the outcall fan-out
-    /// entirely.
+    /// entirely. Acts as the flag for "DNSSEC path?" — when set,
+    /// `cached_dmarc_txt` below is meaningful (Some/None reflecting
+    /// whether the FE included a DMARC leaf in the bundle); when
+    /// `None`, DMARC is fetched via DoH at email time.
     pub cached_dkim_txt: Option<Vec<u8>>,
+    /// Cached DMARC TXT record bytes from the DNSSEC path. Only
+    /// meaningful when `cached_dkim_txt.is_some()` (DNSSEC path).
+    /// `Some(bytes)` means the FE supplied a DMARC leaf in the bundle
+    /// and the canister validated it; `smtp_request` uses these bytes
+    /// directly. `None` (on the DNSSEC path) means the FE didn't
+    /// include DMARC — treated as "no DMARC published" and the
+    /// verifier falls back to strict `d=` alignment.
+    pub cached_dmarc_txt: Option<Vec<u8>>,
     /// Status the FE polls. Flips from `Pending` to a terminal
     /// variant on `smtp_request`; sticky thereafter (the FE reads
     /// once and ends the wizard).
@@ -205,6 +216,7 @@ mod tests {
             selector: "20230601".into(),
             created_at_secs: now,
             cached_dkim_txt: None,
+            cached_dmarc_txt: None,
             status: PendingStatus::Pending,
         }
     }
