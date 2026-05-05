@@ -30,6 +30,8 @@ mod canonicalize;
 mod dns_record;
 mod parse;
 mod signature;
+#[cfg(test)]
+mod test_vectors;
 mod types;
 mod verify;
 
