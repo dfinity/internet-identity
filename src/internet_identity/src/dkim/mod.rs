@@ -26,6 +26,7 @@
 // surface until consumers land.
 #![allow(dead_code)]
 
+mod canonicalize;
 mod parse;
 mod types;
 
