@@ -38,7 +38,7 @@
 //!    follow-up needed.
 
 use crate::internet_identity::types::{
-    AnchorNumber, DelegationChain, DnsProofBundle, SignedRRset, Timestamp, UserKey,
+    AnchorNumber, DnsProofBundle, SignedRRset, Timestamp, UserKey,
 };
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
@@ -79,20 +79,14 @@ pub struct EmailRecoveryChallenge {
     /// followed by 16 lowercase hex characters (8 random bytes from
     /// a canister-side ChaCha20Rng PRNG seeded once via `raw_rand`).
     pub nonce: String,
+    /// Where the user should send the email — `register@id.ai` for
+    /// setup, `recover@id.ai` for recovery. The canister identifies
+    /// the challenge from the `nonce` in the `Subject:`, not from
+    /// the recipient address.
+    pub mailbox: String,
     /// Nanoseconds since the Unix epoch. 30 minutes after issue.
     pub expires_at: Timestamp,
 }
-
-// Note on the recipient mailbox: the canister doesn't include it in
-// this response. All entries of the `related_origins` deploy arg
-// are accepted as equal aliases (`register@<host>` /
-// `recover@<host>` for any host), and the FE renders the
-// user-facing label by pairing `register` / `recover` with
-// `window.location.hostname`. That way each tab shows the user the
-// alias matching the origin they're already on; the canister never
-// has to single one out as canonical. See
-// `crate::email_recovery::mailbox_domains` (canister-side) for the
-// dispatch-side counterpart.
 
 /// What the FE submits at prepare time.
 ///
@@ -155,39 +149,16 @@ pub struct EmailRecoveryDnsInput {
 }
 
 /// What the FE submits at `email_recovery_submit_dkim_leaf` —
-/// the signed DKIM resolution chain `<selector>._domainkey.<d>`
-/// → … → final TXT, plus any *additional* delegation chains for
-/// signed zones the resolution crosses into.
+/// the DKIM leaf RRset for the selector embedded in the
+/// just-arrived email's DKIM-Signature header.
 ///
-/// Operational shape per provider category (see design doc §7.6):
-///
-/// - **Same-zone direct TXT** (Gmail, iCloud, most ESPs configured
-///   directly): `hops = [TXT]`, `extra_chains = []`. The apex zone
-///   was already chained at prepare time.
-/// - **Cross-zone CNAME** (Proton: `proton.me` → `proton.ch`,
-///   Tutanota: `tutanota.com` → `tutanota.de`, M365 custom
-///   domains, …): `hops = [CNAME, …, TXT]`, `extra_chains` carries
-///   one chain per zone touched that wasn't already covered by the
-///   skeleton chain.
-///
-/// The canister already cached the root DNSKEY + apex zone DNSKEY at
-/// prepare time, and the partial-verification record (the signed-
-/// headers digest and the signature blob) at email-arrival time.
-/// This call:
-///
-/// 1. Validates each `extra_chains` entry under the cached root
-///    DNSKEY and merges the resulting `(zone → DNSKEY)` entries
-///    into the cached map.
-/// 2. Verifies each hop under the zone its RRSIG names
-///    (`rrsig.signer_name`).
-/// 3. Walks the hop sequence: `hops[0].name` must equal
-///    `<selector>._domainkey.<registered_domain>`, each
-///    intermediate hop must be a CNAME whose target equals the next
-///    hop's owner, the final hop must be the TXT we want.
-/// 4. Parses the final TXT for the DKIM public key and finishes the
-///    signature check against the cached digest + signature blob.
-///
-/// See design doc §8.4 / §8.5.
+/// The canister already cached the validated zone DNSKEY at prepare
+/// time and the partial-verification record (the signed-headers
+/// digest and the signature blob) at email-arrival time. This call
+/// admits the leaf against the cached DNSKEY, parses the DKIM TXT
+/// to recover the public key, and finishes the signature check
+/// using the cached digest and signature. See design doc §8.4 /
+/// §8.5.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct EmailRecoverySubmitDkimLeafArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`
@@ -195,18 +166,14 @@ pub struct EmailRecoverySubmitDkimLeafArg {
     /// flows share the same submit-leaf surface — the canister
     /// dispatches by the pending entry's `kind`.
     pub nonce: String,
-    /// The DKIM resolution chain in CNAME order, ending in a TXT.
-    /// At least one hop required; bounded by
-    /// `MAX_CNAME_HOPS = 4` at the canister side. For the Gmail-
-    /// style direct-TXT case this is a single-element vec.
-    pub hops: Vec<SignedRRset>,
-    /// Delegation chains for signed zones touched by `hops` that
-    /// weren't already covered by the skeleton chain anchored at
-    /// prepare time. Empty for same-zone resolution. Each chain
-    /// must anchor at the same root DNSKEY the prepare bundle did
-    /// (verified internally by re-validating against the cached
-    /// root DNSKEY RRset).
-    pub extra_chains: Vec<DelegationChain>,
+    /// The DKIM TXT leaf at `<selector>._domainkey.<registered_domain>`,
+    /// signed under the same zone the skeleton chain anchored at
+    /// prepare time. The canister rejects with `DkimLeafMismatch`
+    /// if the leaf's owner name doesn't end at the registered
+    /// domain or if the selector doesn't match the
+    /// `NeedDkimLeaf { selector }` status set when the email
+    /// arrived.
+    pub dkim_leaf: SignedRRset,
 }
 
 /// Errors surfaced by every email-recovery flow method.

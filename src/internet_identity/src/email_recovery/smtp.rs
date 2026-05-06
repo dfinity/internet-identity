@@ -56,10 +56,21 @@ use internet_identity_interface::internet_identity::types::smtp::{
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
+<<<<<<< HEAD
 // Recipient user-parts (`register`, `recover`) live on the parent
 // `email_recovery` module so the shared mailbox-domain helpers can
 // read them too. Imported here for the dispatch logic.
 use super::{RECOVERY_RECIPIENT_USER, SETUP_RECIPIENT_USER};
+=======
+/// Recipient mailbox name for the setup flow.
+pub const SETUP_RECIPIENT_USER: &str = "register";
+/// Recipient mailbox name for the recovery flow.
+pub const RECOVERY_RECIPIENT_USER: &str = "recover";
+/// The domain on which both flows expect to receive mail. The
+/// gateway operator chooses this — `id.ai` is the design-doc
+/// example. Future enhancement: lift this into a deploy-arg.
+pub const SETUP_RECIPIENT_DOMAIN: &str = "id.ai";
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 
 /// Whether `to` matches `<expected_user>@<one of the configured
 /// mailbox domains>`, case-insensitive on both halves. The set of
@@ -146,6 +157,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
+<<<<<<< HEAD
     let recipient_flow = if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER) {
         RecipientFlow::Setup
     } else if recipient_matches(&envelope.to, RECOVERY_RECIPIENT_USER) {
@@ -155,6 +167,22 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // to the gateway.
         return SmtpResponse::Ok {};
     };
+=======
+    let recipient_flow =
+        if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN) {
+            RecipientFlow::Setup
+        } else if recipient_matches(
+            &envelope.to,
+            RECOVERY_RECIPIENT_USER,
+            SETUP_RECIPIENT_DOMAIN,
+        ) {
+            RecipientFlow::Recovery
+        } else {
+            // Drop with Ok — we don't emit a per-recipient signal back
+            // to the gateway.
+            return SmtpResponse::Ok {};
+        };
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 
     let message = match request.message.as_ref() {
         Some(m) => m,
@@ -720,7 +748,11 @@ pub(super) fn recovery_snapshot(
         kind: SnapshotKind::Recovery { session_pk },
         claimed_address,
         registered_domain,
+<<<<<<< HEAD
         is_dnssec_path: true,
+=======
+        cached_zone_dnskey: true,
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
         cached_dmarc_txt: None,
         partial_set: false,
         already_terminal: false,
