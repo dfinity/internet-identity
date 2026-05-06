@@ -90,7 +90,8 @@ pub struct IdentityInfo {
     /// the FE can render the correct "active vs inactive" state of
     /// the recovery email card without round-tripping a separate
     /// query.
-    pub email_recovery: Option<crate::internet_identity::types::email_recovery::EmailRecoveryCredential>,
+    pub email_recovery:
+        Option<crate::internet_identity::types::email_recovery::EmailRecoveryCredential>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
