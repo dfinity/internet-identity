@@ -28,6 +28,31 @@
 readonly WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
 readonly IC_NETWORK="ic"
 
+# Default DoH allowlist for the email-recovery flow. Domains here can
+# bind/recover via the DoH-fallback path even when they don't publish
+# DNSSEC. The list covers the major consumer mailbox providers we
+# expect to support on beta — adding a domain is operator config, not
+# code. Override by passing --doh-domains <comma-list> to the deploy
+# script. Empty allowlist disables the DoH path entirely (DNSSEC-only).
+readonly DEFAULT_DOH_ALLOWED_DOMAINS=(
+    gmail.com
+    googlemail.com
+    outlook.com
+    hotmail.com
+    live.com
+    icloud.com
+    me.com
+    mac.com
+    yahoo.com
+    protonmail.com
+    proton.me
+    pm.me
+)
+
+# Source the IANA fetcher so build_be_install_arg can reach it.
+# shellcheck source=fetch-iana-root-anchors.bash
+source "$(dirname "${BASH_SOURCE[0]}")/fetch-iana-root-anchors.bash"
+
 # -------------------------
 # Staging environments
 # -------------------------
@@ -125,6 +150,13 @@ Common options:
   -be                       Shortcut for --end back
   --dry-run                 Print icp canister install commands instead of running them
   --no-checks               Skip reachability and consistency checks
+  --skip-email-recovery-init
+                            Leave dnssec_config and doh_config as opt null on
+                            this upgrade (preserve previous on-chain values).
+                            Default: fetch fresh IANA root anchors + use the
+                            built-in DoH allowlist.
+  --doh-domains <a,b,...>   Override the default DoH allowlist. Empty disables
+                            the DoH path (DNSSEC-only).
   -h, --help                Show this help
 EOF
 }
@@ -143,6 +175,8 @@ parse_common_args() {
     REBUILD_BE=false
     DRY_RUN=false
     NO_CHECKS=false
+    UPDATE_EMAIL_RECOVERY_INIT=true
+    DOH_DOMAINS_ARG=""
     REMAINING_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -233,6 +267,24 @@ parse_common_args() {
                 ;;
             --no-checks)
                 NO_CHECKS=true
+                shift
+                ;;
+            --skip-email-recovery-init)
+                # Don't fetch IANA anchors / set DoH allowlist on this
+                # upgrade. The fields stay `opt null` in the install
+                # arg, which the canister interprets as "preserve the
+                # previous value". Use this on subsequent upgrades
+                # once the values are already on chain.
+                UPDATE_EMAIL_RECOVERY_INIT=false
+                shift
+                ;;
+            --doh-domains)
+                shift
+                if [ $# -eq 0 ]; then
+                    echo "Error: --doh-domains requires a comma-separated list" >&2
+                    return 1
+                fi
+                DOH_DOMAINS_ARG="$1"
                 shift
                 ;;
             --)
@@ -525,18 +577,75 @@ EOF
 # Build the BE install arg. The BE init type is `opt InternetIdentityInit`
 # where every field is itself `opt` and "absent" = preserve previous value,
 # so we only set the fields that follow from the shared quad (BE_ID, BE_URL,
-# FE_URL). Everything else stays untouched on upgrade.
+# FE_URL) plus — when `UPDATE_EMAIL_RECOVERY_INIT` is true — the
+# `dnssec_config` and `doh_config` knobs the email-recovery flow needs.
+# Everything else stays untouched on upgrade.
 #
 # Output: Candid text on stdout.
 build_be_install_arg() {
+    local extra=""
+    if [ "$UPDATE_EMAIL_RECOVERY_INIT" = true ]; then
+        # IANA root anchors — fetched + reviewed live. Each call hits
+        # data.iana.org, so we cache the result for the lifetime of the
+        # script run by stashing it on the first call.
+        if [ -z "${_BE_DNSSEC_CONFIG_CANDID:-}" ]; then
+            local anchors_vec
+            anchors_vec="$(fetch_and_review_iana_root_anchors)" || return 1
+            _BE_DNSSEC_CONFIG_CANDID="opt opt record { root_anchors = $anchors_vec }"
+        fi
+        # DoH allowlist — operator config (the user can override via
+        # --doh-domains; empty disables the DoH path entirely).
+        local doh_record
+        doh_record="$(_be_doh_config_candid)"
+        extra=$(cat <<EXTRA
+    dnssec_config = $_BE_DNSSEC_CONFIG_CANDID;
+    doh_config = $doh_record;
+EXTRA
+)
+    fi
+
     cat <<EOF
 (
   opt record {
     backend_canister_id = opt principal "$BE_ID";
     backend_origin = opt "$BE_URL";
     related_origins = opt vec { "$FE_URL" };
+$extra
   }
 )
+EOF
+}
+
+# Internal: render the DoH allowlist as Candid `opt opt DohConfig`.
+# Reads either DOH_DOMAINS_ARG (when --doh-domains was passed) or
+# the static DEFAULT_DOH_ALLOWED_DOMAINS list. An empty list still
+# emits the record (with `allowed_domains = vec {}`), which the
+# canister treats as "no domain may use the DoH path".
+_be_doh_config_candid() {
+    local -a domains
+    if [ -n "$DOH_DOMAINS_ARG" ]; then
+        # Comma-separated list → array. Trim whitespace per element.
+        IFS=',' read -ra domains <<< "$DOH_DOMAINS_ARG"
+        local i
+        for i in "${!domains[@]}"; do
+            domains[i]="${domains[i]## }"
+            domains[i]="${domains[i]%% }"
+        done
+    else
+        domains=("${DEFAULT_DOH_ALLOWED_DOMAINS[@]}")
+    fi
+
+    local list=""
+    local d
+    for d in "${domains[@]}"; do
+        if [ -z "$d" ]; then continue; fi
+        list+="\"$d\"; "
+    done
+    cat <<EOF
+opt opt record {
+      allowed_domains = vec { $list};
+      max_cache_age_secs = opt (3600 : nat64);
+    }
 EOF
 }
 
