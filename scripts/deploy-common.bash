@@ -30,23 +30,48 @@ readonly IC_NETWORK="ic"
 
 # Default DoH allowlist for the email-recovery flow. Domains here can
 # bind/recover via the DoH-fallback path even when they don't publish
-# DNSSEC. The list covers the major consumer mailbox providers we
-# expect to support on beta — adding a domain is operator config, not
-# code. Override by passing --doh-domains <comma-list> to the deploy
-# script. Empty allowlist disables the DoH path entirely (DNSSEC-only).
+# DNSSEC. The list is curated from the major consumer mailbox
+# providers that *don't* publish DS records — those that do (Proton,
+# GMX, Tutanota, mail.com, live.com, …) are deliberately excluded
+# because the FE walks DNSSEC for them natively, and putting them on
+# this list would let an unsigned-zone misconfiguration silently
+# downgrade them to the DoH path. Audited 2026-05; every entry below
+# returns an empty `dig +short DS <domain>`.
+#
+# Adding a domain is operator config, not code. Override by passing
+# --doh-domains <comma-list> to the deploy script; empty list
+# disables the DoH path entirely (DNSSEC-only).
 readonly DEFAULT_DOH_ALLOWED_DOMAINS=(
+    # Google
     gmail.com
     googlemail.com
+    # Microsoft (note: live.com IS DNSSEC-signed and is omitted here)
     outlook.com
     hotmail.com
-    live.com
+    msn.com
+    # Apple
     icloud.com
     me.com
     mac.com
+    # Yahoo / Verizon Media
     yahoo.com
-    protonmail.com
-    proton.me
-    pm.me
+    ymail.com
+    aol.com
+    # Other Western providers
+    zoho.com
+    fastmail.com
+    fastmail.fm
+    hey.com
+    # Yandex / Mail.ru (Russia)
+    yandex.com
+    yandex.ru
+    mail.ru
+    # Asia
+    qq.com
+    163.com
+    126.com
+    naver.com
+    daum.net
 )
 
 # Source the IANA fetcher so build_be_install_arg can reach it.
