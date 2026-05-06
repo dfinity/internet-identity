@@ -244,7 +244,9 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
                     selector: selector.clone(),
                 },
                 PendingStatus::Succeeded => match (&c.kind, &c.recovery_outcome) {
-                    (PendingKind::Register { .. }, _) => EmailRecoveryStatus::RegistrationSucceeded,
+                    (PendingKind::Register { .. }, _) => {
+                        EmailRecoveryStatus::RegistrationSucceeded
+                    }
                     (PendingKind::Recover { .. }, Some(outcome)) => {
                         EmailRecoveryStatus::RecoveryReady {
                             user_key: serde_bytes::ByteBuf::from(outcome.user_key.clone()),
