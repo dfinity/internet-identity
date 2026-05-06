@@ -573,13 +573,14 @@ EOF
 #
 # Args: <args-file>  (in-place edit)
 #
-# If `II_SKIP_EMAIL_RECOVERY_INIT=1`, skip the patch entirely — useful
-# for upgrades where the on-chain values are already set and we want
-# them preserved by leaving the fields as `opt null`.
+# Opt-in: only runs when `II_UPDATE_EMAIL_RECOVERY_INIT=1`. Without
+# the env var the patch is skipped and didc-assist's output is used
+# verbatim — most upgrades want this, since the on-chain values are
+# already set after the first init and `opt null` preserves them.
 patch_email_recovery_init_fields() {
   local args_file="$1"
-  if [ "${II_SKIP_EMAIL_RECOVERY_INIT:-0}" = "1" ]; then
-    echo "II_SKIP_EMAIL_RECOVERY_INIT=1 — leaving dnssec_config/doh_config as didc-assist wrote them." >&2
+  if [ "${II_UPDATE_EMAIL_RECOVERY_INIT:-0}" != "1" ]; then
+    echo "II_UPDATE_EMAIL_RECOVERY_INIT not set — leaving dnssec_config/doh_config as didc-assist wrote them." >&2
     return 0
   fi
   echo ""
@@ -587,7 +588,7 @@ patch_email_recovery_init_fields() {
   echo ""
   local anchors_vec
   anchors_vec="$(fetch_and_review_iana_root_anchors)" || {
-    echo "Failed to fetch IANA root anchors. Set II_SKIP_EMAIL_RECOVERY_INIT=1 to skip." >&2
+    echo "Failed to fetch IANA root anchors. Unset II_UPDATE_EMAIL_RECOVERY_INIT to skip." >&2
     return 1
   }
   local doh_record="$(build_doh_config_candid_for_prod)"
