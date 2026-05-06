@@ -133,10 +133,11 @@ export class TestSigner {
 
     // 6. Build the SmtpRequest.
     const fromUser = params.from.split("@")[0] ?? "alice";
-    const fromDomain =
-      params.from.split("@").slice(1).join("@") || this.#domain;
+    const fromDomainRaw = params.from.split("@").slice(1).join("@");
+    const fromDomain = fromDomainRaw === "" ? this.#domain : fromDomainRaw;
     const toUser = params.to.split("@")[0] ?? "register";
-    const toDomain = params.to.split("@").slice(1).join("@") || "id.ai";
+    const toDomainRaw = params.to.split("@").slice(1).join("@");
+    const toDomain = toDomainRaw === "" ? "id.ai" : toDomainRaw;
 
     const request: SmtpRequest = {
       envelope: [

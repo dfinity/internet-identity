@@ -73,7 +73,7 @@
   // Email-recovery wizard plumbing
   // -------------------------------------------------------------
 
-  const prepareEmailDelegation = async (
+  const prepareEmailDelegation = (
     input: EmailRecoveryDnsInput,
     sessionPublicKey: Uint8Array,
   ) =>
@@ -81,11 +81,10 @@
       .email_recovery_prepare_delegation(input, sessionPublicKey)
       .then(throwCanisterError);
 
-  const emailRecoveryStatus = async (nonce: string) => {
-    return await anonymousActor.email_recovery_status(nonce);
-  };
+  const emailRecoveryStatus = (nonce: string) =>
+    anonymousActor.email_recovery_status(nonce);
 
-  const getEmailDelegation = async (args: EmailRecoveryGetDelegationArgs) =>
+  const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
     anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
 
   /**

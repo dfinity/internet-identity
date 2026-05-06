@@ -257,7 +257,7 @@
   // -------------------------------------------------------------
 
   /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-  const prepareAddEmail = async (input: EmailRecoveryDnsInput) =>
+  const prepareAddEmail = (input: EmailRecoveryDnsInput) =>
     $authenticatedStore.actor
       .email_recovery_credential_prepare_add(
         $authenticatedStore.identityNumber,
@@ -266,9 +266,8 @@
       .then(throwCanisterError);
 
   /** Anonymous wrapper around `email_recovery_status` (query). */
-  const statusEmailRecovery = async (nonce: string) => {
-    return await anonymousActor.email_recovery_status(nonce);
-  };
+  const statusEmailRecovery = (nonce: string) =>
+    anonymousActor.email_recovery_status(nonce);
 
   const handleRemoveEmail = async () => {
     if (emailRecovery === undefined) return;
