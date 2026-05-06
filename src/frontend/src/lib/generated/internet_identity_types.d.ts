@@ -379,6 +379,7 @@ export interface Delegation {
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
 }
+export interface DelegationChain { 'links' : Array<DelegationLink> }
 export interface DelegationLink {
   'child_dnskey' : SignedRRset,
   'child_ds' : SignedRRset,
@@ -478,8 +479,8 @@ export interface DeviceWithUsage {
 export interface DiscoverableOidcConfig { 'discovery_domain' : string }
 export interface DnsProofBundle {
   'root_dnskey' : SignedRRset,
-  'chain' : Array<DelegationLink>,
-  'leaf' : [] | [SignedRRset],
+  'hops' : Array<SignedRRset>,
+  'chains' : Array<DelegationChain>,
 }
 /**
  * DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -569,8 +570,9 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'Expired' : null } |
   { 'Pending' : null };
 export interface EmailRecoverySubmitDkimLeafArg {
+  'extra_chains' : Array<DelegationChain>,
+  'hops' : Array<SignedRRset>,
   'nonce' : string,
-  'dkim_leaf' : SignedRRset,
 }
 export type FrontendHostname = string;
 export type GetAccountError = {

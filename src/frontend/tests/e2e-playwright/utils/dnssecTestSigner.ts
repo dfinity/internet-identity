@@ -376,9 +376,9 @@ export async function buildChain(args: {
   return {
     anchor,
     skeleton: {
-      leaf: [],
       root_dnskey: rootDnskey,
-      chain: [{ child_ds: childDs, child_dnskey: childDnskey }],
+      chains: [{ links: [{ child_ds: childDs, child_dnskey: childDnskey }] }],
+      hops: [],
     },
     dkimLeaf,
     dmarcLeaf,

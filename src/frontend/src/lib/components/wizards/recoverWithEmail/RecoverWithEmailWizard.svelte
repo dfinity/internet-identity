@@ -34,7 +34,7 @@
     SignedDelegation,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import { assembleSkeleton, assembleDkimLeaf } from "$lib/utils/dnssec";
+  import { assembleSkeleton, assembleDkimResolution } from "$lib/utils/dnssec";
   import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
   import type { RecoverySuccess } from "./index";
 
@@ -180,11 +180,12 @@
           dkimLeafSubmitted = true;
           const selector = result.NeedDkimLeaf.selector;
           try {
-            const walked = await assembleDkimLeaf(domain, selector);
+            const walked = await assembleDkimResolution(domain, selector);
             if (walked !== undefined) {
               const submission = await submitDkimLeaf({
                 nonce,
-                dkim_leaf: walked.leaf,
+                hops: walked.hops,
+                extra_chains: walked.extraChains,
               });
               if ("RecoveryReady" in submission) {
                 await retrieveDelegation(

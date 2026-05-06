@@ -32,7 +32,7 @@
     EmailRecoverySubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import { assembleSkeleton, assembleDkimLeaf } from "$lib/utils/dnssec";
+  import { assembleSkeleton, assembleDkimResolution } from "$lib/utils/dnssec";
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
@@ -158,11 +158,12 @@
           // entry will time out and the user will see Expired.
           const selector = result.NeedDkimLeaf.selector;
           try {
-            const walked = await assembleDkimLeaf(domain, selector);
+            const walked = await assembleDkimResolution(domain, selector);
             if (walked !== undefined) {
               const submission = await submitDkimLeaf({
                 nonce,
-                dkim_leaf: walked.leaf,
+                hops: walked.hops,
+                extra_chains: walked.extraChains,
               });
               if ("RegistrationSucceeded" in submission) {
                 stage = { kind: "done", address };

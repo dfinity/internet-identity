@@ -68,10 +68,12 @@ function buildMatchEntry(rrset: SignedRRset): MatchEntry {
 
 function buildMatchTable(bundle: DnsProofBundle): MatchEntry[] {
   const entries: MatchEntry[] = [];
-  for (const leaf of bundle.leaf) entries.push(buildMatchEntry(leaf));
-  for (const link of bundle.chain) {
-    entries.push(buildMatchEntry(link.child_dnskey));
-    entries.push(buildMatchEntry(link.child_ds));
+  for (const hop of bundle.hops) entries.push(buildMatchEntry(hop));
+  for (const chain of bundle.chains) {
+    for (const link of chain.links) {
+      entries.push(buildMatchEntry(link.child_dnskey));
+      entries.push(buildMatchEntry(link.child_ds));
+    }
   }
   entries.push(buildMatchEntry(bundle.root_dnskey));
   return entries;
