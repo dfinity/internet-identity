@@ -40,8 +40,18 @@ const TEST_DOMAIN = "test.example.com";
 /** Selector inside the FE's `SELECTOR_CANDIDATES` list so DKIM probing
  *  finds it without patching the FE. */
 const TEST_SELECTOR = "mail";
-/** "From" address used in both setup and recovery emails. */
-const FROM_ADDRESS = `alice@${TEST_DOMAIN}`;
+
+/**
+ * Per-test "From" address. The canister keeps a global
+ * `address → anchor` reverse index, so two tests reusing the same
+ * address in the same canister deployment will collide on the
+ * second `bind_credential_to_anchor` call. We mint a fresh
+ * local-part per fixture instance so tests stay isolated.
+ */
+function makeFromAddress(): string {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `alice-${rand}@${TEST_DOMAIN}`;
+}
 
 /**
  * Inject `localStorage` overrides for the email-recovery feature
@@ -153,8 +163,10 @@ class EmailRecoveryFixtures {
   readonly domain = TEST_DOMAIN;
   /** Selector that lives inside the FE's `SELECTOR_CANDIDATES`. */
   readonly selector = TEST_SELECTOR;
-  /** "From" address used in both setup and recovery emails. */
-  readonly fromAddress = FROM_ADDRESS;
+  /** "From" address used in both setup and recovery emails. Unique
+   *  per test so reruns against a long-lived canister don't collide
+   *  on the global address → anchor reverse index. */
+  readonly fromAddress = makeFromAddress();
 
   constructor(page: Page) {
     this.#page = page;
@@ -255,7 +267,7 @@ class EmailRecoveryFixtures {
   }): Promise<void> {
     const { dkim } = await this.#ensureCtx();
     const signed = await dkim.signEmail({
-      from: FROM_ADDRESS,
+      from: this.fromAddress,
       to: params.to,
       subject: params.subject,
       body: new TextEncoder().encode(params.body ?? "Hello.\r\n"),
