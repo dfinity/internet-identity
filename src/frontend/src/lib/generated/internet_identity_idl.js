@@ -291,10 +291,11 @@ export const idlFactory = ({ IDL }) => {
     'child_dnskey' : SignedRRset,
     'child_ds' : SignedRRset,
   });
+  const DelegationChain = IDL.Record({ 'links' : IDL.Vec(DelegationLink) });
   const DnsProofBundle = IDL.Record({
     'root_dnskey' : SignedRRset,
-    'chain' : IDL.Vec(DelegationLink),
-    'leaf' : IDL.Opt(SignedRRset),
+    'hops' : IDL.Vec(SignedRRset),
+    'chains' : IDL.Vec(DelegationChain),
   });
   const EmailRecoveryDnsInput = IDL.Record({
     'dns_proof' : IDL.Opt(DnsProofBundle),
@@ -350,8 +351,9 @@ export const idlFactory = ({ IDL }) => {
     'Pending' : IDL.Null,
   });
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({
+    'extra_chains' : IDL.Vec(DelegationChain),
+    'hops' : IDL.Vec(SignedRRset),
     'nonce' : IDL.Text,
-    'dkim_leaf' : SignedRRset,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
