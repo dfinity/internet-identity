@@ -36,7 +36,7 @@ import { walkSkeletonChain, walkDkimLeaf } from "./chain";
  * allowlist, which is the intended fallback for unsigned mainstream
  * mailbox providers (Gmail, Outlook, iCloud as of writing).
  */
-export async function assembleSkeleton(
+export function assembleSkeleton(
   domain: string,
   wantDmarc: boolean = true,
 ): Promise<DnsProofBundle | undefined> {
@@ -54,7 +54,7 @@ export async function assembleSkeleton(
  * Returns `undefined` if the leaf doesn't resolve or the chain
  * isn't fully signed.
  */
-export async function assembleDkimLeaf(
+export function assembleDkimLeaf(
   domain: string,
   selector: string,
 ): Promise<{ bundle: DnsProofBundle; leaf: SignedRRset } | undefined> {
