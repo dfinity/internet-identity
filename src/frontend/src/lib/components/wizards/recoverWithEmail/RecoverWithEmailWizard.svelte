@@ -30,10 +30,11 @@
     EmailRecoveryDnsInput,
     EmailRecoveryGetDelegationArgs,
     EmailRecoveryStatus,
+    EmailRecoverySubmitDkimLeafArg,
     SignedDelegation,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import { discoverSelector, assembleBundle } from "$lib/utils/dnssec";
+  import { assembleSkeleton, assembleDkimLeaf } from "$lib/utils/dnssec";
   import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
   import type { RecoverySuccess } from "./index";
 
@@ -45,6 +46,10 @@
     ) => Promise<EmailRecoveryChallenge>;
     /** Anonymous wrapper around `email_recovery_status` (query). */
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
+    submitDkimLeaf: (
+      arg: EmailRecoverySubmitDkimLeafArg,
+    ) => Promise<EmailRecoveryStatus>;
     /** Anonymous wrapper around `email_recovery_get_delegation`. */
     getDelegation: (
       args: EmailRecoveryGetDelegationArgs,
@@ -58,6 +63,7 @@
   const {
     prepareDelegation,
     status,
+    submitDkimLeaf,
     getDelegation,
     onSignedIn,
     onCancel,
@@ -94,8 +100,11 @@
       if ("SubjectNotSigned" in reason) {
         return "Your email provider didn't sign the Subject header. Try a different provider.";
       }
-      if ("SelectorMismatch" in reason) {
-        return "Your email provider rotated its DKIM keys. Please retry.";
+      if ("DkimLeafMismatch" in reason) {
+        return "Your email provider rotated its DKIM keys mid-flow. Please retry.";
+      }
+      if ("NoDkimLeafExpected" in reason) {
+        return "Internal error: the DKIM leaf was submitted at the wrong moment. Please retry.";
       }
       if ("EmailVerificationFailed" in reason) {
         return `Your email didn't verify (${reason.EmailVerificationFailed}). Make sure you sent it from the address you typed, no forwarding, no aliases.`;
@@ -124,29 +133,32 @@
       sessionIdentity.getPublicKey().toDer(),
     );
 
-    const selector = (await discoverSelector(domain)) ?? "default";
     let dnsProof: DnsProofBundle | undefined;
     try {
-      dnsProof = await assembleBundle(domain, selector, true);
+      dnsProof = await assembleSkeleton(domain, true);
     } catch {
       dnsProof = undefined;
     }
 
     const input: EmailRecoveryDnsInput = {
       address,
-      selector,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
 
     const challenge = await prepareDelegation(input, sessionPublicKey);
     stage = { kind: "sending", challenge, address, sessionIdentity };
-    void runPoll(challenge.nonce, sessionIdentity);
+    void runPoll(challenge.nonce, domain, sessionIdentity);
   };
 
-  const runPoll = async (nonce: string, sessionIdentity: ECDSAKeyIdentity) => {
+  const runPoll = async (
+    nonce: string,
+    domain: string,
+    sessionIdentity: ECDSAKeyIdentity,
+  ) => {
     if (polling) return;
     polling = true;
     let intervalMs = 1_000;
+    let dkimLeafSubmitted = false;
     try {
       while (polling && stage.kind === "sending") {
         const result = await status(nonce);
@@ -163,6 +175,36 @@
         if ("Failed" in result || "Expired" in result) {
           stage = { kind: "failed", reason: friendlyError(result) };
           return;
+        }
+        if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
+          dkimLeafSubmitted = true;
+          const selector = result.NeedDkimLeaf.selector;
+          try {
+            const walked = await assembleDkimLeaf(domain, selector);
+            if (walked !== undefined) {
+              const submission = await submitDkimLeaf({
+                nonce,
+                dkim_leaf: walked.leaf,
+              });
+              if ("RecoveryReady" in submission) {
+                await retrieveDelegation(
+                  nonce,
+                  submission.RecoveryReady.user_key,
+                  submission.RecoveryReady.expiration,
+                  submission.RecoveryReady.anchor_number,
+                  sessionIdentity,
+                );
+                return;
+              }
+              if ("Failed" in submission || "Expired" in submission) {
+                stage = { kind: "failed", reason: friendlyError(submission) };
+                return;
+              }
+            }
+          } catch {
+            // Leave the loop running so the user sees a clean
+            // Expired if the canister times out.
+          }
         }
         await new Promise((r) => setTimeout(r, intervalMs));
         intervalMs = Math.min(5_000, intervalMs * 1.5);

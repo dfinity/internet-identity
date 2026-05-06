@@ -37,8 +37,11 @@ import { DEFAULT_HOST } from "./identity";
 
 /** Domain the synthesized DNSSEC chain authenticates. */
 const TEST_DOMAIN = "test.example.com";
-/** Selector inside the FE's `SELECTOR_CANDIDATES` list so DKIM probing
- *  finds it without patching the FE. */
+/** DKIM selector the synthesized email is signed under. With the
+ *  two-phase flow the canister parses `s=` from the email and tells
+ *  the FE which leaf to walk — we no longer probe a candidate list,
+ *  so any selector value works as long as the test fixture signs
+ *  with it. */
 const TEST_SELECTOR = "mail";
 
 /**
@@ -154,14 +157,26 @@ async function makeAnonymousActor(
   });
 }
 
+interface EmailRecoveryCtx {
+  /** Skeleton bundle (chain only, `leaf = []`) for prepare-time. */
+  skeleton: DnsProofBundle;
+  /** Signed DKIM TXT leaf for `<selector>._domainkey.<domain>` —
+   *  the DoH layer serves it; the FE walks it post-email. */
+  dkimLeaf: import("$lib/generated/internet_identity_types").SignedRRset;
+  /** DKIM signer used to produce the test email. */
+  dkim: TestSigner;
+}
+
 class EmailRecoveryFixtures {
   readonly #page: Page;
   /** Lazy: built on first call to `installDohInterceptor` / `submitEmail`. */
-  #ctx: Promise<{ bundle: DnsProofBundle; dkim: TestSigner }> | undefined;
+  #ctx: Promise<EmailRecoveryCtx> | undefined;
 
   /** Domain the synthesized DNSSEC chain authenticates. */
   readonly domain = TEST_DOMAIN;
-  /** Selector that lives inside the FE's `SELECTOR_CANDIDATES`. */
+  /** Selector the test fixture signs the email with. The canister
+   *  reads it back from the DKIM-Signature header and tells the FE
+   *  which leaf to walk; no probing involved. */
   readonly selector = TEST_SELECTOR;
   /** "From" address used in both setup and recovery emails. Unique
    *  per test so reruns against a long-lived canister don't collide
@@ -246,10 +261,12 @@ class EmailRecoveryFixtures {
   // ---------------------------------------------------------------
 
   /** Wire up `page.route()` handlers for both DoH endpoints to serve
-   *  bytes from the freshly-built DNSSEC chain. Idempotent. */
+   *  bytes from the freshly-built DNSSEC chain. Idempotent. The
+   *  skeleton chain is exposed via the bundle; the DKIM leaf is
+   *  exposed as an extra so the FE's post-email walk finds it. */
   async installDohInterceptor(): Promise<void> {
-    const { bundle } = await this.#ensureCtx();
-    await installDohInterceptor(this.#page, bundle);
+    const { skeleton, dkimLeaf } = await this.#ensureCtx();
+    await installDohInterceptor(this.#page, skeleton, [dkimLeaf]);
   }
 
   /**
@@ -285,12 +302,12 @@ class EmailRecoveryFixtures {
 
   /** Build the DNSSEC chain + DKIM keypair the first time the test
    *  reaches for the network-side machinery. ~200ms — RSA keygen. */
-  #ensureCtx(): Promise<{ bundle: DnsProofBundle; dkim: TestSigner }> {
+  #ensureCtx(): Promise<EmailRecoveryCtx> {
     if (this.#ctx === undefined) {
       this.#ctx = (async () => {
         const dkim = await TestSigner.create(TEST_DOMAIN, TEST_SELECTOR);
         const nowSecs = Math.floor(Date.now() / 1000);
-        const { bundle } = await buildChain({
+        const { skeleton, dkimLeaf } = await buildChain({
           domain: TEST_DOMAIN,
           selector: TEST_SELECTOR,
           dkimTxt: dkim.publicTxtRecord(),
@@ -298,7 +315,7 @@ class EmailRecoveryFixtures {
           // alignment when no DMARC record is published.
           nowSecs,
         });
-        return { bundle, dkim };
+        return { skeleton, dkimLeaf, dkim };
       })();
     }
     return this.#ctx;

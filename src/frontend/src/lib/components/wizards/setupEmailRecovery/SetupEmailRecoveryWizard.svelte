@@ -6,15 +6,19 @@
    * §8.4:
    *
    *   1. User types their email address.
-   *   2. We discover the DKIM selector + (optionally) assemble a
-   *      DNSSEC bundle, call `email_recovery_credential_prepare_add`,
-   *      and show the canister-issued nonce + recipient mailbox.
+   *   2. We assemble a DNSSEC *skeleton* bundle (chain + optional
+   *      DMARC leaf — no DKIM leaf, the selector isn't yet known),
+   *      call `email_recovery_credential_prepare_add`, and show the
+   *      canister-issued nonce + recipient mailbox.
    *   3. User sends a DKIM-signed email containing that nonce; we
-   *      poll `email_recovery_status` until it flips to
-   *      `RegistrationSucceeded` (or terminal Failed/Expired).
-   *
-   * Both DNSSEC and DoH paths converge on the same canister method;
-   * the wizard doesn't need to know which one the canister picked.
+   *      poll `email_recovery_status`. The first non-Pending result
+   *      is `NeedDkimLeaf { selector }` (DNSSEC path) — at which
+   *      point we walk that one DKIM leaf and call
+   *      `email_recovery_submit_dkim_leaf`. We then keep polling
+   *      until status flips to `RegistrationSucceeded` (or terminal
+   *      Failed/Expired). On the DoH path the canister finishes
+   *      verification synchronously inside `smtp_request`, so we go
+   *      straight from `Pending` to terminal — no `submit` step.
    */
 
   import EnterAddress from "./views/EnterAddress.svelte";
@@ -25,20 +29,25 @@
     EmailRecoveryChallenge,
     EmailRecoveryDnsInput,
     EmailRecoveryStatus,
+    EmailRecoverySubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import { discoverSelector, assembleBundle } from "$lib/utils/dnssec";
+  import { assembleSkeleton, assembleDkimLeaf } from "$lib/utils/dnssec";
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
     prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
     /** Anonymous wrapper around `email_recovery_status` (query). */
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
+    submitDkimLeaf: (
+      arg: EmailRecoverySubmitDkimLeafArg,
+    ) => Promise<EmailRecoveryStatus>;
     /** Wizard close — called on user-initiated cancel and on `Done`. */
     onClose: () => void;
   }
 
-  const { prepare, status, onClose }: Props = $props();
+  const { prepare, status, submitDkimLeaf, onClose }: Props = $props();
 
   type Stage =
     | { kind: "enter"; initialError?: string }
@@ -73,8 +82,11 @@
       if ("SubjectNotSigned" in reason) {
         return "Your email provider didn't sign the Subject header. Try a different provider.";
       }
-      if ("SelectorMismatch" in reason) {
-        return "Your email provider rotated its DKIM keys. Please retry.";
+      if ("DkimLeafMismatch" in reason) {
+        return "Your email provider rotated its DKIM keys mid-flow. Please retry.";
+      }
+      if ("NoDkimLeafExpected" in reason) {
+        return "Internal error: the DKIM leaf was submitted at the wrong moment. Please retry.";
       }
       if ("AddressAlreadyRegistered" in reason) {
         return "This email is already used to recover a different identity.";
@@ -96,15 +108,16 @@
   const handleAddressSubmitted = async (address: string) => {
     const domain = address.split("@")[1] ?? "";
 
-    // Best-effort selector discovery and DNSSEC bundle assembly.
-    // If either step yields nothing (no DNSSEC, no published
-    // selector candidates) we still let the canister try the DoH
-    // path; only when *neither* domain config applies does the
-    // user get a "DomainNotAllowlisted" error back.
-    const selector = (await discoverSelector(domain)) ?? "default";
+    // Best-effort DNSSEC skeleton-bundle assembly. The DKIM leaf is
+    // *not* fetched here — its selector lives only inside the
+    // eventual email's `DKIM-Signature: s=` tag, so we walk that
+    // leaf later (after polling sees `NeedDkimLeaf`). If the chain
+    // assembly yields nothing (no DNSSEC) we still let the canister
+    // try the DoH path; only when *neither* domain config applies
+    // does the user get a "DomainNotAllowlisted" error back.
     let dnsProof: DnsProofBundle | undefined;
     try {
-      dnsProof = await assembleBundle(domain, selector, true);
+      dnsProof = await assembleSkeleton(domain, true);
     } catch {
       // If chain assembly throws (malformed RRSIG etc.) just let
       // the canister fall through to the DoH path.
@@ -113,19 +126,19 @@
 
     const input: EmailRecoveryDnsInput = {
       address,
-      selector,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
 
     const challenge = await prepare(input);
     stage = { kind: "sending", challenge, address };
-    void runPoll(challenge.nonce, address);
+    void runPoll(challenge.nonce, domain, address);
   };
 
-  const runPoll = async (nonce: string, address: string) => {
+  const runPoll = async (nonce: string, domain: string, address: string) => {
     if (polling) return;
     polling = true;
     let intervalMs = 1_000;
+    let dkimLeafSubmitted = false;
     try {
       while (polling && stage.kind === "sending") {
         const result = await status(nonce);
@@ -137,7 +150,36 @@
           stage = { kind: "failed", reason: friendlyError(result) };
           return;
         }
-        // Pending: back off from 1 → 5 s.
+        if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
+          dkimLeafSubmitted = true;
+          // Email arrived; the canister has the selector. Walk the
+          // single missing DKIM leaf and submit it. If the leaf
+          // walk fails we keep the loop alive — the canister-side
+          // entry will time out and the user will see Expired.
+          const selector = result.NeedDkimLeaf.selector;
+          try {
+            const walked = await assembleDkimLeaf(domain, selector);
+            if (walked !== undefined) {
+              const submission = await submitDkimLeaf({
+                nonce,
+                dkim_leaf: walked.leaf,
+              });
+              if ("RegistrationSucceeded" in submission) {
+                stage = { kind: "done", address };
+                return;
+              }
+              if ("Failed" in submission || "Expired" in submission) {
+                stage = { kind: "failed", reason: friendlyError(submission) };
+                return;
+              }
+            }
+          } catch {
+            // Submit failed; fall through to keep polling so the
+            // user sees a clean Expired if the canister times out.
+          }
+        }
+        // Pending or NeedDkimLeaf-but-already-submitted: back off
+        // from 1 → 5 s.
         await new Promise((r) => setTimeout(r, intervalMs));
         intervalMs = Math.min(5_000, intervalMs * 1.5);
       }

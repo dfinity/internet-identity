@@ -286,9 +286,16 @@ async function makeAnchor(root: ZoneKey): Promise<DnssecRootAnchor> {
  * email-recovery flow. RRSIGs are valid from `nowSecs - 60` to
  * `nowSecs + 7d`.
  *
- * The returned `bundle` is suitable for `email_recovery_credential_prepare_add`'s
- * `dns_proof` field; the matching `anchor` must already be present
- * in the canister's `dnssec_config.root_anchors`.
+ * Returns the chain components separately so callers can compose
+ * single-leaf bundles for the two-phase flow:
+ * - `skeleton` (chain only, `leaf = []`) → for `prepare_add` /
+ *   `prepare_delegation` (when `dmarcTxt` is `undefined`).
+ * - `skeleton` with `leaf = [dmarcLeaf]` → for `prepare` when
+ *   the test wants DMARC included.
+ * - `skeleton` with `leaf = [dkimLeaf]` → for `submit_dkim_leaf`.
+ *
+ * The matching `anchor` must already be present in the canister's
+ * `dnssec_config.root_anchors`.
  */
 export async function buildChain(args: {
   domain: string;
@@ -296,7 +303,12 @@ export async function buildChain(args: {
   dkimTxt: Uint8Array;
   dmarcTxt?: Uint8Array;
   nowSecs: number;
-}): Promise<{ bundle: DnsProofBundle; anchor: DnssecRootAnchor }> {
+}): Promise<{
+  anchor: DnssecRootAnchor;
+  skeleton: DnsProofBundle;
+  dkimLeaf: SignedRRset;
+  dmarcLeaf: SignedRRset | undefined;
+}> {
   const inception = Math.max(0, args.nowSecs - 60);
   const expiration = args.nowSecs + 7 * 24 * 3600;
 
@@ -345,19 +357,17 @@ export async function buildChain(args: {
     expiration,
   );
 
-  const leaves: SignedRRset[] = [dkimLeaf];
+  let dmarcLeaf: SignedRRset | undefined;
   if (args.dmarcTxt !== undefined) {
     const dmarcOwner = encodeDnsName(`_dmarc.${args.domain}`);
-    leaves.push(
-      signRrset(
-        zoneKey,
-        dmarcOwner,
-        TYPE_TXT,
-        [packTxtRdata(args.dmarcTxt)],
-        countLabels(dmarcOwner),
-        inception,
-        expiration,
-      ),
+    dmarcLeaf = signRrset(
+      zoneKey,
+      dmarcOwner,
+      TYPE_TXT,
+      [packTxtRdata(args.dmarcTxt)],
+      countLabels(dmarcOwner),
+      inception,
+      expiration,
     );
   }
 
@@ -365,11 +375,13 @@ export async function buildChain(args: {
 
   return {
     anchor,
-    bundle: {
-      leaves,
+    skeleton: {
+      leaf: [],
       root_dnskey: rootDnskey,
       chain: [{ child_ds: childDs, child_dnskey: childDnskey }],
     },
+    dkimLeaf,
+    dmarcLeaf,
   };
 }
 
