@@ -1461,6 +1461,23 @@ mod email_recovery_api {
         email_recovery::handle_smtp_request(request).await
     }
 
+    /// Open query — the off-chain SMTP gateway calls this at
+    /// `RCPT TO` time to decide whether to accept the connection
+    /// before pulling the message body. Returns `Ok` for the two
+    /// recipients we handle (`register@id.ai`, `recover@id.ai`) and
+    /// 550 (mailbox unavailable) for everything else. Without this
+    /// the gateway has no way to know which recipients we accept,
+    /// and falls back to whatever default policy it was deployed
+    /// with — which on the existing II gateway is the postbox PoC's
+    /// "user-part must be a numeric anchor number" rule, rejecting
+    /// `register@id.ai` and `recover@id.ai` outright.
+    #[query]
+    fn smtp_request_validate(
+        request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
+    ) -> internet_identity_interface::internet_identity::types::smtp::SmtpResponse {
+        email_recovery::handle_smtp_request_validate(request)
+    }
+
     /// Anonymous. The FE polls this with the nonce returned from
     /// `prepare_add` to drive its "waiting for your email" spinner.
     /// Polling at 1–5 s cadence is the FE's responsibility; this

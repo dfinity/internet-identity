@@ -1423,6 +1423,12 @@ service : (opt InternetIdentityInit) -> {
     // status query.
     smtp_request : (SmtpRequest) -> (SmtpResponse);
 
+    // Called by the gateway at RCPT TO time to decide whether to
+    // accept the connection before pulling the message body. Returns
+    // Ok for register@id.ai / recover@id.ai (case-insensitive), and
+    // 550 (mailbox unavailable) for everything else.
+    smtp_request_validate : (SmtpRequest) -> (SmtpResponse) query;
+
     // HTTP Gateway protocol
     // =====================
     http_request : (request : HttpRequest) -> (HttpResponse) query;
