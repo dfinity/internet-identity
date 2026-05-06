@@ -202,7 +202,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             kind,
             claimed_address: c.claimed_address.clone(),
             registered_domain: c.registered_domain.clone(),
-            cached_zone_dnskey: c.cached_zone_dnskey.is_some(),
+            is_dnssec_path: c.cached_root_dnskey.is_some(),
             cached_dmarc_txt: c.cached_dmarc_txt.clone(),
             partial_set: c.partial_verification.is_some(),
             already_terminal: matches!(
@@ -230,7 +230,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         return SmtpResponse::Ok {};
     }
 
-    if snapshot.cached_zone_dnskey {
+    if snapshot.is_dnssec_path {
         // DNSSEC path — pre-DKIM-key verification only. Body is
         // dropped after `bh=` validates; status flips to
         // `NeedDkimLeaf { selector }` so the FE submits the leaf.
@@ -303,9 +303,10 @@ pub(super) struct PendingSnapshot {
     /// Pinned at prepare time; `submit_dkim_leaf` rejects DKIM leaves
     /// at any other zone.
     registered_domain: String,
-    /// `true` when prepare took the DNSSEC path (zone DNSKEY cached).
-    /// Decides whether `smtp_request` finishes here or hands off.
-    cached_zone_dnskey: bool,
+    /// `true` when prepare took the DNSSEC path (root DNSKEY + zone
+    /// keys cached). Decides whether `smtp_request` finishes here or
+    /// hands off to the FE for the DKIM leaf walk.
+    is_dnssec_path: bool,
     /// Pre-validated DMARC TXT bytes from the DNSSEC path. `Some` means
     /// the FE included a DMARC leaf in the skeleton bundle; `None`
     /// means it didn't (we'll fall back to strict `d=` alignment at
@@ -725,7 +726,7 @@ pub(super) fn recovery_snapshot(
         kind: SnapshotKind::Recovery { session_pk },
         claimed_address,
         registered_domain,
-        cached_zone_dnskey: true,
+        is_dnssec_path: true,
         cached_dmarc_txt: None,
         partial_set: false,
         already_terminal: false,

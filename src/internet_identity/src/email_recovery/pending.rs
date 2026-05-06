@@ -38,18 +38,26 @@ pub struct PendingChallenge {
     /// Unix-seconds at which `prepare_add` ran. Used for TTL expiry
     /// and as the basis for `expires_at` shipped to the FE.
     pub created_at_secs: u64,
-    /// Cached deepest-zone DNSKEY RRset from the skeleton chain. Set
-    /// when the FE took the DNSSEC path at prepare time
-    /// (`dns_proof.is_some()`). The canister validates the chain
-    /// against its trust anchors at prepare time and stashes the
-    /// validated DNSKEY RRset here so a follow-up
-    /// `email_recovery_submit_dkim_leaf` can admit a single TXT leaf
-    /// without re-walking the chain. `None` means the DoH path —
+    /// Cached root DNSKEY RRset, set when the FE took the DNSSEC
+    /// path at prepare time (`dns_proof.is_some()`). The canister
+    /// validates it against the configured trust anchors at prepare
+    /// time and stashes it here so that
+    /// `email_recovery_submit_dkim_leaf` can admit *additional*
+    /// delegation chains under the same root if the DKIM CNAME chain
+    /// crosses into a new signed zone (Proton/Tutanota-style; see
+    /// design doc §7.2). `None` means the DoH path —
     /// `smtp_request` resolves the DKIM TXT via
     /// `crate::doh::fetch_txt` instead.
-    pub cached_zone_dnskey: Option<crate::dnssec::SignedRRset>,
+    pub cached_root_dnskey: Option<crate::dnssec::SignedRRset>,
+    /// Cached `(zone_name → DNSKEY RRset)` map populated from the
+    /// skeleton chain at prepare time. Empty on the DoH path. The
+    /// map starts with one zone (the registered apex) for Gmail-
+    /// style direct-TXT domains and grows at `submit_dkim_leaf`
+    /// time when the DKIM resolution crosses into a different
+    /// signed zone.
+    pub cached_zones: crate::dnssec::ZoneKeysMap,
     /// Cached DMARC TXT record bytes from the DNSSEC path. Only
-    /// meaningful when `cached_zone_dnskey.is_some()` (DNSSEC path).
+    /// meaningful when `cached_root_dnskey.is_some()` (DNSSEC path).
     /// `Some(bytes)` means the FE included a DMARC leaf in the
     /// skeleton chain and the canister validated it. `None` (on the
     /// DNSSEC path) means the FE didn't include DMARC — treated as
@@ -332,7 +340,8 @@ mod tests {
             claimed_address: addr.into(),
             registered_domain,
             created_at_secs: now,
-            cached_zone_dnskey: None,
+            cached_root_dnskey: None,
+            cached_zones: crate::dnssec::ZoneKeysMap::new(),
             cached_dmarc_txt: None,
             partial_verification: None,
             status: PendingStatus::Pending,

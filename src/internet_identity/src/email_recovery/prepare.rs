@@ -123,9 +123,13 @@ async fn prepare_common(
     //   arrival.
     // - Neither: reject — the FE will surface a "we can't accept
     //   email from this domain" error.
-    let (cached_zone_dnskey, cached_dmarc_txt) = if let Some(proof) = dns_proof {
+    let (cached_root_dnskey, cached_zones, cached_dmarc_txt) = if let Some(proof) = dns_proof {
         let extracted = verify_dnssec_skeleton(proof, &registered_domain, now_secs)?;
-        (Some(extracted.zone_dnskey), extracted.dmarc)
+        (
+            Some(extracted.root_dnskey),
+            extracted.zones,
+            extracted.dmarc,
+        )
     } else {
         // No DNSSEC bundle → DoH allowlist gate.
         let allowlisted = state::persistent_state(|p| {
@@ -141,7 +145,7 @@ async fn prepare_common(
         if !allowlisted {
             return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
         }
-        (None, None)
+        (None, crate::dnssec::ZoneKeysMap::new(), None)
     };
 
     // Now we can mutate state. The async raw_rand fetch happens at
@@ -176,7 +180,8 @@ async fn prepare_common(
         claimed_address: address,
         registered_domain,
         created_at_secs: now_secs,
-        cached_zone_dnskey,
+        cached_root_dnskey,
+        cached_zones,
         cached_dmarc_txt,
         partial_verification: None,
         status: PendingStatus::Pending,
@@ -197,26 +202,29 @@ async fn prepare_common(
 }
 
 /// Output of a successful DNSSEC skeleton-bundle verification — the
-/// validated deepest-zone DNSKEY RRset (always cached) plus the
-/// optional DMARC TXT bytes (set when the FE included a DMARC leaf
-/// in the skeleton bundle). The DKIM leaf isn't part of the prepare
-/// bundle — it lands later via `email_recovery_submit_dkim_leaf`.
+/// validated root DNSKEY RRset (cached so the canister can admit
+/// further chains under it at submit time when the DKIM CNAME chain
+/// crosses into a new zone), the validated `(zone → DNSKEY)` map for
+/// every zone the prepare bundle covered, and the optional DMARC
+/// TXT bytes (set when the FE included a DMARC leaf in the skeleton
+/// bundle).
 struct DnssecExtracted {
-    zone_dnskey: crate::dnssec::SignedRRset,
+    root_dnskey: crate::dnssec::SignedRRset,
+    zones: crate::dnssec::ZoneKeysMap,
     dmarc: Option<Vec<u8>>,
 }
 
 /// Validate a caller-supplied DNSSEC *skeleton* bundle against the
-/// canister's configured trust anchors and extract the deepest-zone
-/// DNSKEY (always required for the cache) plus the optional DMARC
-/// TXT bytes.
+/// canister's configured trust anchors and extract the validated
+/// zone-keys map and optional DMARC TXT bytes.
 ///
-/// The bundle is allowed to carry at most one leaf, and that leaf
-/// must be the DMARC TXT at `_dmarc.<registered_domain>`. Any other
-/// leaf — including a DKIM TXT — is rejected: the DKIM leaf belongs
-/// in the post-email submit-leaf call, not the prepare bundle, and
-/// an attacker who got a different TXT validated under the same
-/// chain shouldn't be able to smuggle it through here.
+/// The bundle's `hops` is allowed to carry at most one entry, and
+/// that entry must be the DMARC TXT at `_dmarc.<registered_domain>`.
+/// Any other hop — including a DKIM TXT — is rejected: the DKIM
+/// resolution belongs in the post-email submit-leaf call, not the
+/// prepare bundle, and an attacker who got a different TXT
+/// validated under the same chain shouldn't be able to smuggle it
+/// through here.
 fn verify_dnssec_skeleton(
     proof: internet_identity_interface::internet_identity::types::DnsProofBundle,
     registered_domain: &str,
@@ -239,49 +247,68 @@ fn verify_dnssec_skeleton(
     // for the From<> impls.)
     let bundle: crate::dnssec::DnsProofBundle = proof.into();
 
-    // Validate the chain (root + delegations); produces the
-    // deepest-zone DNSKEY RRset that we cache for later leaf
-    // admission. `bundle.leaf` is *not* consulted here.
-    let zone_dnskey = crate::dnssec::verify_chain_with_clock(&bundle, &trust_anchors, now_secs)
-        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
+    // The skeleton bundle must carry at most one hop (the optional
+    // DMARC TXT). Reject up front if the FE tried to smuggle a DKIM
+    // resolution — that belongs in submit_dkim_leaf, not here.
+    if bundle.hops.len() > 1 {
+        return Err(EmailRecoveryError::EmailVerificationFailed(
+            "skeleton bundle carries more than one hop; DKIM resolution \
+             belongs in submit_dkim_leaf"
+                .into(),
+        ));
+    }
 
-    // Optional DMARC leaf: if present, validate against the same
-    // chain and cache the TXT bytes.
-    let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
-    let dmarc = match bundle.leaf.as_ref() {
-        None => None,
-        Some(leaf) => {
-            let verified = crate::dnssec::verify_leaf_against_dnskey(leaf, &zone_dnskey, now_secs)
-                .map_err(|e| {
-                    EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}"))
-                })?;
-            if verified.rtype != crate::dnssec::types::TYPE_TXT {
-                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                    "skeleton bundle leaf is not TXT (got rtype {})",
-                    verified.rtype
-                )));
-            }
-            let leaf_name = decode_dns_name_lowercase(&verified.name.0);
-            if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
-                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                    "skeleton bundle leaf name {leaf_name:?} is not the expected \
-                     DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"
-                )));
-            }
-            let txt = parse_txt_rdata(&verified.rdata)?;
-            if txt.len() > super::MAX_DMARC_TXT_BYTES {
-                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                    "DMARC TXT record at {leaf_name:?} is {} bytes; \
-                     refusing to cache more than {} bytes per pending entry",
-                    txt.len(),
-                    super::MAX_DMARC_TXT_BYTES,
-                )));
-            }
-            Some(txt)
+    // Validate the root DNSKEY against trust anchors and walk every
+    // chain into the zone-keys map.
+    crate::dnssec::verify_root_dnskey_with_clock(&bundle.root_dnskey, &trust_anchors, now_secs)
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC root: {e:?}")))?;
+    let mut zones = crate::dnssec::ZoneKeysMap::new();
+    crate::dnssec::verify_extra_chains_with_clock(
+        &bundle.chains,
+        &bundle.root_dnskey,
+        &mut zones,
+        now_secs,
+    )
+    .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC chain: {e:?}")))?;
+    if zones.is_empty() {
+        return Err(EmailRecoveryError::EmailVerificationFailed(
+            "skeleton bundle supplied no delegation chains".into(),
+        ));
+    }
+
+    // Optional DMARC hop: if present, validate it as a single TXT
+    // hop at `_dmarc.<registered_domain>`.
+    let dmarc = if bundle.hops.is_empty() {
+        None
+    } else {
+        let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
+        let dmarc_name = encode_dns_name_lowercase(&dmarc_fqdn);
+        let verified = crate::dnssec::verify_hops_with_clock(
+            &bundle.hops,
+            &zones,
+            &crate::dnssec::DnsName(dmarc_name),
+            crate::dnssec::types::TYPE_TXT,
+            now_secs,
+        )
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DMARC: {e:?}")))?;
+        let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+        let txt = parse_txt_rdata(&verified.rdata)?;
+        if txt.len() > super::MAX_DMARC_TXT_BYTES {
+            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                "DMARC TXT record at {leaf_name:?} is {} bytes; \
+                 refusing to cache more than {} bytes per pending entry",
+                txt.len(),
+                super::MAX_DMARC_TXT_BYTES,
+            )));
         }
+        Some(txt)
     };
 
-    Ok(DnssecExtracted { zone_dnskey, dmarc })
+    Ok(DnssecExtracted {
+        root_dnskey: bundle.root_dnskey,
+        zones,
+        dmarc,
+    })
 }
 
 /// Concatenate one or more TXT character-strings (each prefixed by a
@@ -306,6 +333,30 @@ fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecoveryError> {
         }
     }
     Ok(txt_bytes)
+}
+
+/// Encode a dotted ASCII DNS name (with or without a trailing dot)
+/// into wire format: a sequence of length-prefixed labels terminated
+/// by a zero-length root label. Labels are lowercased on the way in.
+/// Caller is responsible for passing a syntactically valid ASCII
+/// name; labels longer than 63 bytes are truncated to 63 (RFC 1035
+/// caps).
+fn encode_dns_name_lowercase(dotted: &str) -> Vec<u8> {
+    let trimmed = dotted.strip_suffix('.').unwrap_or(dotted);
+    let mut out = Vec::with_capacity(trimmed.len() + 2);
+    for label in trimmed.split('.') {
+        if label.is_empty() {
+            continue;
+        }
+        let bytes = label.as_bytes();
+        let len = bytes.len().min(63) as u8;
+        out.push(len);
+        for &b in &bytes[..len as usize] {
+            out.push(b.to_ascii_lowercase());
+        }
+    }
+    out.push(0);
+    out
 }
 
 /// Decode a wire-format DNS name (length-prefixed labels) into a
