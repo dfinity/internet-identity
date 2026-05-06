@@ -125,6 +125,24 @@ pub fn check_authorization(
             ));
         }
     }
+    // Else check email-recovery authorization. The recovery flow
+    // stamps a delegation whose user_key is `der(canister_sig_key(seed))`
+    // with `seed = H(salt || "email-recovery" || lowercase(address) ||
+    // anchor)`. Re-derive the same principal for each bound credential
+    // and compare. See `crate::email_recovery::smtp::calculate_email_recovery_seed`.
+    for credential in &anchor.email_recovery {
+        let seed = crate::email_recovery::smtp::calculate_email_recovery_seed(
+            &credential.address,
+            anchor_number,
+        );
+        let public_key = crate::delegation::der_encode_canister_sig_key(seed.to_vec());
+        if caller == Principal::self_authenticating(public_key) {
+            return Ok((
+                anchor.clone(),
+                AuthorizationKey::EmailRecoveryAddress(credential.address.clone()),
+            ));
+        }
+    }
 
     Err(AuthorizationError::from(caller))
 }

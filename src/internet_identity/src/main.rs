@@ -978,6 +978,14 @@ mod v2_api {
             .map(|(k, v)| (k, MetadataEntryV2::from(v)))
             .collect();
 
+        // Anchor stores email recoveries as a Vec to leave room for
+        // future multi-credential support; the candid surface only
+        // exposes the first one (the canister API enforces ≤1 entry).
+        let email_recovery = state::anchor(identity_number)
+            .email_recovery
+            .first()
+            .cloned();
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -991,6 +999,7 @@ mod v2_api {
             metadata,
             name: anchor_info.name,
             created_at: anchor_info.created_at,
+            email_recovery,
         };
         Ok(identity_info)
     }
@@ -1419,10 +1428,14 @@ mod email_recovery_api {
     use super::*;
     use crate::authz_utils::check_authorization;
     use crate::email_recovery;
+    use ic_canister_sig_creation::delegation_signature_msg;
+    use ic_canister_sig_creation::signature_map::CanisterSigInputs;
+    use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
     use internet_identity_interface::internet_identity::types::email_recovery::{
-        EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus,
-        EmailRecoverySubmitDkimLeafArg,
+        EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
+        EmailRecoveryGetDelegationArgs, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
     };
+    use internet_identity_interface::internet_identity::types::SessionKey;
 
     /// Authenticated. Validates the caller owns `identity_number`,
     /// validates the DNS input shape (DNSSEC bundle if supplied,
@@ -1441,6 +1454,28 @@ mod email_recovery_api {
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
         email_recovery::prepare_add(identity_number, dns_input, now_secs).await
+    }
+
+    /// Anonymous. The FE-side counterpart of `prepare_add` for the
+    /// recovery flow: validates the same DNSSEC skeleton chain or
+    /// DoH allowlist, parks a pending challenge bound to the
+    /// FE-supplied `session_key`, and returns the nonce +
+    /// `recover@id.ai` recipient. The anchor isn't resolved here —
+    /// that happens at submit-leaf (or DoH-path smtp_request) time
+    /// from the verified `From:` of the inbound email.
+    ///
+    /// Anonymous because by the time the user reaches for recovery
+    /// they may have lost every authn method on their anchor; the
+    /// DKIM-verified email itself is the credential. The
+    /// nonce-rotation + Subject-visibility defenses (design §3.2)
+    /// stand in for caller authentication.
+    #[update]
+    async fn email_recovery_prepare_delegation(
+        dns_input: EmailRecoveryDnsInput,
+        session_key: SessionKey,
+    ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::prepare_delegation(dns_input, session_key, now_secs).await
     }
 
     /// Open update. Called by the off-chain SMTP gateway for every
@@ -1511,11 +1546,52 @@ mod email_recovery_api {
     /// entry, and the leaf submission is a no-op against any other
     /// entry.
     #[update]
-    fn email_recovery_submit_dkim_leaf(
+    async fn email_recovery_submit_dkim_leaf(
         arg: EmailRecoverySubmitDkimLeafArg,
     ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::submit_dkim_leaf(arg, now_secs)
+        email_recovery::submit_dkim_leaf(arg, now_secs).await
+    }
+
+    /// **Anonymous query.** Final step of the recovery flow: after
+    /// `email_recovery_status` reports `RecoveryReady { user_key,
+    /// expiration, anchor_number }`, the FE calls this to retrieve
+    /// the actual `SignedDelegation`. Mirrors `openid_get_delegation`
+    /// in shape — the args (`session_key`, `expiration`) must match
+    /// exactly what was stamped at submit-leaf time, otherwise the
+    /// canister-signature store has no entry to return.
+    #[query]
+    fn email_recovery_get_delegation(
+        args: EmailRecoveryGetDelegationArgs,
+    ) -> Result<SignedDelegation, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        let seed = email_recovery::recovery_seed_for_nonce(&args.nonce, now_secs)
+            .ok_or(EmailRecoveryError::NonceUnknown)?;
+
+        crate::state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: DELEGATION_SIG_DOMAIN,
+                seed: &seed,
+                message: &delegation_signature_msg(&args.session_key, args.expiration, None),
+            };
+            sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
+                .map(|signature| SignedDelegation {
+                    delegation: Delegation {
+                        pubkey: args.session_key,
+                        expiration: args.expiration,
+                        targets: None,
+                    },
+                    signature: serde_bytes::ByteBuf::from(signature),
+                })
+                .map_err(|_| {
+                    EmailRecoveryError::InternalCanisterError(
+                        "no canister signature for the supplied (nonce, session_key, expiration); \
+                         either the recovery flow hasn't completed yet, the args don't match \
+                         what was stamped, or the signature has been evicted"
+                            .into(),
+                    )
+                })
+        })
     }
 
     /// Authenticated. Detaches the recovery email from the anchor.

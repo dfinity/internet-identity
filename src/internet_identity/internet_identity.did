@@ -602,9 +602,16 @@ type EmailRecoveryStatus = variant {
     RecoveryReady : record {
         user_key : UserKey;
         expiration : Timestamp;
+        anchor_number : IdentityNumber;
     };
     Failed : EmailRecoveryError;
     Expired;
+};
+
+type EmailRecoveryGetDelegationArgs = record {
+    nonce       : text;
+    session_key : SessionKey;
+    expiration  : Timestamp;
 };
 
 // SMTP gateway types — see `internet_identity_interface::smtp`. Carried
@@ -805,6 +812,10 @@ type IdentityInfo = record {
     name : opt text;
     // The timestamp at which the anchor was created
     created_at : opt Timestamp;
+    // The email-recovery credential bound to this anchor, if any.
+    // Lets the FE render the recovery-email card's active vs.
+    // inactive state without a separate query.
+    email_recovery : opt EmailRecoveryCredential;
 };
 
 type IdentityInfoError = variant {
@@ -1419,8 +1430,10 @@ service : (opt InternetIdentityInit) -> {
     // See `docs/ongoing/email-recovery.md`. The recovery half (prepare
     // a delegation from a verified email) lands in a follow-up PR.
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 
     // SMTP gateway protocol

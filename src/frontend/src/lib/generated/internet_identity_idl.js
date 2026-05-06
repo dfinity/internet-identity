@@ -321,6 +321,21 @@ export const idlFactory = ({ IDL }) => {
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
   });
+  const SessionKey = PublicKey;
+  const EmailRecoveryGetDelegationArgs = IDL.Record({
+    'session_key' : SessionKey,
+    'expiration' : Timestamp,
+    'nonce' : IDL.Text,
+  });
+  const Delegation = IDL.Record({
+    'pubkey' : PublicKey,
+    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
+    'expiration' : Timestamp,
+  });
+  const SignedDelegation = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+    'delegation' : Delegation,
+  });
   const UserKey = PublicKey;
   const EmailRecoveryStatus = IDL.Variant({
     'Failed' : EmailRecoveryError,
@@ -328,6 +343,7 @@ export const idlFactory = ({ IDL }) => {
     'RecoveryReady' : IDL.Record({
       'user_key' : UserKey,
       'expiration' : Timestamp,
+      'anchor_number' : IdentityNumber,
     }),
     'RegistrationSucceeded' : IDL.Null,
     'Expired' : IDL.Null,
@@ -342,16 +358,6 @@ export const idlFactory = ({ IDL }) => {
     'entry' : IDL.Vec(IDL.Nat8),
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
-  });
-  const SessionKey = PublicKey;
-  const Delegation = IDL.Record({
-    'pubkey' : PublicKey,
-    'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
-    'expiration' : Timestamp,
-  });
-  const SignedDelegation = IDL.Record({
-    'signature' : IDL.Vec(IDL.Nat8),
-    'delegation' : Delegation,
   });
   const AccountDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
@@ -499,6 +505,11 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethod),
     'recovery_authn_methods' : IDL.Vec(AuthnMethod),
   });
+  const EmailRecoveryCredential = IDL.Record({
+    'created_at' : Timestamp,
+    'address' : IDL.Text,
+    'last_used' : IDL.Opt(Timestamp),
+  });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
     'session' : IDL.Opt(IDL.Principal),
@@ -508,6 +519,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
     'name' : IDL.Opt(IDL.Text),
+    'email_recovery' : IDL.Opt(EmailRecoveryCredential),
     'created_at' : IDL.Opt(Timestamp),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
@@ -848,6 +860,21 @@ export const idlFactory = ({ IDL }) => {
     'email_recovery_credential_remove' : IDL.Func(
         [IdentityNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [],
+      ),
+    'email_recovery_get_delegation' : IDL.Func(
+        [EmailRecoveryGetDelegationArgs],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : EmailRecoveryError })],
+        ['query'],
+      ),
+    'email_recovery_prepare_delegation' : IDL.Func(
+        [EmailRecoveryDnsInput, SessionKey],
+        [
+          IDL.Variant({
+            'Ok' : EmailRecoveryChallenge,
+            'Err' : EmailRecoveryError,
+          }),
+        ],
         [],
       ),
     'email_recovery_status' : IDL.Func(

@@ -30,13 +30,15 @@ use crate::email_recovery::pending;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryError, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
 };
+use internet_identity_interface::internet_identity::types::SessionKey;
 
 /// Body of `email_recovery_submit_dkim_leaf(arg)`. Returns the
-/// post-call polling status — typically `RegistrationSucceeded` or
+/// post-call polling status — `RegistrationSucceeded` for the setup
+/// flow, `RecoveryReady{...}` for the recovery flow, or
 /// `Failed(reason)`. The FE can also poll
 /// `email_recovery_status(nonce)` for the same answer; returning it
 /// here saves the FE one round-trip on the happy path.
-pub fn submit_dkim_leaf(
+pub async fn submit_dkim_leaf(
     arg: EmailRecoverySubmitDkimLeafArg,
     now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
@@ -49,18 +51,19 @@ pub fn submit_dkim_leaf(
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
-    let outcome = run_submit(&dkim_leaf, &snapshot, now_secs);
-    match outcome {
-        Ok(()) => {
-            // Bind the credential and flip status. Re-borrow the
-            // map; the entry still exists (we didn't await between
-            // borrows, so no one else can mutate it).
-            let bind_result = match &snapshot.kind {
-                SnapshotKind::Register { anchor } => {
-                    super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs)
-                }
-            };
-            match bind_result {
+    if let Err(e) = run_submit(&dkim_leaf, &snapshot, now_secs) {
+        let cloned = e.clone();
+        pending::with_mut(&nonce, now_secs, |c| {
+            c.status = PendingStatus::Failed(cloned);
+        });
+        return Err(e);
+    }
+
+    // Verification passed — finalize per kind. Setup binds the
+    // credential, recovery stamps a delegation seed.
+    match &snapshot.kind {
+        SnapshotKind::Register { anchor } => {
+            match super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
                 Ok(()) => {
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.status = PendingStatus::Succeeded;
@@ -77,12 +80,41 @@ pub fn submit_dkim_leaf(
                 }
             }
         }
-        Err(e) => {
-            let cloned = e.clone();
-            pending::with_mut(&nonce, now_secs, |c| {
-                c.status = PendingStatus::Failed(cloned);
-            });
-            Err(e)
+        SnapshotKind::Recovery { session_pk } => {
+            // Build a transient `PendingSnapshot` shape that
+            // `stamp_recovery_delegation` already accepts (the DoH
+            // path uses the same helper). The stamper looks up the
+            // anchor via the reverse-address index and adds the
+            // canister signature.
+            let smtp_snapshot = super::smtp::recovery_snapshot(
+                snapshot.claimed_address.clone(),
+                snapshot.registered_domain.clone(),
+                session_pk.clone(),
+            );
+            match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk).await {
+                Ok(outcome) => {
+                    let user_key = serde_bytes::ByteBuf::from(outcome.user_key.clone());
+                    let expiration = outcome.expiration;
+                    let anchor_number = outcome.anchor_number;
+                    pending::with_mut(&nonce, now_secs, |c| {
+                        c.recovery_outcome = Some(outcome);
+                        c.status = PendingStatus::Succeeded;
+                        c.partial_verification = None;
+                    });
+                    Ok(EmailRecoveryStatus::RecoveryReady {
+                        user_key,
+                        expiration,
+                        anchor_number,
+                    })
+                }
+                Err(e) => {
+                    let cloned = e.clone();
+                    pending::with_mut(&nonce, now_secs, |c| {
+                        c.status = PendingStatus::Failed(cloned);
+                    });
+                    Err(e)
+                }
+            }
         }
     }
 }
@@ -107,6 +139,9 @@ struct Snapshot {
 enum SnapshotKind {
     Register {
         anchor: internet_identity_interface::internet_identity::types::AnchorNumber,
+    },
+    Recovery {
+        session_pk: SessionKey,
     },
 }
 
@@ -135,6 +170,9 @@ impl Snapshot {
             .ok_or(EmailRecoveryError::NoDkimLeafExpected)?;
         let kind = match &c.kind {
             PendingKind::Register { anchor } => SnapshotKind::Register { anchor: *anchor },
+            PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
+                session_pk: session_pk.clone(),
+            },
         };
         Ok(Snapshot {
             kind,

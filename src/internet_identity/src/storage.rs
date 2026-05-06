@@ -127,6 +127,7 @@ use storable::anchor_number::StorableAnchorNumber;
 use storable::application::StorableApplication;
 use storable::credential_id::StorableCredentialId;
 use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
+use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
@@ -178,6 +179,7 @@ const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
+const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -214,6 +216,9 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID: MemoryId =
 
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX);
+
+const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -339,6 +344,16 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+
+    lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Reverse index for the email-recovery flow: maps
+    /// `SHA-256(lowercase(address))` to the anchor that bound it. The
+    /// hash key is fixed-size (32 bytes) so the per-entry footprint
+    /// is bounded regardless of address length; the address itself
+    /// already lives on the anchor's `email_recovery` credential, so
+    /// there's no need to store it again here. See design §8.2.
+    pub(crate) lookup_anchor_with_email_recovery_memory:
+        StableBTreeMap<StorableEmailRecoveryAddressHash, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -422,6 +437,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
         let lookup_anchor_with_passkey_pubkey_hash_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
+        let lookup_anchor_with_email_recovery_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -521,6 +538,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_passkey_pubkey_hash_memory: StableBTreeMap::init(
                 lookup_anchor_with_passkey_pubkey_hash_memory,
+            ),
+            lookup_anchor_with_email_recovery_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_email_recovery_memory.clone(),
+            ),
+            lookup_anchor_with_email_recovery_memory: StableBTreeMap::init(
+                lookup_anchor_with_email_recovery_memory,
             ),
         }
     }
@@ -670,31 +693,33 @@ impl<M: Memory + Clone> Storage<M> {
             .insert(anchor_number, storable_anchor.clone());
 
         // Second, deconstruct the previous anchor, obtaining the previous credentials and recovery keys.
-        let (previous_openid_credentials, previous_passkey_credentials, previous_recovery_keys) =
-            if let Some(StorableAnchor {
-                // The following fields need to be compared with the previous anchor
-                openid_credentials,
-                passkey_credentials,
-                recovery_keys,
+        let (
+            previous_openid_credentials,
+            previous_passkey_credentials,
+            previous_recovery_keys,
+            previous_email_recovery,
+        ) = if let Some(StorableAnchor {
+            // The following fields need to be compared with the previous anchor
+            openid_credentials,
+            passkey_credentials,
+            recovery_keys,
+            email_recovery,
 
-                // The following fields do not require merging.
-                created_at_ns: _,
-                name: _,
-                // email_recovery is overwritten on every write — there's
-                // a single optional credential, no per-anchor index to
-                // sync, so no merge is needed.
-                email_recovery: _,
-            }) = previous_anchor_maybe
-            {
-                (
-                    openid_credentials,
-                    passkey_credentials.unwrap_or_default(),
-                    recovery_keys.unwrap_or_default(),
-                )
-            } else {
-                // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
-                (vec![], vec![], vec![])
-            };
+            // The following fields do not require merging.
+            created_at_ns: _,
+            name: _,
+        }) = previous_anchor_maybe
+        {
+            (
+                openid_credentials,
+                passkey_credentials.unwrap_or_default(),
+                recovery_keys.unwrap_or_default(),
+                email_recovery.unwrap_or_default(),
+            )
+        } else {
+            // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
+            (vec![], vec![], vec![], vec![])
+        };
 
         // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
         self.sync_anchor_with_openid_credential_index(
@@ -720,6 +745,25 @@ impl<M: Memory + Clone> Storage<M> {
             &previous_passkey_credentials,
             &current_passkey_credentials,
         );
+
+        // The reverse address index for email recovery: map
+        // SHA-256(lowercase(address)) → AnchorNumber. Each anchor
+        // holds at most one recovery email (the API caps it; the
+        // storage Vec is ≤ 1 in practice). Sync prev → curr so
+        // address swaps and removals stay consistent.
+        let previous_email_address = previous_email_recovery.first().map(|c| c.address.clone());
+        let current_email_address = storable_anchor
+            .email_recovery
+            .as_ref()
+            .and_then(|v| v.first())
+            .map(|c| c.address.clone());
+        if previous_email_address != current_email_address {
+            self.update_email_recovery_lookup(
+                anchor_number,
+                previous_email_address.as_deref(),
+                current_email_address.as_deref(),
+            );
+        }
 
         Ok(())
     }
@@ -905,6 +949,48 @@ impl<M: Memory + Clone> Storage<M> {
         let principal = Principal::self_authenticating(pubkey);
         self.lookup_anchor_with_passkey_pubkey_hash_memory
             .get(&principal)
+    }
+
+    /// Resolve the verified `From:` of an inbound recovery email to
+    /// the anchor it was bound to at setup time. Returns `None` if
+    /// the address has never been registered (or has been removed).
+    /// The lookup is by `SHA-256(lowercase(address))` — see design
+    /// §8.2 for why.
+    pub fn lookup_anchor_with_email_recovery_address(&self, address: &str) -> Option<AnchorNumber> {
+        let hash = StorableEmailRecoveryAddressHash::of(address);
+        self.lookup_anchor_with_email_recovery_memory.get(&hash)
+    }
+
+    /// Apply a setup/replace: update the reverse index to reflect
+    /// `anchor`'s current bound address. `previous` is the address
+    /// that was bound before the operation (or `None` for an initial
+    /// add); `current` is the new bound address (or `None` for a
+    /// remove). Both transitions are exercised by the email-recovery
+    /// flow:
+    ///
+    /// - `(None, Some(addr))` — first registration: insert the new hash.
+    /// - `(Some(prev), Some(new))` — replacement (anchor swaps which
+    ///   address recovers it): drop the old hash, insert the new.
+    /// - `(Some(prev), None)` — remove: drop the old hash.
+    ///
+    /// `(None, None)` is a no-op. The two operations are sequenced
+    /// so that during a swap the old entry is removed before the new
+    /// one is written; an interleaving observer never sees both.
+    pub fn update_email_recovery_lookup(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous: Option<&str>,
+        current: Option<&str>,
+    ) {
+        if let Some(prev) = previous {
+            let hash = StorableEmailRecoveryAddressHash::of(prev);
+            self.lookup_anchor_with_email_recovery_memory.remove(&hash);
+        }
+        if let Some(curr) = current {
+            let hash = StorableEmailRecoveryAddressHash::of(curr);
+            self.lookup_anchor_with_email_recovery_memory
+                .insert(hash, anchor_number);
+        }
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
@@ -2023,6 +2109,10 @@ impl<M: Memory + Clone> Storage<M> {
                 "lookup_anchor_with_passkey_pubkey_hash_memory".to_string(),
                 self.lookup_anchor_with_passkey_pubkey_hash_memory_wrapper
                     .size(),
+            ),
+            (
+                "lookup_anchor_with_email_recovery_memory".to_string(),
+                self.lookup_anchor_with_email_recovery_memory_wrapper.size(),
             ),
         ])
     }

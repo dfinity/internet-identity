@@ -35,10 +35,10 @@ mod pending;
 mod prepare;
 mod remove;
 mod rng;
-mod smtp;
+pub(crate) mod smtp;
 mod submit_leaf;
 
-pub use prepare::prepare_add;
+pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};
 pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
 pub use submit_leaf::submit_dkim_leaf;
@@ -51,6 +51,22 @@ pub fn pending_status(
     now_secs: u64,
 ) -> internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryStatus {
     pending::status_of(nonce, now_secs)
+}
+
+/// Look up the cached `RecoveryOutcome.seed` for a recovery-flow
+/// pending challenge. Used by `email_recovery_get_delegation` to
+/// find the canister-signature without having to recompute the
+/// seed (which requires the address + anchor — both already
+/// resolved at submit-leaf time).
+///
+/// Returns `None` if the nonce is unknown, expired, isn't a
+/// recovery-kind entry, or hasn't yet completed (`recovery_outcome`
+/// is `None`).
+pub fn recovery_seed_for_nonce(nonce: &str, now_secs: u64) -> Option<ic_certification::Hash> {
+    pending::with_mut(nonce, now_secs, |c| {
+        c.recovery_outcome.as_ref().map(|o| o.seed)
+    })
+    .flatten()
 }
 
 #[allow(unused_imports)]
@@ -167,3 +183,10 @@ pub const MAX_ADDRESS: usize = 254;
 /// flow, not a protocol-level claim.
 pub const MAX_DKIM_TXT_BYTES: usize = 4096;
 pub const MAX_DMARC_TXT_BYTES: usize = 1024;
+
+/// Cap on the FE-supplied `session_pk` length carried on a recovery
+/// pending entry. Real session keys are well under 1 KB regardless
+/// of algorithm (Ed25519 ~44 bytes, ECDSA P-256 ~91, RSA-2048 ~294);
+/// this leaves headroom without giving an anonymous caller room to
+/// inflate the challenge map.
+pub const MAX_SESSION_KEY_BYTES: usize = 1024;

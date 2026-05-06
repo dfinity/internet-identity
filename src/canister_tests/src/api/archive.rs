@@ -130,7 +130,9 @@ pub mod compat {
                 Operation::AddName => CompatOperation::AddName,
                 Operation::UpdateName => CompatOperation::UpdateName,
                 Operation::RemoveName => CompatOperation::RemoveName,
-                Operation::IdentityMetadataReplace { .. } => {
+                Operation::IdentityMetadataReplace { .. }
+                | Operation::AddEmailRecovery
+                | Operation::RemoveEmailRecovery => {
                     panic!("not available in compat type")
                 }
                 Operation::CreateAccount { name } => CompatOperation::CreateAccount { name },
