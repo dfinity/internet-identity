@@ -4,8 +4,8 @@
 //! the verification path (DNSSEC if a skeleton bundle is supplied,
 //! DoH allowlist otherwise), draws a fresh nonce from the heap PRNG,
 //! and parks a `PendingChallenge` keyed by that nonce. Returns the
-//! user-visible challenge (nonce + mailbox + expiry) so the FE can
-//! render the "send a magic email" screen.
+//! user-visible challenge (nonce + expiry) so the FE can render
+//! the "send a magic email" screen.
 //!
 //! See `docs/ongoing/email-recovery.md` §8.4. Two-phase path picker:
 //!
@@ -47,13 +47,7 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-    prepare_common(
-        dns_input,
-        now_secs,
-        PendingKind::Register { anchor },
-        super::SETUP_MAILBOX,
-    )
-    .await
+    prepare_common(dns_input, now_secs, PendingKind::Register { anchor }).await
 }
 
 /// Body of `email_recovery_prepare_delegation(dns_input, session_pk)`.
@@ -80,13 +74,7 @@ pub async fn prepare_delegation(
             super::MAX_SESSION_KEY_BYTES,
         )));
     }
-    prepare_common(
-        dns_input,
-        now_secs,
-        PendingKind::Recover { session_pk },
-        super::RECOVERY_MAILBOX,
-    )
-    .await
+    prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await
 }
 
 /// Shared input-validation + nonce-issuing core. `kind` parametrises
@@ -97,7 +85,6 @@ async fn prepare_common(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
     kind: PendingKind,
-    mailbox: &str,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
     let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
 
@@ -191,7 +178,6 @@ async fn prepare_common(
 
     Ok(EmailRecoveryChallenge {
         nonce,
-        mailbox: mailbox.to_string(),
         // `Timestamp` is nanoseconds since epoch in this crate (see
         // `internet_identity_interface::types`). We work in seconds
         // internally for the TTL math and convert at the wire boundary.
@@ -559,7 +545,6 @@ mod tests {
         let challenge = result.expect("expected Ok");
 
         assert!(challenge.nonce.starts_with(super::super::NONCE_PREFIX));
-        assert_eq!(challenge.mailbox, super::super::SETUP_MAILBOX);
         // expires_at is in nanoseconds since epoch; we passed
         // now_secs = 1_000.
         assert_eq!(
