@@ -762,10 +762,14 @@ impl<M: Memory + Clone> Storage<M> {
                 anchor_number,
                 previous_email_address.as_deref(),
                 current_email_address.as_deref(),
+<<<<<<< HEAD
             )
             .map_err(|existing_anchor| {
                 StorageError::EmailRecoveryAddressAlreadyBound { existing_anchor }
             })?;
+=======
+            );
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
         }
 
         Ok(())
@@ -979,6 +983,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// `(None, None)` is a no-op. The two operations are sequenced
     /// so that during a swap the old entry is removed before the new
     /// one is written; an interleaving observer never sees both.
+<<<<<<< HEAD
     ///
     /// Returns `Err(other_anchor)` if `current` is already bound to a
     /// different anchor — this enforces the "one anchor per address"
@@ -986,11 +991,14 @@ impl<M: Memory + Clone> Storage<M> {
     /// what the caller checked. The caller is expected to surface
     /// `AddressAlreadyRegistered` (setup) or `AddressNotRegistered`
     /// (recovery) to the FE.
+=======
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
     pub fn update_email_recovery_lookup(
         &mut self,
         anchor_number: AnchorNumber,
         previous: Option<&str>,
         current: Option<&str>,
+<<<<<<< HEAD
     ) -> Result<(), AnchorNumber> {
         // Enforce "one anchor per address" before mutating anything.
         // Same-anchor rebinds are idempotent (the API uses this to
@@ -1003,6 +1011,9 @@ impl<M: Memory + Clone> Storage<M> {
                 }
             }
         }
+=======
+    ) {
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
         if let Some(prev) = previous {
             let hash = StorableEmailRecoveryAddressHash::of(prev);
             self.lookup_anchor_with_email_recovery_memory.remove(&hash);
@@ -1012,7 +1023,10 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchor_with_email_recovery_memory
                 .insert(hash, anchor_number);
         }
+<<<<<<< HEAD
         Ok(())
+=======
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
     }
 
     fn sync_anchor_with_passkey_pubkey_index(

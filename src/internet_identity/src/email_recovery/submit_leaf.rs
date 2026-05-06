@@ -62,7 +62,11 @@ pub async fn submit_dkim_leaf(
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
+<<<<<<< HEAD
     if let Err(e) = run_submit(&hops, &extra_chains, &snapshot, now_secs) {
+=======
+    if let Err(e) = run_submit(&dkim_leaf, &snapshot, now_secs) {
+>>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
         let cloned = e.clone();
         pending::with_mut(&nonce, now_secs, |c| {
             c.status = PendingStatus::Failed(cloned);
