@@ -607,6 +607,24 @@ pub fn email_recovery_status(
     query_candid(env, canister_id, "email_recovery_status", (nonce,)).map(|(x,)| x)
 }
 
+pub fn email_recovery_submit_dkim_leaf(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    arg: types::email_recovery::EmailRecoverySubmitDkimLeafArg,
+) -> Result<
+    Result<types::email_recovery::EmailRecoveryStatus, types::email_recovery::EmailRecoveryError>,
+    RejectResponse,
+> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "email_recovery_submit_dkim_leaf",
+        (arg,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn email_recovery_credential_remove(
     env: &PocketIc,
     canister_id: CanisterId,
