@@ -525,7 +525,6 @@ export interface DummyAuthConfig {
   'prompt_for_index' : boolean,
 }
 export interface EmailRecoveryChallenge {
-  'mailbox' : string,
   'nonce' : string,
   'expires_at' : Timestamp,
 }
@@ -1831,6 +1830,13 @@ export interface _SERVICE {
    * status query.
    */
   'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  /**
+   * Called by the gateway at RCPT TO time to decide whether to
+   * accept the connection before pulling the message body. Returns
+   * Ok for register@id.ai / recover@id.ai (case-insensitive), and
+   * 550 (mailbox unavailable) for everything else.
+   */
+  'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<

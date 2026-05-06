@@ -264,7 +264,7 @@
 {:else if stage.kind === "sending"}
   <SendMagicEmail
     nonce={stage.challenge.nonce}
-    mailbox={stage.challenge.mailbox}
+    mailbox={`recover@${window.location.hostname}`}
     fromAddress={stage.address}
     expiresAt={stage.challenge.expires_at}
     onCancel={handleCancel}
