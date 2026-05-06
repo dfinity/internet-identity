@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { MailCheckIcon } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import type { SvelteHTMLElements } from "svelte/elements";
@@ -71,12 +70,12 @@
       </dd>
     </dl>
     <div class="flex flex-row gap-2 @max-xl:mt-5 @xl:my-auto">
-      <Button onclick={onReplace} variant="secondary" size="sm">
+      <button class="btn btn-secondary btn-sm" onclick={onReplace}>
         {$t`Replace`}
-      </Button>
-      <Button onclick={onRemove} danger variant="secondary" size="sm">
+      </button>
+      <button class="btn btn-secondary btn-sm btn-danger" onclick={onRemove}>
         {$t`Remove`}
-      </Button>
+      </button>
     </div>
   </section>
 </div>

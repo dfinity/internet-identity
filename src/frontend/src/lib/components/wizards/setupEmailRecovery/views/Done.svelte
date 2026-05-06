@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { MailCheckIcon } from "@lucide/svelte";
@@ -25,6 +24,6 @@
     </p>
   </header>
   <div class="flex flex-row justify-end">
-    <Button onclick={onDone}>{$t`Done`}</Button>
+    <button class="btn btn-primary btn-md" onclick={onDone}>{$t`Done`}</button>
   </div>
 </div>

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import { MailXIcon } from "@lucide/svelte";
 
@@ -24,9 +23,15 @@
     <p class="text-text-tertiary text-center text-sm">{reason}</p>
   </header>
   <div class="flex flex-row justify-end gap-2">
-    <Button onclick={onCancel} variant="secondary" type="button">
+    <button
+      class="btn btn-secondary btn-md"
+      type="button"
+      onclick={onCancel}
+    >
       {$t`Cancel`}
-    </Button>
-    <Button onclick={onRetry} type="button">{$t`Try again`}</Button>
+    </button>
+    <button class="btn btn-primary btn-md" type="button" onclick={onRetry}>
+      {$t`Try again`}
+    </button>
   </div>
 </div>
