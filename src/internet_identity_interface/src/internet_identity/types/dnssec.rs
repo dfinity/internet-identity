@@ -86,18 +86,18 @@ pub struct DelegationLink {
     pub child_dnskey: SignedRRset,
 }
 
-/// The full proof: one or more leaf RRsets + delegation chain to the
-/// root + the root DNSKEY RRset (which is in turn validated against
-/// the canister's configured `DnssecRootAnchor`s).
+/// A DNSSEC proof: one delegation chain rooted at the IANA KSK plus
+/// at most one signed leaf RRset that the chain authenticates.
 ///
-/// All leaves in `leaves` are validated under the same chain — each is
-/// verified against the deepest zone's DNSKEY RRset. This is what makes
-/// it cheap to bundle DKIM and DMARC into a single proof on the email-
-/// recovery path: both records live under the same zone, so the chain
-/// (root → … → `<domain>`) only needs to be walked once.
+/// The two-phase email-recovery flow only ever needs one leaf per
+/// call — at `prepare_add` it's the optional DMARC TXT, at
+/// `submit_dkim_leaf` it's the DKIM TXT — so `leaf` is `Option`,
+/// not `Vec`. A `None` leaf means "validate the chain only";
+/// callers cache the deepest-zone DNSKEY and use it to admit a leaf
+/// in a follow-up call (see `crate::dnssec::verify_chain_with_clock`).
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DnsProofBundle {
-    pub leaves: Vec<SignedRRset>,
+    pub leaf: Option<SignedRRset>,
     pub root_dnskey: SignedRRset,
     pub chain: Vec<DelegationLink>,
 }
