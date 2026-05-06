@@ -1182,7 +1182,11 @@ mod dnssec_signer {
         /// signed under the chain's deepest zone DNSKEY.
         pub dkim_leaf: SignedRRset,
         /// Signed DMARC leaf at `_dmarc.<domain>`, when `dmarc_txt`
-        /// was supplied. Same zone as `dkim_leaf`.
+        /// was supplied. Same zone as `dkim_leaf`. Tests opt into
+        /// the DMARC-cached path by composing `skeleton.leaf =
+        /// dmarc_leaf` themselves; until they do, the field reads
+        /// as dead-code-untouched.
+        #[allow(dead_code)]
         pub dmarc_leaf: Option<SignedRRset>,
     }
 
