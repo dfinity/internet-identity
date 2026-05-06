@@ -534,11 +534,13 @@ didc_assist_ii_init() {
 }
 
 # Default DoH allowlist for the email-recovery flow on production.
-# Mirrors `DEFAULT_DOH_ALLOWED_DOMAINS` in deploy-common.bash. Override
-# at runtime with the `II_DOH_DOMAINS` env var (comma-separated). Empty
-# disables the DoH path entirely (DNSSEC-only).
+# Mirrors `DEFAULT_DOH_ALLOWED_DOMAINS` in deploy-common.bash. The
+# `II_DOH_DOMAINS` env var overrides — including with the empty
+# string, which yields `allowed_domains = vec {}` (DoH disabled,
+# DNSSEC-only). The check looks for "is the var *set*", not "is it
+# non-empty", so the documented "empty disables" semantics work.
 default_doh_domains_for_prod() {
-  if [ -n "${II_DOH_DOMAINS:-}" ]; then
+  if [ -n "${II_DOH_DOMAINS+set}" ]; then
     echo "$II_DOH_DOMAINS"
     return
   fi
