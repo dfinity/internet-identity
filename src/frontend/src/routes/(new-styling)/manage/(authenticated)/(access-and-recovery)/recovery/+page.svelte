@@ -272,7 +272,10 @@
   /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
   const submitEmailDkimLeaf = (
     arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
-  ) => anonymousActor.email_recovery_submit_dkim_leaf(arg).then(throwCanisterError);
+  ) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
 
   const handleRemoveEmail = async () => {
     if (emailRecovery === undefined) return;

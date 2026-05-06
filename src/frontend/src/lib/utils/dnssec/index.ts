@@ -22,7 +22,10 @@
  *   `email_recovery_submit_dkim_leaf` canister method.
  */
 
-import type { DnsProofBundle, SignedRRset } from "$lib/generated/internet_identity_types";
+import type {
+  DnsProofBundle,
+  SignedRRset,
+} from "$lib/generated/internet_identity_types";
 
 import { walkSkeletonChain, walkDkimLeaf } from "./chain";
 

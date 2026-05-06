@@ -77,12 +77,18 @@ export async function walkSkeletonChain(
   let dmarcLeaf: SignedRRset | undefined;
   if (wantDmarc) {
     const fetched = await fetchSignedRRset(`_dmarc.${domain}`, TYPE_TXT);
-    if (fetched !== undefined && bytesEqual(fetched.signerName, leafZoneBytes)) {
+    if (
+      fetched !== undefined &&
+      bytesEqual(fetched.signerName, leafZoneBytes)
+    ) {
       dmarcLeaf = fetched.rrset;
     }
   }
 
-  const chainAndRoot = await walkUpFromLeafZone(leafZoneBytes, seedDnskey.rrset);
+  const chainAndRoot = await walkUpFromLeafZone(
+    leafZoneBytes,
+    seedDnskey.rrset,
+  );
   if (chainAndRoot === undefined) {
     return undefined;
   }
@@ -128,7 +134,10 @@ export async function walkDkimLeaf(
     return undefined;
   }
 
-  const chainAndRoot = await walkUpFromLeafZone(leafZoneBytes, seedDnskey.rrset);
+  const chainAndRoot = await walkUpFromLeafZone(
+    leafZoneBytes,
+    seedDnskey.rrset,
+  );
   if (chainAndRoot === undefined) {
     return undefined;
   }

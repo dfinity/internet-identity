@@ -647,7 +647,6 @@ pub fn email_recovery_submit_dkim_leaf(
     .map(|(x,)| x)
 }
 
-
 pub fn email_recovery_get_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
