@@ -584,18 +584,14 @@ fn full_setup_flow_via_dnssec_path() {
     );
     let (id, p) = fresh_identity(&env, canister_id);
 
-    // 1. prepare_add with the DNS proof bundle. This synchronously
-    //    walks the chain and caches the leaf TXT bytes on the
-    //    pending challenge.
-    //
-    // FIXME: this test predates the two-phase rewrite — it will be
-    // updated to walk the DKIM leaf via submit_dkim_leaf separately.
-    // Today it constructs a single-leaf bundle carrying the DKIM
-    // record, matching the old prepare-time-cached-DKIM pipeline.
+    // 1. prepare_add with the DNSSEC *skeleton* bundle: chain anchored
+    //    at root + the DMARC leaf. The DKIM leaf is *not* in the
+    //    prepare bundle — its selector is unknown until the email
+    //    arrives, so the FE walks it later via `submit_dkim_leaf`.
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
         dns_proof: Some(DnsProofBundle {
-            leaf: Some(chain.dkim_leaf.clone()),
+            leaf: chain.dmarc_leaf.clone(),
             ..chain.skeleton.clone()
         }),
     };
@@ -612,9 +608,12 @@ fn full_setup_flow_via_dnssec_path() {
         timestamp: time(&env) / 1_000_000_000,
     });
 
-    // 3. Submit smtp_request. Because both DKIM and DMARC TXTs are
-    //    pre-cached via DNSSEC, the canister should issue NO DoH
-    //    outcalls at all. We drive PocketIC forward and assert.
+    // 3. Submit smtp_request. The canister parses `s=` from the
+    //    DKIM-Signature header, validates the body hash, drops the
+    //    body, caches the partial-verification record, and flips
+    //    status to `NeedDkimLeaf { selector }`. No DoH outcalls
+    //    happen — the chain was anchored at prepare time and the
+    //    DMARC TXT was cached.
     let raw_msg_id = env
         .submit_call_with_effective_principal(
             canister_id,
@@ -633,7 +632,37 @@ fn full_setup_flow_via_dnssec_path() {
     let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
     assert!(matches!(resp, SmtpResponse::Ok {}));
 
-    // 4. Status flips to RegistrationSucceeded.
+    // 4. Status now reports `NeedDkimLeaf { selector }` — the
+    //    canister read the selector from the email and is waiting
+    //    for the FE to deliver the leaf.
+    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    let selector = match status {
+        EmailRecoveryStatus::NeedDkimLeaf { ref selector } => selector.clone(),
+        other => panic!("expected NeedDkimLeaf, got {other:?}"),
+    };
+    assert_eq!(selector, TEST_SELECTOR);
+
+    // 5. Submit the DKIM leaf. The canister validates it against
+    //    the cached zone DNSKEY, runs the cryptographic signature
+    //    check using the cached digest, checks DMARC + From: match,
+    //    and binds the credential.
+    let submit_status = api::email_recovery_submit_dkim_leaf(
+        &env,
+        canister_id,
+        internet_identity_interface::internet_identity::types::email_recovery::EmailRecoverySubmitDkimLeafArg {
+            nonce: challenge.nonce.clone(),
+            dkim_leaf: chain.dkim_leaf.clone(),
+        },
+    )
+    .expect("submit_dkim_leaf call failed")
+    .expect("submit_dkim_leaf should succeed");
+    assert!(
+        matches!(submit_status, EmailRecoveryStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded from submit_dkim_leaf, got {submit_status:?}",
+    );
+
+    // 6. Polled status also reflects the success.
     let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
         .expect("status call failed");
     assert!(
@@ -641,7 +670,7 @@ fn full_setup_flow_via_dnssec_path() {
         "expected RegistrationSucceeded, got {status:?}",
     );
 
-    // 5. Removal works → confirms the credential actually persisted
+    // 7. Removal works → confirms the credential actually persisted
     //    to the anchor.
     api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
         .expect("remove call failed")
@@ -1182,11 +1211,9 @@ mod dnssec_signer {
         /// signed under the chain's deepest zone DNSKEY.
         pub dkim_leaf: SignedRRset,
         /// Signed DMARC leaf at `_dmarc.<domain>`, when `dmarc_txt`
-        /// was supplied. Same zone as `dkim_leaf`. Tests opt into
-        /// the DMARC-cached path by composing `skeleton.leaf =
-        /// dmarc_leaf` themselves; until they do, the field reads
-        /// as dead-code-untouched.
-        #[allow(dead_code)]
+        /// was supplied. Same zone as `dkim_leaf`. Tests compose
+        /// the prepare-time bundle as `skeleton + dmarc_leaf` and
+        /// the submit-leaf-time bundle as `skeleton + dkim_leaf`.
         pub dmarc_leaf: Option<SignedRRset>,
     }
 
