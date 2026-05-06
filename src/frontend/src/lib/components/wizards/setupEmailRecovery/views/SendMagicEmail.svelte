@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { MailOpenIcon, CopyIcon, CheckIcon } from "@lucide/svelte";
@@ -112,8 +111,12 @@
   </p>
 
   <div class="flex flex-row justify-end">
-    <Button onclick={onCancel} variant="secondary" type="button">
+    <button
+      class="btn btn-secondary btn-md"
+      type="button"
+      onclick={onCancel}
+    >
       {$t`Cancel`}
-    </Button>
+    </button>
   </div>
 </div>

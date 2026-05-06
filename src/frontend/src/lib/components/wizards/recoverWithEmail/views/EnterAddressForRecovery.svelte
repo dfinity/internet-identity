@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -42,7 +41,7 @@
   };
 </script>
 
-<form on:submit={handleSubmit} class="flex flex-col gap-6">
+<form onsubmit={handleSubmit} class="flex flex-col gap-6">
   <header class="flex flex-col items-center gap-3">
     <MailIcon class="text-fg-brand-primary size-10" />
     <h1 class="text-text-primary text-2xl font-medium">
@@ -67,11 +66,20 @@
     autofocus
   />
   <div class="flex flex-row justify-end gap-2">
-    <Button onclick={onCancel} variant="secondary" type="button" disabled={busy}>
+    <button
+      class="btn btn-secondary btn-md"
+      type="button"
+      onclick={onCancel}
+      disabled={busy}
+    >
       {$t`Cancel`}
-    </Button>
-    <Button type="submit" disabled={!isShapeValid || busy}>
+    </button>
+    <button
+      class="btn btn-primary btn-md"
+      type="submit"
+      disabled={!isShapeValid || busy}
+    >
       {busy ? $t`Verifying…` : $t`Continue`}
-    </Button>
+    </button>
   </div>
 </form>

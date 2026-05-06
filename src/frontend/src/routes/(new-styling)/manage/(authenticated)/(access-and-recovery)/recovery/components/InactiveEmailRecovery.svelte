@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { MailIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -36,8 +35,11 @@
         </Trans>
       </p>
     </header>
-    <Button onclick={onActivate} size="sm" class="@lg:my-auto @lg:ms-auto">
+    <button
+      class="btn btn-primary btn-sm @lg:my-auto @lg:ms-auto"
+      onclick={onActivate}
+    >
       {$t`Add email`}
-    </Button>
+    </button>
   </section>
 </div>
