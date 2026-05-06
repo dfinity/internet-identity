@@ -58,6 +58,14 @@ type Operation = variant {
     add_name;
     update_name;
     remove_name;
+    // Email-recovery setup binding succeeded (an inbound DKIM-verified
+    // email matched a pending challenge and the credential was
+    // written to the anchor). Carries no payload — see the
+    // `Operation` variant doc in `internet_identity_interface`.
+    add_email_recovery;
+    // Email-recovery credential was detached from the anchor by an
+    // authenticated remove call.
+    remove_email_recovery;
     create_account : record {
         name : Private;
     };
