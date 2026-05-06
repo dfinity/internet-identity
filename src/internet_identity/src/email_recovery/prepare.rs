@@ -78,11 +78,11 @@ pub async fn prepare_delegation(
 }
 
 /// Shared input-validation + nonce-issuing core. `kind`
-/// parametrises over which flow we're starting. The challenge
-/// no longer carries a `mailbox` field — the FE pairs the user-
-/// part (`register` / `recover`) with `window.location.hostname`
-/// to render the user-facing label, and the canister accepts mail
-/// at any of the configured `related_origins` aliases (see
+/// parametrises over which flow we're starting. The challenge no
+/// longer carries a `mailbox` field — the FE pairs the user-part
+/// (`register` / `recover`) with `window.location.hostname` to
+/// render the user-facing label, and the canister accepts mail at
+/// any of the configured `related_origins` aliases (see
 /// [`super::mailbox_domains`]).
 async fn prepare_common(
     dns_input: EmailRecoveryDnsInput,
