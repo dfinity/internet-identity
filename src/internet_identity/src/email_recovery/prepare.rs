@@ -202,16 +202,34 @@ fn verify_dnssec_chain(
     // for the From<> impls.)
     let bundle: crate::dnssec::DnsProofBundle = proof.into();
 
-    let verified = crate::dnssec::verify_with_clock(&bundle, &trust_anchors, now_secs)
-        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
-
     let dkim_fqdn = format!("{selector}._domainkey.{registered_domain}.");
     let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
+
+    // Single-leaf bundles: at most one of DKIM / DMARC per call.
+    // (Pre-two-phase compatibility: this function is called from the
+    // legacy test path which still sends a DKIM-leaf bundle. Once
+    // smtp.rs is rewritten for the two-phase flow, the DKIM leaf will
+    // arrive via `submit_dkim_leaf` and prepare-time bundles will
+    // carry only the optional DMARC leaf.)
+    let leaf_present = bundle.leaf.is_some();
+    let verified_opt = if leaf_present {
+        Some(
+            crate::dnssec::verify_with_clock(&bundle, &trust_anchors, now_secs)
+                .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?,
+        )
+    } else {
+        // Chain-only bundle — validate the chain alone (the leaf will be
+        // submitted later via `submit_dkim_leaf`).
+        let _zone_dnskey =
+            crate::dnssec::verify_chain_with_clock(&bundle, &trust_anchors, now_secs)
+                .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
+        None
+    };
 
     let mut dkim: Option<Vec<u8>> = None;
     let mut dmarc: Option<Vec<u8>> = None;
 
-    for rec in &verified {
+    if let Some(rec) = verified_opt.as_ref() {
         if rec.rtype != crate::dnssec::types::TYPE_TXT {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "DNSSEC bundle leaf is not TXT (got rtype {})",
@@ -221,11 +239,6 @@ fn verify_dnssec_chain(
         let leaf_name = decode_dns_name_lowercase(&rec.name.0);
         let txt = parse_txt_rdata(&rec.rdata)?;
         if leaf_name.eq_ignore_ascii_case(&dkim_fqdn) {
-            if dkim.is_some() {
-                return Err(EmailRecoveryError::EmailVerificationFailed(
-                    "DNSSEC bundle has duplicate DKIM leaf".into(),
-                ));
-            }
             if txt.len() > super::MAX_DKIM_TXT_BYTES {
                 return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                     "DKIM TXT record at {leaf_name:?} is {} bytes; \
@@ -236,11 +249,6 @@ fn verify_dnssec_chain(
             }
             dkim = Some(txt);
         } else if leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
-            if dmarc.is_some() {
-                return Err(EmailRecoveryError::EmailVerificationFailed(
-                    "DNSSEC bundle has duplicate DMARC leaf".into(),
-                ));
-            }
             if txt.len() > super::MAX_DMARC_TXT_BYTES {
                 return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                     "DMARC TXT record at {leaf_name:?} is {} bytes; \
