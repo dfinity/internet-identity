@@ -379,7 +379,7 @@ export async function buildChain(args: {
  * one-off scripts that emit `local_test_arg.did` so the canister
  * can be deployed with a matching `dnssec_config`.
  */
-export async function rootAnchor(): Promise<DnssecRootAnchor> {
+export function rootAnchor(): Promise<DnssecRootAnchor> {
   const rootKey = makeZoneKey(new Uint8Array([0]), ROOT_SEED);
   return makeAnchor(rootKey);
 }
