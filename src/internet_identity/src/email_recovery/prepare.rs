@@ -47,17 +47,7 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-<<<<<<< HEAD
     prepare_common(dns_input, now_secs, PendingKind::Register { anchor }).await
-=======
-    prepare_common(
-        dns_input,
-        now_secs,
-        PendingKind::Register { anchor },
-        super::SETUP_MAILBOX,
-    )
-    .await
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 }
 
 /// Body of `email_recovery_prepare_delegation(dns_input, session_pk)`.
@@ -84,31 +74,20 @@ pub async fn prepare_delegation(
             super::MAX_SESSION_KEY_BYTES,
         )));
     }
-<<<<<<< HEAD
     prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await
-=======
-    prepare_common(
-        dns_input,
-        now_secs,
-        PendingKind::Recover { session_pk },
-        super::RECOVERY_MAILBOX,
-    )
-    .await
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 }
 
-/// Shared input-validation + nonce-issuing core. `kind` parametrises
-/// over which flow we're starting; `mailbox` is the recipient string
-/// returned to the FE so the wizard can render "send your email
-/// to ...".
+/// Shared input-validation + nonce-issuing core. `kind`
+/// parametrises over which flow we're starting. The challenge
+/// no longer carries a `mailbox` field — the FE pairs the user-
+/// part (`register` / `recover`) with `window.location.hostname`
+/// to render the user-facing label, and the canister accepts mail
+/// at any of the configured `related_origins` aliases (see
+/// [`super::mailbox_domains`]).
 async fn prepare_common(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
     kind: PendingKind,
-<<<<<<< HEAD
-=======
-    mailbox: &str,
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
     let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
 
@@ -202,10 +181,6 @@ async fn prepare_common(
 
     Ok(EmailRecoveryChallenge {
         nonce,
-<<<<<<< HEAD
-=======
-        mailbox: mailbox.to_string(),
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
         // `Timestamp` is nanoseconds since epoch in this crate (see
         // `internet_identity_interface::types`). We work in seconds
         // internally for the TTL math and convert at the wire boundary.
