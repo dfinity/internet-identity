@@ -7,7 +7,7 @@ still planned.
 **Tracking PoC:** [#3760](https://github.com/dfinity/internet-identity/pull/3760) (DKIM postbox, will not be merged)
 **Targets:** A new production-grade PR series, not a follow-up to #3760.
 
-**Implementation status (as of 2026-05-05).**
+**Implementation status (as of 2026-05-06).**
 
 | Component | Status | Where |
 |---|---|---|
@@ -16,8 +16,8 @@ still planned.
 | DMARC alignment (§6) | In review | PR [#3840](https://github.com/dfinity/internet-identity/pull/3840) |
 | DoH fallback (§7.6) | In review | PR [#3841](https://github.com/dfinity/internet-identity/pull/3841) |
 | Setup flow (§8.4): `prepare_add` → `smtp_request` → `status` → `credential_remove` | In review | PR [#3842](https://github.com/dfinity/internet-identity/pull/3842) |
-| Recovery flow (§8.5): `prepare_delegation`, delegation issuance, `get_delegation` | **Planned** | not yet implemented |
-| Frontend wizards (§8.6, §8.10) | **Planned** | not yet implemented |
+| Recovery flow (§8.5): `prepare_delegation`, delegation issuance, `get_delegation` | In review | PR [#3843](https://github.com/dfinity/internet-identity/pull/3843) |
+| Frontend wizards (§8.6, §8.10) | In review | PR [#3844](https://github.com/dfinity/internet-identity/pull/3844) |
 
 Nothing in this stack is merged to `main` yet; all PRs are open and stacked on each other.
 
@@ -473,19 +473,23 @@ A "DNS proof bundle" looks like:
 
 ```rust
 pub struct DnsProofBundle {
-    /// One or more signed RRsets verified under the same chain. For
-    /// email recovery the bundle carries the DKIM TXT at
-    /// `<selector>._domainkey.<d>` (required) and optionally the
-    /// DMARC TXT at `_dmarc.<d>`. Both records live in the same
-    /// zone, so a single chain walk authenticates both.
-    pub leaves: Vec<SignedRRset>,
+    /// At most one signed RRset verified under the chain. The two-phase
+    /// flow only ever needs one leaf per call:
+    /// - At `prepare_add`: the DMARC TXT at `_dmarc.<d>` (optional —
+    ///   omit when the zone publishes no DMARC; the canister falls
+    ///   through to strict `d=` alignment).
+    /// - At `submit_dkim_leaf`: the DKIM TXT at
+    ///   `<selector>._domainkey.<d>`, signed under the same zone the
+    ///   skeleton chain anchored at prepare time.
+    /// Single-leaf is also a smaller ingress argument than `Vec<…>`.
+    pub leaf: Option<SignedRRset>,
 
     /// The signed root DNSKEY RRset (every link in `chain` is verified
     /// up to here). Validated by checking that one of its KSK DNSKEYs
     /// hashes to a DS digest in the trust anchor stored on the canister.
     pub root_dnskey: SignedRRset,
 
-    /// Walk down the delegation chain from root toward `leaves`. Each
+    /// Walk down the delegation chain from root toward the leaf. Each
     /// entry is the DS RRset published in the parent zone (signed by
     /// the parent's DNSKEY) plus the DNSKEY RRset of the child zone
     /// (self-signed by the child's KSK and DS-pinned by the parent).
