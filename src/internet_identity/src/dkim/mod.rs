@@ -46,3 +46,19 @@ pub use types::{
 // in scope at the same time.
 #[allow(unused_imports)]
 pub use verify::verify as verify_dkim;
+
+// Building blocks consumed by the email-recovery two-phase pipeline
+// (`crate::email_recovery::smtp` parses the signature and computes
+// the headers digest at email-arrival time, then
+// `crate::email_recovery::submit_leaf` admits the DKIM TXT and
+// finishes the signature check).
+#[allow(unused_imports)]
+pub(crate) use canonicalize::relaxed_body;
+#[allow(unused_imports)]
+pub(crate) use dns_record::{parse_dkim_txt, DkimDnsRecord, KeyType};
+#[allow(unused_imports)]
+pub(crate) use parse::{parse_dkim_signature, DkimSignature};
+#[allow(unused_imports)]
+pub(crate) use signature::{body_hash_sha256, verify_signature, VerifyOutcome};
+#[allow(unused_imports)]
+pub(crate) use verify::{build_header_hash_input, simple_body};

@@ -1416,6 +1416,7 @@ mod email_recovery_api {
     use crate::email_recovery;
     use internet_identity_interface::internet_identity::types::email_recovery::{
         EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus,
+        EmailRecoverySubmitDkimLeafArg,
     };
 
     /// Authenticated. Validates the caller owns `identity_number`,
@@ -1468,6 +1469,31 @@ mod email_recovery_api {
     fn email_recovery_status(nonce: String) -> EmailRecoveryStatus {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
         email_recovery::pending_status(&nonce, now_secs)
+    }
+
+    /// Anonymous. Phase 2 of the DNSSEC path: once
+    /// `email_recovery_status` returns `NeedDkimLeaf { selector }`,
+    /// the FE walks DNSSEC for `<selector>._domainkey.<domain>` and
+    /// submits the signed RRset here. The canister validates the leaf
+    /// against the chain it cached at prepare time, completes the DKIM
+    /// signature check using the partial-verification record stashed
+    /// at email-arrival time, runs DMARC alignment, and binds the
+    /// credential. Returns the post-call status — typically
+    /// `RegistrationSucceeded` — saving the FE one extra
+    /// `email_recovery_status` round-trip.
+    ///
+    /// Anonymous because this is the only DNSSEC-path move that
+    /// happens before the address-binding finishes. The pending
+    /// challenge nonce is the only authentication; it's a 64-bit
+    /// canister-issued secret that lives only inside one pending
+    /// entry, and the leaf submission is a no-op against any other
+    /// entry.
+    #[update]
+    fn email_recovery_submit_dkim_leaf(
+        arg: EmailRecoverySubmitDkimLeafArg,
+    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::submit_dkim_leaf(arg, now_secs)
     }
 
     /// Authenticated. Detaches the recovery email from the anchor.

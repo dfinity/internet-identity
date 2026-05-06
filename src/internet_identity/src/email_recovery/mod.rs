@@ -34,10 +34,12 @@ mod prepare;
 mod remove;
 mod rng;
 mod smtp;
+mod submit_leaf;
 
 pub use prepare::prepare_add;
 pub use remove::{remove_credential, RemoveError};
 pub use smtp::handle_smtp_request;
+pub use submit_leaf::submit_dkim_leaf;
 
 /// Wrapper around `pending::status_of` so the canister method in
 /// `main.rs` doesn't need to know which submodule the heap state

@@ -1,22 +1,27 @@
 //! `email_recovery_credential_prepare_add` — start a new binding flow.
 //!
 //! Authenticated entry point that validates the FE's input, picks
-//! the verification path (DNSSEC if a proof bundle is supplied, DoH
-//! allowlist otherwise), draws a fresh nonce from the heap PRNG,
+//! the verification path (DNSSEC if a skeleton bundle is supplied,
+//! DoH allowlist otherwise), draws a fresh nonce from the heap PRNG,
 //! and parks a `PendingChallenge` keyed by that nonce. Returns the
 //! user-visible challenge (nonce + mailbox + expiry) so the FE can
 //! render the "send a magic email" screen.
 //!
-//! See `docs/ongoing/email-recovery.md` §8.4. Path picker:
+//! See `docs/ongoing/email-recovery.md` §8.4. Two-phase path picker:
 //!
-//! - **DNSSEC**: when `dns_proof` is supplied, validate the chain
-//!   synchronously against the canister's configured trust anchors,
-//!   verify the bundle's leaf is at `<selector>._domainkey.<domain>`,
-//!   and cache the verified TXT bytes on the pending challenge so
-//!   `smtp_request` can skip the DoH outcall fan-out entirely.
+//! - **DNSSEC**: when `dns_proof` is supplied, validate the
+//!   *skeleton chain* (root DNSKEY + delegations) synchronously
+//!   against the canister's trust anchors and cache the deepest-zone
+//!   DNSKEY RRset on the pending challenge. The bundle may also
+//!   carry an optional DMARC leaf at `_dmarc.<domain>`; if present
+//!   we validate it and cache the TXT bytes. The DKIM leaf is *not*
+//!   in this bundle — it lands later via
+//!   `email_recovery_submit_dkim_leaf`.
 //! - **DoH allowlist**: when `dns_proof` is absent, the registered
-//!   domain must be in `DohConfig.allowed_domains`. The DKIM key is
-//!   resolved via `crate::doh::fetch_txt` at email-arrival time.
+//!   domain must be in `DohConfig.allowed_domains`. The DKIM TXT is
+//!   resolved via `crate::doh::fetch_txt` at email-arrival time and
+//!   verification finishes inside `smtp_request` (no submit-leaf
+//!   follow-up).
 
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
 use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce};
@@ -42,11 +47,7 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-    let EmailRecoveryDnsInput {
-        address,
-        selector,
-        dns_proof,
-    } = dns_input;
+    let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
 
     // Sanity check the address shape. Detailed RFC 5321/5322 validation
     // is the verifier's job; here we just want to fail fast on the
@@ -58,35 +59,21 @@ pub async fn prepare_add(
     let registered_domain = registered_domain_of(&address)
         .ok_or_else(|| EmailRecoveryError::DomainNotSupported(address.clone()))?;
 
-    // Selector sanity. DKIM selectors are themselves DNS labels (RFC
-    // 6376 §3.6.2.1), so they share the label-validity rules. We
-    // intentionally don't probe DoH here — the selector is unverified
-    // until the inbound email lands in `smtp_request`, and the
-    // `SelectorMismatch` error covers the "FE guessed wrong" case.
-    if selector.is_empty()
-        || selector.len() > 63
-        || !selector
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
-    {
-        return Err(EmailRecoveryError::DomainNotSupported(format!(
-            "invalid DKIM selector: {selector:?}"
-        )));
-    }
-
     // Path picker. The FE never decides the path — it sends whatever
     // it could gather, and we choose:
     //
-    // - DNSSEC path: if `dns_proof` is supplied, validate the chain
-    //   synchronously and cache the verified DKIM TXT for
-    //   `smtp_request` to consume. No outcall fan-out at email time.
+    // - DNSSEC path: if `dns_proof` is supplied, validate the
+    //   *skeleton chain* synchronously and cache the deepest-zone
+    //   DNSKEY for later leaf admission. If the bundle also carries a
+    //   DMARC leaf, validate it and cache the TXT bytes.
     // - DoH path: fall through to the allowlist check; `smtp_request`
-    //   resolves the TXT via `crate::doh::fetch_txt`.
+    //   resolves the DKIM TXT via `crate::doh::fetch_txt` at email
+    //   arrival.
     // - Neither: reject — the FE will surface a "we can't accept
     //   email from this domain" error.
-    let (cached_dkim_txt, cached_dmarc_txt) = if let Some(proof) = dns_proof {
-        let extracted = verify_dnssec_chain(proof, &selector, &registered_domain, now_secs)?;
-        (Some(extracted.dkim), extracted.dmarc)
+    let (cached_zone_dnskey, cached_dmarc_txt) = if let Some(proof) = dns_proof {
+        let extracted = verify_dnssec_skeleton(proof, &registered_domain, now_secs)?;
+        (Some(extracted.zone_dnskey), extracted.dmarc)
     } else {
         // No DNSSEC bundle → DoH allowlist gate.
         let allowlisted = state::persistent_state(|p| {
@@ -135,10 +122,11 @@ pub async fn prepare_add(
     let challenge = PendingChallenge {
         kind: PendingKind::Register { anchor },
         claimed_address: address,
-        selector,
+        registered_domain,
         created_at_secs: now_secs,
-        cached_dkim_txt,
+        cached_zone_dnskey,
         cached_dmarc_txt,
+        partial_verification: None,
         status: PendingStatus::Pending,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
@@ -155,36 +143,32 @@ pub async fn prepare_add(
     })
 }
 
-/// Output of a successful DNSSEC bundle verification — the TXT bytes
-/// for DKIM (required) plus DMARC (optional, included when the FE
-/// supplied a DMARC leaf in the bundle). When `dmarc` is `None`, the
-/// canister treats the domain as "no DMARC published" and uses the
-/// strict `d=` alignment fallback at email-arrival time.
-struct DnssecExtractedTxt {
-    dkim: Vec<u8>,
+/// Output of a successful DNSSEC skeleton-bundle verification — the
+/// validated deepest-zone DNSKEY RRset (always cached) plus the
+/// optional DMARC TXT bytes (set when the FE included a DMARC leaf
+/// in the skeleton bundle). The DKIM leaf isn't part of the prepare
+/// bundle — it lands later via `email_recovery_submit_dkim_leaf`.
+struct DnssecExtracted {
+    zone_dnskey: crate::dnssec::SignedRRset,
     dmarc: Option<Vec<u8>>,
 }
 
-/// Validate a caller-supplied DNSSEC proof bundle against the
-/// canister's configured trust anchors and extract the DKIM (required)
-/// and DMARC (optional) TXT bytes from the verified leaves.
+/// Validate a caller-supplied DNSSEC *skeleton* bundle against the
+/// canister's configured trust anchors and extract the deepest-zone
+/// DNSKEY (always required for the cache) plus the optional DMARC
+/// TXT bytes.
 ///
-/// The bundle is allowed to carry one or two leaves:
-/// - exactly one TXT RRset at `<selector>._domainkey.<registered_domain>`
-///   (DKIM) — required.
-/// - at most one TXT RRset at `_dmarc.<registered_domain>` (DMARC) —
-///   optional. If the FE includes it we cache the bytes so
-///   `smtp_request` can skip the DoH outcall.
-///
-/// Other leaves are an error: an attacker who got a chain validated
-/// for an arbitrary TXT record at the same zone shouldn't be able to
-/// smuggle it into a recovery flow.
-fn verify_dnssec_chain(
+/// The bundle is allowed to carry at most one leaf, and that leaf
+/// must be the DMARC TXT at `_dmarc.<registered_domain>`. Any other
+/// leaf — including a DKIM TXT — is rejected: the DKIM leaf belongs
+/// in the post-email submit-leaf call, not the prepare bundle, and
+/// an attacker who got a different TXT validated under the same
+/// chain shouldn't be able to smuggle it through here.
+fn verify_dnssec_skeleton(
     proof: internet_identity_interface::internet_identity::types::DnsProofBundle,
-    selector: &str,
     registered_domain: &str,
     now_secs: u64,
-) -> Result<DnssecExtractedTxt, EmailRecoveryError> {
+) -> Result<DnssecExtracted, EmailRecoveryError> {
     let trust_anchors = state::persistent_state(|p| {
         p.dnssec_config
             .as_ref()
@@ -202,53 +186,36 @@ fn verify_dnssec_chain(
     // for the From<> impls.)
     let bundle: crate::dnssec::DnsProofBundle = proof.into();
 
-    let dkim_fqdn = format!("{selector}._domainkey.{registered_domain}.");
+    // Validate the chain (root + delegations); produces the
+    // deepest-zone DNSKEY RRset that we cache for later leaf
+    // admission. `bundle.leaf` is *not* consulted here.
+    let zone_dnskey = crate::dnssec::verify_chain_with_clock(&bundle, &trust_anchors, now_secs)
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
+
+    // Optional DMARC leaf: if present, validate against the same
+    // chain and cache the TXT bytes.
     let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
-
-    // Single-leaf bundles: at most one of DKIM / DMARC per call.
-    // (Pre-two-phase compatibility: this function is called from the
-    // legacy test path which still sends a DKIM-leaf bundle. Once
-    // smtp.rs is rewritten for the two-phase flow, the DKIM leaf will
-    // arrive via `submit_dkim_leaf` and prepare-time bundles will
-    // carry only the optional DMARC leaf.)
-    let leaf_present = bundle.leaf.is_some();
-    let verified_opt = if leaf_present {
-        Some(
-            crate::dnssec::verify_with_clock(&bundle, &trust_anchors, now_secs)
-                .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?,
-        )
-    } else {
-        // Chain-only bundle — validate the chain alone (the leaf will be
-        // submitted later via `submit_dkim_leaf`).
-        let _zone_dnskey =
-            crate::dnssec::verify_chain_with_clock(&bundle, &trust_anchors, now_secs)
-                .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
-        None
-    };
-
-    let mut dkim: Option<Vec<u8>> = None;
-    let mut dmarc: Option<Vec<u8>> = None;
-
-    if let Some(rec) = verified_opt.as_ref() {
-        if rec.rtype != crate::dnssec::types::TYPE_TXT {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                "DNSSEC bundle leaf is not TXT (got rtype {})",
-                rec.rtype
-            )));
-        }
-        let leaf_name = decode_dns_name_lowercase(&rec.name.0);
-        let txt = parse_txt_rdata(&rec.rdata)?;
-        if leaf_name.eq_ignore_ascii_case(&dkim_fqdn) {
-            if txt.len() > super::MAX_DKIM_TXT_BYTES {
+    let dmarc = match bundle.leaf.as_ref() {
+        None => None,
+        Some(leaf) => {
+            let verified =
+                crate::dnssec::verify_leaf_against_dnskey(leaf, &zone_dnskey, now_secs).map_err(
+                    |e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}")),
+                )?;
+            if verified.rtype != crate::dnssec::types::TYPE_TXT {
                 return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                    "DKIM TXT record at {leaf_name:?} is {} bytes; \
-                     refusing to cache more than {} bytes per pending entry",
-                    txt.len(),
-                    super::MAX_DKIM_TXT_BYTES,
+                    "skeleton bundle leaf is not TXT (got rtype {})",
+                    verified.rtype
                 )));
             }
-            dkim = Some(txt);
-        } else if leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
+            let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+            if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
+                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                    "skeleton bundle leaf name {leaf_name:?} is not the expected \
+                     DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"
+                )));
+            }
+            let txt = parse_txt_rdata(&verified.rdata)?;
             if txt.len() > super::MAX_DMARC_TXT_BYTES {
                 return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                     "DMARC TXT record at {leaf_name:?} is {} bytes; \
@@ -257,22 +224,11 @@ fn verify_dnssec_chain(
                     super::MAX_DMARC_TXT_BYTES,
                 )));
             }
-            dmarc = Some(txt);
-        } else {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                "DNSSEC bundle leaf name {leaf_name:?} matches neither DKIM \
-                 ({dkim_fqdn:?}) nor DMARC ({dmarc_fqdn:?})"
-            )));
+            Some(txt)
         }
-    }
+    };
 
-    let dkim = dkim.ok_or_else(|| {
-        EmailRecoveryError::EmailVerificationFailed(format!(
-            "DNSSEC bundle missing required DKIM leaf at {dkim_fqdn:?}"
-        ))
-    })?;
-
-    Ok(DnssecExtractedTxt { dkim, dmarc })
+    Ok(DnssecExtracted { zone_dnskey, dmarc })
 }
 
 /// Concatenate one or more TXT character-strings (each prefixed by a
@@ -396,10 +352,9 @@ mod tests {
         });
     }
 
-    fn doh_input(addr: &str, selector: &str) -> EmailRecoveryDnsInput {
+    fn doh_input(addr: &str) -> EmailRecoveryDnsInput {
         EmailRecoveryDnsInput {
             address: addr.to_string(),
-            selector: selector.to_string(),
             dns_proof: None,
         }
     }
@@ -426,11 +381,7 @@ mod tests {
     fn rejects_non_allowlisted_domain() {
         super::super::pending::reset_for_tests();
         install_doh_allowlist(&["gmail.com"]);
-        let result = block_on(prepare_add(
-            1,
-            doh_input("alice@example.com", "default"),
-            100,
-        ));
+        let result = block_on(prepare_add(1, doh_input("alice@example.com"), 100));
         match result {
             Err(EmailRecoveryError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
             other => panic!("expected DomainNotAllowlisted, got {other:?}"),
@@ -441,11 +392,7 @@ mod tests {
     fn rejects_when_doh_config_unset() {
         super::super::pending::reset_for_tests();
         crate::state::persistent_state_mut(|p| p.doh_config = None);
-        let result = block_on(prepare_add(
-            1,
-            doh_input("alice@gmail.com", "20230601"),
-            100,
-        ));
+        let result = block_on(prepare_add(1, doh_input("alice@gmail.com"), 100));
         assert!(matches!(
             result,
             Err(EmailRecoveryError::DomainNotAllowlisted(_))
@@ -464,7 +411,7 @@ mod tests {
             "nolocal@",
             "a b@c.com",
         ] {
-            let result = block_on(prepare_add(1, doh_input(bad, "default"), 100));
+            let result = block_on(prepare_add(1, doh_input(bad), 100));
             assert!(
                 matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
                 "expected DomainNotSupported for {bad:?}, got {result:?}"
@@ -490,24 +437,10 @@ mod tests {
             oversized_local.as_str(),
             oversized_domain.as_str(),
         ] {
-            let result = block_on(prepare_add(1, doh_input(bad, "default"), 100));
+            let result = block_on(prepare_add(1, doh_input(bad), 100));
             assert!(
                 matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
                 "expected DomainNotSupported for oversized {bad:?}, got {result:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn rejects_invalid_selector() {
-        super::super::pending::reset_for_tests();
-        install_doh_allowlist(&["gmail.com"]);
-        let too_long = "a".repeat(64);
-        for bad in &["", "has space", "has/slash", too_long.as_str()] {
-            let result = block_on(prepare_add(1, doh_input("alice@gmail.com", bad), 100));
-            assert!(
-                matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
-                "expected rejection for selector {bad:?}, got {result:?}"
             );
         }
     }
@@ -518,11 +451,7 @@ mod tests {
         super::super::rng::tests::seed_for_tests([7u8; 32]);
         install_doh_allowlist(&["gmail.com"]);
 
-        let result = block_on(prepare_add(
-            42,
-            doh_input("Alice@Gmail.COM", "20230601"),
-            1_000,
-        ));
+        let result = block_on(prepare_add(42, doh_input("Alice@Gmail.COM"), 1_000));
         let challenge = result.expect("expected Ok");
 
         assert!(challenge.nonce.starts_with(super::super::NONCE_PREFIX));
@@ -535,10 +464,10 @@ mod tests {
         );
 
         // The pending entry stores the lowercased address (input was
-        // mixed case).
+        // mixed case) and the registered domain.
         super::super::pending::with_mut(&challenge.nonce, 1_001, |c| {
             assert_eq!(c.claimed_address, "alice@gmail.com");
-            assert_eq!(c.selector, "20230601");
+            assert_eq!(c.registered_domain, "gmail.com");
             matches!(
                 c.kind,
                 super::super::pending::PendingKind::Register { anchor: 42 }
@@ -554,11 +483,7 @@ mod tests {
         // Operator stored the domain in caps; user typed it lowercase.
         // We accept either side mixed-case.
         install_doh_allowlist(&["GMAIL.COM"]);
-        let result = block_on(prepare_add(
-            1,
-            doh_input("alice@gmail.com", "20230601"),
-            1_000,
-        ));
+        let result = block_on(prepare_add(1, doh_input("alice@gmail.com"), 1_000));
         assert!(result.is_ok(), "expected Ok, got {result:?}");
     }
 }

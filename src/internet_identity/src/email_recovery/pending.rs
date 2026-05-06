@@ -28,36 +28,93 @@ pub struct PendingChallenge {
     /// `smtp_request` rejects with `AddressMismatch` if the verified
     /// `From:` of the inbound email doesn't match this exactly.
     pub claimed_address: String,
-    /// DKIM selector the FE found at prepare time. The inbound email
-    /// must be signed under this selector or the canister rejects
-    /// with `SelectorMismatch` (selector rotations between prepare
-    /// and send are rare in practice).
-    pub selector: String,
+    /// Registered domain (the part after `@` in `claimed_address`).
+    /// Stored separately so `smtp_request` and `submit_dkim_leaf`
+    /// don't re-derive it on every call. Also pinned here so the
+    /// owner-name check at `submit_dkim_leaf` time can reject leaves
+    /// at a different zone.
+    pub registered_domain: String,
     /// Unix-seconds at which `prepare_add` ran. Used for TTL expiry
     /// and as the basis for `expires_at` shipped to the FE.
     pub created_at_secs: u64,
-    /// Cached DKIM TXT record bytes from the DNSSEC path. `None`
-    /// means the FE didn't supply a `dns_proof`, so `smtp_request`
-    /// will resolve the TXT via `crate::doh::fetch_txt` instead.
-    /// `Some(bytes)` means the canister has already validated the
-    /// DNSSEC chain at prepare time and can skip the outcall fan-out
-    /// entirely. Acts as the flag for "DNSSEC path?" — when set,
-    /// `cached_dmarc_txt` below is meaningful (Some/None reflecting
-    /// whether the FE included a DMARC leaf in the bundle); when
-    /// `None`, DMARC is fetched via DoH at email time.
-    pub cached_dkim_txt: Option<Vec<u8>>,
+    /// Cached deepest-zone DNSKEY RRset from the skeleton chain. Set
+    /// when the FE took the DNSSEC path at prepare time
+    /// (`dns_proof.is_some()`). The canister validates the chain
+    /// against its trust anchors at prepare time and stashes the
+    /// validated DNSKEY RRset here so a follow-up
+    /// `email_recovery_submit_dkim_leaf` can admit a single TXT leaf
+    /// without re-walking the chain. `None` means the DoH path —
+    /// `smtp_request` resolves the DKIM TXT via
+    /// `crate::doh::fetch_txt` instead.
+    pub cached_zone_dnskey: Option<crate::dnssec::SignedRRset>,
     /// Cached DMARC TXT record bytes from the DNSSEC path. Only
-    /// meaningful when `cached_dkim_txt.is_some()` (DNSSEC path).
-    /// `Some(bytes)` means the FE supplied a DMARC leaf in the bundle
-    /// and the canister validated it; `smtp_request` uses these bytes
-    /// directly. `None` (on the DNSSEC path) means the FE didn't
-    /// include DMARC — treated as "no DMARC published" and the
-    /// verifier falls back to strict `d=` alignment.
+    /// meaningful when `cached_zone_dnskey.is_some()` (DNSSEC path).
+    /// `Some(bytes)` means the FE included a DMARC leaf in the
+    /// skeleton chain and the canister validated it. `None` (on the
+    /// DNSSEC path) means the FE didn't include DMARC — treated as
+    /// "no DMARC published" and the verifier falls back to strict
+    /// `d=` alignment at submit_dkim_leaf time.
     pub cached_dmarc_txt: Option<Vec<u8>>,
-    /// Status the FE polls. Flips from `Pending` to a terminal
-    /// variant on `smtp_request`; sticky thereafter (the FE reads
-    /// once and ends the wizard).
+    /// Partial-verification record stashed by `smtp_request` when the
+    /// email arrives but the canister doesn't yet have the DKIM public
+    /// key. Holds enough to complete the signature check once
+    /// `submit_dkim_leaf` delivers the leaf. `None` until the email
+    /// arrives (DNSSEC path), or never set (DoH path, which finishes
+    /// verification synchronously inside `smtp_request`).
+    pub partial_verification: Option<PartialVerification>,
+    /// Status the FE polls. Flips from `Pending` to either
+    /// `NeedDkimLeaf` (DNSSEC path, mid-verification) or a terminal
+    /// variant (DoH path, or `submit_dkim_leaf` outcome). Terminal
+    /// variants are sticky.
     pub status: PendingStatus,
+}
+
+/// What the canister stashes between email arrival and DKIM-leaf
+/// submission so it can finish DKIM signature verification once the
+/// public key arrives. Roughly ~500 B per entry — see design doc
+/// §8.4 / §8.9.
+///
+/// We deliberately don't keep the email body or the full set of
+/// headers: the body's bytes are no longer needed once `bh=`
+/// validates (the body hash is signed, so the canonical-body bytes
+/// can't change without breaking the hash), and the only thing the
+/// signature check itself consumes is the SHA-256 over the canonical
+/// signed-headers input (RFC 6376 §3.7) plus the signature blob.
+#[derive(Clone, Debug)]
+pub struct PartialVerification {
+    /// SHA-256 of `build_header_hash_input(...)` from the email's
+    /// DKIM-Signature header. 32 bytes. Both DKIM algorithms we
+    /// support sign over this digest: RSA-SHA256 via PKCS#1 v1.5
+    /// (RustCrypto's `verify_prehash`), Ed25519-SHA256 via RFC 8463
+    /// (Ed25519 over `SHA256(signed_data)`).
+    pub headers_digest: [u8; 32],
+    /// Raw `b=` blob (after base64 decode). 256 B for RSA-2048,
+    /// 512 B for RSA-4096, 64 B for Ed25519.
+    pub signature: Vec<u8>,
+    /// Parsed `s=` (selector) from the email's DKIM-Signature
+    /// header. Used to compute the expected
+    /// `<selector>._domainkey.<domain>.` owner-name when
+    /// `submit_dkim_leaf` arrives, and surfaced to the FE in the
+    /// `NeedDkimLeaf { selector }` polling status so the FE knows
+    /// which TXT to walk.
+    pub selector: String,
+    /// Parsed `d=` (signing domain) from the email's DKIM-Signature
+    /// header. Used at `submit_dkim_leaf` time for the
+    /// From↔d= / d=↔leaf-owner-name alignment checks.
+    pub signing_domain: String,
+    /// Algorithm parsed from `a=` so `submit_dkim_leaf` can pick
+    /// the right verifier (RSA-SHA256 or Ed25519-SHA256).
+    pub algorithm: crate::dkim::Algorithm,
+    /// Verified `From:` mailbox in lowercase canonical form.
+    /// Stashed here so `submit_dkim_leaf` can compare it against
+    /// the pending challenge's `claimed_address` without
+    /// re-parsing the message.
+    pub from_address_lc: String,
+    /// Whether `Subject` was in the signed `h=` list. The recovery
+    /// design (§5.4 / §3.2) requires it; we record the answer at
+    /// parse time so `submit_dkim_leaf` can reject with
+    /// `SubjectNotSigned` without re-parsing the headers.
+    pub subject_signed: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -68,12 +125,18 @@ pub enum PendingKind {
     // `Recover { session_pk }` is added by the recovery follow-up PR.
 }
 
-/// Terminal-flippable status the FE polls. The terminal variants
-/// (`Succeeded`, `Failed`, `Expired`) are sticky: a later poll keeps
-/// returning the same variant until the entry is evicted.
+/// Status the FE polls. The terminal variants (`Succeeded`,
+/// `Failed`, `Expired`) are sticky: a later poll keeps returning
+/// the same variant until the entry is evicted. `NeedDkimLeaf` is
+/// the *non-terminal* mid-flow state on the DNSSEC path — it tells
+/// the FE "the email arrived, here's the selector you need to walk,
+/// then call `submit_dkim_leaf`". One pending entry can transition
+/// `Pending → NeedDkimLeaf → Succeeded/Failed` on the DNSSEC path,
+/// or `Pending → Succeeded/Failed` on the DoH path.
 #[derive(Clone, Debug)]
 pub enum PendingStatus {
     Pending,
+    NeedDkimLeaf { selector: String },
     Succeeded,
     Failed(EmailRecoveryError),
     Expired,
@@ -136,6 +199,9 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
             None => EmailRecoveryStatus::Expired, // Same observable effect as TTL eviction.
             Some(c) => match &c.status {
                 PendingStatus::Pending => EmailRecoveryStatus::Pending,
+                PendingStatus::NeedDkimLeaf { selector } => EmailRecoveryStatus::NeedDkimLeaf {
+                    selector: selector.clone(),
+                },
                 PendingStatus::Succeeded => match &c.kind {
                     PendingKind::Register { .. } => EmailRecoveryStatus::RegistrationSucceeded,
                 },
@@ -210,13 +276,18 @@ mod tests {
     use super::*;
 
     fn challenge(addr: &str, now: u64) -> PendingChallenge {
+        let registered_domain = addr
+            .rsplit_once('@')
+            .map(|(_, d)| d.to_string())
+            .unwrap_or_default();
         PendingChallenge {
             kind: PendingKind::Register { anchor: 1 },
             claimed_address: addr.into(),
-            selector: "20230601".into(),
+            registered_domain,
             created_at_secs: now,
-            cached_dkim_txt: None,
+            cached_zone_dnskey: None,
             cached_dmarc_txt: None,
+            partial_verification: None,
             status: PendingStatus::Pending,
         }
     }
