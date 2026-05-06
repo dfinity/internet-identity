@@ -20,13 +20,14 @@ pub struct StorableAnchor {
     pub passkey_credentials: Option<Vec<StorablePasskeyCredential>>,
     #[n(4)]
     pub recovery_keys: Option<Vec<StorableRecoveryKey>>,
-    /// Bound recovery email, if the user has one set up (see
-    /// `docs/ongoing/email-recovery.md` PR #3836). `Option` so old
-    /// anchors decoded under the previous schema deserialize cleanly
-    /// — minicbor `#[cbor(map)]` skips fields not present in the
-    /// encoded bytes, leaving them as their `Default`.
+    /// Bound recovery emails (see `docs/ongoing/email-recovery.md`
+    /// PR #3836). The current canister API enforces at most one
+    /// entry; the data model is a `Vec` so multi-credential support
+    /// can land without another schema bump. `Option` so anchors
+    /// written under the previous schema decode cleanly — same
+    /// pattern as `passkey_credentials` / `recovery_keys` above.
     #[n(5)]
-    pub email_recovery: Option<StorableEmailRecoveryCredential>,
+    pub email_recovery: Option<Vec<StorableEmailRecoveryCredential>>,
 }
 
 impl Storable for StorableAnchor {
