@@ -84,7 +84,7 @@ Conventions and protocol-specific tags used throughout this document.
 |---|---|
 | **Anchor** | The user's identity number. Maps to passkeys, OpenID credentials, and (via this design) email-recovery credentials. |
 | **Nonce** | The canister-issued one-time token (`II-Recovery-…`) embedded in the recovery email's `Subject:`. It self-identifies the pending challenge — see §3.2 / §8.4 — so there is no separate `challenge_id` on the wire. |
-| **Pending challenge** | An ephemeral heap entry keyed by nonce, holding the claimed address, selector, optional cached DKIM/DMARC bytes, and (for recovery) the FE-supplied `session_pk`. 30-minute TTL. |
+| **Pending challenge** | An ephemeral heap entry keyed by nonce, holding the claimed address, the cached zone DNSKEYs from the skeleton chain, optional cached DMARC TXT bytes, optionally a partial-verification record (set when the email has arrived but the DKIM leaf hasn't been submitted yet), and (for recovery) the FE-supplied `session_pk`. 30-minute TTL. |
 | **SMTP gateway** | The off-chain service that accepts inbound mail at `register@id.ai` / `recover@id.ai` and forwards each message to the canister via `smtp_request`. Untrusted by the canister beyond best-effort delivery — see §4.1. |
 
 ---
@@ -213,28 +213,39 @@ sequenceDiagram
     participant Mail as User's mailbox<br/>(e.g. Gmail)
     participant GW as SMTP gateway<br/>(off-chain)
 
-    User->>DNS: 1. probe selector candidates,<br/>fetch DKIM TXT + DMARC TXT,<br/>fetch full DNSSEC chain to root
-    DNS-->>User: signed RRsets + RRSIGs
+    Note over User,DNS: 1 — FE assembles a "skeleton" DNSSEC chain<br/>(everything <em>except</em> the DKIM leaf)
+    User->>DNS: fetch DMARC TXT,<br/>walk DNSSEC chain to root
+    DNS-->>User: signed RRsets + RRSIGs<br/>(no DKIM leaf yet — selector unknown)
 
-    User->>II: 2. prepare { addr, dns_proof, session_pk }
+    User->>II: 2. prepare { addr, dns_proof_skeleton, session_pk }
     II-->>User: 3. challenge { nonce, mailbox }
 
     User->>Mail: 4. compose and send email to<br/>recover@id.ai or register@id.ai,<br/>with the nonce in Subject:
     Mail->>GW: 5. SMTP DATA
     GW->>II: 6. smtp_request(SmtpRequest)
 
+    Note over II: parse DKIM-Signature → s= (selector),<br/>verify body hash, cache headers digest + signature
+
     loop while waiting
         User->>II: 7. email_recovery_status(nonce)
-        II-->>User: Pending → … → Succeeded
+        II-->>User: Pending → NeedDkimLeaf { selector } → …
     end
-    II-->>User: 8. SignedDelegation (recovery only)
+
+    Note over User,DNS: 8 — FE fetches the DKIM leaf for the *real* selector
+    User->>DNS: fetch DKIM TXT at <s=>._domainkey.<domain><br/>+ RRSIGs anchored in the cached chain
+    DNS-->>User: signed RRset
+
+    User->>II: 9. submit_dkim_leaf(nonce, signed_rrset)
+    II-->>User: Pending → Succeeded / RecoveryReady
+
+    II-->>User: 10. SignedDelegation (recovery only)
 ```
 
 The architecture is built around three ideas:
 
-- **DNSSEC validation happens once, up front, in the prepare call.** The user's browser discovers the active DKIM selector for the user's email provider by probing common selector names via DoH (see §8.4 notes), fetches the DKIM TXT record for that selector + the DMARC TXT record + the DNSSEC chain via DoH, and submits everything as a single call argument. The canister validates the chain cryptographically against the IANA root anchor (no HTTPS outcall), and **caches the verified TXT record bytes** for both DKIM (required) and DMARC (optional) on a pending-challenge entry keyed by the canister-issued nonce, with a 30-minute TTL. Parsing of the TXT records into a DKIM public key and a DMARC policy is deferred to `smtp_request` time — the canister stores the *bytes* the chain authenticated, not derived material. The session public key the FE wants the eventual delegation bound to is also passed in here. The canister returns the nonce and the gateway recipient mailbox.
+- **DNSSEC validation happens in two phases, separated by the email arrival.** Pre-email, the FE assembles a "skeleton" `DnsProofBundle`: the DNSSEC chain rooted at the IANA anchor down through the registered domain's zone DNSKEY, plus the DMARC TXT leaf at the well-known name `_dmarc.<domain>` if the zone publishes one. The DKIM leaf is *not* included — its name is `<selector>._domainkey.<domain>`, and the active selector is published only inside the eventual email's `DKIM-Signature` header, so the FE can't fetch it yet. The canister validates the skeleton chain on `prepare`, caches the validated zone DNSKEYs, and returns the nonce. Post-email, the canister extracts `s=` from the DKIM-Signature header, sets the polled status to `NeedDkimLeaf { selector: s }`, and waits for the FE to walk the leaf. The FE submits the signed RRset for `<s>._domainkey.<domain>` via a follow-up call; the canister validates it against the already-cached chain and finalises verification. **No selector probing on the FE**: the selector comes from the email itself, authoritatively.
 - **The user actually emails the nonce.** They send a fresh email from the address they typed, with the nonce in the `Subject:` (e.g. `Subject: II-Recovery-1a2b3c4d5e6f7081`), to `recover@id.ai` (or `register@id.ai` for setup). The recipient is a single static mailbox per kind — **the nonce is the only identifier** in the protocol: it's the lookup key the canister uses to match the inbound email to a pending challenge, the value the FE polls under, and the human-typeable token in `Subject:`. Each nonce is drawn from a 64-bit PRNG (§8.9) into exactly one pending entry, so it self-identifies — knowing the nonce is necessary and sufficient to reference the challenge. We deliberately don't carry a separate `challenge_id`. Keeping the token in `Subject:` rather than the body is the other deliberate choice: the user sees the recovery intent (`II-Recovery-…`) at compose time, which is the cheapest defence against the prepare-then-phish attack discussed in §3.2.
-- **The SMTP gateway forwards the email to the canister via `smtp_request`** — exactly the PoC's surface, no shape change. The canister extracts the nonce from the DKIM-signed `Subject:` header, looks up the pending challenge by nonce, verifies the DKIM signature against the cached public key, checks DMARC alignment against the cached policy, verifies the `From:` matches the address in the original prepare call, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). Until that update lands, the FE polls the canister with `email_recovery_status(nonce)` and shows a "waiting for your email…" spinner. Once the status flips, the FE retrieves the delegation (recovery) or shows "all set" (setup).
+- **The SMTP gateway forwards the email to the canister via `smtp_request`** — exactly the PoC's surface, no shape change. On arrival the canister parses the DKIM-Signature header (without yet having the public key), canonicalises the body and checks `bh=`, computes the SHA-256 of the would-be DKIM-signature input, and stashes a small partial-verification record (~500 B: headers digest, signature blob, selector, signing domain, From-domain, claimed address) on the pending challenge. The body itself is dropped — once `bh=` is verified the body's bytes don't matter for the rest of the pipeline. The status flips to `NeedDkimLeaf { selector }` so the FE can walk DNSSEC for that specific selector and call `email_recovery_submit_dkim_leaf(nonce, signed_rrset)`. The canister validates the leaf against the already-anchored chain, completes the DKIM signature check (`RSA.verify(pk, headers_digest, signature)`), confirms DMARC alignment + `From:` match, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). The FE polls `email_recovery_status(nonce)` throughout — the spinner just stays up a bit longer between "email arrived" and "verified".
 
 The SMTP gateway is *partially trusted*: it can drop, delay, or fabricate calls to `smtp_request`. It cannot fake a DKIM signature for a domain it doesn't control, so the worst it can do is withhold delivery (a DoS that's acceptable for a recovery channel users only hit when locked out).
 
@@ -247,7 +258,7 @@ This buys us:
 
 We pay for it in:
 
-- **Caller complexity.** The browser has to assemble the DNSSEC chain by walking the delegation from root down. This is straightforward TypeScript on top of DoH (see §7.4), no separate library or WASM module needed.
+- **Caller complexity.** The browser has to assemble the DNSSEC chain by walking the delegation from root down — twice: once for the skeleton (DMARC + chain) at prepare, once for the DKIM leaf after the email arrives. Both walks are straightforward TypeScript on top of DoH (see §7.4), no separate library or WASM module needed. The chain reuses validated DNSKEYs from the skeleton so the second walk only needs the leaf RRset and its RRSIG — typically two DoH queries.
 - **No DNSSEC, no email recovery.** Domains that don't sign their zones cannot be used. As of 2026-05, this includes a non-trivial slice of mainstream consumer mailbox domains. We surface this clearly in the UI at registration time and let the user pick a different address or fall back to a recovery phrase.
 - **Trust the gateway to deliver.** A malicious or down gateway can stall recovery, but cannot fabricate or alter outcomes (every cryptographic check is on the canister side).
 
@@ -540,15 +551,25 @@ verify(bundle):
 
 ### 7.4 Caller-side bundle assembly
 
-The browser assembles `DnsProofBundle` directly in TypeScript. No separate library or WASM module is required:
+The browser assembles `DnsProofBundle` directly in TypeScript. No separate library or WASM module is required.
+
+**Pre-email — skeleton chain.** At `prepare` time the FE submits a `DnsProofBundle` covering everything *except* the DKIM leaf:
 
 - Issue DoH queries with `do=1` (request DNSSEC) and `cd=1` (don't validate, give us raw RRSIGs) to a public resolver. `dns.google` and `cloudflare-dns.com` both expose this; the FE can fall back between them. Browsers without OS-level DNS APIs cannot reach the authoritative servers directly, so DoH is the practical path.
-- Walk the delegation chain by querying the DS RRset at each parent zone (root → TLD → registered domain → `_domainkey` subdomain).
-- Stop at root, where the DNSKEY RRset is validated against the trust anchor stored on the canister rather than against another DS lookup.
+- Walk the delegation chain by querying the DS RRset at each parent zone (root → TLD → registered domain). Stop at root, where the DNSKEY RRset is validated against the trust anchor stored on the canister rather than against another DS lookup.
+- Include the DMARC TXT leaf at `_dmarc.<domain>` (a well-known name) if the zone publishes one; omit otherwise (the canister falls through to strict DMARC alignment when no record is published).
+- *Do not* fetch any DKIM leaf — the active selector lives only in the eventual email's `DKIM-Signature` header.
+
+**Post-email — DKIM leaf.** When polling sees `NeedDkimLeaf { selector }`, the FE walks the single missing leaf:
+
+- Query the DKIM TXT at `<selector>._domainkey.<domain>` plus its covering RRSIG. The chain anchored at `prepare` time already covers the zone, so the leaf walk is just the leaf RRset itself — typically two DoH queries.
+- Submit the signed RRset to the canister via `email_recovery_submit_dkim_leaf(nonce, signed_rrset)`.
 
 The earlier draft mentioned "the OS resolver" as a fallback when DoH providers are unavailable; in practice browsers don't expose the OS resolver, so the practical fallback is between multiple DoH endpoints, not to the OS. Domains for which DoH refuses to return RRSIGs are treated the same as domains without DNSSEC (§7.6).
 
-This is a small TS module (~300 lines, no dependencies beyond `fetch`) living in `src/frontend/src/lib/utils/dnssec/`. There is no separate WASM module; the canister already has a Rust DNSSEC verifier and the FE only needs to *gather* the records, not verify them.
+The TS module lives in `src/frontend/src/lib/utils/dnssec/` (~300 lines, no dependencies beyond `fetch`). There is no separate WASM module; the canister already has a Rust DNSSEC verifier and the FE only needs to *gather* the records, not verify them.
+
+**Why two phases instead of one.** A DKIM-signed email carries exactly one signature over exactly one selector — `s=` in the `DKIM-Signature` header. DKIM has no enumeration mechanism: there's no DNS record listing the active selectors, NSEC walking is defeated by NSEC3 on most modern zones, and probing a candidate list is a heuristic that misses esoteric custom selectors. The cleanest source of truth is the email itself — once it arrives, the canister parses `s=` and tells the FE which leaf to fetch. This eliminates selector probing entirely; the selector is authoritative, not guessed.
 
 ### 7.5 Root anchor management — deploy-arg, not bundled
 
@@ -587,10 +608,10 @@ The major consumer mailbox providers we most care about — Gmail, Outlook, iClo
 
 This means the email-recovery stack ends up with **two parallel verification paths** to the same `dkim::verify` + `dmarc::verify_email` core:
 
-| Path | Caller-supplied input | DKIM key sourced from | When the outcall (if any) happens |
-|---|---|---|---|
-| DNSSEC | `DnsProofBundle` (signed RRsets + DNSKEY chain to IANA root) | The validated leaf TXT in the bundle | None — verification is fully sync |
-| DoH allowlist | Just the address (no bundle) | `doh::fetch_txt(selector._domainkey.<domain>, registered_domain)` | At verification time on the first uncached lookup; cache-served thereafter |
+| Path | Caller-supplied input (prepare) | Caller-supplied input (post-email) | DKIM key sourced from | When the outcall (if any) happens |
+|---|---|---|---|---|
+| DNSSEC | Skeleton `DnsProofBundle` (DNSKEY chain to IANA root + optional DMARC leaf) | DKIM leaf RRset for the selector seen in the email | The FE-supplied DKIM TXT, validated against the cached chain | None — verification is fully sync |
+| DoH allowlist | Just the address (no bundle) | — | `doh::fetch_txt(selector._domainkey.<domain>, registered_domain)` once `s=` is read off the email | At verification time on the first uncached lookup; cache-served thereafter |
 
 The canister picks the path per-call: if the FE supplies a `DnsProofBundle`, use the DNSSEC path; otherwise, if the registered domain is on the DoH allowlist, use the DoH path; otherwise reject with a clear error and the copy-able message:
 
@@ -615,15 +636,16 @@ Email recovery shares the most code with the OpenID flow (`src/internet_identity
 
 The whole feature, both setup and recovery, fits in three steps the user sees:
 
-1. **Enter your email.** The FE asks for the address. It always tries to assemble a `DnsProofBundle` via DoH (probing common selectors, walking the DNSSEC chain) and submits it; if the domain doesn't publish DNSSEC, the bundle is omitted and the canister falls back to its DoH allowlist (§7.6) — that fallback is invisible to the FE. For recovery the FE also generates a fresh ECDSA keypair locally and sends the public key as part of the same call — that key is what the eventual delegation will be bound to.
+1. **Enter your email.** The FE asks for the address. It tries to assemble a *skeleton* `DnsProofBundle` (DNSSEC chain to root + the `_dmarc.<domain>` leaf if published) and submits it; if the domain doesn't publish DNSSEC, the bundle is omitted and the canister falls back to its DoH allowlist (§7.6) — that fallback is invisible to the FE. For recovery the FE also generates a fresh ECDSA keypair locally and sends the public key as part of the same call — that key is what the eventual delegation will be bound to.
 2. **Send a magic email.** The canister issues a one-line token (e.g. `II-Recovery-1a2b3c4d5e6f7081`); the FE asks the user to send a fresh email with that token in `Subject:` to `recover@id.ai` (or `register@id.ai` for setup).
-3. **Done.** The SMTP gateway forwards the email straight to the canister, the canister verifies it, and the FE's polling spinner flips to either "all set" (setup) or "signed in" (recovery, with the delegation it can use immediately).
+3. **Walk the DKIM leaf.** Once the email arrives at the canister, the polled status flips to `NeedDkimLeaf { selector }` — the canister has read `s=` from the DKIM-Signature header. The FE walks DNSSEC for that selector and submits the leaf via `email_recovery_submit_dkim_leaf`. The canister completes verification and the polling spinner flips to either "all set" (setup) or "signed in" (recovery, with the delegation it can use immediately). The user sees only the spinner during this step — they don't have to do anything extra.
 
-The shape is one canister call up front, then waiting:
+The shape is two canister calls (prepare + submit_dkim_leaf), with polling in between:
 
-- `email_recovery_credential_prepare_add(anchor, dns_input)` / `email_recovery_prepare_delegation(dns_input, session_pk)` — the FE submits the flat `EmailRecoveryDnsInput` (`{ address, selector, dns_proof: opt DnsProofBundle }`), plus, for recovery, the FE-generated session public key. The **canister** picks the path: if `dns_proof` is set, validate the chain synchronously and cache the verified DKIM and DMARC TXT bytes; otherwise check the registered domain against `DohConfig.allowed_domains` and defer the DoH fetch to `smtp_request` time. The FE doesn't need to know which domains are on the allowlist. Returns `{ nonce, mailbox, expires_at }`.
-- The gateway calls `smtp_request(SmtpRequest)` when the email arrives — exactly the PoC's surface, unchanged. The canister extracts the nonce from the DKIM-signed `Subject:`, looks up the pending challenge, sources the DKIM and DMARC TXTs (cached for DNSSEC entries; `doh::fetch_txt` for DoH entries — typically a cache hit too after the first email per provider per TTL window), parses them into a DKIM key and a DMARC policy, DKIM-verifies the email, checks DMARC + `From:` alignment + `Subject` is in `h=`, and either binds the address (setup) or stamps a delegation seed for the cached `session_pk` (recovery). The FE is **not** involved here — no upload from the browser.
-- The FE polls `email_recovery_status(nonce)` while the user composes/sends the email. Once status flips to `RegistrationSucceeded` / `RecoveryReady`, recovery flows then call `email_recovery_get_delegation(...)` (a query) for the SignedDelegation; setup flows just show "all set".
+- `email_recovery_credential_prepare_add(anchor, dns_input)` / `email_recovery_prepare_delegation(dns_input, session_pk)` — the FE submits the flat `EmailRecoveryDnsInput` (`{ address, dns_proof: opt DnsProofBundle }`), plus, for recovery, the FE-generated session public key. The **canister** picks the path: if `dns_proof` is set, validate the (skeleton) chain synchronously and cache the validated zone DNSKEYs + the DMARC TXT bytes if included; otherwise check the registered domain against `DohConfig.allowed_domains` and defer the DKIM/DMARC fetch to `smtp_request` time. The FE doesn't need to know which domains are on the allowlist. Returns `{ nonce, mailbox, expires_at }`.
+- The gateway calls `smtp_request(SmtpRequest)` when the email arrives — exactly the PoC's surface, unchanged. The canister extracts the nonce from the DKIM-signed `Subject:`, looks up the pending challenge, parses the DKIM-Signature header (without yet having the public key), verifies `bh=` against the canonicalised body and drops the body, computes the SHA-256 of the canonical signed-headers input, and stashes the partial-verification record. On the **DNSSEC path** it then sets the status to `NeedDkimLeaf { selector }` and waits for the FE. On the **DoH path** it directly resolves the DKIM and DMARC TXTs (typically cache hits after the first email per provider per TTL window), completes verification, and either binds the address (setup) or stamps a delegation seed for the cached `session_pk` (recovery).
+- `email_recovery_submit_dkim_leaf(nonce, signed_rrset)` — DNSSEC-path only. The FE supplies the DKIM TXT leaf for the selector seen in step 2's status. The canister validates the leaf against the cached chain, runs `RSA.verify(pk, headers_digest, signature_blob)`, completes DMARC alignment + `From:` match + `Subject` in `h=`, and finalises.
+- The FE polls `email_recovery_status(nonce)` between calls. Terminal states are `RegistrationSucceeded` / `RecoveryReady` / `Failed` / `Expired`. Recovery flows then call `email_recovery_get_delegation(...)` (a query) for the SignedDelegation; setup flows just show "all set".
 
 This shape gives us:
 
@@ -659,11 +681,20 @@ The credential lives **on the anchor struct itself**, not in a separate stable m
 
 ```rust
 // inside Anchor (storage::anchor::Anchor)
+//
+// In the storage form (StorableAnchor), wrapped in `Option<Vec<...>>`
+// so anchors written under the previous schema decode cleanly as None
+// — same pattern as the existing `passkey_credentials` and
+// `recovery_keys` fields.
 #[n(<next-free-index>)]
-pub email_recovery: Option<EmailRecoveryCredential>,
+pub email_recovery: Option<Vec<StorableEmailRecoveryCredential>>,
 ```
 
-Anchor storage already uses `minicbor-derive`, which is forward/backward compatible across optional-field additions out of the box — old anchors deserialize with `email_recovery: None`. No schema migration, no `From<>` impls, just a new `#[n(<next>)]` field.
+Anchor storage already uses `minicbor-derive`, which is forward/backward compatible across optional-field additions out of the box — old anchors deserialize with the field absent. The exposed in-memory representation collapses the `Option` away into a plain `Vec` so callers iterate uniformly: empty vec = no credential bound, single element = one credential bound.
+
+**Why a `Vec` if v1 only ever holds one entry.** The v1 API caps `email_recovery` at one entry per anchor (see "v1 API invariants" below). The data model is widened to a `Vec` anyway so a future iteration that lets a user bind multiple recovery emails can land without another schema migration. Today the `Vec` is structurally never longer than one; tomorrow we can lift the cap with a pure API-layer change.
+
+Surface for the FE: `IdentityInfo` (returned by `identity_info`) carries a flat `email_recovery: opt EmailRecoveryCredential` field, populated as `anchor.email_recovery.first().cloned()`. The manage-page card renders directly off it without a second canister call. When the v1 cap is lifted, this field becomes a `vec` and the FE renders multiple cards.
 
 One additional stable map exists alongside this:
 
@@ -678,15 +709,15 @@ A third, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry c
 
 - `kind`: `Register { anchor }` or `Recover { session_pk }`,
 - the claimed lowercased address,
-- the selector the email is expected to be signed under,
-- on the **DNSSEC path**: the verified DKIM TXT bytes (always) and the verified DMARC TXT bytes (when the FE included a DMARC leaf in the bundle). Stored as raw bytes; parsing happens at `smtp_request` time. When the DMARC TXT is absent the canister falls back to strict `d=` ↔ `From:` domain alignment per §6.3.
+- on the **DNSSEC path**: the validated zone DNSKEYs from the skeleton chain (the chain anchored at prepare time), and the verified DMARC TXT bytes when the FE included a DMARC leaf in the bundle. Stored as raw bytes; parsing happens at `submit_dkim_leaf` time. When the DMARC TXT is absent the canister falls back to strict `d=` ↔ `From:` domain alignment per §6.3.
 - on the **DoH path**: nothing extra — both DKIM and DMARC TXTs are fetched via `doh::fetch_txt` at `smtp_request` time (cache-served after the first lookup per provider per TTL window),
-- a `status: Pending | Succeeded { outcome } | Failed { error }`,
+- once `smtp_request` has run on a DNSSEC-path entry: a **partial-verification record** holding `{ selector, signing_domain, headers_digest (32 B), signature_blob, from_domain, claimed_address_lc }` — together ~500 B per entry. This is the minimum needed to complete DKIM signature verification once the FE submits the leaf with the public key. The body itself is dropped after `bh=` validates,
+- a `status: Pending | NeedDkimLeaf { selector } | Succeeded { outcome } | Failed { error }`,
 - a 30-minute expiry.
 
-Entries flip from `Pending` to `Succeeded`/`Failed` on `smtp_request`. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 25.
+Entries flip from `Pending` to `NeedDkimLeaf` on `smtp_request` (DNSSEC path only), then to `Succeeded`/`Failed` on `email_recovery_submit_dkim_leaf`. The DoH path goes straight from `Pending` to `Succeeded`/`Failed` on `smtp_request` because the canister can fetch the DKIM TXT itself. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 25.
 
-We do **not** store any inbound email body, header bytes, or DKIM verification artefacts past the moment `smtp_request` returns. The cached `session_pk` for recovery is the only piece that survives between prepare and the eventual delegation issuance.
+We do **not** store any inbound email body, header bytes, or DKIM verification artefacts past the moment the challenge reaches a terminal state. The cached `session_pk` for recovery is the only piece that survives between prepare and the eventual delegation issuance.
 
 ### 8.3 Candid surface
 
@@ -710,9 +741,11 @@ type EmailRecoveryChallenge = record {
 // **canister** picks the verification path, not the FE:
 //
 //   - if `dns_proof` is supplied, the canister takes the DNSSEC path:
-//     validates the chain synchronously and caches the DKIM (and
-//     optionally DMARC) TXT bytes on the pending challenge for
-//     `smtp_request` to consume without an outcall.
+//     validates the (skeleton) chain synchronously and caches the
+//     validated zone DNSKEYs on the pending challenge for the
+//     post-email leaf submission to anchor against. The DMARC leaf,
+//     if included, is also validated and its TXT bytes cached for
+//     verification time.
 //   - otherwise, the canister checks the registered domain against
 //     `DohConfig.allowed_domains` (deploy-arg) and resolves the DKIM
 //     and DMARC TXTs via `crate::doh::fetch_txt` at `smtp_request`
@@ -721,16 +754,22 @@ type EmailRecoveryChallenge = record {
 //
 // The FE deliberately **doesn't** need to know which domains are on
 // the DoH allowlist — that's operator config, not user-visible state.
-// The FE just sends whatever it could gather (typically: always try
-// to assemble a `dns_proof`; fall back to no proof only if the domain
-// doesn't publish DNSSEC) and reads the typed error variants.
+// The FE submits a skeleton bundle when DNSSEC is available; the
+// DKIM leaf comes later via `email_recovery_submit_dkim_leaf`.
+//
+// `selector` is intentionally absent — it's read off the eventual
+// email's `DKIM-Signature` header on arrival and surfaced back to the
+// FE via the `NeedDkimLeaf` status variant.
 type EmailRecoveryDnsInput = record {
     address    : text;                      // lowercase canonical form
-    selector   : text;                      // e.g. "20230601" for Gmail
     dns_proof  : opt DnsProofBundle;        // present iff the FE could
-                                            //  assemble a DNSSEC chain
-                                            //  carrying the DKIM TXT
-                                            //  (and optionally DMARC).
+                                            //  walk the DNSSEC chain
+                                            //  for the registered
+                                            //  domain. Carries DNSKEYs
+                                            //  to root + optional
+                                            //  DMARC leaf, no DKIM
+                                            //  leaf (selector unknown
+                                            //  pre-email).
 };
 
 type EmailRecoveryError = variant {
@@ -741,20 +780,34 @@ type EmailRecoveryError = variant {
     DohFetchFailed            : text;          // DoH path: doh::fetch_txt did not reach quorum
     DomainNotSupported        : text;          // covers "no DNSSEC and not on DoH allowlist"
     EmailVerificationFailed   : VerificationStatus;
-    SelectorMismatch;                          // email used a selector other than the one in the prepare proof
     AddressMismatch;                           // From: did not match
     SubjectNotSigned;                          // h= didn't include Subject (§5.4)
-    AddressAlreadyRegistered;
+    AddressAlreadyRegistered;                  // address already bound to a different anchor
     AddressNotRegistered;
+    DkimLeafMismatch;                          // submitted leaf was for a different selector or
+                                               //  failed validation against the cached chain
     InternalCanisterError     : text;
 };
 
 // Polling result.
+//
+// `NeedDkimLeaf` is the post-email-arrival state on the DNSSEC path:
+// the canister has parsed `s=` from the DKIM-Signature header and is
+// waiting for the FE to walk that selector's DKIM TXT and submit it
+// via `email_recovery_submit_dkim_leaf`. The DoH-allowlist path skips
+// this state (the canister fetches the DKIM TXT itself), going
+// straight from `Pending` to `RegistrationSucceeded`/`RecoveryReady`.
 type EmailRecoveryStatus = variant {
     Pending;
+    NeedDkimLeaf : record { selector : text };                          // DNSSEC path, post-email
     RegistrationSucceeded;                                              // setup done
-    RecoveryReady : record { user_key : UserKey;                        // recovery ready
-                             expiration : Timestamp };
+    RecoveryReady : record { user_key       : UserKey;                  // recovery ready
+                             expiration     : Timestamp;
+                             anchor_number  : IdentityNumber };         // anchor the verified
+                                                                        //  From: resolved to,
+                                                                        //  surfaced so the FE
+                                                                        //  doesn't need a
+                                                                        //  separate lookup hop
     Failed   : EmailRecoveryError;
     Expired;
 };
@@ -781,9 +834,24 @@ service : {
 
     // FE polls this while the user is sending the email. The argument is
     // the nonce returned at prepare time. Once Succeeded* the FE acts on it.
+    //
+    // On the DNSSEC path the FE will also see `NeedDkimLeaf { selector }`
+    // — the cue to walk the DKIM TXT for that selector and call
+    // `email_recovery_submit_dkim_leaf`.
     email_recovery_status :
         (text)
         -> (EmailRecoveryStatus) query;
+
+    // DNSSEC path only — call after polling sees `NeedDkimLeaf`. The
+    // canister validates the leaf RRset against the chain anchored at
+    // prepare time, then completes DKIM signature verification using
+    // the public key from the leaf's TXT bytes against the headers
+    // digest cached at email-arrival. State transitions to
+    // RegistrationSucceeded / RecoveryReady on success, Failed on
+    // validation/DKIM error.
+    email_recovery_submit_dkim_leaf :
+        (record { nonce : text; dkim_leaf : SignedRRset })
+        -> (variant { Ok; Err : EmailRecoveryError });
 
     // After RecoveryReady, the FE fetches the SignedDelegation. The
     // session_key + expiration must match what was stored at prepare time.
@@ -837,27 +905,34 @@ sequenceDiagram
     Note over U,FE: 1 — User enters email
     U->>FE: "Add email recovery", types alice@gmail.com
 
-    Note over FE,DNS: 2 — FE discovers the active selector via DoH probing
-    FE->>DNS: probe TXT records at candidate._domainkey.gmail.com<br/>for candidates selector1, selector2, s1, s2,<br/>default, dkim, google, k1, etc.
-    DNS->>FE: TXT records for any selectors that exist (e.g. 20230601)
-
-    Note over FE,II: 3 — FE assembles the DNSSEC-proven bundle and prepares the challenge
-    FE->>DNS: DKIM TXT for 20230601._domainkey.gmail.com,<br/>DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain (DoH cd=1, do=1)
+    Note over FE,II: 2 — FE assembles the DNSSEC skeleton chain and prepares the challenge
+    FE->>DNS: DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain to root (DoH cd=1, do=1).<br/>DKIM leaf is NOT fetched — selector is not yet known.
     DNS->>FE: signed RRsets + RRSIGs + DS chain
     FE->>II: email_recovery_credential_prepare_add(anchor, EmailRecoveryDnsInput)
-    II->>II: verify DNSSEC chain, cache DKIM + DMARC TXT bytes (raw,<br/>parsed only at smtp_request time), store pending challenge<br/>keyed by nonce (TTL 30 min)
+    II->>II: validate DNSSEC chain, cache validated zone DNSKEYs<br/>+ DMARC TXT bytes (if present), store pending challenge<br/>keyed by nonce (TTL 30 min)
     II->>FE: { nonce: "II-Recovery-1a2b3c4d5e6f7081", mailbox: "register@id.ai", expires_at }
 
-    Note over U,Mail: 4 — User emails the magic token
+    Note over U,Mail: 3 — User emails the magic token
     FE->>U: "Send an email with Subject: II-Recovery-1a2b3c4d5e6f7081<br/>to register@id.ai from alice@gmail.com"
     U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA (DKIM-signed by gmail.com)
 
-    Note over GW,II: 5 — Gateway forwards email straight to the canister (PoC surface)
+    Note over GW,II: 4 — Gateway forwards email; canister does pre-DKIM-key verification
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce from signed Subject header,<br/>look up pending challenge by nonce,<br/>verify DKIM signature vs cached pubkey (selector matches),<br/>check DMARC alignment vs cached policy,<br/>verify From matches the address,<br/>verify Subject is in the signed h= list,<br/>atomically replace any prior registered email on this anchor,<br/>bind address → anchor and mark challenge Succeeded
+    II->>II: extract nonce from signed Subject header,<br/>parse DKIM-Signature → s=, d=, b=,<br/>canonicalise body, verify bh=, drop body bytes,<br/>compute SHA-256 of signed-headers input,<br/>cache { headers_digest, signature_blob, selector,<br/>signing_domain, from_domain, claimed_address } (~500 B),<br/>set status = NeedDkimLeaf { selector: s }
 
-    Note over FE,II: 6 — FE polls the canister and shows result
+    Note over FE,DNS: 5 — FE polls, sees the selector, walks the leaf
+    loop until terminal or NeedDkimLeaf
+        FE->>II: email_recovery_status(nonce)
+        II->>FE: Pending → NeedDkimLeaf { selector: "20230601" }
+    end
+    FE->>DNS: DKIM TXT at 20230601._domainkey.gmail.com + RRSIG
+    DNS->>FE: signed RRset
+    FE->>II: email_recovery_submit_dkim_leaf(nonce, signed_rrset)
+    II->>II: validate leaf against cached chain,<br/>RSA.verify(pk, headers_digest, signature_blob),<br/>check DMARC alignment vs cached policy,<br/>verify Subject is in the signed h= list,<br/>verify From matches the claimed address,<br/>refuse to bind if address is already on a different anchor,<br/>bind address → anchor and mark challenge Succeeded
+    II->>FE: Ok
+
+    Note over FE,II: 6 — FE polls one more time and shows result
     loop until terminal status
         FE->>II: email_recovery_status(nonce)
         II->>FE: Pending / RegistrationSucceeded / Failed / Expired
@@ -867,9 +942,10 @@ sequenceDiagram
 
 Notes:
 
-- **Single selector per email.** A DKIM-signed email carries exactly one signature over exactly one selector — the value of the `s=` tag in the `DKIM-Signature` header. Verifying that one email therefore needs exactly one DKIM TXT record (the one for that selector), and one DNSSEC chain to prove it. We don't need to upload multiple selectors at prepare time; we just need to know which one the email *will* be signed under, which is the provider's currently active selector.
-- **How the FE discovers the selector.** DKIM has no native enumeration mechanism — you can't query "list all selectors at `_domainkey.<domain>`". But you *can* probe specific names: a DoH query for `<candidate>._domainkey.<domain>` returns a TXT record if and only if that selector is published. The FE ships a small list of common selector patterns (around 20 names: `selector1`, `selector2`, `s1`, `s2`, `default`, `dkim`, `google`, `mail`, `k1`, `k2`, `protonmail`, `protonmail2`, `protonmail3`, `sig1`, `default._domainkey`, plus current-year date-style names like `20240101`, `20230601`, `20221208` for Google), fires them all in parallel via DoH (each query is tiny and cacheable), and keeps whichever names return a valid `v=DKIM1; k=rsa; p=...` record. The list is data, not code, and updates by ordinary frontend deploys when a new provider naming pattern shows up. For domains where no candidate resolves, the FE shows an error suggesting the user try a different address; a future iteration can offer "advanced — enter your selector manually" as a fallback.
-- **What if the provider rotates between prepare and send.** Rare in practice — providers announce rotations weeks in advance and keep both selectors live during the transition. If it does happen, `smtp_request` returns `SelectorMismatch` and the FE re-probes and retries.
+- **Single selector per email.** A DKIM-signed email carries exactly one signature over exactly one selector — the value of the `s=` tag in the `DKIM-Signature` header. Verifying that one email therefore needs exactly one DKIM TXT record (the one for that selector), and one DNSSEC chain to prove it. The selector is published only inside the email itself, so the FE can't pre-fetch the DKIM leaf — that's why the bundle is built in two phases (skeleton at prepare, DKIM leaf after the email arrives).
+- **No selector probing.** Earlier drafts of this design had the FE ship a candidate list (`selector1`, `s1`, `default`, `google`, date-style patterns for Google, …) and probe them all in parallel via DoH. That worked but was a heuristic — it missed esoteric custom selectors and burned ~20 unnecessary queries on every domain even when only one selector was ever active. The current design is authoritative: the canister reads `s=` directly from the DKIM-Signature header and tells the FE which leaf to fetch. No more guessing.
+- **Cached partial-verification record (~500 B).** When the email arrives but the canister doesn't yet have the DKIM public key, we can't run the full DKIM verifier. We *can*: parse the signature header, canonicalise the body and check `bh=` (the body hash is signed, so once `bh=` validates the body's bytes don't matter further; we drop them), compute the SHA-256 over the canonical signed-headers input (RFC 6376 §3.7), and stash the digest plus the raw `b=` blob, the parsed `s=`/`d=`, the From-domain, and the claimed address. Total: under 500 B per pending challenge, vs. the 100 KB+ a full email payload would cost. When the FE submits the leaf in step 5, completing the signature check is a single `RSA.verify(pk, headers_digest, signature)` call.
+- **What if the provider rotates between prepare and send.** Doesn't matter — the FE doesn't fetch a selector at prepare time, so there's no stale value to mismatch against. Whatever `s=` the email carries is what the FE walks at step 5.
 - The nonce is searched as a case-insensitive substring inside the canonicalized `Subject:` header value, after confirming `Subject` is in the signature's `h=` list (§5.4). The body is not searched at all — moving the nonce out of the body removes the entire class of "is the nonce inside the `l=` window?" edge cases (§5.3).
 - `smtp_request` is open: anyone can call it, but the only effect is to verify a DKIM-signed email against an already-cached challenge. A malicious gateway can withhold or duplicate calls, but cannot forge state changes.
 - **Retries are concurrent, not overwriting.** A user who closes the wizard and starts again gets a fresh nonce; both pending entries co-exist in the map. Whichever nonce the user actually emails resolves; the other times out at TTL. There is no overwrite-by-anchor or overwrite-by-address — see §8.9 for why.
@@ -877,10 +953,10 @@ Notes:
 
 ### 8.5 Recovery flow
 
-Same shape, with three differences:
+Same two-phase DNSSEC shape as setup, with three differences:
 - `email_recovery_prepare_delegation` is anonymous and additionally takes `session_pk` (a fresh ECDSA public key the FE generated locally).
-- On `smtp_request`, the canister looks up the anchor from the verified `From:` address and stamps the delegation seed bound to that `session_pk`.
-- After polling sees `RecoveryReady`, the FE makes a final query call to `email_recovery_get_delegation` for the actual `SignedDelegation`.
+- On `email_recovery_submit_dkim_leaf`, the canister looks up the anchor from the verified `From:` address and stamps the delegation seed bound to that `session_pk`.
+- After polling sees `RecoveryReady`, the FE makes a final query call to `email_recovery_get_delegation` for the actual `SignedDelegation`. `RecoveryReady` carries `anchor_number` so the FE can seed its auth store directly without a separate lookup hop.
 
 ```mermaid
 sequenceDiagram
@@ -895,30 +971,37 @@ sequenceDiagram
     U->>FE: "Recover with email", types alice@gmail.com
     FE->>FE: generate session ECDSA keypair (session_pk + session_sk)
 
-    Note over FE,DNS: 2 — FE discovers the active selector via DoH probing
-    FE->>DNS: probe TXT records at candidate._domainkey.gmail.com<br/>for candidates in the FE's name list
-    DNS->>FE: TXT records for any selectors that exist
-
-    Note over FE,II: 3 — FE assembles the DNSSEC-proven bundle and prepares the challenge
-    FE->>DNS: DKIM TXT for that selector, DMARC TXT, DNSSEC chain
-    DNS->>FE: bundle
+    Note over FE,II: 2 — FE assembles the DNSSEC skeleton chain and prepares the challenge
+    FE->>DNS: DMARC TXT for _dmarc.gmail.com,<br/>full DNSSEC chain to root.<br/>DKIM leaf is NOT fetched — selector is not yet known.
+    DNS->>FE: signed RRsets + RRSIGs + DS chain
     FE->>II: email_recovery_prepare_delegation(EmailRecoveryDnsInput, session_pk)
-    II->>II: verify DNSSEC, extract pubkey, parse policy,<br/>store pending challenge by nonce (TTL 30 min),<br/>anchor resolved later on smtp_request
+    II->>II: validate DNSSEC chain, cache validated zone DNSKEYs<br/>+ DMARC TXT bytes (if present), store pending challenge<br/>by nonce (TTL 30 min). Anchor resolved later.
     II->>FE: { nonce, mailbox: "recover@id.ai", expires_at }
 
-    Note over U,Mail: 4 — User emails the magic token
+    Note over U,Mail: 3 — User emails the magic token
     FE->>U: "Send an email with Subject: II-Recovery-…<br/>to recover@id.ai from alice@gmail.com"
     U->>Mail: send signed email
     Mail->>GW: SMTP DATA
 
-    Note over GW,II: 5 — Gateway forwards email straight to the canister
+    Note over GW,II: 4 — Gateway forwards email; canister parses signature, caches partial verification
     GW->>II: smtp_request(SmtpRequest)
-    II->>II: extract nonce from signed Subject,<br/>look up pending challenge by nonce,<br/>verify DKIM and DMARC and From and h=Subject,<br/>look up anchor by lowercase(From address),<br/>stamp delegation seed bound to cached session_pk,<br/>mark challenge Succeeded
+    II->>II: extract nonce from signed Subject,<br/>parse DKIM-Signature → s=, d=, b=,<br/>verify body hash, drop body bytes,<br/>cache headers digest + signature blob (~500 B),<br/>set status = NeedDkimLeaf { selector: s }
+
+    Note over FE,DNS: 5 — FE polls, sees the selector, walks the leaf
+    loop until terminal or NeedDkimLeaf
+        FE->>II: email_recovery_status(nonce)
+        II->>FE: Pending → NeedDkimLeaf { selector }
+    end
+    FE->>DNS: DKIM TXT for that selector + RRSIG
+    DNS->>FE: signed RRset
+    FE->>II: email_recovery_submit_dkim_leaf(nonce, signed_rrset)
+    II->>II: validate leaf against cached chain,<br/>RSA.verify(pk, headers_digest, signature_blob),<br/>check DMARC + From + h=Subject,<br/>look up anchor by lowercase(From address),<br/>stamp delegation seed bound to cached session_pk,<br/>mark challenge Succeeded
+    II->>FE: Ok
 
     Note over FE,II: 6 — FE polls and retrieves the delegation
     loop until terminal status
         FE->>II: email_recovery_status(nonce)
-        II->>FE: Pending / RecoveryReady { user_key, expiration } / Failed / Expired
+        II->>FE: Pending / RecoveryReady { user_key, expiration, anchor_number } / Failed / Expired
     end
     FE->>II: email_recovery_get_delegation({ nonce, session_key, expiration })
     II->>FE: SignedDelegation
@@ -927,9 +1010,10 @@ sequenceDiagram
 
 Two design points worth pinning down:
 
-- **No address pre-lookup.** The address typed by the user is sent to the canister at prepare time only as part of the DNS proof, not as a lookup key. The anchor isn't resolved until `smtp_request`, when the verified `From:` of the email picks it. If the user typed the wrong address (or doesn't actually own it), the FE just times out polling — there's no leaky lookup-hint round trip.
-- **One anchor per address, one address per anchor.** v1 API constraints (§8.2): the same address cannot be registered to two different anchors, because at recovery time the user's email proof would otherwise not uniquely identify which identity they meant; and each anchor holds at most one registered address. The underlying storage is structurally many-to-many (§8.2) so these are pure API checks — relaxing them later doesn't require a storage migration. `smtp_request` rejects a register-flow email with `AddressAlreadyRegistered` if the address is already bound to a *different* anchor; if it's already bound to the caller's *own* anchor (a re-confirm) the call is a no-op success. Swapping email A for email B on the same anchor is supported by submitting a new prepare for B and verifying — the swap commits atomically when `smtp_request` succeeds.
+- **No address pre-lookup.** The address typed by the user is sent to the canister at prepare time only as part of the DNS proof, not as a lookup key. The anchor isn't resolved until `email_recovery_submit_dkim_leaf` finalises the verification, when the verified `From:` of the email picks it. If the user typed the wrong address (or doesn't actually own it), the FE just times out polling — there's no leaky lookup-hint round trip.
+- **One anchor per address, one address per anchor.** v1 API constraints (§8.2): the same address cannot be registered to two different anchors, because at recovery time the user's email proof would otherwise not uniquely identify which identity they meant; and each anchor holds at most one registered address. The underlying storage is structurally many-to-many (§8.2) so these are pure API checks — relaxing them later doesn't require a storage migration. `email_recovery_submit_dkim_leaf` (setup path) rejects with `AddressAlreadyRegistered` if the address is already bound to a *different* anchor; if it's already bound to the caller's *own* anchor (a re-confirm) the call is a no-op success. Swapping email A for email B on the same anchor is supported by submitting a new prepare for B and verifying — the swap commits atomically when the leaf submission succeeds.
 - **Retries on recovery work the same as on setup.** A second `email_recovery_prepare_delegation` for the same address creates a *second* pending entry under a fresh nonce; both co-exist. Whichever nonce the user emails resolves. We deliberately don't overwrite-by-address — see §8.9 for the threat-model reason.
+- **Authorisation of the resulting delegation principal.** `check_authorization` (the gatekeeper for every authenticated method on the canister, e.g. `identity_info`) recognises three principal kinds: a passkey/recovery-phrase device on the anchor, an OpenID credential bound to the anchor, and — added with this feature — a delegation derived from the email-recovery seed. After recovery completes the FE's session keypair holds a delegation rooted in `H(salt || "email-recovery" || lowercase(address) || anchor)`; the canister re-derives the same principal at authz-check time, so any anchor with a bound recovery email is reachable via the new principal kind without needing to mint a separate device entry. `activity_bookkeeping` updates `last_used` on the matching credential, and the activity-stats counter has an `email_recovery_counter` next to the existing per-issuer OpenID counter.
 
 ### 8.6 UX screen mockups
 
@@ -1130,7 +1214,7 @@ The flow has two error surfaces: synchronous errors at `prepare_*` time (the use
 | `EmailVerificationFailed(VerificationStatus)` | "Your email didn't verify (DKIM/DMARC failure). Make sure you sent it from `<address>` exactly, no forwarding, no aliases." |
 | `AddressMismatch` | "The email came from a different address than the one we have on file." |
 | `SubjectNotSigned` | "Your email provider didn't sign the Subject header. Try a different provider." (Edge case — every mainstream provider signs Subject by default.) |
-| `SelectorMismatch` | "Your email provider rotated its DKIM keys. Please retry." (FE re-probes selectors on retry.) |
+| `DkimLeafMismatch` | "Couldn't verify the DKIM key for your provider. Please retry." (Means the leaf the FE walked didn't validate against the cached chain — usually a transient resolver hiccup.) |
 | `AddressAlreadyRegistered` | (Setup only.) "This email is already used to recover a different identity." |
 | `AddressNotRegistered` | (Recovery only.) "We don't recognize this email. Did you mean to register it instead?" |
 | `NonceExpired` / `NonceUnknown` | Same UX as `Expired` — restart the wizard. |
