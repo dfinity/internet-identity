@@ -150,13 +150,15 @@ Common options:
   -be                       Shortcut for --end back
   --dry-run                 Print icp canister install commands instead of running them
   --no-checks               Skip reachability and consistency checks
-  --skip-email-recovery-init
-                            Leave dnssec_config and doh_config as opt null on
-                            this upgrade (preserve previous on-chain values).
-                            Default: fetch fresh IANA root anchors + use the
-                            built-in DoH allowlist.
-  --doh-domains <a,b,...>   Override the default DoH allowlist. Empty disables
-                            the DoH path (DNSSEC-only).
+  --update-email-recovery-init
+                            Fetch fresh IANA root anchors + set the curated
+                            DoH allowlist on this upgrade. Without this flag
+                            both fields stay opt null (i.e. preserve previous
+                            on-chain values), which is what most upgrades
+                            want once the canister has been initialized once.
+  --doh-domains <a,b,...>   Override the default DoH allowlist (only used
+                            with --update-email-recovery-init). Empty
+                            disables the DoH path (DNSSEC-only).
   -h, --help                Show this help
 EOF
 }
@@ -175,7 +177,7 @@ parse_common_args() {
     REBUILD_BE=false
     DRY_RUN=false
     NO_CHECKS=false
-    UPDATE_EMAIL_RECOVERY_INIT=true
+    UPDATE_EMAIL_RECOVERY_INIT=false
     DOH_DOMAINS_ARG=""
     REMAINING_ARGS=()
 
@@ -269,13 +271,13 @@ parse_common_args() {
                 NO_CHECKS=true
                 shift
                 ;;
-            --skip-email-recovery-init)
-                # Don't fetch IANA anchors / set DoH allowlist on this
-                # upgrade. The fields stay `opt null` in the install
-                # arg, which the canister interprets as "preserve the
-                # previous value". Use this on subsequent upgrades
-                # once the values are already on chain.
-                UPDATE_EMAIL_RECOVERY_INIT=false
+            --update-email-recovery-init)
+                # Opt in to fetching IANA anchors + setting the DoH
+                # allowlist on this upgrade. Without this flag both
+                # fields stay `opt null` (preserve previous on-chain
+                # value), which is what most upgrades want once the
+                # canister has been initialized once.
+                UPDATE_EMAIL_RECOVERY_INIT=true
                 shift
                 ;;
             --doh-domains)
