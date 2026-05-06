@@ -28,8 +28,11 @@ pub struct Anchor {
     pub(crate) anchor_number: AnchorNumber,
     pub(crate) devices: Vec<Device>,
     pub(crate) openid_credentials: Vec<OpenIdCredential>,
-    /// Bound recovery email, if any. See `docs/ongoing/email-recovery.md`.
-    pub(crate) email_recovery: Option<EmailRecoveryCredential>,
+    /// Bound recovery emails (see `docs/ongoing/email-recovery.md`).
+    /// The current canister API enforces at most one entry; the field
+    /// is a `Vec` so the data model can carry multiple in the future
+    /// without another schema bump.
+    pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
@@ -178,7 +181,12 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
         } = anchor;
 
         let openid_credentials = openid_credentials.into_iter().map(Into::into).collect();
-        let email_recovery = email_recovery.map(StorableEmailRecoveryCredential::from);
+        let email_recovery = Some(
+            email_recovery
+                .into_iter()
+                .map(StorableEmailRecoveryCredential::from)
+                .collect(),
+        );
 
         let (mut passkey_credentials, mut recovery_keys, mut recovery_devices) =
             (vec![], vec![], vec![]);
@@ -439,7 +447,11 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             .into_iter()
             .map(OpenIdCredential::from)
             .collect();
-        let email_recovery = email_recovery.map(EmailRecoveryCredential::from);
+        let email_recovery = email_recovery
+            .unwrap_or_default()
+            .into_iter()
+            .map(EmailRecoveryCredential::from)
+            .collect();
 
         let mut devices = passkey_credentials
             .unwrap_or_default()
@@ -557,7 +569,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             return Anchor {
                 name: None,
                 openid_credentials: vec![],
-                email_recovery: None,
+                email_recovery: vec![],
                 anchor_number,
                 devices,
                 metadata,
@@ -574,7 +586,10 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             .collect();
         let email_recovery = storable_anchor
             .email_recovery
-            .map(EmailRecoveryCredential::from);
+            .unwrap_or_default()
+            .into_iter()
+            .map(EmailRecoveryCredential::from)
+            .collect();
 
         Anchor {
             anchor_number,
@@ -597,7 +612,7 @@ impl Anchor {
             created_at: Some(created_at),
             devices: vec![],
             openid_credentials: vec![],
-            email_recovery: None,
+            email_recovery: vec![],
             metadata: None,
             name: None,
         }

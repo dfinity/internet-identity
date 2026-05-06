@@ -412,14 +412,17 @@ fn bind_credential_to_anchor(
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
     let mut anchor = state::anchor(snapshot.anchor);
-    anchor.email_recovery = Some(EmailRecoveryCredential {
+    // `email_recovery` is a `Vec` in the data model; the API caps it
+    // at one entry, so any prior binding is replaced (and we leave it
+    // up to the caller to assert "only one" via the prepare path).
+    anchor.email_recovery = vec![EmailRecoveryCredential {
         address: snapshot.claimed_address.clone(),
         // `Timestamp` is nanoseconds since epoch (see
         // `internet_identity_interface::types::Timestamp`). We work
         // in seconds internally; convert at the boundary.
         created_at: now_secs.saturating_mul(1_000_000_000),
         last_used: None,
-    });
+    }];
     state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|e| EmailRecoveryError::InternalCanisterError(format!("write anchor: {e:?}")))?;
     Ok(())
