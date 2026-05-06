@@ -49,17 +49,15 @@ pub enum RemoveError {
 /// retry on success, but if it does (e.g. a network blip), this
 /// loud-fail surfaces the bug rather than silently masking it.
 pub fn remove_credential(anchor: &mut Anchor, address: &str) -> Result<Operation, RemoveError> {
-    let bound_address = anchor
+    // `email_recovery` is a `Vec` in the data model but the API caps
+    // it at one entry — find the matching credential, then drop it.
+    let position = anchor
         .email_recovery
-        .as_ref()
-        .map(|c| c.address.clone())
+        .iter()
+        .position(|c| c.address.eq_ignore_ascii_case(address))
         .ok_or(RemoveError::NotRegistered)?;
 
-    if !bound_address.eq_ignore_ascii_case(address) {
-        return Err(RemoveError::NotRegistered);
-    }
-
-    anchor.email_recovery = None;
+    anchor.email_recovery.remove(position);
 
     // TODO(email-recovery): once the archive `Operation` enum gains
     // an `EmailRecoveryRemove` variant, switch to it. Using the
@@ -81,13 +79,13 @@ mod tests {
             anchor_number: 1,
             devices: vec![],
             openid_credentials: vec![],
-            email_recovery: None,
+            email_recovery: vec![],
             metadata: None,
             name: None,
             created_at: None,
         };
         if let Some(addr) = address {
-            a.email_recovery = Some(EmailRecoveryCredential {
+            a.email_recovery.push(EmailRecoveryCredential {
                 address: addr.to_string(),
                 created_at: 100,
                 last_used: None,
@@ -101,7 +99,7 @@ mod tests {
         let mut a = anchor_with(Some("alice@gmail.com"));
         let result = remove_credential(&mut a, "alice@gmail.com");
         assert!(result.is_ok());
-        assert!(a.email_recovery.is_none());
+        assert!(a.email_recovery.is_empty());
     }
 
     #[test]
@@ -127,7 +125,7 @@ mod tests {
         assert_eq!(result, Err(RemoveError::NotRegistered));
         // Crucially, the binding is still in place — we didn't
         // partially mutate.
-        assert!(a.email_recovery.is_some());
+        assert_eq!(a.email_recovery.len(), 1);
     }
 
     #[test]
