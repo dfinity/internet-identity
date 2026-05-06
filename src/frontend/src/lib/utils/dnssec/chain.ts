@@ -1,7 +1,7 @@
 /**
- * Walk the DNSSEC delegation chain from a leaf RRset back to the
- * IANA root, assembling the `DnsProofBundle` shape the canister
- * expects (`docs/ongoing/email-recovery.md` §7.2).
+ * Walk the DNSSEC delegation chain from `<domain>` back to the IANA
+ * root, assembling the single-leaf `DnsProofBundle` shape the
+ * canister expects (`docs/ongoing/email-recovery.md` §7.2).
  *
  * The walk is bottom-up. From each zone we:
  *
@@ -19,7 +19,17 @@
  *
  * The resulting `chain` is ordered top-down (root → TLD → … →
  * leaf-zone) to match the canister-side verifier in
- * `crate::dnssec::verify_with_clock`.
+ * `crate::dnssec::verify_chain_with_clock`.
+ *
+ * Two public entry points wrap the shared walk:
+ *
+ * - {@link walkSkeletonChain} — chain + optional DMARC leaf
+ *   (`leaf` is the DMARC `_dmarc.<domain>` RRset when present, or
+ *   `None` otherwise). Used at prepare time. The DKIM leaf is *not*
+ *   included — the selector is unknown until the email arrives.
+ *
+ * - {@link walkDkimLeaf} — chain + DKIM leaf for a known selector.
+ *   Used post-email after polling sees `NeedDkimLeaf { selector }`.
  */
 
 import type {
@@ -38,74 +48,121 @@ const TYPE_RRSIG = 46;
 const TYPE_DNSKEY = 48;
 
 /**
- * Result of `walkChain` — exactly the shape the canister method
- * `email_recovery_credential_prepare_add` accepts. `leaves` holds
- * the DKIM TXT and (when present) the DMARC TXT.
+ * Build the prepare-time skeleton bundle: chain rooted at IANA down
+ * to `<domain>`, plus the DMARC TXT at `_dmarc.<domain>` when the
+ * zone publishes one and `wantDmarc` is true. The DKIM leaf is *not*
+ * fetched here — it lands later via {@link walkDkimLeaf} once the
+ * email arrives and the selector is known.
+ *
+ * Returns `undefined` if the chain doesn't reach the IANA root or
+ * the leaf zone isn't DNSSEC-signed; the canister falls through to
+ * its DoH path in that case.
  */
-export interface AssembledBundle {
-  bundle: DnsProofBundle;
-  /** True if the DMARC leaf was found and included in `bundle.leaves`. */
-  hasDmarc: boolean;
+export async function walkSkeletonChain(
+  domain: string,
+  wantDmarc: boolean,
+): Promise<DnsProofBundle | undefined> {
+  // The skeleton chain is anchored at the registered zone
+  // `<domain>`. We discover the zone cut by querying its DNSKEY
+  // RRSIG and reading `signer_name` (canonical, unambiguous).
+  const seedDnskey = await fetchSignedRRset(domain, TYPE_DNSKEY);
+  if (seedDnskey === undefined) {
+    return undefined;
+  }
+  const leafZoneBytes = seedDnskey.signerName;
+
+  // Optional DMARC leaf. If present and signed by the same zone,
+  // include it; if signed by an unusual cut, drop it (the canister
+  // handles "no DMARC" via strict alignment).
+  let dmarcLeaf: SignedRRset | undefined;
+  if (wantDmarc) {
+    const fetched = await fetchSignedRRset(`_dmarc.${domain}`, TYPE_TXT);
+    if (fetched !== undefined && bytesEqual(fetched.signerName, leafZoneBytes)) {
+      dmarcLeaf = fetched.rrset;
+    }
+  }
+
+  const chainAndRoot = await walkUpFromLeafZone(leafZoneBytes, seedDnskey.rrset);
+  if (chainAndRoot === undefined) {
+    return undefined;
+  }
+
+  return {
+    leaf: dmarcLeaf === undefined ? [] : [dmarcLeaf],
+    root_dnskey: chainAndRoot.rootDnskey,
+    chain: chainAndRoot.chain,
+  };
 }
 
 /**
- * Build the bundle. Returns `undefined` if any of the required
- * records is missing or the chain doesn't reach the IANA root —
- * the canister falls through to its DoH path in that case.
+ * Build the post-email DKIM-leaf bundle: chain rooted at IANA down
+ * to the leaf zone of `<selector>._domainkey.<domain>`, plus the
+ * DKIM TXT at that name as the bundle's single leaf. The chain
+ * mirrors what `walkSkeletonChain` produced at prepare time, so the
+ * canister's verifier accepts the leaf under the same trust anchor.
  *
- * `domain` is the registered email domain (e.g. `example.com`).
- * `selector` is the DKIM selector (typically discovered via
- * `discoverSelector`). `wantDmarc` requests the DMARC TXT at
- * `_dmarc.<domain>` be included as a second leaf.
+ * Returns `undefined` if the leaf doesn't resolve, the chain isn't
+ * fully signed, or the DKIM leaf's signer doesn't match the parent
+ * zone's expected DNSKEY.
  */
-export async function walkChain(
+export async function walkDkimLeaf(
   domain: string,
   selector: string,
-  wantDmarc: boolean,
-): Promise<AssembledBundle | undefined> {
-  // 1. Fetch the leaf DKIM TXT + RRSIG. The signer_name of the
-  //    DKIM RRSIG is our leaf zone — there's no ambiguity about
-  //    where the zone cut is, the RRSIG names it explicitly.
+): Promise<{ bundle: DnsProofBundle; leaf: SignedRRset } | undefined> {
   const dkimFqdn = `${selector}._domainkey.${domain}`;
   const dkimLeaf = await fetchSignedRRset(dkimFqdn, TYPE_TXT);
   if (dkimLeaf === undefined) {
     return undefined;
   }
 
-  const leaves: SignedRRset[] = [dkimLeaf.rrset];
-  let hasDmarc = false;
-
-  if (wantDmarc) {
-    const dmarcFqdn = `_dmarc.${domain}`;
-    const dmarcLeaf = await fetchSignedRRset(dmarcFqdn, TYPE_TXT);
-    if (dmarcLeaf !== undefined) {
-      // Both leaves must be signed by the same zone — they have to
-      // be (DMARC and DKIM both live under the same registered
-      // domain) but verify defensively. If the upstream zone has
-      // an unusual cut, drop the DMARC leaf rather than build an
-      // invalid bundle; the canister's verifier handles "no DMARC"
-      // via strict alignment.
-      const sameSigner = bytesEqual(dkimLeaf.signerName, dmarcLeaf.signerName);
-      if (sameSigner) {
-        leaves.push(dmarcLeaf.rrset);
-        hasDmarc = true;
-      }
-    }
-  }
-
-  const leafZone = decodeNameFromBytes(dkimLeaf.signerName);
-
-  // 2. Walk from the leaf zone up to root, collecting DNSKEY +
-  //    DS pairs.
-  const chainBottomUp: DelegationLink[] = [];
-  let currentZone = leafZone;
-  let currentDnskey = await fetchSignedRRset(
-    currentZone === "" ? "." : currentZone,
+  // The DKIM TXT lives in the same zone as the registered domain;
+  // its RRSIG.signer_name names that zone. Walk from there.
+  const leafZoneBytes = dkimLeaf.signerName;
+  const seedDnskey = await fetchSignedRRset(
+    decodeNameFromBytes(leafZoneBytes) === ""
+      ? "."
+      : decodeNameFromBytes(leafZoneBytes),
     TYPE_DNSKEY,
   );
-  if (currentDnskey === undefined) {
+  if (seedDnskey === undefined) {
     return undefined;
   }
+
+  const chainAndRoot = await walkUpFromLeafZone(leafZoneBytes, seedDnskey.rrset);
+  if (chainAndRoot === undefined) {
+    return undefined;
+  }
+
+  return {
+    bundle: {
+      leaf: [dkimLeaf.rrset],
+      root_dnskey: chainAndRoot.rootDnskey,
+      chain: chainAndRoot.chain,
+    },
+    leaf: dkimLeaf.rrset,
+  };
+}
+
+/**
+ * Walk from a starting zone (named by `leafZoneBytes`) up to the
+ * IANA root, collecting `(DS-in-parent, DNSKEY-of-child)` links
+ * along the way. Returns the top-down chain plus the validated
+ * root DNSKEY RRset.
+ */
+async function walkUpFromLeafZone(
+  leafZoneBytes: Uint8Array,
+  leafZoneDnskey: SignedRRset,
+): Promise<
+  | {
+      chain: DelegationLink[];
+      rootDnskey: SignedRRset;
+    }
+  | undefined
+> {
+  const leafZone = decodeNameFromBytes(leafZoneBytes);
+  const chainBottomUp: DelegationLink[] = [];
+  let currentZone = leafZone;
+  let currentDnskey: SignedRRset = leafZoneDnskey;
 
   // Bound the walk depth — DNS only ever has a handful of label
   // levels, but we don't want a malicious resolver to walk us
@@ -125,16 +182,17 @@ export async function walkChain(
     const parentZone = decodeNameFromBytes(ds.signerName);
     chainBottomUp.push({
       child_ds: ds.rrset,
-      child_dnskey: currentDnskey.rrset,
+      child_dnskey: currentDnskey,
     });
     currentZone = parentZone;
-    currentDnskey = await fetchSignedRRset(
+    const next = await fetchSignedRRset(
       currentZone === "" ? "." : currentZone,
       TYPE_DNSKEY,
     );
-    if (currentDnskey === undefined) {
+    if (next === undefined) {
       return undefined;
     }
+    currentDnskey = next.rrset;
   }
 
   if (currentZone !== "") {
@@ -142,16 +200,12 @@ export async function walkChain(
     return undefined;
   }
 
-  // 3. The DNSKEY at zone "" is the root DNSKEY. The chain in
-  //    bundle order is top-down (root→leaf), so reverse the
-  //    bottom-up traversal we just did.
+  // The DNSKEY at zone "" is the root DNSKEY. The chain in
+  // bundle order is top-down (root→leaf), so reverse the
+  // bottom-up traversal we just did.
   return {
-    bundle: {
-      leaves,
-      root_dnskey: currentDnskey.rrset,
-      chain: chainBottomUp.reverse(),
-    },
-    hasDmarc,
+    rootDnskey: currentDnskey,
+    chain: chainBottomUp.reverse(),
   };
 }
 

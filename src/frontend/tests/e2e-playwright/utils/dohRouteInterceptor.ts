@@ -54,34 +54,48 @@ interface MatchEntry {
  * Each leaf, each delegation link's child_dnskey/child_ds, and the
  * root DNSKEY become one entry each.
  */
+function buildMatchEntry(rrset: SignedRRset): MatchEntry {
+  const nameBytes = toBytes(rrset.name);
+  return {
+    nameBytes,
+    nameLower: decodeNameLower(nameBytes),
+    rtype: rrset.rtype,
+    ttl: rrset.ttl,
+    rdatas: rrset.rdata.map(toBytes),
+    rrsig: rrset.rrsig,
+  };
+}
+
 function buildMatchTable(bundle: DnsProofBundle): MatchEntry[] {
   const entries: MatchEntry[] = [];
-  const push = (rrset: SignedRRset) => {
-    const nameBytes = toBytes(rrset.name);
-    entries.push({
-      nameBytes,
-      nameLower: decodeNameLower(nameBytes),
-      rtype: rrset.rtype,
-      ttl: rrset.ttl,
-      rdatas: rrset.rdata.map(toBytes),
-      rrsig: rrset.rrsig,
-    });
-  };
-  for (const leaf of bundle.leaves) push(leaf);
+  for (const leaf of bundle.leaf) entries.push(buildMatchEntry(leaf));
   for (const link of bundle.chain) {
-    push(link.child_dnskey);
-    push(link.child_ds);
+    entries.push(buildMatchEntry(link.child_dnskey));
+    entries.push(buildMatchEntry(link.child_ds));
   }
-  push(bundle.root_dnskey);
+  entries.push(buildMatchEntry(bundle.root_dnskey));
   return entries;
 }
 
-/** Install the DoH route handler on `page`. Idempotent per page. */
+/**
+ * Install the DoH route handler on `page`. Idempotent per page.
+ *
+ * The DoH layer doesn't care about bundle semantics — it just needs
+ * to be able to answer queries for any RRset the FE is going to
+ * walk. With the two-phase flow the FE walks both the DMARC leaf
+ * (at prepare time) and the DKIM leaf (post-email), so the
+ * interceptor accepts a list of extra leaves on top of the
+ * skeleton bundle's chain.
+ */
 export async function installDohInterceptor(
   page: Page,
   bundle: DnsProofBundle,
+  extraLeaves: SignedRRset[] = [],
 ): Promise<void> {
   const table = buildMatchTable(bundle);
+  for (const leaf of extraLeaves) {
+    table.push(buildMatchEntry(leaf));
+  }
   for (const host of DOH_HOSTS) {
     const pattern = `https://${host}/dns-query**`;
     await page.route(pattern, async (route) => {

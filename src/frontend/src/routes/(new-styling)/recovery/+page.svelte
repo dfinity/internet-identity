@@ -81,6 +81,13 @@
   const emailRecoveryStatus = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);
 
+  const submitEmailDkimLeaf = (
+    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
+  ) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
     anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
 
@@ -226,6 +233,7 @@
     <RecoverWithEmailWizard
       prepareDelegation={prepareEmailDelegation}
       status={emailRecoveryStatus}
+      submitDkimLeaf={submitEmailDkimLeaf}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
       onCancel={() => (showEmailRecoveryDialog = false)}
