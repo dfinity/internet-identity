@@ -70,8 +70,8 @@
       <Trans>
         Send a fresh email from
         <strong>{fromAddress}</strong>
-        to <strong>{mailbox}</strong> with the token below as the subject.
-        We're watching for it — this page will refresh automatically.
+        to <strong>{mailbox}</strong> with the token below as the subject. We're watching
+        for it — this page will refresh automatically.
       </Trans>
     </p>
   </header>
@@ -111,11 +111,7 @@
   </p>
 
   <div class="flex flex-row justify-end">
-    <button
-      class="btn btn-secondary btn-md"
-      type="button"
-      onclick={onCancel}
-    >
+    <button class="btn btn-secondary btn-md" type="button" onclick={onCancel}>
       {$t`Cancel`}
     </button>
   </div>

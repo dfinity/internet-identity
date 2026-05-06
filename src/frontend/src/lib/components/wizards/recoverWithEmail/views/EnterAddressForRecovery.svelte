@@ -49,8 +49,8 @@
     </h1>
     <p class="text-text-tertiary text-center text-sm">
       <Trans>
-        Type the email address you registered as your recovery method. We'll
-        ask you to send a signed email from that inbox to prove ownership.
+        Type the email address you registered as your recovery method. We'll ask
+        you to send a signed email from that inbox to prove ownership.
       </Trans>
     </p>
   </header>
@@ -61,7 +61,7 @@
     type="email"
     autocomplete="email"
     spellcheck={false}
-    error={error}
+    {error}
     disabled={busy}
     autofocus
   />

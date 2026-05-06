@@ -23,11 +23,7 @@
     <p class="text-text-tertiary text-center text-sm">{reason}</p>
   </header>
   <div class="flex flex-row justify-end gap-2">
-    <button
-      class="btn btn-secondary btn-md"
-      type="button"
-      onclick={onCancel}
-    >
+    <button class="btn btn-secondary btn-md" type="button" onclick={onCancel}>
       {$t`Cancel`}
     </button>
     <button class="btn btn-primary btn-md" type="button" onclick={onRetry}>

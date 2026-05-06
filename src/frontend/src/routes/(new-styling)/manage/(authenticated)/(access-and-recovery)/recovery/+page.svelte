@@ -271,10 +271,11 @@
 
   const handleRemoveEmail = async () => {
     if (emailRecovery === undefined) return;
-    const result = await $authenticatedStore.actor.email_recovery_credential_remove(
-      $authenticatedStore.identityNumber,
-      emailRecovery.address,
-    );
+    const result =
+      await $authenticatedStore.actor.email_recovery_credential_remove(
+        $authenticatedStore.identityNumber,
+        emailRecovery.address,
+      );
     if ("Err" in result) {
       handleError(new Error(JSON.stringify(result.Err)));
       return;

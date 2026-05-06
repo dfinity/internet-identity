@@ -85,10 +85,7 @@ export async function walkChain(
       // an unusual cut, drop the DMARC leaf rather than build an
       // invalid bundle; the canister's verifier handles "no DMARC"
       // via strict alignment.
-      const sameSigner = bytesEqual(
-        dkimLeaf.signerName,
-        dmarcLeaf.signerName,
-      );
+      const sameSigner = bytesEqual(dkimLeaf.signerName, dmarcLeaf.signerName);
       if (sameSigner) {
         leaves.push(dmarcLeaf.rrset);
         hasDmarc = true;
@@ -196,13 +193,16 @@ async function fetchSignedRRset(
   // we don't expect CNAMEs at DKIM/DMARC/DNSKEY/DS records.
   const rrs = msg.answers.filter(
     (rr) =>
-      rr.type === qtype && rr.name.toLowerCase() === name.toLowerCase().replace(/\.$/, ""),
+      rr.type === qtype &&
+      rr.name.toLowerCase() === name.toLowerCase().replace(/\.$/, ""),
   );
   if (rrs.length === 0) {
     return undefined;
   }
   const rrsigs = msg.answers.filter(
-    (rr) => rr.type === TYPE_RRSIG && rr.name.toLowerCase() === name.toLowerCase().replace(/\.$/, ""),
+    (rr) =>
+      rr.type === TYPE_RRSIG &&
+      rr.name.toLowerCase() === name.toLowerCase().replace(/\.$/, ""),
   );
   // Find the first RRSIG that covers our qtype.
   let coveringRrsig: DnsRR | undefined;

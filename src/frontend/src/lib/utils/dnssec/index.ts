@@ -135,9 +135,7 @@ export async function assembleBundle(
  * records are concatenated without separators (DKIM/DMARC consumers
  * expect that shape per RFC 6376 §3.6.2.2 / RFC 7489 §6.1).
  */
-async function fetchTxtPresentation(
-  name: string,
-): Promise<string | undefined> {
+async function fetchTxtPresentation(name: string): Promise<string | undefined> {
   const msg = await dohQuery(name, TYPE_TXT);
   if (msg === undefined) {
     return undefined;

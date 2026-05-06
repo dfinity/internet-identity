@@ -22,9 +22,7 @@
       className,
     ]}
   >
-    <MailIcon
-      class={["text-fg-tertiary size-5 shrink-0", "@lg:mt-0.5"]}
-    />
+    <MailIcon class={["text-fg-tertiary size-5 shrink-0", "@lg:mt-0.5"]} />
     <header class={["flex flex-col", "@max-lg:mt-3 @max-lg:mb-5", "@lg:mx-3"]}>
       <h2 class="text-text-primary text-base font-semibold">
         {$t`Recovery email`}

@@ -32,10 +32,7 @@
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
-  import {
-    DelegationChain,
-    DelegationIdentity,
-  } from "@icp-sdk/core/identity";
+  import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
   import { transformSignedDelegation } from "$lib/utils/utils";
 
   let showRecoveryDialog = $state(false);

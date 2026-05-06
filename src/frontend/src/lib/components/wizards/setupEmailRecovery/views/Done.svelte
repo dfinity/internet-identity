@@ -18,8 +18,8 @@
     <p class="text-text-tertiary text-center text-sm">
       <Trans>
         <strong class="break-all">{address}</strong>
-        is now a recovery method for this Internet Identity. You can use it to
-        sign in if you ever lose access to your other authentication methods.
+        is now a recovery method for this Internet Identity. You can use it to sign
+        in if you ever lose access to your other authentication methods.
       </Trans>
     </p>
   </header>

@@ -190,9 +190,7 @@ function buildDnsResponse(
     }
     // The covering RRSIG.
     const rrsigRdata = encodeRrsigRdata(match.rrsig);
-    records.push(
-      buildRR(match.nameBytes, TYPE_RRSIG, match.ttl, rrsigRdata),
-    );
+    records.push(buildRR(match.nameBytes, TYPE_RRSIG, match.ttl, rrsigRdata));
     answers = concatBytes(records);
     ancount = records.length;
   }

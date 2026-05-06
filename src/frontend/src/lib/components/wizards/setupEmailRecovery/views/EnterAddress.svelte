@@ -65,7 +65,7 @@
     type="email"
     autocomplete="email"
     spellcheck={false}
-    error={error}
+    {error}
     disabled={busy}
     autofocus
   />
