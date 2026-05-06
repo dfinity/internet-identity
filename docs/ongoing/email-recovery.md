@@ -923,7 +923,7 @@ sequenceDiagram
     U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA (DKIM-signed by gmail.com)
 
-    Note over GW,II: 4 — Gateway forwards email; canister does pre-DKIM-key verification
+    Note over GW,II: 4 — Gateway forwards email — canister does pre-DKIM-key verification
     GW->>II: smtp_request(SmtpRequest)
     II->>II: extract nonce from signed Subject header,<br/>parse DKIM-Signature → s=, d=, b=,<br/>canonicalise body, verify bh=, drop body bytes,<br/>compute SHA-256 of signed-headers input,<br/>cache { headers_digest, signature_blob, selector,<br/>signing_domain, from_domain, claimed_address } (~500 B),<br/>set status = NeedDkimLeaf { selector: s }
 
@@ -989,7 +989,7 @@ sequenceDiagram
     U->>Mail: send signed email
     Mail->>GW: SMTP DATA
 
-    Note over GW,II: 4 — Gateway forwards email; canister parses signature, caches partial verification
+    Note over GW,II: 4 — Gateway forwards email — canister parses signature and caches partial verification
     GW->>II: smtp_request(SmtpRequest)
     II->>II: extract nonce from signed Subject,<br/>parse DKIM-Signature → s=, d=, b=,<br/>verify body hash, drop body bytes,<br/>cache headers digest + signature blob (~500 B),<br/>set status = NeedDkimLeaf { selector: s }
 
