@@ -1,7 +1,14 @@
 //! Email-based identity recovery: setup (binding) flow.
 //!
 //! See `docs/ongoing/email-recovery.md` (PR #3836) for the full design.
-//! This module currently implements the **setup** half:
+//! This module implements the canister-side **setup** half — the
+//! recovery half (`email_recovery_prepare_delegation` +
+//! `recover@id.ai` dispatch + delegation issuance) is layered on top
+//! in `feat/email-recovery-flow` (PR #3843), which adds the reverse
+//! `address → AnchorNumber` stable index that recovery needs to
+//! resolve the verified `From:` to an anchor.
+//!
+//! Setup half:
 //!
 //! 1. The user, while authenticated, calls
 //!    `email_recovery_credential_prepare_add(anchor, dns_input)`.
@@ -12,11 +19,6 @@
 //! 4. The SMTP gateway forwards the email via `smtp_request`. The
 //!    canister verifies DKIM + DMARC, matches the From: against the
 //!    claimed address, and binds the credential to the anchor.
-//!
-//! The recovery half (`email_recovery_prepare_delegation` +
-//! `recover@id.ai` dispatch) lives in a follow-up PR — it needs a
-//! reverse `address → AnchorNumber` stable index for the verified
-//! `From:` lookup, which is best landed as its own focused change.
 //!
 //! ## Why heap state, not stable
 //!
