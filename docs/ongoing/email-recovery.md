@@ -84,7 +84,7 @@ Conventions and protocol-specific tags used throughout this document.
 |---|---|
 | **Anchor** | The user's identity number. Maps to passkeys, OpenID credentials, and (via this design) email-recovery credentials. |
 | **Nonce** | The canister-issued one-time token (`II-Recovery-…`) embedded in the recovery email's `Subject:`. It self-identifies the pending challenge — see §3.2 / §8.4 — so there is no separate `challenge_id` on the wire. |
-| **Pending challenge** | An ephemeral heap entry keyed by nonce, holding the claimed address, the cached zone DNSKEYs from the skeleton chain, optional cached DMARC TXT bytes, optionally a partial-verification record (set when the email has arrived but the DKIM leaf hasn't been submitted yet), and (for recovery) the FE-supplied `session_pk`. 30-minute TTL. |
+| **Pending challenge** | An ephemeral heap entry keyed by nonce, holding the claimed address, a `(zone_name → DNSKEY RRset)` map populated from the skeleton chain (and grown at `submit_dkim_leaf` time when the DKIM CNAME chain crosses into a new zone), optional cached DMARC TXT bytes, optionally a partial-verification record (set when the email has arrived but the DKIM leaf hasn't been submitted yet), and (for recovery) the FE-supplied `session_pk`. 30-minute TTL. |
 | **SMTP gateway** | The off-chain service that accepts inbound mail at `register@id.ai` / `recover@id.ai` and forwards each message to the canister via `smtp_request`. Untrusted by the canister beyond best-effort delivery — see §4.1. |
 
 ---
@@ -243,7 +243,7 @@ sequenceDiagram
 
 The architecture is built around three ideas:
 
-- **DNSSEC validation happens in two phases, separated by the email arrival.** Pre-email, the FE assembles a "skeleton" `DnsProofBundle`: the DNSSEC chain rooted at the IANA anchor down through the registered domain's zone DNSKEY, plus the DMARC TXT leaf at the well-known name `_dmarc.<domain>` if the zone publishes one. The DKIM leaf is *not* included — its name is `<selector>._domainkey.<domain>`, and the active selector is published only inside the eventual email's `DKIM-Signature` header, so the FE can't fetch it yet. The canister validates the skeleton chain on `prepare`, caches the validated zone DNSKEYs, and returns the nonce. Post-email, the canister extracts `s=` from the DKIM-Signature header, sets the polled status to `NeedDkimLeaf { selector: s }`, and waits for the FE to walk the leaf. The FE submits the signed RRset for `<s>._domainkey.<domain>` via a follow-up call; the canister validates it against the already-cached chain and finalises verification. **No selector probing on the FE**: the selector comes from the email itself, authoritatively.
+- **DNSSEC validation happens in two phases, separated by the email arrival.** Pre-email, the FE assembles a "skeleton" `DnsProofBundle`: the DNSSEC chain rooted at the IANA anchor down through the registered domain's zone DNSKEY, plus the DMARC TXT leaf at the well-known name `_dmarc.<domain>` if the zone publishes one. The DKIM leaf is *not* included — its name is `<selector>._domainkey.<domain>`, and the active selector is published only inside the eventual email's `DKIM-Signature` header, so the FE can't fetch it yet. The canister validates the skeleton chain on `prepare`, caches the resulting `(zone_name → DNSKEY)` map, and returns the nonce. Post-email, the canister extracts `s=` from the DKIM-Signature header, sets the polled status to `NeedDkimLeaf { selector: s }`, and waits for the FE to walk the leaf. The FE submits the signed RRset(s) for the resolution chain `<s>._domainkey.<domain>` → … → final TXT via a follow-up call — supplying any additional zone delegation chains needed when the resolution crosses into a new signed zone (Proton-style cross-zone CNAME, §7.2); the canister merges those new chains into the cached map, validates each hop under the zone its RRSIG names, and finalises verification. **No selector probing on the FE**: the selector comes from the email itself, authoritatively.
 - **The user actually emails the nonce.** They send a fresh email from the address they typed, with the nonce in the `Subject:` (e.g. `Subject: II-Recovery-1a2b3c4d5e6f7081`), to `recover@id.ai` (or `register@id.ai` for setup). The recipient is a single static mailbox per kind — **the nonce is the only identifier** in the protocol: it's the lookup key the canister uses to match the inbound email to a pending challenge, the value the FE polls under, and the human-typeable token in `Subject:`. Each nonce is drawn from a 64-bit PRNG (§8.9) into exactly one pending entry, so it self-identifies — knowing the nonce is necessary and sufficient to reference the challenge. We deliberately don't carry a separate `challenge_id`. Keeping the token in `Subject:` rather than the body is the other deliberate choice: the user sees the recovery intent (`II-Recovery-…`) at compose time, which is the cheapest defence against the prepare-then-phish attack discussed in §3.2.
 - **The SMTP gateway forwards the email to the canister via `smtp_request`** — exactly the PoC's surface, no shape change. On arrival the canister parses the DKIM-Signature header (without yet having the public key), canonicalises the body and checks `bh=`, computes the SHA-256 of the would-be DKIM-signature input, and stashes a small partial-verification record (~500 B: headers digest, signature blob, selector, signing domain, From-domain, claimed address) on the pending challenge. The body itself is dropped — once `bh=` is verified the body's bytes don't matter for the rest of the pipeline. The status flips to `NeedDkimLeaf { selector }` so the FE can walk DNSSEC for that specific selector and call `email_recovery_submit_dkim_leaf(nonce, signed_rrset)`. The canister validates the leaf against the already-anchored chain, completes the DKIM signature check (`RSA.verify(pk, headers_digest, signature)`), confirms DMARC alignment + `From:` match, then either binds the address (setup) or prepares a delegation tied to the FE's session public key (recovery). The FE polls `email_recovery_status(nonce)` throughout — the spinner just stays up a bit longer between "email arrived" and "verified".
 
@@ -473,35 +473,53 @@ A "DNS proof bundle" looks like:
 
 ```rust
 pub struct DnsProofBundle {
-    /// At most one signed RRset verified under the chain. The two-phase
-    /// flow only ever needs one leaf per call:
-    /// - At `prepare_add`: the DMARC TXT at `_dmarc.<d>` (optional —
-    ///   omit when the zone publishes no DMARC; the canister falls
-    ///   through to strict `d=` alignment).
-    /// - At `submit_dkim_leaf`: the DKIM TXT at
-    ///   `<selector>._domainkey.<d>`, signed under the same zone the
-    ///   skeleton chain anchored at prepare time.
-    /// Single-leaf is also a smaller ingress argument than `Vec<…>`.
-    pub leaf: Option<SignedRRset>,
-
-    /// The signed root DNSKEY RRset (every link in `chain` is verified
+    /// The signed root DNSKEY RRset (every chain in `chains` is verified
     /// up to here). Validated by checking that one of its KSK DNSKEYs
     /// hashes to a DS digest in the trust anchor stored on the canister.
     pub root_dnskey: SignedRRset,
 
-    /// Walk down the delegation chain from root toward the leaf. Each
-    /// entry is the DS RRset published in the parent zone (signed by
-    /// the parent's DNSKEY) plus the DNSKEY RRset of the child zone
-    /// (self-signed by the child's KSK and DS-pinned by the parent).
-    pub chain: Vec<DelegationLink>,
+    /// One delegation chain per signing zone touched by this bundle.
+    /// Each chain anchors at the root and ends at a zone's DNSKEY
+    /// RRset; the verifier validates each chain once and builds a
+    /// `(zone_name → DNSKEY RRset)` lookup table reused for every hop.
+    ///
+    /// The single-zone case (gmail-style direct TXT under one zone)
+    /// is just one chain. CNAME indirection across zones (Proton's
+    /// `proton.me` → `proton.ch`, Tutanota's `tutanota.com` →
+    /// `tutanota.de`, …) supplies one chain per zone touched — see
+    /// "DKIM CNAME indirection" below.
+    pub chains: Vec<DelegationChain>,
+
+    /// The RRsets being proven, in CNAME-resolution order. Each hop's
+    /// RRSIG `signer_name` identifies which zone signed it; the
+    /// verifier looks that name up in the table built from `chains`
+    /// and validates the RRset under that zone's DNSKEY.
+    ///
+    /// The two-phase flow uses this in two ways:
+    /// - At `prepare_add`: zero or one hop — the DMARC TXT at
+    ///   `_dmarc.<d>` if the zone publishes one, omitted otherwise
+    ///   (the canister falls through to strict `d=` alignment).
+    /// - At `submit_dkim_leaf`: one or more hops forming a coherent
+    ///   resolution chain `<sel>._domainkey.<d>` → … → final TXT.
+    ///   No CNAME indirection (Gmail-style) → a single TXT hop;
+    ///   one CNAME hop (Proton-style) → CNAME + TXT.
+    pub hops: Vec<SignedRRset>,
+}
+
+pub struct DelegationChain {
+    /// Root → leaf. Each link is a parent-zone DS RRset plus the
+    /// child-zone DNSKEY RRset; the last link's `child_dnskey` is
+    /// the zone whose DNSKEY ends up in the lookup table.
+    pub links: Vec<DelegationLink>,
 }
 
 pub struct SignedRRset {
     pub name: DnsName,
-    pub rtype: u16,            // TXT, DNSKEY, DS, ...
+    pub rtype: u16,            // TXT, DNSKEY, DS, CNAME, ...
     pub rdata: Vec<Vec<u8>>,   // canonical RDATA per RFC 4034 §6
     pub ttl: u32,
-    pub rrsig: Rrsig,          // RFC 4034 §3
+    pub rrsig: Rrsig,          // RFC 4034 §3 — `signer_name` names the
+                               //  zone whose DNSKEY validates this RRset
 }
 
 pub struct DelegationLink {
@@ -510,12 +528,21 @@ pub struct DelegationLink {
 }
 ```
 
+**DKIM CNAME indirection — why `hops` is a sequence, not a single leaf.** DKIM has no rule that a DKIM TXT must live in the same zone as the signing domain. Operationally, several mainstream providers implement DKIM by *delegating* the TXT to a different zone via CNAME — which is a normal part of RFC 6376 resolution and is exactly how mass-mail platforms hand DKIM to their customers without managing per-customer DNS:
+
+- **Same-zone direct TXT** — Gmail (`<sel>._domainkey.gmail.com IN TXT "v=DKIM1; ..."`), iCloud, Outlook (consumer mailboxes that don't use the Microsoft 365 platform), most ESPs configured the DIY way. One hop, one zone.
+- **Cross-zone CNAME** — Proton (`<sel>._domainkey.proton.me IN CNAME <sel>._domainkey.<customer-id>.proton.ch`), Tutanota (`<sel>._domainkey.tutanota.com IN CNAME <sel>._domainkey.tuta.de`), most M365-on-custom-domain setups (`<sel>._domainkey.<customer>.com IN CNAME <sel>._domainkey.<customer>.onmicrosoft.com`). Two or more hops, two or more zones.
+
+For DNSSEC verification each hop is *independently signed by its own zone* — DNSSEC signatures don't span zone boundaries. So a CNAME chain that crosses zones must be presented as a sequence of RRsets, each carrying its zone-local RRSIG, and the verifier needs the DNSKEY chain for *every* zone touched. That's why the bundle carries `chains: Vec<…>` and `hops: Vec<…>` rather than a single chain and a single leaf — one chain per signing zone, one hop per RRset in the resolution sequence.
+
+The single-zone Gmail case is just `chains.len() == 1` and `hops.len() == 1` — the wire format isn't penalised for not needing CNAME indirection.
+
 ### 7.3 Verification algorithm
 
 The trust anchor stored on the canister is a *DS-style digest* of the IANA root KSK — exactly the same shape IANA publishes at `data.iana.org/root-anchors/root-anchors.xml` (an algorithm + digest-type + hex digest). It is **not** a DNSKEY itself; the root DNSKEY RRset is supplied by the caller and validated against the digest at verification time.
 
 ```
-verify(bundle):
+verify(bundle, requested_name, requested_type):
     # 1. Validate the root DNSKEY RRset against the bundled trust anchor.
     #    The trust anchor is a DS digest (algo, digest-type, digest-bytes).
     #    Pick the DNSKEY in `bundle.root_dnskey.rdata` whose KSK digest
@@ -524,26 +551,46 @@ verify(bundle):
     root_ksk = pick_dnskey_matching_ds(bundle.root_dnskey.rdata, TRUST_ANCHOR_DS)
     verify_rrsig(bundle.root_dnskey.rrsig, bundle.root_dnskey.rdata, root_ksk)
 
-    # 2. Walk down the delegation chain.
-    parent_keys = bundle.root_dnskey.rdata    # the validated root DNSKEY RRset
-    for link in bundle.chain:
-        # Parent's DS RRset is signed by the parent's DNSKEY.
-        verify_rrsig(link.child_ds.rrsig, link.child_ds.rdata, parent_keys)
-        # Parent's DS digest matches one of the child's KSK DNSKEYs.
-        child_ksk = pick_dnskey_matching_ds(link.child_dnskey.rdata, link.child_ds)
-        # Child's DNSKEY RRset is self-signed by its KSK.
-        verify_rrsig(link.child_dnskey.rrsig, link.child_dnskey.rdata, child_ksk)
-        parent_keys = link.child_dnskey.rdata
+    # 2. Walk every supplied delegation chain and build a
+    #    (zone_name → DNSKEY RRset) lookup table.
+    zone_keys = { ".": bundle.root_dnskey.rdata }
+    for chain in bundle.chains:
+        parent_keys = bundle.root_dnskey.rdata
+        for link in chain.links:
+            # Parent's DS RRset is signed by the parent's DNSKEY.
+            verify_rrsig(link.child_ds.rrsig, link.child_ds.rdata, parent_keys)
+            # Parent's DS digest matches one of the child's KSK DNSKEYs.
+            child_ksk = pick_dnskey_matching_ds(link.child_dnskey.rdata, link.child_ds)
+            # Child's DNSKEY RRset is self-signed by its KSK.
+            verify_rrsig(link.child_dnskey.rrsig, link.child_dnskey.rdata, child_ksk)
+            parent_keys = link.child_dnskey.rdata
+        # The last link's child_dnskey owner is the zone we just landed in.
+        zone_name = chain.links.last().child_dnskey.name
+        require zone_keys.insert(zone_name, parent_keys).is_none()  # reject duplicate zones
 
-    # 3. Every leaf RRset is signed by the deepest zone's DNSKEY.
-    #    Reject the whole bundle if any leaf fails to verify — partial
-    #    bundles would let an attacker drop the DMARC leaf to dodge
-    #    alignment.
-    require not bundle.leaves.is_empty()
-    for leaf in bundle.leaves:
-        verify_rrsig(leaf.rrsig, leaf.rdata, parent_keys)
+    # 3. Verify every hop under the zone its RRSIG names.
+    for hop in bundle.hops:
+        zone = hop.rrsig.signer_name
+        require zone in zone_keys                      # bundle must include
+                                                       #  the chain for this zone
+        require hop.name.is_subdomain_of(zone)          # owner lies in that zone
+        verify_rrsig(hop.rrsig, hop.rdata, zone_keys[zone])
 
-    # 4. Freshness — every RRSIG's [inception, expiration] window must
+    # 4. Validate the hop sequence forms a coherent CNAME → … → requested_type
+    #    resolution. Reject loops, dangling chains, and oversize bundles.
+    require bundle.hops.len() >= 1
+    require bundle.hops.len() <= MAX_CNAME_HOPS         # cap, defaults to 4
+    require bundle.hops[0].name == requested_name
+    seen_names = { bundle.hops[0].name }
+    for i in 0 .. bundle.hops.len() - 1:
+        require bundle.hops[i].rtype == CNAME
+        require bundle.hops[i].rdata.len() == 1         # CNAME RRset has exactly one target
+        target = bundle.hops[i].rdata[0].canonical_target_name()
+        require bundle.hops[i+1].name == target
+        require seen_names.insert(target)               # no loops
+    require bundle.hops.last().rtype == requested_type
+
+    # 5. Freshness — every RRSIG's [inception, expiration] window must
     #    contain the verifier's clock (±clock_skew).
     now = ic_cdk::time()
     for rrsig in all_rrsigs(bundle):
@@ -553,6 +600,12 @@ verify(bundle):
 
 `verify_rrsig` uses RFC 4034 §3.1.8.1 canonical form (lowercase owner names, RDATA in canonical order) and the algorithm code from the RRSIG. We support algorithms 8 (RSA-SHA256), 13 (ECDSA-P256-SHA256), and 15 (Ed25519) — RFC 8624 "MUST" implementations. Anything older (RSA-SHA1, RSA-MD5) is rejected.
 
+**Why per-hop signer-name validation matters.** The `RRSIG.signer_name` field is signed *as part of the RRSIG RDATA itself* (RFC 4034 §3.1) — an attacker cannot rewrite it without invalidating the signature. Trusting `signer_name` to pick the validating DNSKEY is therefore safe and is exactly what every existing DNSSEC validator does. The canister additionally checks that the hop's owner name is in-zone of the named signer, defending against a curiosity case where an attacker who controls one zone tries to "claim" they signed an RRset from a different zone.
+
+**Why the CNAME chain coherence checks.** Each hop is independently authenticated, but a buggy or malicious caller could still ship a *valid* set of signatures whose owner names don't actually form a CNAME chain ending at the requested type — for example, three legitimately-signed CNAMEs that happen to all exist but don't link to each other. The owner-target equality check on consecutive hops, the no-loops invariant, and the final-hop type check together ensure that the bundle is exactly "what a recursive resolver would have followed if it asked for `requested_name`/`requested_type`".
+
+**Why a hop cap.** `MAX_CNAME_HOPS = 4` is generous: real-world DKIM CNAME chains observed across providers max out at two (`<sel>._domainkey.<customer>.com → <sel>._domainkey.<customer>.onmicrosoft.com → <sel>._domainkey.outlook-something.com`). The cap prevents an oversized bundle from arriving at the canister.
+
 ### 7.4 Caller-side bundle assembly
 
 The browser assembles `DnsProofBundle` directly in TypeScript. No separate library or WASM module is required.
@@ -560,14 +613,36 @@ The browser assembles `DnsProofBundle` directly in TypeScript. No separate libra
 **Pre-email — skeleton chain.** At `prepare` time the FE submits a `DnsProofBundle` covering everything *except* the DKIM leaf:
 
 - Issue DoH queries with `do=1` (request DNSSEC) and `cd=1` (don't validate, give us raw RRSIGs) to a public resolver. `dns.google` and `cloudflare-dns.com` both expose this; the FE can fall back between them. Browsers without OS-level DNS APIs cannot reach the authoritative servers directly, so DoH is the practical path.
-- Walk the delegation chain by querying the DS RRset at each parent zone (root → TLD → registered domain). Stop at root, where the DNSKEY RRset is validated against the trust anchor stored on the canister rather than against another DS lookup.
+- Walk the delegation chain for the registered domain by querying the DS RRset at each parent zone (root → TLD → registered domain). Stop at root, where the DNSKEY RRset is validated against the trust anchor stored on the canister rather than against another DS lookup. This populates `chains[0]`.
 - Include the DMARC TXT leaf at `_dmarc.<domain>` (a well-known name) if the zone publishes one; omit otherwise (the canister falls through to strict DMARC alignment when no record is published).
 - *Do not* fetch any DKIM leaf — the active selector lives only in the eventual email's `DKIM-Signature` header.
 
-**Post-email — DKIM leaf.** When polling sees `NeedDkimLeaf { selector }`, the FE walks the single missing leaf:
+**Post-email — DKIM leaf walk with CNAME following.** When polling sees `NeedDkimLeaf { selector }`, the FE walks `<selector>._domainkey.<domain>` and any CNAMEs in between:
 
-- Query the DKIM TXT at `<selector>._domainkey.<domain>` plus its covering RRSIG. The chain anchored at `prepare` time already covers the zone, so the leaf walk is just the leaf RRset itself — typically two DoH queries.
-- Submit the signed RRset to the canister via `email_recovery_submit_dkim_leaf(nonce, signed_rrset)`.
+```
+walk_dkim(name):
+    bundle.hops = []
+    visited = {}
+    while True:
+        require name not in visited; visited.add(name)
+        rrset = doh.fetch_signed(name, "ANY-DKIM-OR-CNAME")  # CNAME or TXT
+        bundle.hops.push(rrset)
+        if rrset.rtype == TXT: break
+        if rrset.rtype == CNAME: name = rrset.target; continue
+    # Ensure each zone touched by a hop has a chain in the bundle.
+    needed_zones = { hop.rrsig.signer_name for hop in bundle.hops }
+    for zone in needed_zones:
+        if zone not in already_chained_at_prepare:
+            bundle.chains.push(walk_delegation_to(zone))
+```
+
+Concretely:
+
+- **Same-zone case (Gmail, iCloud, …).** One DoH query for the TXT, no extra chain — the apex zone walked at prepare already covers it. Bundle: 1 hop, 0 new chains.
+- **Cross-zone CNAME (Proton, Tutanota, M365 custom domain, …).** Two DoH queries (CNAME then TXT) plus a delegation walk for the second zone. Bundle: 2 hops, 1 new chain.
+- **CNAME landing in unsigned territory.** The TXT (or an intermediate CNAME) lives in a zone that doesn't publish DNSSEC — DoH returns the record but with no RRSIGs. The FE cannot complete the bundle; the canister therefore needs the DoH-allowlist fallback (§7.6) to handle this domain at all. We surface this clearly: the FE detects the missing-RRSIG case while walking, abandons the DNSSEC path, and submits the prepare without a `dns_proof` so the canister either takes the DoH path or rejects with `DomainNotSupported`.
+
+The chain anchored at `prepare` time covers the apex zone; if the DKIM resolution stays in that zone (Gmail-style) the `submit_dkim_leaf` bundle just carries the leaf hop. If the resolution crosses into another zone (Proton-style) the FE adds that zone's delegation chain to `bundle.chains`. The canister merges those new chains into its cached `(zone_name → DNSKEY)` map (§8.2) before validating the hops.
 
 The earlier draft mentioned "the OS resolver" as a fallback when DoH providers are unavailable; in practice browsers don't expose the OS resolver, so the practical fallback is between multiple DoH endpoints, not to the OS. Domains for which DoH refuses to return RRSIGs are treated the same as domains without DNSSEC (§7.6).
 
@@ -603,7 +678,7 @@ The currently configured anchor list is recoverable from the canister's last upg
 
 ### 7.6 Domains without DNSSEC: the DoH fallback
 
-The major consumer mailbox providers we most care about — Gmail, Outlook, iCloud, Yahoo — do **not** publish DNSSEC on their authoritative zones. Rejecting them outright would leave the feature unusable for the majority of real users, so for an explicitly allowlisted set of domains the canister falls back to fetching DKIM/DMARC TXT records via DoH HTTP outcalls, with a multi-provider quorum standing in for the cryptographic provenance DNSSEC would otherwise give us. The DoH module is described in `crate::doh` (PR 4 of this stack); the relevant properties for this design are:
+The major consumer mailbox providers we most care about — Gmail, Outlook, iCloud, Yahoo — do **not** publish DNSSEC end-to-end on their DKIM resolution paths. Rejecting them outright would leave the feature unusable for the majority of real users, so for an explicitly allowlisted set of domains the canister falls back to fetching DKIM/DMARC TXT records via DoH HTTP outcalls, with a multi-provider quorum standing in for the cryptographic provenance DNSSEC would otherwise give us. The DoH module is described in `crate::doh` (PR 4 of this stack); the relevant properties for this design are:
 
 - **Allowlist-gated.** Outcalls fire only for domains in `DohConfig.allowed_domains` (deploy/upgrade arg). Non-allowlisted, non-DNSSEC domains still fail closed.
 - **Multi-provider quorum.** Five DoH providers across four jurisdictions (Cloudflare 🇺🇸, Google 🇺🇸, Quad9 🇨🇭, CIRA Canadian Shield 🇨🇦, IIJ 🇯🇵), 3-of-5 strict-majority quorum on the TXT bytes, no single jurisdiction can reach quorum alone. We trust "at least three of these providers, run by independent operators in different legal regimes, all return the same bytes" as a workable substitute for "the IANA-rooted DNSSEC chain".
@@ -622,6 +697,25 @@ The canister picks the path per-call: if the FE supplies a `DnsProofBundle`, use
 > "Internet Identity cannot verify mail from `example.com` — that domain doesn't publish DNSSEC and isn't on our DoH allowlist. Try a different email address from a supported provider, or use a recovery phrase instead."
 
 A small helper page (linked from the wizard's error state) lists the supported providers and their verification path.
+
+**"DNSSEC at the apex" is not enough — what matters is end-to-end coverage of the DKIM resolution path.** A domain may publish a DS at its registered apex and still be unverifiable end-to-end if its DKIM TXT lives behind a CNAME that targets unsigned territory. The canonical example is **`live.com`**: the apex zone is signed (`dig DS live.com` returns a record), but DKIM at `<sel>._domainkey.live.com` resolves through CNAMEs into the unsigned `protection.outlook.com` zone, where the actual TXT lives. The DNSSEC chain breaks at the cross-zone CNAME — the FE walker sees a hop with no RRSIG and abandons the bundle. So `live.com` is on the DoH allowlist *despite* having an apex DS, because that DS doesn't prove anything about the records the verifier actually needs.
+
+The audit that decides whether a domain belongs on the allowlist is therefore:
+
+1. Resolve `<some-active-selector>._domainkey.<d>` end-to-end via a DNSSEC-validating resolver.
+2. Check the AD bit on the response — `true` means the resolver validated every hop in the CNAME chain.
+3. If `AD=0` even though the apex publishes DS, the CNAME chain has crossed into unsigned territory; this domain belongs on the DoH allowlist.
+
+Concretely, the categories observed across mainstream consumer mailbox providers (audit performed at the time of writing; revisited per release):
+
+| Category | Examples | Verification path |
+|---|---|---|
+| Apex unsigned, DKIM unsigned | `gmail.com`, `outlook.com`, `hotmail.com`, `icloud.com`, `me.com`, `yahoo.com`, `aol.com`, `yandex.com`, `mail.ru`, `qq.com`, `163.com`, `naver.com`, … | DoH allowlist |
+| Apex signed but DKIM CNAMEs into unsigned territory | `live.com` (CNAME → `protection.outlook.com`, unsigned), some M365-on-custom-domain setups | DoH allowlist |
+| Apex signed, DKIM stays in same zone | `protonmail.com`, `pm.me` | DNSSEC, single chain, single hop |
+| Apex signed, DKIM CNAMEs to a *different signed* zone | `proton.me` → `proton.ch`, `tutanota.com` → `tutanota.de` | DNSSEC, multi-zone bundle (2 chains, 2 hops) |
+
+The FE walker does not need to know which category a domain falls into in advance — it tries the DNSSEC path, abandons on the first missing-RRSIG hop, and submits a no-bundle prepare. The canister then either takes the DoH path (if the domain is allowlisted) or rejects with `DomainNotSupported`. Operators audit allowlist additions using the procedure above; the resulting list is shipped via `default-doh-domains.bash` (sourced by `deploy-common.bash` and `make-upgrade-proposal`, single source of truth across deploy and upgrade-proposal flows).
 
 ### 7.7 Replay and freshness
 
@@ -648,7 +742,7 @@ The shape is two canister calls (prepare + submit_dkim_leaf), with polling in be
 
 - `email_recovery_credential_prepare_add(anchor, dns_input)` / `email_recovery_prepare_delegation(dns_input, session_pk)` — the FE submits the flat `EmailRecoveryDnsInput` (`{ address, dns_proof: opt DnsProofBundle }`), plus, for recovery, the FE-generated session public key. The **canister** picks the path: if `dns_proof` is set, validate the (skeleton) chain synchronously and cache the validated zone DNSKEYs + the DMARC TXT bytes if included; otherwise check the registered domain against `DohConfig.allowed_domains` and defer the DKIM/DMARC fetch to `smtp_request` time. The FE doesn't need to know which domains are on the allowlist. Returns `{ nonce, mailbox, expires_at }`.
 - The gateway calls `smtp_request(SmtpRequest)` when the email arrives — exactly the PoC's surface, unchanged. The canister extracts the nonce from the DKIM-signed `Subject:`, looks up the pending challenge, parses the DKIM-Signature header (without yet having the public key), verifies `bh=` against the canonicalised body and drops the body, computes the SHA-256 of the canonical signed-headers input, and stashes the partial-verification record. On the **DNSSEC path** it then sets the status to `NeedDkimLeaf { selector }` and waits for the FE. On the **DoH path** it directly resolves the DKIM and DMARC TXTs (typically cache hits after the first email per provider per TTL window), completes verification, and either binds the address (setup) or stamps a delegation seed for the cached `session_pk` (recovery).
-- `email_recovery_submit_dkim_leaf(nonce, signed_rrset)` — DNSSEC-path only. The FE supplies the DKIM TXT leaf for the selector seen in step 2's status. The canister validates the leaf against the cached chain, runs `RSA.verify(pk, headers_digest, signature_blob)`, completes DMARC alignment + `From:` match + `Subject` in `h=`, and finalises.
+- `email_recovery_submit_dkim_leaf(nonce, hops, extra_chains)` — DNSSEC-path only. The FE supplies the DKIM resolution as a sequence of signed `hops` (CNAME → … → final TXT) for the selector seen in step 2's status, plus any `extra_chains` for new signed zones the resolution crosses into (see §7.2 — Gmail-style is one TXT hop and no extra chains; Proton/Tutanota-style is CNAME + TXT plus the second zone's chain). The canister merges new chains into the cached `(zone → DNSKEY)` map, verifies each hop under the zone its RRSIG names, runs `RSA.verify(pk, headers_digest, signature_blob)` on the final TXT's public key, completes DMARC alignment + `From:` match + `Subject` in `h=`, and finalises.
 - The FE polls `email_recovery_status(nonce)` between calls. Terminal states are `RegistrationSucceeded` / `RecoveryReady` / `Failed` / `Expired`. Recovery flows then call `email_recovery_get_delegation(...)` (a query) for the SignedDelegation; setup flows just show "all set".
 
 This shape gives us:
@@ -713,7 +807,7 @@ A third, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry c
 
 - `kind`: `Register { anchor }` or `Recover { session_pk }`,
 - the claimed lowercased address,
-- on the **DNSSEC path**: the validated zone DNSKEYs from the skeleton chain (the chain anchored at prepare time), and the verified DMARC TXT bytes when the FE included a DMARC leaf in the bundle. Stored as raw bytes; parsing happens at `submit_dkim_leaf` time. When the DMARC TXT is absent the canister falls back to strict `d=` ↔ `From:` domain alignment per §6.3.
+- on the **DNSSEC path**: the validated `(zone_name → DNSKEY RRset)` map populated from the skeleton chain, and the verified DMARC TXT bytes when the FE included a DMARC leaf in the bundle. Stored as raw bytes; parsing happens at `submit_dkim_leaf` time. When the DMARC TXT is absent the canister falls back to strict `d=` ↔ `From:` domain alignment per §6.3. The map starts with one zone (the registered apex) for Gmail-style domains and grows at `submit_dkim_leaf` time when the DKIM resolution crosses into a different signed zone (Proton/Tutanota style — see §7.2). Bounded in size by `MAX_CHAINED_ZONES_PER_PENDING = 4`, which is more than any observed real-world DKIM CNAME chain needs.
 - on the **DoH path**: nothing extra — both DKIM and DMARC TXTs are fetched via `doh::fetch_txt` at `smtp_request` time (cache-served after the first lookup per provider per TTL window),
 - once `smtp_request` has run on a DNSSEC-path entry: a **partial-verification record** holding `{ selector, signing_domain, headers_digest (32 B), signature_blob, from_domain, claimed_address_lc }` — together ~500 B per entry. This is the minimum needed to complete DKIM signature verification once the FE submits the leaf with the public key. The body itself is dropped after `bh=` validates,
 - a `status: Pending | NeedDkimLeaf { selector } | Succeeded { outcome } | Failed { error }`,
@@ -849,14 +943,35 @@ service : {
         -> (EmailRecoveryStatus) query;
 
     // DNSSEC path only — call after polling sees `NeedDkimLeaf`. The
-    // canister validates the leaf RRset against the chain anchored at
-    // prepare time, then completes DKIM signature verification using
-    // the public key from the leaf's TXT bytes against the headers
-    // digest cached at email-arrival. State transitions to
-    // RegistrationSucceeded / RecoveryReady on success, Failed on
-    // validation/DKIM error.
+    // FE supplies the DKIM resolution as a bundle of `hops` (one or
+    // more SignedRRsets forming the CNAME chain `<sel>._domainkey.<d>`
+    // → … → final TXT) plus any *additional* delegation `chains`
+    // needed for zones that weren't already covered by the skeleton
+    // chain anchored at prepare time — the cross-zone CNAME case
+    // (Proton, Tutanota, M365 custom domains; see §7.2). For
+    // Gmail-style same-zone resolution the FE supplies a single
+    // TXT hop and an empty `chains` vec.
+    //
+    // The canister:
+    // 1. validates each new chain against the cached root DNSKEY
+    //    and merges the resulting (zone → DNSKEY) entries into the
+    //    map cached at prepare time;
+    // 2. verifies each hop under the zone its RRSIG names;
+    // 3. checks the hop sequence is a coherent CNAME → … → TXT
+    //    resolution starting at `<sel>._domainkey.<d>`;
+    // 4. completes DKIM signature verification using the public
+    //    key parsed from the final TXT against the headers digest
+    //    cached at email-arrival.
+    //
+    // State transitions to RegistrationSucceeded / RecoveryReady on
+    // success, Failed on validation/DKIM error.
     email_recovery_submit_dkim_leaf :
-        (record { nonce : text; dkim_leaf : SignedRRset })
+        (record {
+            nonce      : text;
+            hops       : vec SignedRRset;
+            extra_chains : vec DelegationChain;       // empty vec for the
+                                                      //  Gmail-style case
+        })
         -> (variant { Ok; Err : EmailRecoveryError });
 
     // After RecoveryReady, the FE fetches the SignedDelegation. The
