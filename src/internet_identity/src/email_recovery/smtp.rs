@@ -698,8 +698,16 @@ pub(super) fn bind_credential(
         created_at: now_secs.saturating_mul(1_000_000_000),
         last_used: None,
     }];
-    state::storage_borrow_mut(|storage| storage.write(a))
-        .map_err(|e| EmailRecoveryError::InternalCanisterError(format!("write anchor: {e:?}")))?;
+    state::storage_borrow_mut(|storage| storage.write(a)).map_err(|e| match e {
+        // The reverse-address index hit a "this address is already
+        // bound to a different anchor" — surface that as the
+        // user-facing error rather than the InternalCanisterError
+        // catch-all. See `Storage::update_email_recovery_lookup`.
+        crate::storage::StorageError::EmailRecoveryAddressAlreadyBound { .. } => {
+            EmailRecoveryError::AddressAlreadyRegistered
+        }
+        other => EmailRecoveryError::InternalCanisterError(format!("write anchor: {other:?}")),
+    })?;
     Ok(())
 }
 
