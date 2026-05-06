@@ -36,7 +36,9 @@ use internet_identity_interface::internet_identity::types::email_recovery::{
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
 };
-use internet_identity_interface::internet_identity::types::{DohConfig, InternetIdentityInit};
+use internet_identity_interface::internet_identity::types::{
+    DnsProofBundle, DohConfig, InternetIdentityInit,
+};
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
@@ -415,7 +417,7 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
         rrsig: stub_rrsig.clone(),
     };
     let proof = DnsProofBundle {
-        leaves: vec![stub_rrset.clone()],
+        leaf: Some(stub_rrset.clone()),
         root_dnskey: stub_rrset,
         chain: vec![DelegationLink {
             child_ds: SignedRRset {
@@ -492,7 +494,7 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
         rrsig: stub_rrsig.clone(),
     };
     let proof = DnsProofBundle {
-        leaves: vec![stub_rrset.clone()],
+        leaf: Some(stub_rrset.clone()),
         root_dnskey: stub_rrset,
         chain: vec![DelegationLink {
             child_ds: SignedRRset {
@@ -589,10 +591,18 @@ fn full_setup_flow_via_dnssec_path() {
     // 1. prepare_add with the DNS proof bundle. This synchronously
     //    walks the chain and caches the leaf TXT bytes on the
     //    pending challenge.
+    //
+    // FIXME: this test predates the two-phase rewrite — it will be
+    // updated to walk the DKIM leaf via submit_dkim_leaf separately.
+    // Today it constructs a single-leaf bundle carrying the DKIM
+    // record, matching the old prepare-time-cached-DKIM pipeline.
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
         selector: TEST_SELECTOR.into(),
-        dns_proof: Some(chain.bundle),
+        dns_proof: Some(DnsProofBundle {
+            leaf: Some(chain.dkim_leaf.clone()),
+            ..chain.skeleton.clone()
+        }),
     };
     let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
         .expect("prepare_add call failed")
@@ -1169,15 +1179,26 @@ mod dnssec_signer {
 
     pub struct ChainOut {
         pub anchor: DnssecRootAnchor,
-        pub bundle: DnsProofBundle,
+        /// Skeleton bundle (chain only, `leaf = None`). Callers
+        /// compose a full bundle for prepare/submit by cloning this
+        /// and setting `leaf` to one of `dkim_leaf` / `dmarc_leaf`.
+        pub skeleton: DnsProofBundle,
+        /// Signed DKIM leaf at `<selector>._domainkey.<domain>`,
+        /// signed under the chain's deepest zone DNSKEY.
+        pub dkim_leaf: SignedRRset,
+        /// Signed DMARC leaf at `_dmarc.<domain>`, when `dmarc_txt`
+        /// was supplied. Same zone as `dkim_leaf`.
+        pub dmarc_leaf: Option<SignedRRset>,
     }
 
-    /// Build a one-link chain (root → `<domain>`) that signs a TXT
-    /// record at `<selector>._domainkey.<domain>` carrying `dkim_txt`,
-    /// plus — when `dmarc_txt` is `Some` — a second TXT record at
-    /// `_dmarc.<domain>`. Both leaves are signed under the same zone
-    /// DNSKEY. `now_secs` is the wall-clock baseline; RRSIGs are
-    /// valid from 60 s before to 7 d after.
+    /// Build a one-link chain (root → `<domain>`) and the
+    /// corresponding signed DKIM (and optional DMARC) TXT leaves.
+    /// Returns the components separately — single-leaf
+    /// `DnsProofBundle` constraints mean callers compose the
+    /// bundle they need (skeleton + DMARC at prepare,
+    /// skeleton + DKIM at submit_dkim_leaf, etc).
+    /// `now_secs` is the wall-clock baseline; RRSIGs are valid
+    /// from 60 s before to 7 d after.
     pub fn build_chain(
         domain: &str,
         selector: &str,
@@ -1233,10 +1254,9 @@ mod dnssec_signer {
             expiration,
         );
 
-        let mut leaves = vec![dkim_leaf];
-        if let Some(dmarc) = dmarc_txt {
+        let dmarc_leaf = dmarc_txt.map(|dmarc| {
             let dmarc_owner = encode_dns_name(&format!("_dmarc.{domain}"));
-            leaves.push(sign_rrset(
+            sign_rrset(
                 &zone_key,
                 &dmarc_owner,
                 TYPE_TXT,
@@ -1244,19 +1264,21 @@ mod dnssec_signer {
                 count_labels(&dmarc_owner),
                 inception,
                 expiration,
-            ));
-        }
+            )
+        });
 
         ChainOut {
             anchor: make_anchor(&root_key),
-            bundle: DnsProofBundle {
-                leaves,
+            skeleton: DnsProofBundle {
+                leaf: None,
                 root_dnskey,
                 chain: vec![DelegationLink {
                     child_ds,
                     child_dnskey,
                 }],
             },
+            dkim_leaf,
+            dmarc_leaf,
         }
     }
 
