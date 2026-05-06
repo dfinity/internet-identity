@@ -527,8 +527,12 @@ type EmailRecoveryChallenge = record {
 
 type EmailRecoveryDnsInput = record {
     address : text;
-    selector : text;
     dns_proof : opt DnsProofBundle;
+};
+
+type EmailRecoverySubmitDkimLeafArg = record {
+    nonce : text;
+    dkim_leaf : SignedRRset;
 };
 
 // DNSSEC proof bundle and supporting types — see
@@ -572,7 +576,8 @@ type EmailRecoveryError = variant {
     DohFetchFailed : text;
     DomainNotSupported : text;
     EmailVerificationFailed : text;
-    SelectorMismatch;
+    DkimLeafMismatch;
+    NoDkimLeafExpected;
     AddressMismatch;
     SubjectNotSigned;
     AddressAlreadyRegistered;
@@ -582,6 +587,7 @@ type EmailRecoveryError = variant {
 
 type EmailRecoveryStatus = variant {
     Pending;
+    NeedDkimLeaf : record { selector : text };
     RegistrationSucceeded;
     RecoveryReady : record {
         user_key : UserKey;
@@ -1404,6 +1410,7 @@ service : (opt InternetIdentityInit) -> {
     // a delegation from a verified email) lands in a follow-up PR.
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
+    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 
     // SMTP gateway protocol
