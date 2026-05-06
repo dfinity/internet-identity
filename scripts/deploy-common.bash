@@ -179,6 +179,10 @@ parse_common_args() {
     NO_CHECKS=false
     UPDATE_EMAIL_RECOVERY_INIT=false
     DOH_DOMAINS_ARG=""
+    # Distinguishes "--doh-domains was not passed" (use the curated
+    # default) from "--doh-domains '' was passed" (operator wants the
+    # empty list to disable the DoH path entirely).
+    DOH_DOMAINS_ARG_SET=false
     REMAINING_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -283,10 +287,11 @@ parse_common_args() {
             --doh-domains)
                 shift
                 if [ $# -eq 0 ]; then
-                    echo "Error: --doh-domains requires a comma-separated list" >&2
+                    echo "Error: --doh-domains requires a comma-separated list (use '' to disable DoH)" >&2
                     return 1
                 fi
                 DOH_DOMAINS_ARG="$1"
+                DOH_DOMAINS_ARG_SET=true
                 shift
                 ;;
             --)
@@ -619,14 +624,17 @@ EOF
 }
 
 # Internal: render the DoH allowlist as Candid `opt opt DohConfig`.
-# Reads either DOH_DOMAINS_ARG (when --doh-domains was passed) or
-# the static DEFAULT_DOH_ALLOWED_DOMAINS list. An empty list still
-# emits the record (with `allowed_domains = vec {}`), which the
-# canister treats as "no domain may use the DoH path".
+# - `--doh-domains` not passed → use DEFAULT_DOH_ALLOWED_DOMAINS.
+# - `--doh-domains foo,bar` → that list.
+# - `--doh-domains ''` → empty list, which the canister treats as
+#   "no domain may use the DoH path" (DNSSEC-only).
 _be_doh_config_candid() {
     local -a domains
-    if [ -n "$DOH_DOMAINS_ARG" ]; then
+    if [ "$DOH_DOMAINS_ARG_SET" = true ]; then
         # Comma-separated list → array. Trim whitespace per element.
+        # An empty string yields a single empty element, which we drop
+        # in the rendering loop below — so `--doh-domains ''` emits
+        # `allowed_domains = vec { };`.
         IFS=',' read -ra domains <<< "$DOH_DOMAINS_ARG"
         local i
         for i in "${!domains[@]}"; do
