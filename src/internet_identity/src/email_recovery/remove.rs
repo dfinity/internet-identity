@@ -18,12 +18,12 @@
 //!   "Remove `alice@gmail.com`?" and on confirm passes the same
 //!   string back. Mismatch → `NotRegistered`. This keeps the FE
 //!   honest if it ever caches a stale list.
-//! - We emit a typed `Operation::EmailRecoveryRemove` for the archive
-//!   stream so removals show up in the audit log alongside passkey /
-//!   recovery-phrase removals. *(TODO: until that operation variant
-//!   lands in the archive types, we map onto the existing
-//!   `Operation::IdentityMetadataReplace` placeholder so the archive
-//!   call still succeeds.)*
+//! - We emit `Operation::RemoveEmailRecovery` for the archive
+//!   stream so removals show up in the audit log alongside passkey
+//!   and recovery-phrase removals. The variant carries no payload —
+//!   the anchor + timestamp on the surrounding archive entry are
+//!   enough for "who changed their recovery email when?" analytics
+//!   without leaking the address itself.
 
 use crate::storage::anchor::Anchor;
 use internet_identity_interface::archive::types::Operation;
@@ -59,13 +59,7 @@ pub fn remove_credential(anchor: &mut Anchor, address: &str) -> Result<Operation
 
     anchor.email_recovery.remove(position);
 
-    // TODO(email-recovery): once the archive `Operation` enum gains
-    // an `EmailRecoveryRemove` variant, switch to it. Using the
-    // metadata-replace placeholder here keeps the type-checker happy
-    // without inventing new variants on a separate PR's surface.
-    Ok(Operation::IdentityMetadataReplace {
-        metadata_keys: vec![],
-    })
+    Ok(Operation::RemoveEmailRecovery)
 }
 
 #[cfg(test)]

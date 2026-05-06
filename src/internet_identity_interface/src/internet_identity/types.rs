@@ -426,6 +426,11 @@ pub struct OidcConfig {
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),
+    /// The caller authenticated via an email-recovery delegation.
+    /// Carries the lowercased canonical address whose binding on the
+    /// anchor produced the matching principal — `activity_bookkeeping`
+    /// uses it to bump `last_used` on the credential.
+    EmailRecoveryAddress(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

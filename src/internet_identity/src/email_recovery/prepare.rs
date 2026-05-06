@@ -4,8 +4,8 @@
 //! the verification path (DNSSEC if a skeleton bundle is supplied,
 //! DoH allowlist otherwise), draws a fresh nonce from the heap PRNG,
 //! and parks a `PendingChallenge` keyed by that nonce. Returns the
-//! user-visible challenge (nonce + expiry) so the FE can render
-//! the "send a magic email" screen.
+//! user-visible challenge (nonce + mailbox + expiry) so the FE can
+//! render the "send a magic email" screen.
 //!
 //! See `docs/ongoing/email-recovery.md` §8.4. Two-phase path picker:
 //!
@@ -29,7 +29,7 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
 };
-use internet_identity_interface::internet_identity::types::AnchorNumber;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
 /// Body of the canister method
 /// `email_recovery_credential_prepare_add(anchor, dns_input)`.
@@ -46,6 +46,58 @@ pub async fn prepare_add(
     anchor: AnchorNumber,
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
+) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+    prepare_common(
+        dns_input,
+        now_secs,
+        PendingKind::Register { anchor },
+        super::SETUP_MAILBOX,
+    )
+    .await
+}
+
+/// Body of `email_recovery_prepare_delegation(dns_input, session_pk)`.
+///
+/// Anonymous: anyone can call this. The `session_pk` is a fresh
+/// public key the FE just generated; the eventual delegation will be
+/// bound to it. The pending challenge holds it until
+/// `submit_dkim_leaf` succeeds, at which point the canister stamps a
+/// delegation seed and adds the matching canister-signature.
+pub async fn prepare_delegation(
+    dns_input: EmailRecoveryDnsInput,
+    session_pk: SessionKey,
+    now_secs: u64,
+) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+    // Cap the FE-supplied `session_pk` length. The pending entry
+    // holds this for up to 30 minutes; without a bound an open
+    // caller could inflate every challenge they prepare. Real
+    // session keys are well under 1 KB regardless of algorithm
+    // (Ed25519 ~44 bytes, ECDSA P-256 ~91, RSA-2048 ~294).
+    if session_pk.len() > super::MAX_SESSION_KEY_BYTES {
+        return Err(EmailRecoveryError::InternalCanisterError(format!(
+            "session_pk is {} bytes, exceeds the {}-byte limit",
+            session_pk.len(),
+            super::MAX_SESSION_KEY_BYTES,
+        )));
+    }
+    prepare_common(
+        dns_input,
+        now_secs,
+        PendingKind::Recover { session_pk },
+        super::RECOVERY_MAILBOX,
+    )
+    .await
+}
+
+/// Shared input-validation + nonce-issuing core. `kind` parametrises
+/// over which flow we're starting; `mailbox` is the recipient string
+/// returned to the FE so the wizard can render "send your email
+/// to ...".
+async fn prepare_common(
+    dns_input: EmailRecoveryDnsInput,
+    now_secs: u64,
+    kind: PendingKind,
+    mailbox: &str,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
     let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
 
@@ -120,7 +172,7 @@ pub async fn prepare_add(
     };
 
     let challenge = PendingChallenge {
-        kind: PendingKind::Register { anchor },
+        kind,
         claimed_address: address,
         registered_domain,
         created_at_secs: now_secs,
@@ -128,11 +180,13 @@ pub async fn prepare_add(
         cached_dmarc_txt,
         partial_verification: None,
         status: PendingStatus::Pending,
+        recovery_outcome: None,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
 
     Ok(EmailRecoveryChallenge {
         nonce,
+        mailbox: mailbox.to_string(),
         // `Timestamp` is nanoseconds since epoch in this crate (see
         // `internet_identity_interface::types`). We work in seconds
         // internally for the TTL math and convert at the wire boundary.
@@ -185,79 +239,46 @@ fn verify_dnssec_skeleton(
     // for the From<> impls.)
     let bundle: crate::dnssec::DnsProofBundle = proof.into();
 
-    // The skeleton bundle covers a single signing zone (the
-    // registered domain) and at most one hop (the optional DMARC
-    // TXT at `_dmarc.<registered_domain>`). A DKIM leaf in the
-    // skeleton would let an attacker who got a different TXT
-    // validated under the same chain smuggle it through here, so we
-    // reject anything other than zero or one hops.
-    if bundle.hops.len() > 1 {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-            "skeleton bundle has {} hops; expected 0 (no DMARC) or 1 (DMARC TXT)",
-            bundle.hops.len()
-        )));
-    }
-
-    // Step 1: validate the root DNSKEY against trust anchors +
-    // RRSIG freshness.
-    crate::dnssec::verify_root_dnskey_with_clock(&bundle.root_dnskey, &trust_anchors, now_secs)
+    // Validate the chain (root + delegations); produces the
+    // deepest-zone DNSKEY RRset that we cache for later leaf
+    // admission. `bundle.leaf` is *not* consulted here.
+    let zone_dnskey = crate::dnssec::verify_chain_with_clock(&bundle, &trust_anchors, now_secs)
         .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
 
-    // Step 2: walk the delegation chain(s); the deepest zone's
-    // DNSKEY RRset is what we cache for later leaf admission.
-    let mut zones = crate::dnssec::ZoneKeysMap::new();
-    crate::dnssec::verify_extra_chains_with_clock(
-        &bundle.chains,
-        &bundle.root_dnskey,
-        &mut zones,
-        now_secs,
-    )
-    .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
-
-    // Extract the single zone's DNSKEY for the cache. The skeleton
-    // case is one chain → one zone; multi-zone bundles (CNAME) are
-    // a follow-up PR.
-    let zone_dnskey = zones
-        .iter()
-        .next()
-        .map(|(_, k)| k.clone())
-        .ok_or_else(|| {
-            EmailRecoveryError::EmailVerificationFailed(
-                "skeleton bundle produced no validated zones".into(),
-            )
-        })?;
-
-    // Step 3 (optional): validate the DMARC hop and cache the TXT.
+    // Optional DMARC leaf: if present, validate against the same
+    // chain and cache the TXT bytes.
     let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
-    let dmarc = if bundle.hops.is_empty() {
-        None
-    } else {
-        let requested_name = bundle.hops[0].name.clone();
-        let verified = crate::dnssec::verify_hops_with_clock(
-            &bundle.hops,
-            &zones,
-            &requested_name,
-            crate::dnssec::TYPE_TXT,
-            now_secs,
-        )
-        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}")))?;
-        let leaf_name = decode_dns_name_lowercase(&verified.name.0);
-        if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                "skeleton bundle leaf name {leaf_name:?} is not the expected \
-                 DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"
-            )));
+    let dmarc = match bundle.leaf.as_ref() {
+        None => None,
+        Some(leaf) => {
+            let verified = crate::dnssec::verify_leaf_against_dnskey(leaf, &zone_dnskey, now_secs)
+                .map_err(|e| {
+                    EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}"))
+                })?;
+            if verified.rtype != crate::dnssec::types::TYPE_TXT {
+                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                    "skeleton bundle leaf is not TXT (got rtype {})",
+                    verified.rtype
+                )));
+            }
+            let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+            if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
+                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                    "skeleton bundle leaf name {leaf_name:?} is not the expected \
+                     DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"
+                )));
+            }
+            let txt = parse_txt_rdata(&verified.rdata)?;
+            if txt.len() > super::MAX_DMARC_TXT_BYTES {
+                return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                    "DMARC TXT record at {leaf_name:?} is {} bytes; \
+                     refusing to cache more than {} bytes per pending entry",
+                    txt.len(),
+                    super::MAX_DMARC_TXT_BYTES,
+                )));
+            }
+            Some(txt)
         }
-        let txt = parse_txt_rdata(&verified.rdata)?;
-        if txt.len() > super::MAX_DMARC_TXT_BYTES {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                "DMARC TXT record at {leaf_name:?} is {} bytes; \
-                 refusing to cache more than {} bytes per pending entry",
-                txt.len(),
-                super::MAX_DMARC_TXT_BYTES,
-            )));
-        }
-        Some(txt)
     };
 
     Ok(DnssecExtracted { zone_dnskey, dmarc })
@@ -487,6 +508,7 @@ mod tests {
         let challenge = result.expect("expected Ok");
 
         assert!(challenge.nonce.starts_with(super::super::NONCE_PREFIX));
+        assert_eq!(challenge.mailbox, super::super::SETUP_MAILBOX);
         // expires_at is in nanoseconds since epoch; we passed
         // now_secs = 1_000.
         assert_eq!(

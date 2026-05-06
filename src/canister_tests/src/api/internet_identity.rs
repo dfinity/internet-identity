@@ -607,6 +607,28 @@ pub fn email_recovery_status(
     query_candid(env, canister_id, "email_recovery_status", (nonce,)).map(|(x,)| x)
 }
 
+pub fn email_recovery_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    dns_input: types::email_recovery::EmailRecoveryDnsInput,
+    session_key: types::SessionKey,
+) -> Result<
+    Result<
+        types::email_recovery::EmailRecoveryChallenge,
+        types::email_recovery::EmailRecoveryError,
+    >,
+    RejectResponse,
+> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "email_recovery_prepare_delegation",
+        (dns_input, session_key),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn email_recovery_submit_dkim_leaf(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -623,6 +645,17 @@ pub fn email_recovery_submit_dkim_leaf(
         (arg,),
     )
     .map(|(x,)| x)
+}
+
+pub fn email_recovery_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    args: types::email_recovery::EmailRecoveryGetDelegationArgs,
+) -> Result<
+    Result<types::SignedDelegation, types::email_recovery::EmailRecoveryError>,
+    RejectResponse,
+> {
+    query_candid(env, canister_id, "email_recovery_get_delegation", (args,)).map(|(x,)| x)
 }
 
 pub fn email_recovery_credential_remove(

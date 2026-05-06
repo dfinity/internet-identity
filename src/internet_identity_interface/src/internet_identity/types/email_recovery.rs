@@ -37,7 +37,9 @@
 //!    verification finishes inside that one call — no `submit_leaf`
 //!    follow-up needed.
 
-use crate::internet_identity::types::{DnsProofBundle, SignedRRset, Timestamp, UserKey};
+use crate::internet_identity::types::{
+    AnchorNumber, DnsProofBundle, SignedRRset, Timestamp, UserKey,
+};
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
 use serde_bytes::ByteBuf;
@@ -256,10 +258,14 @@ pub enum EmailRecoveryStatus {
     RegistrationSucceeded,
     /// Recovery succeeded. The FE follows up with
     /// `email_recovery_get_delegation(nonce, session_key, expiration)`
-    /// to retrieve the actual `SignedDelegation`.
+    /// to retrieve the actual `SignedDelegation`. The `anchor_number`
+    /// is included so the FE can seed its auth store without making a
+    /// separate lookup call — the canister already resolved it from
+    /// the verified `From:` at submit-leaf time.
     RecoveryReady {
         user_key: UserKey,
         expiration: Timestamp,
+        anchor_number: AnchorNumber,
     },
     /// Verification failed. The FE shows the granular reason and
     /// offers a retry.

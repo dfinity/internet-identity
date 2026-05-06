@@ -10,10 +10,11 @@
 //! random-nonce-only key (untargetability) and bound the map size
 //! (eviction is benign for both legitimate users and attackers).
 
+use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryError, EmailRecoveryStatus,
 };
-use internet_identity_interface::internet_identity::types::AnchorNumber;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey, Timestamp};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -67,6 +68,33 @@ pub struct PendingChallenge {
     /// variant (DoH path, or `submit_dkim_leaf` outcome). Terminal
     /// variants are sticky.
     pub status: PendingStatus,
+    /// Set on the recovery path when the verification pipeline
+    /// completes successfully. Stored here (rather than as a payload
+    /// on `PendingStatus`) so `PendingStatus` stays a flat enum and so
+    /// `email_recovery_get_delegation` can recover the seed without
+    /// recomputing it. `None` on the setup path.
+    pub recovery_outcome: Option<RecoveryOutcome>,
+}
+
+/// Cached output of a successful recovery flow. Used to answer
+/// `email_recovery_status` (which returns `RecoveryReady { user_key,
+/// expiration, anchor_number }`) and to look up the
+/// canister-signature in `email_recovery_get_delegation` (the `seed`
+/// is what the canister-sig store is keyed by).
+#[derive(Clone, Debug)]
+pub struct RecoveryOutcome {
+    pub user_key: Vec<u8>,
+    pub expiration: Timestamp,
+    /// The anchor the verified `From:` was bound to. Surfaced back
+    /// to the FE in `RecoveryReady` so the auth store can be seeded
+    /// without an extra lookup hop.
+    pub anchor_number: AnchorNumber,
+    /// `H(salt || "email-recovery" || lowercase(address) || anchor)`,
+    /// computed at submit-leaf time. Cached so `get_delegation` can
+    /// ask the signature store for the signed delegation without
+    /// re-deriving from the anchor (which it'd have to look up by
+    /// hash).
+    pub seed: Hash,
 }
 
 /// What the canister stashes between email arrival and DKIM-leaf
@@ -122,7 +150,12 @@ pub enum PendingKind {
     /// Setup flow — caller is authenticated; the email-recovery
     /// credential will be written to this anchor on success.
     Register { anchor: AnchorNumber },
-    // `Recover { session_pk }` is added by the recovery follow-up PR.
+    /// Recovery flow — caller is anonymous. The anchor is resolved
+    /// at submit-leaf time from the verified `From:` of the inbound
+    /// email (via the `address → AnchorNumber` reverse index). The
+    /// cached `session_pk` is what the eventual delegation will be
+    /// bound to.
+    Recover { session_pk: SessionKey },
 }
 
 /// Status the FE polls. The terminal variants (`Succeeded`,
@@ -202,8 +235,22 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
                 PendingStatus::NeedDkimLeaf { selector } => EmailRecoveryStatus::NeedDkimLeaf {
                     selector: selector.clone(),
                 },
-                PendingStatus::Succeeded => match &c.kind {
-                    PendingKind::Register { .. } => EmailRecoveryStatus::RegistrationSucceeded,
+                PendingStatus::Succeeded => match (&c.kind, &c.recovery_outcome) {
+                    (PendingKind::Register { .. }, _) => EmailRecoveryStatus::RegistrationSucceeded,
+                    (PendingKind::Recover { .. }, Some(outcome)) => {
+                        EmailRecoveryStatus::RecoveryReady {
+                            user_key: serde_bytes::ByteBuf::from(outcome.user_key.clone()),
+                            expiration: outcome.expiration,
+                            anchor_number: outcome.anchor_number,
+                        }
+                    }
+                    // Recover succeeded without a cached outcome →
+                    // canister bug. Fail closed so the FE retries.
+                    (PendingKind::Recover { .. }, None) => {
+                        EmailRecoveryStatus::Failed(EmailRecoveryError::InternalCanisterError(
+                            "Recover challenge marked Succeeded without outcome".into(),
+                        ))
+                    }
                 },
                 PendingStatus::Failed(e) => EmailRecoveryStatus::Failed(e.clone()),
                 PendingStatus::Expired => EmailRecoveryStatus::Expired,
@@ -289,6 +336,7 @@ mod tests {
             cached_dmarc_txt: None,
             partial_verification: None,
             status: PendingStatus::Pending,
+            recovery_outcome: None,
         }
     }
 

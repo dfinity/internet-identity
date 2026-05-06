@@ -551,9 +551,20 @@ export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
   { 'DomainNotAllowlisted' : string } |
   { 'SubjectNotSigned' : null } |
   { 'AddressAlreadyRegistered' : null };
+export interface EmailRecoveryGetDelegationArgs {
+  'session_key' : SessionKey,
+  'expiration' : Timestamp,
+  'nonce' : string,
+}
 export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'NeedDkimLeaf' : { 'selector' : string } } |
-  { 'RecoveryReady' : { 'user_key' : UserKey, 'expiration' : Timestamp } } |
+  {
+    'RecoveryReady' : {
+      'user_key' : UserKey,
+      'expiration' : Timestamp,
+      'anchor_number' : IdentityNumber,
+    }
+  } |
   { 'RegistrationSucceeded' : null } |
   { 'Expired' : null } |
   { 'Pending' : null };
@@ -788,6 +799,12 @@ export interface IdentityInfo {
    */
   'metadata' : MetadataMapV2,
   'name' : [] | [string],
+  /**
+   * The email-recovery credential bound to this anchor, if any.
+   * Lets the FE render the recovery-email card's active vs.
+   * inactive state without a separate query.
+   */
+  'email_recovery' : [] | [EmailRecoveryCredential],
   /**
    * The timestamp at which the anchor was created
    */
@@ -1549,6 +1566,16 @@ export interface _SERVICE {
   'email_recovery_credential_remove' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_get_delegation' : ActorMethod<
+    [EmailRecoveryGetDelegationArgs],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_prepare_delegation' : ActorMethod<
+    [EmailRecoveryDnsInput, SessionKey],
+    { 'Ok' : EmailRecoveryChallenge } |
       { 'Err' : EmailRecoveryError }
   >,
   'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,

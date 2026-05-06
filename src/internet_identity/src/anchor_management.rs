@@ -63,13 +63,29 @@ pub fn activity_bookkeeping(anchor: &mut Anchor, current_authorization_key: &Aut
     activity_stats::update_activity_stats(anchor, current_authorization_key);
     match current_authorization_key {
         AuthorizationKey::DeviceKey(device_key) => {
-            anchor.set_device_usage_timestamp(device_key, time())
+            anchor
+                .set_device_usage_timestamp(device_key, time())
+                .expect("unable to update last usage timestamp");
         }
         AuthorizationKey::OpenIdCredentialKey((openid_credential_key, _)) => {
-            anchor.set_openid_credential_usage_timestamp(openid_credential_key, time())
+            anchor
+                .set_openid_credential_usage_timestamp(openid_credential_key, time())
+                .expect("unable to update last usage timestamp");
+        }
+        AuthorizationKey::EmailRecoveryAddress(address) => {
+            // Bump `last_used` on the matching credential. No-op if
+            // the credential was removed between authz and now (we
+            // checked authorization moments ago, so this is unlikely
+            // but possible across concurrent canister calls).
+            if let Some(credential) = anchor
+                .email_recovery
+                .iter_mut()
+                .find(|c| c.address.eq_ignore_ascii_case(address))
+            {
+                credential.last_used = Some(time());
+            }
         }
     }
-    .expect("unable to update last usage timestamp");
 }
 
 /// Handles all the bookkeeping required after a successful anchor operation:
