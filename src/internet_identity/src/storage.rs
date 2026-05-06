@@ -762,7 +762,10 @@ impl<M: Memory + Clone> Storage<M> {
                 anchor_number,
                 previous_email_address.as_deref(),
                 current_email_address.as_deref(),
-            );
+            )
+            .map_err(|existing_anchor| {
+                StorageError::EmailRecoveryAddressAlreadyBound { existing_anchor }
+            })?;
         }
 
         Ok(())
@@ -976,12 +979,30 @@ impl<M: Memory + Clone> Storage<M> {
     /// `(None, None)` is a no-op. The two operations are sequenced
     /// so that during a swap the old entry is removed before the new
     /// one is written; an interleaving observer never sees both.
+    ///
+    /// Returns `Err(other_anchor)` if `current` is already bound to a
+    /// different anchor — this enforces the "one anchor per address"
+    /// invariant from design §8.2 at the storage layer regardless of
+    /// what the caller checked. The caller is expected to surface
+    /// `AddressAlreadyRegistered` (setup) or `AddressNotRegistered`
+    /// (recovery) to the FE.
     pub fn update_email_recovery_lookup(
         &mut self,
         anchor_number: AnchorNumber,
         previous: Option<&str>,
         current: Option<&str>,
-    ) {
+    ) -> Result<(), AnchorNumber> {
+        // Enforce "one anchor per address" before mutating anything.
+        // Same-anchor rebinds are idempotent (the API uses this to
+        // re-confirm a binding); cross-anchor rebinds are rejected.
+        if let Some(curr) = current {
+            let hash = StorableEmailRecoveryAddressHash::of(curr);
+            if let Some(existing) = self.lookup_anchor_with_email_recovery_memory.get(&hash) {
+                if existing != anchor_number {
+                    return Err(existing);
+                }
+            }
+        }
         if let Some(prev) = previous {
             let hash = StorableEmailRecoveryAddressHash::of(prev);
             self.lookup_anchor_with_email_recovery_memory.remove(&hash);
@@ -991,6 +1012,7 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchor_with_email_recovery_memory
                 .insert(hash, anchor_number);
         }
+        Ok(())
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
@@ -2149,6 +2171,13 @@ pub enum StorageError {
         application_number: ApplicationNumber,
     },
     ErrorUpdatingAccountCounter,
+    /// Tried to bind a recovery email that's already on a different
+    /// anchor. The "one anchor per address" invariant from design
+    /// §8.2 is enforced at the storage layer; the caller surfaces
+    /// `EmailRecoveryError::AddressAlreadyRegistered`.
+    EmailRecoveryAddressAlreadyBound {
+        existing_anchor: AnchorNumber,
+    },
 }
 
 impl fmt::Display for StorageError {
@@ -2204,6 +2233,10 @@ impl fmt::Display for StorageError {
                 "Origin not found for application number {application_number}",
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
+            Self::EmailRecoveryAddressAlreadyBound { existing_anchor } => write!(
+                f,
+                "recovery email is already bound to a different anchor ({existing_anchor})",
+            ),
         }
     }
 }
