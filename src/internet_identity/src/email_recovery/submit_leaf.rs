@@ -163,9 +163,12 @@ fn run_submit(
     // against the canister's trust anchors; the chain is implicit
     // here.
     let leaf_internal: crate::dnssec::SignedRRset = dkim_leaf.clone().into();
-    let verified =
-        crate::dnssec::verify_leaf_against_dnskey(&leaf_internal, &snapshot.cached_zone_dnskey, now_secs)
-            .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+    let verified = crate::dnssec::verify_leaf_against_dnskey(
+        &leaf_internal,
+        &snapshot.cached_zone_dnskey,
+        now_secs,
+    )
+    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
 
     // Step 2: confirm the leaf's owner name and rtype.
     if verified.rtype != crate::dnssec::types::TYPE_TXT {
@@ -251,7 +254,7 @@ fn run_submit(
         .from_address_lc
         .rsplit_once('@')
         .map(|(_, d)| d.to_string())
-        .ok_or_else(|| EmailRecoveryError::AddressMismatch)?;
+        .ok_or(EmailRecoveryError::AddressMismatch)?;
     if let Some(dmarc_bytes) = &snapshot.cached_dmarc_txt {
         let dmarc_str = std::str::from_utf8(dmarc_bytes).map_err(|_| {
             EmailRecoveryError::EmailVerificationFailed("cached DMARC is not valid UTF-8".into())
@@ -267,10 +270,7 @@ fn run_submit(
         }
     } else {
         // No DMARC published — strict equality.
-        if !snapshot
-            .signing_domain
-            .eq_ignore_ascii_case(&from_domain)
-        {
+        if !snapshot.signing_domain.eq_ignore_ascii_case(&from_domain) {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "no DMARC published; DKIM d={} must equal From={}",
                 snapshot.signing_domain, from_domain

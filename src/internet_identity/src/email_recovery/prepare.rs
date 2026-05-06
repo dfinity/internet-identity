@@ -198,10 +198,10 @@ fn verify_dnssec_skeleton(
     let dmarc = match bundle.leaf.as_ref() {
         None => None,
         Some(leaf) => {
-            let verified =
-                crate::dnssec::verify_leaf_against_dnskey(leaf, &zone_dnskey, now_secs).map_err(
-                    |e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}")),
-                )?;
+            let verified = crate::dnssec::verify_leaf_against_dnskey(leaf, &zone_dnskey, now_secs)
+                .map_err(|e| {
+                    EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}"))
+                })?;
             if verified.rtype != crate::dnssec::types::TYPE_TXT {
                 return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                     "skeleton bundle leaf is not TXT (got rtype {})",

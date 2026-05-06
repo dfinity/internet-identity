@@ -151,11 +151,12 @@ pub struct EmailRecoveryDnsInput {
 /// just-arrived email's DKIM-Signature header.
 ///
 /// The canister already cached the validated zone DNSKEY at prepare
-/// time and the partial-verification record (signed-headers digest
-/// + signature blob) at email-arrival time. This call admits the
-/// leaf against the cached DNSKEY, parses the DKIM TXT to recover
-/// the public key, and finishes the signature check using the
-/// cached digest and signature. See design doc §8.4 / §8.5.
+/// time and the partial-verification record (the signed-headers
+/// digest and the signature blob) at email-arrival time. This call
+/// admits the leaf against the cached DNSKEY, parses the DKIM TXT
+/// to recover the public key, and finishes the signature check
+/// using the cached digest and signature. See design doc §8.4 /
+/// §8.5.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct EmailRecoverySubmitDkimLeafArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`

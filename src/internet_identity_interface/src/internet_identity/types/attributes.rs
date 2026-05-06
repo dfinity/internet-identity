@@ -2172,9 +2172,7 @@ mod tests {
             match err {
                 PrepareIcrc3AttributeError::ValidationError { problems } => {
                     assert!(
-                        problems
-                            .iter()
-                            .any(|p| p.contains("not related to origin")),
+                        problems.iter().any(|p| p.contains("not related to origin")),
                         "expected 'not related to origin' problem, got {:?}",
                         problems
                     );
