@@ -51,12 +51,17 @@ export async function dohQuery(
   const dnsParam = base64UrlEncode(queryBytes);
 
   for (const endpoint of DOH_ENDPOINTS) {
+    // AbortController + setTimeout matches the rest of the FE
+    // (`lib/utils/ssoDiscovery.ts`); we avoid `AbortSignal.timeout`
+    // because the project still supports browsers without it.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOH_TIMEOUT_MS);
     try {
       const url = `${endpoint}?dns=${dnsParam}`;
       const res = await fetch(url, {
         method: "GET",
         headers: { Accept: "application/dns-message" },
-        signal: AbortSignal.timeout(DOH_TIMEOUT_MS),
+        signal: controller.signal,
       });
       if (!res.ok) {
         continue;
@@ -83,6 +88,8 @@ export async function dohQuery(
       return msg;
     } catch {
       // Network / timeout / parse error — try the next provider.
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
   return undefined;

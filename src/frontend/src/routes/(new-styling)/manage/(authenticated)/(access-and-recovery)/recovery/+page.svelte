@@ -26,6 +26,7 @@
   import InactiveEmailRecovery from "./components/InactiveEmailRecovery.svelte";
   import ActiveEmailRecovery from "./components/ActiveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
+  import type { EmailRecoveryDnsInput } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
@@ -256,16 +257,13 @@
   // -------------------------------------------------------------
 
   /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-  const prepareAddEmail = async (input: any) => {
-    const result = await $authenticatedStore.actor.email_recovery_credential_prepare_add(
-      $authenticatedStore.identityNumber,
-      input,
-    );
-    if ("Err" in result) {
-      throw new Error(JSON.stringify(result.Err));
-    }
-    return result.Ok;
-  };
+  const prepareAddEmail = async (input: EmailRecoveryDnsInput) =>
+    $authenticatedStore.actor
+      .email_recovery_credential_prepare_add(
+        $authenticatedStore.identityNumber,
+        input,
+      )
+      .then(throwCanisterError);
 
   /** Anonymous wrapper around `email_recovery_status` (query). */
   const statusEmailRecovery = async (nonce: string) => {

@@ -150,6 +150,7 @@
             nonce,
             result.RecoveryReady.user_key,
             result.RecoveryReady.expiration,
+            result.RecoveryReady.anchor_number,
             sessionIdentity,
           );
           return;
@@ -170,6 +171,7 @@
     nonce: string,
     userKey: Uint8Array | number[],
     expiration: bigint,
+    identityNumber: bigint,
     sessionIdentity: ECDSAKeyIdentity,
   ) => {
     try {
@@ -181,7 +183,7 @@
         session_key: sessionPublicKey,
         expiration,
       });
-      await onSignedIn({ sessionIdentity, userKey, delegation });
+      await onSignedIn({ sessionIdentity, userKey, delegation, identityNumber });
     } catch (e) {
       stage = {
         kind: "failed",
