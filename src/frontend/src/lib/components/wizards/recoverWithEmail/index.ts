@@ -1,6 +1,4 @@
-export {
-  default as RecoverWithEmailWizard,
-} from "./RecoverWithEmailWizard.svelte";
+export { default as RecoverWithEmailWizard } from "./RecoverWithEmailWizard.svelte";
 
 import type { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import type { SignedDelegation } from "$lib/generated/internet_identity_types";

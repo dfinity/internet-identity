@@ -27,9 +27,7 @@ import type { Rrsig } from "$lib/generated/internet_identity_types";
 
 export function parseRrsigRdata(rdata: Uint8Array): Rrsig {
   if (rdata.length < 18) {
-    throw new Error(
-      `RRSIG RDATA too short: ${rdata.length} bytes (need ≥ 18)`,
-    );
+    throw new Error(`RRSIG RDATA too short: ${rdata.length} bytes (need ≥ 18)`);
   }
   const typeCovered = (rdata[0] << 8) | rdata[1];
   const algorithm = rdata[2];

@@ -55,8 +55,13 @@
     onCancel: () => void;
   }
 
-  const { prepareDelegation, status, getDelegation, onSignedIn, onCancel }: Props =
-    $props();
+  const {
+    prepareDelegation,
+    status,
+    getDelegation,
+    onSignedIn,
+    onCancel,
+  }: Props = $props();
 
   type Stage =
     | { kind: "enter"; initialError?: string }
@@ -183,7 +188,12 @@
         session_key: sessionPublicKey,
         expiration,
       });
-      await onSignedIn({ sessionIdentity, userKey, delegation, identityNumber });
+      await onSignedIn({
+        sessionIdentity,
+        userKey,
+        delegation,
+        identityNumber,
+      });
     } catch (e) {
       stage = {
         kind: "failed",

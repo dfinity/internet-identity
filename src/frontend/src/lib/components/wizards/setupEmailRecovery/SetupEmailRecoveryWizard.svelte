@@ -31,9 +31,7 @@
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-    prepare: (
-      input: EmailRecoveryDnsInput,
-    ) => Promise<EmailRecoveryChallenge>;
+    prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
     /** Anonymous wrapper around `email_recovery_status` (query). */
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
     /** Wizard close — called on user-initiated cancel and on `Done`. */
