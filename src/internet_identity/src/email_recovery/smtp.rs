@@ -51,7 +51,8 @@ use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryCredential, EmailRecoveryError,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
+    smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
+    SMTP_ERR_SYNTAX_ERROR,
 };
 use internet_identity_interface::internet_identity::types::AnchorNumber;
 
@@ -75,6 +76,52 @@ fn recipient_matches(
     expected_domain: &str,
 ) -> bool {
     to.user.eq_ignore_ascii_case(expected_user) && to.domain.eq_ignore_ascii_case(expected_domain)
+}
+
+/// Query-mode counterpart to [`handle_smtp_request`]. The off-chain
+/// SMTP gateway calls this at `RCPT TO` time — *before* it pulls
+/// the message body from the sending MTA — to decide whether to
+/// accept the connection at all.
+///
+/// We must answer here with a 5xx for any recipient we don't intend
+/// to handle, otherwise the gateway will accept the message, pull
+/// the body, and forward it to `smtp_request` (where we'd silently
+/// drop it). That wastes the sender's bandwidth and, more
+/// importantly, gives no SMTP-level signal that the address is
+/// invalid — the sender's MTA never sees a bounce.
+///
+/// Accepts:
+///
+/// - `register@id.ai` (case-insensitive) — setup flow.
+/// - `recover@id.ai` (case-insensitive) — recovery flow. The
+///   recipient is recognised here even on the storage-and-smtp PR
+///   where the actual handler lives in a follow-up: a query that
+///   says "yes, accept this address" is harmless without the
+///   handler, and gating the gateway accept on the recovery PR
+///   would force a deploy-step ordering we don't otherwise need.
+///
+/// Everything else gets a 550 (mailbox unavailable). The query is
+/// open — anyone can call it — but it has no side effects and
+/// leaks nothing beyond the two recipient labels themselves, both
+/// of which are documented in the design doc.
+pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
+    if let Err(e) = validate_smtp_request(&request) {
+        return e;
+    }
+    let envelope = match request.envelope.as_ref() {
+        Some(e) => e,
+        None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
+    };
+    let to = &envelope.to;
+    if recipient_matches(to, SETUP_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN)
+        || recipient_matches(to, RECOVERY_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN)
+    {
+        return SmtpResponse::Ok {};
+    }
+    smtp_err(
+        SMTP_ERR_MAILBOX_UNAVAILABLE,
+        "Recipient is not a known mailbox on this canister",
+    )
 }
 
 /// Outcome the canister method in `main.rs` returns to the gateway.
@@ -659,5 +706,97 @@ mod tests {
             body: ByteBuf::new(),
         };
         assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+    }
+
+    fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpAddress, SmtpEnvelope,
+        };
+        SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "sender".into(),
+                    domain: "example.com".into(),
+                },
+                to: SmtpAddress {
+                    user: user.into(),
+                    domain: domain.into(),
+                },
+            }),
+            message: None,
+            gateway_flags: None,
+        }
+    }
+
+    fn assert_smtp_ok(resp: SmtpResponse) {
+        assert!(
+            matches!(resp, SmtpResponse::Ok {}),
+            "expected Ok, got {resp:?}"
+        );
+    }
+
+    fn assert_smtp_err_code(resp: SmtpResponse, expected: u64) {
+        match resp {
+            SmtpResponse::Err(e) => assert_eq!(e.code, expected, "wrong error code: {e:?}"),
+            other => panic!("expected Err({expected}), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_register_recipient() {
+        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
+            "register", "id.ai",
+        )));
+    }
+
+    #[test]
+    fn validate_accepts_recover_recipient() {
+        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
+            "recover", "id.ai",
+        )));
+    }
+
+    #[test]
+    fn validate_accepts_case_insensitive() {
+        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
+            "REGISTER", "ID.AI",
+        )));
+        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
+            "Recover", "Id.Ai",
+        )));
+    }
+
+    #[test]
+    fn validate_rejects_unknown_user() {
+        // Numeric anchor numbers (PoC postbox style) are not handled
+        // by this canister anymore — the gateway should bounce them.
+        assert_smtp_err_code(
+            handle_smtp_request_validate(smtp_envelope("12345", "id.ai")),
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+        );
+        assert_smtp_err_code(
+            handle_smtp_request_validate(smtp_envelope("alice", "id.ai")),
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+        );
+    }
+
+    #[test]
+    fn validate_rejects_known_user_wrong_domain() {
+        // `register` at the wrong domain must not slip through — the
+        // domain check is part of the recipient match.
+        assert_smtp_err_code(
+            handle_smtp_request_validate(smtp_envelope("register", "evil.example")),
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+        );
+    }
+
+    #[test]
+    fn validate_rejects_missing_envelope() {
+        let req = SmtpRequest {
+            envelope: None,
+            message: None,
+            gateway_flags: None,
+        };
+        assert_smtp_err_code(handle_smtp_request_validate(req), SMTP_ERR_SYNTAX_ERROR);
     }
 }
