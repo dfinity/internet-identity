@@ -302,7 +302,6 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
   });
   const EmailRecoveryChallenge = IDL.Record({
-    'mailbox' : IDL.Text,
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
@@ -1131,6 +1130,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'smtp_request' : IDL.Func([SmtpRequest], [SmtpResponse], []),
+    'smtp_request_validate' : IDL.Func(
+        [SmtpRequest],
+        [SmtpResponse],
+        ['query'],
+      ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'whoami' : IDL.Func([], [IDL.Principal], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
