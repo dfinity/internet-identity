@@ -521,7 +521,6 @@ type EmailRecoveryCredential = record {
 
 type EmailRecoveryChallenge = record {
     nonce : text;
-    mailbox : text;
     expires_at : Timestamp;
 };
 

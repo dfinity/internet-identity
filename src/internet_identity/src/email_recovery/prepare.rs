@@ -4,8 +4,8 @@
 //! the verification path (DNSSEC if a skeleton bundle is supplied,
 //! DoH allowlist otherwise), draws a fresh nonce from the heap PRNG,
 //! and parks a `PendingChallenge` keyed by that nonce. Returns the
-//! user-visible challenge (nonce + mailbox + expiry) so the FE can
-//! render the "send a magic email" screen.
+//! user-visible challenge (nonce + expiry) so the FE can render
+//! the "send a magic email" screen.
 //!
 //! See `docs/ongoing/email-recovery.md` §8.4. Two-phase path picker:
 //!
@@ -133,7 +133,6 @@ pub async fn prepare_add(
 
     Ok(EmailRecoveryChallenge {
         nonce,
-        mailbox: super::SETUP_MAILBOX.into(),
         // `Timestamp` is nanoseconds since epoch in this crate (see
         // `internet_identity_interface::types`). We work in seconds
         // internally for the TTL math and convert at the wire boundary.
@@ -455,7 +454,6 @@ mod tests {
         let challenge = result.expect("expected Ok");
 
         assert!(challenge.nonce.starts_with(super::super::NONCE_PREFIX));
-        assert_eq!(challenge.mailbox, super::super::SETUP_MAILBOX);
         // expires_at is in nanoseconds since epoch; we passed
         // now_secs = 1_000.
         assert_eq!(
