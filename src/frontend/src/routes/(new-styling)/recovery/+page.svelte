@@ -10,6 +10,11 @@
     type FoundIdentity,
     RecoverIdentityWizard,
   } from "$lib/components/wizards/recoverIdentity";
+  import {
+    RecoverWithEmailWizard,
+    type RecoverySuccess,
+  } from "$lib/components/wizards/recoverWithEmail";
+  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import {
     fromMnemonicWithoutValidation,
@@ -23,8 +28,14 @@
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
+  import {
+    DelegationChain,
+    DelegationIdentity,
+  } from "@icp-sdk/core/identity";
+  import { transformSignedDelegation } from "$lib/utils/utils";
 
   let showRecoveryDialog = $state(false);
+  let showEmailRecoveryDialog = $state(false);
 
   const handleSubmit = async (
     recoveryPhrase: string[],
@@ -50,6 +61,94 @@
       return { identityNumber, identityInfo };
     } catch (error) {
       showRecoveryDialog = false;
+      handleError(error);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Email-recovery wizard plumbing
+  // -------------------------------------------------------------
+
+  const prepareEmailDelegation = async (
+    input: any,
+    sessionPublicKey: Uint8Array,
+  ) => {
+    const result = await anonymousActor.email_recovery_prepare_delegation(
+      input,
+      sessionPublicKey,
+    );
+    if ("Err" in result) {
+      throw new Error(JSON.stringify(result.Err));
+    }
+    return result.Ok;
+  };
+
+  const emailRecoveryStatus = async (nonce: string) => {
+    return await anonymousActor.email_recovery_status(nonce);
+  };
+
+  const getEmailDelegation = async (args: any) => {
+    const result = await anonymousActor.email_recovery_get_delegation(args);
+    if ("Err" in result) {
+      throw new Error(JSON.stringify(result.Err));
+    }
+    return result.Ok;
+  };
+
+  /**
+   * Bridge the wizard's "I have a SignedDelegation" output back into
+   * the manage-page session: build a DelegationIdentity, look up the
+   * matching anchor via `lookup_caller_identity_by_recovery_phrase`-
+   * adjacent path (here we trust the canister's `user_key` which
+   * encodes the anchor in its seed), seed the auth store, and go.
+   */
+  const handleEmailRecoverySignIn = async (success: RecoverySuccess) => {
+    try {
+      const delegationChain = DelegationChain.fromDelegations(
+        [transformSignedDelegation(success.delegation)],
+        new Uint8Array(success.userKey),
+      );
+      const delegationIdentity = DelegationIdentity.fromDelegation(
+        success.sessionIdentity,
+        delegationChain,
+      );
+      // Resolve which anchor this delegation belongs to. We do this
+      // by making any authenticated call against the canister with
+      // the new identity and pulling the anchor number from
+      // `identity_info`'s authz record path. The simplest path is
+      // to ask the canister directly via a freshly-authed lookup —
+      // but `identity_info` requires the anchor number as input,
+      // chicken-and-egg. Use the helper introduced for the
+      // recovery-phrase flow instead.
+      const agent = await HttpAgent.from(anonymousAgent);
+      agent.replaceIdentity(delegationIdentity);
+      const lookup =
+        await anonymousActor.lookup_caller_identity_by_recovery_phrase.withOptions(
+          { agent },
+        )();
+      const identityNumber = lookup[0];
+      if (identityNumber === undefined) {
+        throw new Error("recovery delegation didn't resolve to an anchor");
+      }
+      await authenticationStore.set({
+        identity: delegationIdentity,
+        identityNumber,
+        authMethod: {
+          recoveryPhrase: {
+            principal: delegationIdentity.getPrincipal(),
+          },
+        },
+      });
+      await preloadData("/manage/access");
+      await goto("/manage/access");
+      toaster.success({
+        title: $t`Successfully recovered your identity`,
+        description: $t`You can manage your access methods on this page.`,
+        duration: 5000,
+      });
+    } catch (error) {
+      showEmailRecoveryDialog = false;
+      authenticationStore.reset();
       handleError(error);
     }
   };
@@ -118,8 +217,16 @@
           onclick={() => (showRecoveryDialog = true)}
           class="btn btn-xl mb-3"
         >
-          {$t`Get started`}
+          {$t`Recover with phrase`}
         </button>
+        {#if $EMAIL_RECOVERY}
+          <button
+            onclick={() => (showEmailRecoveryDialog = true)}
+            class="btn btn-secondary btn-xl mb-3"
+          >
+            {$t`Recover with email`}
+          </button>
+        {/if}
         <a href="/" class="btn btn-secondary btn-xl">
           {$t`Cancel`}
         </a>
@@ -136,6 +243,21 @@
       onSubmit={handleSubmit}
       onSignIn={handleSignIn}
       onCancel={() => (showRecoveryDialog = false)}
+    />
+  </Dialog>
+{/if}
+
+{#if showEmailRecoveryDialog}
+  <Dialog
+    onClose={() => (showEmailRecoveryDialog = false)}
+    closeOnOutsideClick={false}
+  >
+    <RecoverWithEmailWizard
+      prepareDelegation={prepareEmailDelegation}
+      status={emailRecoveryStatus}
+      getDelegation={getEmailDelegation}
+      onSignedIn={handleEmailRecoverySignIn}
+      onCancel={() => (showEmailRecoveryDialog = false)}
     />
   </Dialog>
 {/if}

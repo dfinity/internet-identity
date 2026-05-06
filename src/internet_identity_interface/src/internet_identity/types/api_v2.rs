@@ -86,9 +86,11 @@ pub struct IdentityInfo {
     pub name: Option<String>,
     pub created_at: Option<Timestamp>,
     /// The email-recovery credential bound to this anchor, if any.
-    /// Lets the FE render the recovery-email card's active vs. inactive
-    /// state without a separate query.
-    pub email_recovery: Option<crate::internet_identity::types::EmailRecoveryCredential>,
+    /// Populated by the canister on every `identity_info` call so
+    /// the FE can render the correct "active vs inactive" state of
+    /// the recovery email card without round-tripping a separate
+    /// query.
+    pub email_recovery: Option<crate::internet_identity::types::email_recovery::EmailRecoveryCredential>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

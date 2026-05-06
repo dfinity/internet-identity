@@ -9,6 +9,7 @@ import { test as recoveryPageTest } from "./recoveryPage";
 import { test as managePageTest } from "./managePage";
 import { test as manageAccessPageTest } from "./manageAccessPage";
 import { test as manageRecoveryPageTest } from "./manageRecoveryPage";
+import { test as emailRecoveryTest } from "./emailRecovery";
 
 export const test = mergeTests(
   inertWorkaroundTest,
@@ -21,4 +22,5 @@ export const test = mergeTests(
   managePageTest,
   manageAccessPageTest,
   manageRecoveryPageTest,
+  emailRecoveryTest,
 );

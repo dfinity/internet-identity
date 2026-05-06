@@ -23,6 +23,10 @@
     replaceState,
   } from "$app/navigation";
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
+  import InactiveEmailRecovery from "./components/InactiveEmailRecovery.svelte";
+  import ActiveEmailRecovery from "./components/ActiveEmailRecovery.svelte";
+  import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
+  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
     fromMnemonicWithoutValidation,
@@ -46,6 +50,17 @@
   let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
   let unverifiedRecoveryPhrase = $state<string[]>();
   let lockedRecoveryPhraseIdentity = $state<Identity>();
+
+  let showEmailRecoverySetup = $state(false);
+  /**
+   * Email-recovery binding observable to the FE. The canister
+   * returns it on every `identity_info` call (see
+   * `IdentityInfo.email_recovery`); we mirror that into local
+   * state so the wizard can optimistically flip the card to
+   * "active" right after a successful binding without waiting for
+   * the next route load to re-fetch.
+   */
+  let emailRecovery = $derived(data.identityInfo.email_recovery[0]);
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -236,6 +251,49 @@
     return true;
   };
 
+  // -------------------------------------------------------------
+  // Email-recovery handlers
+  // -------------------------------------------------------------
+
+  /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
+  const prepareAddEmail = async (input: any) => {
+    const result = await $authenticatedStore.actor.email_recovery_credential_prepare_add(
+      $authenticatedStore.identityNumber,
+      input,
+    );
+    if ("Err" in result) {
+      throw new Error(JSON.stringify(result.Err));
+    }
+    return result.Ok;
+  };
+
+  /** Anonymous wrapper around `email_recovery_status` (query). */
+  const statusEmailRecovery = async (nonce: string) => {
+    return await anonymousActor.email_recovery_status(nonce);
+  };
+
+  const handleRemoveEmail = async () => {
+    if (emailRecovery === undefined) return;
+    const result = await $authenticatedStore.actor.email_recovery_credential_remove(
+      $authenticatedStore.identityNumber,
+      emailRecovery.address,
+    );
+    if ("Err" in result) {
+      handleError(new Error(JSON.stringify(result.Err)));
+      return;
+    }
+    void invalidateAll();
+    toaster.success({
+      title: $t`Recovery email removed`,
+      description: $t`Your recovery email has been detached from this identity.`,
+    });
+  };
+
+  const handleEmailWizardClosed = () => {
+    showEmailRecoverySetup = false;
+    void invalidateAll();
+  };
+
   // Warn user if they're leaving in the middle of a recovery phrase set-up
   beforeNavigate((navigation) => {
     if (showRecoveryPhraseSetup === undefined || navigation.type !== "leave") {
@@ -274,7 +332,7 @@
 <div
   class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5"
 >
-  <div class="col-span-3 max-sm:col-span-1">
+  <div class="col-span-3 flex flex-col gap-4 max-sm:col-span-1">
     {#if isUnverified}
       <!-- This identity has a recovery phrase that isn't verified yet -->
       <UnverifiedRecoveryPhrase
@@ -293,6 +351,23 @@
       <InactiveRecoveryPhrase
         onActivate={() => (showRecoveryPhraseSetup = "activate")}
       />
+    {/if}
+
+    <!-- Recovery email card. Gated by the EMAIL_RECOVERY feature
+         flag (default false; auto-enabled on beta.id.ai by the
+         flag's init callback). -->
+    {#if $EMAIL_RECOVERY}
+      {#if emailRecovery !== undefined}
+        <ActiveEmailRecovery
+          credential={emailRecovery}
+          onReplace={() => (showEmailRecoverySetup = true)}
+          onRemove={handleRemoveEmail}
+        />
+      {:else}
+        <InactiveEmailRecovery
+          onActivate={() => (showEmailRecoverySetup = true)}
+        />
+      {/if}
     {/if}
   </div>
 </div>
@@ -362,6 +437,16 @@
       }}
       existingRecoveryPhraseType={recoveryPhraseType}
       {unverifiedRecoveryPhrase}
+    />
+  </Dialog>
+{/if}
+
+{#if showEmailRecoverySetup}
+  <Dialog onClose={handleEmailWizardClosed} closeOnOutsideClick={false}>
+    <SetupEmailRecoveryWizard
+      prepare={prepareAddEmail}
+      status={statusEmailRecovery}
+      onClose={handleEmailWizardClosed}
     />
   </Dialog>
 {/if}
