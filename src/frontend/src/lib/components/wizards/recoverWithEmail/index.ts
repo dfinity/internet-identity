@@ -11,9 +11,14 @@ import type { SignedDelegation } from "$lib/generated/internet_identity_types";
  * The host page builds a `DelegationIdentity` from the
  * `sessionIdentity` + delegation and proceeds with the rest of the
  * sign-in.
+ *
+ * `identityNumber` is the anchor the canister resolved from the
+ * verified `From:` at smtp time, surfaced via `RecoveryReady` so the
+ * host doesn't need a separate lookup hop.
  */
 export interface RecoverySuccess {
   sessionIdentity: ECDSAKeyIdentity;
   userKey: Uint8Array | number[];
   delegation: SignedDelegation;
+  identityNumber: bigint;
 }

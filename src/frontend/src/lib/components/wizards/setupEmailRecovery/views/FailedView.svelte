@@ -1,7 +1,6 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import { MailXIcon } from "@lucide/svelte";
 
   interface Props {
@@ -22,9 +21,7 @@
     <h1 class="text-text-primary text-2xl font-medium">
       {$t`Verification failed`}
     </h1>
-    <p class="text-text-tertiary text-center text-sm">
-      <Trans>{reason}</Trans>
-    </p>
+    <p class="text-text-tertiary text-center text-sm">{reason}</p>
   </header>
   <div class="flex flex-row justify-end gap-2">
     <Button onclick={onCancel} variant="secondary" type="button">

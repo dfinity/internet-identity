@@ -2,7 +2,6 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { MailCheckIcon } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
   import { nanosToMillis } from "$lib/utils/time";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -40,9 +39,7 @@
       <h2 class="text-text-primary text-base font-semibold">
         {$t`Recovery email active`}
       </h2>
-      <p class="text-text-tertiary text-sm break-all">
-        <Trans>{credential.address}</Trans>
-      </p>
+      <p class="text-text-tertiary text-sm break-all">{credential.address}</p>
     </header>
     <hr class={["border-border-tertiary my-5 border-t", "@xl:hidden"]} />
     <dl class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>

@@ -14,6 +14,10 @@
     RecoverWithEmailWizard,
     type RecoverySuccess,
   } from "$lib/components/wizards/recoverWithEmail";
+  import type {
+    EmailRecoveryDnsInput,
+    EmailRecoveryGetDelegationArgs,
+  } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import {
@@ -70,37 +74,26 @@
   // -------------------------------------------------------------
 
   const prepareEmailDelegation = async (
-    input: any,
+    input: EmailRecoveryDnsInput,
     sessionPublicKey: Uint8Array,
-  ) => {
-    const result = await anonymousActor.email_recovery_prepare_delegation(
-      input,
-      sessionPublicKey,
-    );
-    if ("Err" in result) {
-      throw new Error(JSON.stringify(result.Err));
-    }
-    return result.Ok;
-  };
+  ) =>
+    anonymousActor
+      .email_recovery_prepare_delegation(input, sessionPublicKey)
+      .then(throwCanisterError);
 
   const emailRecoveryStatus = async (nonce: string) => {
     return await anonymousActor.email_recovery_status(nonce);
   };
 
-  const getEmailDelegation = async (args: any) => {
-    const result = await anonymousActor.email_recovery_get_delegation(args);
-    if ("Err" in result) {
-      throw new Error(JSON.stringify(result.Err));
-    }
-    return result.Ok;
-  };
+  const getEmailDelegation = async (args: EmailRecoveryGetDelegationArgs) =>
+    anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
 
   /**
    * Bridge the wizard's "I have a SignedDelegation" output back into
-   * the manage-page session: build a DelegationIdentity, look up the
-   * matching anchor via `lookup_caller_identity_by_recovery_phrase`-
-   * adjacent path (here we trust the canister's `user_key` which
-   * encodes the anchor in its seed), seed the auth store, and go.
+   * the manage-page session: build a DelegationIdentity, seed the
+   * auth store with the anchor the canister already resolved at
+   * smtp time (carried back via `RecoverySuccess.identityNumber`),
+   * and navigate.
    */
   const handleEmailRecoverySignIn = async (success: RecoverySuccess) => {
     try {
@@ -112,29 +105,11 @@
         success.sessionIdentity,
         delegationChain,
       );
-      // Resolve which anchor this delegation belongs to. We do this
-      // by making any authenticated call against the canister with
-      // the new identity and pulling the anchor number from
-      // `identity_info`'s authz record path. The simplest path is
-      // to ask the canister directly via a freshly-authed lookup —
-      // but `identity_info` requires the anchor number as input,
-      // chicken-and-egg. Use the helper introduced for the
-      // recovery-phrase flow instead.
-      const agent = await HttpAgent.from(anonymousAgent);
-      agent.replaceIdentity(delegationIdentity);
-      const lookup =
-        await anonymousActor.lookup_caller_identity_by_recovery_phrase.withOptions(
-          { agent },
-        )();
-      const identityNumber = lookup[0];
-      if (identityNumber === undefined) {
-        throw new Error("recovery delegation didn't resolve to an anchor");
-      }
       await authenticationStore.set({
         identity: delegationIdentity,
-        identityNumber,
+        identityNumber: success.identityNumber,
         authMethod: {
-          recoveryPhrase: {
+          emailRecovery: {
             principal: delegationIdentity.getPrincipal(),
           },
         },
