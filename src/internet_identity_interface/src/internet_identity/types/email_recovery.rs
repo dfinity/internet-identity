@@ -77,14 +77,20 @@ pub struct EmailRecoveryChallenge {
     /// followed by 16 lowercase hex characters (8 random bytes from
     /// a canister-side ChaCha20Rng PRNG seeded once via `raw_rand`).
     pub nonce: String,
-    /// Where the user should send the email — `register@id.ai` for
-    /// setup, `recover@id.ai` for recovery. The canister identifies
-    /// the challenge from the `nonce` in the `Subject:`, not from
-    /// the recipient address.
-    pub mailbox: String,
     /// Nanoseconds since the Unix epoch. 30 minutes after issue.
     pub expires_at: Timestamp,
 }
+
+// Note on the recipient mailbox: the canister doesn't include it in
+// this response. All entries of the `related_origins` deploy arg
+// are accepted as equal aliases (`register@<host>` /
+// `recover@<host>` for any host), and the FE renders the
+// user-facing label by pairing `register` / `recover` with
+// `window.location.hostname`. That way each tab shows the user the
+// alias matching the origin they're already on; the canister never
+// has to single one out as canonical. See
+// `crate::email_recovery::mailbox_domains` (canister-side) for the
+// dispatch-side counterpart.
 
 /// What the FE submits at prepare time.
 ///

@@ -116,7 +116,10 @@ fn prepare_add_returns_well_formed_challenge() {
         "unexpected nonce length: {}",
         challenge.nonce
     );
-    assert_eq!(challenge.mailbox, "register@id.ai");
+    // No mailbox field on the challenge — the FE pairs the
+    // user-part (`register` / `recover`) with
+    // `window.location.hostname` so each tab shows the alias
+    // matching the origin the user is on.
     // expires_at is 30 minutes from now in nanoseconds (matches the
     // rest of II's `Timestamp` encoding). Can't pin it precisely
     // because PocketIC's clock advances during the call; check it's

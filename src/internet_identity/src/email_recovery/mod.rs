@@ -79,15 +79,65 @@ pub const CHALLENGE_TTL_SECS: u64 = 30 * 60;
 /// the design-doc §8.8 eviction analysis applies cleanly above it.
 pub const MAX_PENDING_CHALLENGES: usize = 10_000;
 
-/// Mailbox the user emails for the **setup** flow. The canister
-/// dispatches by recipient: `register@id.ai` ↔ binding flow,
-/// `recover@id.ai` ↔ recovery flow (the latter is deferred).
-pub const SETUP_MAILBOX: &str = "register@id.ai";
+/// Recipient user-part for the **setup** flow. Together with any of
+/// the configured mailbox domains (see [`mailbox_domains`]) this
+/// forms a full mailbox the canister accepts at SMTP time.
+pub const SETUP_RECIPIENT_USER: &str = "register";
 
-/// Mailbox the user emails for the **recovery** flow. Reserved for
-/// the follow-up PR; declared here so the constant lives next to its
-/// peer and the surface is committed.
-pub const RECOVERY_MAILBOX: &str = "recover@id.ai";
+/// Recipient user-part for the **recovery** flow.
+pub const RECOVERY_RECIPIENT_USER: &str = "recover";
+
+/// All mailbox domains the canister accepts as `register@…` /
+/// `recover@…` aliases. Derived entirely from `related_origins`
+/// (already a per-deploy arg, set by the deploy scripts): for every
+/// entry we take the host part, lowercased.
+///
+/// On prod that's typically `["id.ai", "identity.ic0.app",
+/// "identity.internetcomputer.org"]`; on beta it's `["beta.id.ai"]`.
+/// All entries are equal aliases — recipient dispatch and the
+/// `smtp_request_validate` query accept the user-part `register` or
+/// `recover` paired with any of these domains, so the same WASM
+/// works against whichever zone the gateway routes mail for and a
+/// multi-domain prod deploy doesn't have to single one out as
+/// canonical. The FE renders the user-facing mailbox label by
+/// pairing `register` / `recover` with `window.location.hostname`,
+/// so each tab automatically shows the user the alias matching the
+/// origin they're already on; the canister never needs to pick a
+/// "primary" domain.
+///
+/// Returns an empty vec when `related_origins` is unset or empty —
+/// the canister then drops every inbound `smtp_request` recipient.
+/// Deploys are expected to configure `related_origins`; running
+/// the email-recovery flow without it is a misconfig.
+pub fn mailbox_domains() -> Vec<String> {
+    crate::state::persistent_state(|p| {
+        p.related_origins
+            .as_ref()
+            .map(|v| {
+                v.iter()
+                    .filter_map(|s| origin_to_host(s))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    })
+}
+
+/// Strip the scheme and any trailing path/port from `origin`,
+/// returning the lowercased host. Returns `None` for inputs that
+/// don't have a recognisable host part — a malformed
+/// `related_origins` entry shouldn't trap the canister; we just
+/// silently drop it from the accepted-domains list.
+fn origin_to_host(origin: &str) -> Option<String> {
+    let after_scheme = origin
+        .strip_prefix("https://")
+        .or_else(|| origin.strip_prefix("http://"))
+        .unwrap_or(origin);
+    let host_only = after_scheme
+        .split(['/', ':'])
+        .next()
+        .filter(|s| !s.is_empty())?;
+    Some(host_only.to_ascii_lowercase())
+}
 
 /// RFC 5321 §4.5.3.1 limits, applied at every address-handling
 /// boundary (prepare-time validation, verified-`From:` extraction):
