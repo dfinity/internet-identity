@@ -27,10 +27,11 @@ import type {
   SignedRRset,
 } from "$lib/generated/internet_identity_types";
 
-const TYPE_TXT = 16;
+// `rtype` numbers come from the bundle's `SignedRRset.rtype` field
+// (already correct for TXT / DNSKEY / DS). The interceptor only
+// needs to construct RRSIG records itself, so just RRSIG and CLASS_IN
+// are referenced directly.
 const TYPE_RRSIG = 46;
-const TYPE_DNSKEY = 48;
-const TYPE_DS = 43;
 const CLASS_IN = 1;
 
 const DOH_HOSTS = ["cloudflare-dns.com", "dns.google"];
