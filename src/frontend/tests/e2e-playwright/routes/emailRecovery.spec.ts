@@ -1,30 +1,32 @@
 /**
- * E2E coverage for the email-recovery feature flag + wizard wiring.
+ * Coverage for the email-recovery feature, two layers deep:
  *
- * What's covered here:
- * - Feature-flag gating on both the manage page and the
- *   recover-sign-in page: when `EMAIL_RECOVERY` is off, the email
- *   surface stays hidden.
- * - Manage-page setup wizard: the "Add email" button opens the
- *   dialog with the right heading.
- * - Recovery-sign-in: the "Recover with email" button is exposed
- *   and opens its dialog.
+ *   1. **Wizard surface** — flag gating + dialog open/close. Catches
+ *      regressions in the FE wiring without needing a working
+ *      DNSSEC chain or DKIM key.
  *
- * What's NOT covered yet:
- * - Driving the magic-email step end-to-end. That requires the
- *   local II canister to be deployed with a DoH allowlist for the
- *   test domain *and* a way to push a DKIM-signed `smtp_request`
- *   into the canister so the polling status flips. Both are real
- *   work; the canister-side integration tests (PocketIC) already
- *   cover that path. This file exercises the FE wiring (flag
- *   gating, dialog open, view rendering) so a regression in the
- *   wizard's mounting is caught here without rebuilding the
- *   gateway-side test rig.
+ *   2. **Real end-to-end** — synthesizes a DNSSEC chain
+ *      (`utils/dnssecTestSigner.ts`) plus a DKIM keypair, intercepts
+ *      the FE's DoH lookups, drives the wizard to the magic-email
+ *      step, and submits a DKIM-signed `smtp_request` so polling
+ *      flips to `RegistrationSucceeded` / `RecoveryReady`. Exercises
+ *      the canister's DNSSEC verifier + DKIM/DMARC verifier + status
+ *      transitions end-to-end. The local II canister is deployed
+ *      with a trust anchor matching the signer's deterministic seed
+ *      (see `local_test_arg.did` + `.github/workflows/canister-tests.yml`).
+ *
+ * Both layers share one fixture (`emailRecovery`); the heavy DNSSEC
+ * + DKIM material is built lazily so gating tests stay fast.
  */
 
 import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { II_URL } from "../utils";
+
+// The canister gives ~30 minutes for the email to arrive but the
+// test budget is much smaller. We submit immediately after the
+// wizard transitions, then wait for the polling status flip.
+const STATUS_POLL_TIMEOUT = 30_000;
 
 test.describe("Email recovery — feature-flag gating", () => {
   test("manage page hides the email card when the flag is off", async ({
@@ -93,5 +95,108 @@ test.describe("Email recovery — wizard surface", () => {
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
+  });
+});
+
+test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
+  test("setup then recover an identity via email", async ({
+    page,
+    emailRecovery,
+    manageRecoveryPage,
+    signInWithIdentity,
+    identities,
+  }) => {
+    test.slow(); // RSA keygen + DNSSEC walk + status polling
+
+    await emailRecovery.enableFlag();
+    await emailRecovery.installDohInterceptor();
+
+    // ---------------------------------------------------------------
+    // Setup leg — bind alice@test.example.com as a recovery method
+    // ---------------------------------------------------------------
+    await manageRecoveryPage.goto();
+    await signInWithIdentity(page, identities[0].identityNumber);
+    await emailRecovery.assertSetupCardVisible();
+
+    await page
+      .getByRole("main")
+      .getByRole("button", { name: "Add email" })
+      .click();
+    const setupDialog = page.getByRole("dialog");
+    await expect(setupDialog).toBeVisible();
+    await setupDialog
+      .getByRole("textbox", { name: "Email address" })
+      .fill(emailRecovery.fromAddress);
+    await setupDialog.getByRole("button", { name: "Continue" }).click();
+
+    // The wizard is now polling email_recovery_status. Pull the
+    // canister-issued nonce off the rendered token block, sign an
+    // email with the matching subject, submit it via smtp_request.
+    await expect(
+      setupDialog.getByRole("heading", { name: "Send the magic email" }),
+    ).toBeVisible();
+    const setupNonce = await setupDialog
+      .getByText(/II-Recovery-[0-9a-f]{16}/)
+      .textContent();
+    if (setupNonce === null) {
+      throw new Error("setup wizard did not render a nonce");
+    }
+    await emailRecovery.submitEmail({
+      to: "register@id.ai",
+      subject: setupNonce,
+    });
+
+    // The wizard should flip to the Done view once polling sees
+    // RegistrationSucceeded. Heading text comes from
+    // `setupEmailRecovery/views/Done.svelte`.
+    await expect(
+      setupDialog.getByRole("heading", { name: "All set" }),
+    ).toBeVisible({ timeout: STATUS_POLL_TIMEOUT });
+    await setupDialog.getByRole("button", { name: "Done" }).click();
+    await expect(setupDialog).toBeHidden();
+
+    // The manage page should now show the active card.
+    await expect(
+      page.getByRole("heading", { name: "Recovery email active" }),
+    ).toBeVisible();
+
+    // ---------------------------------------------------------------
+    // Recovery leg — sign in via the email we just bound
+    // ---------------------------------------------------------------
+    // The DoH interceptor was installed page-wide and persists across
+    // navigations — no need to reinstall.
+    await page.goto(II_URL + "/recovery");
+
+    await page.getByRole("button", { name: "Recover with email" }).click();
+    const recoverDialog = page.getByRole("dialog");
+    await expect(recoverDialog).toBeVisible();
+    await recoverDialog
+      .getByRole("textbox", { name: "Email address" })
+      .fill(emailRecovery.fromAddress);
+    await recoverDialog.getByRole("button", { name: "Continue" }).click();
+
+    await expect(
+      recoverDialog.getByRole("heading", { name: "Send the magic email" }),
+    ).toBeVisible();
+    const recoveryNonce = await recoverDialog
+      .getByText(/II-Recovery-[0-9a-f]{16}/)
+      .textContent();
+    if (recoveryNonce === null) {
+      throw new Error("recovery wizard did not render a nonce");
+    }
+    await emailRecovery.submitEmail({
+      to: "recover@id.ai",
+      subject: recoveryNonce,
+    });
+
+    // On success the wizard issues a delegation and the host page
+    // navigates to /manage/access with a success toast. Assert the
+    // destination heading rather than the toast (auto-dismisses).
+    await page.waitForURL(/\/manage\/access/, {
+      timeout: STATUS_POLL_TIMEOUT,
+    });
+    await expect(
+      page.getByRole("heading", { name: /access methods/i }).first(),
+    ).toBeVisible();
   });
 });
