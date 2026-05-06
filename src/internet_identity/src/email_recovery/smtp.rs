@@ -56,12 +56,6 @@ use internet_identity_interface::internet_identity::types::smtp::{
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
-<<<<<<< HEAD
-// Recipient user-parts (`register`, `recover`) live on the parent
-// `email_recovery` module so the shared mailbox-domain helpers can
-// read them too. Imported here for the dispatch logic.
-use super::{RECOVERY_RECIPIENT_USER, SETUP_RECIPIENT_USER};
-=======
 /// Recipient mailbox name for the setup flow.
 pub const SETUP_RECIPIENT_USER: &str = "register";
 /// Recipient mailbox name for the recovery flow.
@@ -70,29 +64,17 @@ pub const RECOVERY_RECIPIENT_USER: &str = "recover";
 /// gateway operator chooses this — `id.ai` is the design-doc
 /// example. Future enhancement: lift this into a deploy-arg.
 pub const SETUP_RECIPIENT_DOMAIN: &str = "id.ai";
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 
-/// Whether `to` matches `<expected_user>@<one of the configured
-/// mailbox domains>`, case-insensitive on both halves. The set of
-/// accepted domains comes from the `related_origins` deploy arg via
-/// [`super::mailbox_domains`] — on prod that's typically `id.ai` +
-/// the `*.icp0.io` aliases, on beta it's `beta.id.ai`. The same
-/// WASM works for both deployments because the domain isn't pinned
-/// in source.
-///
-/// Defence-in-depth against a direct caller constructing an
-/// `SmtpRequest` with `to.user="register"` but a different domain
-/// to bypass recipient dispatch — only domains the deploy arg
-/// authorised count.
+/// Whether `to` matches `<user>@<domain>` exactly, case-insensitive
+/// on both halves. Defence-in-depth against a direct caller
+/// constructing an SmtpRequest with `to.user="register"` but a
+/// different domain to bypass recipient dispatch.
 fn recipient_matches(
     to: &internet_identity_interface::internet_identity::types::smtp::SmtpAddress,
     expected_user: &str,
+    expected_domain: &str,
 ) -> bool {
-    if !to.user.eq_ignore_ascii_case(expected_user) {
-        return false;
-    }
-    let to_domain = to.domain.to_ascii_lowercase();
-    super::mailbox_domains().iter().any(|d| d == &to_domain)
+    to.user.eq_ignore_ascii_case(expected_user) && to.domain.eq_ignore_ascii_case(expected_domain)
 }
 
 /// Query-mode counterpart to [`handle_smtp_request`]. The off-chain
@@ -107,13 +89,20 @@ fn recipient_matches(
 /// importantly, gives no SMTP-level signal that the address is
 /// invalid — the sender's MTA never sees a bounce.
 ///
-/// Accepts `register@<d>` and `recover@<d>` (case-insensitive) for
-/// any `d` in [`super::mailbox_domains`] — i.e. for any host listed
-/// in the `related_origins` deploy arg. On prod that's typically
-/// `id.ai` plus the `*.icp0.io` aliases; on beta it's `beta.id.ai`.
+/// Accepts:
+///
+/// - `register@id.ai` (case-insensitive) — setup flow.
+/// - `recover@id.ai` (case-insensitive) — recovery flow. The
+///   recipient is recognised here even on the storage-and-smtp PR
+///   where the actual handler lives in a follow-up: a query that
+///   says "yes, accept this address" is harmless without the
+///   handler, and gating the gateway accept on the recovery PR
+///   would force a deploy-step ordering we don't otherwise need.
+///
 /// Everything else gets a 550 (mailbox unavailable). The query is
 /// open — anyone can call it — but it has no side effects and
-/// leaks nothing beyond the deploy arg, which is already public.
+/// leaks nothing beyond the two recipient labels themselves, both
+/// of which are documented in the design doc.
 pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
     if let Err(e) = validate_smtp_request(&request) {
         return e;
@@ -123,7 +112,8 @@ pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
     let to = &envelope.to;
-    if recipient_matches(to, SETUP_RECIPIENT_USER) || recipient_matches(to, RECOVERY_RECIPIENT_USER)
+    if recipient_matches(to, SETUP_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN)
+        || recipient_matches(to, RECOVERY_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN)
     {
         return SmtpResponse::Ok {};
     }
@@ -157,17 +147,6 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-<<<<<<< HEAD
-    let recipient_flow = if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER) {
-        RecipientFlow::Setup
-    } else if recipient_matches(&envelope.to, RECOVERY_RECIPIENT_USER) {
-        RecipientFlow::Recovery
-    } else {
-        // Drop with Ok — we don't emit a per-recipient signal back
-        // to the gateway.
-        return SmtpResponse::Ok {};
-    };
-=======
     let recipient_flow =
         if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER, SETUP_RECIPIENT_DOMAIN) {
             RecipientFlow::Setup
@@ -182,7 +161,6 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             // to the gateway.
             return SmtpResponse::Ok {};
         };
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
 
     let message = match request.message.as_ref() {
         Some(m) => m,
@@ -748,11 +726,7 @@ pub(super) fn recovery_snapshot(
         kind: SnapshotKind::Recovery { session_pk },
         claimed_address,
         registered_domain,
-<<<<<<< HEAD
         is_dnssec_path: true,
-=======
-        cached_zone_dnskey: true,
->>>>>>> cf149cb5 (feat(email-recovery): recovery flow on top of two-phase DNSSEC)
         cached_dmarc_txt: None,
         partial_set: false,
         already_terminal: false,
@@ -961,19 +935,8 @@ mod tests {
         }
     }
 
-    /// Configure the per-deploy `related_origins` so
-    /// `super::mailbox_domains()` returns the listed hosts.
-    /// Recipient dispatch and the `smtp_request_validate` query
-    /// both pull the accepted domain set from this list.
-    fn set_related_origins(origins: &[&str]) {
-        crate::state::persistent_state_mut(|p| {
-            p.related_origins = Some(origins.iter().map(|s| (*s).to_string()).collect());
-        });
-    }
-
     #[test]
     fn validate_accepts_register_recipient() {
-        set_related_origins(&["https://id.ai"]);
         assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
             "register", "id.ai",
         )));
@@ -981,7 +944,6 @@ mod tests {
 
     #[test]
     fn validate_accepts_recover_recipient() {
-        set_related_origins(&["https://id.ai"]);
         assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
             "recover", "id.ai",
         )));
@@ -989,11 +951,6 @@ mod tests {
 
     #[test]
     fn validate_accepts_case_insensitive() {
-        // Source `related_origins` are already lowercased by the
-        // host-extraction helper, so accepting an upper-case input
-        // exercises the case-insensitive comparison on the SMTP
-        // side.
-        set_related_origins(&["https://id.ai"]);
         assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
             "REGISTER", "ID.AI",
         )));
@@ -1003,47 +960,9 @@ mod tests {
     }
 
     #[test]
-    fn validate_accepts_any_related_origin_alias() {
-        // All `related_origins` entries are equal aliases. A prod
-        // deploy with id.ai + the *.icp0.io aliases must accept
-        // mail at register@<any of them>.
-        set_related_origins(&[
-            "https://id.ai",
-            "https://identity.ic0.app",
-            "https://identity.internetcomputer.org",
-        ]);
-        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
-            "register",
-            "identity.ic0.app",
-        )));
-        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
-            "recover",
-            "identity.internetcomputer.org",
-        )));
-    }
-
-    #[test]
-    fn validate_accepts_beta_alias_only_when_configured() {
-        // beta deploy: only beta.id.ai is on the allowlist.
-        set_related_origins(&["https://beta.id.ai"]);
-        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope(
-            "register",
-            "beta.id.ai",
-        )));
-        // The bare `id.ai` is *not* on this deploy's list, so it's
-        // bounced — the canister doesn't accept it just because the
-        // string contains "id.ai".
-        assert_smtp_err_code(
-            handle_smtp_request_validate(smtp_envelope("register", "id.ai")),
-            SMTP_ERR_MAILBOX_UNAVAILABLE,
-        );
-    }
-
-    #[test]
     fn validate_rejects_unknown_user() {
         // Numeric anchor numbers (PoC postbox style) are not handled
         // by this canister anymore — the gateway should bounce them.
-        set_related_origins(&["https://id.ai"]);
         assert_smtp_err_code(
             handle_smtp_request_validate(smtp_envelope("12345", "id.ai")),
             SMTP_ERR_MAILBOX_UNAVAILABLE,
@@ -1056,22 +975,10 @@ mod tests {
 
     #[test]
     fn validate_rejects_known_user_wrong_domain() {
-        // `register` at a domain not on the deploy's
-        // `related_origins` must not slip through.
-        set_related_origins(&["https://id.ai"]);
+        // `register` at the wrong domain must not slip through — the
+        // domain check is part of the recipient match.
         assert_smtp_err_code(
             handle_smtp_request_validate(smtp_envelope("register", "evil.example")),
-            SMTP_ERR_MAILBOX_UNAVAILABLE,
-        );
-    }
-
-    #[test]
-    fn validate_rejects_when_no_origins_configured() {
-        // No `related_origins` set → no domains accepted. Defensive
-        // path — real deploys always configure this.
-        crate::state::persistent_state_mut(|p| p.related_origins = None);
-        assert_smtp_err_code(
-            handle_smtp_request_validate(smtp_envelope("register", "id.ai")),
             SMTP_ERR_MAILBOX_UNAVAILABLE,
         );
     }
