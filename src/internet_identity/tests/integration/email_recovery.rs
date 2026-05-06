@@ -56,7 +56,6 @@ const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
 fn dns_input() -> EmailRecoveryDnsInput {
     EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
-        selector: TEST_SELECTOR.into(),
         dns_proof: None,
     }
 }
@@ -142,7 +141,6 @@ fn prepare_add_rejects_non_allowlisted_domain() {
 
     let bad_input = EmailRecoveryDnsInput {
         address: "bob@evil.com".into(),
-        selector: "default".into(),
         dns_proof: None,
     };
     let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, bad_input)
@@ -438,7 +436,6 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
     };
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
-        selector: TEST_SELECTOR.into(),
         dns_proof: Some(proof),
     };
     let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
@@ -517,7 +514,6 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
         // test.example.com IS on the allowlist — but the DNSSEC path
         // takes precedence.
         address: TEST_ADDRESS.into(),
-        selector: TEST_SELECTOR.into(),
         dns_proof: Some(proof),
     };
     let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
@@ -598,7 +594,6 @@ fn full_setup_flow_via_dnssec_path() {
     // record, matching the old prepare-time-cached-DKIM pipeline.
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
-        selector: TEST_SELECTOR.into(),
         dns_proof: Some(DnsProofBundle {
             leaf: Some(chain.dkim_leaf.clone()),
             ..chain.skeleton.clone()

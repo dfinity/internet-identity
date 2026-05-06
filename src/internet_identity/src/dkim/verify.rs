@@ -380,7 +380,7 @@ fn auid_aligns(i: &str, d: &str, strict: bool) -> bool {
 /// `dkim_header_value` is the original (gateway-supplied) value of the
 /// DKIM-Signature header itself; we blank its `b=` content as the spec
 /// requires before canonicalising.
-fn build_header_hash_input(
+pub(crate) fn build_header_hash_input(
     all_headers: &[SmtpHeader],
     sig: &DkimSignature,
     dkim_header_value: &str,
@@ -496,7 +496,7 @@ fn at_tag_start(bytes: &[u8], i: usize) -> bool {
 /// not the empty buffer. We support this only because the body side
 /// of a `c=relaxed/simple` signature uses it; the header side is
 /// rejected upstream.
-fn simple_body(body: &[u8]) -> Vec<u8> {
+pub(crate) fn simple_body(body: &[u8]) -> Vec<u8> {
     if body.is_empty() {
         return b"\r\n".to_vec();
     }

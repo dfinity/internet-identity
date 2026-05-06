@@ -62,3 +62,10 @@ mod verify;
 pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord, EmailVerificationStatus};
 #[allow(unused_imports)]
 pub use verify::verify_email;
+
+// Building blocks the email-recovery submit-leaf path needs to admit
+// a DMARC record cached at prepare time and re-check alignment
+// without re-running the full `verify_email` pipeline (which expects
+// the message body the body has already been dropped).
+pub(crate) use alignment::aligns;
+pub(crate) use parse::parse_dmarc_txt;
