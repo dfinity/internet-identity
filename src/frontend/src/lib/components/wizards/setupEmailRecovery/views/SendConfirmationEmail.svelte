@@ -62,7 +62,7 @@
       {$t`Verify your email`}
     </h1>
     <p class="text-text-tertiary text-base font-medium">
-      <Trans>Send the email below. We'll verify it automatically.</Trans>
+      <Trans>Send the email below to confirm.</Trans>
     </p>
   </header>
 
@@ -71,7 +71,7 @@
        whole-row click targets that copy their value to the clipboard.
        From and Body rows are plain text. -->
   <div
-    class="bg-bg-primary border-border-secondary flex flex-col rounded-xl border not-dark:shadow-sm"
+    class="bg-bg-primary border-border-secondary flex flex-col overflow-hidden rounded-xl border not-dark:shadow-sm"
   >
     <Tooltip label={$t`Copied to clipboard`} hidden={!copiedTo} manual>
       <button
@@ -105,14 +105,18 @@
           {fromAddress}
         </span>
         <Tooltip
-          label={$t`Cryptographically verified`}
+          label={$t`Cryptographically authentic`}
           description={verificationDescription}
+          direction="up"
+          align="end"
+          offset="0rem"
+          class="max-w-80"
         >
           <span
-            class="bg-bg-success-secondary text-fg-success-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+            class="text-fg-success-primary inline-flex shrink-0 items-center"
+            aria-label={$t`Cryptographically authentic`}
           >
-            <ShieldCheckIcon class="size-3.5" aria-hidden="true" />
-            <span>{$t`Verified`}</span>
+            <ShieldCheckIcon class="size-4" aria-hidden="true" />
           </span>
         </Tooltip>
       </span>
