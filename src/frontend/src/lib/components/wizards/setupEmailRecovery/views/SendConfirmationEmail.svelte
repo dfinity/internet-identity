@@ -112,12 +112,13 @@
           offset="0rem"
           class="max-w-80"
         >
-          <span
-            class="text-fg-success-primary inline-flex shrink-0 items-center"
+          <button
+            type="button"
+            class="btn btn-tertiary btn-icon text-fg-success-primary !cursor-default !rounded-full"
             aria-label={$t`Cryptographically authentic`}
           >
-            <ShieldCheckIcon class="size-4" aria-hidden="true" />
-          </span>
+            <ShieldCheckIcon class="size-5" aria-hidden="true" />
+          </button>
         </Tooltip>
       </span>
     </div>
