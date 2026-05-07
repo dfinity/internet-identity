@@ -1510,7 +1510,7 @@ We do **not** keep PoC PR #3760's WASM in any release. Its branch closes when Ph
 
 The current design pins each flow to *one* path: full end-to-end DNSSEC, or DoH against an allowlisted apex. A meaningful slice of real-world senders falls between the two:
 
-- **Workspace custom domains with DNSSEC at the apex** (e.g. `dfinity.org` if the registrar publishes a DS): DKIM TXT lives in-zone. The DNSSEC path covers them, no allowlist entry needed. Already supported — the gap is operator-side (registrar-DS) not II-side.
+- **Workspace custom domains with DNSSEC at the apex** (e.g. an organization on Google Workspace whose registrar publishes a DS for the apex): DKIM TXT lives in-zone. The DNSSEC path covers them, no allowlist entry needed. Already supported — the gap is operator-side (registrar-DS) not II-side.
 - **M365 custom domains with DNSSEC at the apex**: DKIM resolves via a signed CNAME at the customer's apex into `*.onmicrosoft.com`, which is **unsigned**. End-to-end DNSSEC fails at the cross-zone hop; the DoH allowlist excludes the customer's apex; result: rejected.
 - **`live.com` and other "apex signed but DKIM CNAMEs into unsigned" patterns**: today on the DoH allowlist out of necessity, even though most of the resolution chain is DNSSEC-signed.
 
@@ -1542,7 +1542,7 @@ vs. today's pure-DoH treatment of the same domains, the hybrid roughly halves ou
 
 #### What this still doesn't cover
 
-- **Custom domains with no DNSSEC at the apex**, e.g. `tackmann.net` self-hosted on a small MTA. There's no signed warrant we can anchor to, so the canister has no safe way to query their DKIM. The owner has to set up DNSSEC + DKIM + DMARC properly; until then their flow is rejected. This is a structural property, not something the hybrid can fix.
+- **Custom domains with no DNSSEC at the apex** — for example a small organization self-hosting mail on a domain whose registrar/nameserver setup never enabled DNSSEC. There's no signed warrant we can anchor to, so the canister has no safe way to query their DKIM. The owner has to set up DNSSEC + DKIM + DMARC properly; until then their flow is rejected. This is a structural property, not something the hybrid can fix.
 - **Sender domains with DKIM resolutions terminating in arbitrary unsigned zones** that we wouldn't curate. Same shape as M365 / `live.com`, but for a no-name backend operator we don't recognize. These would need a deploy-time allowlist addition like `onmicrosoft.com`.
 
 ---
