@@ -236,7 +236,6 @@
       submitDkimLeaf={submitEmailDkimLeaf}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
-      onCancel={() => (showEmailRecoveryDialog = false)}
     />
   </Dialog>
 {/if}

@@ -1,16 +1,15 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
+  import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { MailIcon } from "@lucide/svelte";
 
   interface Props {
     onSubmit: (address: string) => Promise<void>;
-    onCancel: () => void;
     initialError?: string;
   }
 
-  const { onSubmit, onCancel, initialError }: Props = $props();
+  const { onSubmit, initialError }: Props = $props();
 
   let address = $state("");
   let error = $state(initialError);
@@ -45,12 +44,15 @@
 </script>
 
 <form onsubmit={handleSubmit} class="flex flex-col gap-6">
-  <header class="flex flex-col items-center gap-3">
-    <MailIcon class="text-fg-brand-primary size-10" />
+  <div class="my-2"><Steps total={3} current={1} /></div>
+  <header class="flex flex-col gap-2">
+    <p class="text-text-tertiary text-xs font-medium uppercase tracking-wide">
+      {$t`Add email recovery — step 1 of 3`}
+    </p>
     <h1 class="text-text-primary text-2xl font-medium">
       {$t`Add a recovery email`}
     </h1>
-    <p class="text-text-tertiary text-center text-sm">
+    <p class="text-text-tertiary text-base font-medium">
       <Trans>
         Type the email address you want to use to recover this Internet
         Identity. We'll ask you to send a signed email from this inbox to
@@ -69,21 +71,11 @@
     disabled={busy}
     autofocus
   />
-  <div class="flex flex-row justify-end gap-2">
-    <button
-      class="btn btn-secondary btn-md"
-      type="button"
-      onclick={onCancel}
-      disabled={busy}
-    >
-      {$t`Cancel`}
-    </button>
-    <button
-      class="btn btn-primary btn-md"
-      type="submit"
-      disabled={!isShapeValid || busy}
-    >
-      {busy ? $t`Verifying…` : $t`Continue`}
-    </button>
-  </div>
+  <button
+    class="btn btn-primary btn-lg"
+    type="submit"
+    disabled={!isShapeValid || busy}
+  >
+    {busy ? $t`Verifying…` : $t`Continue`}
+  </button>
 </form>

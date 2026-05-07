@@ -25,14 +25,19 @@
   import SendMagicEmail from "./views/SendMagicEmail.svelte";
   import Done from "./views/Done.svelte";
   import FailedView from "./views/FailedView.svelte";
+  import UnsupportedDomain from "./views/UnsupportedDomain.svelte";
+  import { t } from "$lib/stores/locale.store";
   import type {
     EmailRecoveryChallenge,
     EmailRecoveryDnsInput,
+    EmailRecoveryError,
     EmailRecoveryStatus,
     EmailRecoverySubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, assembleDkimResolution } from "$lib/utils/dnssec";
+  import { isCanisterError } from "$lib/utils/utils";
+  import { onDestroy } from "svelte";
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
@@ -57,20 +62,28 @@
         address: string;
       }
     | { kind: "done"; address: string }
+    | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
   let stage = $state<Stage>({ kind: "enter" });
 
   // Cancel the polling loop when the user navigates away mid-flow.
+  // The Dialog's close (X) button unmounts this component without
+  // going through any user-handler path, so we lean on `onDestroy`
+  // to flip the flag — otherwise the closure's poll keeps ticking
+  // against a dead component until status() naturally terminates.
   let polling = $state(false);
+  onDestroy(() => {
+    polling = false;
+  });
 
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
       const reason = variant.Failed;
-      // The variants are produced canister-side; we map the most
-      // common ones to copy the user can act on. Anything else
-      // falls through to the variant key.
       if ("DomainNotAllowlisted" in reason) {
+        // This shouldn't surface here normally — `handleAddressSubmitted`
+        // routes the synchronous form to the unsupported view — but
+        // keep the copy in case a delayed status flip carries it.
         return `Internet Identity can't verify mail from ${reason.DomainNotAllowlisted} yet. Try a different email or use a recovery phrase.`;
       }
       if ("DomainNotSupported" in reason) {
@@ -114,13 +127,12 @@
     // leaf later (after polling sees `NeedDkimLeaf`). If the chain
     // assembly yields nothing (no DNSSEC) we still let the canister
     // try the DoH path; only when *neither* domain config applies
-    // does the user get a "DomainNotAllowlisted" error back.
+    // does the user get a "DomainNotAllowlisted" error back, which
+    // we translate into the unsupported-domain view.
     let dnsProof: DnsProofBundle | undefined;
     try {
       dnsProof = await assembleSkeleton(domain, true);
     } catch {
-      // If chain assembly throws (malformed RRSIG etc.) just let
-      // the canister fall through to the DoH path.
       dnsProof = undefined;
     }
 
@@ -129,9 +141,25 @@
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
 
-    const challenge = await prepare(input);
-    stage = { kind: "sending", challenge, address };
-    void runPoll(challenge.nonce, domain, address);
+    try {
+      const challenge = await prepare(input);
+      stage = { kind: "sending", challenge, address };
+      void runPoll(challenge.nonce, domain, address);
+    } catch (e) {
+      // `DomainNotAllowlisted` / `DomainNotSupported` at prepare
+      // time means we've got neither DNSSEC nor an allowlist entry
+      // — route to the dedicated unsupported view so the user gets
+      // the technical "why + how to fix" treatment instead of an
+      // opaque inline error string.
+      if (isCanisterError<EmailRecoveryError>(e)) {
+        if (e.type === "DomainNotAllowlisted" || e.type === "DomainNotSupported") {
+          stage = { kind: "unsupported", domain };
+          return;
+        }
+      }
+      // Anything else propagates to EnterAddress's inline error.
+      throw e;
+    }
   };
 
   const runPoll = async (nonce: string, domain: string, address: string) => {
@@ -192,17 +220,11 @@
   const handleRetry = () => {
     stage = { kind: "enter" };
   };
-
-  const handleCancel = () => {
-    polling = false;
-    onClose();
-  };
 </script>
 
 {#if stage.kind === "enter"}
   <EnterAddress
     onSubmit={handleAddressSubmitted}
-    onCancel={handleCancel}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
@@ -211,14 +233,12 @@
     mailbox={`register@${window.location.hostname}`}
     fromAddress={stage.address}
     expiresAt={stage.challenge.expires_at}
-    onCancel={handleCancel}
+    title={$t`Add email recovery`}
   />
 {:else if stage.kind === "done"}
   <Done address={stage.address} onDone={onClose} />
+{:else if stage.kind === "unsupported"}
+  <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
 {:else}
-  <FailedView
-    reason={stage.reason}
-    onRetry={handleRetry}
-    onCancel={handleCancel}
-  />
+  <FailedView reason={stage.reason} onRetry={handleRetry} />
 {/if}
