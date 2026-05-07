@@ -67,7 +67,7 @@ test.describe("Email recovery — wizard surface", () => {
 
     await page
       .getByRole("main")
-      .getByRole("button", { name: "Add email" })
+      .getByRole("button", { name: "Activate recovery email" })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -124,7 +124,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
 
     await page
       .getByRole("main")
-      .getByRole("button", { name: "Add email" })
+      .getByRole("button", { name: "Activate recovery email" })
       .click();
     const setupDialog = page.getByRole("dialog");
     await expect(setupDialog).toBeVisible();

@@ -20,7 +20,11 @@
 >
   <div class="mb-3 flex h-9 flex-row items-center">
     <ShieldOffIcon class="text-fg-tertiary size-6" />
-    <button class="btn btn-secondary btn-sm ms-auto" onclick={onActivate}>
+    <button
+      class="btn btn-primary btn-sm ms-auto"
+      onclick={onActivate}
+      aria-label={$t`Activate recovery phrase`}
+    >
       {$t`Activate`}
     </button>
   </div>
@@ -33,8 +37,8 @@
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="text-text-primary text-xs">
     <Trans>
-      A 24-word seed kept offline. Use it to recover when you lose all other
-      access methods.
+      A 24-word seed you write down and keep offline. Use it to recover when you
+      lose all other access methods.
     </Trans>
   </div>
 </section>

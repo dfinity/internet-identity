@@ -96,6 +96,9 @@
     </div>
   </div>
   <div class="text-text-primary text-xs">
-    <Trans>Sign in by sending a signed email from your inbox.</Trans>
+    <Trans>
+      Sign in by sending a signed email from your inbox. Use it to recover when
+      you lose all other access methods.
+    </Trans>
   </div>
 </section>

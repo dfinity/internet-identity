@@ -393,51 +393,53 @@
   {/if}
 </div>
 
-<section>
-  <h2 class="text-text-primary mt-10 text-lg font-semibold">
-    {$t`How to stay secure`}
-  </h2>
-  <div
-    class={[
-      // Layout
-      "mt-5 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5",
-      // Articles
-      "[&_article]:border-border-secondary [&_article]:bg-bg-primary [&_article]:rounded-2xl [&_article]:border [&_article]:p-5 [&_article]:not-dark:shadow-sm",
-      // Headings
-      "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
-      // Paragraphs
-      "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
-    ]}
-  >
-    <article>
-      <h3>{$t`Keep it secret`}</h3>
-      <p>
-        <Trans>
-          Your recovery phrase gives full control over your identity. Never
-          share it and only use it on the official website.
-        </Trans>
-      </p>
-    </article>
-    <article>
-      <h3>{$t`Store it safely`}</h3>
-      <p>
-        <Trans>
-          Write down all 24 words correctly and keep them offline. Do not store
-          them in the cloud or on devices.
-        </Trans>
-      </p>
-    </article>
-    <article>
-      <h3>{$t`Replace it anytime`}</h3>
-      <p>
-        <Trans>
-          You can reset your recovery phrase at any time. This keeps your
-          identity secure if it is ever exposed.
-        </Trans>
-      </p>
-    </article>
-  </div>
-</section>
+{#if !$EMAIL_RECOVERY}
+  <section>
+    <h2 class="text-text-primary mt-10 text-lg font-semibold">
+      {$t`How to stay secure`}
+    </h2>
+    <div
+      class={[
+        // Layout
+        "mt-5 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5",
+        // Articles
+        "[&_article]:border-border-secondary [&_article]:bg-bg-primary [&_article]:rounded-2xl [&_article]:border [&_article]:p-5 [&_article]:not-dark:shadow-sm",
+        // Headings
+        "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
+        // Paragraphs
+        "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
+      ]}
+    >
+      <article>
+        <h3>{$t`Keep it secret`}</h3>
+        <p>
+          <Trans>
+            Your recovery phrase gives full control over your identity. Never
+            share it and only use it on the official website.
+          </Trans>
+        </p>
+      </article>
+      <article>
+        <h3>{$t`Store it safely`}</h3>
+        <p>
+          <Trans>
+            Write down all 24 words correctly and keep them offline. Do not
+            store them in the cloud or on devices.
+          </Trans>
+        </p>
+      </article>
+      <article>
+        <h3>{$t`Replace it anytime`}</h3>
+        <p>
+          <Trans>
+            You can reset your recovery phrase at any time. This keeps your
+            identity secure if it is ever exposed.
+          </Trans>
+        </p>
+      </article>
+    </div>
+  </section>
+{/if}
 
 {#if showRecoveryPhraseSetup !== undefined}
   <Dialog
