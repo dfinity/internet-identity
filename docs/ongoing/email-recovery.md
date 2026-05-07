@@ -19,6 +19,7 @@ still planned.
 | Recovery flow (§8.5): `prepare_delegation`, delegation issuance, `get_delegation` | In review | PR [#3843](https://github.com/dfinity/internet-identity/pull/3843) |
 | Frontend wizards (§8.6, §8.10) | In review | PR [#3844](https://github.com/dfinity/internet-identity/pull/3844) |
 | Deploy/upgrade scripts (§7.5) — IANA root anchor fetcher, `dnssec_config` + `doh_config` install args | In review | PR [#3855](https://github.com/dfinity/internet-identity/pull/3855) |
+| Frontend UX overhaul (§8.6) | In review | PR [#3857](https://github.com/dfinity/internet-identity/pull/3857) |
 
 Nothing in this stack is merged to `main` yet; all PRs are open and stacked on each other.
 
