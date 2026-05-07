@@ -1502,7 +1502,52 @@ We do **not** keep PoC PR #3760's WASM in any release. Its branch closes when Ph
 
 ---
 
-## 12. References
+## 12. Future work
+
+### 12.1 Hybrid DNSSEC + DoH path for custom domains
+
+**Status: deferred. Open work item.**
+
+The current design pins each flow to *one* path: full end-to-end DNSSEC, or DoH against an allowlisted apex. A meaningful slice of real-world senders falls between the two:
+
+- **Workspace custom domains with DNSSEC at the apex** (e.g. `dfinity.org` if the registrar publishes a DS): DKIM TXT lives in-zone. The DNSSEC path covers them, no allowlist entry needed. Already supported — the gap is operator-side (registrar-DS) not II-side.
+- **M365 custom domains with DNSSEC at the apex**: DKIM resolves via a signed CNAME at the customer's apex into `*.onmicrosoft.com`, which is **unsigned**. End-to-end DNSSEC fails at the cross-zone hop; the DoH allowlist excludes the customer's apex; result: rejected.
+- **`live.com` and other "apex signed but DKIM CNAMEs into unsigned" patterns**: today on the DoH allowlist out of necessity, even though most of the resolution chain is DNSSEC-signed.
+
+The natural design that handles all three cases:
+
+1. **FE walks DNSSEC as far as the chain holds** and submits whatever it got — signed apex, signed CNAME, stopping at the first cross-zone unsigned hop.
+2. **BE verifies the signed prefix** with the existing DNSSEC verifier (§7.3).
+3. **BE inspects the unsigned tail's owner zone**. If the zone is in `DohConfig.allowed_domains` (with label-anchored suffix matching), the BE issues a DoH outcall fan-out for the remaining hops and applies the existing 3-of-5 quorum (§7.6). Otherwise the bundle is rejected.
+
+This reuses the existing allowlist for both pure-DoH and hybrid paths — one config, one matching rule (`name == entry || name.ends_with("." + entry)`). Adding `onmicrosoft.com` to the allowlist covers every M365 tenant globally because the suffix match captures `*.onmicrosoft.com`. The cryptographic warrant for *which* unsigned name to query comes from the signed CNAME the FE walked, so an attacker can't redirect a DKIM lookup to a different tenant without forging a signature in the customer's signed apex.
+
+**The precise rule:** a custom domain works iff its apex is DNSSEC-signed end-to-end AND either (a) DKIM resolves entirely in-zone, or (b) the unsigned tail terminates in an allowlisted operator zone. Apex signing is a one-time registrar action by the custom domain owner; everything else is automatic.
+
+#### Cost trade-off
+
+The hybrid's BE outcall is the only expensive piece — the FE-side DNSSEC walk is browser-DoH (free); only the unsigned-tail fetch costs cycles. Per-tenant cache fragmentation is real and inherent to per-organization DKIM keys (Workspace customers have the same property — gmail.com is a special case of shared infrastructure, not the norm). Bounding levers:
+
+- The 1 h `max_cache_age_secs` default can be lifted; DKIM keys rotate on month timescales, so a 7-day cap brings the worst case to one cold fetch per tenant per week.
+- §8.9's per-anchor outcall caps already prevent unbounded fan-out from an attacker registering throwaway domains.
+
+vs. today's pure-DoH treatment of the same domains, the hybrid roughly halves outcall cost: one fan-out for the DKIM tail instead of two (today's pure DoH fetches both DKIM and DMARC; in the hybrid DMARC validates via DNSSEC at the apex or falls back to strict `d=` alignment per §6.3).
+
+#### Implementation surface
+
+- **FE**: emit a partial `DnsProofBundle` when the chain breaks at a CNAME, recording the unsigned-tail anchor name.
+- **BE**: extend the §7.3 verifier to accept partial bundles; gate the unsigned tail on `allowed_domains` (suffix match); reuse `crate::doh::fetch_txt` for the tail fetch.
+- **Config**: add `onmicrosoft.com` to `DEFAULT_DOH_ALLOWED_DOMAINS`. Other operator-backend zones can be added the same way as new managed-mail platforms emerge.
+- **Matching helper**: lift the gate in `crate::doh::fetch_txt` from exact equality to label-anchored suffix match — same shape as the existing `name_within_domain` helper.
+
+#### What this still doesn't cover
+
+- **Custom domains with no DNSSEC at the apex**, e.g. `tackmann.net` self-hosted on a small MTA. There's no signed warrant we can anchor to, so the canister has no safe way to query their DKIM. The owner has to set up DNSSEC + DKIM + DMARC properly; until then their flow is rejected. This is a structural property, not something the hybrid can fix.
+- **Sender domains with DKIM resolutions terminating in arbitrary unsigned zones** that we wouldn't curate. Same shape as M365 / `live.com`, but for a no-name backend operator we don't recognize. These would need a deploy-time allowlist addition like `onmicrosoft.com`.
+
+---
+
+## 13. References
 
 - RFC 6376 — DomainKeys Identified Mail (DKIM) Signatures
 - RFC 8301 — Cryptographic Algorithms and Key Usage for DKIM
