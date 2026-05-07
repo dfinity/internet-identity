@@ -2,7 +2,7 @@
   import Trans from "../../../lib/components/locale/Trans.svelte";
   import { t } from "$lib/stores/locale.store";
   import {
-    ChevronRightIcon,
+    ArrowRightIcon,
     KeyRoundIcon,
     MailIcon,
     RefreshCcw,
@@ -200,36 +200,52 @@
         <div class="mb-3 flex flex-col gap-2">
           <ButtonCard
             onclick={() => (showRecoveryDialog = true)}
-            class="py-4"
+            class="group !flex-col !items-stretch !gap-1 py-4"
             aria-label={$t`Recover with phrase`}
           >
-            <KeyRoundIcon class="text-fg-tertiary size-5 shrink-0" />
-            <div class="flex grow flex-col items-start">
-              <span class="text-text-primary text-base font-semibold">
+            <span class="flex w-full items-center gap-3">
+              <KeyRoundIcon class="text-fg-tertiary size-5 shrink-0" />
+              <span
+                class="text-text-primary grow text-start text-base font-semibold"
+              >
                 {$t`Recovery phrase`}
               </span>
-              <span class="text-text-tertiary text-sm font-normal">
-                {$t`Type your 24 words.`}
-              </span>
-            </div>
-            <ChevronRightIcon class="text-fg-tertiary size-5 shrink-0" />
+              <ArrowRightIcon
+                class={[
+                  "text-fg-tertiary me-3 size-5 shrink-0 transform opacity-0 transition-all duration-200 rtl:-scale-x-100",
+                  "group-enabled:group-hover:me-2 group-enabled:group-hover:opacity-100",
+                  "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
+                ]}
+              />
+            </span>
+            <span class="text-text-tertiary ps-8 text-sm font-normal">
+              {$t`Type your 24 words.`}
+            </span>
           </ButtonCard>
           {#if $EMAIL_RECOVERY}
             <ButtonCard
               onclick={() => (showEmailRecoveryDialog = true)}
-              class="py-4"
+              class="group !flex-col !items-stretch !gap-1 py-4"
               aria-label={$t`Recover with email`}
             >
-              <MailIcon class="text-fg-tertiary size-5 shrink-0" />
-              <div class="flex grow flex-col items-start">
-                <span class="text-text-primary text-base font-semibold">
+              <span class="flex w-full items-center gap-3">
+                <MailIcon class="text-fg-tertiary size-5 shrink-0" />
+                <span
+                  class="text-text-primary grow text-start text-base font-semibold"
+                >
                   {$t`Recovery email`}
                 </span>
-                <span class="text-text-tertiary text-sm font-normal">
-                  {$t`Send a signed email from your inbox.`}
-                </span>
-              </div>
-              <ChevronRightIcon class="text-fg-tertiary size-5 shrink-0" />
+                <ArrowRightIcon
+                  class={[
+                    "text-fg-tertiary me-3 size-5 shrink-0 transform opacity-0 transition-all duration-200 rtl:-scale-x-100",
+                    "group-enabled:group-hover:me-2 group-enabled:group-hover:opacity-100",
+                    "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
+                  ]}
+                />
+              </span>
+              <span class="text-text-tertiary ps-8 text-sm font-normal">
+                {$t`Send a signed email from your inbox.`}
+              </span>
             </ButtonCard>
           {/if}
         </div>

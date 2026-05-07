@@ -114,10 +114,10 @@
         >
           <button
             type="button"
-            class="btn btn-tertiary btn-icon text-fg-success-primary !cursor-default !rounded-full"
+            class="btn btn-tertiary btn-icon text-fg-success-primary -me-1.5 size-7! shrink-0 !cursor-default !rounded-full"
             aria-label={$t`Cryptographically authentic`}
           >
-            <ShieldCheckIcon class="size-5" aria-hidden="true" />
+            <ShieldCheckIcon class="size-4" aria-hidden="true" />
           </button>
         </Tooltip>
       </span>

@@ -18,20 +18,20 @@
     className,
   ]}
 >
-  <header class="flex flex-row gap-3">
-    <MailIcon class="text-fg-tertiary mt-0.5 size-5 shrink-0" />
-    <div class="flex flex-col">
-      <h2 class="text-text-primary text-base font-semibold">
-        {$t`Recovery email`}
-      </h2>
-      <p class="text-text-tertiary text-sm">
-        <Trans>Not activated.</Trans>
-      </p>
-    </div>
-  </header>
-  <div class="mt-5">
-    <button class="btn btn-primary btn-sm" onclick={onActivate}>
+  <div class="mb-3 flex h-9 flex-row items-center">
+    <MailIcon class="text-fg-tertiary size-6" />
+    <button class="btn btn-secondary btn-sm ms-auto" onclick={onActivate}>
       {$t`Add email`}
     </button>
+  </div>
+  <div class="text-text-primary mb-1 text-base font-semibold">
+    {$t`Recovery email`}
+  </div>
+  <div class="text-text-tertiary text-sm">
+    {$t`Not activated`}
+  </div>
+  <div class="border-border-tertiary my-5 border-t"></div>
+  <div class="text-text-primary text-xs">
+    <Trans>Sign in by sending a signed email from your inbox.</Trans>
   </div>
 </section>

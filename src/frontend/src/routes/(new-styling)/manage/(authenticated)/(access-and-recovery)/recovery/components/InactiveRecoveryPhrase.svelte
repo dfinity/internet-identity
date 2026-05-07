@@ -11,35 +11,30 @@
   const { onActivate, class: className, ...props }: Props = $props();
 </script>
 
-<div class="@container">
-  <section
-    {...props}
-    class={[
-      "flex rounded-2xl border p-6",
-      "bg-bg-error-primary border-fg-error-primary",
-      "@max-lg:flex-col",
-      "@lg:flex-row",
-      className,
-    ]}
-  >
-    <ShieldOffIcon
-      class={["text-fg-error-primary size-5 shrink-0", "@lg:mt-0.5"]}
-    />
-    <header class={["flex flex-col", "@max-lg:mt-3 @max-lg:mb-5", "@lg:mx-3"]}>
-      <h2 class="text-text-primary text-base font-semibold">
-        {$t`Recovery phrase not activated`}
-      </h2>
-      <p class="text-text-tertiary text-sm">
-        <Trans>
-          Activate it so that you can recover your identity at any time.
-        </Trans>
-      </p>
-    </header>
-    <button
-      class="btn btn-primary btn-sm @lg:my-auto @lg:ms-auto"
-      onclick={onActivate}
-    >
+<section
+  {...props}
+  class={[
+    "bg-bg-primary border-border-secondary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm",
+    className,
+  ]}
+>
+  <div class="mb-3 flex h-9 flex-row items-center">
+    <ShieldOffIcon class="text-fg-tertiary size-6" />
+    <button class="btn btn-secondary btn-sm ms-auto" onclick={onActivate}>
       {$t`Activate`}
     </button>
-  </section>
-</div>
+  </div>
+  <div class="text-text-primary mb-1 text-base font-semibold">
+    {$t`Recovery phrase`}
+  </div>
+  <div class="text-text-tertiary text-sm">
+    {$t`Not activated`}
+  </div>
+  <div class="border-border-tertiary my-5 border-t"></div>
+  <div class="text-text-primary text-xs">
+    <Trans>
+      A 24-word seed kept offline. Use it to recover when you lose all other
+      access methods.
+    </Trans>
+  </div>
+</section>
