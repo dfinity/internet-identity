@@ -57,6 +57,7 @@ mod dmarc;
 mod dnssec;
 mod doh;
 mod email_recovery;
+mod email_recovery_debug_log;
 mod http;
 mod ii_domain;
 
@@ -1620,6 +1621,25 @@ mod email_recovery_api {
 
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
         Ok(())
+    }
+
+    /// TEMPORARY (PR #3855): anonymous query exposing the in-memory
+    /// debug log appended by `er_dbg!` calls scattered through the
+    /// email-recovery + DoH path. Heap-only, lost on every upgrade,
+    /// capped at a few thousand lines. Remove together with the
+    /// `email_recovery_debug_log` module once the staging
+    /// outlook.com flow is confirmed working.
+    #[query]
+    fn email_recovery_debug_logs() -> Vec<String> {
+        crate::email_recovery_debug_log::snapshot()
+    }
+
+    /// TEMPORARY (PR #3855): companion to `email_recovery_debug_logs`.
+    /// Anonymous update so a tester can reset the buffer between
+    /// flows. Remove with the rest of the debug surface.
+    #[update]
+    fn email_recovery_debug_clear() {
+        crate::email_recovery_debug_log::clear();
     }
 }
 
