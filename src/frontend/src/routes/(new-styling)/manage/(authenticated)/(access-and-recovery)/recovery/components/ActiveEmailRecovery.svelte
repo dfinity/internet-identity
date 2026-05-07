@@ -19,63 +19,53 @@
     class: className,
     ...props
   }: Props = $props();
+
+  const lastUsedLabel = $derived.by(() => {
+    const ts = credential.last_used[0];
+    if (ts !== undefined) {
+      return $t`Last used: ${$formatRelative(new Date(nanosToMillis(ts)), { style: "long" })}`;
+    }
+    return $t`Never used`;
+  });
+  const lastUsedTooltip = $derived.by(() => {
+    const ts = credential.last_used[0];
+    if (ts !== undefined) {
+      return $formatDate(new Date(nanosToMillis(ts)), {
+        timeStyle: "short",
+        dateStyle: "medium",
+      });
+    }
+    return $t`Has not been used yet`;
+  });
 </script>
 
-<div class="@container">
-  <section
-    {...props}
-    class={[
-      "flex flex-col rounded-2xl border p-6",
-      "bg-bg-primary border-border-secondary not-dark:shadow-sm",
-      "@xl:flex-row",
-      className,
-    ]}
-  >
-    <MailCheckIcon
-      class={["text-fg-success-primary size-5 shrink-0", "@xl:mt-0.5"]}
-    />
-    <header class={["flex flex-col", "@max-xl:mt-3", "@xl:mx-3"]}>
+<section
+  {...props}
+  class={[
+    "bg-bg-primary border-border-secondary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm",
+    className,
+  ]}
+>
+  <header class="flex flex-row gap-3">
+    <MailCheckIcon class="text-fg-success-primary mt-0.5 size-5 shrink-0" />
+    <div class="flex min-w-0 flex-col">
       <h2 class="text-text-primary text-base font-semibold">
-        {$t`Recovery email active`}
+        {$t`Recovery email`}
       </h2>
-      <p class="text-text-tertiary text-sm break-all">{credential.address}</p>
-    </header>
-    <hr class={["border-border-tertiary my-5 border-t", "@xl:hidden"]} />
-    <dl class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>
-      <dt class="text-text-primary text-xs font-semibold">
-        {$t`Last used`}
-      </dt>
-      <dd class="text-text-primary cursor-default text-xs">
-        {#if credential.last_used[0] !== undefined}
-          {@const date = new Date(nanosToMillis(credential.last_used[0]))}
-          <Tooltip
-            label={$formatDate(date, {
-              timeStyle: "short",
-              dateStyle: "medium",
-            })}
-            direction="up"
-            align="start"
-          >
-            <span>{$formatRelative(date, { style: "long" })}</span>
-          </Tooltip>
-        {:else}
-          <Tooltip
-            label={$t`Has not been used yet`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`n/a`}</span>
-          </Tooltip>
-        {/if}
-      </dd>
-    </dl>
-    <div class="flex flex-row gap-2 @max-xl:mt-5 @xl:my-auto">
-      <button class="btn btn-secondary btn-sm" onclick={onReplace}>
-        {$t`Replace`}
-      </button>
-      <button class="btn btn-secondary btn-sm btn-danger" onclick={onRemove}>
-        {$t`Remove`}
-      </button>
+      <p class="text-text-tertiary truncate text-sm">{credential.address}</p>
+      <Tooltip label={lastUsedTooltip} direction="up" align="start">
+        <p class="text-text-tertiary cursor-default text-xs">
+          {lastUsedLabel}
+        </p>
+      </Tooltip>
     </div>
-  </section>
-</div>
+  </header>
+  <div class="mt-5 flex flex-row gap-2">
+    <button class="btn btn-secondary btn-sm" onclick={onReplace}>
+      {$t`Replace`}
+    </button>
+    <button class="btn btn-secondary btn-sm btn-danger" onclick={onRemove}>
+      {$t`Remove`}
+    </button>
+  </div>
+</section>

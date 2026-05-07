@@ -303,6 +303,15 @@
     void invalidateAll();
   };
 
+  const handleEmailWizardSuccess = (address: string) => {
+    showEmailRecoverySetup = false;
+    void invalidateAll();
+    toaster.success({
+      title: $t`Recovery email added`,
+      description: $t`${address} is now a recovery method.`,
+    });
+  };
+
   // Warn user if they're leaving in the middle of a recovery phrase set-up
   beforeNavigate((navigation) => {
     if (showRecoveryPhraseSetup === undefined || navigation.type !== "leave") {
@@ -459,7 +468,7 @@
       prepare={prepareAddEmail}
       status={statusEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
-      onClose={handleEmailWizardClosed}
+      onSuccess={handleEmailWizardSuccess}
     />
   </Dialog>
 {/if}

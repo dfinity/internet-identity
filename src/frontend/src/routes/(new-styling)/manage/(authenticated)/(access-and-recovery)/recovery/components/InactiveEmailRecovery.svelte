@@ -11,33 +11,27 @@
   const { onActivate, class: className, ...props }: Props = $props();
 </script>
 
-<div class="@container">
-  <section
-    {...props}
-    class={[
-      "flex rounded-2xl border p-6",
-      "bg-bg-primary border-border-secondary not-dark:shadow-sm",
-      "@max-lg:flex-col",
-      "@lg:flex-row",
-      className,
-    ]}
-  >
-    <MailIcon class={["text-fg-tertiary size-5 shrink-0", "@lg:mt-0.5"]} />
-    <header class={["flex flex-col", "@max-lg:mt-3 @max-lg:mb-5", "@lg:mx-3"]}>
+<section
+  {...props}
+  class={[
+    "bg-bg-primary border-border-secondary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm",
+    className,
+  ]}
+>
+  <header class="flex flex-row gap-3">
+    <MailIcon class="text-fg-tertiary mt-0.5 size-5 shrink-0" />
+    <div class="flex flex-col">
       <h2 class="text-text-primary text-base font-semibold">
         {$t`Recovery email`}
       </h2>
       <p class="text-text-tertiary text-sm">
-        <Trans>
-          Receive a sign-in link by sending a signed email from your inbox.
-        </Trans>
+        <Trans>Not activated.</Trans>
       </p>
-    </header>
-    <button
-      class="btn btn-primary btn-sm @lg:my-auto @lg:ms-auto"
-      onclick={onActivate}
-    >
+    </div>
+  </header>
+  <div class="mt-5">
+    <button class="btn btn-primary btn-sm" onclick={onActivate}>
       {$t`Add email`}
     </button>
-  </section>
-</div>
+  </div>
+</section>

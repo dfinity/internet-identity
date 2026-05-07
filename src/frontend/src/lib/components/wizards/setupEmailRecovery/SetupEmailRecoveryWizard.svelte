@@ -2,8 +2,7 @@
   /**
    * Setup wizard for binding an email address as a recovery method
    * to the currently-authenticated Internet Identity. Drives the
-   * three-step flow described in `docs/ongoing/email-recovery.md`
-   * §8.4:
+   * flow described in `docs/ongoing/email-recovery.md` §8.4:
    *
    *   1. User types their email address.
    *   2. We assemble a DNSSEC *skeleton* bundle (chain + optional
@@ -19,14 +18,16 @@
    *      Failed/Expired). On the DoH path the canister finishes
    *      verification synchronously inside `smtp_request`, so we go
    *      straight from `Pending` to terminal — no `submit` step.
+   *
+   * On success the wizard hands control back to the host via
+   * `onSuccess(address)`; the host fires a toast and closes the
+   * dialog. There is no terminal "all set" view in the wizard.
    */
 
   import EnterAddress from "./views/EnterAddress.svelte";
   import SendConfirmationEmail from "./views/SendConfirmationEmail.svelte";
-  import Done from "./views/Done.svelte";
   import FailedView from "./views/FailedView.svelte";
   import UnsupportedDomain from "./views/UnsupportedDomain.svelte";
-  import { t } from "$lib/stores/locale.store";
   import type {
     EmailRecoveryChallenge,
     EmailRecoveryDnsInput,
@@ -48,12 +49,14 @@
     submitDkimLeaf: (
       arg: EmailRecoverySubmitDkimLeafArg,
     ) => Promise<EmailRecoveryStatus>;
-    /** Wizard close — called when the host Dialog closes (X button or
-     *  outside-click) and when `Done` is clicked. */
-    onClose: () => void;
+    /** Called once on `RegistrationSucceeded`. The host is expected to
+     *  show a success toast and close the dialog. */
+    onSuccess: (address: string) => void;
   }
 
-  const { prepare, status, submitDkimLeaf, onClose }: Props = $props();
+  const { prepare, status, submitDkimLeaf, onSuccess }: Props = $props();
+
+  type Path = "dnssec" | "doh";
 
   type Stage =
     | { kind: "enter"; initialError?: string }
@@ -61,8 +64,8 @@
         kind: "sending";
         challenge: EmailRecoveryChallenge;
         address: string;
+        path: Path;
       }
-    | { kind: "done"; address: string }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
@@ -136,6 +139,7 @@
     } catch {
       dnsProof = undefined;
     }
+    const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
     const input: EmailRecoveryDnsInput = {
       address,
@@ -144,7 +148,7 @@
 
     try {
       const challenge = await prepare(input);
-      stage = { kind: "sending", challenge, address };
+      stage = { kind: "sending", challenge, address, path };
       void runPoll(challenge.nonce, domain, address);
     } catch (e) {
       // `DomainNotAllowlisted` / `DomainNotSupported` at prepare
@@ -175,7 +179,8 @@
       while (polling && stage.kind === "sending") {
         const result = await status(nonce);
         if ("RegistrationSucceeded" in result) {
-          stage = { kind: "done", address };
+          polling = false;
+          onSuccess(address);
           return;
         }
         if ("Failed" in result || "Expired" in result) {
@@ -198,7 +203,8 @@
                 extra_chains: walked.extraChains,
               });
               if ("RegistrationSucceeded" in submission) {
-                stage = { kind: "done", address };
+                polling = false;
+                onSuccess(address);
                 return;
               }
               if ("Failed" in submission || "Expired" in submission) {
@@ -236,11 +242,8 @@
     nonce={stage.challenge.nonce}
     mailbox={`register@${window.location.hostname}`}
     fromAddress={stage.address}
-    expiresAt={stage.challenge.expires_at}
-    title={$t`Add email recovery`}
+    path={stage.path}
   />
-{:else if stage.kind === "done"}
-  <Done address={stage.address} onDone={onClose} />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
 {:else}

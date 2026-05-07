@@ -1,10 +1,8 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { MailIcon, CopyIcon, Loader2Icon } from "@lucide/svelte";
-  import { onMount, onDestroy } from "svelte";
+  import { CopyIcon, ExternalLinkIcon, ShieldCheckIcon } from "@lucide/svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
   import { waitFor } from "$lib/utils/utils";
 
   interface Props {
@@ -17,37 +15,14 @@
     /** Address the user typed at step 1, shown back so they don't send
      *  the email from the wrong account. */
     fromAddress: string;
-    /** Unix-ns timestamp at which the canister-side challenge expires. */
-    expiresAt: bigint;
-    /** Wizard heading prefix — "Add email recovery" for setup, "Recover
-     *  with email" for recovery. */
-    title: string;
+    /** Which DNS-verification path the canister will run when the
+     *  email arrives — drives the trust-story tooltip on the From row.
+     *  "dnssec" when the FE submitted a signed bundle; "doh" when the
+     *  canister will fall back to its multi-provider DoH quorum. */
+    path: "dnssec" | "doh";
   }
 
-  const { nonce, mailbox, fromAddress, expiresAt, title }: Props = $props();
-
-  // Live countdown to expiration. Canister gives us 30 minutes; we
-  // tick every second so the UI doesn't lie about how much time is
-  // left.
-  let now = $state(Date.now());
-  let timer: ReturnType<typeof setInterval> | undefined;
-  onMount(() => {
-    timer = setInterval(() => {
-      now = Date.now();
-    }, 1_000);
-  });
-  onDestroy(() => {
-    if (timer) clearInterval(timer);
-  });
-  const expiresAtMs = $derived(Number(expiresAt / BigInt(1_000_000)));
-  const remainingSecs = $derived(
-    Math.max(0, Math.floor((expiresAtMs - now) / 1_000)),
-  );
-  const remainingLabel = $derived(
-    remainingSecs >= 60
-      ? `${Math.floor(remainingSecs / 60)}:${String(remainingSecs % 60).padStart(2, "0")}`
-      : `${remainingSecs}s`,
-  );
+  const { nonce, mailbox, fromAddress, path }: Props = $props();
 
   // mailto: link — pre-fills To and Subject, leaves the body empty.
   // Honoured by every native mail client we care about (Apple Mail,
@@ -57,9 +32,7 @@
     `mailto:${mailbox}?subject=${encodeURIComponent(nonce)}`,
   );
 
-  // One-shot "Copied" tooltip per copy target. Same pattern as
-  // ContinueOnNewDevice.svelte: navigator.clipboard, flip flag, wait
-  // ~700 ms, flip back.
+  // One-shot "Copied" tooltip per copy target.
   let copiedTo = $state(false);
   let copiedSubject = $state(false);
 
@@ -75,96 +48,100 @@
     await waitFor(700);
     copiedSubject = false;
   };
+
+  const verificationDescription = $derived(
+    path === "dnssec"
+      ? $t`Your provider's DKIM key is verified end-to-end via DNSSEC — no trusted intermediaries.`
+      : $t`Your provider's DKIM key is verified by independent DNS resolvers — three out of five must agree.`,
+  );
 </script>
 
 <div class="flex flex-col gap-6">
-  <div class="my-2"><Steps total={3} current={2} /></div>
-
   <header class="flex flex-col gap-2">
-    <p class="text-text-tertiary text-xs font-medium tracking-wide uppercase">
-      {title} — {$t`step 2 of 3`}
-    </p>
     <h1 class="text-text-primary text-2xl font-medium">
-      {$t`Send your confirmation email`}
+      {$t`Verify your email`}
     </h1>
     <p class="text-text-tertiary text-base font-medium">
-      <Trans>
-        Open your inbox and send the email below — we're watching for it.
-      </Trans>
+      <Trans>Send the email below. We'll verify it automatically.</Trans>
     </p>
   </header>
 
-  <!-- The pre-filled email card. Each row is a label + value; To and
-       Subject have whole-row copy buttons matching the
-       ContinueOnNewDevice pattern. -->
+  <!-- Pre-filled email card. Each row places its label above the value
+       so the dialog stays comfortably narrow. To and Subject rows are
+       whole-row click targets that copy their value to the clipboard.
+       From and Body rows are plain text. -->
   <div
     class="bg-bg-primary border-border-secondary flex flex-col rounded-xl border not-dark:shadow-sm"
   >
-    <div
-      class="border-border-tertiary flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
-    >
-      <span
-        class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"
+    <Tooltip label={$t`Copied to clipboard`} hidden={!copiedTo} manual>
+      <button
+        type="button"
+        onclick={copyTo}
+        aria-label={$t`Copy recipient address`}
+        class="border-border-tertiary hover:bg-bg-secondary focus-visible:bg-bg-secondary flex w-full flex-col gap-1 border-b px-4 py-3 text-start transition-colors outline-none"
       >
-        {$t`To`}
-      </span>
-      <Tooltip
-        label={$t`Copied to clipboard`}
-        hidden={!copiedTo}
-        manual
-        class="grow"
-      >
-        <button
-          class="btn btn-secondary btn-sm w-full justify-between font-mono"
-          onclick={copyTo}
-          aria-label={$t`Copy recipient`}
+        <span
+          class="text-text-tertiary text-xs font-semibold tracking-wide uppercase"
         >
-          <span class="truncate">{mailbox}</span>
-          <CopyIcon class="size-4 shrink-0" />
-        </button>
-      </Tooltip>
-    </div>
-    <div
-      class="border-border-tertiary flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
-    >
+          {$t`To`}
+        </span>
+        <span class="flex items-center gap-2">
+          <span class="text-text-primary grow truncate font-mono text-sm">
+            {mailbox}
+          </span>
+          <CopyIcon class="text-fg-tertiary size-4 shrink-0" />
+        </span>
+      </button>
+    </Tooltip>
+
+    <div class="border-border-tertiary flex flex-col gap-1 border-b px-4 py-3">
       <span
-        class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"
+        class="text-text-tertiary text-xs font-semibold tracking-wide uppercase"
       >
         {$t`From`}
       </span>
-      <span class="text-text-primary truncate font-mono text-sm">
-        {fromAddress}
-      </span>
-    </div>
-    <div
-      class="border-border-tertiary flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
-    >
-      <span
-        class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"
-      >
-        {$t`Subject`}
-      </span>
-      <Tooltip
-        label={$t`Copied to clipboard`}
-        hidden={!copiedSubject}
-        manual
-        class="grow"
-      >
-        <button
-          class="btn btn-secondary btn-sm w-full justify-between font-mono"
-          onclick={copySubject}
-          aria-label={$t`Copy subject`}
+      <span class="flex items-center gap-2">
+        <span class="text-text-primary grow truncate font-mono text-sm">
+          {fromAddress}
+        </span>
+        <Tooltip
+          label={$t`Cryptographically verified`}
+          description={verificationDescription}
         >
-          <span class="truncate">{nonce}</span>
-          <CopyIcon class="size-4 shrink-0" />
-        </button>
-      </Tooltip>
+          <span
+            class="bg-bg-success-secondary text-fg-success-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+          >
+            <ShieldCheckIcon class="size-3.5" aria-hidden="true" />
+            <span>{$t`Verified`}</span>
+          </span>
+        </Tooltip>
+      </span>
     </div>
-    <div
-      class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
-    >
+
+    <Tooltip label={$t`Copied to clipboard`} hidden={!copiedSubject} manual>
+      <button
+        type="button"
+        onclick={copySubject}
+        aria-label={$t`Copy subject`}
+        class="border-border-tertiary hover:bg-bg-secondary focus-visible:bg-bg-secondary flex w-full flex-col gap-1 border-b px-4 py-3 text-start transition-colors outline-none"
+      >
+        <span
+          class="text-text-tertiary text-xs font-semibold tracking-wide uppercase"
+        >
+          {$t`Subject`}
+        </span>
+        <span class="flex items-center gap-2">
+          <span class="text-text-primary grow truncate font-mono text-sm">
+            {nonce}
+          </span>
+          <CopyIcon class="text-fg-tertiary size-4 shrink-0" />
+        </span>
+      </button>
+    </Tooltip>
+
+    <div class="flex flex-col gap-1 px-4 py-3">
       <span
-        class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"
+        class="text-text-tertiary text-xs font-semibold tracking-wide uppercase"
       >
         {$t`Body`}
       </span>
@@ -175,20 +152,7 @@
   </div>
 
   <a class="btn btn-primary btn-lg" href={mailtoHref}>
-    <MailIcon class="size-5" />
+    <ExternalLinkIcon class="size-5" />
     <span>{$t`Open in mail app`}</span>
   </a>
-
-  <div
-    class="text-text-tertiary flex flex-col items-center gap-1.5 text-sm"
-    role="status"
-  >
-    <Loader2Icon class="text-fg-tertiary size-5 animate-spin" />
-    <span>{$t`Waiting for your email to arrive…`}</span>
-    {#if remainingSecs > 0}
-      <span class="text-xs">
-        <Trans>Expires in {remainingLabel}.</Trans>
-      </span>
-    {/if}
-  </div>
 </div>

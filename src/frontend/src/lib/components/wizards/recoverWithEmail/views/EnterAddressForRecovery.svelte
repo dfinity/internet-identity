@@ -1,6 +1,6 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
-  import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -41,11 +41,7 @@
 </script>
 
 <form onsubmit={handleSubmit} class="flex flex-col gap-6">
-  <div class="my-2"><Steps total={3} current={1} /></div>
   <header class="flex flex-col gap-2">
-    <p class="text-text-tertiary text-xs font-medium tracking-wide uppercase">
-      {$t`Recover with email — step 1 of 3`}
-    </p>
     <h1 class="text-text-primary text-2xl font-medium">
       {$t`Recover with email`}
     </h1>
@@ -61,8 +57,12 @@
     bind:value={address}
     placeholder="alice@example.com"
     type="email"
-    autocomplete="email"
-    spellcheck={false}
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false"
+    data-1p-ignore
+    data-lpignore="true"
     {error}
     disabled={busy}
     autofocus
@@ -72,6 +72,11 @@
     type="submit"
     disabled={!isShapeValid || busy}
   >
-    {busy ? $t`Verifying…` : $t`Continue`}
+    {#if busy}
+      <ProgressRing />
+      <span>{$t`Verifying…`}</span>
+    {:else}
+      <span>{$t`Continue`}</span>
+    {/if}
   </button>
 </form>
