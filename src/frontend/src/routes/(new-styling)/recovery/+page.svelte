@@ -1,7 +1,13 @@
 <script lang="ts">
   import Trans from "../../../lib/components/locale/Trans.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { RefreshCcw } from "@lucide/svelte";
+  import {
+    ChevronRightIcon,
+    KeyRoundIcon,
+    MailIcon,
+    RefreshCcw,
+  } from "@lucide/svelte";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
@@ -191,20 +197,37 @@
             phrase ready. Keep it confidential to protect your identity.
           </Trans>
         </p>
-        <button
-          onclick={() => (showRecoveryDialog = true)}
-          class="btn btn-xl mb-3"
-        >
-          {$t`Recover with phrase`}
-        </button>
-        {#if $EMAIL_RECOVERY}
-          <button
-            onclick={() => (showEmailRecoveryDialog = true)}
-            class="btn btn-xl mb-3"
-          >
-            {$t`Recover with email`}
-          </button>
-        {/if}
+        <div class="mb-3 flex flex-col gap-2">
+          <ButtonCard onclick={() => (showRecoveryDialog = true)} class="py-4">
+            <KeyRoundIcon class="text-fg-tertiary size-5 shrink-0" />
+            <div class="flex grow flex-col items-start">
+              <span class="text-text-primary text-base font-semibold">
+                {$t`Recovery phrase`}
+              </span>
+              <span class="text-text-tertiary text-sm font-normal">
+                {$t`Type your 24 words.`}
+              </span>
+            </div>
+            <ChevronRightIcon class="text-fg-tertiary size-5 shrink-0" />
+          </ButtonCard>
+          {#if $EMAIL_RECOVERY}
+            <ButtonCard
+              onclick={() => (showEmailRecoveryDialog = true)}
+              class="py-4"
+            >
+              <MailIcon class="text-fg-tertiary size-5 shrink-0" />
+              <div class="flex grow flex-col items-start">
+                <span class="text-text-primary text-base font-semibold">
+                  {$t`Recovery email`}
+                </span>
+                <span class="text-text-tertiary text-sm font-normal">
+                  {$t`Send a signed email from your inbox.`}
+                </span>
+              </div>
+              <ChevronRightIcon class="text-fg-tertiary size-5 shrink-0" />
+            </ButtonCard>
+          {/if}
+        </div>
         <a href="/" class="btn btn-secondary btn-xl">
           {$t`Cancel`}
         </a>
