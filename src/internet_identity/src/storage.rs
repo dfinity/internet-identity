@@ -601,32 +601,6 @@ impl<M: Memory + Clone> Storage<M> {
             trap(&format!("unsupported header version: {}", header.version));
         }
 
-        // TEMPORARY (PR #3855): one-shot wipe of the BTreeMap magic at
-        // memory IDs 23 and 24. The Postbox PoC (dfinity/internet-identity
-        // PR #3760, never merged but deployed to staging A) used these
-        // for `SMTP_POSTBOX` and `PUSH_SUBSCRIPTION` BTreeMaps with a
-        // different storable layout — left in place, our re-use of ID 23
-        // for `lookup_anchor_with_email_recovery` traps inside
-        // stable-structures on first read because the loaded node header
-        // disagrees with our K/V config. Zeroing the first bytes makes
-        // `StableBTreeMap::init` fall through the magic check and create
-        // a fresh map with our layout. Idempotent (writing zeros to
-        // already-zero bytes is fine), so it's safe to leave for one
-        // upgrade cycle. Remove this block once staging A has been
-        // upgraded with this code at least once.
-        {
-            let mm = MemoryManager::init_with_bucket_size(
-                RestrictedMemory::new(memory.clone(), 1..MAX_MANAGED_WASM_PAGES),
-                BUCKET_SIZE_IN_PAGES,
-            );
-            for id in [23u8, 24u8] {
-                let m = mm.get(MemoryId::new(id));
-                if m.size() > 0 {
-                    m.write(0, &[0u8; 16]);
-                }
-            }
-        }
-
         Self::init_with_header(memory, header)
     }
 
