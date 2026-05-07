@@ -25,6 +25,7 @@
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
   import InactiveEmailRecovery from "./components/InactiveEmailRecovery.svelte";
   import ActiveEmailRecovery from "./components/ActiveEmailRecovery.svelte";
+  import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
   import type { EmailRecoveryDnsInput } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
@@ -53,6 +54,7 @@
   let lockedRecoveryPhraseIdentity = $state<Identity>();
 
   let showEmailRecoverySetup = $state(false);
+  let removingEmailRecovery = $state(false);
   /**
    * Email-recovery binding observable to the FE. The canister
    * returns it on every `identity_info` call (see
@@ -288,6 +290,7 @@
       handleError(new Error(JSON.stringify(result.Err)));
       return;
     }
+    removingEmailRecovery = false;
     void invalidateAll();
     toaster.success({
       title: $t`Recovery email removed`,
@@ -328,54 +331,57 @@
 </script>
 
 <header class="flex flex-col gap-3">
-  <h1 class="text-text-primary text-3xl font-medium">{$t`Recovery phrase`}</h1>
+  <h1 class="text-text-primary text-3xl font-medium">
+    {$t`Recovery methods`}
+  </h1>
   <p class="text-text-tertiary text-base">
-    <Trans>A way to regain access to your identity if you ever lose it.</Trans>
+    <Trans>
+      Use these to regain access to your identity if you ever lose it.
+    </Trans>
   </p>
 </header>
 
-<!-- Uses same grid as cards below to match the width of all 3 cards -->
-<div
-  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5"
->
-  <div class="col-span-3 flex flex-col gap-4 max-sm:col-span-1">
-    {#if isUnverified}
-      <!-- This identity has a recovery phrase that isn't verified yet -->
-      <UnverifiedRecoveryPhrase
-        onReset={() => (showRecoveryPhraseSetup = "reset")}
-        onVerify={() => (showRecoveryPhraseSetup = "verify")}
-      />
-    {:else if recoveryPhraseData !== undefined}
-      <!-- This identity has a verified recovery phrase -->
-      <ActiveRecoveryPhrase
-        onReset={() => (showRecoveryPhraseSetup = "reset")}
-        recoveryPhrase={recoveryPhraseData}
-        {isCurrentAccessMethod}
+<!-- Two-up grid on >=sm so the phrase and email cards sit side-by-
+     side; stacks vertically on mobile. Each card stretches to the
+     row's natural height via grid's default `align-items: stretch`
+     so the two tiles match heights when their content differs. -->
+<div class="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+  {#if isUnverified}
+    <!-- This identity has a recovery phrase that isn't verified yet -->
+    <UnverifiedRecoveryPhrase
+      onReset={() => (showRecoveryPhraseSetup = "reset")}
+      onVerify={() => (showRecoveryPhraseSetup = "verify")}
+    />
+  {:else if recoveryPhraseData !== undefined}
+    <!-- This identity has a verified recovery phrase -->
+    <ActiveRecoveryPhrase
+      onReset={() => (showRecoveryPhraseSetup = "reset")}
+      recoveryPhrase={recoveryPhraseData}
+      {isCurrentAccessMethod}
+    />
+  {:else}
+    <!-- This identity doesn't have a recovery phrase yet -->
+    <InactiveRecoveryPhrase
+      onActivate={() => (showRecoveryPhraseSetup = "activate")}
+    />
+  {/if}
+
+  <!-- Recovery email card. Gated by the EMAIL_RECOVERY feature
+       flag (default false; auto-enabled on beta.id.ai by the
+       flag's init callback). -->
+  {#if $EMAIL_RECOVERY}
+    {#if emailRecovery !== undefined}
+      <ActiveEmailRecovery
+        credential={emailRecovery}
+        onReplace={() => (showEmailRecoverySetup = true)}
+        onRemove={() => (removingEmailRecovery = true)}
       />
     {:else}
-      <!-- This identity doesn't have a recovery phrase yet -->
-      <InactiveRecoveryPhrase
-        onActivate={() => (showRecoveryPhraseSetup = "activate")}
+      <InactiveEmailRecovery
+        onActivate={() => (showEmailRecoverySetup = true)}
       />
     {/if}
-
-    <!-- Recovery email card. Gated by the EMAIL_RECOVERY feature
-         flag (default false; auto-enabled on beta.id.ai by the
-         flag's init callback). -->
-    {#if $EMAIL_RECOVERY}
-      {#if emailRecovery !== undefined}
-        <ActiveEmailRecovery
-          credential={emailRecovery}
-          onReplace={() => (showEmailRecoverySetup = true)}
-          onRemove={handleRemoveEmail}
-        />
-      {:else}
-        <InactiveEmailRecovery
-          onActivate={() => (showEmailRecoverySetup = true)}
-        />
-      {/if}
-    {/if}
-  </div>
+  {/if}
 </div>
 
 <section>
@@ -454,6 +460,16 @@
       status={statusEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
       onClose={handleEmailWizardClosed}
+    />
+  </Dialog>
+{/if}
+
+{#if removingEmailRecovery && emailRecovery !== undefined}
+  <Dialog onClose={() => (removingEmailRecovery = false)}>
+    <RemoveEmailRecovery
+      address={emailRecovery.address}
+      onRemove={handleRemoveEmail}
+      onCancel={() => (removingEmailRecovery = false)}
     />
   </Dialog>
 {/if}

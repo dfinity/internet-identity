@@ -25,9 +25,12 @@
   import EnterAddressForRecovery from "./views/EnterAddressForRecovery.svelte";
   import SendMagicEmail from "$lib/components/wizards/setupEmailRecovery/views/SendMagicEmail.svelte";
   import FailedView from "$lib/components/wizards/setupEmailRecovery/views/FailedView.svelte";
+  import UnsupportedDomain from "$lib/components/wizards/setupEmailRecovery/views/UnsupportedDomain.svelte";
+  import { t } from "$lib/stores/locale.store";
   import type {
     EmailRecoveryChallenge,
     EmailRecoveryDnsInput,
+    EmailRecoveryError,
     EmailRecoveryGetDelegationArgs,
     EmailRecoveryStatus,
     EmailRecoverySubmitDkimLeafArg,
@@ -35,7 +38,9 @@
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, assembleDkimResolution } from "$lib/utils/dnssec";
+  import { isCanisterError } from "$lib/utils/utils";
   import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+  import { onDestroy } from "svelte";
   import type { RecoverySuccess } from "./index";
 
   interface Props {
@@ -57,7 +62,6 @@
     /** Called after a successful recovery; the host page builds the
         DelegationIdentity and proceeds with the rest of the sign-in. */
     onSignedIn: (success: RecoverySuccess) => Promise<void>;
-    onCancel: () => void;
   }
 
   const {
@@ -66,7 +70,6 @@
     submitDkimLeaf,
     getDelegation,
     onSignedIn,
-    onCancel,
   }: Props = $props();
 
   type Stage =
@@ -77,10 +80,14 @@
         address: string;
         sessionIdentity: ECDSAKeyIdentity;
       }
+    | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
   let stage = $state<Stage>({ kind: "enter" });
   let polling = $state(false);
+  onDestroy(() => {
+    polling = false;
+  });
 
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
@@ -145,9 +152,19 @@
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
 
-    const challenge = await prepareDelegation(input, sessionPublicKey);
-    stage = { kind: "sending", challenge, address, sessionIdentity };
-    void runPoll(challenge.nonce, domain, sessionIdentity);
+    try {
+      const challenge = await prepareDelegation(input, sessionPublicKey);
+      stage = { kind: "sending", challenge, address, sessionIdentity };
+      void runPoll(challenge.nonce, domain, sessionIdentity);
+    } catch (e) {
+      if (isCanisterError<EmailRecoveryError>(e)) {
+        if (e.type === "DomainNotAllowlisted" || e.type === "DomainNotSupported") {
+          stage = { kind: "unsupported", domain };
+          return;
+        }
+      }
+      throw e;
+    }
   };
 
   const runPoll = async (
@@ -248,17 +265,11 @@
   const handleRetry = () => {
     stage = { kind: "enter" };
   };
-
-  const handleCancel = () => {
-    polling = false;
-    onCancel();
-  };
 </script>
 
 {#if stage.kind === "enter"}
   <EnterAddressForRecovery
     onSubmit={handleAddressSubmitted}
-    onCancel={handleCancel}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
@@ -267,12 +278,10 @@
     mailbox={`recover@${window.location.hostname}`}
     fromAddress={stage.address}
     expiresAt={stage.challenge.expires_at}
-    onCancel={handleCancel}
+    title={$t`Recover with email`}
   />
+{:else if stage.kind === "unsupported"}
+  <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
 {:else}
-  <FailedView
-    reason={stage.reason}
-    onRetry={handleRetry}
-    onCancel={handleCancel}
-  />
+  <FailedView reason={stage.reason} onRetry={handleRetry} />
 {/if}
