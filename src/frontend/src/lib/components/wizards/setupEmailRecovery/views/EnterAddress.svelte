@@ -46,7 +46,7 @@
 <form onsubmit={handleSubmit} class="flex flex-col gap-6">
   <div class="my-2"><Steps total={3} current={1} /></div>
   <header class="flex flex-col gap-2">
-    <p class="text-text-tertiary text-xs font-medium uppercase tracking-wide">
+    <p class="text-text-tertiary text-xs font-medium tracking-wide uppercase">
       {$t`Add email recovery — step 1 of 3`}
     </p>
     <h1 class="text-text-primary text-2xl font-medium">

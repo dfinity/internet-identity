@@ -1,11 +1,7 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import {
-    MailIcon,
-    CopyIcon,
-    Loader2Icon,
-  } from "@lucide/svelte";
+  import { MailIcon, CopyIcon, Loader2Icon } from "@lucide/svelte";
   import { onMount, onDestroy } from "svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
@@ -85,7 +81,7 @@
   <div class="my-2"><Steps total={3} current={2} /></div>
 
   <header class="flex flex-col gap-2">
-    <p class="text-text-tertiary text-xs font-medium uppercase tracking-wide">
+    <p class="text-text-tertiary text-xs font-medium tracking-wide uppercase">
       {title} — {$t`step 2 of 3`}
     </p>
     <h1 class="text-text-primary text-2xl font-medium">
@@ -105,7 +101,7 @@
     class="bg-bg-primary border-border-secondary flex flex-col rounded-xl border not-dark:shadow-sm"
   >
     <div
-      class="flex flex-col gap-2 border-b border-border-tertiary px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
+      class="border-border-tertiary flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
     >
       <span
         class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"
@@ -129,7 +125,7 @@
       </Tooltip>
     </div>
     <div
-      class="flex flex-col gap-2 border-b border-border-tertiary px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
+      class="border-border-tertiary flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
     >
       <span
         class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"
@@ -141,7 +137,7 @@
       </span>
     </div>
     <div
-      class="flex flex-col gap-2 border-b border-border-tertiary px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
+      class="border-border-tertiary flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
     >
       <span
         class="text-text-tertiary w-16 shrink-0 text-xs font-semibold uppercase"

@@ -23,8 +23,8 @@
       <Trans>
         We can't verify mail from
         <strong class="break-all">{domain}</strong>
-        yet. Try a different address — Gmail, iCloud, Outlook, Fastmail, and
-        Proton all work.
+        yet. Try a different address — Gmail, iCloud, Outlook, Fastmail, and Proton
+        all work.
       </Trans>
     </p>
   </header>
@@ -45,9 +45,9 @@
     >
       <p>
         <Trans>
-          To accept email from a domain we either need DNSSEC at its apex (so
-          we can cryptographically validate the DKIM key your provider uses)
-          or for the domain to be on our list of known mailbox providers.
+          To accept email from a domain we either need DNSSEC at its apex (so we
+          can cryptographically validate the DKIM key your provider uses) or for
+          the domain to be on our list of known mailbox providers.
           <strong class="break-all">{domain}</strong>
           meets neither.
         </Trans>
@@ -56,9 +56,8 @@
         <Trans>
           If you administer
           <strong class="break-all">{domain}</strong>, enabling DNSSEC at your
-          domain registrar usually takes a few clicks. Once it propagates,
-          this address will work automatically — no further action from us
-          needed.
+          domain registrar usually takes a few clicks. Once it propagates, this
+          address will work automatically — no further action from us needed.
         </Trans>
       </p>
     </div>
