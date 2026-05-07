@@ -65,14 +65,17 @@ fn dns_input() -> EmailRecoveryDnsInput {
 // ===================================================================
 
 /// Stand up a canister with an `allowed_domains` list that lets
-/// `test.example.com` through to the DoH path. We don't need any
-/// other init knobs for these tests.
+/// `test.example.com` through to the DoH path, and a `related_origins`
+/// entry so `mailbox_domains()` accepts `register@id.ai` /
+/// `recover@id.ai` envelopes (recipient acceptance reads from
+/// `related_origins`; see `email_recovery::mailbox_domains`).
 fn setup_canister(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
             allowed_domains: vec![TEST_DOMAIN.into()],
             max_cache_age_secs: Some(3600),
         })),
+        related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
         ..Default::default()
     };
@@ -580,6 +583,7 @@ fn full_setup_flow_via_dnssec_path() {
         dnssec_config: Some(Some(DnssecConfig {
             root_anchors: vec![chain.anchor],
         })),
+        related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
         ..Default::default()
     };
