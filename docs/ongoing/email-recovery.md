@@ -221,7 +221,7 @@ sequenceDiagram
     User->>II: 2. prepare { addr, dns_proof_skeleton, session_pk }
     II-->>User: 3. challenge { nonce, expires_at }
 
-    User->>Mail: 4. compose and send email to<br/>register@&lt;host&gt; or recover@&lt;host&gt;<br/>(host = window.location.hostname),<br/>with the nonce in Subject:
+    User->>Mail: 4. compose and send email to<br/>register@[host] or recover@[host]<br/>(host = window.location.hostname),<br/>with the nonce in Subject:
     Mail->>GW: 5. SMTP DATA
     GW->>II: 6. smtp_request(SmtpRequest)
 
@@ -561,9 +561,15 @@ verify(bundle, requested_name, requested_type):
             # Parent's DS RRset is signed by the parent's DNSKEY.
             verify_rrsig(link.child_ds.rrsig, link.child_ds.rdata, parent_keys)
             # Parent's DS digest matches one of the child's KSK DNSKEYs.
-            child_ksk = pick_dnskey_matching_ds(link.child_dnskey.rdata, link.child_ds)
-            # Child's DNSKEY RRset is self-signed by its KSK.
-            verify_rrsig(link.child_dnskey.rrsig, link.child_dnskey.rdata, child_ksk)
+            # We don't keep `child_ksk` after this — it's enough to know
+            # the DS pinned *some* KSK in the RRset; see below.
+            require pick_dnskey_matching_ds(link.child_dnskey.rdata, link.child_ds).is_some()
+            # Child's DNSKEY RRset is signed by *some* DNSKEY in the
+            # RRset (typically the ZSK self-signing the KSK + its own
+            # entry, but the standard also allows KSK-only signing —
+            # operators differ). We accept any RRSIG whose `key_tag`
+            # matches a DNSKEY in `link.child_dnskey.rdata`.
+            verify_rrsig_under_dnskey_rrset(link.child_dnskey.rrsig, link.child_dnskey.rdata)
             parent_keys = link.child_dnskey.rdata
         # The last link's child_dnskey owner is the zone we just landed in.
         zone_name = chain.links.last().child_dnskey.name
@@ -600,6 +606,8 @@ verify(bundle, requested_name, requested_type):
 ```
 
 `verify_rrsig` uses RFC 4034 §3.1.8.1 canonical form (lowercase owner names, RDATA in canonical order) and the algorithm code from the RRSIG. We support algorithms 8 (RSA-SHA256), 13 (ECDSA-P256-SHA256), and 15 (Ed25519) — RFC 8624 "MUST" implementations. Anything older (RSA-SHA1, RSA-MD5) is rejected.
+
+**Why "any DNSKEY in the RRset" is enough for the DNSKEY self-signature.** The chain of trust is still pinned by the DS step above — `pick_dnskey_matching_ds` proves that the parent's DS digest matches a KSK present in the child's DNSKEY RRset, so the RRset as a whole is authenticated by the parent. Once that's true, accepting any DNSKEY-set member as the validator of the DNSKEY RRset's RRSIG is equivalent to what production DNSSEC validators do: the standard permits the DNSKEY RRset to be signed by either the KSK alone, the ZSK alone, or both, and operator practice is split (Proton signs DNSKEY with the ZSK; Cloudflare signs with the KSK). Pinning to the KSK refused otherwise-valid Proton bundles for no security gain.
 
 **Why per-hop signer-name validation matters.** The `RRSIG.signer_name` field is signed *as part of the RRSIG RDATA itself* (RFC 4034 §3.1) — an attacker cannot rewrite it without invalidating the signature. Trusting `signer_name` to pick the validating DNSKEY is therefore safe and is exactly what every existing DNSSEC validator does. The canister additionally checks that the hop's owner name is in-zone of the named signer, defending against a curiosity case where an attacker who controls one zone tries to "claim" they signed an RRset from a different zone.
 
@@ -797,7 +805,7 @@ Surface for the FE: `IdentityInfo` (returned by `identity_info`) carries a flat 
 
 One additional stable map exists alongside this:
 
-- **Reverse address index**, memory ID 24 (next free): `SHA-256(lowercase(address)) → AnchorNumber`. Used at recovery time to resolve a verified `From:` to an anchor. Required because we can't efficiently scan all anchors to find one bound to a given address. The address itself already lives on the anchor (`Anchor.email_recovery.address`), so there is no reason to store it in the index too — the index just answers "which anchor does this address belong to?". A fixed-size hashed key keeps the index entry bounded by construction (32 bytes regardless of address length) and removes one variable-length-key surface from stable memory. Per §3.1, the lookup is gated by DKIM and is enumerable only to attackers who already control the queried mailbox, so the hash is unsalted.
+- **Reverse address index**, memory ID 23 (next free): `SHA-256(lowercase(address)) → AnchorNumber`. Used at recovery time to resolve a verified `From:` to an anchor. Required because we can't efficiently scan all anchors to find one bound to a given address. The address itself already lives on the anchor (`Anchor.email_recovery.address`), so there is no reason to store it in the index too — the index just answers "which anchor does this address belong to?". A fixed-size hashed key keeps the index entry bounded by construction (32 bytes regardless of address length) and removes one variable-length-key surface from stable memory. Per §3.1, the lookup is gated by DKIM and is enumerable only to attackers who already control the queried mailbox, so the hash is unsalted.
 
 **v1 API invariants** (enforced in canister code, not in storage):
 
@@ -814,7 +822,7 @@ A third, ephemeral map holds *pending challenges* keyed by `nonce`. Each entry c
 - a `status: Pending | NeedDkimLeaf { selector } | Succeeded { outcome } | Failed { error }`,
 - a 30-minute expiry.
 
-Entries flip from `Pending` to `NeedDkimLeaf` on `smtp_request` (DNSSEC path only), then to `Succeeded`/`Failed` on `email_recovery_submit_dkim_leaf`. The DoH path goes straight from `Pending` to `Succeeded`/`Failed` on `smtp_request` because the canister can fetch the DKIM TXT itself. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Memory-bounded `StableBTreeMap` with oldest-first eviction. Memory ID 25.
+Entries flip from `Pending` to `NeedDkimLeaf` on `smtp_request` (DNSSEC path only), then to `Succeeded`/`Failed` on `email_recovery_submit_dkim_leaf`. The DoH path goes straight from `Pending` to `Succeeded`/`Failed` on `smtp_request` because the canister can fetch the DKIM TXT itself. They are dropped on poll-after-expiry, on terminal status read, or on TTL eviction. Held in a heap-only `thread_local!` `HashMap<nonce, PendingChallenge>` — *not* in stable memory. The map is ephemeral by design: an upgrade in flight cancels every in-flight challenge, which is fine for a 30-minute-TTL flow that the user re-runs from scratch on retry. Bounded above by `MAX_PENDING_CHALLENGES` plus the TTL; oldest entries evict first when the cap is hit (§8.9).
 
 We do **not** store any inbound email body, header bytes, or DKIM verification artefacts past the moment the challenge reaches a terminal state. The cached `session_pk` for recovery is the only piece that survives between prepare and the eventual delegation issuance.
 
@@ -1064,7 +1072,7 @@ sequenceDiagram
     II->>FE: { nonce: "II-Recovery-1a2b3c4d5e6f7081", expires_at }
 
     Note over U,Mail: 3 — User emails the magic token
-    FE->>U: "Send an email with Subject: II-Recovery-1a2b3c4d5e6f7081<br/>to register@&lt;window.location.hostname&gt;<br/>(e.g. register@id.ai on prod, register@beta.id.ai on beta)<br/>from alice@gmail.com"
+    FE->>U: "Send an email with Subject: II-Recovery-1a2b3c4d5e6f7081<br/>to register@[window.location.hostname]<br/>(e.g. register@id.ai on prod, register@beta.id.ai on beta)<br/>from alice@gmail.com"
     U->>Mail: composes & sends from alice@gmail.com
     Mail->>GW: SMTP DATA (DKIM-signed by gmail.com)
 
@@ -1130,7 +1138,7 @@ sequenceDiagram
     II->>FE: { nonce, expires_at }
 
     Note over U,Mail: 3 — User emails the magic token
-    FE->>U: "Send an email with Subject: II-Recovery-…<br/>to recover@&lt;window.location.hostname&gt;<br/>from alice@gmail.com"
+    FE->>U: "Send an email with Subject: II-Recovery-…<br/>to recover@[window.location.hostname]<br/>from alice@gmail.com"
     U->>Mail: send signed email
     Mail->>GW: SMTP DATA
 
@@ -1365,7 +1373,7 @@ The flow has two error surfaces: synchronous errors at `prepare_*` time (the use
 | `EmailVerificationFailed(VerificationStatus)` | "Your email didn't verify (DKIM/DMARC failure). Make sure you sent it from `<address>` exactly, no forwarding, no aliases." |
 | `AddressMismatch` | "The email came from a different address than the one we have on file." |
 | `SubjectNotSigned` | "Your email provider didn't sign the Subject header. Try a different provider." (Edge case — every mainstream provider signs Subject by default.) |
-| `DkimLeafMismatch` | "Couldn't verify the DKIM key for your provider. Please retry." (Means the leaf the FE walked didn't validate against the cached chain — usually a transient resolver hiccup.) |
+| `DkimLeafMismatch` | "Couldn't verify the DKIM key for your provider. Please retry." (Means the leaf the FE walked didn't validate against the cached chain — typically because the provider rotated DKIM keys between prepare and submit, or a transient resolver hiccup. Both have the same retry-from-scratch remediation.) |
 | `AddressAlreadyRegistered` | (Setup only.) "This email is already used to recover a different identity." |
 | `AddressNotRegistered` | (Recovery only.) "We don't recognize this email. Did you mean to register it instead?" |
 | `NonceExpired` / `NonceUnknown` | Same UX as `Expired` — restart the wizard. |
