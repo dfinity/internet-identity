@@ -153,7 +153,10 @@
       // the technical "why + how to fix" treatment instead of an
       // opaque inline error string.
       if (isCanisterError<EmailRecoveryError>(e)) {
-        if (e.type === "DomainNotAllowlisted" || e.type === "DomainNotSupported") {
+        if (
+          e.type === "DomainNotAllowlisted" ||
+          e.type === "DomainNotSupported"
+        ) {
           stage = { kind: "unsupported", domain };
           return;
         }

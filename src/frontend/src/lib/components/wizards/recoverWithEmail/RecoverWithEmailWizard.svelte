@@ -158,7 +158,10 @@
       void runPoll(challenge.nonce, domain, sessionIdentity);
     } catch (e) {
       if (isCanisterError<EmailRecoveryError>(e)) {
-        if (e.type === "DomainNotAllowlisted" || e.type === "DomainNotSupported") {
+        if (
+          e.type === "DomainNotAllowlisted" ||
+          e.type === "DomainNotSupported"
+        ) {
           stage = { kind: "unsupported", domain };
           return;
         }
