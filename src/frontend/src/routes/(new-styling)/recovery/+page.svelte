@@ -200,7 +200,7 @@
         <div class="mb-3 flex flex-col gap-2">
           <ButtonCard
             onclick={() => (showRecoveryDialog = true)}
-            class="group !flex-col !items-stretch !gap-1 py-4"
+            class="group !flex-col !items-stretch !gap-1 py-4 text-start"
             aria-label={$t`Recover with phrase`}
           >
             <span class="flex w-full items-center gap-3">
@@ -225,7 +225,7 @@
           {#if $EMAIL_RECOVERY}
             <ButtonCard
               onclick={() => (showEmailRecoveryDialog = true)}
-              class="group !flex-col !items-stretch !gap-1 py-4"
+              class="group !flex-col !items-stretch !gap-1 py-4 text-start"
               aria-label={$t`Recover with email`}
             >
               <span class="flex w-full items-center gap-3">
