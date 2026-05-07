@@ -204,7 +204,7 @@ class EmailRecoveryFixtures {
       this.#page.getByRole("heading", { name: "Recovery email" }),
     ).toBeVisible();
     await expect(
-      this.#page.getByRole("button", { name: "Add email" }),
+      this.#page.getByRole("button", { name: "Activate recovery email" }),
     ).toBeVisible();
   }
 
@@ -231,7 +231,7 @@ class EmailRecoveryFixtures {
   ): Promise<T> {
     await this.#page
       .getByRole("main")
-      .getByRole("button", { name: "Add email" })
+      .getByRole("button", { name: "Activate recovery email" })
       .click();
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();

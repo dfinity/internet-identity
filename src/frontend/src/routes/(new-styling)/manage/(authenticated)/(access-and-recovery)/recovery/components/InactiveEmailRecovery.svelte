@@ -20,8 +20,12 @@
 >
   <div class="mb-3 flex h-9 flex-row items-center">
     <MailIcon class="text-fg-tertiary size-6" />
-    <button class="btn btn-secondary btn-sm ms-auto" onclick={onActivate}>
-      {$t`Add email`}
+    <button
+      class="btn btn-primary btn-sm ms-auto"
+      onclick={onActivate}
+      aria-label={$t`Activate recovery email`}
+    >
+      {$t`Activate`}
     </button>
   </div>
   <h2 class="text-text-primary mb-1 text-base font-semibold">
@@ -32,6 +36,9 @@
   </div>
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="text-text-primary text-xs">
-    <Trans>Sign in by sending a signed email from your inbox.</Trans>
+    <Trans>
+      Sign in by sending a cryptographically signed email from your inbox. Use
+      it to recover when you lose all other access methods.
+    </Trans>
   </div>
 </section>
