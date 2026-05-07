@@ -7,7 +7,6 @@
     Loader2Icon,
   } from "@lucide/svelte";
   import { onMount, onDestroy } from "svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
   import { waitFor } from "$lib/utils/utils";
@@ -119,16 +118,14 @@
         manual
         class="grow"
       >
-        <Button
+        <button
+          class="btn btn-secondary btn-sm w-full justify-between font-mono"
           onclick={copyTo}
-          variant="secondary"
-          size="sm"
-          class="w-full justify-between font-mono"
           aria-label={$t`Copy recipient`}
         >
           <span class="truncate">{mailbox}</span>
           <CopyIcon class="size-4 shrink-0" />
-        </Button>
+        </button>
       </Tooltip>
     </div>
     <div
@@ -157,16 +154,14 @@
         manual
         class="grow"
       >
-        <Button
+        <button
+          class="btn btn-secondary btn-sm w-full justify-between font-mono"
           onclick={copySubject}
-          variant="secondary"
-          size="sm"
-          class="w-full justify-between font-mono"
           aria-label={$t`Copy subject`}
         >
           <span class="truncate">{nonce}</span>
           <CopyIcon class="size-4 shrink-0" />
-        </Button>
+        </button>
       </Tooltip>
     </div>
     <div
@@ -183,12 +178,11 @@
     </div>
   </div>
 
-  <Button href={mailtoHref} size="lg">
+  <a class="btn btn-primary btn-lg" href={mailtoHref}>
     <MailIcon class="size-5" />
     <span>{$t`Open in mail app`}</span>
-  </Button>
+  </a>
 
-  <!-- Subtle "we're listening" indicator, no scary orange. -->
   <div
     class="text-text-tertiary flex flex-col items-center gap-1.5 text-sm"
     role="status"

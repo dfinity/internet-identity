@@ -22,7 +22,7 @@
    */
 
   import EnterAddress from "./views/EnterAddress.svelte";
-  import SendMagicEmail from "./views/SendMagicEmail.svelte";
+  import SendConfirmationEmail from "./views/SendConfirmationEmail.svelte";
   import Done from "./views/Done.svelte";
   import FailedView from "./views/FailedView.svelte";
   import UnsupportedDomain from "./views/UnsupportedDomain.svelte";
@@ -48,7 +48,8 @@
     submitDkimLeaf: (
       arg: EmailRecoverySubmitDkimLeafArg,
     ) => Promise<EmailRecoveryStatus>;
-    /** Wizard close — called on user-initiated cancel and on `Done`. */
+    /** Wizard close — called when the host Dialog closes (X button or
+     *  outside-click) and when `Done` is clicked. */
     onClose: () => void;
   }
 
@@ -228,7 +229,7 @@
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
-  <SendMagicEmail
+  <SendConfirmationEmail
     nonce={stage.challenge.nonce}
     mailbox={`register@${window.location.hostname}`}
     fromAddress={stage.address}
