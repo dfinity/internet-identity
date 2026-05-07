@@ -7,8 +7,9 @@
  *
  *   2. **Real end-to-end** — synthesizes a DNSSEC chain
  *      (`utils/dnssecTestSigner.ts`) plus a DKIM keypair, intercepts
- *      the FE's DoH lookups, drives the wizard to the magic-email
- *      step, and submits a DKIM-signed `smtp_request` so polling
+ *      the FE's DoH lookups, drives the wizard to the
+ *      send-confirmation-email step, and submits a DKIM-signed
+ *      `smtp_request` so polling
  *      flips to `RegistrationSucceeded` / `RecoveryReady`. Exercises
  *      the canister's DNSSEC verifier + DKIM/DMARC verifier + status
  *      transitions end-to-end. The local II canister is deployed
@@ -73,7 +74,10 @@ test.describe("Email recovery — wizard surface", () => {
     await expect(
       dialog.getByRole("heading", { name: "Add a recovery email" }),
     ).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    // Wizard views no longer carry a Cancel button — the dialog's
+    // built-in close (X) is the only user-driven exit. See
+    // setupEmailRecovery/views/EnterAddress.svelte.
+    await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
   });
 
@@ -93,7 +97,7 @@ test.describe("Email recovery — wizard surface", () => {
     await expect(
       dialog.getByRole("heading", { name: "Recover with email" }),
     ).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
   });
 });
@@ -133,7 +137,9 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     // canister-issued nonce off the rendered token block, sign an
     // email with the matching subject, submit it via smtp_request.
     await expect(
-      setupDialog.getByRole("heading", { name: "Send the magic email" }),
+      setupDialog.getByRole("heading", {
+        name: "Send your confirmation email",
+      }),
     ).toBeVisible();
     const setupNonce = await setupDialog
       .getByText(/II-Recovery-[0-9a-f]{16}/)
@@ -176,7 +182,9 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     await recoverDialog.getByRole("button", { name: "Continue" }).click();
 
     await expect(
-      recoverDialog.getByRole("heading", { name: "Send the magic email" }),
+      recoverDialog.getByRole("heading", {
+        name: "Send your confirmation email",
+      }),
     ).toBeVisible();
     const recoveryNonce = await recoverDialog
       .getByText(/II-Recovery-[0-9a-f]{16}/)
