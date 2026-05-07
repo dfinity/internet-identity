@@ -49,9 +49,13 @@ pub fn clear() {
 }
 
 /// Convenience macro: `er_dbg!("doh.fetch.start name={}", name);`
+///
+/// Body has no trailing semicolon so the expansion stays an
+/// expression — usable inside `match` arms and `|e| { … }`-style
+/// closures without tripping `semicolon_in_expressions_from_macros`.
 #[macro_export]
 macro_rules! er_dbg {
     ($($arg:tt)*) => {
-        $crate::email_recovery_debug_log::push(format!($($arg)*));
+        $crate::email_recovery_debug_log::push(format!($($arg)*))
     };
 }
