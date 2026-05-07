@@ -198,7 +198,11 @@
           </Trans>
         </p>
         <div class="mb-3 flex flex-col gap-2">
-          <ButtonCard onclick={() => (showRecoveryDialog = true)} class="py-4">
+          <ButtonCard
+            onclick={() => (showRecoveryDialog = true)}
+            class="py-4"
+            aria-label={$t`Recover with phrase`}
+          >
             <KeyRoundIcon class="text-fg-tertiary size-5 shrink-0" />
             <div class="flex grow flex-col items-start">
               <span class="text-text-primary text-base font-semibold">
@@ -214,6 +218,7 @@
             <ButtonCard
               onclick={() => (showEmailRecoveryDialog = true)}
               class="py-4"
+              aria-label={$t`Recover with email`}
             >
               <MailIcon class="text-fg-tertiary size-5 shrink-0" />
               <div class="flex grow flex-col items-start">
