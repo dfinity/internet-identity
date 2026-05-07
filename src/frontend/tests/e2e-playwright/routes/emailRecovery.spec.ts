@@ -153,9 +153,13 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     // On RegistrationSucceeded the wizard fires `onSuccess` which the
     // host translates into a toast + closing the dialog. Assert the
     // dialog goes away and the active recovery-email card now shows
-    // the bound address (the inactive card variant doesn't).
+    // the bound address (the inactive card variant doesn't). Use
+    // exact-text match because the address also appears as a
+    // substring inside the success toast's description.
     await expect(setupDialog).toBeHidden({ timeout: STATUS_POLL_TIMEOUT });
-    await expect(page.getByText(emailRecovery.fromAddress)).toBeVisible();
+    await expect(
+      page.getByText(emailRecovery.fromAddress, { exact: true }),
+    ).toBeVisible();
 
     // ---------------------------------------------------------------
     // Recovery leg — sign in via the email we just bound
