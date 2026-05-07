@@ -23,7 +23,7 @@
    */
 
   import EnterAddressForRecovery from "./views/EnterAddressForRecovery.svelte";
-  import SendMagicEmail from "$lib/components/wizards/setupEmailRecovery/views/SendMagicEmail.svelte";
+  import SendConfirmationEmail from "$lib/components/wizards/setupEmailRecovery/views/SendConfirmationEmail.svelte";
   import FailedView from "$lib/components/wizards/setupEmailRecovery/views/FailedView.svelte";
   import UnsupportedDomain from "$lib/components/wizards/setupEmailRecovery/views/UnsupportedDomain.svelte";
   import { t } from "$lib/stores/locale.store";
@@ -273,7 +273,7 @@
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
-  <SendMagicEmail
+  <SendConfirmationEmail
     nonce={stage.challenge.nonce}
     mailbox={`recover@${window.location.hostname}`}
     fromAddress={stage.address}
