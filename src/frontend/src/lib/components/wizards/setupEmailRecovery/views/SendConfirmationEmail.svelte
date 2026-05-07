@@ -51,8 +51,8 @@
 
   const verificationDescription = $derived(
     path === "dnssec"
-      ? $t`Your provider's DKIM key is verified end-to-end via DNSSEC — no trusted intermediaries.`
-      : $t`Your provider's DKIM key is verified by independent DNS resolvers — three out of five must agree.`,
+      ? $t`Your provider's DKIM key is verified end-to-end via DNSSEC. No trusted intermediaries.`
+      : $t`Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers.`,
   );
 </script>
 
@@ -146,7 +146,7 @@
         {$t`Body`}
       </span>
       <span class="text-text-tertiary text-sm italic">
-        {$t`(anything — leave it blank)`}
+        {$t`(anything, leave it blank)`}
       </span>
     </div>
   </div>

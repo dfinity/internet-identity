@@ -23,7 +23,7 @@
       <Trans>
         We can't verify mail from
         <strong class="break-all">{domain}</strong>
-        yet. Try a different address — Gmail, iCloud, Outlook, Fastmail, and Proton
+        yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton
         all work.
       </Trans>
     </p>
@@ -57,7 +57,7 @@
           If you administer
           <strong class="break-all">{domain}</strong>, enabling DNSSEC at your
           domain registrar usually takes a few clicks. Once it propagates, this
-          address will work automatically — no further action from us needed.
+          address will work automatically. No further action from us needed.
         </Trans>
       </p>
     </div>
