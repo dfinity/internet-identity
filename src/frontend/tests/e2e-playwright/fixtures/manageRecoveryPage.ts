@@ -193,23 +193,31 @@ class ManageRecoveryPage {
     return this.#withWizard(fn);
   }
 
+  // The phrase card now renders the title and the activation status in
+  // separate elements (heading + status div), so we scope each assertion
+  // to the section containing the "Recovery phrase" heading and check
+  // for the matching status text within it.
+  #phraseCard() {
+    return this.#page.locator("section").filter({
+      has: this.#page.getByRole("heading", { name: "Recovery phrase" }),
+    });
+  }
+
   async assertNotActivated() {
     await expect(
-      this.#page.getByRole("heading", {
-        name: "Recovery phrase not activated",
-      }),
+      this.#phraseCard().getByText("Not activated", { exact: true }),
     ).toBeVisible();
   }
 
   async assertNotVerified() {
     await expect(
-      this.#page.getByRole("heading", { name: "Recovery phrase not verified" }),
+      this.#phraseCard().getByText("Not verified", { exact: true }),
     ).toBeVisible();
   }
 
   async assertActivated() {
     await expect(
-      this.#page.getByRole("heading", { name: "Recovery phrase activated" }),
+      this.#phraseCard().getByText("Activated", { exact: true }),
     ).toBeVisible();
   }
 
