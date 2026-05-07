@@ -60,9 +60,9 @@
       </button>
     </Select>
   </div>
-  <div class="text-text-primary mb-1 text-base font-semibold">
+  <h2 class="text-text-primary mb-1 text-base font-semibold">
     {$t`Recovery email`}
-  </div>
+  </h2>
   <div class="text-text-tertiary truncate text-sm">{credential.address}</div>
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="mb-4 flex flex-row">

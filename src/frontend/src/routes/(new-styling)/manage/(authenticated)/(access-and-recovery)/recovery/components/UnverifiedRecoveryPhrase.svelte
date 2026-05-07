@@ -50,9 +50,9 @@
       </button>
     </Select>
   </div>
-  <div class="text-text-primary mb-1 text-base font-semibold">
+  <h2 class="text-text-primary mb-1 text-base font-semibold">
     {$t`Recovery phrase`}
-  </div>
+  </h2>
   <div class="text-text-tertiary text-sm">
     {$t`Not verified`}
   </div>
