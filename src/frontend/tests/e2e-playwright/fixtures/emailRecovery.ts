@@ -101,15 +101,13 @@ class EmailRecoveryWizard {
     await this.#view.getByRole("button", { name: "Continue" }).click();
   }
 
-  /** Step 2: assert the send-confirmation-email view rendered with
-   *  the right recipient and a valid-looking nonce in the Subject. */
-  async expectSendConfirmationEmailView(opts: {
+  /** Step 2: assert the verify-email view rendered with the right
+   *  recipient and a valid-looking nonce in the Subject. */
+  async expectVerifyEmailView(opts: {
     recipient: "register@id.ai" | "recover@id.ai";
   }): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", {
-        name: "Send your confirmation email",
-      }),
+      this.#view.getByRole("heading", { name: "Verify your email" }),
     ).toBeVisible();
     await expect(this.#view.getByText(opts.recipient)).toBeVisible();
     // The Subject token is rendered in a monospaced span; assert

@@ -200,7 +200,7 @@
         {#if $EMAIL_RECOVERY}
           <button
             onclick={() => (showEmailRecoveryDialog = true)}
-            class="btn btn-secondary btn-xl mb-3"
+            class="btn btn-xl mb-3"
           >
             {$t`Recover with email`}
           </button>

@@ -137,9 +137,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     // canister-issued nonce off the rendered token block, sign an
     // email with the matching subject, submit it via smtp_request.
     await expect(
-      setupDialog.getByRole("heading", {
-        name: "Send your confirmation email",
-      }),
+      setupDialog.getByRole("heading", { name: "Verify your email" }),
     ).toBeVisible();
     const setupNonce = await setupDialog
       .getByText(/II-Recovery-[0-9a-f]{16}/)
@@ -152,19 +150,12 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
       subject: setupNonce,
     });
 
-    // The wizard should flip to the Done view once polling sees
-    // RegistrationSucceeded. Heading text comes from
-    // `setupEmailRecovery/views/Done.svelte`.
-    await expect(
-      setupDialog.getByRole("heading", { name: "All set" }),
-    ).toBeVisible({ timeout: STATUS_POLL_TIMEOUT });
-    await setupDialog.getByRole("button", { name: "Done" }).click();
-    await expect(setupDialog).toBeHidden();
-
-    // The manage page should now show the active card.
-    await expect(
-      page.getByRole("heading", { name: "Recovery email active" }),
-    ).toBeVisible();
+    // On RegistrationSucceeded the wizard fires `onSuccess` which the
+    // host translates into a toast + closing the dialog. Assert the
+    // dialog goes away and the active recovery-email card now shows
+    // the bound address (the inactive card variant doesn't).
+    await expect(setupDialog).toBeHidden({ timeout: STATUS_POLL_TIMEOUT });
+    await expect(page.getByText(emailRecovery.fromAddress)).toBeVisible();
 
     // ---------------------------------------------------------------
     // Recovery leg — sign in via the email we just bound
@@ -182,9 +173,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     await recoverDialog.getByRole("button", { name: "Continue" }).click();
 
     await expect(
-      recoverDialog.getByRole("heading", {
-        name: "Send your confirmation email",
-      }),
+      recoverDialog.getByRole("heading", { name: "Verify your email" }),
     ).toBeVisible();
     const recoveryNonce = await recoverDialog
       .getByText(/II-Recovery-[0-9a-f]{16}/)

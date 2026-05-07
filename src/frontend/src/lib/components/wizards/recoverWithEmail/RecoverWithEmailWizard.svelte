@@ -26,7 +26,6 @@
   import SendConfirmationEmail from "$lib/components/wizards/setupEmailRecovery/views/SendConfirmationEmail.svelte";
   import FailedView from "$lib/components/wizards/setupEmailRecovery/views/FailedView.svelte";
   import UnsupportedDomain from "$lib/components/wizards/setupEmailRecovery/views/UnsupportedDomain.svelte";
-  import { t } from "$lib/stores/locale.store";
   import type {
     EmailRecoveryChallenge,
     EmailRecoveryDnsInput,
@@ -72,6 +71,8 @@
     onSignedIn,
   }: Props = $props();
 
+  type Path = "dnssec" | "doh";
+
   type Stage =
     | { kind: "enter"; initialError?: string }
     | {
@@ -79,6 +80,7 @@
         challenge: EmailRecoveryChallenge;
         address: string;
         sessionIdentity: ECDSAKeyIdentity;
+        path: Path;
       }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
@@ -146,6 +148,7 @@
     } catch {
       dnsProof = undefined;
     }
+    const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
     const input: EmailRecoveryDnsInput = {
       address,
@@ -154,7 +157,7 @@
 
     try {
       const challenge = await prepareDelegation(input, sessionPublicKey);
-      stage = { kind: "sending", challenge, address, sessionIdentity };
+      stage = { kind: "sending", challenge, address, sessionIdentity, path };
       void runPoll(challenge.nonce, domain, sessionIdentity);
     } catch (e) {
       if (isCanisterError<EmailRecoveryError>(e)) {
@@ -280,8 +283,7 @@
     nonce={stage.challenge.nonce}
     mailbox={`recover@${window.location.hostname}`}
     fromAddress={stage.address}
-    expiresAt={stage.challenge.expires_at}
-    title={$t`Recover with email`}
+    path={stage.path}
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />

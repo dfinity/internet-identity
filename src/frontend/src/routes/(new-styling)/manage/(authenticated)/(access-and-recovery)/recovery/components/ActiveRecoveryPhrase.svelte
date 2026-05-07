@@ -1,7 +1,6 @@
 <script lang="ts">
   import { ShieldCheckIcon, LockKeyholeIcon } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
   import { nanosToMillis } from "$lib/utils/time";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -24,84 +23,59 @@
   const isProtected = $derived(
     "Protected" in recoveryPhrase.security_settings.protection,
   );
+
+  const lastUsedLabel = $derived.by(() => {
+    if (isCurrentAccessMethod) {
+      return $t`Last used: right now`;
+    }
+    const ts = recoveryPhrase.last_authentication[0];
+    if (ts !== undefined) {
+      return $t`Last used: ${$formatRelative(new Date(nanosToMillis(ts)), { style: "long" })}`;
+    }
+    return $t`Never used`;
+  });
+  const lastUsedTooltip = $derived.by(() => {
+    if (isCurrentAccessMethod) {
+      return $t`Currently signed in with this recovery phrase`;
+    }
+    const ts = recoveryPhrase.last_authentication[0];
+    if (ts !== undefined) {
+      return $formatDate(new Date(nanosToMillis(ts)), {
+        timeStyle: "short",
+        dateStyle: "medium",
+      });
+    }
+    return $t`Has not been used yet`;
+  });
 </script>
 
-<div class="@container">
-  <section
-    {...props}
-    class={[
-      "flex flex-col rounded-2xl border p-6",
-      "bg-bg-primary border-border-secondary not-dark:shadow-sm",
-      "@xl:flex-row",
-      className,
-    ]}
-  >
-    <ShieldCheckIcon
-      class={["text-fg-success-primary size-5 shrink-0", "@xl:mt-0.5"]}
-    />
-    <header class={["flex flex-col", "@max-xl:mt-3", "@xl:mx-3"]}>
+<section
+  {...props}
+  class={[
+    "bg-bg-primary border-border-secondary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm",
+    className,
+  ]}
+>
+  <header class="flex flex-row gap-3">
+    <ShieldCheckIcon class="text-fg-success-primary mt-0.5 size-5 shrink-0" />
+    <div class="flex flex-col">
       <h2 class="text-text-primary text-base font-semibold">
-        {$t`Recovery phrase activated`}
+        {$t`Recovery phrase`}
       </h2>
-      <p class="text-text-tertiary text-sm">
-        <Trans>It can be used at any time to recover your identity.</Trans>
-      </p>
-    </header>
-    <hr class={["border-border-tertiary my-5 border-t", "@xl:hidden"]} />
-    <dl class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>
-      <dt class="text-text-primary text-xs font-semibold">
-        {$t`Last used`}
-      </dt>
-      <dd class="text-text-primary cursor-default text-xs">
-        {#if isCurrentAccessMethod}
-          <Tooltip
-            label={$t`Currently signed in with this passkey`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`Right now`}</span>
-          </Tooltip>
-        {:else if recoveryPhrase.last_authentication[0] !== undefined}
-          {@const date = new Date(
-            nanosToMillis(recoveryPhrase.last_authentication[0]),
-          )}
-          <Tooltip
-            label={$formatDate(date, {
-              timeStyle: "short",
-              dateStyle: "medium",
-            })}
-            direction="up"
-            align="start"
-          >
-            <span>{$formatRelative(date, { style: "long" })}</span>
-          </Tooltip>
-        {:else}
-          <Tooltip
-            label={$t`Has not been used yet`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`n/a`}</span>
-          </Tooltip>
-        {/if}
-      </dd>
-    </dl>
+      <Tooltip label={lastUsedTooltip} direction="up" align="start">
+        <p class="text-text-tertiary cursor-default text-sm">
+          {lastUsedLabel}
+        </p>
+      </Tooltip>
+    </div>
+  </header>
+  <div class="mt-5">
     <Tooltip
       label={$t`Locked legacy recovery phrase`}
       description={$t`Requires unlocking before it can be reset.`}
       hidden={!isProtected}
-      direction="up"
-      align="end"
-      offset="0rem"
     >
-      <button
-        class={[
-          "btn btn-secondary btn-sm btn-danger",
-          "@max-xl:mt-5",
-          "@xl:my-auto",
-        ]}
-        onclick={onReset}
-      >
+      <button class="btn btn-secondary btn-sm btn-danger" onclick={onReset}>
         {#if isProtected}
           <LockKeyholeIcon class="size-4" />
           <span>{$t`Unlock and reset`}</span>
@@ -110,5 +84,5 @@
         {/if}
       </button>
     </Tooltip>
-  </section>
-</div>
+  </div>
+</section>
