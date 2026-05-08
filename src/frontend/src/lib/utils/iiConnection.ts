@@ -1032,11 +1032,18 @@ export const inferHost = (): string => {
     return "https://" + IC_API_DOMAIN;
   }
 
+  // Match a hostname against an official gateway domain by exact equality or
+  // by a dot boundary, so adversarial subdomains like `evil-ic0.app` are not
+  // treated as the IC.
+  const isGatewayDomain = (domain: string): boolean =>
+    location.hostname === domain ||
+    location.hostname.endsWith(`.${domain}`);
+
   if (
-    location.hostname.endsWith("icp0.io") ||
-    location.hostname.endsWith("ic0.app") ||
-    location.hostname.endsWith("icp.net") ||
-    location.hostname.endsWith("internetcomputer.org")
+    isGatewayDomain("icp0.io") ||
+    isGatewayDomain("ic0.app") ||
+    isGatewayDomain("icp.net") ||
+    isGatewayDomain("internetcomputer.org")
   ) {
     // If this is a canister running on one of the official IC domains, then return the
     // official API endpoint
