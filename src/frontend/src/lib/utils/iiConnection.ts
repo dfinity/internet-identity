@@ -1036,8 +1036,7 @@ export const inferHost = (): string => {
   // by a dot boundary, so adversarial subdomains like `evil-ic0.app` are not
   // treated as the IC.
   const isGatewayDomain = (domain: string): boolean =>
-    location.hostname === domain ||
-    location.hostname.endsWith(`.${domain}`);
+    location.hostname === domain || location.hostname.endsWith(`.${domain}`);
 
   if (
     isGatewayDomain("icp0.io") ||
