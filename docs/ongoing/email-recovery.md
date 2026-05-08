@@ -1270,14 +1270,14 @@ dialogs.
 
 **Setup wizard — step 1: enter address**
 
-The wizard has a `<Steps total={3} current={i} />` indicator at the top
-of every step. There is no in-wizard `Cancel` button — the dialog's
-top-right `×` is the only user-driven exit, matching the convention
-the rest of the (new-styling) dialogs use.
+There is no in-wizard `Cancel` button — the dialog's top-right `×`
+is the only user-driven exit, matching the convention the rest of
+the (new-styling) dialogs use. The wizard has no top-of-view step
+indicator either; the user moves through three views (enter address →
+send confirmation email → success toast) but the views are not
+numbered in the UI.
 
 ```
-■■□□      ← Steps indicator (1 of 3 filled)
-
 Add a recovery email
 
 Type the email address you want to use to recover this
@@ -1302,38 +1302,45 @@ surfacing the error inline.
 **Setup wizard — step 2: send the confirmation email** (FE shown after `email_recovery_credential_prepare_add` returns; the file is `SendConfirmationEmail.svelte`)
 
 ```
-■■■□      ← Steps indicator (2 of 3 filled)
-
-🛡✓ Verify your email
+Verify your email
 
 Send the email below to confirm.
 
-┌────────────────────────────────────────────┐
-│ To       register@beta.id.ai      [ copy ] │
-│ From     alice@gmail.com                   │
-│ Subject  II-Recovery-1a2b3c4d5e6f7081 [ copy ]│
-│ Body     (anything, leave it blank)        │
-└────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ TO                                  [ copy ]│
+│ register@beta.id.ai                         │
+├─────────────────────────────────────────────┤
+│ FROM                                        │
+│ alice@gmail.com                       🛡✓   │
+├─────────────────────────────────────────────┤
+│ SUBJECT                             [ copy ]│
+│ II-Recovery-1a2b3c4d5e6f7081                │
+├─────────────────────────────────────────────┤
+│ BODY                                        │
+│ (anything, leave it blank)                  │
+└─────────────────────────────────────────────┘
 
-┌────────────────────────────────────────────┐
-│           ✉  Open in mail app              │  (mailto: link)
-└────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│           ✉  Open in mail app               │  (mailto: link)
+└─────────────────────────────────────────────┘
 
        ⟳  Waiting for your email to arrive…
 
            Expires in 29:42
 ```
 
-The shield-check chip next to the heading carries a tooltip
-explaining the cryptographic-authenticity model (the wording differs
-slightly between the DNSSEC and DoH paths, derived in the wizard glue
-from whether `dnsProof` was supplied to `prepare_add`). The "Open in
-mail app" button is a `mailto:` link with `to`, `subject`, and an
-empty `body` pre-filled, so the user can complete step 2 in one click
-on platforms whose mail client honours `mailto:`. The To and Subject
-rows each have a per-row copy button that reveals a "Copied to
-clipboard" tooltip for ~700 ms after success — same pattern as
-`ContinueOnNewDevice.svelte`.
+The small shield-check chip on the right of the **From** row carries a
+tooltip explaining the cryptographic-authenticity model (the wording
+differs slightly between the DNSSEC and DoH paths, derived in the
+wizard glue from whether `dnsProof` was supplied to `prepare_add`).
+Putting the badge against the `From:` value visually anchors the
+"this address is verified" claim to the address it's about. The
+"Open in mail app" button is a `mailto:` link with `to`, `subject`,
+and an empty `body` pre-filled, so the user can complete step 2 in
+one click on platforms whose mail client honours `mailto:`. The To
+and Subject rows each have a per-row copy button (top-right of the
+row) that reveals a "Copied to clipboard" tooltip for ~700 ms after
+success — same pattern as `ContinueOnNewDevice.svelte`.
 
 There is no orange warning block, no `Cancel`, and no `Resend` —
 closing and re-opening the dialog issues a fresh nonce naturally, so
