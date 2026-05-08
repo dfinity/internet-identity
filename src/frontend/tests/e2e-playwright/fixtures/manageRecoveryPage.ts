@@ -104,7 +104,12 @@ class CreateRecoveryPhraseWizard {
   }
 
   async close(): Promise<void> {
-    await this.#view.getByRole("button", { name: "Close" }).click();
+    // Use the aria-label attribute selector instead of role+name to
+    // avoid collisions when the recovery phrase contains the BIP39
+    // word "close" — that word button has accessible name "close"
+    // which would match `name: "Close"` (case-insensitive) inside the
+    // same dialog scope.
+    await this.#view.locator('button[aria-label="Close"]').click();
   }
 
   async retry(): Promise<void> {
@@ -166,10 +171,22 @@ class ManageRecoveryPage {
   async reset<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page
-      .getByRole("main")
-      .getByRole("button", { name: "Reset" })
-      .click();
+    // Activated state: a direct "Reset" button is rendered. Unverified
+    // state: Reset is one of the menu items behind the "More options"
+    // dropdown. Pick whichever is currently on the page.
+    const main = this.#page.getByRole("main");
+    const directReset = main.getByRole("button", {
+      name: "Reset",
+      exact: true,
+    });
+    if ((await directReset.count()) > 0) {
+      await directReset.click();
+    } else {
+      await main.getByRole("button", { name: "More options" }).click();
+      await this.#page
+        .getByRole("menuitem", { name: "Reset", exact: true })
+        .click();
+    }
     return this.#withWizard(fn);
   }
 
@@ -186,9 +203,14 @@ class ManageRecoveryPage {
   async verify<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
+    // Verify lives inside the "More options" dropdown on the
+    // unverified card — open the menu, then click the menuitem.
     await this.#page
       .getByRole("main")
-      .getByRole("button", { name: "Verify" })
+      .getByRole("button", { name: "More options" })
+      .click();
+    await this.#page
+      .getByRole("menuitem", { name: "Verify", exact: true })
       .click();
     return this.#withWizard(fn);
   }
