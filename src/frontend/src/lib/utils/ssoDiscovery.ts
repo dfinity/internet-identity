@@ -39,14 +39,12 @@
  *   doc from bouncing auth off-host AFTER we've committed to a provider).
  * - Provider `authorization_endpoint` hostname must match the same.
  *
- * Rate limiting:
+ * Throttling:
  * - Successful responses cached for 4 hours per hop.
- * - Per-domain rate limit: max 1 request per 10 minutes.
  * - Max 2 concurrent SSO discoveries globally.
  * - Exponential backoff (2s, 4s, 8s) for retryable errors, up to 3 attempts.
- * - Request timeouts: 5s for `ii-openid-configuration`, 10s for provider
- *   discovery. The abort timer is cleared in a `finally` so network errors
- *   don't leak armed timers.
+ * - Request timeout: 15s per hop. The abort timer is cleared in a `finally`
+ *   so network errors don't leak armed timers.
  */
 
 import { z } from "zod";
@@ -105,7 +103,11 @@ type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
  */
 export class DomainNotConfiguredError extends Error {
   constructor(
-    public readonly reason: "http-error" | "invalid-response" | "network",
+    public readonly reason:
+      | "http-error"
+      | "invalid-response"
+      | "network"
+      | "timeout",
     public readonly httpStatus?: number,
     public readonly detail?: string,
   ) {
@@ -120,9 +122,7 @@ export class DomainNotConfiguredError extends Error {
 
 const II_CONFIG_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const PROVIDER_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const RATE_LIMIT_MS = 10 * 60 * 1000; // 10 minutes per domain
-const II_CONFIG_TIMEOUT_MS = 5_000;
-const PROVIDER_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 15_000;
 const MAX_CONCURRENT = 2;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
@@ -145,7 +145,6 @@ interface ProviderCacheEntry {
 
 const iiConfigCache = new Map<string, IIConfigCacheEntry>();
 const providerCache = new Map<string, ProviderCacheEntry>();
-const lastFetchAttempt = new Map<string, number>();
 let activeFetches = 0;
 
 /**
@@ -314,9 +313,10 @@ const validateProviderDiscovery = (
  *
  * - `Fetch failed: <status> ...` from our {@link fetchWithRetry} → http-error
  *   with the parsed status.
+ * - `AbortError` from the per-hop timeout → timeout.
  * - `SyntaxError` from `response.json()` → invalid-response (HTML served at
  *   200 is the most common cause, e.g. a CMS that SPA-routes every path).
- * - Anything else (timeouts, network failures, CORS, DNS) → network.
+ * - Anything else (network failures, CORS, DNS) → network.
  */
 const wrapHopOneError = (error: unknown): DomainNotConfiguredError => {
   // Duck-type (not `instanceof Error`): jsdom errors thrown from
@@ -330,6 +330,9 @@ const wrapHopOneError = (error: unknown): DomainNotConfiguredError => {
     if (match !== null) {
       return new DomainNotConfiguredError("http-error", parseInt(match[1], 10));
     }
+  }
+  if (name === "AbortError") {
+    return new DomainNotConfiguredError("timeout");
   }
   if (name === "SyntaxError") {
     return new DomainNotConfiguredError("invalid-response");
@@ -418,7 +421,7 @@ const fetchWithRetry = async (
  *
  * @param domain - The organization domain (e.g., `dfinity.org`)
  * @returns The `client_id` and OIDC discovery document
- * @throws On validation failure, rate limit, timeout, or network error
+ * @throws On validation failure, timeout, or network error
  */
 export const discoverSsoConfig = async (
   domain: string,
@@ -447,32 +450,10 @@ export const discoverSsoConfig = async (
     }
   }
 
-  // Per-domain rate limit.
-  const lastAttempt = lastFetchAttempt.get(validatedDomain);
-  if (lastAttempt !== undefined && Date.now() - lastAttempt < RATE_LIMIT_MS) {
-    // Fall back to stale cache if we have it, rather than outright failing.
-    if (cachedIIConfig !== undefined) {
-      const cachedProvider = providerCache.get(
-        cachedIIConfig.config.openid_configuration,
-      );
-      if (cachedProvider !== undefined) {
-        return {
-          domain: validatedDomain,
-          clientId: cachedIIConfig.config.client_id,
-          discovery: cachedProvider.document,
-        };
-      }
-    }
-    throw new Error(
-      `Rate limited: SSO discovery for ${validatedDomain} was attempted too recently`,
-    );
-  }
-
   if (activeFetches >= MAX_CONCURRENT) {
     throw new Error("Too many concurrent SSO discovery requests");
   }
 
-  lastFetchAttempt.set(validatedDomain, Date.now());
   activeFetches++;
 
   try {
@@ -483,7 +464,7 @@ export const discoverSsoConfig = async (
     const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
     let iiConfigData: unknown;
     try {
-      iiConfigData = await fetchWithRetry(iiConfigUrl, II_CONFIG_TIMEOUT_MS);
+      iiConfigData = await fetchWithRetry(iiConfigUrl, FETCH_TIMEOUT_MS);
     } catch (error) {
       throw wrapHopOneError(error);
     }
@@ -522,7 +503,7 @@ export const discoverSsoConfig = async (
     const providerUrl = new URL(iiConfig.openid_configuration);
     const providerData = await fetchWithRetry(
       iiConfig.openid_configuration,
-      PROVIDER_TIMEOUT_MS,
+      FETCH_TIMEOUT_MS,
     );
     const providerDoc = validateProviderDiscovery(
       providerData,
@@ -549,7 +530,6 @@ export const discoverSsoConfig = async (
 export const clearSsoDiscoveryCache = (): void => {
   iiConfigCache.clear();
   providerCache.clear();
-  lastFetchAttempt.clear();
   // If a test timed out mid-fetch, the pending promise's `finally` may not
   // have run yet and `activeFetches` could be stuck above 0, making the
   // next test trip the MAX_CONCURRENT guard. Reset it so each test starts

@@ -93,8 +93,11 @@
       if (e.reason === "http-error" && e.httpStatus !== undefined) {
         return $t`${domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP ${String(e.httpStatus)}).`;
       }
+      if (e.reason === "timeout") {
+        return $t`${domainInput} took too long to respond. Try again in a moment.`;
+      }
       if (e.reason === "network") {
-        return $t`Couldn't reach ${domainInput}. Check the spelling and your network.`;
+        return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
       }
       return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed.`;
     }
@@ -120,9 +123,6 @@
       const msg = e.message;
       if (msg.toLowerCase().includes("canary allowlist")) {
         return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
-      }
-      if (msg.startsWith("Rate limited:")) {
-        return $t`Too many recent attempts for ${domainInput}. Wait a few minutes.`;
       }
       if (msg === "Too many concurrent SSO discovery requests") {
         return $t`Several SSO sign-ins are in flight already. Wait a moment.`;
