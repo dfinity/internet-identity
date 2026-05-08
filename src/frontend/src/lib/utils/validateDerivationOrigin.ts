@@ -28,10 +28,10 @@ export const validateDerivationOrigin = async ({
 }): Promise<ValidationResult> => {
   // Compare in canonical (ic0.app) form so that the three official canister
   // gateway domains (ic0.app, icp0.io, icp.net) are treated as one site.
-  const normalisedRequestOrigin = remapToLegacyDomain(requestOrigin);
+  const normalizedRequestOrigin = remapToLegacyDomain(requestOrigin);
   if (
     derivationOrigin === undefined ||
-    remapToLegacyDomain(derivationOrigin) === normalisedRequestOrigin
+    remapToLegacyDomain(derivationOrigin) === normalizedRequestOrigin
   ) {
     // this is the default behaviour -> no further validation necessary
     return { result: "valid" };
@@ -98,13 +98,12 @@ export const validateDerivationOrigin = async ({
     }
 
     // Check allowed alternative origins. Both the request origin and each
-    // listed entry are normalised to the canonical ic0.app form, so listing
+    // listed entry are normalized to the canonical ic0.app form, so listing
     // any one of <canister>.ic0.app, <canister>.icp0.io, or <canister>.icp.net
     // covers requests from all three gateway variants.
-    const normalisedAllowed = alternativeOriginsObj.alternativeOrigins.map(
-      remapToLegacyDomain,
-    );
-    if (!normalisedAllowed.includes(normalisedRequestOrigin)) {
+    const normalizedAllowed =
+      alternativeOriginsObj.alternativeOrigins.map(remapToLegacyDomain);
+    if (!normalizedAllowed.includes(normalizedRequestOrigin)) {
       return {
         result: "invalid",
         message: `"${requestOrigin}" is not listed in the list of allowed alternative origins. Allowed alternative origins: ${alternativeOriginsObj.alternativeOrigins}`,

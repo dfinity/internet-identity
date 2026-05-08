@@ -30,7 +30,7 @@ test("should validate same derivation origin", async () => {
 
 test("should validate when request and derivation origin are different gateway variants of the same canister", async () => {
   // Same canister served from different IC gateway domains: no alternative
-  // origins file lookup is required because the two URLs normalise to the
+  // origins file lookup is required because the two URLs normalize to the
   // same canonical (ic0.app) origin.
   const variants = [
     [
@@ -271,8 +271,10 @@ for (const iiUrl of validIIUrls) {
           resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
         });
 
-        expect(result, `listed=${listedVariant} request=${requestVariant}`)
-          .toEqual({ result: "valid" });
+        expect(
+          result,
+          `listed=${listedVariant} request=${requestVariant}`,
+        ).toEqual({ result: "valid" });
       }
     }
   });
