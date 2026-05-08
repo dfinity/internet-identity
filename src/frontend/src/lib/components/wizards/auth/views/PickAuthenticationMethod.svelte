@@ -65,7 +65,7 @@
           manual
         >
           <button
-            class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-2 px-3 py-4 text-xs font-medium"
+            class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-1.5 px-2 py-3 text-xs font-medium"
             onclick={() => handleContinueWithOpenId(provider)}
             disabled={authenticatingProviderId !== undefined}
             aria-label={$t`Continue with ${name}`}
@@ -95,7 +95,7 @@
         exists.
       -->
       <button
-        class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-2 px-3 py-4 text-xs font-medium"
+        class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-1.5 px-2 py-3 text-xs font-medium"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={$t`Continue with SSO`}
