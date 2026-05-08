@@ -35,10 +35,16 @@
     {$t`Not activated`}
   </div>
   <div class="border-border-tertiary my-5 border-t"></div>
-  <div class="text-text-primary text-xs">
-    <Trans>
-      Sign in by sending a cryptographically signed email from your inbox. Use
-      it to recover when you lose all other access methods.
-    </Trans>
+  <div class="text-text-primary flex flex-col gap-3 text-xs">
+    <p>
+      <Trans>Sign in by sending a signed email from your inbox.</Trans>
+    </p>
+    <p>
+      <Trans>
+        Each email carries a cryptographic signature that proves it really came
+        from your inbox. The only party you trust is your mail provider, with
+        nothing else in between.
+      </Trans>
+    </p>
   </div>
 </section>

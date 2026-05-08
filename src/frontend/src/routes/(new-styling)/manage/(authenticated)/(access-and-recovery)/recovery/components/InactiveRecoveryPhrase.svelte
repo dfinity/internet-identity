@@ -35,10 +35,16 @@
     {$t`Not activated`}
   </div>
   <div class="border-border-tertiary my-5 border-t"></div>
-  <div class="text-text-primary text-xs">
-    <Trans>
-      A 24-word seed you write down and keep offline. Use it to recover when you
-      lose all other access methods.
-    </Trans>
+  <div class="text-text-primary flex flex-col gap-3 text-xs">
+    <p>
+      <Trans>A 24-word phrase you write down and keep offline.</Trans>
+    </p>
+    <p>
+      <Trans>
+        The most reliable backup. Stored entirely by you, on paper. It does not
+        depend on any account, service, or provider, and only you can use, lose,
+        or replace it.
+      </Trans>
+    </p>
   </div>
 </section>
