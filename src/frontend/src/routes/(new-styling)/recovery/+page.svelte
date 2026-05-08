@@ -3,9 +3,9 @@
   import { t } from "$lib/stores/locale.store";
   import {
     ArrowRightIcon,
-    KeyRoundIcon,
     MailIcon,
     RefreshCcw,
+    ShieldIcon,
   } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -201,7 +201,7 @@
             aria-label={$t`Recover with phrase`}
           >
             <span class="flex w-full items-center gap-3">
-              <KeyRoundIcon class="text-fg-tertiary size-5 shrink-0" />
+              <ShieldIcon class="text-fg-tertiary size-5 shrink-0" />
               <span
                 class="text-text-primary grow text-start text-base font-semibold"
               >
@@ -216,7 +216,7 @@
               />
             </span>
             <span class="text-text-tertiary ps-8 text-sm font-normal">
-              {$t`Type your 24 words.`}
+              {$t`Type your 24 recovery words.`}
             </span>
           </ButtonCard>
           {#if $EMAIL_RECOVERY}
@@ -241,7 +241,7 @@
                 />
               </span>
               <span class="text-text-tertiary ps-8 text-sm font-normal">
-                {$t`Send a signed email from your inbox.`}
+                {$t`Send an email from your inbox.`}
               </span>
             </ButtonCard>
           {/if}
