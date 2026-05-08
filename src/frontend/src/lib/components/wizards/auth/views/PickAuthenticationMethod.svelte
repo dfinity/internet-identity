@@ -59,35 +59,30 @@
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
-        <div class="flex min-w-0 flex-1 flex-col items-stretch gap-1.5">
-          <Tooltip
-            label={$t`Interaction canceled. Please try again.`}
-            hidden={cancelledProviderId !== provider.client_id}
-            manual
+        <Tooltip
+          label={$t`Interaction canceled. Please try again.`}
+          hidden={cancelledProviderId !== provider.client_id}
+          manual
+        >
+          <button
+            class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-2 px-3 py-4 text-xs font-medium"
+            onclick={() => handleContinueWithOpenId(provider)}
+            disabled={authenticatingProviderId !== undefined}
+            aria-label={$t`Continue with ${name}`}
           >
-            <button
-              class="btn btn-secondary btn-xl"
-              onclick={() => handleContinueWithOpenId(provider)}
-              disabled={authenticatingProviderId !== undefined}
-              aria-label={$t`Continue with ${name}`}
-            >
-              {#if authenticatingProviderId === provider.client_id}
-                <ProgressRing />
-              {:else}
-                <div class="size-6">
-                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
-                  {@html provider.logo}
-                </div>
-              {/if}
-            </button>
-          </Tooltip>
-          <span
-            aria-hidden="true"
-            class="text-text-tertiary truncate text-center text-xs"
-          >
-            {name}
-          </span>
-        </div>
+            {#if authenticatingProviderId === provider.client_id}
+              <ProgressRing />
+            {:else}
+              <div class="size-6">
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
+                {@html provider.logo}
+              </div>
+            {/if}
+            <span aria-hidden="true" class="text-text-tertiary w-full truncate">
+              {name}
+            </span>
+          </button>
+        </Tooltip>
       {/each}
       <!--
         SSO entry is always rendered. Registration is enforced on the
@@ -99,22 +94,17 @@
         here — we keep this option visible so users know the mechanism
         exists.
       -->
-      <div class="flex min-w-0 flex-1 flex-col items-stretch gap-1.5">
-        <button
-          class="btn btn-secondary btn-xl"
-          onclick={signInWithSso}
-          disabled={authenticatingProviderId !== undefined}
-          aria-label={$t`Continue with SSO`}
-        >
-          <SsoIcon class="size-6" />
-        </button>
-        <span
-          aria-hidden="true"
-          class="text-text-tertiary truncate text-center text-xs"
-        >
+      <button
+        class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-2 px-3 py-4 text-xs font-medium"
+        onclick={signInWithSso}
+        disabled={authenticatingProviderId !== undefined}
+        aria-label={$t`Continue with SSO`}
+      >
+        <SsoIcon class="size-6" />
+        <span aria-hidden="true" class="text-text-tertiary w-full truncate">
           {$t`SSO`}
         </span>
-      </div>
+      </button>
     </div>
   </div>
   <div class="border-border-tertiary border-t"></div>
