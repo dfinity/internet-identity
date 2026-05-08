@@ -354,7 +354,7 @@
      side; stacks vertically on mobile. Each card stretches to the
      row's natural height via grid's default `align-items: stretch`
      so the two tiles match heights when their content differs. -->
-<div class="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+<div class="mt-10 grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2">
   {#if isUnverified}
     <!-- This identity has a recovery phrase that isn't verified yet -->
     <UnverifiedRecoveryPhrase
