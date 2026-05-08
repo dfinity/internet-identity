@@ -31,6 +31,9 @@ msgstr "{displayName}-account"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} heeft /.well-known/ii-openid-configuration niet gepubliceerd (HTTP {0})."
 
+msgid "{domainInput} took too long to respond. Try again in a moment."
+msgstr "{domainInput} heeft te lang gedaan om te reageren. Probeer het over een moment opnieuw."
+
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "De /.well-known/ii-openid-configuration van {domainInput} is ongeldig."
 
@@ -277,8 +280,8 @@ msgstr "Doorgaan met passkey"
 msgid "Continue with SSO"
 msgstr "Doorgaan met SSO"
 
-msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr "Kon {domainInput} niet bereiken. Controleer de spelling en uw netwerk."
+msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
+msgstr "Kan SSO-instellingen van {domainInput} niet laden. Vraag uw SSO-beheerder om te controleren of /.well-known/ii-openid-configuration bereikbaar is."
 
 msgid "Create account"
 msgstr "Account aanmaken"
@@ -881,9 +884,6 @@ msgstr "Sessie verlopen"
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
-msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr "Er zijn al meerdere SSO-aanmeldingen bezig. Een moment geduld."
-
 msgid "Share {label}"
 msgstr "{label} delen"
 
@@ -1082,9 +1082,6 @@ msgstr "Om verder te gaan:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Om uw passkey te voltooien, volgt u de instructies op uw <0>nieuwe apparaat</0>."
-
-msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr "Te veel recente pogingen voor {domainInput}. Wacht enkele minuten."
 
 msgid "Type each word in the correct order:"
 msgstr "Typ elk woord in de juiste volgorde:"
