@@ -31,6 +31,9 @@ msgstr "Compte {displayName}"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} n’a pas publié /.well-known/ii-openid-configuration (HTTP {0})."
 
+msgid "{domainInput} took too long to respond. Try again in a moment."
+msgstr "{domainInput} a mis trop de temps à répondre. Réessayez dans un moment."
+
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "Le fichier /.well-known/ii-openid-configuration de {domainInput} est mal formé."
 
@@ -277,8 +280,8 @@ msgstr "Continuer avec une passkey"
 msgid "Continue with SSO"
 msgstr "Continuer avec SSO"
 
-msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr "Impossible de joindre {domainInput}. Vérifiez l’orthographe et votre réseau."
+msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
+msgstr "Impossible de charger les paramètres SSO depuis {domainInput}. Demandez à votre administrateur SSO de vérifier que /.well-known/ii-openid-configuration est accessible."
 
 msgid "Create account"
 msgstr "Créer un compte"
@@ -881,9 +884,6 @@ msgstr "Session expirée"
 msgid "Set as default sign-in"
 msgstr "Définir comme connexion par défaut"
 
-msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr "Plusieurs connexions SSO sont déjà en cours. Veuillez patienter un instant."
-
 msgid "Share {label}"
 msgstr "Partager {label}"
 
@@ -1082,9 +1082,6 @@ msgstr "Pour continuer :"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Pour terminer la configuration de votre passkey, suivez les instructions affichées sur votre <0>nouvel appareil</0>."
-
-msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr "Trop de tentatives récentes pour {domainInput}. Veuillez patienter quelques minutes."
 
 msgid "Type each word in the correct order:"
 msgstr "Tapez chaque mot dans le bon ordre :"
