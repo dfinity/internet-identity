@@ -280,8 +280,8 @@ msgstr "Lanjutkan dengan passkey"
 msgid "Continue with SSO"
 msgstr "Lanjutkan dengan SSO"
 
-msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
-msgstr "Tidak dapat memuat pengaturan SSO dari {domainInput}. Minta admin SSO untuk memeriksa apakah /.well-known/ii-openid-configuration dapat dijangkau."
+msgid "Couldn't reach {domainInput}. Check the spelling and your network."
+msgstr "Tidak dapat menjangkau {domainInput}. Periksa ejaan dan jaringan Anda."
 
 msgid "Create account"
 msgstr "Buat akun"
@@ -884,6 +884,9 @@ msgstr "Sesi telah habis"
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
 
+msgid "Several SSO sign-ins are in flight already. Wait a moment."
+msgstr "Beberapa proses masuk SSO sedang berlangsung. Tunggu sebentar."
+
 msgid "Share {label}"
 msgstr "Bagikan {label}"
 
@@ -1082,6 +1085,9 @@ msgstr "Untuk melanjutkan:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Untuk menyelesaikan pengaturan passkey Anda, ikuti instruksi yang ditampilkan di <0>perangkat baru</0> Anda."
+
+msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
+msgstr "Terlalu banyak percobaan baru-baru ini untuk {domainInput}. Tunggu beberapa menit."
 
 msgid "Type each word in the correct order:"
 msgstr "Ketik setiap kata dalam urutan yang benar:"
