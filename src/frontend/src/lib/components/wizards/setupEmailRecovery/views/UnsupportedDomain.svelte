@@ -48,8 +48,6 @@
           To accept email from a domain we either need DNSSEC at its apex (so we
           can cryptographically validate the DKIM key your provider uses) or for
           the domain to be on our list of known mailbox providers.
-          <strong class="break-all">{domain}</strong>
-          meets neither.
         </Trans>
       </p>
       <p>
