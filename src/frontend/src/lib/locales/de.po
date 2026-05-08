@@ -31,6 +31,9 @@ msgstr "{displayName}-Konto"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} hat /.well-known/ii-openid-configuration nicht veröffentlicht (HTTP {0})."
 
+msgid "{domainInput} took too long to respond. Try again in a moment."
+msgstr "{domainInput} hat zu lange für eine Antwort gebraucht. Versuchen Sie es gleich erneut."
+
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "Die /.well-known/ii-openid-configuration von {domainInput} ist fehlerhaft."
 
@@ -277,8 +280,8 @@ msgstr "Mit Passkey fortfahren"
 msgid "Continue with SSO"
 msgstr "Mit SSO fortfahren"
 
-msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr "{domainInput} konnte nicht erreicht werden. Überprüfen Sie die Schreibweise und Ihre Netzwerkverbindung."
+msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
+msgstr "SSO-Einstellungen von {domainInput} konnten nicht geladen werden. Bitten Sie Ihren SSO-Administrator zu prüfen, ob /.well-known/ii-openid-configuration erreichbar ist."
 
 msgid "Create account"
 msgstr "Konto erstellen"
@@ -881,9 +884,6 @@ msgstr "Sitzung abgelaufen"
 msgid "Set as default sign-in"
 msgstr "Als Standardanmeldung festlegen"
 
-msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr "Es laufen bereits mehrere SSO-Anmeldungen. Bitte warten Sie einen Moment."
-
 msgid "Share {label}"
 msgstr "{label} teilen"
 
@@ -1082,9 +1082,6 @@ msgstr "So fahren Sie fort:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Um die Einrichtung Ihres Passkeys abzuschließen, folgen Sie den Anweisungen auf Ihrem <0>neuen Gerät</0>."
-
-msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr "Zu viele kürzliche Versuche für {domainInput}. Bitte warten Sie einige Minuten."
 
 msgid "Type each word in the correct order:"
 msgstr "Geben Sie jedes Wort in der richtigen Reihenfolge ein:"
