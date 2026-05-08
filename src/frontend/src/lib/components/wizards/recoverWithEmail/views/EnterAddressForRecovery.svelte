@@ -48,7 +48,7 @@
     <p class="text-text-tertiary text-base font-medium">
       <Trans>
         Type the email address you registered as your recovery method. We'll ask
-        you to send a signed email from that inbox to prove ownership.
+        you to send a signed email from this inbox to confirm.
       </Trans>
     </p>
   </header>
