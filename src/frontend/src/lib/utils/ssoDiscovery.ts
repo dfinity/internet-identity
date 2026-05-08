@@ -95,8 +95,8 @@ type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
 
 /**
  * Raised when hop 1 (`/.well-known/ii-openid-configuration` on the user's
- * domain) fails in a way that signals the domain owner hasn't set up II
- * integration — 404, non-JSON response, missing fields, or unreachable.
+ * domain) fails. Covers misconfiguration (`http-error`, `invalid-response`)
+ * and transient failures (`network`, `timeout`).
  *
  * Surfaced to the UI so we can show a single user-friendly message
  * instead of leaking raw `fetch` / JSON parse errors.
@@ -113,8 +113,8 @@ export class DomainNotConfiguredError extends Error {
   ) {
     super(
       detail !== undefined
-        ? `Domain not configured for II (${reason}): ${detail}`
-        : `Domain not configured for II (${reason})`,
+        ? `SSO discovery hop 1 failed (${reason}): ${detail}`
+        : `SSO discovery hop 1 failed (${reason})`,
     );
     this.name = "DomainNotConfiguredError";
   }
@@ -421,7 +421,12 @@ const fetchWithRetry = async (
  *
  * @param domain - The organization domain (e.g., `dfinity.org`)
  * @returns The `client_id` and OIDC discovery document
- * @throws On validation failure, timeout, or network error
+ * @throws {Error} On invalid `domain` input or when over `MAX_CONCURRENT`.
+ * @throws {DomainNotConfiguredError} On any hop-1 failure
+ *   (`http-error`, `invalid-response`, `network`, `timeout`).
+ * @throws {Error} On hop-2 fetch failures (`Fetch failed: <status>`,
+ *   `AbortError`) or provider-discovery validation failures (HTTPS, hostname
+ *   match, schema).
  */
 export const discoverSsoConfig = async (
   domain: string,
