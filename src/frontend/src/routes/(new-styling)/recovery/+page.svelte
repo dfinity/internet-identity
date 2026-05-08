@@ -192,10 +192,7 @@
           {$t`Recover your identity`}
         </h1>
         <p class="text-text-tertiary mb-6 text-base text-pretty">
-          <Trans>
-            Before getting started, find a private place and have your recovery
-            phrase ready. Keep it confidential to protect your identity.
-          </Trans>
+          <Trans>Pick a recovery method below to sign back in.</Trans>
         </p>
         <div class="mb-3 flex flex-col gap-2">
           <ButtonCard

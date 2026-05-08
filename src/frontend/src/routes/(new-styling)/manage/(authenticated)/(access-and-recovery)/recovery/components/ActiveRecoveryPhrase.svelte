@@ -102,9 +102,6 @@
     </div>
   </div>
   <div class="text-text-primary text-xs">
-    <Trans>
-      A 24-word seed kept offline. Use it to recover when you lose all other
-      access methods.
-    </Trans>
+    <Trans>A 24-word phrase you write down and keep offline.</Trans>
   </div>
 </section>
