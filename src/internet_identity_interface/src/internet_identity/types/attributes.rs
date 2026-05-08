@@ -20,24 +20,27 @@ pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
 pub const SSO_DOMAIN_MAX_BYTES: usize = 253;
 
 /// Mirror of the frontend's `remapToLegacyDomain`: the frontend rewrites
-/// `https://<sub>.icp0.io` to `https://<sub>.ic0.app` before deriving a
-/// principal so users get the same principal across the two domains. The
-/// canister needs the same transformation to verify that an `unmapped_origin`
-/// supplied alongside the (legacy-mapped) `origin` is just the icp0.io form
-/// of the same site, not a different origin sneaking into the certified
-/// `implicit:origin`.
+/// `https://<sub>.icp0.io` and `https://<sub>.icp.net` to `https://<sub>.ic0.app`
+/// before deriving a principal so users get the same principal across all
+/// canister gateway domains. The canister needs the same transformation to
+/// verify that an `unmapped_origin` supplied alongside the (legacy-mapped)
+/// `origin` is just an alternate gateway form of the same site, not a
+/// different origin sneaking into the certified `implicit:origin`.
 ///
 /// The accepted shape — `<subdomain>(.raw)?` containing only ASCII word
-/// characters or `-` — matches the regex `^https://([\w-]+(?:\.raw)?)\.icp0\.io$`
-/// used in the frontend.
+/// characters or `-` — matches the regex
+/// `^https://([\w-]+(?:\.raw)?)\.(?:icp0\.io|icp\.net)$` used in the frontend.
 pub fn remap_to_legacy_domain(origin: &str) -> String {
     const PREFIX: &str = "https://";
-    const ICP0_SUFFIX: &str = ".icp0.io";
+    const REMAPPED_SUFFIXES: &[&str] = &[".icp0.io", ".icp.net"];
 
     let Some(rest) = origin.strip_prefix(PREFIX) else {
         return origin.to_string();
     };
-    let Some(subdomain) = rest.strip_suffix(ICP0_SUFFIX) else {
+    let Some(subdomain) = REMAPPED_SUFFIXES
+        .iter()
+        .find_map(|suffix| rest.strip_suffix(suffix))
+    else {
         return origin.to_string();
     };
 
@@ -2237,6 +2240,14 @@ mod tests {
         }
 
         #[test]
+        fn maps_icp_net_subdomain_to_ic0_app() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://foo.icp.net"),
+                "https://foo.ic0.app"
+            );
+        }
+
+        #[test]
         fn maps_raw_subdomain() {
             pretty_assert_eq!(
                 remap_to_legacy_domain("https://foo.raw.icp0.io"),
@@ -2245,9 +2256,25 @@ mod tests {
         }
 
         #[test]
+        fn maps_raw_subdomain_on_icp_net() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://foo.raw.icp.net"),
+                "https://foo.raw.ic0.app"
+            );
+        }
+
+        #[test]
         fn allows_underscore_and_hyphen_in_subdomain() {
             pretty_assert_eq!(
                 remap_to_legacy_domain("https://my-app_1.icp0.io"),
+                "https://my-app_1.ic0.app"
+            );
+        }
+
+        #[test]
+        fn allows_underscore_and_hyphen_in_subdomain_on_icp_net() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://my-app_1.icp.net"),
                 "https://my-app_1.ic0.app"
             );
         }
@@ -2270,10 +2297,26 @@ mod tests {
         }
 
         #[test]
+        fn rejects_extra_subdomain_levels_on_icp_net() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("https://foo.bar.icp.net"),
+                "https://foo.bar.icp.net"
+            );
+        }
+
+        #[test]
         fn rejects_http_scheme() {
             pretty_assert_eq!(
                 remap_to_legacy_domain("http://foo.icp0.io"),
                 "http://foo.icp0.io"
+            );
+        }
+
+        #[test]
+        fn rejects_http_scheme_on_icp_net() {
+            pretty_assert_eq!(
+                remap_to_legacy_domain("http://foo.icp.net"),
+                "http://foo.icp.net"
             );
         }
     }
