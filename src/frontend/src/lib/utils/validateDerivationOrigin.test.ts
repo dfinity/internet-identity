@@ -28,6 +28,40 @@ test("should validate same derivation origin", async () => {
   expect(result).toEqual({ result: "valid" });
 });
 
+test("should validate when request and derivation origin are different gateway variants of the same canister", async () => {
+  // Same canister served from different IC gateway domains: no alternative
+  // origins file lookup is required because the two URLs normalise to the
+  // same canonical (ic0.app) origin.
+  const variants = [
+    [
+      `https://${TEST_CANISTER_ID}.icp0.io`,
+      `https://${TEST_CANISTER_ID}.ic0.app`,
+    ],
+    [
+      `https://${TEST_CANISTER_ID}.ic0.app`,
+      `https://${TEST_CANISTER_ID}.icp.net`,
+    ],
+    [
+      `https://${TEST_CANISTER_ID}.icp.net`,
+      `https://${TEST_CANISTER_ID}.icp0.io`,
+    ],
+    [
+      `https://${TEST_CANISTER_ID}.raw.icp0.io`,
+      `https://${TEST_CANISTER_ID}.raw.icp.net`,
+    ],
+  ];
+
+  for (const [requestOrigin, derivationOrigin] of variants) {
+    const result = await validateDerivationOrigin({
+      requestOrigin,
+      derivationOrigin,
+      resolveCanisterId: () =>
+        Promise.reject("should not be reached for same-canister variants"),
+    });
+    expect(result).toEqual({ result: "valid" });
+  }
+});
+
 test("should fetch alternative origins file from expected URL", async () => {
   const testCases = [
     {
@@ -210,6 +244,37 @@ for (const iiUrl of validIIUrls) {
     });
 
     expect(result.result).toBe("invalid");
+  });
+
+  test("should validate request origin against alternative origins regardless of gateway variant", async () => {
+    // Listing the canister origin under any of its three official gateway
+    // domains should accept requests coming from any of the others, without
+    // needing every variant to be enumerated explicitly.
+    const variants = [
+      `https://${TEST_CANISTER_ID}.ic0.app`,
+      `https://${TEST_CANISTER_ID}.icp0.io`,
+      `https://${TEST_CANISTER_ID}.icp.net`,
+    ];
+
+    for (const listedVariant of variants) {
+      for (const requestVariant of variants) {
+        setupMocks({
+          iiUrl,
+          response: Response.json({
+            alternativeOrigins: [listedVariant],
+          }),
+        });
+
+        const result = await validateDerivationOrigin({
+          requestOrigin: requestVariant,
+          derivationOrigin: "https://some-url.com",
+          resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+        });
+
+        expect(result, `listed=${listedVariant} request=${requestVariant}`)
+          .toEqual({ result: "valid" });
+      }
+    }
   });
 }
 
