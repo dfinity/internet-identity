@@ -59,7 +59,7 @@
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
-        <div class="flex flex-1 flex-col items-stretch gap-1.5">
+        <div class="flex min-w-0 flex-1 flex-col items-stretch gap-1.5">
           <Tooltip
             label={$t`Interaction canceled. Please try again.`}
             hidden={cancelledProviderId !== provider.client_id}
@@ -99,7 +99,7 @@
         here — we keep this option visible so users know the mechanism
         exists.
       -->
-      <div class="flex flex-1 flex-col items-stretch gap-1.5">
+      <div class="flex min-w-0 flex-1 flex-col items-stretch gap-1.5">
         <button
           class="btn btn-secondary btn-xl"
           onclick={signInWithSso}
