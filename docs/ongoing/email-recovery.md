@@ -1323,11 +1323,15 @@ Send the email below to confirm.
 ┌─────────────────────────────────────────────┐
 │           ✉  Open in mail app               │  (mailto: link)
 └─────────────────────────────────────────────┘
-
-       ⟳  Waiting for your email to arrive…
-
-           Expires in 29:42
 ```
+
+There is no "waiting for email" spinner or countdown rendered on
+this view: the FE polls `email_recovery_status(nonce)` silently in
+the background, and the dialog flips straight to the success toast
+(setup) or to a sign-in redirect (recovery) the moment the canister
+returns a terminal status. If the user does nothing, the entry just
+expires after 30 minutes and the next prepare call gets a fresh
+nonce — there's no useful countdown to render against.
 
 The small shield-check chip on the right of the **From** row carries a
 tooltip explaining the cryptographic-authenticity model (the wording
@@ -1431,13 +1435,13 @@ The flow has two error surfaces: synchronous errors at `prepare_*` time (the use
 
 **Status states the FE renders:**
 
-| `EmailRecoveryStatus`                    | UX                                                                                                                                                                                                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Pending`                                | "Waiting for your email to arrive…" with a live countdown ("Expires in 29:42") below. No `Cancel` link inside the wizard — the dialog `×` is the cancel affordance.                                                                        |
-| `RegistrationSucceeded`                  | (Setup only) Wizard closes; the host page fires a top-of-page toast ("alice@example.com is now a recovery method"). No dedicated "Done" view.                                                                                              |
-| `RecoveryReady { user_key, expiration }` | (Recovery only) FE silently calls `email_recovery_get_delegation`, signs the user in, and redirects to `/manage/access`.                                                                                                                   |
-| `Failed(reason)`                         | The wizard switches to `FailedView`: "We couldn't verify your email." plus a body mapped from the `EmailRecoveryError` variant (see table below). Single full-width `Try again` button restarts the wizard from step 1 with a fresh nonce. |
-| `Expired`                                | Same `FailedView` shape as `Failed(NonceExpired)` ("This recovery link timed out. Try again.").                                                                                                                                            |
+| `EmailRecoveryStatus`                    | UX                                                                                                                                                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Pending`                                | The wizard stays on the send-confirmation-email view; the FE polls `email_recovery_status` silently in the background and flips views the moment a terminal status arrives. No rendered countdown or spinner. The dialog `×` is the cancel affordance. |
+| `RegistrationSucceeded`                  | (Setup only) Wizard closes; the host page fires a top-of-page toast ("alice@example.com is now a recovery method"). No dedicated "Done" view.                                                                                                          |
+| `RecoveryReady { user_key, expiration }` | (Recovery only) FE silently calls `email_recovery_get_delegation`, signs the user in, and redirects to `/manage/access`.                                                                                                                               |
+| `Failed(reason)`                         | The wizard switches to `FailedView`: "We couldn't verify your email." plus a body mapped from the `EmailRecoveryError` variant (see table below). Single full-width `Try again` button restarts the wizard from step 1 with a fresh nonce.             |
+| `Expired`                                | Same `FailedView` shape as `Failed(NonceExpired)` ("This recovery link timed out. Try again.").                                                                                                                                                        |
 
 **Sync `prepare_*` errors** — surfaced inline before the user sends anything, so they don't waste an email composing on a flow that's already doomed:
 
