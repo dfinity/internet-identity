@@ -41,10 +41,12 @@
  *
  * Throttling:
  * - Successful responses cached for 4 hours per hop.
- * - Max 2 concurrent SSO discoveries globally.
  * - Exponential backoff (2s, 4s, 8s) for retryable errors, up to 3 attempts.
  * - Request timeout: 15s per hop. The abort timer is cleared in a `finally`
  *   so network errors don't leak armed timers.
+ * - Caller can pass an `AbortSignal` to cancel an in-flight discovery (used
+ *   by the input-debounce in `SignInWithSso.svelte` to drop a stale lookup
+ *   the moment the user types a different domain).
  */
 
 import { z } from "zod";
@@ -123,7 +125,6 @@ export class DomainNotConfiguredError extends Error {
 const II_CONFIG_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const PROVIDER_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const FETCH_TIMEOUT_MS = 15_000;
-const MAX_CONCURRENT = 2;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
 
@@ -145,7 +146,6 @@ interface ProviderCacheEntry {
 
 const iiConfigCache = new Map<string, IIConfigCacheEntry>();
 const providerCache = new Map<string, ProviderCacheEntry>();
-let activeFetches = 0;
 
 /**
  * True if `hostname` is exactly `expected` or a proper subdomain of it.
@@ -369,15 +369,23 @@ const isTransientHttpStatus = (status: number): boolean =>
 const fetchWithRetry = async (
   url: string,
   timeoutMs: number,
+  externalSignal?: AbortSignal,
 ): Promise<unknown> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (externalSignal?.aborted === true) {
+      throw new DOMException("Aborted", "AbortError");
+    }
     if (attempt > 0) {
       const delay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await sleep(delay, externalSignal);
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    // Bridge external abort → this attempt's controller so an in-flight
+    // `fetch` is cancelled the moment the caller signals.
+    const onExternalAbort = () => controller.abort();
+    externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
     // Default: treat unknown / network errors as transient and retry.
     // The try block overrides this with the HTTP-status classification
     // when the response itself was received.
@@ -393,18 +401,18 @@ const fetchWithRetry = async (
       retryable = isTransientHttpStatus(response.status);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        // Explicit timeout: surface the abort immediately; don't backoff
-        // through retries when the first attempt already spent the full
-        // budget.
+        // Either the per-attempt timeout or the caller aborted us. In
+        // both cases there's no point retrying — surface immediately.
         throw error;
       }
       // Network errors (TypeError from `fetch`) and other unknowns: leave
       // `retryable = true` as initialised.
       lastError = error;
     } finally {
-      // Clear the abort timer on every exit path so a late abort can't
-      // fire after the attempt is already done.
+      // Clear the abort timer and listener on every exit path so a late
+      // abort can't fire after the attempt is already done.
       clearTimeout(timeoutId);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
     }
     // Break out of the retry loop on deterministic failures (4xx other
     // than 408 / 429) so the UI can surface them without backoff delay.
@@ -413,6 +421,26 @@ const fetchWithRetry = async (
   throw lastError;
 };
 
+/** Backoff sleep that resolves after `ms` or rejects with AbortError if the
+ *  caller's signal fires first — so a stale lookup doesn't keep waiting
+ *  through the full backoff window after the user has moved on. */
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted === true) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
 /**
  * Perform the two-hop SSO discovery chain for a given domain.
  *
@@ -420,8 +448,11 @@ const fetchWithRetry = async (
  * `oidc_configs` — this function does no allowlist check of its own.
  *
  * @param domain - The organization domain (e.g., `dfinity.org`)
+ * @param signal - Optional `AbortSignal` to cancel an in-flight discovery.
+ *   When fired, in-flight `fetch`es are aborted and the function rejects
+ *   with an `AbortError`.
  * @returns The `client_id` and OIDC discovery document
- * @throws {Error} On invalid `domain` input or when over `MAX_CONCURRENT`.
+ * @throws {Error} On invalid `domain` input.
  * @throws {DomainNotConfiguredError} On any hop-1 failure
  *   (`http-error`, `invalid-response`, `network`, `timeout`).
  * @throws {Error} On hop-2 fetch failures (`Fetch failed: <status>`,
@@ -430,6 +461,7 @@ const fetchWithRetry = async (
  */
 export const discoverSsoConfig = async (
   domain: string,
+  signal?: AbortSignal,
 ): Promise<SsoDiscoveryResult> => {
   const validatedDomain = validateDomain(domain);
 
@@ -455,89 +487,78 @@ export const discoverSsoConfig = async (
     }
   }
 
-  if (activeFetches >= MAX_CONCURRENT) {
-    throw new Error("Too many concurrent SSO discovery requests");
+  // Hop 1: fetch /.well-known/ii-openid-configuration from the org domain.
+  // Raw fetch / JSON / validation errors are converted to
+  // DomainNotConfiguredError so the UI can show one friendly message
+  // regardless of how exactly the domain misbehaves. Caller-side aborts
+  // are passed through unwrapped so the UI can ignore them silently —
+  // wrapping them as "timeout" would be a lie.
+  const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
+  let iiConfigData: unknown;
+  try {
+    iiConfigData = await fetchWithRetry(iiConfigUrl, FETCH_TIMEOUT_MS, signal);
+  } catch (error) {
+    if (signal?.aborted === true) throw error;
+    throw wrapHopOneError(error);
+  }
+  let iiConfig: IIOpenIdConfiguration;
+  try {
+    iiConfig = validateIIConfig(iiConfigData);
+  } catch (error) {
+    // Response decoded but doesn't match the expected shape — from the
+    // user's perspective the domain still isn't correctly configured.
+    throw new DomainNotConfiguredError(
+      "invalid-response",
+      undefined,
+      error instanceof Error ? error.message : undefined,
+    );
   }
 
-  activeFetches++;
+  iiConfigCache.set(validatedDomain, {
+    config: iiConfig,
+    fetchedAt: Date.now(),
+  });
 
-  try {
-    // Hop 1: fetch /.well-known/ii-openid-configuration from the org domain.
-    // Raw fetch / JSON / validation errors are converted to
-    // DomainNotConfiguredError so the UI can show one friendly message
-    // regardless of how exactly the domain misbehaves.
-    const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
-    let iiConfigData: unknown;
-    try {
-      iiConfigData = await fetchWithRetry(iiConfigUrl, FETCH_TIMEOUT_MS);
-    } catch (error) {
-      throw wrapHopOneError(error);
-    }
-    let iiConfig: IIOpenIdConfiguration;
-    try {
-      iiConfig = validateIIConfig(iiConfigData);
-    } catch (error) {
-      // Response decoded but doesn't match the expected shape — from the
-      // user's perspective the domain still isn't correctly configured.
-      throw new DomainNotConfiguredError(
-        "invalid-response",
-        undefined,
-        error instanceof Error ? error.message : undefined,
-      );
-    }
-
-    iiConfigCache.set(validatedDomain, {
-      config: iiConfig,
-      fetchedAt: Date.now(),
-    });
-
-    // Hop 2: fetch the provider's standard OIDC discovery document.
-    const cachedProviderDoc = providerCache.get(iiConfig.openid_configuration);
-    if (
-      cachedProviderDoc !== undefined &&
-      Date.now() - cachedProviderDoc.fetchedAt < PROVIDER_CACHE_TTL_MS
-    ) {
-      return {
-        domain: validatedDomain,
-        clientId: iiConfig.client_id,
-        name: iiConfig.name,
-        discovery: cachedProviderDoc.document,
-      };
-    }
-
-    const providerUrl = new URL(iiConfig.openid_configuration);
-    const providerData = await fetchWithRetry(
-      iiConfig.openid_configuration,
-      FETCH_TIMEOUT_MS,
-    );
-    const providerDoc = validateProviderDiscovery(
-      providerData,
-      providerUrl.hostname,
-    );
-
-    providerCache.set(iiConfig.openid_configuration, {
-      document: providerDoc,
-      fetchedAt: Date.now(),
-    });
-
+  // Hop 2: fetch the provider's standard OIDC discovery document.
+  const cachedProviderDoc = providerCache.get(iiConfig.openid_configuration);
+  if (
+    cachedProviderDoc !== undefined &&
+    Date.now() - cachedProviderDoc.fetchedAt < PROVIDER_CACHE_TTL_MS
+  ) {
     return {
       domain: validatedDomain,
       clientId: iiConfig.client_id,
       name: iiConfig.name,
-      discovery: providerDoc,
+      discovery: cachedProviderDoc.document,
     };
-  } finally {
-    activeFetches--;
   }
+
+  const providerUrl = new URL(iiConfig.openid_configuration);
+  const providerData = await fetchWithRetry(
+    iiConfig.openid_configuration,
+    FETCH_TIMEOUT_MS,
+    signal,
+  );
+  const providerDoc = validateProviderDiscovery(
+    providerData,
+    providerUrl.hostname,
+  );
+
+  providerCache.set(iiConfig.openid_configuration, {
+    document: providerDoc,
+    fetchedAt: Date.now(),
+  });
+
+  return {
+    domain: validatedDomain,
+    clientId: iiConfig.client_id,
+    name: iiConfig.name,
+    discovery: providerDoc,
+  };
 };
 
 /** Clear all SSO discovery caches (for testing). */
 export const clearSsoDiscoveryCache = (): void => {
   iiConfigCache.clear();
   providerCache.clear();
-  // If a test timed out mid-fetch, the pending promise's `finally` may not
-  // have run yet and `activeFetches` could be stuck above 0, making the
-  // next test trip the MAX_CONCURRENT guard. Reset it so each test starts
-  // from a clean slate.
-  activeFetches = 0;
 };
