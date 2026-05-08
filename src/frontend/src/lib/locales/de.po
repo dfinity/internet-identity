@@ -281,7 +281,7 @@ msgid "Continue with SSO"
 msgstr "Mit SSO fortfahren"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
-msgstr "SSO-Einstellungen von {domainInput} konnten nicht geladen werden. Bitten Sie Ihren SSO-Administrator zu prüfen, ob /.well-known/ii-openid-configuration erreichbar ist."
+msgstr "SSO-Einstellungen von {domainInput} konnten nicht geladen werden. Bitten Sie Ihren SSO-Administrator, zu prüfen, ob /.well-known/ii-openid-configuration erreichbar ist."
 
 msgid "Create account"
 msgstr "Konto erstellen"
