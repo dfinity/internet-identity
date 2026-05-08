@@ -31,6 +31,9 @@ msgstr "{displayName} اکاؤنٹ"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} نے /.well-known/ii-openid-configuration شائع نہیں کیا (HTTP {0})۔"
 
+msgid "{domainInput} took too long to respond. Try again in a moment."
+msgstr ""
+
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "{domainInput} کی /.well-known/ii-openid-configuration درست شکل میں نہیں ہے۔"
 
@@ -277,8 +280,8 @@ msgstr "پاس کی کے ساتھ جاری رکھیں"
 msgid "Continue with SSO"
 msgstr "SSO کے ساتھ جاری رکھیں"
 
-msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr "{domainInput} تک نہیں پہنچا جا سکا۔ سپیلنگ اور اپنا نیٹ ورک چیک کریں۔"
+msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
+msgstr ""
 
 msgid "Create account"
 msgstr "اکاؤنٹ بنائیں"
@@ -881,9 +884,6 @@ msgstr "سیشن کا وقت ختم ہو گیا"
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
 
-msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr "متعدد SSO سائن اِن پہلے ہی جاری ہیں۔ ایک لمحہ انتظار کریں۔"
-
 msgid "Share {label}"
 msgstr "{label} شیئر کریں"
 
@@ -1082,9 +1082,6 @@ msgstr "جاری رکھنے کے لیے:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "اپنی پاس کی سیٹ اپ مکمل کرنے کے لیے، اپنی <0>نئی ڈیوائس</0> پر دکھائی گئی ہدایات پر عمل کریں۔"
-
-msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr "{domainInput} کے لیے حالیہ کوششیں بہت زیادہ ہیں۔ چند منٹ انتظار کریں۔"
 
 msgid "Type each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں درج کریں:"

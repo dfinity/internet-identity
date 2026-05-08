@@ -31,6 +31,9 @@ msgstr "Konto {displayName}"
 msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
 msgstr "{domainInput} nie opublikował /.well-known/ii-openid-configuration (HTTP {0})."
 
+msgid "{domainInput} took too long to respond. Try again in a moment."
+msgstr ""
+
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "Plik /.well-known/ii-openid-configuration domeny {domainInput} jest nieprawidłowy."
 
@@ -277,8 +280,8 @@ msgstr "Kontynuuj za pomocą klucza dostępu"
 msgid "Continue with SSO"
 msgstr "Kontynuuj z SSO"
 
-msgid "Couldn't reach {domainInput}. Check the spelling and your network."
-msgstr "Nie można połączyć się z {domainInput}. Sprawdź pisownię i swoje połączenie sieciowe."
+msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
+msgstr ""
 
 msgid "Create account"
 msgstr "Utwórz konto"
@@ -881,9 +884,6 @@ msgstr "Sesja wygasła"
 msgid "Set as default sign-in"
 msgstr "Ustaw jako domyślne logowanie"
 
-msgid "Several SSO sign-ins are in flight already. Wait a moment."
-msgstr "Kilka logowań SSO jest już w toku. Poczekaj chwilę."
-
 msgid "Share {label}"
 msgstr "Udostępnij {label}"
 
@@ -1082,9 +1082,6 @@ msgstr "Aby kontynuować:"
 
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr "Aby dokończyć konfigurowanie klucza dostępu, postępuj zgodnie z instrukcjami wyświetlanymi na <0>nowym urządzeniu</0>."
-
-msgid "Too many recent attempts for {domainInput}. Wait a few minutes."
-msgstr "Zbyt wiele ostatnich prób dla {domainInput}. Poczekaj kilka minut."
 
 msgid "Type each word in the correct order:"
 msgstr "Wpisz każde słowo we właściwej kolejności:"
