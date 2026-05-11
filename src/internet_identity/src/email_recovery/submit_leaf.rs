@@ -5,19 +5,26 @@
 //! header, validated the body hash, and stashed a small
 //! `PartialVerification` record on the pending challenge. It then
 //! flipped the polled status to `NeedDkimLeaf { selector }` so the
-//! FE could walk DNSSEC for that one TXT and submit it back here.
+//! FE could walk DNSSEC for that selector and submit the resulting
+//! `(hops, extra_chains)` bundle back here.
 //!
 //! This call:
 //!
 //! 1. Looks up the pending challenge by nonce; rejects with
 //!    `NoDkimLeafExpected` if the entry isn't in `NeedDkimLeaf`.
-//! 2. Validates the FE-supplied `SignedRRset` against the cached
-//!    deepest-zone DNSKEY (the chain itself was already validated
-//!    at prepare time — see `verify_chain_with_clock`).
-//! 3. Confirms the leaf's owner name is exactly
+//! 2. Re-validates the cached root DNSKEY against the configured
+//!    trust anchors (it may have aged out of its inception/expiration
+//!    window since prepare), then walks each `extra_chain` under it,
+//!    extending the cached `(zone → DNSKEY)` map for any new signed
+//!    zone the DKIM CNAME chain crosses into (Proton/Tutanota-style;
+//!    see design doc §7.2).
+//! 3. Verifies each FE-supplied hop under the zone its
+//!    `RRSIG.signer_name` names, then walks the hop sequence as a
+//!    coherent CNAME → … → TXT resolution starting at
 //!    `<expected_selector>._domainkey.<registered_domain>.`. Both
-//!    sides come from canister-pinned state, never the FE.
-//! 4. Parses the DKIM TXT, runs the cryptographic signature check
+//!    the selector and the registered domain come from canister-
+//!    pinned state, never the FE.
+//! 4. Parses the final TXT, runs the cryptographic signature check
 //!    using the cached headers digest + signature blob, and
 //!    optionally verifies DMARC alignment against the cached DMARC
 //!    bytes (or strict `d=` alignment when no DMARC was cached).
@@ -42,7 +49,11 @@ pub async fn submit_dkim_leaf(
     arg: EmailRecoverySubmitDkimLeafArg,
     now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
-    let EmailRecoverySubmitDkimLeafArg { nonce, dkim_leaf } = arg;
+    let EmailRecoverySubmitDkimLeafArg {
+        nonce,
+        hops,
+        extra_chains,
+    } = arg;
 
     // Snapshot everything we need under one borrow so the rest of
     // the function works against owned data. Includes early
@@ -51,7 +62,7 @@ pub async fn submit_dkim_leaf(
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
-    if let Err(e) = run_submit(&dkim_leaf, &snapshot, now_secs) {
+    if let Err(e) = run_submit(&hops, &extra_chains, &snapshot, now_secs) {
         let cloned = e.clone();
         pending::with_mut(&nonce, now_secs, |c| {
             c.status = PendingStatus::Failed(cloned);
@@ -125,7 +136,8 @@ struct Snapshot {
     claimed_address: String,
     registered_domain: String,
     expected_selector: String,
-    cached_zone_dnskey: crate::dnssec::SignedRRset,
+    cached_root_dnskey: crate::dnssec::SignedRRset,
+    cached_zones: crate::dnssec::ZoneKeysMap,
     cached_dmarc_txt: Option<Vec<u8>>,
     headers_digest: [u8; 32],
     signature: Vec<u8>,
@@ -158,8 +170,8 @@ impl Snapshot {
             PendingStatus::NeedDkimLeaf { selector } => selector.clone(),
             _ => return Err(EmailRecoveryError::NoDkimLeafExpected),
         };
-        let cached_zone_dnskey = c
-            .cached_zone_dnskey
+        let cached_root_dnskey = c
+            .cached_root_dnskey
             .as_ref()
             .ok_or(EmailRecoveryError::NoDkimLeafExpected)?
             .clone();
@@ -178,7 +190,8 @@ impl Snapshot {
             claimed_address: c.claimed_address.clone(),
             registered_domain: c.registered_domain.clone(),
             expected_selector,
-            cached_zone_dnskey,
+            cached_root_dnskey,
+            cached_zones: c.cached_zones.clone(),
             cached_dmarc_txt: c.cached_dmarc_txt.clone(),
             headers_digest: partial.headers_digest,
             signature: partial.signature.clone(),
@@ -192,51 +205,68 @@ impl Snapshot {
 /// The leaf-validation + signature-verification + alignment-check
 /// pipeline. Returns `Ok(())` on full success.
 fn run_submit(
-    dkim_leaf: &internet_identity_interface::internet_identity::types::SignedRRset,
+    hops: &[internet_identity_interface::internet_identity::types::SignedRRset],
+    extra_chains: &[internet_identity_interface::internet_identity::types::DelegationChain],
     snapshot: &Snapshot,
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
-    // Step 1: validate the FE-supplied leaf against the cached zone
-    // DNSKEY. The cached DNSKEY was itself validated at prepare time
-    // against the canister's trust anchors; the chain is implicit
-    // here.
-    //
-    // The verifier's top-level entry points are bundle / hops shaped;
-    // for the single-leaf single-zone case we wrap the cached zone
-    // DNSKEY in a one-entry `ZoneKeysMap` and the leaf in a one-hop
-    // slice, and use the leaf's own owner name as `requested_name`
-    // (the policy check on the verified owner happens in step 2).
-    let leaf_internal: crate::dnssec::SignedRRset = dkim_leaf.clone().into();
-    let mut zones = crate::dnssec::ZoneKeysMap::new();
-    zones
-        .insert(
-            snapshot.cached_zone_dnskey.name.clone(),
-            snapshot.cached_zone_dnskey.clone(),
-        )
-        .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
-    let verified = crate::dnssec::verify_hops_with_clock(
-        std::slice::from_ref(&leaf_internal),
-        &zones,
-        &leaf_internal.name,
-        leaf_internal.rtype,
+    // Step 1: re-validate the cached root DNSKEY against the trust
+    // anchors. The pending challenge has a 30-min TTL but the RRSIG
+    // window is what really decides freshness — re-checking is
+    // cheap (one signature verify) and removes any chance of
+    // admitting a chain under a now-stale root DNSKEY.
+    let trust_anchors = crate::state::persistent_state(|p| {
+        p.dnssec_config
+            .as_ref()
+            .map(|c| c.root_anchors.clone())
+            .unwrap_or_default()
+    });
+    crate::dnssec::verify_root_dnskey_with_clock(
+        &snapshot.cached_root_dnskey,
+        &trust_anchors,
         now_secs,
     )
     .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
 
-    // Step 2: confirm the leaf's owner name and rtype.
-    if verified.rtype != crate::dnssec::types::TYPE_TXT {
-        return Err(EmailRecoveryError::DkimLeafMismatch);
-    }
-    let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+    // Step 2: extend the cached zone-keys map with any *new*
+    // delegation chains the FE supplied. Empty for the Gmail-style
+    // same-zone case; one new chain for the Proton/Tutanota-style
+    // cross-zone CNAME case.
+    let mut zones = snapshot.cached_zones.clone();
+    let extra_chains_internal: Vec<crate::dnssec::DelegationChain> =
+        extra_chains.iter().cloned().map(Into::into).collect();
+    crate::dnssec::verify_extra_chains_with_clock(
+        &extra_chains_internal,
+        &snapshot.cached_root_dnskey,
+        &mut zones,
+        now_secs,
+    )
+    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+
+    // Step 3: walk the hops as a CNAME → … → TXT resolution
+    // anchored at the canister-pinned `<selector>._domainkey.<d>.`
+    // FQDN. Any incoherence (wrong first hop, intermediate that
+    // isn't a CNAME, bad target chaining, oversized chain, loop) is
+    // surfaced as DkimLeafMismatch.
+    let hops_internal: Vec<crate::dnssec::SignedRRset> =
+        hops.iter().cloned().map(Into::into).collect();
     let expected_fqdn = format!(
         "{}._domainkey.{}.",
         snapshot.expected_selector, snapshot.registered_domain
     );
-    if !leaf_name.eq_ignore_ascii_case(&expected_fqdn) {
-        return Err(EmailRecoveryError::DkimLeafMismatch);
-    }
+    let expected_wire = encode_dns_name_lowercase(&expected_fqdn);
+    let verified = crate::dnssec::verify_hops_with_clock(
+        &hops_internal,
+        &zones,
+        &crate::dnssec::DnsName(expected_wire),
+        crate::dnssec::types::TYPE_TXT,
+        now_secs,
+    )
+    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
 
-    // Step 3: parse the DKIM TXT, get the public key + key type.
+    let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+
+    // Step 4: parse the DKIM TXT, get the public key + key type.
     let txt = parse_txt_rdata(&verified.rdata)?;
     if txt.len() > super::MAX_DKIM_TXT_BYTES {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
@@ -251,7 +281,7 @@ fn run_submit(
         EmailRecoveryError::EmailVerificationFailed(format!("DKIM DNS record: {e}"))
     })?;
 
-    // Step 4: complete the cryptographic signature check.
+    // Step 5: complete the cryptographic signature check.
     //
     // `verify_signature` takes the raw signed_data and hashes it
     // internally. Since we cached only the SHA-256 digest, feed
@@ -298,7 +328,7 @@ fn run_submit(
         }
     }
 
-    // Step 5: DMARC alignment. The smtp.rs path enforced that the
+    // Step 6: DMARC alignment. The smtp.rs path enforced that the
     // signing domain (`d=`) is within the registered zone, so any
     // strict-or-relaxed alignment under DMARC is trivially
     // satisfied. We re-check explicitly here against the cached
@@ -464,6 +494,27 @@ fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecoveryError> {
         }
     }
     Ok(txt_bytes)
+}
+
+/// Encode a dotted ASCII DNS name (with or without a trailing dot)
+/// into wire format: a sequence of length-prefixed labels terminated
+/// by a zero-length root label. Labels are lowercased on the way in.
+fn encode_dns_name_lowercase(dotted: &str) -> Vec<u8> {
+    let trimmed = dotted.strip_suffix('.').unwrap_or(dotted);
+    let mut out = Vec::with_capacity(trimmed.len() + 2);
+    for label in trimmed.split('.') {
+        if label.is_empty() {
+            continue;
+        }
+        let bytes = label.as_bytes();
+        let len = bytes.len().min(63) as u8;
+        out.push(len);
+        for &b in &bytes[..len as usize] {
+            out.push(b.to_ascii_lowercase());
+        }
+    }
+    out.push(0);
+    out
 }
 
 /// Decode a wire-format DNS name (length-prefixed labels) into a

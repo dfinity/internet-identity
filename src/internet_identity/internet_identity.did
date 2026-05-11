@@ -531,7 +531,15 @@ type EmailRecoveryDnsInput = record {
 
 type EmailRecoverySubmitDkimLeafArg = record {
     nonce : text;
-    dkim_leaf : SignedRRset;
+    // The DKIM resolution chain in CNAME order, ending in a TXT. At
+    // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+    // canister side. For the Gmail-style direct-TXT case this is a
+    // single-element vec.
+    hops : vec SignedRRset;
+    // Delegation chains for signed zones touched by `hops` that
+    // weren't already covered by the skeleton chain anchored at
+    // prepare time. Empty for same-zone resolution.
+    extra_chains : vec DelegationChain;
 };
 
 // DNSSEC proof bundle and supporting types — see
