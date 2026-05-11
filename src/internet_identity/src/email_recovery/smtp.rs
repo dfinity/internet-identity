@@ -720,7 +720,7 @@ pub(super) fn recovery_snapshot(
         kind: SnapshotKind::Recovery { session_pk },
         claimed_address,
         registered_domain,
-        cached_zone_dnskey: true,
+        is_dnssec_path: true,
         cached_dmarc_txt: None,
         partial_set: false,
         already_terminal: false,
