@@ -388,7 +388,7 @@ fn remove_credential_rejects_when_nothing_bound() {
 #[test]
 fn dnssec_path_rejects_when_no_trust_anchors_configured() {
     use internet_identity_interface::internet_identity::types::dnssec::{
-        DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
+        DelegationChain, DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
     };
     use serde_bytes::ByteBuf;
 
@@ -418,23 +418,25 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
         rrsig: stub_rrsig.clone(),
     };
     let proof = DnsProofBundle {
-        leaf: Some(stub_rrset.clone()),
+        hops: vec![stub_rrset.clone()],
         root_dnskey: stub_rrset,
-        chain: vec![DelegationLink {
-            child_ds: SignedRRset {
-                name: ByteBuf::from(b"\x03com\x00".to_vec()),
-                rtype: 43,
-                rdata: vec![ByteBuf::from(vec![0u8; 36])],
-                ttl: 3600,
-                rrsig: stub_rrsig.clone(),
-            },
-            child_dnskey: SignedRRset {
-                name: ByteBuf::from(b"\x03com\x00".to_vec()),
-                rtype: 48,
-                rdata: vec![ByteBuf::from(vec![0u8; 64])],
-                ttl: 3600,
-                rrsig: stub_rrsig,
-            },
+        chains: vec![DelegationChain {
+            links: vec![DelegationLink {
+                child_ds: SignedRRset {
+                    name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                    rtype: 43,
+                    rdata: vec![ByteBuf::from(vec![0u8; 36])],
+                    ttl: 3600,
+                    rrsig: stub_rrsig.clone(),
+                },
+                child_dnskey: SignedRRset {
+                    name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                    rtype: 48,
+                    rdata: vec![ByteBuf::from(vec![0u8; 64])],
+                    ttl: 3600,
+                    rrsig: stub_rrsig,
+                },
+            }],
         }],
     };
     let input = EmailRecoveryDnsInput {
@@ -462,7 +464,7 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
 #[test]
 fn dnssec_path_takes_precedence_over_doh_allowlist() {
     use internet_identity_interface::internet_identity::types::dnssec::{
-        DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
+        DelegationChain, DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
     };
     use serde_bytes::ByteBuf;
 
@@ -494,23 +496,25 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
         rrsig: stub_rrsig.clone(),
     };
     let proof = DnsProofBundle {
-        leaf: Some(stub_rrset.clone()),
+        hops: vec![stub_rrset.clone()],
         root_dnskey: stub_rrset,
-        chain: vec![DelegationLink {
-            child_ds: SignedRRset {
-                name: ByteBuf::from(b"\x03com\x00".to_vec()),
-                rtype: 43,
-                rdata: vec![ByteBuf::from(vec![0u8; 36])],
-                ttl: 3600,
-                rrsig: stub_rrsig.clone(),
-            },
-            child_dnskey: SignedRRset {
-                name: ByteBuf::from(b"\x03com\x00".to_vec()),
-                rtype: 48,
-                rdata: vec![ByteBuf::from(vec![0u8; 64])],
-                ttl: 3600,
-                rrsig: stub_rrsig,
-            },
+        chains: vec![DelegationChain {
+            links: vec![DelegationLink {
+                child_ds: SignedRRset {
+                    name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                    rtype: 43,
+                    rdata: vec![ByteBuf::from(vec![0u8; 36])],
+                    ttl: 3600,
+                    rrsig: stub_rrsig.clone(),
+                },
+                child_dnskey: SignedRRset {
+                    name: ByteBuf::from(b"\x03com\x00".to_vec()),
+                    rtype: 48,
+                    rdata: vec![ByteBuf::from(vec![0u8; 64])],
+                    ttl: 3600,
+                    rrsig: stub_rrsig,
+                },
+            }],
         }],
     };
     let input = EmailRecoveryDnsInput {
@@ -594,7 +598,7 @@ fn full_setup_flow_via_dnssec_path() {
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
         dns_proof: Some(DnsProofBundle {
-            leaf: chain.dmarc_leaf.clone(),
+            hops: chain.dmarc_leaf.clone().map_or(vec![], |l| vec![l]),
             ..chain.skeleton.clone()
         }),
     };
@@ -1187,7 +1191,7 @@ mod dkim_signer {
 mod dnssec_signer {
     use ed25519_dalek::{Signer, SigningKey};
     use internet_identity_interface::internet_identity::types::dnssec::{
-        DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
+        DelegationChain, DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
     };
     use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
     use serde_bytes::ByteBuf;
@@ -1299,11 +1303,13 @@ mod dnssec_signer {
         ChainOut {
             anchor: make_anchor(&root_key),
             skeleton: DnsProofBundle {
-                leaf: None,
+                hops: vec![],
                 root_dnskey,
-                chain: vec![DelegationLink {
-                    child_ds,
-                    child_dnskey,
+                chains: vec![DelegationChain {
+                    links: vec![DelegationLink {
+                        child_ds,
+                        child_dnskey,
+                    }],
                 }],
             },
             dkim_leaf,
