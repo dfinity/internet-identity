@@ -1,5 +1,5 @@
 {
-  "_comment": "IANA root KSK trust anchors as published at https://data.iana.org/root-anchors/root-anchors.xml. Captured 2026-05-04. Update when the upstream XML changes (rare — KSK rollovers are signalled months in advance). The 19036 key is past its validUntil (2019) and is included for historical-vector tests only; production deployments should configure 20326 + 38696.",
+  "_comment": "IANA root KSK trust anchors as published at https://data.iana.org/root-anchors/root-anchors.xml. Captured 2026-05-04. Update when the upstream XML changes (rare — KSK rollovers are signalled months in advance). Currently active KSKs are 20326 and 38696; the historical 19036 key (valid until 2019) is intentionally NOT included here. Tests that need a historical-vector anchor should add it explicitly to a separate fixture.",
   "anchors": [
     {
       "id": "Klajeyz",

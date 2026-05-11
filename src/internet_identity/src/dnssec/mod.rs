@@ -2,11 +2,13 @@
 //!
 //! Inputs are a [`DnsProofBundle`] (a leaf RRset plus the DNSKEY / DS
 //! chain linking it back to the IANA root) and the canister's
-//! currently-trusted root anchors. Verification is fully deterministic
-//! — every byte the verifier consumes is supplied as a canister-call
-//! argument or baked in via the init / upgrade arg. There are no HTTP
-//! outcalls anywhere in the email-recovery stack (see
-//! `docs/ongoing/email-recovery.md` §7).
+//! currently-trusted root anchors. Verification of a bundle is fully
+//! deterministic — every byte the verifier consumes is supplied as a
+//! canister-call argument or baked in via the init / upgrade arg, and
+//! this module makes no HTTP outcalls. Domains that don't publish
+//! DNSSEC are handled separately by the DoH-quorum fallback (landing
+//! in PR 4 of the email-recovery stack; see design doc §7.6); this
+//! module is the no-outcall path.
 //!
 //! ## Spec references
 //!

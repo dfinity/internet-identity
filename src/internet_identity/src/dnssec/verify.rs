@@ -117,10 +117,21 @@ fn current_time_secs() -> u64 {
 /// contain at least one KSK whose DS-style digest matches a configured
 /// trust anchor, and the RRSIG covering the RRset must verify under
 /// that KSK (RFC 4035 §5).
+///
+/// During a KSK rollover the operator may configure multiple anchors
+/// at once — the rolling-out KSK plus the rolling-in pre-published
+/// KSK (RFC 5011 §2). Only one of them is currently being used to
+/// sign the DNSKEY RRset, so a "first digest match wins" strategy
+/// risks short-circuiting onto the inactive key and never trying the
+/// active one. We therefore attempt every matching candidate before
+/// reporting failure.
 fn verify_root_dnskey(
     root_dnskey: &SignedRRset,
     trust_anchors: &[DnssecRootAnchor],
 ) -> Result<(), DnssecError> {
+    let mut had_digest_match = false;
+    let mut last_signature_err: Option<DnssecError> = None;
+
     for dnskey_rdata in &root_dnskey.rdata {
         for anchor in trust_anchors {
             // We only implement SHA-256 DS digests (RFC 4509 /
@@ -131,16 +142,31 @@ fn verify_root_dnskey(
             if anchor.digest_type != DS_DIGEST_TYPE_SHA256 {
                 continue;
             }
-            if anchor_matches_dnskey(anchor, &root_dnskey.name.0, dnskey_rdata) {
-                return verify_rrsig_under_dnskey(
-                    root_dnskey,
-                    dnskey_rdata,
-                    root_dnskey.rrsig.algorithm,
-                );
+            if !anchor_matches_dnskey(anchor, &root_dnskey.name.0, dnskey_rdata) {
+                continue;
+            }
+            had_digest_match = true;
+            match verify_rrsig_under_dnskey(
+                root_dnskey,
+                dnskey_rdata,
+                root_dnskey.rrsig.algorithm,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(e) => last_signature_err = Some(e),
             }
         }
     }
-    Err(DnssecError::RootAnchorMismatch)
+
+    // If at least one anchor matched a DNSKEY by digest but every
+    // signature check failed, surface the cryptographic error
+    // (typically `BadSignature`) rather than the generic anchor
+    // mismatch — the operator-facing distinction is important when
+    // diagnosing a misconfigured anchor vs. a stale capture.
+    if had_digest_match {
+        Err(last_signature_err.unwrap_or(DnssecError::RootAnchorMismatch))
+    } else {
+        Err(DnssecError::RootAnchorMismatch)
+    }
 }
 
 /// Check whether a root DNSKEY matches a configured trust anchor.
