@@ -162,10 +162,25 @@ fn run_submit(
     // DNSKEY. The cached DNSKEY was itself validated at prepare time
     // against the canister's trust anchors; the chain is implicit
     // here.
+    //
+    // The verifier's top-level entry points are bundle / hops shaped;
+    // for the single-leaf single-zone case we wrap the cached zone
+    // DNSKEY in a one-entry `ZoneKeysMap` and the leaf in a one-hop
+    // slice, and use the leaf's own owner name as `requested_name`
+    // (the policy check on the verified owner happens in step 2).
     let leaf_internal: crate::dnssec::SignedRRset = dkim_leaf.clone().into();
-    let verified = crate::dnssec::verify_leaf_against_dnskey(
-        &leaf_internal,
-        &snapshot.cached_zone_dnskey,
+    let mut zones = crate::dnssec::ZoneKeysMap::new();
+    zones
+        .insert(
+            snapshot.cached_zone_dnskey.name.clone(),
+            snapshot.cached_zone_dnskey.clone(),
+        )
+        .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+    let verified = crate::dnssec::verify_hops_with_clock(
+        std::slice::from_ref(&leaf_internal),
+        &zones,
+        &leaf_internal.name,
+        leaf_internal.rtype,
         now_secs,
     )
     .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;

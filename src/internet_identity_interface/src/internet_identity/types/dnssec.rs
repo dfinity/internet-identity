@@ -21,10 +21,9 @@ pub struct DnssecConfig {
 }
 
 /// A single IANA root KSK trust anchor, in the same shape IANA publishes at
-/// `data.iana.org/root-anchors/root-anchors.xml`.
-///
-/// We only ship `digest_type = 2` (SHA-256) — the legacy SHA-1 form is
-/// declined at the boundary by the verifier (see PR #1b TODO list).
+/// `data.iana.org/root-anchors/root-anchors.xml`. Only `digest_type = 2`
+/// (SHA-256) is accepted; the legacy SHA-1 form is rejected at the verifier
+/// boundary.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DnssecRootAnchor {
     pub key_tag: u16,
@@ -86,18 +85,34 @@ pub struct DelegationLink {
     pub child_dnskey: SignedRRset,
 }
 
-/// A DNSSEC proof: one delegation chain rooted at the IANA KSK plus
-/// at most one signed leaf RRset that the chain authenticates.
+/// A delegation walk from the root zone to a single zone's DNSKEY.
+/// Each link carries the child zone's DS RRset (signed by the parent)
+/// plus the child zone's DNSKEY RRset (self-signed). The last link's
+/// `child_dnskey` is the zone whose DNSKEY ends up in the verifier's
+/// `(zone_name → DNSKEY RRset)` lookup table.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct DelegationChain {
+    pub links: Vec<DelegationLink>,
+}
+
+/// A DNSSEC proof: a set of delegation chains rooted at the IANA KSK
+/// plus the signed RRsets being authenticated. See design doc §7.2.
 ///
-/// The two-phase email-recovery flow only ever needs one leaf per
-/// call — at `prepare_add` it's the optional DMARC TXT, at
-/// `submit_dkim_leaf` it's the DKIM TXT — so `leaf` is `Option`,
-/// not `Vec`. A `None` leaf means "validate the chain only";
-/// callers cache the deepest-zone DNSKEY and use it to admit a leaf
-/// in a follow-up call (see `crate::dnssec::verify_chain_with_clock`).
+/// Single-zone direct case (e.g. Gmail-style DKIM): one chain, one TXT
+/// hop. Cross-zone CNAME case (Proton's `proton.me` → `proton.ch`,
+/// Tutanota's `tutanota.com` → `tutanota.de`, M365 custom domains, …):
+/// one chain per signing zone touched, one hop per RRset in the
+/// resolution sequence (CNAME, CNAME, …, TXT).
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DnsProofBundle {
-    pub leaf: Option<SignedRRset>,
     pub root_dnskey: SignedRRset,
-    pub chain: Vec<DelegationLink>,
+    /// One delegation chain per signing zone touched by this bundle.
+    /// At least one is required; duplicates (two chains landing at
+    /// the same zone) are rejected.
+    pub chains: Vec<DelegationChain>,
+    /// The RRsets being authenticated, in CNAME-resolution order.
+    /// Each hop's `rrsig.signer_name` identifies which zone signed
+    /// it; the verifier looks that name up in the table built from
+    /// `chains` and validates the RRset under that zone's DNSKEY.
+    pub hops: Vec<SignedRRset>,
 }

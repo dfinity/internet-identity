@@ -278,3 +278,73 @@ pub enum DnssecError {
     /// in [`crate::dnssec::verify`].
     TooManyHops,
 }
+
+// =========================================================================
+// Conversions from the Candid-friendly mirror types in
+// `internet_identity_interface::types::dnssec`. Used at the canister
+// method boundary so callers (FE, integration tests) can pass a
+// `DnsProofBundle` over Candid without us having to add CandidType
+// derives everywhere in the verifier.
+// =========================================================================
+
+mod interface_conversions {
+    use super::{
+        DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset,
+    };
+    use internet_identity_interface::internet_identity::types as i_types;
+
+    impl From<i_types::SignedRRset> for SignedRRset {
+        fn from(v: i_types::SignedRRset) -> Self {
+            SignedRRset {
+                name: DnsName(v.name.into_vec()),
+                rtype: v.rtype,
+                rdata: v.rdata.into_iter().map(|b| b.into_vec()).collect(),
+                ttl: v.ttl,
+                rrsig: v.rrsig.into(),
+            }
+        }
+    }
+
+    impl From<i_types::Rrsig> for Rrsig {
+        fn from(v: i_types::Rrsig) -> Self {
+            Rrsig {
+                type_covered: v.type_covered,
+                algorithm: v.algorithm,
+                labels: v.labels,
+                original_ttl: v.original_ttl,
+                expiration: v.expiration,
+                inception: v.inception,
+                key_tag: v.key_tag,
+                signer_name: DnsName(v.signer_name.into_vec()),
+                signature: v.signature.into_vec(),
+            }
+        }
+    }
+
+    impl From<i_types::DelegationLink> for DelegationLink {
+        fn from(v: i_types::DelegationLink) -> Self {
+            DelegationLink {
+                child_ds: v.child_ds.into(),
+                child_dnskey: v.child_dnskey.into(),
+            }
+        }
+    }
+
+    impl From<i_types::DelegationChain> for DelegationChain {
+        fn from(v: i_types::DelegationChain) -> Self {
+            DelegationChain {
+                links: v.links.into_iter().map(Into::into).collect(),
+            }
+        }
+    }
+
+    impl From<i_types::DnsProofBundle> for DnsProofBundle {
+        fn from(v: i_types::DnsProofBundle) -> Self {
+            DnsProofBundle {
+                root_dnskey: v.root_dnskey.into(),
+                chains: v.chains.into_iter().map(Into::into).collect(),
+                hops: v.hops.into_iter().map(Into::into).collect(),
+            }
+        }
+    }
+}
