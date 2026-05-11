@@ -6,116 +6,122 @@
     "leaf_rtype": "TXT",
     "resolver": "https://1.1.1.1/dns-query"
   },
-  "chain": [
+  "chains": [
     {
-      "child_dnskey": {
-        "name_hex": "03636f6d00",
-        "rdata_hex": [
-          "0100030de5e1cc2131cb9532ca5ca019875fe0847ee564e7c36a9d0756f3edc57d1ae9813eebe110fc3f0c3fae872d56a2840e41ab5ba1cb4990ddb55fe9a52dbaab43d0",
-          "0101030db71f0465101ddbe2bf0c9455d12fa16c1cda44f4bf1ba2553418ad1f3aa9b06973f21b84eb532cf4035ee8d4832ca26d89306a7d32560c0cb0129d450ac10835"
-        ],
-        "rrsig": {
-          "algorithm": 13,
-          "expiration": 1779458555,
-          "inception": 1778162255,
-          "key_tag": 19718,
-          "labels": 1,
-          "original_ttl": 86400,
-          "signature_hex": "ccbbeb2ef4b82cafdc8f0be639d465d36fd3153e862f4c99091def4c1719d47137559fb68a51d7dafae9906f7667a64452521d7877f75ff7c3245c4e06723f5a",
-          "signer_name": "03636f6d00",
-          "type_covered": 48
+      "links": [
+        {
+          "child_dnskey": {
+            "name_hex": "03636f6d00",
+            "rdata_hex": [
+              "0100030de5e1cc2131cb9532ca5ca019875fe0847ee564e7c36a9d0756f3edc57d1ae9813eebe110fc3f0c3fae872d56a2840e41ab5ba1cb4990ddb55fe9a52dbaab43d0",
+              "0101030db71f0465101ddbe2bf0c9455d12fa16c1cda44f4bf1ba2553418ad1f3aa9b06973f21b84eb532cf4035ee8d4832ca26d89306a7d32560c0cb0129d450ac10835"
+            ],
+            "rrsig": {
+              "algorithm": 13,
+              "expiration": 1779458555,
+              "inception": 1778162255,
+              "key_tag": 19718,
+              "labels": 1,
+              "original_ttl": 86400,
+              "signature_hex": "ccbbeb2ef4b82cafdc8f0be639d465d36fd3153e862f4c99091def4c1719d47137559fb68a51d7dafae9906f7667a64452521d7877f75ff7c3245c4e06723f5a",
+              "signer_name": "03636f6d00",
+              "type_covered": 48
+            },
+            "rtype": 48,
+            "ttl": 4119
+          },
+          "child_ds": {
+            "name_hex": "03636f6d00",
+            "rdata_hex": [
+              "4d060d028acbb0cd28f41250a80a491389424d341522d946b0da0c0291f2d3d771d7805a"
+            ],
+            "rrsig": {
+              "algorithm": 8,
+              "expiration": 1779598800,
+              "inception": 1778472000,
+              "key_tag": 54393,
+              "labels": 1,
+              "original_ttl": 86400,
+              "signature_hex": "0d741dc3e4b3fb57357bac3786abcd1bbb1ca801a00d1ad7fafe431634a38b5dcb18eb5e1df3d132d501744d623e461ca2ed36dc4d571d1a93e7ee8cea5748deb40c559bb740afb8a453e2edff22344e6066a13b74215b06428605af891be614e270b95b45291f26ef1dc6cea897dfef7d0bd708daa8ee484ef7d28c031af80584f6b35f39d13e22aa8892d34583682f34a0a4b90dfea5334e6ac0fa43c2cb5fd336e687c40f5ebf0a6f0d60cd8cf02bc5956e475565faabc506cb11e542303ddeebdc2e5de86782856a536dce846266cb1eadb2d035f43a54b7e49962fb631033952fbb16b96246bc50fa2016710c829841aeb1866fdb2553eb2767bd43a5f4",
+              "signer_name": "00",
+              "type_covered": 43
+            },
+            "rtype": 43,
+            "ttl": 74636
+          }
         },
-        "rtype": 48,
-        "ttl": 4119
-      },
-      "child_ds": {
-        "name_hex": "03636f6d00",
-        "rdata_hex": [
-          "4d060d028acbb0cd28f41250a80a491389424d341522d946b0da0c0291f2d3d771d7805a"
-        ],
-        "rrsig": {
-          "algorithm": 8,
-          "expiration": 1779598800,
-          "inception": 1778472000,
-          "key_tag": 54393,
-          "labels": 1,
-          "original_ttl": 86400,
-          "signature_hex": "0d741dc3e4b3fb57357bac3786abcd1bbb1ca801a00d1ad7fafe431634a38b5dcb18eb5e1df3d132d501744d623e461ca2ed36dc4d571d1a93e7ee8cea5748deb40c559bb740afb8a453e2edff22344e6066a13b74215b06428605af891be614e270b95b45291f26ef1dc6cea897dfef7d0bd708daa8ee484ef7d28c031af80584f6b35f39d13e22aa8892d34583682f34a0a4b90dfea5334e6ac0fa43c2cb5fd336e687c40f5ebf0a6f0d60cd8cf02bc5956e475565faabc506cb11e542303ddeebdc2e5de86782856a536dce846266cb1eadb2d035f43a54b7e49962fb631033952fbb16b96246bc50fa2016710c829841aeb1866fdb2553eb2767bd43a5f4",
-          "signer_name": "00",
-          "type_covered": 43
-        },
-        "rtype": 43,
-        "ttl": 74636
-      }
-    },
-    {
-      "child_dnskey": {
-        "name_hex": "0a70726f746f6e6d61696c03636f6d00",
-        "rdata_hex": [
-          "0100030d6bdf61888b120b177fb57a0ccb53790346ea4adc7650bbe5050f0a34e881213bbb70cb238da30e2b3efe5b0ddd2af73b53f1dea702d102697d00e4ee7826b598",
-          "0101030d551bebaa9d2114f79976b14b7cef5ffebb6a660fe697108082a90879e1a44ee0260912dc889bfdf79ff6694d5cbc60ee284315b87db7bfc39d82a92aaad2c860"
-        ],
-        "rrsig": {
-          "algorithm": 13,
-          "expiration": 1780279624,
-          "inception": 1777687058,
-          "key_tag": 44693,
-          "labels": 2,
-          "original_ttl": 1200,
-          "signature_hex": "9143f00a6765af9cc815f8b3fb9456810cb55d7f4e1b8bab96a9f1f3a21d4a0ba82714ee6970dcfacdf907f5631fee7cf81e732ef02dd20a6628f599f6fe6d7d",
-          "signer_name": "0a70726f746f6e6d61696c03636f6d00",
-          "type_covered": 48
-        },
-        "rtype": 48,
-        "ttl": 125
-      },
-      "child_ds": {
-        "name_hex": "0a70726f746f6e6d61696c03636f6d00",
-        "rdata_hex": [
-          "ae950d029f8a2a3ceee67b747c4cf7d52e6eb0dfd309fd363fd0d059de66e9667d038115"
-        ],
-        "rrsig": {
-          "algorithm": 13,
-          "expiration": 1778813577,
-          "inception": 1778204577,
-          "key_tag": 27677,
-          "labels": 2,
-          "original_ttl": 86400,
-          "signature_hex": "78a5b1be9d0c990b4486ef59316d76d0c04458690d6746db83843c1dcfb79fee387e244a84453ffd1234f4d580a15d9e0eb2a5973ed0a9a1e0b099a39ceac4ca",
-          "signer_name": "03636f6d00",
-          "type_covered": 43
-        },
-        "rtype": 43,
-        "ttl": 86400
-      }
+        {
+          "child_dnskey": {
+            "name_hex": "0a70726f746f6e6d61696c03636f6d00",
+            "rdata_hex": [
+              "0100030d6bdf61888b120b177fb57a0ccb53790346ea4adc7650bbe5050f0a34e881213bbb70cb238da30e2b3efe5b0ddd2af73b53f1dea702d102697d00e4ee7826b598",
+              "0101030d551bebaa9d2114f79976b14b7cef5ffebb6a660fe697108082a90879e1a44ee0260912dc889bfdf79ff6694d5cbc60ee284315b87db7bfc39d82a92aaad2c860"
+            ],
+            "rrsig": {
+              "algorithm": 13,
+              "expiration": 1780279624,
+              "inception": 1777687058,
+              "key_tag": 44693,
+              "labels": 2,
+              "original_ttl": 1200,
+              "signature_hex": "9143f00a6765af9cc815f8b3fb9456810cb55d7f4e1b8bab96a9f1f3a21d4a0ba82714ee6970dcfacdf907f5631fee7cf81e732ef02dd20a6628f599f6fe6d7d",
+              "signer_name": "0a70726f746f6e6d61696c03636f6d00",
+              "type_covered": 48
+            },
+            "rtype": 48,
+            "ttl": 125
+          },
+          "child_ds": {
+            "name_hex": "0a70726f746f6e6d61696c03636f6d00",
+            "rdata_hex": [
+              "ae950d029f8a2a3ceee67b747c4cf7d52e6eb0dfd309fd363fd0d059de66e9667d038115"
+            ],
+            "rrsig": {
+              "algorithm": 13,
+              "expiration": 1778813577,
+              "inception": 1778204577,
+              "key_tag": 27677,
+              "labels": 2,
+              "original_ttl": 86400,
+              "signature_hex": "78a5b1be9d0c990b4486ef59316d76d0c04458690d6746db83843c1dcfb79fee387e244a84453ffd1234f4d580a15d9e0eb2a5973ed0a9a1e0b099a39ceac4ca",
+              "signer_name": "03636f6d00",
+              "type_covered": 43
+            },
+            "rtype": 43,
+            "ttl": 86400
+          }
+        }
+      ]
     }
   ],
-  "leaf": {
-    "name_hex": "0a70726f746f6e6d61696c03636f6d00",
-    "rdata_hex": [
-      "256d61696c72752d766572696669636174696f6e3a2031343530356336656232323263383437",
-      "2579616e6465782d766572696669636174696f6e3a2036303539623138376537386465353434",
-      "26763d7370663120696e636c7564653a5f7370662e70726f746f6e6d61696c2e6368207e616c6c",
-      "44676f6f676c652d736974652d766572696669636174696f6e3d525655434b4946446b672d53706175386b456f6851527367794845425551635665685a7146365041516351",
-      "44676f6f676c652d736974652d766572696669636174696f6e3d6171397a4a6e70334833624e453059344434724835493544686a38564d614c597830755137526f7a666767",
-      "44676f6f676c652d736974652d766572696669636174696f6e3d7558564e514c69765470706e5a73735848744d593751566e37304d70643078325538704b6a3332344b726b",
-      "596168726566732d736974652d766572696669636174696f6e5f34626461633662626161383165306435393164376330663365663233383930356330353231623639626633643734653634643337373562636232373433616664",
-      "5a62726176652d6c65646765722d766572696669636174696f6e3d36366137663237666239393934396363306335363461623938656663633538656131626163336539376562353537633738326162326434346234396165666437"
-    ],
-    "rrsig": {
-      "algorithm": 13,
-      "expiration": 1779312055,
-      "inception": 1776720049,
-      "key_tag": 56075,
-      "labels": 2,
-      "original_ttl": 1200,
-      "signature_hex": "f60663ff6541c2c66558c096cc15ca13ea4eca621b6522c2abe50454767389d4795b4e86867317e36e87199d8096c7edf14edd77347ece3e0676af8fecb6f5c2",
-      "signer_name": "0a70726f746f6e6d61696c03636f6d00",
-      "type_covered": 16
-    },
-    "rtype": 16,
-    "ttl": 1200
-  },
+  "hops": [
+    {
+      "name_hex": "0a70726f746f6e6d61696c03636f6d00",
+      "rdata_hex": [
+        "256d61696c72752d766572696669636174696f6e3a2031343530356336656232323263383437",
+        "2579616e6465782d766572696669636174696f6e3a2036303539623138376537386465353434",
+        "26763d7370663120696e636c7564653a5f7370662e70726f746f6e6d61696c2e6368207e616c6c",
+        "44676f6f676c652d736974652d766572696669636174696f6e3d525655434b4946446b672d53706175386b456f6851527367794845425551635665685a7146365041516351",
+        "44676f6f676c652d736974652d766572696669636174696f6e3d6171397a4a6e70334833624e453059344434724835493544686a38564d614c597830755137526f7a666767",
+        "44676f6f676c652d736974652d766572696669636174696f6e3d7558564e514c69765470706e5a73735848744d593751566e37304d70643078325538704b6a3332344b726b",
+        "596168726566732d736974652d766572696669636174696f6e5f34626461633662626161383165306435393164376330663365663233383930356330353231623639626633643734653634643337373562636232373433616664",
+        "5a62726176652d6c65646765722d766572696669636174696f6e3d36366137663237666239393934396363306335363461623938656663633538656131626163336539376562353537633738326162326434346234396165666437"
+      ],
+      "rrsig": {
+        "algorithm": 13,
+        "expiration": 1779312055,
+        "inception": 1776720049,
+        "key_tag": 56075,
+        "labels": 2,
+        "original_ttl": 1200,
+        "signature_hex": "f60663ff6541c2c66558c096cc15ca13ea4eca621b6522c2abe50454767389d4795b4e86867317e36e87199d8096c7edf14edd77347ece3e0676af8fecb6f5c2",
+        "signer_name": "0a70726f746f6e6d61696c03636f6d00",
+        "type_covered": 16
+      },
+      "rtype": 16,
+      "ttl": 1200
+    }
+  ],
   "root_dnskey": {
     "name_hex": "00",
     "rdata_hex": [

@@ -32,7 +32,9 @@
 //! This module is gated `#[cfg(test)]` at its declaration in
 //! `dnssec/mod.rs`, so no inner gate is needed here.
 
-use super::types::{DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
+use super::types::{
+    DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset,
+};
 use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
 use serde::Deserialize;
 use serde_bytes::ByteBuf;
@@ -66,10 +68,15 @@ struct WireDelegationLink {
 }
 
 #[derive(Deserialize)]
+struct WireDelegationChain {
+    links: Vec<WireDelegationLink>,
+}
+
+#[derive(Deserialize)]
 struct WireBundle {
     root_dnskey: WireSignedRRset,
-    chain: Vec<WireDelegationLink>,
-    leaf: WireSignedRRset,
+    chains: Vec<WireDelegationChain>,
+    hops: Vec<WireSignedRRset>,
 }
 
 fn hex_to_vec(s: &str) -> Vec<u8> {
@@ -116,12 +123,20 @@ impl From<WireDelegationLink> for DelegationLink {
     }
 }
 
+impl From<WireDelegationChain> for DelegationChain {
+    fn from(w: WireDelegationChain) -> Self {
+        DelegationChain {
+            links: w.links.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 impl From<WireBundle> for DnsProofBundle {
     fn from(w: WireBundle) -> Self {
         DnsProofBundle {
             root_dnskey: w.root_dnskey.into(),
-            chain: w.chain.into_iter().map(Into::into).collect(),
-            leaf: w.leaf.into(),
+            chains: w.chains.into_iter().map(Into::into).collect(),
+            hops: w.hops.into_iter().map(Into::into).collect(),
         }
     }
 }

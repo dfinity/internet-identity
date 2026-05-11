@@ -6,109 +6,115 @@
     "leaf_rtype": "A",
     "resolver": "https://1.1.1.1/dns-query"
   },
-  "chain": [
+  "chains": [
     {
-      "child_dnskey": {
-        "name_hex": "026e6c00",
-        "rdata_hex": [
-          "0100030d2babc8cb0e3735eaaa21ee2f5c4b2453ce1cbac8b01e38bceba5b6d90a436c54d1424d61d7126ae2a0c8a4fa5634767cea6586bf0ed6de70f5e4b6ffc2b080cb",
-          "0101030d69e0dd16673f24b3f2bdaed8e1b4b64856df5a6c5a892ae7ab082cf83d4f2923d2aeec48447fba8072e12785d8233ad2693dee93aaecc777398d5f14e01f0efa"
-        ],
-        "rrsig": {
-          "algorithm": 13,
-          "expiration": 1780113703,
-          "inception": 1777682300,
-          "key_tag": 17153,
-          "labels": 1,
-          "original_ttl": 3600,
-          "signature_hex": "468297f9a11e1609eeca89bf9e2c3f12295437f39a5127520fa989ee148d84cf2c25b7f3cf2896321b680d537fb5655edef911c21b4fa0061544e0fce816aec8",
-          "signer_name": "026e6c00",
-          "type_covered": 48
+      "links": [
+        {
+          "child_dnskey": {
+            "name_hex": "026e6c00",
+            "rdata_hex": [
+              "0100030d2babc8cb0e3735eaaa21ee2f5c4b2453ce1cbac8b01e38bceba5b6d90a436c54d1424d61d7126ae2a0c8a4fa5634767cea6586bf0ed6de70f5e4b6ffc2b080cb",
+              "0101030d69e0dd16673f24b3f2bdaed8e1b4b64856df5a6c5a892ae7ab082cf83d4f2923d2aeec48447fba8072e12785d8233ad2693dee93aaecc777398d5f14e01f0efa"
+            ],
+            "rrsig": {
+              "algorithm": 13,
+              "expiration": 1780113703,
+              "inception": 1777682300,
+              "key_tag": 17153,
+              "labels": 1,
+              "original_ttl": 3600,
+              "signature_hex": "468297f9a11e1609eeca89bf9e2c3f12295437f39a5127520fa989ee148d84cf2c25b7f3cf2896321b680d537fb5655edef911c21b4fa0061544e0fce816aec8",
+              "signer_name": "026e6c00",
+              "type_covered": 48
+            },
+            "rtype": 48,
+            "ttl": 3463
+          },
+          "child_ds": {
+            "name_hex": "026e6c00",
+            "rdata_hex": [
+              "43010d02c5dfddc91e7532562a35f3c2cd30823894be08f20101f1abf45c8ab9739f3f49"
+            ],
+            "rrsig": {
+              "algorithm": 8,
+              "expiration": 1779598800,
+              "inception": 1778472000,
+              "key_tag": 54393,
+              "labels": 1,
+              "original_ttl": 86400,
+              "signature_hex": "ae9370c5f54a19cf8458b815fab4f0c8349b835b87ca380520e98979ef7c1b1c2f025685d88ff7c3dfc0ce61a053c71e78c1261d51d82191ef1a6806c116256b91122b4285ddef2874937c15ade0074ab3b089c55b76f3470c9a0c04e3981b8094bb57c96ff9f8cf1b995234e40a4c08ead14aa869044aa0a7b8e144d9fadc574efcbd4bbe684e73c535b4298da937f732fa41ada16f16f45699759ed262ea16b63aea6cbada7dc366b771f2a74ce01450a5b11af91a47ce5752bcbec3bdde61330a28089f54b1e149234d6c2ef482d778eef9b817fd2143d70467bb92313bb025e422916881b337b6806f36ec0f4050df225f272d27bb56dd7381ce4cada15d",
+              "signer_name": "00",
+              "type_covered": 43
+            },
+            "rtype": 43,
+            "ttl": 81479
+          }
         },
-        "rtype": 48,
-        "ttl": 3463
-      },
-      "child_ds": {
-        "name_hex": "026e6c00",
-        "rdata_hex": [
-          "43010d02c5dfddc91e7532562a35f3c2cd30823894be08f20101f1abf45c8ab9739f3f49"
-        ],
-        "rrsig": {
-          "algorithm": 8,
-          "expiration": 1779598800,
-          "inception": 1778472000,
-          "key_tag": 54393,
-          "labels": 1,
-          "original_ttl": 86400,
-          "signature_hex": "ae9370c5f54a19cf8458b815fab4f0c8349b835b87ca380520e98979ef7c1b1c2f025685d88ff7c3dfc0ce61a053c71e78c1261d51d82191ef1a6806c116256b91122b4285ddef2874937c15ade0074ab3b089c55b76f3470c9a0c04e3981b8094bb57c96ff9f8cf1b995234e40a4c08ead14aa869044aa0a7b8e144d9fadc574efcbd4bbe684e73c535b4298da937f732fa41ada16f16f45699759ed262ea16b63aea6cbada7dc366b771f2a74ce01450a5b11af91a47ce5752bcbec3bdde61330a28089f54b1e149234d6c2ef482d778eef9b817fd2143d70467bb92313bb025e422916881b337b6806f36ec0f4050df225f272d27bb56dd7381ce4cada15d",
-          "signer_name": "00",
-          "type_covered": 43
-        },
-        "rtype": 43,
-        "ttl": 81479
-      }
-    },
-    {
-      "child_dnskey": {
-        "name_hex": "0765643235353139026e6c00",
-        "rdata_hex": [
-          "0100030fdadb2d6408e09a50d378f9f43555eb0070499a0f382e8685571ccb9756a78c62",
-          "0101030f9b53442cb55540a9787c7567fca29d78d3b43eb60a193dc819b62c793f1770aa"
-        ],
-        "rrsig": {
-          "algorithm": 15,
-          "expiration": 1779321600,
-          "inception": 1777507200,
-          "key_tag": 45515,
-          "labels": 2,
-          "original_ttl": 3600,
-          "signature_hex": "9c3e8d74e985646f5452b1643a7677d75244544e0121385c91ebc358277d3e0270a4c37c8d224e2ef50e57fce5802e6e027aa95ae2d00ee16f2664c8e055280b",
-          "signer_name": "0765643235353139026e6c00",
-          "type_covered": 48
-        },
-        "rtype": 48,
-        "ttl": 3600
-      },
-      "child_ds": {
-        "name_hex": "0765643235353139026e6c00",
-        "rdata_hex": [
-          "b1cb0f021579ce721a8adf5ef5222d48d6065fdd06e7bce5c0154ec3ef1f30cc0d06eaaa"
-        ],
-        "rrsig": {
-          "algorithm": 13,
-          "expiration": 1780041762,
-          "inception": 1777617440,
-          "key_tag": 41543,
-          "labels": 2,
-          "original_ttl": 3600,
-          "signature_hex": "db653da347bb658103263a7ee6104dcd12efe500bfeac368b74e903b0b84195421ff63becd32e6f9defdc7801f990eb6dc1c8c34db81dc374b10a6774f518512",
-          "signer_name": "026e6c00",
-          "type_covered": 43
-        },
-        "rtype": 43,
-        "ttl": 3600
-      }
+        {
+          "child_dnskey": {
+            "name_hex": "0765643235353139026e6c00",
+            "rdata_hex": [
+              "0100030fdadb2d6408e09a50d378f9f43555eb0070499a0f382e8685571ccb9756a78c62",
+              "0101030f9b53442cb55540a9787c7567fca29d78d3b43eb60a193dc819b62c793f1770aa"
+            ],
+            "rrsig": {
+              "algorithm": 15,
+              "expiration": 1779321600,
+              "inception": 1777507200,
+              "key_tag": 45515,
+              "labels": 2,
+              "original_ttl": 3600,
+              "signature_hex": "9c3e8d74e985646f5452b1643a7677d75244544e0121385c91ebc358277d3e0270a4c37c8d224e2ef50e57fce5802e6e027aa95ae2d00ee16f2664c8e055280b",
+              "signer_name": "0765643235353139026e6c00",
+              "type_covered": 48
+            },
+            "rtype": 48,
+            "ttl": 3600
+          },
+          "child_ds": {
+            "name_hex": "0765643235353139026e6c00",
+            "rdata_hex": [
+              "b1cb0f021579ce721a8adf5ef5222d48d6065fdd06e7bce5c0154ec3ef1f30cc0d06eaaa"
+            ],
+            "rrsig": {
+              "algorithm": 13,
+              "expiration": 1780041762,
+              "inception": 1777617440,
+              "key_tag": 41543,
+              "labels": 2,
+              "original_ttl": 3600,
+              "signature_hex": "db653da347bb658103263a7ee6104dcd12efe500bfeac368b74e903b0b84195421ff63becd32e6f9defdc7801f990eb6dc1c8c34db81dc374b10a6774f518512",
+              "signer_name": "026e6c00",
+              "type_covered": 43
+            },
+            "rtype": 43,
+            "ttl": 3600
+          }
+        }
+      ]
     }
   ],
-  "leaf": {
-    "name_hex": "0765643235353139026e6c00",
-    "rdata_hex": [
-      "4d489652"
-    ],
-    "rrsig": {
-      "algorithm": 15,
-      "expiration": 1779321600,
-      "inception": 1777507200,
-      "key_tag": 27662,
-      "labels": 2,
-      "original_ttl": 3600,
-      "signature_hex": "9eea67085f26bf991dc1c59db9d88b8bbe106c33d0354b88263016b0d1096cc3c33227cc6f0bdc57709ac43e4eac29d14b387c0fdf00f48024d7d35fedb22a07",
-      "signer_name": "0765643235353139026e6c00",
-      "type_covered": 1
-    },
-    "rtype": 1,
-    "ttl": 3600
-  },
+  "hops": [
+    {
+      "name_hex": "0765643235353139026e6c00",
+      "rdata_hex": [
+        "4d489652"
+      ],
+      "rrsig": {
+        "algorithm": 15,
+        "expiration": 1779321600,
+        "inception": 1777507200,
+        "key_tag": 27662,
+        "labels": 2,
+        "original_ttl": 3600,
+        "signature_hex": "9eea67085f26bf991dc1c59db9d88b8bbe106c33d0354b88263016b0d1096cc3c33227cc6f0bdc57709ac43e4eac29d14b387c0fdf00f48024d7d35fedb22a07",
+        "signer_name": "0765643235353139026e6c00",
+        "type_covered": 1
+      },
+      "rtype": 1,
+      "ttl": 3600
+    }
+  ],
   "root_dnskey": {
     "name_hex": "00",
     "rdata_hex": [

@@ -52,7 +52,12 @@ mod wire;
 
 #[allow(unused_imports)]
 pub use types::{
-    DelegationLink, DnsName, DnsProofBundle, DnssecError, Rrsig, SignedRRset, VerifiedRecord,
+    DelegationChain, DelegationLink, DnsName, DnsProofBundle, DnssecError, Rrsig, SignedRRset,
+    VerifiedRecord, ZoneKeysMap, TYPE_DNSKEY, TYPE_DS, TYPE_TXT,
 };
 #[allow(unused_imports)]
-pub use verify::{verify, verify_with_clock};
+pub use verify::{
+    verify_bundle, verify_bundle_with_clock, verify_chain_with_clock,
+    verify_extra_chains_with_clock, verify_hops_with_clock, verify_root_dnskey_with_clock,
+    MAX_CNAME_HOPS,
+};
