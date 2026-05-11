@@ -38,20 +38,14 @@ mod verify;
 
 #[allow(unused_imports)]
 pub use types::{
-<<<<<<< HEAD
     Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
     VerificationFailReason,
-=======
-    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult,
-    HeaderCanon, VerificationFailReason,
->>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
 };
 // Re-exported as `verify_dkim` so downstream callers (the dmarc layer)
 // don't have to deal with both a `dkim::verify` and `dmarc::verify`
 // in scope at the same time.
 #[allow(unused_imports)]
 pub use verify::verify as verify_dkim;
-<<<<<<< HEAD
 
 // Building blocks consumed by the email-recovery two-phase pipeline
 // (`crate::email_recovery::smtp` parses the signature and computes
@@ -68,5 +62,3 @@ pub(crate) use parse::{parse_dkim_signature, DkimSignature};
 pub(crate) use signature::{body_hash_sha256, verify_signature, VerifyOutcome};
 #[allow(unused_imports)]
 pub(crate) use verify::{build_header_hash_input, simple_body};
-=======
->>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)

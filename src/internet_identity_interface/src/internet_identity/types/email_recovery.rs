@@ -172,14 +172,16 @@ pub struct EmailRecoverySubmitDkimLeafArg {
     /// flows share the same submit-leaf surface — the canister
     /// dispatches by the pending entry's `kind`.
     pub nonce: String,
-    /// The DKIM TXT leaf at `<selector>._domainkey.<registered_domain>`,
-    /// signed under the same zone the skeleton chain anchored at
-    /// prepare time. The canister rejects with `DkimLeafMismatch`
-    /// if the leaf's owner name doesn't end at the registered
-    /// domain or if the selector doesn't match the
-    /// `NeedDkimLeaf { selector }` status set when the email
-    /// arrived.
-    pub dkim_leaf: SignedRRset,
+    /// The DKIM resolution chain in CNAME order, ending in a TXT.
+    /// At least one hop required; bounded by `MAX_CNAME_HOPS = 4`
+    /// at the canister side. For the Gmail-style direct-TXT case
+    /// this is a single-element vec.
+    pub hops: Vec<SignedRRset>,
+    /// Delegation chains for signed zones touched by `hops` that
+    /// weren't already covered by the skeleton chain anchored at
+    /// prepare time. Empty for same-zone resolution. Each chain
+    /// must anchor at the same root DNSKEY the prepare bundle did.
+    pub extra_chains: Vec<crate::internet_identity::types::DelegationChain>,
 }
 
 /// Errors surfaced by every email-recovery flow method.

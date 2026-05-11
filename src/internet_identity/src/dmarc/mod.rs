@@ -44,31 +44,21 @@
 //!   downgrade — a recovery attempt either proves mailbox control or
 //!   it doesn't run.
 
-<<<<<<< HEAD
 // `crate::email_recovery::smtp::verify_setup_email` is the in-canister
 // consumer; some less-used variants in the public surface (e.g.
 // fine-grained `EmailVerificationStatus` reasons) aren't yet
 // pattern-matched. Suppress dead-code warnings until those land.
-=======
-// PR 3 lands the verifier without an in-canister consumer (PR 8's
-// `smtp_request` dispatch is the first caller). Suppress dead-code
-// warnings for the public surface until consumers land.
->>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
 #![allow(dead_code)]
 
 mod alignment;
 mod from_header;
 mod parse;
-<<<<<<< HEAD
 #[cfg(test)]
 mod test_vectors;
-=======
->>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
 mod types;
 mod verify;
 
 #[allow(unused_imports)]
-<<<<<<< HEAD
 pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord, EmailVerificationStatus};
 #[allow(unused_imports)]
 pub use verify::verify_email;
@@ -79,10 +69,3 @@ pub use verify::verify_email;
 // the message body the body has already been dropped).
 pub(crate) use alignment::aligns;
 pub(crate) use parse::parse_dmarc_txt;
-=======
-pub use types::{
-    AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord, EmailVerificationStatus,
-};
-#[allow(unused_imports)]
-pub use verify::verify_email;
->>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)

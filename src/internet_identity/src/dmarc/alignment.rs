@@ -118,15 +118,7 @@ mod tests {
             "googlemail.com",
             AlignmentMode::Relaxed
         ));
-<<<<<<< HEAD
         assert!(!aligns("example.com", "evil.com", AlignmentMode::Relaxed));
-=======
-        assert!(!aligns(
-            "example.com",
-            "evil.com",
-            AlignmentMode::Relaxed
-        ));
->>>>>>> d926b477 (feat(dmarc): RFC 7489 alignment check + combined DKIM+DMARC verifier)
     }
 
     #[test]
