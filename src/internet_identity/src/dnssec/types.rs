@@ -203,6 +203,12 @@ impl ZoneKeysMap {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    /// Iterate the validated zones in insertion order, which matches
+    /// the order the delegation chains were verified in.
+    pub fn iter(&self) -> impl Iterator<Item = (&DnsName, &SignedRRset)> {
+        self.entries.iter().map(|(n, k)| (n, k))
+    }
 }
 
 /// Verification failure modes. Each variant is granular enough that
