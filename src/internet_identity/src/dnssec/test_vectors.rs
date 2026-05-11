@@ -1,9 +1,33 @@
-//! Test-vector loader: deserialize captured DNSSEC chains into
+//! Test-vector loader: deserialize captured DNSSEC chains into a
 //! `DnsProofBundle`.
 //!
-//! See `scripts/capture-dnssec-chain.py` for the producing side. The JSON
-//! format mirrors `DnsProofBundle` field-for-field, with byte fields
-//! hex-encoded (so the file is grep-friendly and diff-clean).
+//! These captures are frozen wire-format DoH responses recorded during
+//! PR development; they're checked into `test_vectors/dnssec/` and
+//! pulled in here via `include_str!`. Each capture's
+//! `_meta.captured_at_unix` field is used as the frozen `now` for the
+//! freshness check, so the tests remain stable indefinitely even after
+//! the captured RRSIGs roll out of their original validity windows.
+//!
+//! Algorithm coverage across the bundled chains (algorithm names as
+//! used in RFC 8624 §3.1):
+//!
+//! - `cloudflare-com` — RSA-SHA256 root → ECDSA-P256-SHA256 com →
+//!   ECDSA-P256-SHA256 leaf (TXT).
+//! - `proton.me` — RSA-SHA256 root → RSA-SHA256 com → RSA-SHA256
+//!   leaf (TXT).
+//! - `protonmail.com` — RSA-SHA256 root → ECDSA-P256-SHA256 com →
+//!   ECDSA-P256-SHA256 leaf (TXT).
+//! - `tutanota.com` — RSA-SHA256 root → ECDSA-P256-SHA256 com →
+//!   ECDSA-P256-SHA256 leaf (TXT).
+//! - `ed25519.nl` — RSA-SHA256 root → ECDSA-P256-SHA256 nl →
+//!   Ed25519 leaf (A).
+//!
+//! Together they exercise every algorithm in our RFC 8624 MUST set
+//! `{RSA-SHA256, ECDSA-P256-SHA256, Ed25519}` with real captured
+//! data, plus the four production email zones the recovery feature
+//! targets (proton.me, protonmail.com, tutanota.com — gmail.com /
+//! icloud.com / outlook.com / fastmail.com are unsigned and rely on
+//! the DoH-fallback path landing in PR 4).
 //!
 //! This module is gated `#[cfg(test)]` at its declaration in
 //! `dnssec/mod.rs`, so no inner gate is needed here.
@@ -54,9 +78,9 @@ fn hex_to_vec(s: &str) -> Vec<u8> {
 
 impl From<WireRrsig> for Rrsig {
     fn from(w: WireRrsig) -> Self {
-        // The wire format puts `signer_name` as the canonical wire form
-        // (length-prefixed labels + null) hex-encoded; the captured field
-        // historically carries the same form.
+        // The wire format stores `signer_name` as the canonical wire
+        // form (length-prefixed labels + null) hex-encoded; the
+        // captured field carries the same form.
         Rrsig {
             type_covered: w.type_covered,
             algorithm: w.algorithm,
@@ -133,11 +157,35 @@ pub fn load_anchors(json: &str) -> Vec<DnssecRootAnchor> {
         .collect()
 }
 
-/// The captured chain for cloudflare.com TXT — exercises algorithms 8
-/// (RSA-SHA256, root) and 13 (ECDSA-P256-SHA256, com → cloudflare.com →
-/// leaf). See `test_vectors/dnssec/cloudflare-com-2026-05.json`.
+/// Captured chain for `cloudflare.com TXT`. End-to-end algorithm
+/// coverage: RSA-SHA256 at the root, ECDSA-P256-SHA256 from `com.`
+/// downward.
 pub const CLOUDFLARE_COM_CHAIN_JSON: &str =
     include_str!("../../../../test_vectors/dnssec/cloudflare-com-2026-05.json");
+
+/// Captured chain for `proton.me TXT`. End-to-end RSA-SHA256, so
+/// this is the only fixture that exercises RSA-SHA256 at the leaf.
+pub const PROTON_ME_CHAIN_JSON: &str =
+    include_str!("../../../../test_vectors/dnssec/proton.me-2026-05.json");
+
+/// Captured chain for `protonmail.com TXT` — email-recovery target,
+/// ECDSA-P256-SHA256 leaf.
+pub const PROTONMAIL_COM_CHAIN_JSON: &str =
+    include_str!("../../../../test_vectors/dnssec/protonmail.com-2026-05.json");
+
+/// Captured chain for `tutanota.com TXT` — email-recovery target,
+/// ECDSA-P256-SHA256 leaf.
+pub const TUTANOTA_COM_CHAIN_JSON: &str =
+    include_str!("../../../../test_vectors/dnssec/tutanota.com-2026-05.json");
+
+/// Captured chain for `ed25519.nl A`. Provides real-data Ed25519 leaf
+/// coverage — the rarest RFC 8624 MUST algorithm in production today.
+/// The leaf is an `A` record because `ed25519.nl` doesn't publish a
+/// signed apex `TXT`; for verifier purposes the leaf RTYPE is
+/// irrelevant — the algorithm dispatch and signature check are the
+/// same path.
+pub const ED25519_NL_CHAIN_JSON: &str =
+    include_str!("../../../../test_vectors/dnssec/ed25519-nl-2026-05.json");
 
 pub const IANA_ROOT_ANCHORS_JSON: &str =
     include_str!("../../../../test_vectors/dnssec/iana-root-anchors-2026-05.json");
