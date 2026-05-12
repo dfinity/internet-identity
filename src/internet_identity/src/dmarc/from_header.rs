@@ -113,6 +113,12 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
             continue;
         }
         if b == b'>' {
+            if angle_start.is_none() {
+                return Err("stray '>' without matching '<' in From: value".to_string());
+            }
+            if angle_end.is_some() {
+                return Err("multiple '>' in From: value".to_string());
+            }
             angle_end = Some(i);
             i += 1;
             continue;
@@ -271,5 +277,19 @@ mod tests {
         let m = message_with(&["<<alice@example.com>>"]);
         let err = extract_from_domain(&m).unwrap_err();
         assert!(err.contains("nested"));
+    }
+
+    #[test]
+    fn rejects_stray_close_angle_bracket() {
+        let m = message_with(&["alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("stray '>'"));
+    }
+
+    #[test]
+    fn rejects_multiple_close_angle_brackets() {
+        let m = message_with(&["<alice@example.com>>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("multiple '>'"));
     }
 }

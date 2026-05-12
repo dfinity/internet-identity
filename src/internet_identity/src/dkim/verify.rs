@@ -1,10 +1,12 @@
 //! DKIM verification entry point — orchestrates parsing, canonicalisation,
 //! body hash, and signature verification per RFC 6376 §6.1.
 //!
-//! Caller-facing API:
+//! Caller-facing API (defined here as `verify`, re-exported by the
+//! parent `dkim` module as `verify_dkim` so it doesn't collide with
+//! `dmarc::verify` at call sites):
 //!
 //! ```ignore
-//! pub fn verify(
+//! pub fn verify_dkim(
 //!     email: &SmtpRequest,
 //!     dkim_txt: &str,
 //!     now_secs: u64,
