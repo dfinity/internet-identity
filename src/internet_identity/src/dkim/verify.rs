@@ -179,6 +179,11 @@ fn try_verify_signature(
 
     // Parse the DNS record now — we need its t=s flag to know how
     // strict to be on i= alignment.
+    //
+    // SECURITY: `dkim_txt` is treated as trusted bytes. The caller is
+    // responsible for sourcing it from a DNSSEC-validated chain (PR
+    // #3838) or, for unsigned domains, a DoH outcall whose host is
+    // pinned per the design doc §7.6 (PR #3879).
     let dns = match parse_dkim_txt(dkim_txt) {
         Ok(r) => r,
         Err(e) => {

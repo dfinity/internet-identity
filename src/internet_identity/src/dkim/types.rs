@@ -80,7 +80,9 @@ pub enum DkimCheckStatus {
 /// Why a signature didn't verify, mapping straight to a UI message.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VerificationFailReason {
-    /// No `DKIM-Signature` header in the message.
+    /// No `DKIM-Signature` header in the message. Distinct from the
+    /// other variants so the frontend can render "this provider doesn't
+    /// use DKIM" instead of a generic verification-failed message.
     NoSignature,
     /// At least one DKIM-Signature header was malformed (missing required
     /// tag, bad base64, unparseable folding, etc).
