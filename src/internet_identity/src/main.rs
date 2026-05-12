@@ -52,6 +52,7 @@ mod attributes;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
+mod dnssec;
 mod http;
 mod ii_domain;
 
@@ -682,6 +683,7 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: None,
+        dnssec_config: Some(persistent_state.dnssec_config.clone()),
     })
 }
 
@@ -820,6 +822,12 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(dummy_auth) = arg.dummy_auth {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.dummy_auth = dummy_auth;
+            })
+        }
+        if let Some(dnssec_config) = arg.dnssec_config {
+            // Outer Some -> apply: inner None clears, inner Some replaces.
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.dnssec_config = dnssec_config;
             })
         }
     }

@@ -131,6 +131,11 @@ pub struct PersistentState {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
+    /// DNSSEC verification config (trust anchors). Survives upgrades when an
+    /// upgrade arg omits it. Consumed by the email-recovery DKIM/DMARC flow
+    /// in later PRs and by any future feature that needs DNSSEC-verified
+    /// DNS — see `docs/ongoing/email-recovery.md` §7.5.
+    pub dnssec_config: Option<DnssecConfig>,
 }
 
 impl Default for PersistentState {
@@ -154,6 +159,7 @@ impl Default for PersistentState {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            dnssec_config: None,
         }
     }
 }
