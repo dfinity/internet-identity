@@ -83,7 +83,7 @@ fn relaxed_header_value(value: &str) -> String {
     if out.last() == Some(&b' ') {
         out.pop();
     }
-    String::from_utf8(out).unwrap_or_default()
+    String::from_utf8(out).expect("relaxed_header_value preserves UTF-8 from its &str input")
 }
 
 /// Whitespace test per RFC 6376 §2.8 (citing RFC 5234): SP (0x20) and
