@@ -39,14 +39,14 @@
  *   doc from bouncing auth off-host AFTER we've committed to a provider).
  * - Provider `authorization_endpoint` hostname must match the same.
  *
- * Rate limiting:
+ * Throttling:
  * - Successful responses cached for 4 hours per hop.
- * - Per-domain rate limit: max 1 request per 10 minutes.
- * - Max 2 concurrent SSO discoveries globally.
  * - Exponential backoff (2s, 4s, 8s) for retryable errors, up to 3 attempts.
- * - Request timeouts: 5s for `ii-openid-configuration`, 10s for provider
- *   discovery. The abort timer is cleared in a `finally` so network errors
- *   don't leak armed timers.
+ * - Request timeout: 15s per hop. The abort timer is cleared in a `finally`
+ *   so network errors don't leak armed timers.
+ * - Caller can pass an `AbortSignal` to cancel an in-flight discovery (used
+ *   by the input-debounce in `SignInWithSso.svelte` to drop a stale lookup
+ *   the moment the user types a different domain).
  */
 
 import { z } from "zod";
@@ -97,22 +97,26 @@ type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
 
 /**
  * Raised when hop 1 (`/.well-known/ii-openid-configuration` on the user's
- * domain) fails in a way that signals the domain owner hasn't set up II
- * integration — 404, non-JSON response, missing fields, or unreachable.
+ * domain) fails. Covers misconfiguration (`http-error`, `invalid-response`)
+ * and transient failures (`network`, `timeout`).
  *
  * Surfaced to the UI so we can show a single user-friendly message
  * instead of leaking raw `fetch` / JSON parse errors.
  */
 export class DomainNotConfiguredError extends Error {
   constructor(
-    public readonly reason: "http-error" | "invalid-response" | "network",
+    public readonly reason:
+      | "http-error"
+      | "invalid-response"
+      | "network"
+      | "timeout",
     public readonly httpStatus?: number,
     public readonly detail?: string,
   ) {
     super(
       detail !== undefined
-        ? `Domain not configured for II (${reason}): ${detail}`
-        : `Domain not configured for II (${reason})`,
+        ? `SSO discovery hop 1 failed (${reason}): ${detail}`
+        : `SSO discovery hop 1 failed (${reason})`,
     );
     this.name = "DomainNotConfiguredError";
   }
@@ -120,10 +124,7 @@ export class DomainNotConfiguredError extends Error {
 
 const II_CONFIG_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const PROVIDER_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const RATE_LIMIT_MS = 10 * 60 * 1000; // 10 minutes per domain
-const II_CONFIG_TIMEOUT_MS = 5_000;
-const PROVIDER_TIMEOUT_MS = 10_000;
-const MAX_CONCURRENT = 2;
+const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
 
@@ -145,8 +146,6 @@ interface ProviderCacheEntry {
 
 const iiConfigCache = new Map<string, IIConfigCacheEntry>();
 const providerCache = new Map<string, ProviderCacheEntry>();
-const lastFetchAttempt = new Map<string, number>();
-let activeFetches = 0;
 
 /**
  * True if `hostname` is exactly `expected` or a proper subdomain of it.
@@ -314,9 +313,10 @@ const validateProviderDiscovery = (
  *
  * - `Fetch failed: <status> ...` from our {@link fetchWithRetry} → http-error
  *   with the parsed status.
+ * - `AbortError` from the per-hop timeout → timeout.
  * - `SyntaxError` from `response.json()` → invalid-response (HTML served at
  *   200 is the most common cause, e.g. a CMS that SPA-routes every path).
- * - Anything else (timeouts, network failures, CORS, DNS) → network.
+ * - Anything else (network failures, CORS, DNS) → network.
  */
 const wrapHopOneError = (error: unknown): DomainNotConfiguredError => {
   // Duck-type (not `instanceof Error`): jsdom errors thrown from
@@ -330,6 +330,9 @@ const wrapHopOneError = (error: unknown): DomainNotConfiguredError => {
     if (match !== null) {
       return new DomainNotConfiguredError("http-error", parseInt(match[1], 10));
     }
+  }
+  if (name === "AbortError") {
+    return new DomainNotConfiguredError("timeout");
   }
   if (name === "SyntaxError") {
     return new DomainNotConfiguredError("invalid-response");
@@ -366,15 +369,23 @@ const isTransientHttpStatus = (status: number): boolean =>
 const fetchWithRetry = async (
   url: string,
   timeoutMs: number,
+  externalSignal?: AbortSignal,
 ): Promise<unknown> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (externalSignal?.aborted === true) {
+      throw new DOMException("Aborted", "AbortError");
+    }
     if (attempt > 0) {
       const delay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await sleep(delay, externalSignal);
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    // Bridge external abort → this attempt's controller so an in-flight
+    // `fetch` is cancelled the moment the caller signals.
+    const onExternalAbort = () => controller.abort();
+    externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
     // Default: treat unknown / network errors as transient and retry.
     // The try block overrides this with the HTTP-status classification
     // when the response itself was received.
@@ -390,18 +401,18 @@ const fetchWithRetry = async (
       retryable = isTransientHttpStatus(response.status);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        // Explicit timeout: surface the abort immediately; don't backoff
-        // through retries when the first attempt already spent the full
-        // budget.
+        // Either the per-attempt timeout or the caller aborted us. In
+        // both cases there's no point retrying — surface immediately.
         throw error;
       }
       // Network errors (TypeError from `fetch`) and other unknowns: leave
       // `retryable = true` as initialised.
       lastError = error;
     } finally {
-      // Clear the abort timer on every exit path so a late abort can't
-      // fire after the attempt is already done.
+      // Clear the abort timer and listener on every exit path so a late
+      // abort can't fire after the attempt is already done.
       clearTimeout(timeoutId);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
     }
     // Break out of the retry loop on deterministic failures (4xx other
     // than 408 / 429) so the UI can surface them without backoff delay.
@@ -410,6 +421,26 @@ const fetchWithRetry = async (
   throw lastError;
 };
 
+/** Backoff sleep that resolves after `ms` or rejects with AbortError if the
+ *  caller's signal fires first — so a stale lookup doesn't keep waiting
+ *  through the full backoff window after the user has moved on. */
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted === true) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
 /**
  * Perform the two-hop SSO discovery chain for a given domain.
  *
@@ -417,11 +448,20 @@ const fetchWithRetry = async (
  * `oidc_configs` — this function does no allowlist check of its own.
  *
  * @param domain - The organization domain (e.g., `dfinity.org`)
+ * @param signal - Optional `AbortSignal` to cancel an in-flight discovery.
+ *   When fired, in-flight `fetch`es are aborted and the function rejects
+ *   with an `AbortError`.
  * @returns The `client_id` and OIDC discovery document
- * @throws On validation failure, rate limit, timeout, or network error
+ * @throws {Error} On invalid `domain` input.
+ * @throws {DomainNotConfiguredError} On any hop-1 failure
+ *   (`http-error`, `invalid-response`, `network`, `timeout`).
+ * @throws {Error} On hop-2 fetch failures (`Fetch failed: <status>`,
+ *   `AbortError`) or provider-discovery validation failures (HTTPS, hostname
+ *   match, schema).
  */
 export const discoverSsoConfig = async (
   domain: string,
+  signal?: AbortSignal,
 ): Promise<SsoDiscoveryResult> => {
   const validatedDomain = validateDomain(domain);
 
@@ -447,112 +487,78 @@ export const discoverSsoConfig = async (
     }
   }
 
-  // Per-domain rate limit.
-  const lastAttempt = lastFetchAttempt.get(validatedDomain);
-  if (lastAttempt !== undefined && Date.now() - lastAttempt < RATE_LIMIT_MS) {
-    // Fall back to stale cache if we have it, rather than outright failing.
-    if (cachedIIConfig !== undefined) {
-      const cachedProvider = providerCache.get(
-        cachedIIConfig.config.openid_configuration,
-      );
-      if (cachedProvider !== undefined) {
-        return {
-          domain: validatedDomain,
-          clientId: cachedIIConfig.config.client_id,
-          discovery: cachedProvider.document,
-        };
-      }
-    }
-    throw new Error(
-      `Rate limited: SSO discovery for ${validatedDomain} was attempted too recently`,
-    );
-  }
-
-  if (activeFetches >= MAX_CONCURRENT) {
-    throw new Error("Too many concurrent SSO discovery requests");
-  }
-
-  lastFetchAttempt.set(validatedDomain, Date.now());
-  activeFetches++;
-
+  // Hop 1: fetch /.well-known/ii-openid-configuration from the org domain.
+  // Raw fetch / JSON / validation errors are converted to
+  // DomainNotConfiguredError so the UI can show one friendly message
+  // regardless of how exactly the domain misbehaves. Caller-side aborts
+  // are passed through unwrapped so the UI can ignore them silently —
+  // wrapping them as "timeout" would be a lie.
+  const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
+  let iiConfigData: unknown;
   try {
-    // Hop 1: fetch /.well-known/ii-openid-configuration from the org domain.
-    // Raw fetch / JSON / validation errors are converted to
-    // DomainNotConfiguredError so the UI can show one friendly message
-    // regardless of how exactly the domain misbehaves.
-    const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
-    let iiConfigData: unknown;
-    try {
-      iiConfigData = await fetchWithRetry(iiConfigUrl, II_CONFIG_TIMEOUT_MS);
-    } catch (error) {
-      throw wrapHopOneError(error);
-    }
-    let iiConfig: IIOpenIdConfiguration;
-    try {
-      iiConfig = validateIIConfig(iiConfigData);
-    } catch (error) {
-      // Response decoded but doesn't match the expected shape — from the
-      // user's perspective the domain still isn't correctly configured.
-      throw new DomainNotConfiguredError(
-        "invalid-response",
-        undefined,
-        error instanceof Error ? error.message : undefined,
-      );
-    }
-
-    iiConfigCache.set(validatedDomain, {
-      config: iiConfig,
-      fetchedAt: Date.now(),
-    });
-
-    // Hop 2: fetch the provider's standard OIDC discovery document.
-    const cachedProviderDoc = providerCache.get(iiConfig.openid_configuration);
-    if (
-      cachedProviderDoc !== undefined &&
-      Date.now() - cachedProviderDoc.fetchedAt < PROVIDER_CACHE_TTL_MS
-    ) {
-      return {
-        domain: validatedDomain,
-        clientId: iiConfig.client_id,
-        name: iiConfig.name,
-        discovery: cachedProviderDoc.document,
-      };
-    }
-
-    const providerUrl = new URL(iiConfig.openid_configuration);
-    const providerData = await fetchWithRetry(
-      iiConfig.openid_configuration,
-      PROVIDER_TIMEOUT_MS,
+    iiConfigData = await fetchWithRetry(iiConfigUrl, FETCH_TIMEOUT_MS, signal);
+  } catch (error) {
+    if (signal?.aborted === true) throw error;
+    throw wrapHopOneError(error);
+  }
+  let iiConfig: IIOpenIdConfiguration;
+  try {
+    iiConfig = validateIIConfig(iiConfigData);
+  } catch (error) {
+    // Response decoded but doesn't match the expected shape — from the
+    // user's perspective the domain still isn't correctly configured.
+    throw new DomainNotConfiguredError(
+      "invalid-response",
+      undefined,
+      error instanceof Error ? error.message : undefined,
     );
-    const providerDoc = validateProviderDiscovery(
-      providerData,
-      providerUrl.hostname,
-    );
+  }
 
-    providerCache.set(iiConfig.openid_configuration, {
-      document: providerDoc,
-      fetchedAt: Date.now(),
-    });
+  iiConfigCache.set(validatedDomain, {
+    config: iiConfig,
+    fetchedAt: Date.now(),
+  });
 
+  // Hop 2: fetch the provider's standard OIDC discovery document.
+  const cachedProviderDoc = providerCache.get(iiConfig.openid_configuration);
+  if (
+    cachedProviderDoc !== undefined &&
+    Date.now() - cachedProviderDoc.fetchedAt < PROVIDER_CACHE_TTL_MS
+  ) {
     return {
       domain: validatedDomain,
       clientId: iiConfig.client_id,
       name: iiConfig.name,
-      discovery: providerDoc,
+      discovery: cachedProviderDoc.document,
     };
-  } finally {
-    activeFetches--;
   }
+
+  const providerUrl = new URL(iiConfig.openid_configuration);
+  const providerData = await fetchWithRetry(
+    iiConfig.openid_configuration,
+    FETCH_TIMEOUT_MS,
+    signal,
+  );
+  const providerDoc = validateProviderDiscovery(
+    providerData,
+    providerUrl.hostname,
+  );
+
+  providerCache.set(iiConfig.openid_configuration, {
+    document: providerDoc,
+    fetchedAt: Date.now(),
+  });
+
+  return {
+    domain: validatedDomain,
+    clientId: iiConfig.client_id,
+    name: iiConfig.name,
+    discovery: providerDoc,
+  };
 };
 
 /** Clear all SSO discovery caches (for testing). */
 export const clearSsoDiscoveryCache = (): void => {
   iiConfigCache.clear();
   providerCache.clear();
-  lastFetchAttempt.clear();
-  // If a test timed out mid-fetch, the pending promise's `finally` may not
-  // have run yet and `activeFetches` could be stuck above 0, making the
-  // next test trip the MAX_CONCURRENT guard. Reset it so each test starts
-  // from a clean slate.
-  activeFetches = 0;
 };

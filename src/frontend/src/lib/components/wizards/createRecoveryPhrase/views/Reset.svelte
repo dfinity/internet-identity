@@ -1,6 +1,5 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
-  import Button from "$lib/components/ui/Button.svelte";
   import { Trans } from "$lib/components/locale";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { TriangleAlertIcon } from "@lucide/svelte";
@@ -40,11 +39,9 @@
 <p class="text-text-tertiary mb-8 text-base font-medium">
   <Trans>Do you want to continue?</Trans>
 </p>
-<Button
+<button
+  class="btn btn-primary btn-lg btn-danger mb-3"
   onclick={handleReset}
-  size="lg"
-  danger
-  class="mb-3"
   disabled={isGeneratingPhrase}
 >
   {#if isGeneratingPhrase}
@@ -53,12 +50,11 @@
   {:else}
     <span>{$t`Reset`}</span>
   {/if}
-</Button>
-<Button
+</button>
+<button
+  class="btn btn-tertiary btn-lg"
   onclick={onCancel}
-  variant="tertiary"
-  size="lg"
   disabled={isGeneratingPhrase}
 >
   {$t`Cancel`}
-</Button>
+</button>

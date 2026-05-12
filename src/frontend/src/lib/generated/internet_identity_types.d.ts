@@ -1631,6 +1631,7 @@ export interface _SERVICE {
       { 'Err' : SetDefaultAccountError }
   >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
+  'whoami' : ActorMethod<[], Principal>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],

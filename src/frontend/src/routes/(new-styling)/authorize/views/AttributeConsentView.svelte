@@ -8,7 +8,6 @@
   import { backendCanisterConfig } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import AttributePicker from "./AttributePicker.svelte";
   import {
@@ -303,12 +302,11 @@
       {$t`Deny All`}
     </button>
 
-    <Button
+    <button
+      class="btn btn-primary btn-xl w-full"
       onclick={() => handleContinue(data.groups)}
-      size="xl"
-      class="w-full"
     >
       {$t`Continue`}
-    </Button>
+    </button>
   </div>
 {/await}

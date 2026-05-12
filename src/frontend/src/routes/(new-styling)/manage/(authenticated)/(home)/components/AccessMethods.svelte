@@ -1,6 +1,5 @@
 <script lang="ts">
   import { ChevronRightIcon, KeyRoundIcon } from "@lucide/svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -29,12 +28,10 @@
   <span class="text-text-primary text-sm font-semibold">
     {totalAccessMethods}
   </span>
-  <Button
+  <a
+    class="btn btn-tertiary btn-icon ms-auto !rounded-full"
     href="/manage/access"
-    variant="tertiary"
-    iconOnly
-    class="ms-auto !rounded-full"
   >
     <ChevronRightIcon class="size-5" />
-  </Button>
+  </a>
 </div>

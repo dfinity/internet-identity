@@ -2,7 +2,6 @@
   import { EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "@lucide/svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
@@ -117,15 +116,12 @@
     {/if}
     {#if options.length > 0}
       <Select {options} align="end">
-        <Button
-          variant="tertiary"
-          size="sm"
-          iconOnly
-          class="ms-auto"
+        <button
+          class="btn btn-tertiary btn-sm btn-icon ms-auto"
           aria-label={$t`More options`}
         >
           <EllipsisVerticalIcon class="size-5" />
-        </Button>
+        </button>
       </Select>
     {/if}
   </div>

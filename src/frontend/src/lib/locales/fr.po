@@ -316,9 +316,6 @@ msgstr "Actuellement connecté avec ce compte"
 msgid "Currently signed in with this passkey"
 msgstr "Actuellement connecté avec cette passkey"
 
-msgid "Dashlane has been confirmed to be incompatible."
-msgstr "Il a été confirmé que Dashlane est incompatible."
-
 msgid "Default"
 msgstr "Par défaut"
 
@@ -366,6 +363,9 @@ msgstr "Saisir la phrase de récupération"
 
 msgid "Enter your company domain"
 msgstr "Saisissez le domaine de votre entreprise"
+
+msgid "Error"
+msgstr "Erreur"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Tout ce que vous devez savoir sur Internet Identity, votre moyen privé, sécurisé et facile de vous connecter à des applications sur l’Internet Computer."
@@ -593,9 +593,6 @@ msgstr "Dernière utilisation"
 msgid "Learn how to open links in your browser"
 msgstr "Découvrez comment ouvrir les liens dans votre navigateur"
 
-msgid "Ledger has been confirmed to be incompatible."
-msgstr "Il a été confirmé que Ledger est incompatible."
-
 msgid "Legacy"
 msgstr "Ancienne"
 
@@ -691,9 +688,6 @@ msgstr "Aucune phrase de récupération"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Non. Votre Face ID ou votre empreinte digitale est uniquement utilisé pour créer ou déverrouiller votre passkey. Vos données biométriques ne sont jamais partagées avec Internet Identity ni avec les sites web ou applications que vous utilisez."
-
-msgid "NordPass has been confirmed to be incompatible."
-msgstr "Il a été confirmé que NordPass est incompatible."
 
 msgid "Not upgraded"
 msgstr "Non mis à niveau"
@@ -935,6 +929,12 @@ msgstr "Se déconnecter de cet appareil"
 msgid "Sign out to remove"
 msgstr "Se déconnecter pour supprimer"
 
+msgid "Sign-in"
+msgstr "Connexion"
+
+msgid "Sign-up"
+msgstr "Inscription"
+
 msgid "Signed in"
 msgstr "Connecté"
 
@@ -1008,9 +1008,6 @@ msgstr "Accès à votre identité restauré avec succès"
 msgid "Support"
 msgstr "Support"
 
-msgid "Supported"
-msgstr "Pris en charge"
-
 msgid "Switch identity"
 msgstr "Changer d’identité"
 
@@ -1026,6 +1023,9 @@ msgstr "Tester la prise en charge des passkeys"
 msgid "Test passkey support and view authenticator details"
 msgstr "Tester la prise en charge des passkeys et afficher les détails de l’authentificateur"
 
+msgid "Test sign-in"
+msgstr "Tester la connexion"
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "L’<0>appareil existant</0> se prépare à continuer."
 
@@ -1034,9 +1034,6 @@ msgstr "Le <0>nouvel appareil</0> se prépare à continuer."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "L’intégration avec Google, Microsoft et Apple utilise un protocole d’authentification standard appelé OpenID. C’est le même protocole que d’autres applications utilisent pour se connecter avec Google."
-
-msgid "The passkey could not be identified, support unknown."
-msgstr "La passkey n’a pas pu être identifiée, prise en charge inconnue."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "La phrase a été saisie correctement mais appartient à un produit autre qu’Internet Identity."
@@ -1062,26 +1059,11 @@ msgstr "Cela peut prendre quelques secondes"
 msgid "This passkey is no longer associated with any identity."
 msgstr "Cette passkey n’est plus associée à aucune identité."
 
+msgid "This passkey seems to have issues, please share the export with support."
+msgstr "Cette passkey semble avoir des problèmes. Veuillez partager l'export avec le support."
+
 msgid "This SSO is already linked to your identity."
 msgstr "Ce SSO est déjà lié à votre identité."
-
-msgid "This YubiKey has older firmware (5.1) that's incompatible."
-msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.1) qui est incompatible."
-
-msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
-msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.2 - 5.4) qui pourrait être incompatible."
-
-msgid "This YubiKey has older firmware (5.2) that might be incompatible."
-msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.2) qui pourrait être incompatible."
-
-msgid "This YubiKey has older firmware (5.4) that might be incompatible."
-msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.4) qui pourrait être incompatible."
-
-msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
-msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.5 - 5.6) qui pourrait être incompatible."
-
-msgid "This YubiKey has older firmware (5.6) that might be incompatible."
-msgstr "Cette YubiKey possède un micrologiciel plus ancien (5.6) qui pourrait être incompatible."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Pour confirmer votre identité, saisissez le code ci‑dessous sur votre <0>appareil existant</0>."
@@ -1143,9 +1125,6 @@ msgstr "Déverrouiller et réinitialiser"
 msgid "Unlock to continue"
 msgstr "Déverrouiller pour continuer"
 
-msgid "Unsupported"
-msgstr "Non pris en charge"
-
 msgid "Unsupported browser"
 msgstr "Navigateur non pris en charge"
 
@@ -1205,9 +1184,6 @@ msgstr "En attente de votre appareil existant"
 
 msgid "Waiting for your new device"
 msgstr "En attente de votre nouvel appareil"
-
-msgid "Warning"
-msgstr "Avertissement"
 
 msgid "We didn't recognize that activation code."
 msgstr "Nous n’avons pas reconnu ce code d’activation."

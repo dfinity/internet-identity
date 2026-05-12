@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { waitFor } from "$lib/utils/utils";
@@ -95,10 +94,9 @@
       hidden={!isCancelled}
       manual
     >
-      <Button
+      <button
+        class="btn btn-primary btn-lg"
         onclick={handleCreate}
-        variant="primary"
-        size="lg"
         type="submit"
         disabled={name.length === 0 || name.length > 64 || isCreating}
       >
@@ -108,7 +106,7 @@
         {:else}
           <span>{$t`Create identity`}</span>
         {/if}
-      </Button>
+      </button>
     </Tooltip>
     <div class="flex flex-row items-center">
       <p class="text-text-secondary text-sm">
@@ -130,13 +128,11 @@
         offset="0rem"
         class="max-w-80"
       >
-        <Button
-          variant="tertiary"
-          iconOnly
-          class="ms-auto !cursor-default !rounded-full"
+        <button
+          class="btn btn-tertiary btn-icon ms-auto !cursor-default !rounded-full"
         >
           <HelpCircleIcon class="size-5" />
-        </Button>
+        </button>
       </Tooltip>
     </div>
   </div>

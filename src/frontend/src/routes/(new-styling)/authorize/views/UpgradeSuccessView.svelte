@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
@@ -61,7 +60,7 @@
       </Trans>
     </p>
   </div>
-  <Button variant="primary" onclick={handleRedirect}>
+  <button class="btn btn-primary" onclick={handleRedirect}>
     {#if countdown >= 0}
       <Trans>
         Go to the app - (<span class="tabular-nums">{countdown}</span>)
@@ -69,5 +68,5 @@
     {:else}
       <Trans>Go to the app</Trans>
     {/if}
-  </Button>
+  </button>
 </div>

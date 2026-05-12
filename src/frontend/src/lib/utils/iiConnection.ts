@@ -993,11 +993,12 @@ export const creationOptions = (
   };
 };
 
-// In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
-// we map back the derivation origin to the ic0.app domain.
+// In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or
+// any of the newer canister gateway domains (icp0.io, icp.net) we map back the derivation origin
+// to the ic0.app domain.
 export const remapToLegacyDomain = (origin: string): string => {
   const ORIGIN_MAPPING_REGEX =
-    /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
+    /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.(?:icp0\.io|icp\.net)$/;
   const match = origin.match(ORIGIN_MAPPING_REGEX);
   const subdomain = match?.groups?.subdomain;
   if (subdomain !== undefined) {
@@ -1031,10 +1032,17 @@ export const inferHost = (): string => {
     return "https://" + IC_API_DOMAIN;
   }
 
+  // Match a hostname against an official gateway domain by exact equality or
+  // by a dot boundary, so adversarial subdomains like `evil-ic0.app` are not
+  // treated as the IC.
+  const isGatewayDomain = (domain: string): boolean =>
+    location.hostname === domain || location.hostname.endsWith(`.${domain}`);
+
   if (
-    location.hostname.endsWith("icp0.io") ||
-    location.hostname.endsWith("ic0.app") ||
-    location.hostname.endsWith("internetcomputer.org")
+    isGatewayDomain("icp0.io") ||
+    isGatewayDomain("ic0.app") ||
+    isGatewayDomain("icp.net") ||
+    isGatewayDomain("internetcomputer.org")
   ) {
     // If this is a canister running on one of the official IC domains, then return the
     // official API endpoint

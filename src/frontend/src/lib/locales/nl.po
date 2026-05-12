@@ -316,9 +316,6 @@ msgstr "Momenteel ingelogd met dit account"
 msgid "Currently signed in with this passkey"
 msgstr "Momenteel ingelogd met deze passkey"
 
-msgid "Dashlane has been confirmed to be incompatible."
-msgstr "Dashlane is bevestigd als incompatibel."
-
 msgid "Default"
 msgstr "Standaard"
 
@@ -366,6 +363,9 @@ msgstr "Voer herstelzin in"
 
 msgid "Enter your company domain"
 msgstr "Voer uw bedrijfsdomein in"
+
+msgid "Error"
+msgstr "Fout"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles wat u moet weten over Internet Identity, uw veilige, privacyvriendelijke en gemakkelijke manier om in te loggen op Internet Computer-apps."
@@ -593,9 +593,6 @@ msgstr "Laatst gebruikt"
 msgid "Learn how to open links in your browser"
 msgstr "Ontdek hoe u links in uw browser kunt openen"
 
-msgid "Ledger has been confirmed to be incompatible."
-msgstr "Ledger is bevestigd als incompatibel."
-
 msgid "Legacy"
 msgstr "Legacy"
 
@@ -691,9 +688,6 @@ msgstr "Geen herstelzin"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Nee. Uw Face ID of vingerafdruk wordt alleen gebruikt om uw passkey aan te maken of te ontgrendelen. Uw biometrische gegevens worden nooit gedeeld met Internet Identity of met websites of apps die u gebruikt."
-
-msgid "NordPass has been confirmed to be incompatible."
-msgstr "NordPass is bevestigd als incompatibel."
 
 msgid "Not upgraded"
 msgstr "Niet geüpgraded"
@@ -935,6 +929,12 @@ msgstr "Uitloggen van dit apparaat"
 msgid "Sign out to remove"
 msgstr "Log uit om te verwijderen"
 
+msgid "Sign-in"
+msgstr "Inloggen"
+
+msgid "Sign-up"
+msgstr "Aanmelden"
+
 msgid "Signed in"
 msgstr "Ingelogd"
 
@@ -1008,9 +1008,6 @@ msgstr "Toegang tot uw identiteit is hersteld"
 msgid "Support"
 msgstr "Ondersteuning"
 
-msgid "Supported"
-msgstr "Ondersteund"
-
 msgid "Switch identity"
 msgstr "Identiteit wisselen"
 
@@ -1026,6 +1023,9 @@ msgstr "Passkey-ondersteuning testen"
 msgid "Test passkey support and view authenticator details"
 msgstr "Test passkey-ondersteuning en bekijk authenticatordetails"
 
+msgid "Test sign-in"
+msgstr "Inloggen testen"
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "Het <0>bestaande apparaat</0> bereidt zich voor om door te gaan."
 
@@ -1034,9 +1034,6 @@ msgstr "Het <0>nieuwe apparaat</0> bereidt zich voor om door te gaan."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "De integratie met Google, Microsoft en Apple maakt gebruik van een standaard authenticatieprotocol genaamd OpenID. Dit is hetzelfde protocol dat andere applicaties gebruiken om in te loggen met Google."
-
-msgid "The passkey could not be identified, support unknown."
-msgstr "De passkey kon niet worden geïdentificeerd, ondersteuning onbekend."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "De zin is correct ingevoerd, maar hoort bij een ander product dan Internet Identity."
@@ -1062,26 +1059,11 @@ msgstr "Dit kan enkele seconden duren"
 msgid "This passkey is no longer associated with any identity."
 msgstr "Deze passkey is niet langer gekoppeld aan een identiteit."
 
+msgid "This passkey seems to have issues, please share the export with support."
+msgstr "Deze passkey lijkt problemen te hebben. Deel de export met ondersteuning."
+
 msgid "This SSO is already linked to your identity."
 msgstr "Deze SSO is al gekoppeld aan uw identiteit."
-
-msgid "This YubiKey has older firmware (5.1) that's incompatible."
-msgstr "Deze YubiKey heeft oudere firmware (5.1) die incompatibel is."
-
-msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
-msgstr "Deze YubiKey heeft oudere firmware (5.2 - 5.4) die mogelijk incompatibel is."
-
-msgid "This YubiKey has older firmware (5.2) that might be incompatible."
-msgstr "Deze YubiKey heeft oudere firmware (5.2) die mogelijk niet compatibel is."
-
-msgid "This YubiKey has older firmware (5.4) that might be incompatible."
-msgstr "Deze YubiKey heeft oudere firmware (5.4) die mogelijk niet compatibel is."
-
-msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
-msgstr "Deze YubiKey heeft oudere firmware (5.5 - 5.6) die mogelijk niet compatibel is."
-
-msgid "This YubiKey has older firmware (5.6) that might be incompatible."
-msgstr "Deze YubiKey heeft oudere firmware (5.6) die mogelijk niet compatibel is."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Om te bevestigen dat u het bent, voert u onderstaande code in op uw <0>bestaande apparaat</0>."
@@ -1143,9 +1125,6 @@ msgstr "Ontgrendel en reset"
 msgid "Unlock to continue"
 msgstr "Ontgrendel om verder te gaan"
 
-msgid "Unsupported"
-msgstr "Niet ondersteund"
-
 msgid "Unsupported browser"
 msgstr "Niet-ondersteunde browser"
 
@@ -1205,9 +1184,6 @@ msgstr "Wachten op uw bestaande apparaat"
 
 msgid "Waiting for your new device"
 msgstr "Wachten op uw nieuwe apparaat"
-
-msgid "Warning"
-msgstr "Waarschuwing"
 
 msgid "We didn't recognize that activation code."
 msgstr "We herkenden die activeringscode niet."

@@ -2,7 +2,6 @@
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
   import { CopyIcon } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { t } from "$lib/stores/locale.store";
@@ -41,10 +40,9 @@
 </p>
 
 <Tooltip label={$t`Code copied to clipboard`} hidden={!copied} manual>
-  <Button
+  <button
+    class="btn btn-secondary btn-xl"
     onclick={handleCopyCode}
-    variant="secondary"
-    size="xl"
     disabled={confirmationCode === undefined}
     aria-label={$t`Confirmation code`}
   >
@@ -57,5 +55,5 @@
       <ProgressRing />
       <span>{$t`Generating code...`}</span>
     {/if}
-  </Button>
+  </button>
 </Tooltip>

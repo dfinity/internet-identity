@@ -644,6 +644,11 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[query]
+fn whoami() -> Principal {
+    caller()
+}
+
+#[query]
 fn discovered_oidc_configs() -> Vec<OidcConfig> {
     openid::get_discovered_oidc_configs()
 }
