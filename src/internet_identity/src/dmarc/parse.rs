@@ -26,23 +26,34 @@ pub fn parse_dmarc_txt(record: &str) -> Result<DmarcRecord, String> {
         return Err(format!("unsupported DMARC version v={}", v.1));
     }
 
-    let get = |name: &str| -> Option<&str> {
-        tags.iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(name))
-            .map(|(_, v)| v.as_str())
-    };
-
-    // §6.3: p= is required, must be one of {none, quarantine, reject}.
-    let policy = match get("p")
-        .ok_or_else(|| "missing required p= tag".to_string())?
-        .trim()
-        .to_ascii_lowercase()
-        .as_str()
-    {
+    // §6.3: p= is required for policy records and must immediately
+    // follow v=. Every real-world DMARC record we've surveyed (Gmail,
+    // Outlook, Yahoo, ProtonMail, Cloudflare, …) places p= as the
+    // second tag, and several reference DMARC parsers (OpenDMARC and
+    // others) reject the alternative. Accepting `v=DMARC1; rua=...;
+    // p=reject` would let a malformed record influence acceptance
+    // decisions on receivers that *do* enforce the position rule —
+    // we'd be silently more permissive than the spec's intent.
+    let p_tag = tags
+        .get(1)
+        .ok_or_else(|| "missing required p= tag (must follow v=)".to_string())?;
+    if !p_tag.0.eq_ignore_ascii_case("p") {
+        return Err(format!(
+            "p= must be the second tag (got {}=) per RFC 7489 §6.3",
+            p_tag.0
+        ));
+    }
+    let policy = match p_tag.1.trim().to_ascii_lowercase().as_str() {
         "none" => DmarcPolicy::None,
         "quarantine" => DmarcPolicy::Quarantine,
         "reject" => DmarcPolicy::Reject,
         other => return Err(format!("unsupported p={other}")),
+    };
+
+    let get = |name: &str| -> Option<&str> {
+        tags.iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
     };
 
     // sp= inherits from p= when absent or unrecognised. Per §6.3 the
