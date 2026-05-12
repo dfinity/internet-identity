@@ -373,4 +373,19 @@ mod tests {
         let err = parse_dkim_signature(v).unwrap_err();
         assert!(err.contains("invalid base64 in bh"));
     }
+
+    #[test]
+    fn unknown_tags_are_ignored() {
+        // RFC 6376 §3.5: implementations MUST ignore tags they don't
+        // recognise (forward-compatibility with future extensions).
+        // `z=` (copied headers) and a synthetic `zz=` are both unknown
+        // to us; parsing must still succeed.
+        let v = "v=1; a=rsa-sha256; d=example.com; s=mail; h=from; \
+                 bh=MTIzNDU2; b=YWJjZGVm; \
+                 z=From:alice@example.com|To:bob@example.org; \
+                 zz=future-extension-value";
+        let s = parse_dkim_signature(v).unwrap();
+        assert_eq!(s.d, "example.com");
+        assert_eq!(s.algorithm, Algorithm::RsaSha256);
+    }
 }
