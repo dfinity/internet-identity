@@ -16,6 +16,33 @@
 //! - `alignment` — strict / relaxed alignment check (no PSL — see
 //!   design doc §6.4).
 //! - `verify` — orchestration; the public entry point lives here.
+//!
+//! # Security model
+//!
+//! Three intentional deviations from "stock" DMARC, each documented in
+//! the design doc and worth surfacing here for auditors:
+//!
+//! - **No Public Suffix List.** Relaxed alignment uses a label-anchored
+//!   suffix check (see `alignment::is_subdomain_of`) instead of computing
+//!   the PSL-defined organizational domain. This prevents suffix
+//!   attacks (`evilexample.com` masquerading as `example.com`) and
+//!   removes a large, slowly-changing trust dependency from the
+//!   canister. The cost is that legitimate multi-domain orgs
+//!   (`gmail.com` ↔ `googlemail.com`) fail closed; that's the safe
+//!   direction for an account-recovery surface. Design doc §6.4.
+//!
+//! - **No SPF.** The recovery flow proves *mailbox control*, not
+//!   *path-of-delivery*. DKIM gives us a cryptographic binding from the
+//!   message content to the signing domain; SPF would only tell us the
+//!   message came from an IP the domain authorised, which we can't
+//!   meaningfully check in-canister anyway (no source IP in the gateway
+//!   payload). Design doc §6.5.
+//!
+//! - **Fail-closed everywhere.** Every malformed input, every
+//!   unrecognised value, every step that can't produce a positive
+//!   answer collapses to `Unverified`. We never quarantine, never
+//!   downgrade — a recovery attempt either proves mailbox control or
+//!   it doesn't run.
 
 // PR 3 lands the verifier without an in-canister consumer (PR 8's
 // `smtp_request` dispatch is the first caller). Suppress dead-code

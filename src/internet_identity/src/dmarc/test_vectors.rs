@@ -185,6 +185,32 @@ fn rejects_end_to_end_when_dmarc_record_is_malformed() {
 }
 
 #[test]
+fn verifies_end_to_end_when_dmarc_record_has_unknown_tags() {
+    // RFC 7489 §6.3 requires verifiers to ignore tags they don't
+    // understand. We exercise the full verify_email path with a DMARC
+    // record carrying reporting tags (`rua=`, `ruf=`, `fo=`), a vendor
+    // extension we've never heard of, and a duplicate-looking-but-
+    // different reporting tag — verification must still succeed.
+    let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
+    let dmarc_txt = "v=DMARC1; p=reject; rua=mailto:reports@example.com; \
+                     ruf=mailto:forensics@example.com; fo=1; \
+                     vendorext=experimental-value; adkim=s";
+    let result = verify_email(&req, SYNTH_RSA_TXT, Some(dmarc_txt), frozen_now());
+    match result {
+        EmailVerificationStatus::Verified { dmarc, .. } => {
+            assert_eq!(
+                dmarc,
+                DmarcOutcome::Aligned {
+                    policy: DmarcPolicy::Reject,
+                    alignment_mode: AlignmentMode::Strict,
+                }
+            );
+        }
+        other => panic!("expected Verified, got {:?}", other),
+    }
+}
+
+#[test]
 fn rejects_end_to_end_when_from_header_is_address_list() {
     let mut req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     // Replace From: with an address list. DKIM signs From, so this
