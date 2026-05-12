@@ -103,6 +103,15 @@ pub fn parse_dkim_signature(value: &str) -> Result<DkimSignature, String> {
     if h.is_empty() {
         return Err("h= must list at least one signed header".to_string());
     }
+    // RFC 6376 §5.4: "The From header field MUST be signed (that is,
+    // included in the 'h=' tag of the resulting DKIM-Signature header
+    // field)." Without this, an attacker can rewrite From after
+    // signing, and the DMARC alignment layer above us would compare
+    // against the rewritten value — defeating the whole point of
+    // DKIM+DMARC.
+    if !h.iter().any(|n| n == "from") {
+        return Err("h= must include the From header (RFC 6376 §5.4)".to_string());
+    }
 
     // Base64 values may contain whitespace (folding), strip it before
     // decoding.

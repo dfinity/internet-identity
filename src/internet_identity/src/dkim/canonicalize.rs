@@ -127,7 +127,13 @@ pub fn relaxed_body(body: &[u8]) -> Vec<u8> {
     }
 
     if lines.is_empty() {
-        return Vec::new();
+        // RFC 6376 §3.4.3 (cited by §3.4.4): "a completely empty or
+        // missing body is canonicalized as a single 'CRLF'; that is,
+        // the canonicalized length will be 2 octets". Same rule for
+        // both simple and relaxed body canonicalization. Returning
+        // Vec::new() here would make `bh=` checks fail for valid
+        // signatures over empty-body messages.
+        return b"\r\n".to_vec();
     }
 
     // Join with CRLF terminators; the algorithm guarantees a single
@@ -232,8 +238,12 @@ mod tests {
     // --- Body tests ---
 
     #[test]
-    fn relaxed_body_empty_stays_empty() {
-        assert_eq!(relaxed_body(b""), b"");
+    fn relaxed_body_empty_canonicalizes_to_crlf() {
+        // RFC 6376 §3.4.3: a completely empty body is canonicalized
+        // as a single CRLF (2 octets). This rule applies to both
+        // simple and relaxed canonicalization; without it, valid
+        // DKIM signatures over empty bodies would fail bh= checks.
+        assert_eq!(relaxed_body(b""), b"\r\n");
     }
 
     #[test]
@@ -284,10 +294,13 @@ mod tests {
     }
 
     #[test]
-    fn relaxed_body_only_whitespace_is_empty() {
-        // The whole body is one WSP-only line; it canonicalises to
-        // empty (no trailing CRLF).
+    fn relaxed_body_only_whitespace_canonicalizes_to_crlf() {
+        // The whole body is one WSP-only line. After per-line WSP
+        // stripping it's the empty line, which then gets dropped by
+        // the trailing-empty-lines clause. Result: the body is
+        // effectively empty, which RFC 6376 §3.4.3 canonicalises to
+        // a single CRLF.
         let body = b"   \r\n";
-        assert_eq!(relaxed_body(body), b"");
+        assert_eq!(relaxed_body(body), b"\r\n");
     }
 }
