@@ -83,12 +83,25 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
     let mut in_quotes = false;
     let mut angle_start: Option<usize> = None;
     let mut angle_end: Option<usize> = None;
-    for (i, &b) in bytes.iter().enumerate() {
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        // RFC 5322 §3.2.4: inside a quoted-string a backslash escapes
+        // the next character (notably an embedded `"`). Without this
+        // we'd close the quoted region prematurely on something like
+        // `"Alice \"Ops, Inc\"" <alice@example.com>` and then
+        // misinterpret the comma as an address-list separator.
+        if in_quotes && b == b'\\' && i + 1 < bytes.len() {
+            i += 2;
+            continue;
+        }
         if b == b'"' {
             in_quotes = !in_quotes;
+            i += 1;
             continue;
         }
         if in_quotes {
+            i += 1;
             continue;
         }
         if b == b'<' {
@@ -96,14 +109,17 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
                 return Err("nested '<' in From: value".to_string());
             }
             angle_start = Some(i + 1);
+            i += 1;
             continue;
         }
         if b == b'>' {
             angle_end = Some(i);
+            i += 1;
             continue;
         }
         if angle_start.is_some() && angle_end.is_none() {
             // Inside angle brackets — anything goes (no further checks).
+            i += 1;
             continue;
         }
         if b == b',' {
@@ -112,6 +128,7 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
         if b == b':' {
             return Err("From: contains group syntax, not a single mailbox".to_string());
         }
+        i += 1;
     }
 
     if let (Some(start), Some(end)) = (angle_start, angle_end) {
