@@ -32,11 +32,13 @@ pub trait DohFetcher {
     /// with `query_bytes` as body) to `provider.url`. Returns the raw
     /// response body bytes on success.
     ///
-    /// In production this is async (it goes over the network). The
-    /// trait surface is sync because the cache + quorum logic runs
-    /// inside an already-async wrapper that calls all three fetchers
-    /// in parallel. See [`super::mod::fetch_txt`] for the production
-    /// wiring.
+    /// This trait is the **synchronous test seam**: tests build a
+    /// `MockFetcher` and call [`run_quorum`] which iterates `PROVIDERS`
+    /// sequentially. The production async path in [`super::fetch_txt`]
+    /// does NOT go through this trait — it constructs its own per-
+    /// provider futures and fans them out via `futures::future::join_all`
+    /// for genuine parallelism. The two paths share only the bucketing
+    /// logic in [`decide_quorum`].
     ///
     /// Tests pass a `&MockDohFetcher` that has a `HashMap<DohProvider,
     /// Result<Vec<u8>, ()>>` and just returns the canned answer.
@@ -55,7 +57,7 @@ pub trait DohFetcher {
 /// question section, TTLs) is intentionally *not* compared — only the
 /// TXT RDATA is.
 pub fn run_quorum<F: DohFetcher>(name: &str, fetcher: &F) -> Result<Vec<u8>, DohError> {
-    let query = build_txt_query(name);
+    let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
 
     // Per-provider outcomes. Order matches PROVIDERS so logs are
     // attributable, but the quorum count doesn't care about order.

@@ -37,6 +37,13 @@ pub enum ParseError {
     /// The response carried no answer records of the requested type
     /// (NoData) or returned an explicit "not found" RCODE.
     NoAnswer,
+    /// The QNAME we were asked to encode violates RFC 1035 §2.3.4
+    /// (label > 63 octets, name > 255 octets, or empty label) and so
+    /// can't be expressed on the wire. We refuse to silently truncate
+    /// or drop labels — that would mutate the queried name into a
+    /// different one, which is a correctness bug at best and a
+    /// security bug at worst (cache poisoning by selector confusion).
+    InvalidName(String),
 }
 
 /// Build a wire-format DNS query for `<name> IN TXT`.
@@ -49,7 +56,13 @@ pub enum ParseError {
 /// every time. DoH responses echo the ID back; the IC's HTTP-outcall
 /// transform function strips header bytes anyway, so a fixed ID makes
 /// for cleaner replica-consensus byte equality.
-pub fn build_txt_query(name: &str) -> Vec<u8> {
+///
+/// Returns [`ParseError::InvalidName`] if `name` violates the wire-
+/// format constraints (label > 63 octets, total name > 255 octets,
+/// or an empty label other than the trailing root). We fail closed
+/// rather than silently truncating: a 64-octet selector becoming a
+/// different valid 63-octet selector would be a real correctness bug.
+pub fn build_txt_query(name: &str) -> Result<Vec<u8>, ParseError> {
     let mut out = Vec::with_capacity(HEADER_LEN + name.len() + 16);
     // Header (12 bytes).
     // ID (2): 0
@@ -63,10 +76,10 @@ pub fn build_txt_query(name: &str) -> Vec<u8> {
     out.extend_from_slice(&0u16.to_be_bytes());
 
     // Question section: QNAME (length-prefixed labels + 0), QTYPE, QCLASS.
-    encode_name(name, &mut out);
+    encode_name(name, &mut out)?;
     out.extend_from_slice(&TYPE_TXT.to_be_bytes());
     out.extend_from_slice(&CLASS_IN.to_be_bytes());
-    out
+    Ok(out)
 }
 
 /// Parse a DoH response and return the concatenated TXT RDATA bytes
@@ -188,18 +201,48 @@ fn skip_name(bytes: &[u8], mut pos: usize) -> Result<usize, ParseError> {
 }
 
 /// Encode a dotted name as a sequence of length-prefixed labels
-/// terminated by a zero-length label.
-fn encode_name(name: &str, out: &mut Vec<u8>) {
-    for label in name.trim_end_matches('.').split('.') {
-        if label.is_empty() {
-            continue;
-        }
+/// terminated by a zero-length label. Per RFC 1035 §2.3.4: each
+/// label is 1..=63 octets, the entire name (including length octets
+/// and the trailing zero) is at most 255 octets.
+///
+/// We fail closed on every constraint rather than truncating —
+/// silently shortening a label to 63 octets would change which name
+/// we're asking for, which can collapse two distinct selectors onto
+/// a single cache key (a cache-poisoning vector for any caller that
+/// passes attacker-influenced names).
+fn encode_name(name: &str, out: &mut Vec<u8>) -> Result<(), ParseError> {
+    let trimmed = name.trim_end_matches('.');
+    if trimmed.is_empty() {
+        // Root-only name. Just emit the terminator.
+        out.push(0);
+        return Ok(());
+    }
+    let start_len = out.len();
+    for label in trimmed.split('.') {
         let bytes = label.as_bytes();
-        let len = bytes.len().min(63) as u8;
-        out.push(len);
-        out.extend_from_slice(&bytes[..len as usize]);
+        if bytes.is_empty() {
+            return Err(ParseError::InvalidName(format!(
+                "empty label in {name:?} (consecutive dots)"
+            )));
+        }
+        if bytes.len() > 63 {
+            return Err(ParseError::InvalidName(format!(
+                "label {:?} is {} bytes; max is 63",
+                label,
+                bytes.len()
+            )));
+        }
+        out.push(bytes.len() as u8);
+        out.extend_from_slice(bytes);
     }
     out.push(0);
+    let wire_len = out.len() - start_len;
+    if wire_len > 255 {
+        return Err(ParseError::InvalidName(format!(
+            "encoded QNAME for {name:?} is {wire_len} bytes; max is 255"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -208,7 +251,7 @@ mod tests {
 
     #[test]
     fn build_query_for_simple_name() {
-        let bytes = build_txt_query("example.com");
+        let bytes = build_txt_query("example.com").unwrap();
         // Header: ID=0, flags=0x0100, QDCOUNT=1, others=0
         assert_eq!(&bytes[0..2], &[0, 0]);
         assert_eq!(&bytes[2..4], &[0x01, 0x00]);
@@ -219,14 +262,44 @@ mod tests {
 
     #[test]
     fn build_query_handles_trailing_dot() {
-        let with_dot = build_txt_query("example.com.");
-        let without_dot = build_txt_query("example.com");
+        let with_dot = build_txt_query("example.com.").unwrap();
+        let without_dot = build_txt_query("example.com").unwrap();
         assert_eq!(with_dot, without_dot);
     }
 
     #[test]
+    fn build_query_rejects_oversize_label() {
+        let label = "a".repeat(64);
+        let name = format!("{label}.example.com");
+        match build_txt_query(&name) {
+            Err(ParseError::InvalidName(_)) => {}
+            other => panic!("expected InvalidName, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_query_rejects_empty_label() {
+        match build_txt_query("foo..bar.example.com") {
+            Err(ParseError::InvalidName(_)) => {}
+            other => panic!("expected InvalidName, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_query_rejects_oversize_total() {
+        // 5 × 50-char labels + 5 length octets + terminator → ~256.
+        // RFC 1035 §2.3.4 caps the wire QNAME at 255 octets total.
+        let label = "a".repeat(50);
+        let name = (0..5).map(|_| label.as_str()).collect::<Vec<_>>().join(".");
+        match build_txt_query(&name) {
+            Err(ParseError::InvalidName(_)) => {}
+            other => panic!("expected InvalidName, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn build_query_handles_long_name() {
-        let bytes = build_txt_query("selector1._domainkey.gmail.com");
+        let bytes = build_txt_query("selector1._domainkey.gmail.com").unwrap();
         // Header (12) + name (32 = 1+9 + 1+10 + 1+5 + 1+3 + 1) + qtype(2) + qclass(2)
         assert_eq!(bytes.len(), 12 + 1 + 9 + 1 + 10 + 1 + 5 + 1 + 3 + 1 + 4);
     }

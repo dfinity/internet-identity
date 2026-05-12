@@ -29,10 +29,12 @@ pub struct DohConfig {
     /// domains.
     ///
     /// Each entry is the *registered* domain (e.g. `gmail.com`,
-    /// `outlook.com`) lowercased. The canister extracts the registered
-    /// domain from the queried FQDN by dropping leading subdomain
-    /// labels until it finds an exact match, with a label-anchored
-    /// dot check (so `evilexample.com` cannot match `example.com`).
+    /// `outlook.com`) lowercased. The DKIM/DMARC code path passes the
+    /// registered domain to the verifier explicitly (alongside the
+    /// queried FQDN) and the canister enforces both an allowlist match
+    /// against this list and a label-anchored suffix check that the
+    /// FQDN actually sits inside that registered domain (so
+    /// `evilexample.com` cannot match `example.com`).
     pub allowed_domains: Vec<String>,
 
     /// Maximum age, in seconds, that the in-memory cache keeps a
