@@ -1,14 +1,14 @@
 //! DKIM verification entry point — orchestrates parsing, canonicalisation,
 //! body hash, and signature verification per RFC 6376 §6.1.
 //!
-//! Caller-facing API:
+//! Caller-facing API (re-exported as `crate::dkim::verify_dkim`):
 //!
 //! ```ignore
-//! pub fn verify(
+//! pub fn verify_dkim(
 //!     email: &SmtpRequest,
 //!     dkim_txt: &str,
 //!     now_secs: u64,
-//! ) -> EmailVerificationStatus
+//! ) -> DkimVerifyResult
 //! ```
 //!
 //! `dkim_txt` is the (already-trusted) content of the DKIM TXT record
@@ -37,7 +37,7 @@ use super::dns_record::parse_dkim_txt;
 use super::parse::{parse_dkim_signature, DkimSignature};
 use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
 use super::types::{
-    DkimCheck, DkimCheckName, DkimCheckStatus, EmailVerificationStatus, HeaderCanon,
+    DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
     VerificationFailReason,
 };
 use internet_identity_interface::internet_identity::types::smtp::{SmtpHeader, SmtpRequest};
@@ -47,7 +47,7 @@ const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
 /// Verify an `SmtpRequest` against an already-trusted DKIM TXT record.
 ///
 /// `now_secs` is Unix seconds — passed in so unit tests can pin time.
-pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> EmailVerificationStatus {
+pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyResult {
     let message = match email.message.as_ref() {
         Some(m) => m,
         None => {
@@ -79,11 +79,15 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> EmailVerifi
 
     for dkim_header in &dkim_headers {
         match try_verify_signature(email, message, dkim_header, dkim_txt, now_secs) {
-            Ok((dkim_domain, mut checks)) => {
-                all_checks.append(&mut checks);
-                return EmailVerificationStatus::Verified {
+            Ok((dkim_domain, checks)) => {
+                // Per `DkimVerifyResult::Verified.checks` ("checks for
+                // the winning signature"), surface only the successful
+                // attempt's per-step trail — not the accumulated trail
+                // of every failed signature before it. Callers (and the
+                // DMARC layer) reason about the winning signature only.
+                return DkimVerifyResult::Verified {
                     dkim_domain,
-                    checks: all_checks,
+                    checks,
                 };
             }
             Err((reason, mut checks)) => {
@@ -97,8 +101,8 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> EmailVerifi
 }
 
 #[allow(non_snake_case)]
-fn Unverified(reason: VerificationFailReason, checks: Vec<DkimCheck>) -> EmailVerificationStatus {
-    EmailVerificationStatus::Unverified { reason, checks }
+fn Unverified(reason: VerificationFailReason, checks: Vec<DkimCheck>) -> DkimVerifyResult {
+    DkimVerifyResult::Unverified { reason, checks }
 }
 
 /// Try to verify one specific DKIM-Signature header. Returns the `d=`
@@ -622,7 +626,7 @@ mod tests {
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
-            EmailVerificationStatus::Unverified { reason, .. } => {
+            DkimVerifyResult::Unverified { reason, .. } => {
                 assert_eq!(reason, VerificationFailReason::NoSignature);
             }
             other => panic!("expected Unverified(NoSignature), got {:?}", other),
@@ -669,7 +673,7 @@ mod tests {
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
-            EmailVerificationStatus::Unverified { reason, .. } => {
+            DkimVerifyResult::Unverified { reason, .. } => {
                 assert_eq!(reason, VerificationFailReason::UnsupportedCanonicalization);
             }
             other => panic!(
@@ -717,7 +721,7 @@ mod tests {
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
-            EmailVerificationStatus::Unverified { reason, .. } => {
+            DkimVerifyResult::Unverified { reason, .. } => {
                 assert_eq!(reason, VerificationFailReason::SignatureExpired);
             }
             other => panic!("expected Unverified(SignatureExpired), got {:?}", other),
@@ -763,7 +767,7 @@ mod tests {
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
-            EmailVerificationStatus::Unverified { reason, .. } => {
+            DkimVerifyResult::Unverified { reason, .. } => {
                 assert_eq!(reason, VerificationFailReason::AuidMisaligned);
             }
             other => panic!("expected Unverified(AuidMisaligned), got {:?}", other),
