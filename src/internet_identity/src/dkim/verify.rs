@@ -1,10 +1,10 @@
 //! DKIM verification entry point — orchestrates parsing, canonicalisation,
 //! body hash, and signature verification per RFC 6376 §6.1.
 //!
-//! Caller-facing API:
+//! Caller-facing API (re-exported as `crate::dkim::verify_dkim`):
 //!
 //! ```ignore
-//! pub fn verify(
+//! pub fn verify_dkim(
 //!     email: &SmtpRequest,
 //!     dkim_txt: &str,
 //!     now_secs: u64,
@@ -79,11 +79,15 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyR
 
     for dkim_header in &dkim_headers {
         match try_verify_signature(email, message, dkim_header, dkim_txt, now_secs) {
-            Ok((dkim_domain, mut checks)) => {
-                all_checks.append(&mut checks);
+            Ok((dkim_domain, checks)) => {
+                // Per `DkimVerifyResult::Verified.checks` ("checks for
+                // the winning signature"), surface only the successful
+                // attempt's per-step trail — not the accumulated trail
+                // of every failed signature before it. Callers (and the
+                // DMARC layer) reason about the winning signature only.
                 return DkimVerifyResult::Verified {
                     dkim_domain,
-                    checks: all_checks,
+                    checks,
                 };
             }
             Err((reason, mut checks)) => {

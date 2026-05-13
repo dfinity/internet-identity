@@ -51,14 +51,18 @@ pub fn verify_email(
         }
     };
 
-    // Step 2: From-header domain. We need a message body to read the
-    // headers from; if `email.message` was missing the DKIM step would
-    // have already failed (NoSignature). Unwrap is safe.
+    // Step 2: From-header domain. DKIM having returned `Verified`
+    // already implies `email.message.is_some()` — `verify_dkim` would
+    // have returned `Unverified(NoSignature)` otherwise. We still
+    // re-check defensively rather than `.expect(...)` because canister
+    // code on the IC must never trap: an invariant violation should
+    // surface as a structured fail-closed verdict, not as a rolled-back
+    // message with an opaque trap message.
     let message = match email.message.as_ref() {
         Some(m) => m,
         None => {
             return EmailVerificationStatus::Unverified {
-                reason: VerificationFailReason::MalformedFromHeader("message body missing".into()),
+                reason: VerificationFailReason::NoSignature,
                 checks: dkim_checks,
             };
         }

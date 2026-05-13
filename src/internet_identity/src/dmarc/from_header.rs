@@ -49,10 +49,19 @@ fn parse_single_mailbox_domain(value: &str) -> Result<String, String> {
     // somewhere later is the giveaway. We also reject any unquoted top-
     // level `,` because that would be an address-list with multiple
     // entries — DMARC requires exactly one.
-    let address_part = match find_address_spec(value)? {
-        Some(s) => s,
+    let (address_part, in_angle_brackets) = match find_address_spec(value)? {
+        Some(spec) => spec,
         None => return Err("could not locate address-spec".to_string()),
     };
+
+    // Bare addr-spec (no angle brackets) must be a single token: no
+    // whitespace at all. With angle brackets, the inside has already
+    // been carved out so anything outside is display-name territory.
+    // Without them, `"Alice alice@example.com"` or `"alice @example.com"`
+    // would otherwise slip through with domain == example.com.
+    if !in_angle_brackets && address_part.chars().any(char::is_whitespace) {
+        return Err("From: addr-spec contains whitespace".to_string());
+    }
 
     let (_, domain) = address_part
         .split_once('@')
@@ -74,11 +83,15 @@ fn parse_single_mailbox_domain(value: &str) -> Result<String, String> {
 /// - `Display Name <local@domain>`   — name-addr
 /// - `"Quoted, Name" <local@domain>` — name-addr with quoted display
 ///
-/// Returns the inside of the angle brackets if any; otherwise the whole
-/// trimmed value. Rejects on an unquoted top-level `,` (address-list)
-/// or any `:` that appears outside angle brackets / quotes (group
-/// syntax).
-fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
+/// Returns `(addr-spec, in_angle_brackets)`. `in_angle_brackets` is
+/// `true` when the addr-spec came from inside `<...>` — the caller uses
+/// that to relax whitespace rules outside the brackets (display name)
+/// while still rejecting whitespace inside the bare addr-spec form.
+///
+/// Rejects on an unquoted top-level `,` (address-list), any `:` outside
+/// angle brackets / quotes (group syntax), or a `>` without a preceding
+/// `<`.
+fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
     let bytes = value.as_bytes();
     let mut in_quotes = false;
     let mut angle_start: Option<usize> = None;
@@ -108,11 +121,20 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
             if angle_start.is_some() {
                 return Err("nested '<' in From: value".to_string());
             }
+            if angle_end.is_some() {
+                return Err("'<' after '>' in From: value".to_string());
+            }
             angle_start = Some(i + 1);
             i += 1;
             continue;
         }
         if b == b'>' {
+            if angle_start.is_none() {
+                return Err("'>' without matching '<' in From: value".to_string());
+            }
+            if angle_end.is_some() {
+                return Err("multiple '>' in From: value".to_string());
+            }
             angle_end = Some(i);
             i += 1;
             continue;
@@ -121,6 +143,12 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
             // Inside angle brackets — anything goes (no further checks).
             i += 1;
             continue;
+        }
+        // Outside angle brackets (or after the closing `>`): only
+        // whitespace is permitted as trailing content. Anything else
+        // after `>` would be a malformed mailbox like `<a@b> garbage`.
+        if angle_end.is_some() && !b.is_ascii_whitespace() {
+            return Err("trailing content after '>' in From: value".to_string());
         }
         if b == b',' {
             return Err("From: contains an address list, not a single mailbox".to_string());
@@ -135,12 +163,12 @@ fn find_address_spec(value: &str) -> Result<Option<&str>, String> {
         if start > end {
             return Err("malformed angle-bracket pair in From:".to_string());
         }
-        return Ok(Some(value[start..end].trim()));
+        return Ok(Some((value[start..end].trim(), true)));
     }
     if angle_start.is_some() {
         return Err("unclosed '<' in From: value".to_string());
     }
-    Ok(Some(value.trim()))
+    Ok(Some((value.trim(), false)))
 }
 
 #[cfg(test)]
@@ -271,5 +299,43 @@ mod tests {
         let m = message_with(&["<<alice@example.com>>"]);
         let err = extract_from_domain(&m).unwrap_err();
         assert!(err.contains("nested"));
+    }
+
+    #[test]
+    fn rejects_whitespace_in_bare_addr_spec() {
+        // No angle brackets → the whole value is the addr-spec, so a
+        // leading display name with a space would otherwise sneak the
+        // last token through as a fake mailbox.
+        let m = message_with(&["Alice alice@example.com"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("whitespace"));
+    }
+
+    #[test]
+    fn rejects_space_around_at_in_bare_addr_spec() {
+        let m = message_with(&["alice @example.com"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("whitespace"));
+    }
+
+    #[test]
+    fn rejects_stray_closing_angle_without_opening() {
+        let m = message_with(&["alice@example.com>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("'>' without matching '<'"));
+    }
+
+    #[test]
+    fn rejects_content_after_closing_angle() {
+        let m = message_with(&["<alice@example.com> garbage"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("trailing content"));
+    }
+
+    #[test]
+    fn rejects_multiple_closing_angles() {
+        let m = message_with(&["<alice@example.com>>"]);
+        let err = extract_from_domain(&m).unwrap_err();
+        assert!(err.contains("multiple '>'"));
     }
 }
