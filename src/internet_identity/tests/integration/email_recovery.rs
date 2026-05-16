@@ -66,8 +66,9 @@ fn dns_input() -> EmailRecoveryDnsInput {
 
 /// Stand up a canister with an `allowed_domains` list that lets
 /// `test.example.com` through to the DoH path, and a `related_origins`
-/// entry for `id.ai` so `smtp_request`'s recipient dispatch accepts
-/// `register@id.ai` (the address the tests send `to`).
+/// entry so `mailbox_domains()` accepts `register@id.ai` /
+/// `recover@id.ai` envelopes (recipient acceptance reads from
+/// `related_origins`; see `email_recovery::mailbox_domains`).
 fn setup_canister(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {

@@ -159,7 +159,9 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
 
     let message = match request.message.as_ref() {
         Some(m) => m,
-        None => return SmtpResponse::Ok {},
+        None => {
+            return SmtpResponse::Ok {};
+        }
     };
 
     // Extract the canister-issued nonce from the Subject header. If
@@ -224,7 +226,6 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     if snapshot.already_terminal || snapshot.partial_set {
         return SmtpResponse::Ok {};
     }
-
     if snapshot.is_dnssec_path {
         // DNSSEC path — pre-DKIM-key verification only. Body is
         // dropped after `bh=` validates; status flips to
@@ -542,9 +543,11 @@ async fn verify_setup_email_doh(
         })?;
     let dkim_fqdn = format!("{}._domainkey.{}", sig.s, domain);
     let dmarc_fqdn = format!("_dmarc.{}", domain);
-    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain)
-        .await
-        .map_err(|e| map_doh_error(e, &domain))?;
+    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain).await.map_err(
+        |e| {
+            map_doh_error(e, &domain)
+        },
+    )?;
     let dmarc_bytes_opt = (crate::doh::fetch_txt(&dmarc_fqdn, &domain).await).ok();
 
     let dkim_txt = std::str::from_utf8(&dkim_bytes)
@@ -557,7 +560,8 @@ async fn verify_setup_email_doh(
     // Run the combined DKIM + DMARC verifier.
     let status = crate::dmarc::verify_email(request, dkim_txt, dmarc_txt_opt, now_secs);
     match status {
-        crate::dmarc::EmailVerificationStatus::Verified { .. } => {}
+        crate::dmarc::EmailVerificationStatus::Verified { .. } => {
+        }
         crate::dmarc::EmailVerificationStatus::Unverified { reason, .. } => {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "{reason:?}"
@@ -575,7 +579,6 @@ async fn verify_setup_email_doh(
     if !from.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);
     }
-
     Ok(())
 }
 

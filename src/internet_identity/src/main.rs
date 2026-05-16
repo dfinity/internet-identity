@@ -1625,6 +1625,7 @@ mod email_recovery_api {
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
         Ok(())
     }
+
 }
 
 mod attribute_sharing {

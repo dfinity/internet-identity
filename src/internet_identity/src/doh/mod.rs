@@ -73,7 +73,9 @@ thread_local! {
 pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, DohError> {
     let config = match crate::state::persistent_state(|p| p.doh_config.clone()) {
         Some(c) => c,
-        None => return Err(DohError::NotConfigured),
+        None => {
+            return Err(DohError::NotConfigured);
+        }
     };
     if !config
         .allowed_domains
@@ -110,9 +112,15 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     let now = now_secs();
     let lookup = DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now));
     let token = match lookup {
-        CacheLookup::Hit(bytes) => return Ok(bytes),
-        CacheLookup::Wait(fut) => return fut.await,
-        CacheLookup::Fetch(token) => token, // First arrival; we own this fetch.
+        CacheLookup::Hit(bytes) => {
+            return Ok(bytes);
+        }
+        CacheLookup::Wait(fut) => {
+            return fut.await;
+        }
+        CacheLookup::Fetch(token) => {
+            token
+        }
     };
 
     // Fan out to every provider in parallel, then decide.
@@ -249,13 +257,15 @@ mod prod {
                 },
             ],
         };
-        let (response,) = http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh)
-            .await
-            .map_err(|(_, err)| err)?;
-        if response.status != HTTP_STATUS_OK {
-            return Err(format!("HTTP {}", response.status));
+        match http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh).await {
+            Ok((response,)) => {
+                if response.status != HTTP_STATUS_OK {
+                    return Err(format!("HTTP {}", response.status));
+                }
+                Ok(response.body)
+            }
+            Err((_, err)) => Err(err),
         }
-        Ok(response.body)
     }
 
     /// Transform query for replica consensus.
