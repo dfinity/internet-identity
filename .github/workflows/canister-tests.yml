@@ -64,7 +64,13 @@ jobs:
           file: Dockerfile
           build-args: |
             II_VERSION=${{ steps.version.outputs.version }}
-          cache-from: type=gha,scope=cached-stage
+          # Pull deps-stage layers from the shared base cache, and this job's
+          # own sccache cache mount from prior runs. Push only the sccache
+          # additions back so we don't pollute the base scope.
+          cache-from: |
+            type=gha,scope=cached-stage
+            type=gha,scope=ii-build-backend
+          cache-to: type=gha,scope=ii-build-backend,mode=max
           # Exports the artefacts from the final stage
           outputs: ./out
           target: scratch_internet_identity
@@ -94,7 +100,10 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          cache-from: type=gha,scope=cached-stage
+          cache-from: |
+            type=gha,scope=cached-stage
+            type=gha,scope=ii-build-archive
+          cache-to: type=gha,scope=ii-build-archive,mode=max
           # Exports the artefacts from the final stage
           outputs: ./out
           target: scratch_archive
@@ -133,7 +142,10 @@ jobs:
           file: Dockerfile
           build-args: |
             II_VERSION=${{ steps.version.outputs.version }}
-          cache-from: type=gha,scope=cached-stage
+          cache-from: |
+            type=gha,scope=cached-stage
+            type=gha,scope=ii-build-frontend
+          cache-to: type=gha,scope=ii-build-frontend,mode=max
           # Exports the artefacts from the final stage
           outputs: ./out
           target: scratch_internet_identity_frontend
