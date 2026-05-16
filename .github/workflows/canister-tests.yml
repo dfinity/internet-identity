@@ -100,10 +100,10 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          cache-from: |
-            type=gha,scope=cached-stage
-            type=gha,scope=ii-build-archive
-          cache-to: type=gha,scope=ii-build-archive,mode=max
+          # Archive build is short and not on the critical path; reuse the
+          # base cache only. (Adding cache-to here caused BuildKit to
+          # re-execute the deps stage instead of reusing it from cached-stage.)
+          cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
           target: scratch_archive
@@ -142,10 +142,10 @@ jobs:
           file: Dockerfile
           build-args: |
             II_VERSION=${{ steps.version.outputs.version }}
-          cache-from: |
-            type=gha,scope=cached-stage
-            type=gha,scope=ii-build-frontend
-          cache-to: type=gha,scope=ii-build-frontend,mode=max
+          # Frontend build is short and not on the critical path; reuse the
+          # base cache only. (Adding cache-to here caused BuildKit to
+          # re-execute the deps stage instead of reusing it from cached-stage.)
+          cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
           target: scratch_internet_identity_frontend
