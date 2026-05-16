@@ -136,6 +136,11 @@ pub struct PersistentState {
     /// in later PRs and by any future feature that needs DNSSEC-verified
     /// DNS — see `docs/ongoing/email-recovery.md` §7.5.
     pub dnssec_config: Option<DnssecConfig>,
+    /// DoH (DNS-over-HTTPS) fallback config. Allowlists domains for
+    /// which the canister may fetch DKIM/DMARC TXT records via HTTP
+    /// outcalls when no DNSSEC chain is available — see
+    /// `docs/ongoing/email-recovery.md` §7.6.
+    pub doh_config: Option<DohConfig>,
 }
 
 impl Default for PersistentState {
@@ -160,6 +165,7 @@ impl Default for PersistentState {
             is_production: None,
             dummy_auth: None,
             dnssec_config: None,
+            doh_config: None,
         }
     }
 }

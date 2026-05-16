@@ -22,6 +22,7 @@ pub type AccountNumber = u64;
 mod api_v2;
 pub mod attributes;
 pub mod dnssec;
+pub mod doh;
 pub mod icrc3;
 pub mod openid;
 pub mod smtp;
@@ -30,6 +31,7 @@ pub mod vc_mvp;
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
+pub use crate::internet_identity::types::doh::*;
 pub use crate::internet_identity::types::openid::*;
 pub use crate::internet_identity::types::smtp::*;
 pub use api_v2::*;
@@ -281,6 +283,13 @@ pub struct InternetIdentityInit {
     /// previously-stored value across an upgrade, `Some(None)` clears it,
     /// `Some(Some(c))` sets it to `c`.
     pub dnssec_config: Option<Option<DnssecConfig>>,
+    /// DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
+    /// domains for which the canister may fetch DKIM / DMARC TXT
+    /// records via HTTP outcalls (covers the consumer-mailbox
+    /// providers whose DNS zones aren't DNSSEC-signed — see
+    /// `docs/ongoing/email-recovery.md` §7.6). Same set/clear pattern
+    /// as `dnssec_config`.
+    pub doh_config: Option<Option<DohConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

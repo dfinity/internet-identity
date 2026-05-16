@@ -55,6 +55,7 @@ mod delegation;
 mod dkim;
 mod dmarc;
 mod dnssec;
+mod doh;
 mod http;
 mod ii_domain;
 
@@ -686,6 +687,7 @@ fn config() -> InternetIdentityInit {
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: None,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
+        doh_config: Some(persistent_state.doh_config.clone()),
     })
 }
 
@@ -830,6 +832,12 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             // Outer Some -> apply: inner None clears, inner Some replaces.
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.dnssec_config = dnssec_config;
+            })
+        }
+        if let Some(doh_config) = arg.doh_config {
+            // Outer Some -> apply: inner None clears, inner Some replaces.
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.doh_config = doh_config;
             })
         }
     }

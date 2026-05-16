@@ -9,8 +9,8 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, DiscoverableOidcConfig, DnssecConfig, DummyAuthConfig,
-    FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp,
+    AnalyticsConfig, CaptchaConfig, DiscoverableOidcConfig, DnssecConfig, DohConfig,
+    DummyAuthConfig, FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -43,6 +43,7 @@ pub struct StorablePersistentState {
     is_production: Option<bool>,
     dummy_auth: Option<DummyAuthConfig>,
     dnssec_config: Option<DnssecConfig>,
+    doh_config: Option<DohConfig>,
 }
 
 impl Storable for StorablePersistentState {
@@ -90,6 +91,7 @@ impl From<PersistentState> for StorablePersistentState {
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
             dnssec_config: s.dnssec_config,
+            doh_config: s.doh_config,
         }
     }
 }
@@ -115,6 +117,7 @@ impl From<StorablePersistentState> for PersistentState {
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
             dnssec_config: s.dnssec_config,
+            doh_config: s.doh_config,
         }
     }
 }
@@ -168,6 +171,7 @@ mod tests {
             is_production: None,
             dummy_auth: None,
             dnssec_config: None,
+            doh_config: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -197,6 +201,7 @@ mod tests {
             is_production: None,
             dummy_auth: None,
             dnssec_config: None,
+            doh_config: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }
