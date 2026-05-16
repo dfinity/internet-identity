@@ -531,7 +531,15 @@ type EmailRecoveryDnsInput = record {
 
 type EmailRecoverySubmitDkimLeafArg = record {
     nonce : text;
-    dkim_leaf : SignedRRset;
+    // The DKIM resolution chain in CNAME order, ending in a TXT. At
+    // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+    // canister side. For the Gmail-style direct-TXT case this is a
+    // single-element vec.
+    hops : vec SignedRRset;
+    // Delegation chains for signed zones touched by `hops` that
+    // weren't already covered by the skeleton chain anchored at
+    // prepare time. Empty for same-zone resolution.
+    extra_chains : vec DelegationChain;
 };
 
 // DNSSEC proof bundle and supporting types — see
@@ -602,9 +610,16 @@ type EmailRecoveryStatus = variant {
     RecoveryReady : record {
         user_key : UserKey;
         expiration : Timestamp;
+        anchor_number : IdentityNumber;
     };
     Failed : EmailRecoveryError;
     Expired;
+};
+
+type EmailRecoveryGetDelegationArgs = record {
+    nonce       : text;
+    session_key : SessionKey;
+    expiration  : Timestamp;
 };
 
 // SMTP gateway types — see `internet_identity_interface::smtp`. Carried
@@ -805,6 +820,12 @@ type IdentityInfo = record {
     name : opt text;
     // The timestamp at which the anchor was created
     created_at : opt Timestamp;
+    // Email-recovery credentials bound to this anchor (empty when
+    // none is configured). The canister API currently caps the list
+    // at one entry — the FE renders the recovery-email card from
+    // the first one — but exposing it as a `vec` lets future
+    // multi-credential support land without a candid schema bump.
+    email_recovery : vec EmailRecoveryCredential;
 };
 
 type IdentityInfoError = variant {
@@ -1419,8 +1440,10 @@ service : (opt InternetIdentityInit) -> {
     // See `docs/ongoing/email-recovery.md`. The recovery half (prepare
     // a delegation from a verified email) lands in a follow-up PR.
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 
     // SMTP gateway protocol

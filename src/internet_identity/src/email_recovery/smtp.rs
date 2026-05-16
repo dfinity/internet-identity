@@ -54,7 +54,7 @@ use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
     SMTP_ERR_SYNTAX_ERROR,
 };
-use internet_identity_interface::internet_identity::types::AnchorNumber;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
 // Recipient user-parts (`register`, `recover`) live on the parent
 // `email_recovery` module so the shared mailbox-domain helpers and
@@ -134,21 +134,28 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         return e;
     }
 
-    // Recipient dispatch. Setup is the only flow wired up in this
-    // PR; recovery is reserved (and silently no-ops, see module
-    // note). We match on the *full* recipient address (user +
-    // domain), case-insensitively, so a direct caller can't bypass
-    // dispatch by spoofing just the user-part with a different
-    // domain — `smtp_request` is an open update.
+    // Recipient dispatch. We accept either of the two reserved
+    // recipients (`register@id.ai` for setup, `recover@id.ai` for
+    // recovery); after the pending lookup we cross-check that the
+    // recipient matches the `PendingKind` of the entry, so a direct
+    // caller can't trick us into running a recovery flow against a
+    // setup challenge or vice versa. We match on the *full* recipient
+    // address (user + domain), case-insensitively, so a direct caller
+    // can't bypass dispatch by spoofing just the user-part with a
+    // different domain — `smtp_request` is an open update.
     let envelope = match request.envelope.as_ref() {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-    if !recipient_matches(&envelope.to, SETUP_RECIPIENT_USER) {
+    let recipient_flow = if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER) {
+        RecipientFlow::Setup
+    } else if recipient_matches(&envelope.to, RECOVERY_RECIPIENT_USER) {
+        RecipientFlow::Recovery
+    } else {
         // Drop with Ok — we don't emit a per-recipient signal back
         // to the gateway.
         return SmtpResponse::Ok {};
-    }
+    };
 
     let message = match request.message.as_ref() {
         Some(m) => m,
@@ -169,9 +176,25 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // the pipeline. We borrow only briefly so the async outcalls
     // below don't hold a `RefCell` across an await (which would
     // trap inside the canister).
-    let snapshot = match pending::with_mut(&nonce, now_secs, |c| match &c.kind {
-        PendingKind::Register { anchor } => Some(PendingSnapshot {
-            anchor: *anchor,
+    let snapshot = match pending::with_mut(&nonce, now_secs, |c| {
+        let kind = match (&c.kind, recipient_flow) {
+            (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
+                SnapshotKind::Setup { anchor: *anchor }
+            }
+            (PendingKind::Recover { session_pk }, RecipientFlow::Recovery) => {
+                SnapshotKind::Recovery {
+                    session_pk: session_pk.clone(),
+                }
+            }
+            // Recipient ↔ kind mismatch. Could be a forged `to:`
+            // value from a direct caller, or a benign cross-up
+            // (the user copy-pasted the recovery-flow nonce into
+            // an email addressed to `register@id.ai`). Either way:
+            // drop silently.
+            _ => return None,
+        };
+        Some(PendingSnapshot {
+            kind,
             claimed_address: c.claimed_address.clone(),
             registered_domain: c.registered_domain.clone(),
             is_dnssec_path: c.cached_root_dnskey.is_some(),
@@ -184,13 +207,12 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
                     | PendingStatus::Expired
                     | PendingStatus::NeedDkimLeaf { .. }
             ),
-        }),
+        })
     }) {
         Some(Some(s)) => s,
         // Either nonce is unknown / expired (None), or the pending
-        // entry is for a flow not yet wired up here (Some(None) —
-        // currently the `Recover` variant; lands with the recovery
-        // flow). Drop silently — see module note.
+        // entry's kind didn't match the recipient (Some(None)).
+        // Drop silently — see module note.
         _ => return SmtpResponse::Ok {},
     };
 
@@ -226,19 +248,34 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // verification finishes synchronously inside this one call.
         let outcome = verify_setup_email_doh(&request, &snapshot, now_secs).await;
         match outcome {
-            Ok(()) => {
-                if let Err(e) =
-                    bind_credential(snapshot.anchor, &snapshot.claimed_address, now_secs)
-                {
-                    pending::with_mut(&nonce, now_secs, |c| {
-                        c.status = PendingStatus::Failed(e);
-                    });
-                } else {
-                    pending::with_mut(&nonce, now_secs, |c| {
-                        c.status = PendingStatus::Succeeded;
-                    });
+            Ok(()) => match &snapshot.kind {
+                SnapshotKind::Setup { anchor } => {
+                    if let Err(e) = bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
+                        pending::with_mut(&nonce, now_secs, |c| {
+                            c.status = PendingStatus::Failed(e);
+                        });
+                    } else {
+                        pending::with_mut(&nonce, now_secs, |c| {
+                            c.status = PendingStatus::Succeeded;
+                        });
+                    }
                 }
-            }
+                SnapshotKind::Recovery { session_pk } => {
+                    match stamp_recovery_delegation(&snapshot, session_pk).await {
+                        Ok(outcome) => {
+                            pending::with_mut(&nonce, now_secs, |c| {
+                                c.recovery_outcome = Some(outcome);
+                                c.status = PendingStatus::Succeeded;
+                            });
+                        }
+                        Err(e) => {
+                            pending::with_mut(&nonce, now_secs, |c| {
+                                c.status = PendingStatus::Failed(e);
+                            });
+                        }
+                    }
+                }
+            },
             Err(reason) => {
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.status = PendingStatus::Failed(reason);
@@ -254,8 +291,8 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
 /// borrow so the async verification pipeline doesn't have to hold
 /// the cell across awaits.
 #[derive(Clone, Debug)]
-struct PendingSnapshot {
-    anchor: AnchorNumber,
+pub(super) struct PendingSnapshot {
+    kind: SnapshotKind,
     /// Lowercased canonical form (matches what `prepare_add` stored).
     claimed_address: String,
     /// Pinned at prepare time; `submit_dkim_leaf` rejects DKIM leaves
@@ -277,6 +314,31 @@ struct PendingSnapshot {
     /// `true` if `status` is already terminal or `NeedDkimLeaf` —
     /// the gateway redelivered an email we already processed.
     already_terminal: bool,
+}
+
+#[derive(Clone, Debug)]
+enum SnapshotKind {
+    /// Setup-flow snapshot. The anchor was supplied by the
+    /// (authenticated) caller at prepare time and is pinned.
+    Setup { anchor: AnchorNumber },
+    /// Recovery-flow snapshot. The anchor isn't yet known — it's
+    /// resolved at submit-leaf time from the verified `From:` via
+    /// the reverse address index. The cached `session_pk` is what
+    /// the eventual delegation will be stamped for.
+    Recovery { session_pk: SessionKey },
+}
+
+/// Recipient-half of the dispatch — paired with the entry's
+/// `PendingKind` to ensure they match.
+#[derive(Clone, Copy, Debug)]
+enum RecipientFlow {
+    /// Inbound to `register@id.ai` — bind the verified `From:`
+    /// address to the anchor named in the pending challenge.
+    Setup,
+    /// Inbound to `recover@id.ai` — stamp a delegation seed for the
+    /// session_pk cached in the pending challenge and mark the
+    /// challenge `RecoveryReady`.
+    Recovery,
 }
 
 /// Look up the `Subject:` header and find a `II-Recovery-…` nonce
@@ -634,10 +696,137 @@ pub(super) fn bind_credential(
         created_at: now_secs.saturating_mul(1_000_000_000),
         last_used: None,
     }];
-    state::storage_borrow_mut(|storage| storage.write(a))
-        .map_err(|e| EmailRecoveryError::InternalCanisterError(format!("write anchor: {e:?}")))?;
+    state::storage_borrow_mut(|storage| storage.write(a)).map_err(|e| match e {
+        // The reverse-address index hit a "this address is already
+        // bound to a different anchor" — surface that as the
+        // user-facing error rather than the InternalCanisterError
+        // catch-all. See `Storage::update_email_recovery_lookup`.
+        crate::storage::StorageError::EmailRecoveryAddressAlreadyBound { .. } => {
+            EmailRecoveryError::AddressAlreadyRegistered
+        }
+        other => EmailRecoveryError::InternalCanisterError(format!("write anchor: {other:?}")),
+    })?;
     Ok(())
 }
+
+/// Build a `PendingSnapshot` shape suitable for
+/// `stamp_recovery_delegation` from the data submit_leaf.rs already
+/// has at hand. Used so the same delegation-stamping helper serves
+/// both the DoH path (called inline in `handle_smtp_request`) and
+/// the DNSSEC path (called from `submit_leaf::submit_dkim_leaf`
+/// after the leaf admits and the cryptographic check passes).
+pub(super) fn recovery_snapshot(
+    claimed_address: String,
+    registered_domain: String,
+    session_pk: SessionKey,
+) -> PendingSnapshot {
+    PendingSnapshot {
+        kind: SnapshotKind::Recovery { session_pk },
+        claimed_address,
+        registered_domain,
+        is_dnssec_path: true,
+        cached_dmarc_txt: None,
+        partial_set: false,
+        already_terminal: false,
+    }
+}
+
+/// Recovery-flow counterpart to `bind_credential`: resolve the
+/// verified `From:` address (already checked to match the claimed
+/// address by the verification pipeline) to its bound anchor via the
+/// reverse index, derive the delegation seed, and add the canister
+/// signature so a subsequent `email_recovery_get_delegation` query
+/// can retrieve it.
+///
+/// Returns the `RecoveryOutcome` to cache on the pending challenge —
+/// `email_recovery_status` reads it to answer with
+/// `RecoveryReady { user_key, expiration, anchor_number }`, and
+/// `email_recovery_get_delegation` reads the cached `seed` to look
+/// up the signature without re-deriving from the anchor.
+pub(super) async fn stamp_recovery_delegation(
+    snapshot: &PendingSnapshot,
+    session_pk: &SessionKey,
+) -> Result<super::pending::RecoveryOutcome, EmailRecoveryError> {
+    use ic_certification::Hash;
+
+    // The verifier already checked that From == claimed_address, so
+    // this lookup is for the address the user typed at prepare time
+    // *and* signed mail from. If the address isn't bound to any
+    // anchor (registration step never happened, or the user removed
+    // the credential after starting the wizard), fail closed.
+    let anchor_number = state::storage_borrow(|storage| {
+        storage.lookup_anchor_with_email_recovery_address(&snapshot.claimed_address)
+    })
+    .ok_or(EmailRecoveryError::AddressNotRegistered)?;
+
+    // The signature-map operations need the canister salt. In
+    // production it's already initialised (every prior delegation
+    // call paid that cost); we await defensively in case this is
+    // the very first delegation since deploy.
+    state::ensure_salt_set().await;
+
+    let expiration =
+        ic_cdk::api::time().saturating_add(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS);
+    let seed: Hash = calculate_email_recovery_seed(&snapshot.claimed_address, anchor_number);
+
+    state::signature_map_mut(|sigs| {
+        crate::delegation::add_delegation_signature(sigs, session_pk.clone(), &seed, expiration);
+    });
+    crate::update_root_hash();
+
+    let user_key = crate::delegation::der_encode_canister_sig_key(seed.to_vec());
+
+    Ok(super::pending::RecoveryOutcome {
+        user_key,
+        expiration,
+        anchor_number,
+        seed,
+    })
+}
+
+/// Compute the canister-signature seed binding a recovery email to
+/// an anchor. Mirrors `openid::calculate_delegation_seed` in shape:
+/// length-prefixed components hashed with SHA-256, prefixed by the
+/// canister-wide salt so principals are unique to *this* II
+/// instance.
+///
+/// The components are:
+/// - `salt` (32 bytes) — the canister-wide salt set on first call.
+/// - the literal byte string `"email-recovery"` — domain separator,
+///   so this seed never collides with the OpenID, anchor, or
+///   account seeds.
+/// - the lowercased canonical address (variable, ≤ 254 bytes per
+///   RFC 5321 §4.5.3.1, enforced upstream).
+/// - the anchor number as little-endian bytes.
+pub(crate) fn calculate_email_recovery_seed(
+    address: &str,
+    anchor_number: AnchorNumber,
+) -> ic_certification::Hash {
+    use sha2::{Digest, Sha256};
+
+    const DOMAIN_SEPARATOR: &[u8] = b"email-recovery";
+
+    let salt = state::salt();
+    let address_lower = address.to_ascii_lowercase();
+
+    let mut blob: Vec<u8> = Vec::new();
+    blob.push(salt.len() as u8);
+    blob.extend_from_slice(&salt);
+
+    blob.push(DOMAIN_SEPARATOR.len() as u8);
+    blob.extend_from_slice(DOMAIN_SEPARATOR);
+
+    blob.push(address_lower.len() as u8);
+    blob.extend_from_slice(address_lower.as_bytes());
+
+    blob.push(anchor_number.to_le_bytes().len() as u8);
+    blob.extend_from_slice(&anchor_number.to_le_bytes());
+
+    let mut hasher = Sha256::new();
+    hasher.update(&blob);
+    hasher.finalize().into()
+}
+
 
 #[cfg(not(test))]
 fn now_secs() -> u64 {

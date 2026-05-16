@@ -664,7 +664,8 @@ fn full_setup_flow_via_dnssec_path() {
         canister_id,
         internet_identity_interface::internet_identity::types::email_recovery::EmailRecoverySubmitDkimLeafArg {
             nonce: challenge.nonce.clone(),
-            dkim_leaf: chain.dkim_leaf.clone(),
+            hops: vec![chain.dkim_leaf.clone()],
+            extra_chains: vec![],
         },
     )
     .expect("submit_dkim_leaf call failed")

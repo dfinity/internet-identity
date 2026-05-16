@@ -5,19 +5,26 @@
 //! header, validated the body hash, and stashed a small
 //! `PartialVerification` record on the pending challenge. It then
 //! flipped the polled status to `NeedDkimLeaf { selector }` so the
-//! FE could walk DNSSEC for that one TXT and submit it back here.
+//! FE could walk DNSSEC for that selector and submit the resulting
+//! `(hops, extra_chains)` bundle back here.
 //!
 //! This call:
 //!
 //! 1. Looks up the pending challenge by nonce; rejects with
 //!    `NoDkimLeafExpected` if the entry isn't in `NeedDkimLeaf`.
-//! 2. Validates the FE-supplied `SignedRRset` against the cached
-//!    deepest-zone DNSKEY (the chain itself was already validated
-//!    at prepare time — see `verify_chain_with_clock`).
-//! 3. Confirms the leaf's owner name is exactly
+//! 2. Re-validates the cached root DNSKEY against the configured
+//!    trust anchors (it may have aged out of its inception/expiration
+//!    window since prepare), then walks each `extra_chain` under it,
+//!    extending the cached `(zone → DNSKEY)` map for any new signed
+//!    zone the DKIM CNAME chain crosses into (Proton/Tutanota-style;
+//!    see design doc §7.2).
+//! 3. Verifies each FE-supplied hop under the zone its
+//!    `RRSIG.signer_name` names, then walks the hop sequence as a
+//!    coherent CNAME → … → TXT resolution starting at
 //!    `<expected_selector>._domainkey.<registered_domain>.`. Both
-//!    sides come from canister-pinned state, never the FE.
-//! 4. Parses the DKIM TXT, runs the cryptographic signature check
+//!    the selector and the registered domain come from canister-
+//!    pinned state, never the FE.
+//! 4. Parses the final TXT, runs the cryptographic signature check
 //!    using the cached headers digest + signature blob, and
 //!    optionally verifies DMARC alignment against the cached DMARC
 //!    bytes (or strict `d=` alignment when no DMARC was cached).
@@ -30,17 +37,23 @@ use crate::email_recovery::pending;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryError, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
 };
+use internet_identity_interface::internet_identity::types::SessionKey;
 
 /// Body of `email_recovery_submit_dkim_leaf(arg)`. Returns the
-/// post-call polling status — typically `RegistrationSucceeded` or
+/// post-call polling status — `RegistrationSucceeded` for the setup
+/// flow, `RecoveryReady{...}` for the recovery flow, or
 /// `Failed(reason)`. The FE can also poll
 /// `email_recovery_status(nonce)` for the same answer; returning it
 /// here saves the FE one round-trip on the happy path.
-pub fn submit_dkim_leaf(
+pub async fn submit_dkim_leaf(
     arg: EmailRecoverySubmitDkimLeafArg,
     now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
-    let EmailRecoverySubmitDkimLeafArg { nonce, dkim_leaf } = arg;
+    let EmailRecoverySubmitDkimLeafArg {
+        nonce,
+        hops,
+        extra_chains,
+    } = arg;
 
     // Snapshot everything we need under one borrow so the rest of
     // the function works against owned data. Includes early
@@ -49,18 +62,20 @@ pub fn submit_dkim_leaf(
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
-    let outcome = run_submit(&dkim_leaf, &snapshot, now_secs);
-    match outcome {
-        Ok(()) => {
-            // Bind the credential and flip status. Re-borrow the
-            // map; the entry still exists (we didn't await between
-            // borrows, so no one else can mutate it).
-            let bind_result = match &snapshot.kind {
-                SnapshotKind::Register { anchor } => {
-                    super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs)
-                }
-            };
-            match bind_result {
+    if let Err(e) = run_submit(&hops, &extra_chains, &snapshot, now_secs) {
+        let cloned = e.clone();
+        pending::with_mut(&nonce, now_secs, |c| {
+            c.status = PendingStatus::Failed(cloned);
+            c.partial_verification = None;
+        });
+        return Err(e);
+    }
+
+    // Verification passed — finalize per kind. Setup binds the
+    // credential, recovery stamps a delegation seed.
+    match &snapshot.kind {
+        SnapshotKind::Register { anchor } => {
+            match super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
                 Ok(()) => {
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.status = PendingStatus::Succeeded;
@@ -78,13 +93,42 @@ pub fn submit_dkim_leaf(
                 }
             }
         }
-        Err(e) => {
-            let cloned = e.clone();
-            pending::with_mut(&nonce, now_secs, |c| {
-                c.status = PendingStatus::Failed(cloned);
-                c.partial_verification = None;
-            });
-            Err(e)
+        SnapshotKind::Recovery { session_pk } => {
+            // Build a transient `PendingSnapshot` shape that
+            // `stamp_recovery_delegation` already accepts (the DoH
+            // path uses the same helper). The stamper looks up the
+            // anchor via the reverse-address index and adds the
+            // canister signature.
+            let smtp_snapshot = super::smtp::recovery_snapshot(
+                snapshot.claimed_address.clone(),
+                snapshot.registered_domain.clone(),
+                session_pk.clone(),
+            );
+            match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk).await {
+                Ok(outcome) => {
+                    let user_key = serde_bytes::ByteBuf::from(outcome.user_key.clone());
+                    let expiration = outcome.expiration;
+                    let anchor_number = outcome.anchor_number;
+                    pending::with_mut(&nonce, now_secs, |c| {
+                        c.recovery_outcome = Some(outcome);
+                        c.status = PendingStatus::Succeeded;
+                        c.partial_verification = None;
+                    });
+                    Ok(EmailRecoveryStatus::RecoveryReady {
+                        user_key,
+                        expiration,
+                        anchor_number,
+                    })
+                }
+                Err(e) => {
+                    let cloned = e.clone();
+                    pending::with_mut(&nonce, now_secs, |c| {
+                        c.status = PendingStatus::Failed(cloned);
+                        c.partial_verification = None;
+                    });
+                    Err(e)
+                }
+            }
         }
     }
 }
@@ -109,6 +153,9 @@ struct Snapshot {
 enum SnapshotKind {
     Register {
         anchor: internet_identity_interface::internet_identity::types::AnchorNumber,
+    },
+    Recovery {
+        session_pk: SessionKey,
     },
 }
 
@@ -137,6 +184,9 @@ impl Snapshot {
             .ok_or(EmailRecoveryError::NoDkimLeafExpected)?;
         let kind = match &c.kind {
             PendingKind::Register { anchor } => SnapshotKind::Register { anchor: *anchor },
+            PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
+                session_pk: session_pk.clone(),
+            },
         };
         Ok(Snapshot {
             kind,
@@ -158,43 +208,68 @@ impl Snapshot {
 /// The leaf-validation + signature-verification + alignment-check
 /// pipeline. Returns `Ok(())` on full success.
 fn run_submit(
-    dkim_leaf: &internet_identity_interface::internet_identity::types::SignedRRset,
+    hops: &[internet_identity_interface::internet_identity::types::SignedRRset],
+    extra_chains: &[internet_identity_interface::internet_identity::types::DelegationChain],
     snapshot: &Snapshot,
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
-    // Step 1: validate the FE-supplied leaf against the cached zone
-    // DNSKEY map. The map was validated at prepare time against the
-    // canister's trust anchors; the chain is implicit here.
-    //
-    // We use the leaf's own owner name as `requested_name` (the
-    // policy check on the verified owner happens in step 2). Future
-    // PRs extend this to admit `extra_chains` for CNAME resolutions
-    // that cross into new signed zones — that's why we cache the
-    // whole `ZoneKeysMap`, not just one DNSKEY.
-    let leaf_internal: crate::dnssec::SignedRRset = dkim_leaf.clone().into();
-    let verified = crate::dnssec::verify_hops_with_clock(
-        std::slice::from_ref(&leaf_internal),
-        &snapshot.cached_zones,
-        &leaf_internal.name,
-        leaf_internal.rtype,
+    // Step 1: re-validate the cached root DNSKEY against the trust
+    // anchors. The pending challenge has a 30-min TTL but the RRSIG
+    // window is what really decides freshness — re-checking is
+    // cheap (one signature verify) and removes any chance of
+    // admitting a chain under a now-stale root DNSKEY.
+    let trust_anchors = crate::state::persistent_state(|p| {
+        p.dnssec_config
+            .as_ref()
+            .map(|c| c.root_anchors.clone())
+            .unwrap_or_default()
+    });
+    crate::dnssec::verify_root_dnskey_with_clock(
+        &snapshot.cached_root_dnskey,
+        &trust_anchors,
         now_secs,
     )
     .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
 
-    // Step 2: confirm the leaf's owner name and rtype.
-    if verified.rtype != crate::dnssec::types::TYPE_TXT {
-        return Err(EmailRecoveryError::DkimLeafMismatch);
-    }
-    let leaf_name = super::dns::decode_dns_name_lowercase(&verified.name.0);
+    // Step 2: extend the cached zone-keys map with any *new*
+    // delegation chains the FE supplied. Empty for the Gmail-style
+    // same-zone case; one new chain for the Proton/Tutanota-style
+    // cross-zone CNAME case.
+    let mut zones = snapshot.cached_zones.clone();
+    let extra_chains_internal: Vec<crate::dnssec::DelegationChain> =
+        extra_chains.iter().cloned().map(Into::into).collect();
+    crate::dnssec::verify_extra_chains_with_clock(
+        &extra_chains_internal,
+        &snapshot.cached_root_dnskey,
+        &mut zones,
+        now_secs,
+    )
+    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+
+    // Step 3: walk the hops as a CNAME → … → TXT resolution
+    // anchored at the canister-pinned `<selector>._domainkey.<d>.`
+    // FQDN. Any incoherence (wrong first hop, intermediate that
+    // isn't a CNAME, bad target chaining, oversized chain, loop) is
+    // surfaced as DkimLeafMismatch.
+    let hops_internal: Vec<crate::dnssec::SignedRRset> =
+        hops.iter().cloned().map(Into::into).collect();
     let expected_fqdn = format!(
         "{}._domainkey.{}.",
         snapshot.expected_selector, snapshot.registered_domain
     );
-    if !leaf_name.eq_ignore_ascii_case(&expected_fqdn) {
-        return Err(EmailRecoveryError::DkimLeafMismatch);
-    }
+    let expected_wire = super::dns::encode_dns_name_lowercase(&expected_fqdn);
+    let verified = crate::dnssec::verify_hops_with_clock(
+        &hops_internal,
+        &zones,
+        &crate::dnssec::DnsName(expected_wire),
+        crate::dnssec::TYPE_TXT,
+        now_secs,
+    )
+    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
 
-    // Step 3: parse the DKIM TXT, get the public key + key type.
+    let leaf_name = super::dns::decode_dns_name_lowercase(&verified.name.0);
+
+    // Step 4: parse the DKIM TXT, get the public key + key type.
     let txt = super::dns::parse_txt_rdata(&verified.rdata)?;
     if txt.len() > super::MAX_DKIM_TXT_BYTES {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
@@ -209,7 +284,7 @@ fn run_submit(
         EmailRecoveryError::EmailVerificationFailed(format!("DKIM DNS record: {e}"))
     })?;
 
-    // Step 4: complete the cryptographic signature check.
+    // Step 5: complete the cryptographic signature check.
     //
     // `verify_signature` takes the raw signed_data and hashes it
     // internally. Since we cached only the SHA-256 digest, feed
@@ -256,7 +331,7 @@ fn run_submit(
         }
     }
 
-    // Step 5: DMARC alignment. The smtp.rs path enforced that the
+    // Step 6: DMARC alignment. The smtp.rs path enforced that the
     // signing domain (`d=`) is within the registered zone, so any
     // strict-or-relaxed alignment under DMARC is trivially
     // satisfied. We re-check explicitly here against the cached

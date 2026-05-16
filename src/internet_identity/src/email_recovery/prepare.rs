@@ -29,7 +29,7 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
 };
-use internet_identity_interface::internet_identity::types::AnchorNumber;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
 /// Body of the canister method
 /// `email_recovery_credential_prepare_add(anchor, dns_input)`.
@@ -46,6 +46,45 @@ pub async fn prepare_add(
     anchor: AnchorNumber,
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
+) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+    prepare_common(dns_input, now_secs, PendingKind::Register { anchor }).await
+}
+
+/// Body of `email_recovery_prepare_delegation(dns_input, session_pk)`.
+///
+/// Anonymous: anyone can call this. The `session_pk` is a fresh
+/// public key the FE just generated; the eventual delegation will be
+/// bound to it. The pending challenge holds it until
+/// `submit_dkim_leaf` succeeds, at which point the canister stamps a
+/// delegation seed and adds the matching canister-signature.
+pub async fn prepare_delegation(
+    dns_input: EmailRecoveryDnsInput,
+    session_pk: SessionKey,
+    now_secs: u64,
+) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+    // Cap the FE-supplied `session_pk` length. The pending entry
+    // holds this for up to 30 minutes; without a bound an open
+    // caller could inflate every challenge they prepare. Real
+    // session keys are well under 1 KB regardless of algorithm
+    // (Ed25519 ~44 bytes, ECDSA P-256 ~91, RSA-2048 ~294).
+    if session_pk.len() > super::MAX_SESSION_KEY_BYTES {
+        return Err(EmailRecoveryError::InternalCanisterError(format!(
+            "session_pk is {} bytes, exceeds the {}-byte limit",
+            session_pk.len(),
+            super::MAX_SESSION_KEY_BYTES,
+        )));
+    }
+    prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await
+}
+
+/// Shared input-validation + nonce-issuing core. `kind` parametrises
+/// over which flow we're starting; `mailbox` is the recipient string
+/// returned to the FE so the wizard can render "send your email
+/// to ...".
+async fn prepare_common(
+    dns_input: EmailRecoveryDnsInput,
+    now_secs: u64,
+    kind: PendingKind,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
     let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
 
@@ -124,7 +163,7 @@ pub async fn prepare_add(
     };
 
     let challenge = PendingChallenge {
-        kind: PendingKind::Register { anchor },
+        kind,
         claimed_address: address,
         registered_domain,
         created_at_secs: now_secs,
@@ -133,6 +172,7 @@ pub async fn prepare_add(
         cached_dmarc_txt,
         partial_verification: None,
         status: PendingStatus::Pending,
+        recovery_outcome: None,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
 
@@ -148,13 +188,12 @@ pub async fn prepare_add(
 }
 
 /// Output of a successful DNSSEC skeleton-bundle verification — the
-/// validated root DNSKEY plus the validated `(zone → DNSKEY)` map
-/// (both always cached), plus the optional DMARC TXT bytes (set when
-/// the FE included a DMARC leaf in the skeleton bundle). The DKIM
-/// leaf isn't part of the prepare bundle — it lands later via
-/// `email_recovery_submit_dkim_leaf`, which may extend the cached
-/// `zones` map with extra chains if the DKIM CNAME resolution crosses
-/// into a new signed zone.
+/// validated root DNSKEY RRset (cached so the canister can admit
+/// further chains under it at submit time when the DKIM CNAME chain
+/// crosses into a new zone), the validated `(zone → DNSKEY)` map for
+/// every zone the prepare bundle covered, and the optional DMARC
+/// TXT bytes (set when the FE included a DMARC leaf in the skeleton
+/// bundle).
 struct DnssecExtracted {
     root_dnskey: crate::dnssec::SignedRRset,
     zones: crate::dnssec::ZoneKeysMap,
@@ -162,16 +201,16 @@ struct DnssecExtracted {
 }
 
 /// Validate a caller-supplied DNSSEC *skeleton* bundle against the
-/// canister's configured trust anchors and extract the deepest-zone
-/// DNSKEY (always required for the cache) plus the optional DMARC
-/// TXT bytes.
+/// canister's configured trust anchors and extract the validated
+/// zone-keys map and optional DMARC TXT bytes.
 ///
-/// The bundle is allowed to carry at most one leaf, and that leaf
-/// must be the DMARC TXT at `_dmarc.<registered_domain>`. Any other
-/// leaf — including a DKIM TXT — is rejected: the DKIM leaf belongs
-/// in the post-email submit-leaf call, not the prepare bundle, and
-/// an attacker who got a different TXT validated under the same
-/// chain shouldn't be able to smuggle it through here.
+/// The bundle's `hops` is allowed to carry at most one entry, and
+/// that entry must be the DMARC TXT at `_dmarc.<registered_domain>`.
+/// Any other hop — including a DKIM TXT — is rejected: the DKIM
+/// resolution belongs in the post-email submit-leaf call, not the
+/// prepare bundle, and an attacker who got a different TXT
+/// validated under the same chain shouldn't be able to smuggle it
+/// through here.
 fn verify_dnssec_skeleton(
     proof: internet_identity_interface::internet_identity::types::DnsProofBundle,
     registered_domain: &str,
@@ -194,12 +233,10 @@ fn verify_dnssec_skeleton(
     // for the From<> impls.)
     let bundle: crate::dnssec::DnsProofBundle = proof.into();
 
-    // The skeleton bundle covers a single signing zone (the
-    // registered domain) and at most one hop (the optional DMARC
-    // TXT at `_dmarc.<registered_domain>`). A DKIM leaf in the
-    // skeleton would let an attacker who got a different TXT
-    // validated under the same chain smuggle it through here, so we
-    // reject anything other than zero or one hops.
+    // The skeleton bundle must carry at most one hop (the optional
+    // DMARC TXT at `_dmarc.<registered_domain>`). Reject up front if
+    // the FE tried to smuggle a DKIM resolution — that belongs in
+    // submit_dkim_leaf, not here.
     if bundle.hops.len() > 1 {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
             "skeleton bundle has {} hops; expected 0 (no DMARC) or 1 (DMARC TXT)",
@@ -223,15 +260,15 @@ fn verify_dnssec_skeleton(
         &mut zones,
         now_secs,
     )
-    .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
-
+    .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC chain: {e:?}")))?;
     if zones.is_empty() {
         return Err(EmailRecoveryError::EmailVerificationFailed(
-            "skeleton bundle produced no validated zones".into(),
+            "skeleton bundle supplied no delegation chains".into(),
         ));
     }
 
-    // Step 3 (optional): validate the DMARC hop and cache the TXT.
+    // Optional DMARC hop: if present, validate it as a single TXT
+    // hop at `_dmarc.<registered_domain>`.
     let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
     let dmarc = if bundle.hops.is_empty() {
         None

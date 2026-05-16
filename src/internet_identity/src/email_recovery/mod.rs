@@ -1,14 +1,20 @@
-//! Email-based identity recovery: setup (binding) flow.
+//! Email-based identity recovery: setup + recovery flows.
 //!
 //! See `docs/ongoing/email-recovery.md` (PR #3836) for the full design.
-//! This module implements the canister-side **setup** half — the
-//! recovery half (`email_recovery_prepare_delegation` +
-//! `recover@id.ai` dispatch + delegation issuance) is layered on top
-//! in `feat/email-recovery-flow` (PR #3843), which adds the reverse
-//! `address → AnchorNumber` stable index that recovery needs to
-//! resolve the verified `From:` to an anchor.
+//! Both halves of the canister-side flow live in this module:
 //!
-//! Setup half:
+//! - **Setup** (binding): an authenticated caller binds a recovery
+//!   email address to an anchor.
+//! - **Recovery** (delegation): an anonymous caller proves control
+//!   of a previously-bound address and ends with a `SignedDelegation`
+//!   rooted in the anchor that address resolves to.
+//!
+//! Both share the SMTP gateway protocol (`smtp_request`), the DKIM
+//! verifier, the DMARC alignment check, and the `(address →
+//! AnchorNumber)` reverse index in stable memory used at recovery
+//! time to resolve the verified `From:` to an anchor.
+//!
+//! Setup flow at a glance:
 //!
 //! 1. The user, while authenticated, calls
 //!    `email_recovery_credential_prepare_add(anchor, dns_input)`.
@@ -19,6 +25,10 @@
 //! 4. The SMTP gateway forwards the email via `smtp_request`. The
 //!    canister verifies DKIM + DMARC, matches the From: against the
 //!    claimed address, and binds the credential to the anchor.
+//!
+//! Recovery follows the same two-phase DNSSEC shape but starts
+//! anonymous, sends to `recover@id.ai`, and finishes by stamping a
+//! delegation seed bound to the FE's session_pk (see §8.5).
 //!
 //! ## Why heap state, not stable
 //!
@@ -36,10 +46,10 @@ mod pending;
 mod prepare;
 mod remove;
 mod rng;
-mod smtp;
+pub(crate) mod smtp;
 mod submit_leaf;
 
-pub use prepare::prepare_add;
+pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};
 pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
 pub use submit_leaf::submit_dkim_leaf;
@@ -52,6 +62,22 @@ pub fn pending_status(
     now_secs: u64,
 ) -> internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryStatus {
     pending::status_of(nonce, now_secs)
+}
+
+/// Look up the cached `RecoveryOutcome.seed` for a recovery-flow
+/// pending challenge. Used by `email_recovery_get_delegation` to
+/// find the canister-signature without having to recompute the
+/// seed (which requires the address + anchor — both already
+/// resolved at submit-leaf time).
+///
+/// Returns `None` if the nonce is unknown, expired, isn't a
+/// recovery-kind entry, or hasn't yet completed (`recovery_outcome`
+/// is `None`).
+pub fn recovery_seed_for_nonce(nonce: &str, now_secs: u64) -> Option<ic_certification::Hash> {
+    pending::with_mut(nonce, now_secs, |c| {
+        c.recovery_outcome.as_ref().map(|o| o.seed)
+    })
+    .flatten()
 }
 
 #[allow(unused_imports)]
@@ -168,3 +194,10 @@ pub const MAX_ADDRESS: usize = 254;
 /// flow, not a protocol-level claim.
 pub const MAX_DKIM_TXT_BYTES: usize = 4096;
 pub const MAX_DMARC_TXT_BYTES: usize = 1024;
+
+/// Cap on the FE-supplied `session_pk` length carried on a recovery
+/// pending entry. Real session keys are well under 1 KB regardless
+/// of algorithm (Ed25519 ~44 bytes, ECDSA P-256 ~91, RSA-2048 ~294);
+/// this leaves headroom without giving an anonymous caller room to
+/// inflate the challenge map.
+pub const MAX_SESSION_KEY_BYTES: usize = 1024;
