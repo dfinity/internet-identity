@@ -291,17 +291,17 @@ export const idlFactory = ({ IDL }) => {
     'child_dnskey' : SignedRRset,
     'child_ds' : SignedRRset,
   });
+  const DelegationChain = IDL.Record({ 'links' : IDL.Vec(DelegationLink) });
   const DnsProofBundle = IDL.Record({
     'root_dnskey' : SignedRRset,
-    'chain' : IDL.Vec(DelegationLink),
-    'leaf' : IDL.Opt(SignedRRset),
+    'hops' : IDL.Vec(SignedRRset),
+    'chains' : IDL.Vec(DelegationChain),
   });
   const EmailRecoveryDnsInput = IDL.Record({
     'dns_proof' : IDL.Opt(DnsProofBundle),
     'address' : IDL.Text,
   });
   const EmailRecoveryChallenge = IDL.Record({
-    'mailbox' : IDL.Text,
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
@@ -350,8 +350,9 @@ export const idlFactory = ({ IDL }) => {
     'Pending' : IDL.Null,
   });
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({
+    'extra_chains' : IDL.Vec(DelegationChain),
+    'hops' : IDL.Vec(SignedRRset),
     'nonce' : IDL.Text,
-    'dkim_leaf' : SignedRRset,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -1129,8 +1130,12 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'smtp_request' : IDL.Func([SmtpRequest], [SmtpResponse], []),
+    'smtp_request_validate' : IDL.Func(
+        [SmtpRequest],
+        [SmtpResponse],
+        ['query'],
+      ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
-    'whoami' : IDL.Func([], [IDL.Principal], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],
@@ -1142,6 +1147,7 @@ export const idlFactory = ({ IDL }) => {
         [VerifyTentativeDeviceResponse],
         [],
       ),
+    'whoami' : IDL.Func([], [IDL.Principal], ['query']),
   });
 };
 export const init = ({ IDL }) => {

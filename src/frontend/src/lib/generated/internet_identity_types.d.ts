@@ -379,6 +379,7 @@ export interface Delegation {
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
 }
+export interface DelegationChain { 'links' : Array<DelegationLink> }
 export interface DelegationLink {
   'child_dnskey' : SignedRRset,
   'child_ds' : SignedRRset,
@@ -478,8 +479,19 @@ export interface DeviceWithUsage {
 export interface DiscoverableOidcConfig { 'discovery_domain' : string }
 export interface DnsProofBundle {
   'root_dnskey' : SignedRRset,
-  'chain' : Array<DelegationLink>,
-  'leaf' : [] | [SignedRRset],
+  /**
+   * The RRsets being authenticated, in CNAME-resolution order.
+   * Single-leaf case: one hop. CNAME case: intermediate CNAMEs,
+   * then the final TXT.
+   */
+  'hops' : Array<SignedRRset>,
+  /**
+   * One delegation chain per signing zone the bundle touches.
+   * Single-zone direct case (Gmail, iCloud, …): one chain.
+   * Cross-zone CNAME case (Proton, Tutanota, M365 custom domains):
+   * one chain per signing zone touched.
+   */
+  'chains' : Array<DelegationChain>,
 }
 /**
  * DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
@@ -524,7 +536,6 @@ export interface DummyAuthConfig {
   'prompt_for_index' : boolean,
 }
 export interface EmailRecoveryChallenge {
-  'mailbox' : string,
   'nonce' : string,
   'expires_at' : Timestamp,
 }
@@ -569,8 +580,20 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'Expired' : null } |
   { 'Pending' : null };
 export interface EmailRecoverySubmitDkimLeafArg {
+  /**
+   * Delegation chains for signed zones touched by `hops` that
+   * weren't already covered by the skeleton chain anchored at
+   * prepare time. Empty for same-zone resolution.
+   */
+  'extra_chains' : Array<DelegationChain>,
+  /**
+   * The DKIM resolution chain in CNAME order, ending in a TXT. At
+   * least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+   * canister side. For the Gmail-style direct-TXT case this is a
+   * single-element vec.
+   */
+  'hops' : Array<SignedRRset>,
   'nonce' : string,
-  'dkim_leaf' : SignedRRset,
 }
 export type FrontendHostname = string;
 export type GetAccountError = {
@@ -1829,8 +1852,14 @@ export interface _SERVICE {
    * status query.
    */
   'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  /**
+   * Called by the gateway at RCPT TO time to decide whether to
+   * accept the connection before pulling the message body. Returns
+   * Ok for register@id.ai / recover@id.ai (case-insensitive), and
+   * 550 (mailbox unavailable) for everything else.
+   */
+  'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
-  'whoami' : ActorMethod<[], Principal>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
@@ -1841,6 +1870,7 @@ export interface _SERVICE {
     [UserNumber, string],
     VerifyTentativeDeviceResponse
   >,
+  'whoami' : ActorMethod<[], Principal>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
