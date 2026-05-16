@@ -1,9 +1,14 @@
 <script lang="ts">
-  import { ShieldIcon } from "@lucide/svelte";
+  import {
+    EllipsisVerticalIcon,
+    ShieldIcon,
+    ShieldCheckIcon,
+    Trash2Icon,
+  } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
-  import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import Select from "$lib/components/ui/Select.svelte";
 
   type Props = {
     onReset: () => void;
@@ -13,53 +18,49 @@
   const { onReset, onVerify, class: className, ...props }: Props = $props();
 </script>
 
-<div class="@container">
-  <section
-    {...props}
-    class={[
-      "flex flex-col rounded-2xl border p-6",
-      "bg-bg-warning-primary border-fg-warning-primary not-dark:shadow-sm",
-      "@xl:flex-row",
-      className,
-    ]}
-  >
-    <ShieldIcon
-      class={["text-fg-warning-primary size-5 shrink-0", "@xl:mt-0.5"]}
-    />
-    <header class={["flex flex-col", "@max-xl:mt-3", "@xl:mx-3"]}>
-      <h2 class="text-text-primary text-base font-semibold">
-        {$t`Recovery phrase not verified`}
-      </h2>
-      <p class="text-text-tertiary text-sm">
-        <Trans>
-          You can recover your identity now, verify you saved it correctly.
-        </Trans>
-      </p>
-    </header>
-    <hr class={["border-border-tertiary my-5 border-t", "@xl:hidden"]} />
-    <dl class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>
-      <dt class="text-text-primary text-xs font-semibold">
-        {$t`Last used`}
-      </dt>
-      <dd class="text-text-primary cursor-default text-xs">
-        <Tooltip label={$t`Has not been used yet`} direction="up" align="start">
-          <span>{$t`n/a`}</span>
-        </Tooltip>
-      </dd>
-    </dl>
-    <div
-      class={[
-        "flex flex-col gap-1.5",
-        "@max-xl:mt-5 ",
-        "@xl:my-auto @xl:ms-auto @xl:flex-row @xl:gap-4",
+<section
+  {...props}
+  class={[
+    "bg-bg-warning-primary border-fg-warning-primary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm",
+    className,
+  ]}
+>
+  <div class="mb-3 flex h-9 flex-row items-center">
+    <ShieldIcon class="text-fg-warning-primary size-6" />
+    <Select
+      options={[
+        {
+          label: $t`Verify`,
+          icon: ShieldCheckIcon,
+          onClick: onVerify,
+        },
+        {
+          label: $t`Reset`,
+          icon: Trash2Icon,
+          onClick: onReset,
+        },
       ]}
+      align="end"
     >
-      <button class="btn btn-secondary btn-sm btn-danger" onclick={onReset}>
-        {$t`Reset`}
+      <button
+        class="btn btn-tertiary btn-sm btn-icon ms-auto"
+        aria-label={$t`More options`}
+      >
+        <EllipsisVerticalIcon class="size-5" />
       </button>
-      <button class="btn btn-primary btn-sm" onclick={onVerify}>
-        {$t`Verify`}
-      </button>
-    </div>
-  </section>
-</div>
+    </Select>
+  </div>
+  <h2 class="text-text-primary mb-1 text-base font-semibold">
+    {$t`Recovery phrase`}
+  </h2>
+  <div class="text-text-tertiary text-sm">
+    {$t`Not verified`}
+  </div>
+  <div class="border-border-tertiary my-5 border-t"></div>
+  <div class="text-text-primary text-xs">
+    <Trans>
+      You can use it now to recover, but verify you've saved it correctly so you
+      can rely on it later.
+    </Trans>
+  </div>
+</section>

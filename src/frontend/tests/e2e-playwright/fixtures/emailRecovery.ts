@@ -101,13 +101,13 @@ class EmailRecoveryWizard {
     await this.#view.getByRole("button", { name: "Continue" }).click();
   }
 
-  /** Step 2: assert the magic-email view rendered with the right
+  /** Step 2: assert the verify-email view rendered with the right
    *  recipient and a valid-looking nonce in the Subject. */
-  async expectMagicEmailView(opts: {
+  async expectVerifyEmailView(opts: {
     recipient: "register@id.ai" | "recover@id.ai";
   }): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", { name: "Send the magic email" }),
+      this.#view.getByRole("heading", { name: "Verify your email" }),
     ).toBeVisible();
     await expect(this.#view.getByText(opts.recipient)).toBeVisible();
     // The Subject token is rendered in a monospaced span; assert
@@ -117,8 +117,8 @@ class EmailRecoveryWizard {
     ).toBeVisible();
   }
 
-  async cancel(): Promise<void> {
-    await this.#view.getByRole("button", { name: "Cancel" }).click();
+  async close(): Promise<void> {
+    await this.#view.getByRole("button", { name: "Close" }).click();
   }
 }
 
@@ -204,7 +204,7 @@ class EmailRecoveryFixtures {
       this.#page.getByRole("heading", { name: "Recovery email" }),
     ).toBeVisible();
     await expect(
-      this.#page.getByRole("button", { name: "Add email" }),
+      this.#page.getByRole("button", { name: "Activate recovery email" }),
     ).toBeVisible();
   }
 
@@ -231,7 +231,7 @@ class EmailRecoveryFixtures {
   ): Promise<T> {
     await this.#page
       .getByRole("main")
-      .getByRole("button", { name: "Add email" })
+      .getByRole("button", { name: "Activate recovery email" })
       .click();
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();

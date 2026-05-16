@@ -1,9 +1,16 @@
 <script lang="ts">
-  import { MailCheckIcon } from "@lucide/svelte";
+  import {
+    EllipsisVerticalIcon,
+    MailCheckIcon,
+    PencilIcon,
+    Trash2Icon,
+  } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
   import { nanosToMillis } from "$lib/utils/time";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import Select from "$lib/components/ui/Select.svelte";
   import type { EmailRecoveryCredential } from "$lib/generated/internet_identity_types";
 
   type Props = {
@@ -21,31 +28,49 @@
   }: Props = $props();
 </script>
 
-<div class="@container">
-  <section
-    {...props}
-    class={[
-      "flex flex-col rounded-2xl border p-6",
-      "bg-bg-primary border-border-secondary not-dark:shadow-sm",
-      "@xl:flex-row",
-      className,
-    ]}
-  >
-    <MailCheckIcon
-      class={["text-fg-success-primary size-5 shrink-0", "@xl:mt-0.5"]}
-    />
-    <header class={["flex flex-col", "@max-xl:mt-3", "@xl:mx-3"]}>
-      <h2 class="text-text-primary text-base font-semibold">
-        {$t`Recovery email active`}
-      </h2>
-      <p class="text-text-tertiary text-sm break-all">{credential.address}</p>
-    </header>
-    <hr class={["border-border-tertiary my-5 border-t", "@xl:hidden"]} />
-    <dl class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>
-      <dt class="text-text-primary text-xs font-semibold">
+<section
+  {...props}
+  class={[
+    "bg-bg-primary border-border-secondary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm",
+    className,
+  ]}
+>
+  <div class="mb-3 flex h-9 flex-row items-center">
+    <MailCheckIcon class="text-fg-success-primary size-6" />
+    <Select
+      options={[
+        {
+          label: $t`Replace`,
+          icon: PencilIcon,
+          onClick: onReplace,
+        },
+        {
+          label: $t`Remove`,
+          icon: Trash2Icon,
+          onClick: onRemove,
+        },
+      ]}
+      align="end"
+    >
+      <button
+        class="btn btn-tertiary btn-sm btn-icon ms-auto"
+        aria-label={$t`More options`}
+      >
+        <EllipsisVerticalIcon class="size-5" />
+      </button>
+    </Select>
+  </div>
+  <h2 class="text-text-primary mb-1 text-base font-semibold">
+    {$t`Recovery email`}
+  </h2>
+  <div class="text-text-tertiary truncate text-sm">{credential.address}</div>
+  <div class="border-border-tertiary my-5 border-t"></div>
+  <div class="mb-4 flex flex-row">
+    <div class="flex flex-1 flex-col gap-1">
+      <div class="text-text-primary text-xs font-semibold">
         {$t`Last used`}
-      </dt>
-      <dd class="text-text-primary cursor-default text-xs">
+      </div>
+      <div class="text-text-primary cursor-default text-xs">
         {#if credential.last_used[0] !== undefined}
           {@const date = new Date(nanosToMillis(credential.last_used[0]))}
           <Tooltip
@@ -67,15 +92,10 @@
             <span>{$t`n/a`}</span>
           </Tooltip>
         {/if}
-      </dd>
-    </dl>
-    <div class="flex flex-row gap-2 @max-xl:mt-5 @xl:my-auto">
-      <button class="btn btn-secondary btn-sm" onclick={onReplace}>
-        {$t`Replace`}
-      </button>
-      <button class="btn btn-secondary btn-sm btn-danger" onclick={onRemove}>
-        {$t`Remove`}
-      </button>
+      </div>
     </div>
-  </section>
-</div>
+  </div>
+  <div class="text-text-primary text-xs">
+    <Trans>Sign in by sending a signed email from your inbox.</Trans>
+  </div>
+</section>

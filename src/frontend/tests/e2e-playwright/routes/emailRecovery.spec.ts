@@ -7,8 +7,9 @@
  *
  *   2. **Real end-to-end** — synthesizes a DNSSEC chain
  *      (`utils/dnssecTestSigner.ts`) plus a DKIM keypair, intercepts
- *      the FE's DoH lookups, drives the wizard to the magic-email
- *      step, and submits a DKIM-signed `smtp_request` so polling
+ *      the FE's DoH lookups, drives the wizard to the
+ *      send-confirmation-email step, and submits a DKIM-signed
+ *      `smtp_request` so polling
  *      flips to `RegistrationSucceeded` / `RecoveryReady`. Exercises
  *      the canister's DNSSEC verifier + DKIM/DMARC verifier + status
  *      transitions end-to-end. The local II canister is deployed
@@ -66,14 +67,17 @@ test.describe("Email recovery — wizard surface", () => {
 
     await page
       .getByRole("main")
-      .getByRole("button", { name: "Add email" })
+      .getByRole("button", { name: "Activate recovery email" })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(
       dialog.getByRole("heading", { name: "Add a recovery email" }),
     ).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    // Wizard views no longer carry a Cancel button — the dialog's
+    // built-in close (X) is the only user-driven exit. See
+    // setupEmailRecovery/views/EnterAddress.svelte.
+    await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
   });
 
@@ -93,7 +97,7 @@ test.describe("Email recovery — wizard surface", () => {
     await expect(
       dialog.getByRole("heading", { name: "Recover with email" }),
     ).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
   });
 });
@@ -120,7 +124,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
 
     await page
       .getByRole("main")
-      .getByRole("button", { name: "Add email" })
+      .getByRole("button", { name: "Activate recovery email" })
       .click();
     const setupDialog = page.getByRole("dialog");
     await expect(setupDialog).toBeVisible();
@@ -133,7 +137,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     // canister-issued nonce off the rendered token block, sign an
     // email with the matching subject, submit it via smtp_request.
     await expect(
-      setupDialog.getByRole("heading", { name: "Send the magic email" }),
+      setupDialog.getByRole("heading", { name: "Verify your email" }),
     ).toBeVisible();
     const setupNonce = await setupDialog
       .getByText(/II-Recovery-[0-9a-f]{16}/)
@@ -146,18 +150,15 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
       subject: setupNonce,
     });
 
-    // The wizard should flip to the Done view once polling sees
-    // RegistrationSucceeded. Heading text comes from
-    // `setupEmailRecovery/views/Done.svelte`.
+    // On RegistrationSucceeded the wizard fires `onSuccess` which the
+    // host translates into a toast + closing the dialog. Assert the
+    // dialog goes away and the active recovery-email card now shows
+    // the bound address (the inactive card variant doesn't). Use
+    // exact-text match because the address also appears as a
+    // substring inside the success toast's description.
+    await expect(setupDialog).toBeHidden({ timeout: STATUS_POLL_TIMEOUT });
     await expect(
-      setupDialog.getByRole("heading", { name: "All set" }),
-    ).toBeVisible({ timeout: STATUS_POLL_TIMEOUT });
-    await setupDialog.getByRole("button", { name: "Done" }).click();
-    await expect(setupDialog).toBeHidden();
-
-    // The manage page should now show the active card.
-    await expect(
-      page.getByRole("heading", { name: "Recovery email active" }),
+      page.getByText(emailRecovery.fromAddress, { exact: true }),
     ).toBeVisible();
 
     // ---------------------------------------------------------------
@@ -176,7 +177,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     await recoverDialog.getByRole("button", { name: "Continue" }).click();
 
     await expect(
-      recoverDialog.getByRole("heading", { name: "Send the magic email" }),
+      recoverDialog.getByRole("heading", { name: "Verify your email" }),
     ).toBeVisible();
     const recoveryNonce = await recoverDialog
       .getByText(/II-Recovery-[0-9a-f]{16}/)

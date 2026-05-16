@@ -22,21 +22,28 @@
    *      sign-in.
    */
 
-  import { onDestroy } from "svelte";
   import EnterAddressForRecovery from "./views/EnterAddressForRecovery.svelte";
-  import SendMagicEmail from "$lib/components/wizards/setupEmailRecovery/views/SendMagicEmail.svelte";
+  import SendConfirmationEmail from "$lib/components/wizards/setupEmailRecovery/views/SendConfirmationEmail.svelte";
   import FailedView from "$lib/components/wizards/setupEmailRecovery/views/FailedView.svelte";
+  import UnsupportedDomain from "$lib/components/wizards/setupEmailRecovery/views/UnsupportedDomain.svelte";
   import type {
     EmailRecoveryChallenge,
     EmailRecoveryDnsInput,
+    EmailRecoveryError,
     EmailRecoveryGetDelegationArgs,
     EmailRecoveryStatus,
     EmailRecoverySubmitDkimLeafArg,
     SignedDelegation,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import { assembleSkeleton, assembleDkimResolution } from "$lib/utils/dnssec";
+  import {
+    assembleSkeleton,
+    assembleDkimResolution,
+    type Path,
+  } from "$lib/utils/dnssec";
+  import { isCanisterError } from "$lib/utils/utils";
   import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+  import { onDestroy } from "svelte";
   import type { RecoverySuccess } from "./index";
 
   interface Props {
@@ -58,7 +65,6 @@
     /** Called after a successful recovery; the host page builds the
         DelegationIdentity and proceeds with the rest of the sign-in. */
     onSignedIn: (success: RecoverySuccess) => Promise<void>;
-    onCancel: () => void;
   }
 
   const {
@@ -67,7 +73,6 @@
     submitDkimLeaf,
     getDelegation,
     onSignedIn,
-    onCancel,
   }: Props = $props();
 
   type Stage =
@@ -77,11 +82,16 @@
         challenge: EmailRecoveryChallenge;
         address: string;
         sessionIdentity: ECDSAKeyIdentity;
+        path: Path;
       }
+    | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
   let stage = $state<Stage>({ kind: "enter" });
   let polling = $state(false);
+  onDestroy(() => {
+    polling = false;
+  });
 
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
@@ -140,15 +150,29 @@
     } catch {
       dnsProof = undefined;
     }
+    const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
     const input: EmailRecoveryDnsInput = {
       address,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
 
-    const challenge = await prepareDelegation(input, sessionPublicKey);
-    stage = { kind: "sending", challenge, address, sessionIdentity };
-    void runPoll(challenge.nonce, domain, sessionIdentity);
+    try {
+      const challenge = await prepareDelegation(input, sessionPublicKey);
+      stage = { kind: "sending", challenge, address, sessionIdentity, path };
+      void runPoll(challenge.nonce, domain, sessionIdentity);
+    } catch (e) {
+      if (isCanisterError<EmailRecoveryError>(e)) {
+        if (
+          e.type === "DomainNotAllowlisted" ||
+          e.type === "DomainNotSupported"
+        ) {
+          stage = { kind: "unsupported", domain };
+          return;
+        }
+      }
+      throw e;
+    }
   };
 
   const runPoll = async (
@@ -249,40 +273,22 @@
   const handleRetry = () => {
     stage = { kind: "enter" };
   };
-
-  const handleCancel = () => {
-    polling = false;
-    onCancel();
-  };
-
-  // Belt-and-braces: closing the parent `Dialog` via its built-in
-  // close button destroys this component without routing through
-  // `handleCancel`. Stop the poll loop unconditionally on unmount
-  // so we don't keep hitting the canister — or, worse, fire
-  // `onSignedIn` and navigate after the wizard has already closed.
-  onDestroy(() => {
-    polling = false;
-  });
 </script>
 
 {#if stage.kind === "enter"}
   <EnterAddressForRecovery
     onSubmit={handleAddressSubmitted}
-    onCancel={handleCancel}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
-  <SendMagicEmail
+  <SendConfirmationEmail
     nonce={stage.challenge.nonce}
     mailbox={`recover@${window.location.hostname}`}
     fromAddress={stage.address}
-    expiresAt={stage.challenge.expires_at}
-    onCancel={handleCancel}
+    path={stage.path}
   />
+{:else if stage.kind === "unsupported"}
+  <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
 {:else}
-  <FailedView
-    reason={stage.reason}
-    onRetry={handleRetry}
-    onCancel={handleCancel}
-  />
+  <FailedView reason={stage.reason} onRetry={handleRetry} />
 {/if}
