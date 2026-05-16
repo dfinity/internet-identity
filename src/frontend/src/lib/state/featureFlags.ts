@@ -107,6 +107,22 @@ export const MIN_GUIDED_UPGRADE = createFeatureFlagStore(
   false,
 );
 
+/// Email-based recovery method (design doc §8). Default `false`
+/// everywhere except `beta.id.ai`, where the init callback flips it
+/// on so internal beta testers can exercise the wizard without
+/// reaching for the browser console. Same override path as
+/// `GUIDED_UPGRADE` above — we use `temporaryOverride` so a manual
+/// `set()` from the console takes precedence on any host.
+export const EMAIL_RECOVERY = createFeatureFlagStore(
+  "EMAIL_RECOVERY",
+  false,
+  (featureFlag) => {
+    if (window.location.hostname === "beta.id.ai") {
+      featureFlag.temporaryOverride(true);
+    }
+  },
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
@@ -114,4 +130,5 @@ export default {
   ENABLE_ALL_LOCALES,
   GUIDED_UPGRADE,
   MIN_GUIDED_UPGRADE,
+  EMAIL_RECOVERY,
 } as Record<string, FeatureFlagStore>;

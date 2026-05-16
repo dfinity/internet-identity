@@ -124,7 +124,9 @@ class RecoveryPage {
   async start<T>(
     fn: (wizard: RecoverIdentityWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page.getByRole("button", { name: "Get started" }).click();
+    await this.#page
+      .getByRole("button", { name: "Recover with phrase" })
+      .click();
     const dialog = this.#page.getByRole("dialog");
     const wizard = new RecoverIdentityWizard(dialog);
     await expect(dialog).toBeVisible();

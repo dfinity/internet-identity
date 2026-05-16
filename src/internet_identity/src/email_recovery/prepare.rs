@@ -77,10 +77,13 @@ pub async fn prepare_delegation(
     prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await
 }
 
-/// Shared input-validation + nonce-issuing core. `kind` parametrises
-/// over which flow we're starting; `mailbox` is the recipient string
-/// returned to the FE so the wizard can render "send your email
-/// to ...".
+/// Shared input-validation + nonce-issuing core. `kind`
+/// parametrises over which flow we're starting. The challenge
+/// no longer carries a `mailbox` field — the FE pairs the user-
+/// part (`register` / `recover`) with `window.location.hostname`
+/// to render the user-facing label, and the canister accepts mail
+/// at any of the configured `related_origins` aliases (see
+/// [`super::mailbox_domains`]).
 async fn prepare_common(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,

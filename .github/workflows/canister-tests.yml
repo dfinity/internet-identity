@@ -585,7 +585,12 @@ jobs:
           for domain in ${{ env.sso_discoverable_domains }}; do
             sso_domains_vec="$sso_domains_vec\"$domain\"; "
           done
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_discoverable_domains = opt vec { $sso_domains_vec } })"
+          # Trust anchor for the DNSSEC chain assembled by the e2e
+          # signer (`src/frontend/tests/e2e-playwright/utils/dnssecTestSigner.ts`).
+          # Derived fresh from the signer's seed so there's no hardcoded
+          # digest to drift out of sync.
+          dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_discoverable_domains = opt vec { $sso_domains_vec }; dnssec_config = $dnssec_config })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
           icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           icp canister install test_app --wasm demos/test-app/test_app.wasm
