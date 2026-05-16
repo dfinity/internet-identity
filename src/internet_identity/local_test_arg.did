@@ -56,5 +56,6 @@
         };
       };
     };
+    doh_config = opt null;
   },
 )
