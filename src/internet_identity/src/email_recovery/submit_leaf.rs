@@ -185,7 +185,7 @@ fn run_submit(
     if verified.rtype != crate::dnssec::types::TYPE_TXT {
         return Err(EmailRecoveryError::DkimLeafMismatch);
     }
-    let leaf_name = decode_dns_name_lowercase(&verified.name.0);
+    let leaf_name = super::dns::decode_dns_name_lowercase(&verified.name.0);
     let expected_fqdn = format!(
         "{}._domainkey.{}.",
         snapshot.expected_selector, snapshot.registered_domain
@@ -195,7 +195,7 @@ fn run_submit(
     }
 
     // Step 3: parse the DKIM TXT, get the public key + key type.
-    let txt = parse_txt_rdata(&verified.rdata)?;
+    let txt = super::dns::parse_txt_rdata(&verified.rdata)?;
     if txt.len() > super::MAX_DKIM_TXT_BYTES {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
             "DKIM TXT record at {leaf_name:?} is {} bytes; refusing to admit",
@@ -403,46 +403,3 @@ fn verify_ed25519_prehashed(
     }
 }
 
-/// Concatenate one or more TXT character-strings (each prefixed by
-/// a length octet) into the bytes the DKIM verifier expects.
-fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecoveryError> {
-    let mut txt_bytes = Vec::new();
-    for rec in rdata {
-        let mut i = 0;
-        while i < rec.len() {
-            let len = rec[i] as usize;
-            i += 1;
-            if i + len > rec.len() {
-                return Err(EmailRecoveryError::EmailVerificationFailed(
-                    "DNSSEC TXT RDATA truncated".into(),
-                ));
-            }
-            txt_bytes.extend_from_slice(&rec[i..i + len]);
-            i += len;
-        }
-    }
-    Ok(txt_bytes)
-}
-
-/// Decode a wire-format DNS name (length-prefixed labels) into a
-/// dotted ASCII-lowercased string with a trailing dot.
-fn decode_dns_name_lowercase(wire: &[u8]) -> String {
-    let mut out = String::new();
-    let mut i = 0;
-    while i < wire.len() {
-        let len = wire[i] as usize;
-        i += 1;
-        if len == 0 {
-            break;
-        }
-        if i + len > wire.len() {
-            return out;
-        }
-        for &b in &wire[i..i + len] {
-            out.push(b.to_ascii_lowercase() as char);
-        }
-        out.push('.');
-        i += len;
-    }
-    out
-}

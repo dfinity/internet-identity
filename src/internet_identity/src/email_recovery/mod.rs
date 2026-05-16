@@ -31,6 +31,7 @@
 
 #![allow(dead_code)] // Exposed as the module fills in.
 
+mod dns;
 mod pending;
 mod prepare;
 mod remove;
