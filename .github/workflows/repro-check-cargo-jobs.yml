@@ -1,0 +1,142 @@
+# Reproducibility check: does relaxing `-j1` in scripts/build change the
+# produced wasm? Builds the internet_identity backend twice on the same
+# commit:
+#   - control:    CARGO_BUILD_JOBS unset (defaults to 1, current behavior)
+#   - experiment: CARGO_BUILD_JOBS=$(nproc)
+# Compares the two wasm.gz sha256 hashes and fails if they differ.
+#
+# This workflow exists to gather evidence for or against the `-j1` hedge in
+# scripts/build (added in #490 for reproducibility). Background:
+# https://github.com/dfinity/internet-identity/pull/3895#issuecomment- (closed)
+#
+# Triggered manually (workflow_dispatch). Not part of the per-PR CI to avoid
+# spending ~15 min of runner time on every push.
+name: Repro check (cargo -j)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-control:
+    name: Build with -j1 (control)
+    runs-on: ubuntu-latest
+    outputs:
+      hash: ${{ steps.hash.outputs.value }}
+      seconds: ${{ steps.timing.outputs.seconds }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Record start time
+        id: start
+        run: echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Build internet_identity backend (-j1)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          # No CARGO_BUILD_JOBS build-arg → Dockerfile default of 1 applies.
+          # cache-from on cached-stage is fine; we're not asserting on cold
+          # build time here, only on byte equivalence.
+          cache-from: type=gha,scope=cached-stage
+          outputs: ./out
+          target: scratch_internet_identity
+
+      - name: Record timing
+        id: timing
+        run: |
+          end=$(date +%s)
+          echo "seconds=$(( end - ${{ steps.start.outputs.epoch }} ))" >> "$GITHUB_OUTPUT"
+
+      - name: Hash
+        id: hash
+        run: |
+          h=$(sha256sum out/internet_identity.wasm.gz | awk '{print $1}')
+          echo "Control hash: $h"
+          echo "value=$h" >> "$GITHUB_OUTPUT"
+
+  build-experiment:
+    name: Build with -j$(nproc) (experiment)
+    runs-on: ubuntu-latest
+    outputs:
+      hash: ${{ steps.hash.outputs.value }}
+      jobs: ${{ steps.nproc.outputs.value }}
+      seconds: ${{ steps.timing.outputs.seconds }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Resolve nproc
+        id: nproc
+        run: |
+          n=$(nproc)
+          echo "Runner has $n logical CPUs"
+          echo "value=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Record start time
+        id: start
+        run: echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Build internet_identity backend (-jN)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          build-args: |
+            CARGO_BUILD_JOBS=${{ steps.nproc.outputs.value }}
+          # Distinct ENV (CARGO_BUILD_JOBS=N vs 1) gives the deps stage a
+          # different layer hash than the control build, so the deps compile
+          # actually re-runs under the experimental setting even if both jobs
+          # were pulling from the same cache scope. We pull from a separate
+          # empty scope anyway to make this explicit.
+          cache-from: type=gha,scope=repro-check-experiment
+          outputs: ./out
+          target: scratch_internet_identity
+
+      - name: Record timing
+        id: timing
+        run: |
+          end=$(date +%s)
+          echo "seconds=$(( end - ${{ steps.start.outputs.epoch }} ))" >> "$GITHUB_OUTPUT"
+
+      - name: Hash
+        id: hash
+        run: |
+          h=$(sha256sum out/internet_identity.wasm.gz | awk '{print $1}')
+          echo "Experiment hash: $h"
+          echo "value=$h" >> "$GITHUB_OUTPUT"
+
+  compare:
+    name: Compare hashes
+    needs: [build-control, build-experiment]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare
+        run: |
+          control="${{ needs.build-control.outputs.hash }}"
+          experiment="${{ needs.build-experiment.outputs.hash }}"
+          control_s="${{ needs.build-control.outputs.seconds }}"
+          experiment_s="${{ needs.build-experiment.outputs.seconds }}"
+          jobs="${{ needs.build-experiment.outputs.jobs }}"
+
+          echo "============================================"
+          echo "Reproducibility check: cargo -j1 vs -j$jobs"
+          echo "============================================"
+          echo "Control     (-j1)      hash: $control"
+          echo "Experiment  (-j$jobs)  hash: $experiment"
+          echo "Control     job time:  ${control_s}s"
+          echo "Experiment  job time:  ${experiment_s}s"
+          echo ""
+
+          if [ "$control" = "$experiment" ]; then
+            echo "::notice::Hashes MATCH — -j$jobs is byte-equivalent to -j1."
+            echo "::notice::The historical -j1 hedge is no longer load-bearing for reproducibility on this toolchain."
+            echo "::notice::Job-time delta (experiment vs control): $(( experiment_s - control_s ))s."
+            exit 0
+          else
+            echo "::error::Hashes DIFFER — -j$jobs produces a different wasm than -j1."
+            echo "::error::-j1 is still doing something; do NOT relax it without further investigation."
+            echo "::error::Possible next step: also pin codegen-units=1 explicitly and re-test."
+            exit 1
+          fi

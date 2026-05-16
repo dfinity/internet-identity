@@ -5,9 +5,23 @@
 #
 # The docker image. To update, run `docker pull ubuntu` locally, and update the
 # sha256:... accordingly.
+
+# Global build args. Default values preserve the established build behavior
+# (matching what was running before any of these were declared); the
+# reproducibility-check workflow overrides them to probe whether the legacy
+# settings are still load-bearing for byte-identical output on modern rustc.
+ARG CARGO_BUILD_JOBS=1
+
 FROM --platform=linux/amd64 ubuntu@sha256:bbf3d1baa208b7649d1d0264ef7d522e1dc0deeeaaf6085bf8e4618867f03494 as deps
 
 ENV TZ=UTC
+
+# Bring the global ARG into this stage's scope and propagate as ENV so that
+# `scripts/build` (invoked in this stage and inherited by downstream
+# FROM-deps stages) picks it up. ENV declarations propagate to derived
+# stages; ARG declarations do not.
+ARG CARGO_BUILD_JOBS
+ENV CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
     apt -yq update && \
