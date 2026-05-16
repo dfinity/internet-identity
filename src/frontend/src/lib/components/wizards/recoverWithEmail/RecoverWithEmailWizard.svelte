@@ -22,6 +22,7 @@
    *      sign-in.
    */
 
+  import { onDestroy } from "svelte";
   import EnterAddressForRecovery from "./views/EnterAddressForRecovery.svelte";
   import SendMagicEmail from "$lib/components/wizards/setupEmailRecovery/views/SendMagicEmail.svelte";
   import FailedView from "$lib/components/wizards/setupEmailRecovery/views/FailedView.svelte";
@@ -253,6 +254,15 @@
     polling = false;
     onCancel();
   };
+
+  // Belt-and-braces: closing the parent `Dialog` via its built-in
+  // close button destroys this component without routing through
+  // `handleCancel`. Stop the poll loop unconditionally on unmount
+  // so we don't keep hitting the canister — or, worse, fire
+  // `onSignedIn` and navigate after the wizard has already closed.
+  onDestroy(() => {
+    polling = false;
+  });
 </script>
 
 {#if stage.kind === "enter"}

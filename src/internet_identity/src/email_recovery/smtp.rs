@@ -57,8 +57,9 @@ use internet_identity_interface::internet_identity::types::smtp::{
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
 // Recipient user-parts (`register`, `recover`) live on the parent
-// `email_recovery` module so the shared mailbox-domain helpers can
-// read them too. Imported here for the dispatch logic.
+// `email_recovery` module so the shared mailbox-domain helpers and
+// the user-facing mailbox labels can read them too. Imported here
+// for the dispatch logic.
 use super::{RECOVERY_RECIPIENT_USER, SETUP_RECIPIENT_USER};
 
 /// Whether `to` matches `<expected_user>@<one of the configured
@@ -438,12 +439,15 @@ fn prepare_partial_verification(
         EmailRecoveryError::EmailVerificationFailed("missing message body".into())
     })?;
 
-    // Pick the first DKIM-Signature header we can parse. RFC 6376
-    // permits multiple; the existing dkim::verify accepts on first
-    // pass. For the recovery surface we only ever care about one of
-    // them — the one that signs the recipient mailbox we control —
-    // and that one will be among the first if more than one is
-    // present.
+    // Use the *first* DKIM-Signature header. RFC 6376 permits
+    // multiple — a forwarder may re-sign — but the recovery surface
+    // only trusts the originating-domain signer (enforced by the `d=`
+    // anchor check below), and that signature is by convention placed
+    // first by every signer we've observed. If the first header is
+    // unparseable or doesn't match the registered domain, we reject
+    // rather than walking the rest of the list: that policy keeps the
+    // attack surface small for an authentication-critical path and
+    // matches what `crate::dkim::verify` does on its main entry.
     let dkim_header = message
         .headers
         .iter()
@@ -885,6 +889,7 @@ pub(crate) fn calculate_email_recovery_seed(
     hasher.update(&blob);
     hasher.finalize().into()
 }
+
 
 #[cfg(not(test))]
 fn now_secs() -> u64 {

@@ -479,7 +479,18 @@ export interface DeviceWithUsage {
 export interface DiscoverableOidcConfig { 'discovery_domain' : string }
 export interface DnsProofBundle {
   'root_dnskey' : SignedRRset,
+  /**
+   * The RRsets being authenticated, in CNAME-resolution order.
+   * Single-leaf case: one hop. CNAME case: intermediate CNAMEs,
+   * then the final TXT.
+   */
   'hops' : Array<SignedRRset>,
+  /**
+   * One delegation chain per signing zone the bundle touches.
+   * Single-zone direct case (Gmail, iCloud, …): one chain.
+   * Cross-zone CNAME case (Proton, Tutanota, M365 custom domains):
+   * one chain per signing zone touched.
+   */
   'chains' : Array<DelegationChain>,
 }
 /**
@@ -569,7 +580,18 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'Expired' : null } |
   { 'Pending' : null };
 export interface EmailRecoverySubmitDkimLeafArg {
+  /**
+   * Delegation chains for signed zones touched by `hops` that
+   * weren't already covered by the skeleton chain anchored at
+   * prepare time. Empty for same-zone resolution.
+   */
   'extra_chains' : Array<DelegationChain>,
+  /**
+   * The DKIM resolution chain in CNAME order, ending in a TXT. At
+   * least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+   * canister side. For the Gmail-style direct-TXT case this is a
+   * single-element vec.
+   */
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
@@ -801,11 +823,13 @@ export interface IdentityInfo {
   'metadata' : MetadataMapV2,
   'name' : [] | [string],
   /**
-   * The email-recovery credential bound to this anchor, if any.
-   * Lets the FE render the recovery-email card's active vs.
-   * inactive state without a separate query.
+   * Email-recovery credentials bound to this anchor (empty when
+   * none is configured). The canister API currently caps the list
+   * at one entry — the FE renders the recovery-email card from
+   * the first one — but exposing it as a `vec` lets future
+   * multi-credential support land without a candid schema bump.
    */
-  'email_recovery' : [] | [EmailRecoveryCredential],
+  'email_recovery' : Array<EmailRecoveryCredential>,
   /**
    * The timestamp at which the anchor was created
    */
@@ -1838,7 +1862,6 @@ export interface _SERVICE {
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
-  'whoami' : ActorMethod<[], Principal>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
@@ -1849,6 +1872,7 @@ export interface _SERVICE {
     [UserNumber, string],
     VerifyTentativeDeviceResponse
   >,
+  'whoami' : ActorMethod<[], Principal>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

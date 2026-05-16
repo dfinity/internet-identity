@@ -979,13 +979,12 @@ mod v2_api {
             .map(|(k, v)| (k, MetadataEntryV2::from(v)))
             .collect();
 
-        // Anchor stores email recoveries as a Vec to leave room for
-        // future multi-credential support; the candid surface only
-        // exposes the first one (the canister API enforces ≤1 entry).
-        let email_recovery = state::anchor(identity_number)
-            .email_recovery
-            .first()
-            .cloned();
+        // Anchor stores email recoveries as a Vec; the candid surface
+        // exposes the full list. The canister API currently enforces
+        // ≤1 entry, so the FE picks the first to render the recovery-
+        // email card — but a future bump to N>1 won't need a candid
+        // schema change.
+        let email_recovery = state::anchor(identity_number).email_recovery.clone();
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

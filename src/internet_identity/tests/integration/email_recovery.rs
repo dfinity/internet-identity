@@ -574,7 +574,9 @@ fn full_setup_flow_via_dnssec_path() {
 
     // Stand up the canister with both the DoH allowlist (so the
     // domain check on the DoH path would pass too — proving we're
-    // actually exercising the DNSSEC branch) and the trust anchor.
+    // actually exercising the DNSSEC branch), the trust anchor, and
+    // a `related_origins` entry for `id.ai` so `smtp_request`'s
+    // recipient dispatch accepts `register@id.ai`.
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
             allowed_domains: vec![TEST_DOMAIN.into()],
