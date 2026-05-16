@@ -237,20 +237,25 @@ fn verify_dnssec_skeleton(
     let bundle: crate::dnssec::DnsProofBundle = proof.into();
 
     // The skeleton bundle must carry at most one hop (the optional
-    // DMARC TXT). Reject up front if the FE tried to smuggle a DKIM
-    // resolution — that belongs in submit_dkim_leaf, not here.
+    // DMARC TXT at `_dmarc.<registered_domain>`). Reject up front if
+    // the FE tried to smuggle a DKIM resolution — that belongs in
+    // submit_dkim_leaf, not here.
     if bundle.hops.len() > 1 {
-        return Err(EmailRecoveryError::EmailVerificationFailed(
-            "skeleton bundle carries more than one hop; DKIM resolution \
-             belongs in submit_dkim_leaf"
-                .into(),
-        ));
+        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            "skeleton bundle has {} hops; expected 0 (no DMARC) or 1 (DMARC TXT)",
+            bundle.hops.len()
+        )));
     }
 
-    // Validate the root DNSKEY against trust anchors and walk every
-    // chain into the zone-keys map.
+    // Step 1: validate the root DNSKEY against trust anchors +
+    // RRSIG freshness.
     crate::dnssec::verify_root_dnskey_with_clock(&bundle.root_dnskey, &trust_anchors, now_secs)
-        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC root: {e:?}")))?;
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC: {e:?}")))?;
+
+    // Step 2: walk every delegation chain into a (zone → DNSKEY)
+    // map. The map starts with one zone for Gmail-style direct-TXT
+    // domains and may carry several zones when the FE pre-walked a
+    // CNAME chain across signed zones at prepare time.
     let mut zones = crate::dnssec::ZoneKeysMap::new();
     crate::dnssec::verify_extra_chains_with_clock(
         &bundle.chains,
@@ -267,21 +272,27 @@ fn verify_dnssec_skeleton(
 
     // Optional DMARC hop: if present, validate it as a single TXT
     // hop at `_dmarc.<registered_domain>`.
+    let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
     let dmarc = if bundle.hops.is_empty() {
         None
     } else {
-        let dmarc_fqdn = format!("_dmarc.{registered_domain}.");
-        let dmarc_name = encode_dns_name_lowercase(&dmarc_fqdn);
+        let requested_name = bundle.hops[0].name.clone();
         let verified = crate::dnssec::verify_hops_with_clock(
             &bundle.hops,
             &zones,
-            &crate::dnssec::DnsName(dmarc_name),
-            crate::dnssec::types::TYPE_TXT,
+            &requested_name,
+            crate::dnssec::TYPE_TXT,
             now_secs,
         )
-        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DMARC: {e:?}")))?;
-        let leaf_name = decode_dns_name_lowercase(&verified.name.0);
-        let txt = parse_txt_rdata(&verified.rdata)?;
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}")))?;
+        let leaf_name = super::dns::decode_dns_name_lowercase(&verified.name.0);
+        if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
+            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+                "skeleton bundle leaf name {leaf_name:?} is not the expected \
+                 DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"
+            )));
+        }
+        let txt = super::dns::parse_txt_rdata(&verified.rdata)?;
         if txt.len() > super::MAX_DMARC_TXT_BYTES {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "DMARC TXT record at {leaf_name:?} is {} bytes; \
@@ -298,80 +309,6 @@ fn verify_dnssec_skeleton(
         zones,
         dmarc,
     })
-}
-
-/// Concatenate one or more TXT character-strings (each prefixed by a
-/// length octet) into the bytes the DKIM/DMARC verifier expects.
-/// `rdata` is `Vec<Vec<u8>>` because TXT RRsets can carry multiple
-/// records — but for DKIM/DMARC there's exactly one record made of
-/// multiple chunks.
-fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecoveryError> {
-    let mut txt_bytes = Vec::new();
-    for rec in rdata {
-        let mut i = 0;
-        while i < rec.len() {
-            let len = rec[i] as usize;
-            i += 1;
-            if i + len > rec.len() {
-                return Err(EmailRecoveryError::EmailVerificationFailed(
-                    "DNSSEC TXT RDATA truncated".into(),
-                ));
-            }
-            txt_bytes.extend_from_slice(&rec[i..i + len]);
-            i += len;
-        }
-    }
-    Ok(txt_bytes)
-}
-
-/// Encode a dotted ASCII DNS name (with or without a trailing dot)
-/// into wire format: a sequence of length-prefixed labels terminated
-/// by a zero-length root label. Labels are lowercased on the way in.
-/// Caller is responsible for passing a syntactically valid ASCII
-/// name; labels longer than 63 bytes are truncated to 63 (RFC 1035
-/// caps).
-fn encode_dns_name_lowercase(dotted: &str) -> Vec<u8> {
-    let trimmed = dotted.strip_suffix('.').unwrap_or(dotted);
-    let mut out = Vec::with_capacity(trimmed.len() + 2);
-    for label in trimmed.split('.') {
-        if label.is_empty() {
-            continue;
-        }
-        let bytes = label.as_bytes();
-        let len = bytes.len().min(63) as u8;
-        out.push(len);
-        for &b in &bytes[..len as usize] {
-            out.push(b.to_ascii_lowercase());
-        }
-    }
-    out.push(0);
-    out
-}
-
-/// Decode a wire-format DNS name (length-prefixed labels) into a
-/// dotted ASCII-lowercased string with a trailing dot. The root
-/// terminator (`\x00`) is *not* an extra label — the trailing dot
-/// comes from the final non-root label; reaching the terminator just
-/// stops the walk.
-fn decode_dns_name_lowercase(wire: &[u8]) -> String {
-    let mut out = String::new();
-    let mut i = 0;
-    while i < wire.len() {
-        let len = wire[i] as usize;
-        i += 1;
-        if len == 0 {
-            break;
-        }
-        if i + len > wire.len() {
-            return out;
-        }
-        for &b in &wire[i..i + len] {
-            out.push(b.to_ascii_lowercase() as char);
-        }
-        out.push('.');
-        i += len;
-    }
-    out
 }
 
 /// Normalise an email address to the canonical `lowercase(local) +
