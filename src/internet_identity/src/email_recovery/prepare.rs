@@ -90,15 +90,6 @@ async fn prepare_common(
     kind: PendingKind,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
     let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
-    crate::er_dbg!(
-        "prepare.start address={} kind={} dns_proof={}",
-        address,
-        match &kind {
-            PendingKind::Register { anchor } => format!("Register({anchor})"),
-            PendingKind::Recover { .. } => "Recover".into(),
-        },
-        if dns_proof.is_some() { "DNSSEC" } else { "DoH" }
-    );
 
     // Sanity check the address shape. Detailed RFC 5321/5322 validation
     // is the verifier's job; here we just want to fail fast on the
@@ -142,13 +133,8 @@ async fn prepare_common(
                 .unwrap_or(false)
         });
         if !allowlisted {
-            crate::er_dbg!(
-                "prepare DomainNotAllowlisted reg={}",
-                registered_domain
-            );
             return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
         }
-        crate::er_dbg!("prepare doh_path_ok reg={}", registered_domain);
         (None, crate::dnssec::ZoneKeysMap::new(), None)
     };
 
@@ -192,7 +178,6 @@ async fn prepare_common(
         recovery_outcome: None,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
-    crate::er_dbg!("prepare.ok nonce={}", nonce);
 
     Ok(EmailRecoveryChallenge {
         nonce,

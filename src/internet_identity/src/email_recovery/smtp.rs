@@ -127,27 +127,10 @@ pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
 /// We only ever return `Ok` for verification results — see the
 /// module-level note on why we don't surface verification failures.
 pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
-    crate::er_dbg!(
-        "smtp.handle_smtp_request from={:?} to={:?} headers={}",
-        request
-            .envelope
-            .as_ref()
-            .map(|e| format!("{}@{}", e.from.user, e.from.domain)),
-        request
-            .envelope
-            .as_ref()
-            .map(|e| format!("{}@{}", e.to.user, e.to.domain)),
-        request
-            .message
-            .as_ref()
-            .map(|m| m.headers.len())
-            .unwrap_or(0)
-    );
     // Bound-check up front so a malformed gateway-side payload
     // returns a clean syntax error instead of trapping somewhere
     // inside the verifier.
     if let Err(e) = validate_smtp_request(&request) {
-        crate::er_dbg!("smtp.handle_smtp_request validate_failed {:?}", e);
         return e;
     }
 
@@ -165,18 +148,10 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
     let recipient_flow = if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER) {
-        crate::er_dbg!("smtp.recipient_flow=Setup");
         RecipientFlow::Setup
     } else if recipient_matches(&envelope.to, RECOVERY_RECIPIENT_USER) {
-        crate::er_dbg!("smtp.recipient_flow=Recovery");
         RecipientFlow::Recovery
     } else {
-        crate::er_dbg!(
-            "smtp.recipient_flow=DROP to={}@{} mailbox_domains={:?}",
-            envelope.to.user,
-            envelope.to.domain,
-            super::mailbox_domains()
-        );
         // Drop with Ok — we don't emit a per-recipient signal back
         // to the gateway.
         return SmtpResponse::Ok {};
@@ -185,7 +160,6 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     let message = match request.message.as_ref() {
         Some(m) => m,
         None => {
-            crate::er_dbg!("smtp.no_message_body DROP");
             return SmtpResponse::Ok {};
         }
     };
@@ -195,10 +169,8 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // challenge for the discovered nonce, treat the message as not
     // for us and silently drop.
     let Some(nonce) = extract_nonce_from_subject(message) else {
-        crate::er_dbg!("smtp.no_nonce_in_subject DROP");
         return SmtpResponse::Ok {};
     };
-    crate::er_dbg!("smtp.nonce={}", nonce);
 
     let now_secs = now_secs();
 
@@ -254,13 +226,6 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     if snapshot.already_terminal || snapshot.partial_set {
         return SmtpResponse::Ok {};
     }
-
-    crate::er_dbg!(
-        "smtp.snapshot path={} claimed={} reg={}",
-        if snapshot.is_dnssec_path { "DNSSEC" } else { "DoH" },
-        snapshot.claimed_address,
-        snapshot.registered_domain
-    );
     if snapshot.is_dnssec_path {
         // DNSSEC path — pre-DKIM-key verification only. Body is
         // dropped after `bh=` validates; status flips to
@@ -553,7 +518,6 @@ async fn verify_setup_email_doh(
     snapshot: &PendingSnapshot,
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
-    crate::er_dbg!("smtp.verify_doh.start claimed={}", snapshot.claimed_address);
     // We need a selector to fetch the DKIM TXT, and on the DoH path
     // we don't have one cached at prepare time. Read it directly
     // from the email's DKIM-Signature header.
@@ -579,27 +543,12 @@ async fn verify_setup_email_doh(
         })?;
     let dkim_fqdn = format!("{}._domainkey.{}", sig.s, domain);
     let dmarc_fqdn = format!("_dmarc.{}", domain);
-    crate::er_dbg!(
-        "smtp.verify_doh dkim_fqdn={} dmarc_fqdn={} domain={}",
-        dkim_fqdn,
-        dmarc_fqdn,
-        domain
-    );
     let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain).await.map_err(
         |e| {
-            crate::er_dbg!("smtp.verify_doh dkim_fetch_failed {:?}", e);
             map_doh_error(e, &domain)
         },
     )?;
-    crate::er_dbg!("smtp.verify_doh dkim_fetch_ok len={}", dkim_bytes.len());
     let dmarc_bytes_opt = (crate::doh::fetch_txt(&dmarc_fqdn, &domain).await).ok();
-    crate::er_dbg!(
-        "smtp.verify_doh dmarc_fetch={}",
-        dmarc_bytes_opt
-            .as_ref()
-            .map(|b| format!("ok len={}", b.len()))
-            .unwrap_or_else(|| "missing".into())
-    );
 
     let dkim_txt = std::str::from_utf8(&dkim_bytes)
         .map_err(|_| EmailRecoveryError::DohFetchFailed("DKIM TXT is not valid UTF-8".into()))?;
@@ -612,10 +561,8 @@ async fn verify_setup_email_doh(
     let status = crate::dmarc::verify_email(request, dkim_txt, dmarc_txt_opt, now_secs);
     match status {
         crate::dmarc::EmailVerificationStatus::Verified { .. } => {
-            crate::er_dbg!("smtp.verify_doh dmarc_verified");
         }
         crate::dmarc::EmailVerificationStatus::Unverified { reason, .. } => {
-            crate::er_dbg!("smtp.verify_doh dmarc_unverified reason={:?}", reason);
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "{reason:?}"
             )));
@@ -630,15 +577,8 @@ async fn verify_setup_email_doh(
     // Pin the address explicitly here.
     let from = extract_from_address(message)?;
     if !from.eq_ignore_ascii_case(&snapshot.claimed_address) {
-        crate::er_dbg!(
-            "smtp.verify_doh from_mismatch from={} claimed={}",
-            from,
-            snapshot.claimed_address
-        );
         return Err(EmailRecoveryError::AddressMismatch);
     }
-
-    crate::er_dbg!("smtp.verify_doh.ok");
     Ok(())
 }
 
