@@ -31,8 +31,9 @@ rand = { version = "0.8", default-features = false }
 rand_core = { version = "0.6", default-features = false }
 # `rand_chacha` powers the email-recovery PRNG (`email_recovery::rng`).
 # Seeded once per canister lifetime from `raw_rand`; every subsequent
-# nonce draw is local. `default-features = false` keeps us off the
-# `getrandom`-backed `OsRng` path that doesn't exist on wasm32.
+# nonce draw is local. `default-features = false` drops the `std`
+# feature — matching the `rand` / `rand_core` lines above so the
+# whole `rand_*` family stays on the same no-std-friendly footing.
 rand_chacha = { version = "0.3", default-features = false }
 captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
 

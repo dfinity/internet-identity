@@ -1419,8 +1419,9 @@ mod openid_api {
 /// - **Recovery** (delegation): `prepare_delegation` (anonymous)
 ///   issues a nonce bound to a session_key, `smtp_request` for
 ///   `recover@id.ai` consumes the verified email and stamps a
-///   canister-signed delegation seed, and `get_delegation`
-///   (anonymous query) hands the signed delegation to the FE.
+///   canister-signed delegation seed, and
+///   `email_recovery_get_delegation` (anonymous query) hands the
+///   signed delegation to the FE.
 ///
 /// The canister methods below are thin wrappers handling
 /// authorization, wall-clock injection (`now_secs` lifted out of
@@ -1499,12 +1500,18 @@ mod email_recovery_api {
     /// probe the canister for which nonces exist. The FE sees the
     /// outcome via its `email_recovery_status(nonce)` poll.
     ///
-    /// **Security:** no-oracle endpoint — always returns
-    /// `SmtpResponse::Ok {}` so a caller can't probe which nonces
-    /// are in flight via response shape or timing. Recipient
-    /// dispatch matches the full `user@domain` against
-    /// `related_origins`, defence-in-depth against a direct caller
-    /// spoofing just the user-part.
+    /// **Security:** no-oracle on the response *shape* — always
+    /// returns `SmtpResponse::Ok {}` regardless of whether the
+    /// nonce is known, expired, or terminal, so a caller can't
+    /// learn the verification outcome from the response. (Response
+    /// *latency* does differ — an unknown nonce silent-drops in
+    /// microseconds, a valid one on the DoH path runs DKIM/DMARC
+    /// fetches first — but with 64 bits of nonce entropy and a
+    /// 30-minute TTL, timing-based existence probing isn't a
+    /// threat this property is meant to block.) Recipient dispatch
+    /// matches the full `user@domain` against `related_origins`,
+    /// defense-in-depth against a direct caller spoofing just the
+    /// user-part.
     #[update]
     async fn smtp_request(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
