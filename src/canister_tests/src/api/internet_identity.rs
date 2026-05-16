@@ -573,5 +573,90 @@ pub fn list_available_attributes(
     .map(|(x,)| x)
 }
 
+// --- Email recovery ---
+
+pub fn email_recovery_credential_prepare_add(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    dns_input: types::email_recovery::EmailRecoveryDnsInput,
+) -> Result<
+    Result<
+        types::email_recovery::EmailRecoveryChallenge,
+        types::email_recovery::EmailRecoveryError,
+    >,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "email_recovery_credential_prepare_add",
+        (identity_number, dns_input),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn email_recovery_status(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    nonce: &str,
+) -> Result<types::email_recovery::EmailRecoveryStatus, RejectResponse> {
+    query_candid(env, canister_id, "email_recovery_status", (nonce,)).map(|(x,)| x)
+}
+
+pub fn email_recovery_submit_dkim_leaf(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    arg: types::email_recovery::EmailRecoverySubmitDkimLeafArg,
+) -> Result<
+    Result<types::email_recovery::EmailRecoveryStatus, types::email_recovery::EmailRecoveryError>,
+    RejectResponse,
+> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "email_recovery_submit_dkim_leaf",
+        (arg,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn email_recovery_credential_remove(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    address: &str,
+) -> Result<Result<(), types::email_recovery::EmailRecoveryError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "email_recovery_credential_remove",
+        (identity_number, address),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn smtp_request(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    request: &types::smtp::SmtpRequest,
+) -> Result<types::smtp::SmtpResponse, RejectResponse> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "smtp_request",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
 /// A "compatibility" module for the previous version of II to handle API changes.
 pub mod compat {}

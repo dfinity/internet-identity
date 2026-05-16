@@ -16,14 +16,15 @@
 //! - `verify` — orchestration: multi-signature loop, tag enforcement,
 //!   accept-on-first-pass.
 //!
-//! The verifier consumes a `DnsProofBundle`-verified DKIM TXT record (or
-//! a DoH-fetched one in PR 4) plus a parsed `SmtpRequest`. It does not
-//! make any DNS calls itself; the caller is responsible for delivering
-//! the trusted public-key bytes.
+//! The verifier consumes a DKIM TXT record (sourced either from a
+//! DNSSEC-verified `DnsProofBundle` cached at prepare time, or via
+//! `crate::doh::fetch_txt` at email-arrival time) plus a parsed
+//! `SmtpRequest`. It does not make any DNS calls itself; the caller
+//! is responsible for delivering the trusted public-key bytes.
 
-// PR 2 lands the verifier without a canister-side caller (PR 8 will wire
-// it into `smtp_request`). Suppress dead-code warnings for the public
-// surface until consumers land.
+// `crate::email_recovery::smtp::verify_setup_email` is the in-canister
+// consumer; some less-used items in the public surface aren't yet
+// referenced. Suppress dead-code warnings until those land.
 #![allow(dead_code)]
 
 mod canonicalize;
@@ -45,3 +46,19 @@ pub use types::{
 // in scope at the same time.
 #[allow(unused_imports)]
 pub use verify::verify as verify_dkim;
+
+// Building blocks consumed by the email-recovery two-phase pipeline
+// (`crate::email_recovery::smtp` parses the signature and computes
+// the headers digest at email-arrival time, then
+// `crate::email_recovery::submit_leaf` admits the DKIM TXT and
+// finishes the signature check).
+#[allow(unused_imports)]
+pub(crate) use canonicalize::relaxed_body;
+#[allow(unused_imports)]
+pub(crate) use dns_record::{parse_dkim_txt, DkimDnsRecord, KeyType};
+#[allow(unused_imports)]
+pub(crate) use parse::{parse_dkim_signature, DkimSignature};
+#[allow(unused_imports)]
+pub(crate) use signature::{body_hash_sha256, verify_signature, VerifyOutcome};
+#[allow(unused_imports)]
+pub(crate) use verify::{build_header_hash_input, simple_body};

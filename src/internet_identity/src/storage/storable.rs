@@ -11,6 +11,7 @@ pub mod application;
 pub mod application_number;
 pub mod credential_id;
 pub mod discrepancy_counter;
+pub mod email_recovery_credential;
 pub mod fixed_anchor;
 pub mod metadata_v2;
 pub mod openid_credential;

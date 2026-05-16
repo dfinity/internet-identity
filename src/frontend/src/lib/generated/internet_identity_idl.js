@@ -1,6 +1,19 @@
 export const idlFactory = ({ IDL }) => {
   const MetadataMap = IDL.Rec();
   const MetadataMapV2 = IDL.Rec();
+  const DohConfig = IDL.Record({
+    'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
+    'allowed_domains' : IDL.Vec(IDL.Text),
+  });
+  const DnssecRootAnchor = IDL.Record({
+    'algorithm' : IDL.Nat8,
+    'key_tag' : IDL.Nat16,
+    'digest_type' : IDL.Nat8,
+    'digest' : IDL.Vec(IDL.Nat8),
+  });
+  const DnssecConfig = IDL.Record({
+    'root_anchors' : IDL.Vec(DnssecRootAnchor),
+  });
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -51,11 +64,13 @@ export const idlFactory = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
+    'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
     'sso_discoverable_domains' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
@@ -253,6 +268,74 @@ export const idlFactory = ({ IDL }) => {
     'issuer' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Opt(IDL.Text),
+  });
+  const Rrsig = IDL.Record({
+    'algorithm' : IDL.Nat8,
+    'signature' : IDL.Vec(IDL.Nat8),
+    'original_ttl' : IDL.Nat32,
+    'signer_name' : IDL.Vec(IDL.Nat8),
+    'labels' : IDL.Nat8,
+    'inception' : IDL.Nat32,
+    'expiration' : IDL.Nat32,
+    'key_tag' : IDL.Nat16,
+    'type_covered' : IDL.Nat16,
+  });
+  const SignedRRset = IDL.Record({
+    'ttl' : IDL.Nat32,
+    'name' : IDL.Vec(IDL.Nat8),
+    'rdata' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'rrsig' : Rrsig,
+    'rtype' : IDL.Nat16,
+  });
+  const DelegationLink = IDL.Record({
+    'child_dnskey' : SignedRRset,
+    'child_ds' : SignedRRset,
+  });
+  const DnsProofBundle = IDL.Record({
+    'root_dnskey' : SignedRRset,
+    'chain' : IDL.Vec(DelegationLink),
+    'leaf' : IDL.Opt(SignedRRset),
+  });
+  const EmailRecoveryDnsInput = IDL.Record({
+    'dns_proof' : IDL.Opt(DnsProofBundle),
+    'address' : IDL.Text,
+  });
+  const EmailRecoveryChallenge = IDL.Record({
+    'mailbox' : IDL.Text,
+    'nonce' : IDL.Text,
+    'expires_at' : Timestamp,
+  });
+  const EmailRecoveryError = IDL.Variant({
+    'EmailVerificationFailed' : IDL.Text,
+    'DkimLeafMismatch' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'NonceUnknown' : IDL.Null,
+    'DohFetchFailed' : IDL.Text,
+    'NoDkimLeafExpected' : IDL.Null,
+    'DomainNotSupported' : IDL.Text,
+    'AddressNotRegistered' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+    'NonceExpired' : IDL.Null,
+    'AddressMismatch' : IDL.Null,
+    'DomainNotAllowlisted' : IDL.Text,
+    'SubjectNotSigned' : IDL.Null,
+    'AddressAlreadyRegistered' : IDL.Null,
+  });
+  const UserKey = PublicKey;
+  const EmailRecoveryStatus = IDL.Variant({
+    'Failed' : EmailRecoveryError,
+    'NeedDkimLeaf' : IDL.Record({ 'selector' : IDL.Text }),
+    'RecoveryReady' : IDL.Record({
+      'user_key' : UserKey,
+      'expiration' : Timestamp,
+    }),
+    'RegistrationSucceeded' : IDL.Null,
+    'Expired' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const EmailRecoverySubmitDkimLeafArg = IDL.Record({
+    'nonce' : IDL.Text,
+    'dkim_leaf' : SignedRRset,
   });
   const BufferedArchiveEntry = IDL.Record({
     'sequence_number' : IDL.Nat64,
@@ -508,7 +591,6 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'salt' : Salt,
   });
-  const UserKey = PublicKey;
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
@@ -587,6 +669,26 @@ export const idlFactory = ({ IDL }) => {
       'origin' : FrontendHostname,
       'anchor_number' : UserNumber,
     }),
+  });
+  const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
+  const SmtpEnvelope = IDL.Record({ 'to' : SmtpAddress, 'from' : SmtpAddress });
+  const SmtpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
+  const SmtpMessage = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(SmtpHeader),
+  });
+  const SmtpRequest = IDL.Record({
+    'envelope' : IDL.Opt(SmtpEnvelope),
+    'message' : IDL.Opt(SmtpMessage),
+    'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+  });
+  const SmtpRequestError = IDL.Record({
+    'code' : IDL.Nat64,
+    'message' : IDL.Text,
+  });
+  const SmtpResponse = IDL.Variant({
+    'Ok' : IDL.Record({}),
+    'Err' : SmtpRequestError,
   });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
@@ -733,6 +835,36 @@ export const idlFactory = ({ IDL }) => {
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'discovered_oidc_configs' : IDL.Func([], [IDL.Vec(OidcConfig)], ['query']),
+    'email_recovery_credential_prepare_add' : IDL.Func(
+        [IdentityNumber, EmailRecoveryDnsInput],
+        [
+          IDL.Variant({
+            'Ok' : EmailRecoveryChallenge,
+            'Err' : EmailRecoveryError,
+          }),
+        ],
+        [],
+      ),
+    'email_recovery_credential_remove' : IDL.Func(
+        [IdentityNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [],
+      ),
+    'email_recovery_status' : IDL.Func(
+        [IDL.Text],
+        [EmailRecoveryStatus],
+        ['query'],
+      ),
+    'email_recovery_submit_dkim_leaf' : IDL.Func(
+        [EmailRecoverySubmitDkimLeafArg],
+        [
+          IDL.Variant({
+            'Ok' : EmailRecoveryStatus,
+            'Err' : EmailRecoveryError,
+          }),
+        ],
+        [],
+      ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
@@ -969,6 +1101,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : SetDefaultAccountError })],
         [],
       ),
+    'smtp_request' : IDL.Func([SmtpRequest], [SmtpResponse], []),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'whoami' : IDL.Func([], [IDL.Principal], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
@@ -985,6 +1118,19 @@ export const idlFactory = ({ IDL }) => {
   });
 };
 export const init = ({ IDL }) => {
+  const DohConfig = IDL.Record({
+    'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
+    'allowed_domains' : IDL.Vec(IDL.Text),
+  });
+  const DnssecRootAnchor = IDL.Record({
+    'algorithm' : IDL.Nat8,
+    'key_tag' : IDL.Nat16,
+    'digest_type' : IDL.Nat8,
+    'digest' : IDL.Vec(IDL.Nat8),
+  });
+  const DnssecConfig = IDL.Record({
+    'root_anchors' : IDL.Vec(DnssecRootAnchor),
+  });
   const ArchiveConfig = IDL.Record({
     'polling_interval_ns' : IDL.Nat64,
     'entries_buffer_limit' : IDL.Nat64,
@@ -1035,11 +1181,13 @@ export const init = ({ IDL }) => {
     'time_per_token_ns' : IDL.Nat64,
   });
   const InternetIdentityInit = IDL.Record({
+    'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'dnssec_config' : IDL.Opt(IDL.Opt(DnssecConfig)),
     'sso_discoverable_domains' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),

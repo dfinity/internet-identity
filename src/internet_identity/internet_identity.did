@@ -507,6 +507,145 @@ type OpenIdPrepareDelegationResponse = record {
     anchor_number : UserNumber;
 };
 
+// Email-recovery types
+// ====================
+// See `docs/ongoing/email-recovery.md` for the full design. This PR
+// only ships the setup half (binding flow); the recovery half lands
+// next.
+
+type EmailRecoveryCredential = record {
+    address : text;
+    created_at : Timestamp;
+    last_used : opt Timestamp;
+};
+
+type EmailRecoveryChallenge = record {
+    nonce : text;
+    expires_at : Timestamp;
+};
+
+type EmailRecoveryDnsInput = record {
+    address : text;
+    dns_proof : opt DnsProofBundle;
+};
+
+type EmailRecoverySubmitDkimLeafArg = record {
+    nonce : text;
+    dkim_leaf : SignedRRset;
+};
+
+// DNSSEC proof bundle and supporting types — see
+// `internet_identity_interface::types::dnssec`.
+type Rrsig = record {
+    type_covered : nat16;
+    algorithm : nat8;
+    labels : nat8;
+    original_ttl : nat32;
+    expiration : nat32;
+    inception : nat32;
+    key_tag : nat16;
+    signer_name : blob;
+    signature : blob;
+};
+
+type SignedRRset = record {
+    name : blob;
+    rtype : nat16;
+    rdata : vec blob;
+    ttl : nat32;
+    rrsig : Rrsig;
+};
+
+type DelegationLink = record {
+    child_ds : SignedRRset;
+    child_dnskey : SignedRRset;
+};
+
+type DelegationChain = record {
+    links : vec DelegationLink;
+};
+
+type DnsProofBundle = record {
+    root_dnskey : SignedRRset;
+    // One delegation chain per signing zone the bundle touches.
+    // Single-zone direct case (Gmail, iCloud, …): one chain.
+    // Cross-zone CNAME case (Proton, Tutanota, M365 custom domains):
+    // one chain per signing zone touched.
+    chains : vec DelegationChain;
+    // The RRsets being authenticated, in CNAME-resolution order.
+    // Single-leaf case: one hop. CNAME case: intermediate CNAMEs,
+    // then the final TXT.
+    hops : vec SignedRRset;
+};
+
+type EmailRecoveryError = variant {
+    Unauthorized : principal;
+    NonceUnknown;
+    NonceExpired;
+    DomainNotAllowlisted : text;
+    DohFetchFailed : text;
+    DomainNotSupported : text;
+    EmailVerificationFailed : text;
+    DkimLeafMismatch;
+    NoDkimLeafExpected;
+    AddressMismatch;
+    SubjectNotSigned;
+    AddressAlreadyRegistered;
+    AddressNotRegistered;
+    InternalCanisterError : text;
+};
+
+type EmailRecoveryStatus = variant {
+    Pending;
+    NeedDkimLeaf : record { selector : text };
+    RegistrationSucceeded;
+    RecoveryReady : record {
+        user_key : UserKey;
+        expiration : Timestamp;
+    };
+    Failed : EmailRecoveryError;
+    Expired;
+};
+
+// SMTP gateway types — see `internet_identity_interface::smtp`. Carried
+// forward from PoC #3760 surface (the existing gateway can target this
+// canister without changes).
+type SmtpHeader = record {
+    name : text;
+    value : text;
+};
+
+type SmtpMessage = record {
+    headers : vec SmtpHeader;
+    body : blob;
+};
+
+type SmtpAddress = record {
+    user : text;
+    domain : text;
+};
+
+type SmtpEnvelope = record {
+    from : SmtpAddress;
+    to : SmtpAddress;
+};
+
+type SmtpRequest = record {
+    message : opt SmtpMessage;
+    envelope : opt SmtpEnvelope;
+    gateway_flags : opt vec text;
+};
+
+type SmtpRequestError = record {
+    code : nat64;
+    message : text;
+};
+
+type SmtpResponse = variant {
+    Ok : record {};
+    Err : SmtpRequestError;
+};
+
 // API V2 specific types
 // WARNING: These type are experimental and may change in the future.
 type IdentityNumber = nat64;
@@ -1274,6 +1413,31 @@ service : (opt InternetIdentityInit) -> {
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
     openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
+
+    // Email-recovery protocol — setup half
+    // ====================================
+    // See `docs/ongoing/email-recovery.md`. The recovery half (prepare
+    // a delegation from a verified email) lands in a follow-up PR.
+    email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_status : (text) -> (EmailRecoveryStatus) query;
+    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
+
+    // SMTP gateway protocol
+    // =====================
+    // The off-chain SMTP gateway forwards every inbound message via
+    // smtp_request. The canister verifies the email cryptographically
+    // and dispatches by recipient (register@id.ai → setup completion).
+    // Always returns Ok — the gateway shouldn't get a per-message
+    // verification signal back. The FE sees outcomes via the polling
+    // status query.
+    smtp_request : (SmtpRequest) -> (SmtpResponse);
+
+    // Called by the gateway at RCPT TO time to decide whether to
+    // accept the connection before pulling the message body. Returns
+    // Ok for register@id.ai / recover@id.ai (case-insensitive), and
+    // 550 (mailbox unavailable) for everything else.
+    smtp_request_validate : (SmtpRequest) -> (SmtpResponse) query;
 
     // HTTP Gateway protocol
     // =====================
