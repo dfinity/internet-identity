@@ -55,6 +55,14 @@ type Operation = variant {
     register_anchor_with_openid_credential : record {
         iss : text;
     };
+    // Email-recovery credentials. Deliberately carry no payload —
+    // emitting the address (or even just its domain) would let an
+    // archive consumer correlate anchors back to mailbox providers.
+    // The audit log already includes the anchor + timestamp, which
+    // is enough to answer "who changed their recovery email when?"
+    // without leaking the address itself.
+    add_email_recovery;
+    remove_email_recovery;
     add_name;
     update_name;
     remove_name;
