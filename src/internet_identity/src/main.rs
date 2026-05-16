@@ -1443,6 +1443,12 @@ mod email_recovery_api {
     /// anchor in the heap pending-challenge map; an inbound email
     /// with that nonce in `Subject:` completes the binding via
     /// `smtp_request`.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `check_authorization(identity_number)`. Resource exposure
+    /// is bounded by the 10 k pending-map cap (see
+    /// `email_recovery::MAX_PENDING_CHALLENGES`) with 30-minute TTL
+    /// and oldest-first eviction.
     #[update]
     async fn email_recovery_credential_prepare_add(
         identity_number: IdentityNumber,
@@ -1488,6 +1494,13 @@ mod email_recovery_api {
     /// "verification failed" answers, and emitting one would let it
     /// probe the canister for which nonces exist. The FE sees the
     /// outcome via its `email_recovery_status(nonce)` poll.
+    ///
+    /// **Security:** no-oracle endpoint — always returns
+    /// `SmtpResponse::Ok {}` so a caller can't probe which nonces
+    /// are in flight via response shape or timing. Recipient
+    /// dispatch matches the full `user@domain` against
+    /// `related_origins`, defence-in-depth against a direct caller
+    /// spoofing just the user-part.
     #[update]
     async fn smtp_request(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
@@ -1521,6 +1534,10 @@ mod email_recovery_api {
     /// observably indistinguishable from "the canister forgot it",
     /// which is exactly what we want (the FE shows "timed out, try
     /// again" in either case).
+    ///
+    /// **Security:** unknown-nonce → `Expired` is deliberate: a
+    /// caller without the original `prepare_add` nonce can't
+    /// distinguish "never issued" from "evicted" from "expired".
     #[query]
     fn email_recovery_status(nonce: String) -> EmailRecoveryStatus {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
@@ -1599,6 +1616,10 @@ mod email_recovery_api {
     /// recovery email the anchor doesn't have is surfaced as
     /// `AddressNotRegistered` so the FE can show a meaningful error
     /// if it got into an inconsistent state.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `authz_utils::check_authorization` (same path the other
+    /// authenticated anchor mutators use).
     #[update]
     fn email_recovery_credential_remove(
         identity_number: IdentityNumber,
