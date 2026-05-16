@@ -71,11 +71,9 @@ thread_local! {
 /// absent, returns [`DohError::NotConfigured`] without touching the
 /// network.
 pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, DohError> {
-    crate::er_dbg!("doh.fetch_txt.start name={} reg={}", name, registered_domain);
     let config = match crate::state::persistent_state(|p| p.doh_config.clone()) {
         Some(c) => c,
         None => {
-            crate::er_dbg!("doh.fetch_txt NotConfigured");
             return Err(DohError::NotConfigured);
         }
     };
@@ -84,11 +82,6 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
         .iter()
         .any(|d| d.eq_ignore_ascii_case(registered_domain))
     {
-        crate::er_dbg!(
-            "doh.fetch_txt DomainNotAllowed reg={} list_len={}",
-            registered_domain,
-            config.allowed_domains.len()
-        );
         return Err(DohError::DomainNotAllowed);
     }
     // Defence-in-depth: the allowlist gate above only checks the
@@ -99,11 +92,6 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     // outcall for it. Insist that `name` sits inside `registered_domain`
     // with a label-anchored suffix match.
     if !name_within_domain(name, registered_domain) {
-        crate::er_dbg!(
-            "doh.fetch_txt NameOutsideRegisteredDomain name={} reg={}",
-            name,
-            registered_domain
-        );
         return Err(DohError::NameOutsideRegisteredDomain {
             name: name.to_string(),
             registered_domain: registered_domain.to_string(),
@@ -117,7 +105,6 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     // Build the query early so an InvalidName failure short-circuits
     // before we touch the cache or claim a Fetch token.
     let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
-    crate::er_dbg!("doh.fetch_txt query_built len={}", query.len());
 
     // Cache lookup. We must release the borrow before awaiting — the
     // canister is single-threaded but futures across yields can re-
@@ -126,15 +113,12 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     let lookup = DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now));
     let token = match lookup {
         CacheLookup::Hit(bytes) => {
-            crate::er_dbg!("doh.fetch_txt cache_hit len={}", bytes.len());
             return Ok(bytes);
         }
         CacheLookup::Wait(fut) => {
-            crate::er_dbg!("doh.fetch_txt cache_wait_for_inflight");
             return fut.await;
         }
         CacheLookup::Fetch(token) => {
-            crate::er_dbg!("doh.fetch_txt cache_miss_fanning_out");
             token
         }
     };
@@ -143,39 +127,12 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     let outcall_results = fetch_all(&query).await;
     let outcomes: Vec<Outcome> = outcall_results
         .into_iter()
-        .enumerate()
-        .map(|(i, r)| match r {
-            Ok(txt_bytes) => {
-                let preview: String = txt_bytes
-                    .iter()
-                    .take(60)
-                    .map(|b| {
-                        if b.is_ascii_graphic() || *b == b' ' {
-                            *b as char
-                        } else {
-                            '.'
-                        }
-                    })
-                    .collect();
-                crate::er_dbg!(
-                    "doh.fetch_txt provider[{}] ok txt_len={} preview=\"{}\"",
-                    i,
-                    txt_bytes.len(),
-                    preview
-                );
-                Outcome::Txt(txt_bytes)
-            }
-            Err(e) => {
-                crate::er_dbg!("doh.fetch_txt provider[{}] err {}", i, e);
-                Outcome::FetchError(e)
-            }
+        .map(|r| match r {
+            Ok(txt_bytes) => Outcome::Txt(txt_bytes),
+            Err(e) => Outcome::FetchError(e),
         })
         .collect();
     let result = decide_quorum(&outcomes);
-    match &result {
-        Ok(b) => crate::er_dbg!("doh.fetch_txt quorum_ok len={}", b.len()),
-        Err(e) => crate::er_dbg!("doh.fetch_txt quorum_err {:?}", e),
-    }
 
     // Publish: stores on success, removes the pending entry, wakes any
     // dedup subscribers. The expires-at uses the timestamp we captured
@@ -300,42 +257,14 @@ mod prod {
                 },
             ],
         };
-        crate::er_dbg!("doh.outcall.start url={}", provider.url);
         match http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh).await {
             Ok((response,)) => {
-                let preview: String = response
-                    .body
-                    .iter()
-                    .take(60)
-                    .map(|b| {
-                        if b.is_ascii_graphic() || *b == b' ' {
-                            *b as char
-                        } else {
-                            '.'
-                        }
-                    })
-                    .collect();
-                crate::er_dbg!(
-                    "doh.outcall.resp url={} status={} body_len={} preview=\"{}\"",
-                    provider.url,
-                    response.status,
-                    response.body.len(),
-                    preview
-                );
                 if response.status != HTTP_STATUS_OK {
                     return Err(format!("HTTP {}", response.status));
                 }
                 Ok(response.body)
             }
-            Err((rc, err)) => {
-                crate::er_dbg!(
-                    "doh.outcall.err url={} rejection={:?} err={}",
-                    provider.url,
-                    rc,
-                    err
-                );
-                Err(err)
-            }
+            Err((_, err)) => Err(err),
         }
     }
 

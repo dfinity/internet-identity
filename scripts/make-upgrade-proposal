@@ -620,20 +620,33 @@ patch_email_recovery_init_fields() {
     const dnssec = process.env.DNSSEC_RECORD;
     const doh = process.env.DOH_RECORD;
     let body = readFileSync(path, "utf8");
-    // Match `<field> = <value>;` where <value> can span multiple
-    // lines (didc-assist sometimes pretty-prints opt records). The
-    // match terminator is the next `;` followed by either a newline
-    // or another field name. We use a non-greedy match anchored at
-    // the next `<ident> =` boundary.
+    // Constrain the patcher to the values didc-assist actually emits
+    // for unfilled optional fields — literal `null`. A regex-based
+    // match across a populated value would stop at the first
+    // semicolon, which inside a nested record (e.g. an already-set
+    // `dnssec_config = opt opt record { root_anchors = vec { record {
+    // key_tag = ...; algorithm = ...; }; }; }`) terminates after the
+    // first nested field and leaves the rest of the old value in
+    // place. Rather than write a Candid-aware parser in a one-shot
+    // Node snippet, we patch only `null` values and bail out loudly
+    // otherwise — the human running this script can either reset
+    // the field to `null` in args.txt or edit the new value in by
+    // hand.
     const replaceField = (name, replacement) => {
-        const re = new RegExp(`(\\b${name}\\s*=\\s*)(?:[\\s\\S]*?)(;\\s*(?:\\}|[a-zA-Z_]+\\s*=))`, "");
-        if (re.test(body)) {
-            body = body.replace(re, (_, head, tail) => `${head}${replacement}${tail}`);
-        } else {
-            // Append the field inside the outermost `record { ... }`
-            // before the closing brace.
+        const nullRe = new RegExp(`(\\b${name}\\s*=\\s*)null(\\s*;)`);
+        const fieldPresentRe = new RegExp(`\\b${name}\\s*=`);
+        if (nullRe.test(body)) {
+            body = body.replace(nullRe, (_, head, tail) => `${head}${replacement}${tail}`);
+        } else if (!fieldPresentRe.test(body)) {
+            // Field not present at all — append inside the outermost
+            // `record { ... }` before the closing brace.
             const insert = `    ${name} = ${replacement};\n  `;
             body = body.replace(/(record\s*\{[\s\S]*?)(\}\s*\)\s*$)/, (_, head, tail) => `${head}${insert}${tail}`);
+        } else {
+            throw new Error(
+                `Refusing to patch \`${name}\`: existing value in args.txt is not \`null\`. ` +
+                `Reset it to \`null\` first, or edit the new value in by hand.`
+            );
         }
     };
     if (body.trim() === "(null)") {

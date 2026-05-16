@@ -1462,13 +1462,6 @@ service : (opt InternetIdentityInit) -> {
     // 550 (mailbox unavailable) for everything else.
     smtp_request_validate : (SmtpRequest) -> (SmtpResponse) query;
 
-    // TEMPORARY (PR #3855): anonymous debug surface for tracing the
-    // email-recovery + DoH flow on staging. Remove together with the
-    // `email_recovery_debug_log` Rust module once outlook.com is
-    // confirmed working end-to-end.
-    email_recovery_debug_logs : () -> (vec text) query;
-    email_recovery_debug_clear : () -> ();
-
     // HTTP Gateway protocol
     // =====================
     http_request : (request : HttpRequest) -> (HttpResponse) query;

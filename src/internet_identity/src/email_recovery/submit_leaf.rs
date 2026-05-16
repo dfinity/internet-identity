@@ -54,25 +54,15 @@ pub async fn submit_dkim_leaf(
         hops,
         extra_chains,
     } = arg;
-    crate::er_dbg!(
-        "submit_dkim_leaf.start nonce={} hops={} extra_chains={}",
-        nonce,
-        hops.len(),
-        extra_chains.len()
-    );
 
     // Snapshot everything we need under one borrow so the rest of
     // the function works against owned data. Includes early
     // rejection of "not a DNSSEC pending entry" / "not in
     // NeedDkimLeaf state" / etc.
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
-        .ok_or_else(|| {
-            crate::er_dbg!("submit_dkim_leaf NonceUnknown nonce={}", nonce);
-            EmailRecoveryError::NonceUnknown
-        })??;
+        .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     if let Err(e) = run_submit(&hops, &extra_chains, &snapshot, now_secs) {
-        crate::er_dbg!("submit_dkim_leaf run_submit_failed {:?}", e);
         let cloned = e.clone();
         pending::with_mut(&nonce, now_secs, |c| {
             c.status = PendingStatus::Failed(cloned);
@@ -80,7 +70,6 @@ pub async fn submit_dkim_leaf(
         });
         return Err(e);
     }
-    crate::er_dbg!("submit_dkim_leaf run_submit_ok");
 
     // Verification passed — finalize per kind. Setup binds the
     // credential, recovery stamps a delegation seed.
