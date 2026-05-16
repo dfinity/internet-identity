@@ -257,7 +257,7 @@ fn run_submit(
         "{}._domainkey.{}.",
         snapshot.expected_selector, snapshot.registered_domain
     );
-    let expected_wire = super::dns::encode_dns_name_lowercase(&expected_fqdn);
+    let expected_wire = super::dns::encode_dns_name_lowercase(&expected_fqdn)?;
     let verified = crate::dnssec::verify_hops_with_clock(
         &hops_internal,
         &zones,

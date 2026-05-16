@@ -37,10 +37,17 @@ pub(super) fn parse_txt_rdata(rdata: &[Vec<u8>]) -> Result<Vec<u8>, EmailRecover
 /// Encode a dotted ASCII DNS name (with or without a trailing dot)
 /// into wire format: a sequence of length-prefixed labels terminated
 /// by a zero-length root label. Labels are lowercased on the way in.
-/// Caller is responsible for passing a syntactically valid ASCII
-/// name; labels longer than 63 bytes are truncated to 63 (RFC 1035
-/// caps).
-pub(super) fn encode_dns_name_lowercase(dotted: &str) -> Vec<u8> {
+///
+/// Rejects names that violate RFC 1035 §3.1 limits:
+/// - labels longer than 63 bytes (`DkimLeafMismatch`);
+/// - encoded names longer than 255 bytes total including the root
+///   terminator (`DkimLeafMismatch`).
+///
+/// Silently truncating an oversized label would let the canister
+/// verify a DNS name different from the DKIM selector/domain it
+/// intended to pin — caller-pinned `<selector>._domainkey.<domain>`
+/// must round-trip exactly.
+pub(super) fn encode_dns_name_lowercase(dotted: &str) -> Result<Vec<u8>, EmailRecoveryError> {
     let trimmed = dotted.strip_suffix('.').unwrap_or(dotted);
     let mut out = Vec::with_capacity(trimmed.len() + 2);
     for label in trimmed.split('.') {
@@ -48,14 +55,19 @@ pub(super) fn encode_dns_name_lowercase(dotted: &str) -> Vec<u8> {
             continue;
         }
         let bytes = label.as_bytes();
-        let len = bytes.len().min(63) as u8;
-        out.push(len);
-        for &b in &bytes[..len as usize] {
+        if bytes.len() > 63 {
+            return Err(EmailRecoveryError::DkimLeafMismatch);
+        }
+        out.push(bytes.len() as u8);
+        for &b in bytes {
             out.push(b.to_ascii_lowercase());
         }
     }
     out.push(0);
-    out
+    if out.len() > 255 {
+        return Err(EmailRecoveryError::DkimLeafMismatch);
+    }
+    Ok(out)
 }
 
 /// Decode a wire-format DNS name (length-prefixed labels) into a

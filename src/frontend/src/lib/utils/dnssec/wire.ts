@@ -10,6 +10,13 @@
  */
 
 // ---------------------------------------------------------------------------
+// Record-type constants
+// ---------------------------------------------------------------------------
+
+/** CNAME record (RFC 1035 §3.3.1). RDATA is a single DNS name. */
+const TYPE_CNAME = 5;
+
+// ---------------------------------------------------------------------------
 // DNS name encoding
 // ---------------------------------------------------------------------------
 
@@ -277,7 +284,21 @@ export function parseDnsMessage(buf: Uint8Array): DnsMessage {
       if (cursor + rdlength > buf.length) {
         throw new Error("truncated RDATA");
       }
-      const rdata = buf.subarray(cursor, cursor + rdlength).slice();
+      // RFC 4034 §6.2: RDATA containing embedded DNS names must be
+      // in canonical (uncompressed) form for DNSSEC signing. CNAME
+      // RDATA may use message compression pointers, which only
+      // resolve against the full DNS message — and the canister-
+      // side verifier hashes RRSIG signed-data over the canonical
+      // bytes. Decode against `buf` (handles pointers) and re-encode
+      // uncompressed; for other types the raw rdata is already
+      // canonical (TXT, A, AAAA, RRSIG, DNSKEY, DS, …).
+      let rdata: Uint8Array;
+      if (type === TYPE_CNAME) {
+        const { name } = decodeDnsName(buf, cursor);
+        rdata = encodeDnsName(name);
+      } else {
+        rdata = buf.subarray(cursor, cursor + rdlength).slice();
+      }
       cursor += rdlength;
       out.push({
         name: decoded.name,

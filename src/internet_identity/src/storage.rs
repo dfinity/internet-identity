@@ -687,7 +687,28 @@ impl<M: Memory + Clone> Storage<M> {
         // If there was an anchor stored previously, we need to take its credentials and recovery keys into account
         // while synchronizing the respective indices.
         //
-        // First, read the previous anchor and store the new anchor as-is in its place.
+        // Pre-validate the email-recovery binding against the reverse
+        // index *before* inserting the new anchor — if the address is
+        // already bound to a different anchor, returning an error
+        // after `stable_anchor_memory.insert` would leave the anchor
+        // store and the reverse index inconsistent. Same-anchor
+        // rebinds are idempotent and accepted here.
+        if let Some(curr) = storable_anchor
+            .email_recovery
+            .as_ref()
+            .and_then(|v| v.first())
+            .map(|c| c.address.as_str())
+        {
+            if let Some(existing) = self.lookup_anchor_with_email_recovery_address(curr) {
+                if existing != anchor_number {
+                    return Err(StorageError::EmailRecoveryAddressAlreadyBound {
+                        existing_anchor: existing,
+                    });
+                }
+            }
+        }
+
+        // Read the previous anchor and store the new anchor as-is in its place.
         let previous_anchor_maybe = self
             .stable_anchor_memory
             .insert(anchor_number, storable_anchor.clone());

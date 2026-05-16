@@ -21,6 +21,7 @@
    *      straight from `Pending` to terminal — no `submit` step.
    */
 
+  import { onDestroy } from "svelte";
   import EnterAddress from "./views/EnterAddress.svelte";
   import SendMagicEmail from "./views/SendMagicEmail.svelte";
   import Done from "./views/Done.svelte";
@@ -197,6 +198,15 @@
     polling = false;
     onClose();
   };
+
+  // Belt-and-braces: closing the parent `Dialog` via its built-in
+  // close button destroys this component without routing through
+  // `handleCancel`. Stop the poll loop unconditionally on unmount so
+  // we don't keep hitting the canister (or worse, mutate `stage`
+  // after the wizard is gone).
+  onDestroy(() => {
+    polling = false;
+  });
 </script>
 
 {#if stage.kind === "enter"}
