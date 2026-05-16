@@ -16,13 +16,6 @@ FROM --platform=linux/amd64 ubuntu@sha256:bbf3d1baa208b7649d1d0264ef7d522e1dc0de
 
 ENV TZ=UTC
 
-# Bring the global ARG into this stage's scope and propagate as ENV so that
-# `scripts/build` (invoked in this stage and inherited by downstream
-# FROM-deps stages) picks it up. ENV declarations propagate to derived
-# stages; ARG declarations do not.
-ARG CARGO_BUILD_JOBS
-ENV CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS
-
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
     apt -yq update && \
     apt -yqq install --no-install-recommends curl ca-certificates \
@@ -68,6 +61,17 @@ COPY src/internet_identity_frontend/Cargo.toml src/internet_identity_frontend/Ca
 COPY src/asset_util/Cargo.toml src/asset_util/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
 COPY ./scripts/build ./scripts/build
+
+# Bring the global CARGO_BUILD_JOBS ARG into scope as ENV so that
+# `scripts/build` (invoked here and inherited by downstream FROM-deps
+# stages) picks it up. Placed here, immediately before the deps prebuild,
+# so changing CARGO_BUILD_JOBS does not invalidate the apt/Node/Rust/wasm-pack
+# install layers above — only the cargo build layer (and the downstream
+# build_internet_identity / build_archive / build_internet_identity_frontend
+# stages, which is correct: they also invoke scripts/build).
+ARG CARGO_BUILD_JOBS
+ENV CARGO_BUILD_JOBS=$CARGO_BUILD_JOBS
+
 RUN mkdir -p src/internet_identity/src \
     && touch src/internet_identity/src/lib.rs \
     && mkdir -p src/internet_identity_interface/src \

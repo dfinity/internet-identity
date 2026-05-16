@@ -6,8 +6,8 @@
 # Compares the two wasm.gz sha256 hashes and fails if they differ.
 #
 # This workflow exists to gather evidence for or against the `-j1` hedge in
-# scripts/build (added in #490 for reproducibility). Background:
-# https://github.com/dfinity/internet-identity/pull/3895#issuecomment- (closed)
+# scripts/build, added in #490 for reproducibility. See the introducing PR
+# for the theory: https://github.com/dfinity/internet-identity/pull/3897
 #
 # Triggered manually (workflow_dispatch). Not part of the per-PR CI to avoid
 # spending ~15 min of runner time on every push.
@@ -15,6 +15,9 @@ name: Repro check (cargo -j)
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-control:
@@ -27,6 +30,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
+      - name: Infer version
+        id: version
+        run: |
+          version="$(./scripts/version)"
+          echo "Inferred version: '$version'"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Record start time
         id: start
         run: echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
@@ -37,8 +47,13 @@ jobs:
           context: .
           file: Dockerfile
           # No CARGO_BUILD_JOBS build-arg → Dockerfile default of 1 applies.
+          # II_VERSION passed in the same way the production canister-tests
+          # workflow does it; without it, scripts/build falls back to
+          # ./scripts/version which relies on git (not installed in the image).
           # cache-from on cached-stage is fine; we're not asserting on cold
           # build time here, only on byte equivalence.
+          build-args: |
+            II_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=cached-stage
           outputs: ./out
           target: scratch_internet_identity
@@ -67,6 +82,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
+      - name: Infer version
+        id: version
+        run: |
+          version="$(./scripts/version)"
+          echo "Inferred version: '$version'"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Resolve nproc
         id: nproc
         run: |
@@ -84,6 +106,7 @@ jobs:
           context: .
           file: Dockerfile
           build-args: |
+            II_VERSION=${{ steps.version.outputs.version }}
             CARGO_BUILD_JOBS=${{ steps.nproc.outputs.value }}
           # Distinct ENV (CARGO_BUILD_JOBS=N vs 1) gives the deps stage a
           # different layer hash than the control build, so the deps compile
