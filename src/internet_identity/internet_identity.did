@@ -820,10 +820,12 @@ type IdentityInfo = record {
     name : opt text;
     // The timestamp at which the anchor was created
     created_at : opt Timestamp;
-    // The email-recovery credential bound to this anchor, if any.
-    // Lets the FE render the recovery-email card's active vs.
-    // inactive state without a separate query.
-    email_recovery : opt EmailRecoveryCredential;
+    // Email-recovery credentials bound to this anchor (empty when
+    // none is configured). The canister API currently caps the list
+    // at one entry — the FE renders the recovery-email card from
+    // the first one — but exposing it as a `vec` lets future
+    // multi-credential support land without a candid schema bump.
+    email_recovery : vec EmailRecoveryCredential;
 };
 
 type IdentityInfoError = variant {

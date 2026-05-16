@@ -520,7 +520,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
     'name' : IDL.Opt(IDL.Text),
-    'email_recovery' : IDL.Opt(EmailRecoveryCredential),
+    'email_recovery' : IDL.Vec(EmailRecoveryCredential),
     'created_at' : IDL.Opt(Timestamp),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
@@ -1136,7 +1136,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
-    'whoami' : IDL.Func([], [IDL.Principal], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],
@@ -1148,6 +1147,7 @@ export const idlFactory = ({ IDL }) => {
         [VerifyTentativeDeviceResponse],
         [],
       ),
+    'whoami' : IDL.Func([], [IDL.Principal], ['query']),
   });
 };
 export const init = ({ IDL }) => {

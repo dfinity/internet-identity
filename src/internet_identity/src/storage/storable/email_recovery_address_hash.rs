@@ -8,6 +8,7 @@
 //! reason to store it again in the index. Lookup recomputes the hash
 //! from the verified `From:` of the inbound email.
 
+use crate::utils::slice_to_bounded_32;
 use ic_stable_structures::{storable::Bound, Storable};
 use std::borrow::Cow;
 
@@ -40,9 +41,12 @@ impl Storable for StorableEmailRecoveryAddressHash {
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        let mut out = [0u8; 32];
-        out.copy_from_slice(&bytes);
-        Self(out)
+        // `BOUND` says 32 bytes fixed-size, so this should always be
+        // exactly 32 bytes. Use the same defensive helper as
+        // `StorableApplication`'s hash key — copy up to 32, zero-pad
+        // any short input — so corrupted stable memory never makes
+        // the canister trap mid-call.
+        Self(slice_to_bounded_32(bytes.as_ref()))
     }
 
     const BOUND: Bound = Bound::Bounded {
