@@ -341,12 +341,15 @@ fn prepare_partial_verification(
         EmailRecoveryError::EmailVerificationFailed("missing message body".into())
     })?;
 
-    // Pick the first DKIM-Signature header we can parse. RFC 6376
-    // permits multiple; the existing dkim::verify accepts on first
-    // pass. For the recovery surface we only ever care about one of
-    // them — the one that signs the recipient mailbox we control —
-    // and that one will be among the first if more than one is
-    // present.
+    // Use the *first* DKIM-Signature header. RFC 6376 permits
+    // multiple — a forwarder may re-sign — but the recovery surface
+    // only trusts the originating-domain signer (enforced by the `d=`
+    // anchor check below), and that signature is by convention placed
+    // first by every signer we've observed. If the first header is
+    // unparseable or doesn't match the registered domain, we reject
+    // rather than walking the rest of the list: that policy keeps the
+    // attack surface small for an authentication-critical path and
+    // matches what `crate::dkim::verify` does on its main entry.
     let dkim_header = message
         .headers
         .iter()

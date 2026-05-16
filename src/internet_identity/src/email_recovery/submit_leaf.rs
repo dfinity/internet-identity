@@ -72,6 +72,7 @@ pub fn submit_dkim_leaf(
                     let cloned = e.clone();
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.status = PendingStatus::Failed(cloned);
+                        c.partial_verification = None;
                     });
                     Err(e)
                 }
@@ -81,6 +82,7 @@ pub fn submit_dkim_leaf(
             let cloned = e.clone();
             pending::with_mut(&nonce, now_secs, |c| {
                 c.status = PendingStatus::Failed(cloned);
+                c.partial_verification = None;
             });
             Err(e)
         }
