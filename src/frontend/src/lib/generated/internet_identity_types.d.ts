@@ -823,11 +823,13 @@ export interface IdentityInfo {
   'metadata' : MetadataMapV2,
   'name' : [] | [string],
   /**
-   * The email-recovery credential bound to this anchor, if any.
-   * Lets the FE render the recovery-email card's active vs.
-   * inactive state without a separate query.
+   * Email-recovery credentials bound to this anchor (empty when
+   * none is configured). The canister API currently caps the list
+   * at one entry — the FE renders the recovery-email card from
+   * the first one — but exposing it as a `vec` lets future
+   * multi-credential support land without a candid schema bump.
    */
-  'email_recovery' : [] | [EmailRecoveryCredential],
+  'email_recovery' : Array<EmailRecoveryCredential>,
   /**
    * The timestamp at which the anchor was created
    */
