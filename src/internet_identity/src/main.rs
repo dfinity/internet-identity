@@ -1407,22 +1407,26 @@ mod openid_api {
     }
 }
 
-/// Email-based identity recovery — setup half (binding flow only).
+/// Email-based identity recovery — both halves of the flow.
 ///
 /// See `docs/ongoing/email-recovery.md` (PR #3836) for the full
-/// design, and `crate::email_recovery` for the per-flow logic. The
-/// canister methods below are thin wrappers that handle:
+/// design, and `crate::email_recovery` for the per-flow logic.
 ///
-/// - Authorization (`prepare_add` / `credential_remove` are
-///   authenticated; `status` is anonymous since the nonce is the
-///   only secret needed to poll).
-/// - Wall-clock injection (`now_secs` lifted out of
-///   `ic_cdk::api::time` so the inner functions stay testable).
+/// - **Setup** (binding): `prepare_add` (authenticated) issues a
+///   nonce, `smtp_request` for `register@id.ai` consumes the
+///   verified email and binds the credential to the anchor, and
+///   `credential_remove` (authenticated) detaches it.
+/// - **Recovery** (delegation): `prepare_delegation` (anonymous)
+///   issues a nonce bound to a session_key, `smtp_request` for
+///   `recover@id.ai` consumes the verified email and stamps a
+///   canister-signed delegation seed, and `get_delegation`
+///   (anonymous query) hands the signed delegation to the FE.
 ///
-/// The recovery half (`prepare_delegation` / `get_delegation` /
-/// `recover@id.ai` dispatch in `smtp_request`) is intentionally not
-/// part of this PR — it needs a stable reverse address index that
-/// is best landed on its own.
+/// The canister methods below are thin wrappers handling
+/// authorization, wall-clock injection (`now_secs` lifted out of
+/// `ic_cdk::api::time` so the inner functions stay testable), and
+/// the FE-facing `Result` shape. `status` is anonymous for both
+/// flows since the nonce is the only secret needed to poll.
 mod email_recovery_api {
     use super::*;
     use crate::authz_utils::check_authorization;
