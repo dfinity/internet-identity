@@ -4,6 +4,7 @@
   import { CopyIcon, ExternalLinkIcon, ShieldCheckIcon } from "@lucide/svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { waitFor } from "$lib/utils/utils";
+  import type { Path } from "$lib/utils/dnssec";
 
   interface Props {
     /** The canister-issued nonce (e.g. `II-Recovery-1a2b3c4d…`) — also
@@ -19,7 +20,7 @@
      *  email arrives — drives the trust-story tooltip on the From row.
      *  "dnssec" when the FE submitted a signed bundle; "doh" when the
      *  canister will fall back to its multi-provider DoH quorum. */
-    path: "dnssec" | "doh";
+    path: Path;
   }
 
   const { nonce, mailbox, fromAddress, path }: Props = $props();
@@ -36,14 +37,28 @@
   let copiedTo = $state(false);
   let copiedSubject = $state(false);
 
+  // `navigator.clipboard.writeText` rejects on browsers that block
+  // clipboard writes outside secure contexts (some embedded iframes,
+  // permission-denied prompts on Safari/Firefox). Swallow the failure
+  // and skip the "Copied" tooltip rather than throwing an unhandled
+  // rejection into devtools — the value the user wanted is still
+  // selectable in the UI.
   const copyTo = async () => {
-    await navigator.clipboard.writeText(mailbox);
+    try {
+      await navigator.clipboard.writeText(mailbox);
+    } catch {
+      return;
+    }
     copiedTo = true;
     await waitFor(700);
     copiedTo = false;
   };
   const copySubject = async () => {
-    await navigator.clipboard.writeText(nonce);
+    try {
+      await navigator.clipboard.writeText(nonce);
+    } catch {
+      return;
+    }
     copiedSubject = true;
     await waitFor(700);
     copiedSubject = false;
@@ -155,6 +170,15 @@
       </span>
     </div>
   </div>
+
+  <!-- Static lifetime hint. The actual TTL lives in
+       `email_recovery::CHALLENGE_TTL_SECS` (30 minutes). We don't run
+       a ticking countdown — the status-poll surfaces `Expired` via
+       `FailedView` when the user is out of time, which is the
+       authoritative source. -->
+  <p class="text-text-tertiary text-xs">
+    {$t`This email link expires in about 30 minutes.`}
+  </p>
 
   <a class="btn btn-primary btn-lg" href={mailtoHref}>
     <ExternalLinkIcon class="size-5" />

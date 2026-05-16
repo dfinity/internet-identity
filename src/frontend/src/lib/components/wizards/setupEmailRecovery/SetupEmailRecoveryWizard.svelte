@@ -36,7 +36,11 @@
     EmailRecoverySubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import { assembleSkeleton, assembleDkimResolution } from "$lib/utils/dnssec";
+  import {
+    assembleSkeleton,
+    assembleDkimResolution,
+    type Path,
+  } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
   import { onDestroy } from "svelte";
 
@@ -55,8 +59,6 @@
   }
 
   const { prepare, status, submitDkimLeaf, onSuccess }: Props = $props();
-
-  type Path = "dnssec" | "doh";
 
   type Stage =
     | { kind: "enter"; initialError?: string }

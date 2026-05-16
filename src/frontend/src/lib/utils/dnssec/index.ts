@@ -35,6 +35,16 @@ import type {
 import { walkSkeletonChain, walkDkimResolution } from "./chain";
 
 /**
+ * Which DNS-verification path the canister takes when the email
+ * arrives. Set by the wizards at `prepare_*` time based on whether
+ * `assembleSkeleton` returned a signed bundle (`dnssec`) or fell
+ * through to the canister's DoH allowlist (`doh`). Surfaced through
+ * to `SendConfirmationEmail` so the trust-story tooltip on the
+ * `From` row can show the right wording.
+ */
+export type Path = "dnssec" | "doh";
+
+/**
  * Walk the DNSSEC chain rooted at IANA down to `<domain>`, plus the
  * DMARC TXT leaf at `_dmarc.<domain>` when `wantDmarc` is true and
  * the zone publishes one.
