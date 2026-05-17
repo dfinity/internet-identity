@@ -28,6 +28,12 @@
 //! - `a=` must be `rsa-sha256` or `ed25519-sha256` (parse rejects rest).
 //! - `c=` header side must be `relaxed` (rejected here).
 //! - `x=` if present must be in the future.
+//! - `t=` if present must not be in the future beyond `CLOCK_SKEW_SECS`.
+//! - `h=` must include `From` (parse-layer reject) **and** `Subject`
+//!   (rejected here as `SubjectNotSigned`). Subject coverage is
+//!   recovery-specific — the challenge nonce lives in `Subject:` and a
+//!   signature that doesn't cover it would let a MITM rewrite the
+//!   nonce on a legitimately-signed email.
 //! - `i=` must end in `@d` or `.d`. Soft-failed when DNS record has
 //!   `t=s` cleared (i.e. accept subdomains by default).
 //! - DNS `k=` must match `a=`'s underlying key type.
@@ -44,6 +50,13 @@ use super::types::{
 use internet_identity_interface::internet_identity::types::smtp::{SmtpHeader, SmtpRequest};
 
 const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
+
+/// How far a signature's claimed signing time (`t=`) may sit in the
+/// future relative to the canister's clock before we reject it as
+/// future-dated. 60 seconds matches the DNSSEC verifier's
+/// `CLOCK_SKEW_SECS` and absorbs the worst-case sender / canister
+/// clock-skew while still rejecting signatures dated months ahead.
+const CLOCK_SKEW_SECS: u64 = 60;
 
 /// Verify an `SmtpRequest` against an already-trusted DKIM TXT record.
 ///
@@ -178,6 +191,52 @@ fn try_verify_signature(
     }
     checks.push(check(
         DkimCheckName::SignatureNotExpired,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // (t=) Future-dated check. `t=` is the time the signer claims it
+    // signed the message; one beyond `now + CLOCK_SKEW_SECS` is either
+    // a misconfigured signer or a manipulated replay. The PoC parsed
+    // this tag but didn't validate it — design §5.4 calls it out as a
+    // must-enforce.
+    if let Some(t) = sig.t {
+        if t > now_secs.saturating_add(CLOCK_SKEW_SECS) {
+            let detail = format!(
+                "signature claims t={t}, now={now_secs}, beyond {CLOCK_SKEW_SECS}s skew"
+            );
+            checks.push(check(
+                DkimCheckName::SignatureNotFromFuture,
+                DkimCheckStatus::Fail,
+                Some(detail),
+            ));
+            return Err((VerificationFailReason::SignatureFutureDated, checks));
+        }
+    }
+    checks.push(check(
+        DkimCheckName::SignatureNotFromFuture,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // `h=` must include `Subject`. The `From` requirement is enforced
+    // at parse time (RFC 6376 §5.4 hard-requires it); `Subject` is the
+    // email-recovery-specific tightening from design §5.4 — the
+    // challenge nonce lives in `Subject:`, so a signature that doesn't
+    // cover Subject would let a MITM rewrite the nonce on a
+    // legitimately-signed email. Every mainstream sender we care about
+    // already signs Subject; rejecting the niche signer that doesn't
+    // is the right trade-off.
+    if !sig.h.iter().any(|n| n.eq_ignore_ascii_case("subject")) {
+        checks.push(check(
+            DkimCheckName::SubjectSigned,
+            DkimCheckStatus::Fail,
+            Some("h= does not include the Subject header".to_string()),
+        ));
+        return Err((VerificationFailReason::SubjectNotSigned, checks));
+    }
+    checks.push(check(
+        DkimCheckName::SubjectSigned,
         DkimCheckStatus::Pass,
         None,
     ));
@@ -738,7 +797,7 @@ mod tests {
 
         // i= claims a different domain than d=
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
-                          c=relaxed/relaxed; h=From; \
+                          c=relaxed/relaxed; h=From:Subject; \
                           i=alice@evil.com; bh=MTIzNDU2; b=YWJj";
         let req = SmtpRequest {
             envelope: Some(SmtpEnvelope {
@@ -772,6 +831,158 @@ mod tests {
                 assert_eq!(reason, VerificationFailReason::AuidMisaligned);
             }
             other => panic!("expected Unverified(AuidMisaligned), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rejects_future_dated_signature() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpAddress, SmtpEnvelope, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+
+        // t= claims a signing time well past now + CLOCK_SKEW_SECS.
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From:Subject; \
+                          t=1700001000; bh=MTIzNDU2; b=YWJj";
+        let req = SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "alice".into(),
+                    domain: "example.com".into(),
+                },
+                to: SmtpAddress {
+                    user: "recover".into(),
+                    domain: "id.ai".into(),
+                },
+            }),
+            message: Some(SmtpMessage {
+                headers: vec![
+                    SmtpHeader {
+                        name: "From".into(),
+                        value: "alice@example.com".into(),
+                    },
+                    SmtpHeader {
+                        name: "DKIM-Signature".into(),
+                        value: dkim_value.into(),
+                    },
+                ],
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+        };
+        // now = 1_700_000_000, t = 1_700_001_000 → 1000 s in the future,
+        // well beyond CLOCK_SKEW_SECS (60).
+        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
+        match result {
+            DkimVerifyResult::Unverified { reason, .. } => {
+                assert_eq!(reason, VerificationFailReason::SignatureFutureDated);
+            }
+            other => panic!(
+                "expected Unverified(SignatureFutureDated), got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn accepts_slightly_future_t_within_skew() {
+        // A `t=` value inside the CLOCK_SKEW_SECS window must NOT be
+        // rejected as future-dated — that would create a spurious
+        // failure mode for senders whose clock runs a few seconds
+        // ahead of the canister's. We test that the t= check passes;
+        // a later check (body-hash mismatch) trips the verdict.
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpAddress, SmtpEnvelope, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From:Subject; \
+                          t=1700000030; bh=MTIzNDU2; b=YWJj";
+        let req = SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "alice".into(),
+                    domain: "example.com".into(),
+                },
+                to: SmtpAddress {
+                    user: "recover".into(),
+                    domain: "id.ai".into(),
+                },
+            }),
+            message: Some(SmtpMessage {
+                headers: vec![
+                    SmtpHeader {
+                        name: "From".into(),
+                        value: "alice@example.com".into(),
+                    },
+                    SmtpHeader {
+                        name: "DKIM-Signature".into(),
+                        value: dkim_value.into(),
+                    },
+                ],
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+        };
+        // now = 1_700_000_000, t = 1_700_000_030 → 30 s in the future,
+        // inside the 60 s skew window. Must pass the t= check.
+        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
+        if let DkimVerifyResult::Unverified { reason, .. } = &result {
+            assert_ne!(
+                *reason,
+                VerificationFailReason::SignatureFutureDated,
+                "t=now+30s with 60s skew must not be rejected as future-dated"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_signature_without_subject_in_h() {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpAddress, SmtpEnvelope, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+
+        // h= covers From but not Subject. The challenge nonce lives in
+        // Subject, so a signature that doesn't cover it would let a
+        // MITM rewrite the nonce on a legitimately-signed email
+        // (design §5.4).
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From; bh=MTIzNDU2; b=YWJj";
+        let req = SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "alice".into(),
+                    domain: "example.com".into(),
+                },
+                to: SmtpAddress {
+                    user: "recover".into(),
+                    domain: "id.ai".into(),
+                },
+            }),
+            message: Some(SmtpMessage {
+                headers: vec![
+                    SmtpHeader {
+                        name: "From".into(),
+                        value: "alice@example.com".into(),
+                    },
+                    SmtpHeader {
+                        name: "DKIM-Signature".into(),
+                        value: dkim_value.into(),
+                    },
+                ],
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+        };
+        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
+        match result {
+            DkimVerifyResult::Unverified { reason, .. } => {
+                assert_eq!(reason, VerificationFailReason::SubjectNotSigned);
+            }
+            other => panic!("expected Unverified(SubjectNotSigned), got {:?}", other),
         }
     }
 }

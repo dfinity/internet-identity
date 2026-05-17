@@ -60,6 +60,8 @@ pub enum DkimCheckName {
     AlgorithmSupported,
     CanonicalizationSupported,
     SignatureNotExpired,
+    SignatureNotFromFuture,
+    SubjectSigned,
     AuidAlignsWithDomain,
     DnsRecordParsed,
     PublicKeyTypeMatches,
@@ -94,6 +96,17 @@ pub enum VerificationFailReason {
     UnsupportedCanonicalization,
     /// Signature's `x=` field is in the past.
     SignatureExpired,
+    /// Signature's `t=` timestamp claims a signing time in the future
+    /// beyond the configured clock-skew tolerance. RFC 6376 §3.5
+    /// describes `t=` as "the time the signature was created"; a
+    /// signature that claims it was signed in the future is either a
+    /// misconfigured signer or a manipulated replay.
+    SignatureFutureDated,
+    /// `h=` doesn't include the `Subject` header. Required by the
+    /// email-recovery flow (the challenge nonce lives in `Subject:`,
+    /// see design §5.4); a signature that doesn't cover Subject would
+    /// let a MITM rewrite the nonce on a legitimately-signed email.
+    SubjectNotSigned,
     /// `i=` agent identifier doesn't end in `@d=` or `.d=` (and the DNS
     /// record didn't set the `t=s` flag that would soft-fail this).
     AuidMisaligned,
