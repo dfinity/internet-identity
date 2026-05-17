@@ -285,14 +285,16 @@ fn verify_dnssec_skeleton(
             now_secs,
         )
         .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("DNSSEC leaf: {e:?}")))?;
-        let leaf_name = super::dns::decode_dns_name_lowercase(&verified.name.0);
+        let leaf_name = crate::dnssec::wire::decode_dns_name_lowercase(&verified.name.0);
         if !leaf_name.eq_ignore_ascii_case(&dmarc_fqdn) {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "skeleton bundle leaf name {leaf_name:?} is not the expected \
                  DMARC name {dmarc_fqdn:?} — DKIM leaves belong in submit_dkim_leaf"
             )));
         }
-        let txt = super::dns::parse_txt_rdata(&verified.rdata)?;
+        let txt = crate::dnssec::wire::parse_txt_rdata(&verified.rdata).map_err(|_| {
+            EmailRecoveryError::EmailVerificationFailed("DNSSEC TXT RDATA truncated".into())
+        })?;
         if txt.len() > super::MAX_DMARC_TXT_BYTES {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "DMARC TXT record at {leaf_name:?} is {} bytes; \

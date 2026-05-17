@@ -48,7 +48,7 @@ mod signature;
 mod test_vectors;
 pub(crate) mod types;
 mod verify;
-mod wire;
+pub(crate) mod wire;
 
 #[allow(unused_imports)]
 pub use types::{
