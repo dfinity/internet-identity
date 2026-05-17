@@ -101,8 +101,21 @@
   // wizard mounts. Each milestone calls `trigger(...)`; the terminal
   // states (signed-in / failed / unsupported) call `close()` to record
   // duration. See `recoverWithEmailFunnel.ts` for the event shape.
+  //
+  // Belt-and-braces `close()` on unmount: if the user abandons the
+  // wizard mid-flow (Dialog `×`, navigation away, browser back)
+  // without reaching a terminal branch, the funnel's
+  // `trackWindowSession` listener would otherwise stay registered.
+  // A later remount's `init()` would then overwrite the cleanup
+  // pointer, leaking the old listener. `close()` is idempotent (it
+  // only does work if a `start-…` timestamp is set), so calling it
+  // here both fires `end-…` for the abandoned flow and unregisters
+  // the visibility listener cleanly.
   onMount(() => {
     recoverWithEmailFunnel.init();
+  });
+  onDestroy(() => {
+    recoverWithEmailFunnel.close();
   });
 
   /**
