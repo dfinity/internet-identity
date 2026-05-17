@@ -548,7 +548,18 @@ async fn verify_setup_email_doh(
             map_doh_error(e, &domain)
         },
     )?;
-    let dmarc_bytes_opt = (crate::doh::fetch_txt(&dmarc_fqdn, &domain).await).ok();
+    // DMARC: a quorum of providers reporting "no record" is a valid
+    // DNS state ("no policy published" per RFC 7489) and lets the
+    // verifier fall back to strict alignment (design §6.3). Any other
+    // failure mode — transient outage, quorum disagreement, transport
+    // error — must NOT silently take the same fallback: that would
+    // turn a transient DoH outage into a quietly stricter check that
+    // could break legitimate setup flows. Propagate everything else.
+    let dmarc_bytes_opt = match crate::doh::fetch_txt(&dmarc_fqdn, &domain).await {
+        Ok(bytes) => Some(bytes),
+        Err(crate::doh::DohError::NoAnswer) => None,
+        Err(e) => return Err(map_doh_error(e, &domain)),
+    };
 
     let dkim_txt = std::str::from_utf8(&dkim_bytes)
         .map_err(|_| EmailRecoveryError::DohFetchFailed("DKIM TXT is not valid UTF-8".into()))?;
@@ -659,6 +670,16 @@ fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError 
         DohError::QuorumFailed { agreeing, total } => EmailRecoveryError::DohFetchFailed(format!(
             "DoH quorum failed: {agreeing} of {total} providers agreed",
         )),
+        // `NoAnswer` from the DMARC fetch is handled inline at the
+        // call site (it switches the verifier to the strict-alignment
+        // fallback). If we land here it's from the DKIM fetch — a
+        // quorum of providers saying "no DKIM record at this selector",
+        // which means the signature's public key is gone (key rotation
+        // or a forged `s=` tag). Treat that as a verification rejection
+        // rather than a transient DoH outage.
+        DohError::NoAnswer => EmailRecoveryError::EmailVerificationFailed(
+            "DKIM record not found at signed selector".into(),
+        ),
         DohError::ResponseMalformed(msg) => {
             EmailRecoveryError::DohFetchFailed(format!("DoH response malformed: {msg}"))
         }

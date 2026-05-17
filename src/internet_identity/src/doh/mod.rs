@@ -124,14 +124,7 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     };
 
     // Fan out to every provider in parallel, then decide.
-    let outcall_results = fetch_all(&query).await;
-    let outcomes: Vec<Outcome> = outcall_results
-        .into_iter()
-        .map(|r| match r {
-            Ok(txt_bytes) => Outcome::Txt(txt_bytes),
-            Err(e) => Outcome::FetchError(e),
-        })
-        .collect();
+    let outcomes = fetch_all(&query).await;
     let result = decide_quorum(&outcomes);
 
     // Publish: stores on success, removes the pending entry, wakes any
@@ -196,6 +189,7 @@ fn now_secs() -> u64 {
 
 #[cfg(not(test))]
 mod prod {
+    use super::Outcome;
     use ic_cdk::api::management_canister::http_request::{
         http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
         HttpResponse,
@@ -216,6 +210,15 @@ mod prod {
     pub(super) const HTTP_STATUS_OK: u8 = 200;
 
     /// HTTP status the transform returns when the wire-format DNS
+    /// response was a valid "no such record" answer (NXDOMAIN or an
+    /// RCODE=0 empty answer section). 204 ("No Content") is a
+    /// defensible bucket for "the request succeeded but there's
+    /// nothing to return", and [`outcall`] maps it to
+    /// [`Outcome::NoAnswer`] so the quorum can count "no record"
+    /// agreement separately from transient outages.
+    pub(super) const HTTP_STATUS_TRANSFORM_NO_ANSWER: u16 = 204;
+
+    /// HTTP status the transform returns when the wire-format DNS
     /// response can't be parsed down to a TXT RDATA. We deliberately
     /// signal failure via the *status code*, not via a sentinel body
     /// string, because any TXT-bytes body the transform might emit
@@ -228,12 +231,12 @@ mod prod {
     /// branch in [`outcall`] turns into an `Err`.
     pub(super) const HTTP_STATUS_TRANSFORM_PARSE_FAILED: u16 = 422;
 
-    pub(super) async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+    pub(super) async fn fetch_all(query: &[u8]) -> Vec<Outcome> {
         let futures: Vec<_> = super::PROVIDERS.iter().map(|p| outcall(p, query)).collect();
         futures::future::join_all(futures).await
     }
 
-    async fn outcall(provider: &super::DohProvider, query: &[u8]) -> Result<Vec<u8>, String> {
+    async fn outcall(provider: &super::DohProvider, query: &[u8]) -> Outcome {
         let request = CanisterHttpRequestArgument {
             url: provider.url.to_string(),
             method: HttpMethod::POST,
@@ -259,12 +262,16 @@ mod prod {
         };
         match http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh).await {
             Ok((response,)) => {
-                if response.status != HTTP_STATUS_OK {
-                    return Err(format!("HTTP {}", response.status));
+                let status_u16: u16 = response.status.0.try_into().unwrap_or(u16::MAX);
+                if status_u16 == u16::from(HTTP_STATUS_OK) {
+                    Outcome::Txt(response.body)
+                } else if status_u16 == HTTP_STATUS_TRANSFORM_NO_ANSWER {
+                    Outcome::NoAnswer
+                } else {
+                    Outcome::FetchError(format!("HTTP {status_u16}"))
                 }
-                Ok(response.body)
             }
-            Err((_, err)) => Err(err),
+            Err((_, err)) => Outcome::FetchError(err),
         }
     }
 
@@ -281,9 +288,14 @@ mod prod {
     /// 200 status code (with empty body) rather than encoding it in
     /// the body. An in-band sentinel string would risk colliding with
     /// a legitimate (if unusual) TXT payload and silently turning a
-    /// valid record into a "malformed" failure for the quorum.
+    /// valid record into a "malformed" failure for the quorum. The
+    /// "no such record" case (NXDOMAIN / empty answer section) is
+    /// reported as a separate status (204) so the quorum step can
+    /// count "everyone agrees there is no record" distinctly from
+    /// "everyone failed to respond".
     #[allow(clippy::needless_pass_by_value)]
     pub(super) fn transform_doh(response: HttpResponse) -> HttpResponse {
+        use super::ParseError;
         use candid::Nat;
         if response.status != HTTP_STATUS_OK {
             // Non-200 upstream responses are passed through untouched
@@ -302,9 +314,15 @@ mod prod {
                 headers: vec![],
                 body: txt,
             },
+            Err(ParseError::NoAnswer) => HttpResponse {
+                // Out-of-band "no record" signal: see `HTTP_STATUS_TRANSFORM_NO_ANSWER`.
+                status: Nat::from(u32::from(HTTP_STATUS_TRANSFORM_NO_ANSWER)),
+                headers: vec![],
+                body: vec![],
+            },
             Err(_) => HttpResponse {
-                // Out-of-band failure signal: see `HTTP_STATUS_TRANSFORM_PARSE_FAILED`.
-                status: Nat::from(HTTP_STATUS_TRANSFORM_PARSE_FAILED as u32),
+                // Out-of-band parse-failure signal: see `HTTP_STATUS_TRANSFORM_PARSE_FAILED`.
+                status: Nat::from(u32::from(HTTP_STATUS_TRANSFORM_PARSE_FAILED)),
                 headers: vec![],
                 body: vec![],
             },
@@ -313,7 +331,7 @@ mod prod {
 }
 
 #[cfg(not(test))]
-async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+async fn fetch_all(query: &[u8]) -> Vec<Outcome> {
     prod::fetch_all(query).await
 }
 
@@ -325,28 +343,28 @@ async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
 // =====================================================================
 
 #[cfg(test)]
-async fn fetch_all(query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+async fn fetch_all(query: &[u8]) -> Vec<Outcome> {
     test_support::run_mock(query)
 }
 
 #[cfg(test)]
-pub(crate) mod test_support {
+pub(super) mod test_support {
     use super::*;
     use std::collections::HashMap;
 
     thread_local! {
         pub(super) static TEST_NOW_SECS: RefCell<u64> = const { RefCell::new(1_700_000_000) };
         pub(super) static MOCK_RESPONSES: RefCell<
-            HashMap<&'static str, Result<Vec<u8>, String>>,
+            HashMap<&'static str, Outcome>,
         > = RefCell::new(HashMap::new());
         pub(super) static MOCK_CALL_COUNT: RefCell<usize> = const { RefCell::new(0) };
     }
 
-    pub(crate) fn set_now(t: u64) {
+    pub(super) fn set_now(t: u64) {
         TEST_NOW_SECS.with(|c| *c.borrow_mut() = t);
     }
 
-    pub(crate) fn set_mock(responses: &[(&'static str, Result<Vec<u8>, String>)]) {
+    pub(super) fn set_mock(responses: &[(&'static str, Outcome)]) {
         MOCK_RESPONSES.with(|m| {
             let mut m = m.borrow_mut();
             m.clear();
@@ -356,19 +374,19 @@ pub(crate) mod test_support {
         });
     }
 
-    pub(crate) fn call_count() -> usize {
+    pub(super) fn call_count() -> usize {
         MOCK_CALL_COUNT.with(|c| *c.borrow())
     }
 
     /// Wipes both cache + counter so each test starts from a known
     /// state. Call this at the top of every test that asserts on
     /// `call_count`.
-    pub(crate) fn reset_cache() {
+    pub(super) fn reset_cache() {
         DOH_CACHE.with(|c| *c.borrow_mut() = DohCache::default());
         MOCK_CALL_COUNT.with(|c| *c.borrow_mut() = 0);
     }
 
-    pub(super) fn run_mock(_query: &[u8]) -> Vec<Result<Vec<u8>, String>> {
+    pub(super) fn run_mock(_query: &[u8]) -> Vec<Outcome> {
         MOCK_CALL_COUNT.with(|c| *c.borrow_mut() += 1);
         MOCK_RESPONSES.with(|m| {
             let m = m.borrow();
@@ -377,7 +395,7 @@ pub(crate) mod test_support {
                 .map(|p| {
                     m.get(p.url)
                         .cloned()
-                        .unwrap_or_else(|| Err("no canned response".into()))
+                        .unwrap_or_else(|| Outcome::FetchError("no canned response".into()))
                 })
                 .collect()
         })
@@ -432,15 +450,19 @@ mod tests {
     }
 
     /// The mock-side equivalent of `transform_doh`'s output: just the
-    /// TXT bytes a real provider would have parsed out.
-    fn ok(bytes: &[u8]) -> Result<Vec<u8>, String> {
-        Ok(bytes.to_vec())
+    /// TXT bytes a real provider would have parsed out, wrapped in
+    /// the same `Outcome` enum the prod outcall path constructs.
+    fn ok(bytes: &[u8]) -> Outcome {
+        Outcome::Txt(bytes.to_vec())
     }
-    fn fail(s: &str) -> Result<Vec<u8>, String> {
-        Err(s.into())
+    fn fail(s: &str) -> Outcome {
+        Outcome::FetchError(s.into())
+    }
+    fn no_answer() -> Outcome {
+        Outcome::NoAnswer
     }
 
-    fn agreeing_dkim() -> Vec<(&'static str, Result<Vec<u8>, String>)> {
+    fn agreeing_dkim() -> Vec<(&'static str, Outcome)> {
         // Three provider responses agree, two disagree — quorum (3-of-
         // 5) hits.
         vec![
@@ -597,6 +619,49 @@ mod tests {
         assert!(!name_within_domain("evilgmail.com", "gmail.com"));
         assert!(!name_within_domain("gmail.com.evil.com", "gmail.com"));
         assert!(!name_within_domain("", "gmail.com"));
+    }
+
+    #[test]
+    fn three_providers_no_answer_returns_no_answer() {
+        // Three providers authoritatively report "no record" (the wire
+        // shape that lands here is the transform's 204), two are down.
+        // The quorum on absence is itself an answer.
+        install_config(&["example.com"], Some(3600));
+        reset_cache();
+        set_mock(&[
+            (PROVIDERS[0].url, no_answer()),
+            (PROVIDERS[1].url, no_answer()),
+            (PROVIDERS[2].url, no_answer()),
+            (PROVIDERS[3].url, fail("network down")),
+            (PROVIDERS[4].url, fail("timeout")),
+        ]);
+        let r = block_on(fetch_txt("_dmarc.example.com", "example.com"));
+        assert_eq!(r, Err(DohError::NoAnswer));
+    }
+
+    #[test]
+    fn no_answer_result_is_not_cached() {
+        // Surfacing NoAnswer must NOT poison the cache: a follow-up
+        // call with a different mock (record was just published) re-
+        // fetches and now gets the real bytes.
+        install_config(&["example.com"], Some(3600));
+        reset_cache();
+        set_mock(&[
+            (PROVIDERS[0].url, no_answer()),
+            (PROVIDERS[1].url, no_answer()),
+            (PROVIDERS[2].url, no_answer()),
+            (PROVIDERS[3].url, no_answer()),
+            (PROVIDERS[4].url, no_answer()),
+        ]);
+        set_now(1_000);
+        let r1 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
+        assert_eq!(r1, Err(DohError::NoAnswer));
+
+        set_mock(&agreeing_dkim());
+        set_now(1_001);
+        let r2 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
+        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        assert_eq!(call_count(), 2);
     }
 
     #[test]

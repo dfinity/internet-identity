@@ -32,10 +32,22 @@ const MAX_LABEL_HOPS: usize = 32;
 pub enum ParseError {
     Truncated,
     BadFlags,
+    /// Server-side error RCODE other than the "name doesn't exist"
+    /// rcode (3 / NXDOMAIN). SERVFAIL (2), REFUSED (5), etc. are
+    /// transient or operator failures and not authoritative answers,
+    /// so they're kept distinct from [`Self::NoAnswer`].
     BadResponseCode(u8),
     PointerLoop,
-    /// The response carried no answer records of the requested type
-    /// (NoData) or returned an explicit "not found" RCODE.
+    /// The response carried no record of the requested type at this
+    /// name. Covers both authoritative wire-format shapes:
+    ///   - RCODE=3 (NXDOMAIN): the name itself doesn't exist.
+    ///   - RCODE=0 with empty answer section (NODATA): the name exists
+    ///     but has no records of the requested type.
+    ///
+    /// Per RFC 2308 these are semantically distinct DNS responses, but
+    /// for the verifier they collapse to the same thing — "there is no
+    /// such record" — and the caller (DMARC, etc.) needs only the
+    /// single bit to apply its fallback.
     NoAnswer,
     /// The QNAME we were asked to encode violates RFC 1035 §2.3.4
     /// (label > 63 octets, name > 255 octets, or empty label) and so
@@ -102,8 +114,15 @@ pub fn parse_txt_response(bytes: &[u8]) -> Result<Vec<u8>, ParseError> {
         return Err(ParseError::BadFlags);
     }
     let rcode = (flags & 0x000f) as u8;
-    if rcode != 0 {
-        return Err(ParseError::BadResponseCode(rcode));
+    // RCODE=3 (NXDOMAIN) is an authoritative "no such name" — collapse
+    // it into `NoAnswer` so the verifier sees a single bit for "the
+    // record doesn't exist", regardless of whether the server framed
+    // it as NXDOMAIN or NODATA. Any other non-zero RCODE is a server
+    // error (SERVFAIL, REFUSED, etc.) and stays distinct.
+    match rcode {
+        0 => {}
+        3 => return Err(ParseError::NoAnswer),
+        other => return Err(ParseError::BadResponseCode(other)),
     }
     let qdcount = u16::from_be_bytes([bytes[4], bytes[5]]);
     let ancount = u16::from_be_bytes([bytes[6], bytes[7]]);
@@ -352,14 +371,29 @@ mod tests {
     }
 
     #[test]
-    fn rejects_nxdomain() {
+    fn nxdomain_maps_to_no_answer() {
         let mut resp = fake_response(b"\x05hello");
-        // Flip RCODE to NXDOMAIN (3).
+        // Flip RCODE to NXDOMAIN (3). Authoritative "no such name" —
+        // we collapse this onto the same `NoAnswer` variant as an
+        // RCODE=0 empty answer section.
         resp[3] = 0x83;
-        assert_eq!(
-            parse_txt_response(&resp),
-            Err(ParseError::BadResponseCode(3))
-        );
+        assert_eq!(parse_txt_response(&resp), Err(ParseError::NoAnswer));
+    }
+
+    #[test]
+    fn server_error_rcodes_stay_distinct_from_no_answer() {
+        // SERVFAIL (2) and REFUSED (5) are transient/operator failures,
+        // not authoritative "no record" answers. They must NOT collapse
+        // onto `NoAnswer`, since the DMARC fallback path treats those
+        // very differently.
+        for rcode in [2u8, 5u8] {
+            let mut resp = fake_response(b"\x05hello");
+            resp[3] = 0x80 | rcode;
+            assert_eq!(
+                parse_txt_response(&resp),
+                Err(ParseError::BadResponseCode(rcode))
+            );
+        }
     }
 
     #[test]

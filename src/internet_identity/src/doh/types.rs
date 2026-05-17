@@ -86,6 +86,15 @@ pub enum DohError {
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
     QuorumFailed { agreeing: usize, total: usize },
+    /// Quorum of providers authoritatively reported no record at this
+    /// name (DNS `RCODE=NXDOMAIN` or an empty answer section). Distinct
+    /// from `QuorumFailed` / `AllProvidersFailed` so the caller can
+    /// distinguish "this record doesn't exist" — a valid DNS state — from
+    /// "we couldn't reach a verdict on what this record is". DMARC, for
+    /// example, treats a missing `_dmarc` TXT as "no policy published"
+    /// and falls back to strict alignment (design §6.3); a transient
+    /// outage should NOT take the same fallback — it should fail.
+    NoAnswer,
     /// A single response was received but failed to parse as a DNS
     /// message with a valid TXT record. (Reported during quorum
     /// counting; not a top-level failure unless every response is
