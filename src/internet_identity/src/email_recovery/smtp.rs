@@ -178,6 +178,14 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // the pipeline. We borrow only briefly so the async outcalls
     // below don't hold a `RefCell` across an await (which would
     // trap inside the canister).
+    //
+    // Note: this lookup *lazily evicts* the entry if it has aged
+    // past `CHALLENGE_TTL_SECS` — `pending::with_mut` checks the
+    // TTL before invoking the closure and drops the entry on
+    // expiry. So a stale nonce surfaces as `SmtpResponse::Ok {}` /
+    // status `Expired` without consuming further canister cycles,
+    // and the global eviction sweep on the next `insert_with_eviction`
+    // call cleans up any other expired entries.
     let snapshot = match pending::with_mut(&nonce, now_secs, |c| {
         let kind = match (&c.kind, recipient_flow) {
             (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
