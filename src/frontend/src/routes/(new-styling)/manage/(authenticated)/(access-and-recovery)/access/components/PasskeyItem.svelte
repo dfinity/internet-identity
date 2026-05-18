@@ -95,14 +95,19 @@
 
 <div>
   <div class="mb-3 flex h-9 flex-row items-center">
-    <div class="relative">
-      <PasskeyIcon class="text-fg-primary size-6" />
-      {#if isCurrentAccessMethod}
-        <div
-          class="bg-bg-success-secondary border-bg-primary absolute top-0 -right-0.25 size-2.5 rounded-full border-2"
-        ></div>
-      {/if}
-    </div>
+    <PasskeyIcon class="text-fg-primary size-6" />
+    {#if isCurrentAccessMethod}
+      <div
+        class={[
+          "ms-2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+          "border-[#b8e6c8] bg-[#e6f7ed] text-[#1a7a40]",
+          "dark:border-[#1f4a2e] dark:bg-[#0f2a1a] dark:text-[#4ade80]",
+        ]}
+      >
+        <div class="bg-bg-success-secondary size-2 rounded-full"></div>
+        {$t`Active`}
+      </div>
+    {/if}
     {#if isLegacy}
       <div
         class={[
