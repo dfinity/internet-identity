@@ -131,7 +131,7 @@
     </h1>
     <p class="text-text-tertiary text-base font-medium">
       {#if sent}
-        {$t`This usually takes under 30 seconds.`}
+        <Trans>This usually takes under 30 seconds.</Trans>
       {:else}
         <Trans>Send the email below to confirm.</Trans>
       {/if}
@@ -306,20 +306,21 @@
       >
         <p>
           <Trans>
-            The email needs to come from
-            <strong class="break-all">{fromAddress}</strong>
-            directly. Aliases and forwarders won't work.
+            The email needs to come from the address above directly. Aliases and
+            forwarders won't work.
           </Trans>
         </p>
         <p>
-          {$t`Double-check the subject line. It has to be exactly:`}
-          <code
-            class="bg-bg-secondary text-text-primary mt-1 block rounded px-2 py-1 font-mono text-xs break-all"
-            >{nonce}</code
-          >
+          <Trans>
+            Double-check the subject line. It has to match the one above
+            exactly.
+          </Trans>
         </p>
         <p>
-          {$t`Some mail providers queue outgoing mail. Check your sent folder to make sure it actually went out.`}
+          <Trans>
+            Some mail providers queue outgoing mail. Check your sent folder to
+            make sure it actually went out.
+          </Trans>
         </p>
       </div>
     </details>
