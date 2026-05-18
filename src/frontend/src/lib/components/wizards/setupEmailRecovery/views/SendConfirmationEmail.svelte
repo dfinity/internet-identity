@@ -323,7 +323,7 @@
       {$t`This email link expires in about 30 minutes.`}
     </p>
 
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col items-stretch gap-3">
       <a class="btn btn-primary btn-lg" href={mailtoHref}>
         <ExternalLinkIcon class="size-5" />
         <span>{$t`Open in mail app`}</span>
