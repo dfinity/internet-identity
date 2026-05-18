@@ -21,9 +21,13 @@
      *  "dnssec" when the FE submitted a signed bundle; "doh" when the
      *  canister will fall back to its multi-provider DoH quorum. */
     path: Path;
+    /** Fired when the user clicks "I've sent the email". Pure
+     *  presentation hook — the parent wizard's polling loop already
+     *  runs; this just advances to the waiting view. */
+    onSent: () => void;
   }
 
-  const { nonce, mailbox, fromAddress, path }: Props = $props();
+  const { nonce, mailbox, fromAddress, path, onSent }: Props = $props();
 
   // mailto: link — pre-fills To and Subject, leaves the body empty.
   // Honoured by every native mail client we care about (Apple Mail,
@@ -180,8 +184,20 @@
     {$t`This email link expires in about 30 minutes.`}
   </p>
 
-  <a class="btn btn-primary btn-lg" href={mailtoHref}>
-    <ExternalLinkIcon class="size-5" />
-    <span>{$t`Open in mail app`}</span>
-  </a>
+  <div class="flex flex-col gap-2">
+    <a class="btn btn-primary btn-lg" href={mailtoHref}>
+      <ExternalLinkIcon class="size-5" />
+      <span>{$t`Open in mail app`}</span>
+    </a>
+    <!-- Presentation-only secondary action. The polling loop in the
+         parent wizard already runs from the moment `prepare_add`
+         returned, so the canister can flip terminal without the user
+         ever clicking this — notably the DoH path. This button just
+         advances the wizard to the waiting view so the screen
+         visibly responds to the user's physical action of sending
+         the mail. -->
+    <button type="button" class="btn btn-secondary btn-lg" onclick={onSent}>
+      {$t`I've sent the email`}
+    </button>
+  </div>
 </div>
