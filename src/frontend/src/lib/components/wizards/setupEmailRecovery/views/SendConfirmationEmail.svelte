@@ -325,15 +325,6 @@
       </div>
     </details>
   {:else}
-    <!-- Static lifetime hint. The actual TTL lives in
-         `email_recovery::CHALLENGE_TTL_SECS` (30 minutes). We don't
-         run a ticking countdown — the status-poll surfaces `Expired`
-         via `FailedView` when the user is out of time, which is the
-         authoritative source. -->
-    <p class="text-text-tertiary text-xs">
-      {$t`This email link expires in about 30 minutes.`}
-    </p>
-
     <div class="flex flex-col items-stretch gap-3">
       <a class="btn btn-primary btn-lg" href={mailtoHref}>
         <ExternalLinkIcon class="size-5" />
