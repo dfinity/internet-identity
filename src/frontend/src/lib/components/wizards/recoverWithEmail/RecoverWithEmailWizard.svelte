@@ -24,7 +24,6 @@
 
   import EnterAddressForRecovery from "./views/EnterAddressForRecovery.svelte";
   import SendConfirmationEmail from "$lib/components/wizards/setupEmailRecovery/views/SendConfirmationEmail.svelte";
-  import WaitingForEmail from "$lib/components/wizards/setupEmailRecovery/views/WaitingForEmail.svelte";
   import FailedView from "$lib/components/wizards/setupEmailRecovery/views/FailedView.svelte";
   import UnsupportedDomain from "$lib/components/wizards/setupEmailRecovery/views/UnsupportedDomain.svelte";
   import type {
@@ -93,6 +92,7 @@
         challenge: EmailRecoveryChallenge;
         address: string;
         sessionIdentity: ECDSAKeyIdentity;
+        path: Path;
       }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
@@ -297,6 +297,7 @@
       challenge: stage.challenge,
       address: stage.address,
       sessionIdentity: stage.sessionIdentity,
+      path: stage.path,
     };
   };
 </script>
@@ -315,10 +316,12 @@
     onSent={handleSent}
   />
 {:else if stage.kind === "waiting"}
-  <WaitingForEmail
-    fromAddress={stage.address}
+  <SendConfirmationEmail
     nonce={stage.challenge.nonce}
     mailbox={`recover@${window.location.hostname}`}
+    fromAddress={stage.address}
+    path={stage.path}
+    sent
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
