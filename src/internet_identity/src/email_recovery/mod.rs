@@ -104,6 +104,16 @@ pub const CHALLENGE_TTL_SECS: u64 = 30 * 60;
 /// Cap on the in-flight pending-challenge map. Sized generously
 /// (10 000 entries) so legitimate fill rates never get close, and
 /// the design-doc §8.8 eviction analysis applies cleanly above it.
+///
+/// **Doubles as the per-canister rate-limit on `prepare_add` /
+/// `prepare_delegation`.** There is no per-anchor or per-caller
+/// counter: at sustained call rate `R`, an attacker can hold at
+/// most `min(R × CHALLENGE_TTL_SECS, MAX_PENDING_CHALLENGES)`
+/// entries in flight. The cap + TTL together bound heap residency
+/// to ≈ 10 k × 1 KB ≈ 10 MB — a small fraction of the canister's
+/// heap budget. Legitimate users coexist because oldest-first
+/// eviction targets stale attacker entries first whenever the map
+/// fills (see `evict_oldest` in `pending.rs`).
 pub const MAX_PENDING_CHALLENGES: usize = 10_000;
 
 /// Recipient user-part for the **setup** flow. Together with any of
