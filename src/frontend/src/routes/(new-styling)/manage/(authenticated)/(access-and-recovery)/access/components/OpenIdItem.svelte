@@ -47,7 +47,7 @@
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">
-  <div class="text-fg-primary relative size-6">
+  <div class="text-fg-primary size-6">
     {#if isSso || logo === undefined}
       <!--
         SSO credentials render the generic SSO icon. We also fall back
@@ -61,12 +61,19 @@
       <!-- eslint-disable-next-line svelte/no-at-html-tags -- logo is a trusted SVG string sourced from the backend canister's openid_configs -->
       {@html logo}
     {/if}
-    {#if isCurrentAccessMethod}
-      <div
-        class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
-      ></div>
-    {/if}
   </div>
+  {#if isCurrentAccessMethod}
+    <div
+      class={[
+        "ms-2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+        "border-[#b8e6c8] bg-[#e6f7ed] text-[#1a7a40]",
+        "dark:border-[#1f4a2e] dark:bg-[#0f2a1a] dark:text-[#4ade80]",
+      ]}
+    >
+      <div class="bg-bg-success-secondary size-2 rounded-full"></div>
+      {$t`Active`}
+    </div>
+  {/if}
   {#if options.length > 0}
     <Select {options} align="end">
       <button
