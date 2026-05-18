@@ -1273,9 +1273,9 @@ dialogs.
 There is no in-wizard `Cancel` button — the dialog's top-right `×`
 is the only user-driven exit, matching the convention the rest of
 the (new-styling) dialogs use. The wizard has no top-of-view step
-indicator either; the user moves through three views (enter address →
-send confirmation email → success toast) but the views are not
-numbered in the UI.
+indicator either; the user moves through four views (enter address →
+send confirmation email → waiting → success toast) but the views are
+not numbered in the UI.
 
 ```
 Add a recovery email
@@ -1321,17 +1321,12 @@ Send the email below to confirm.
 └─────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────┐
-│           ✉  Open in mail app               │  (mailto: link)
+│           ✉  Open in mail app               │  (primary, mailto:)
 └─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│           I've sent the email               │  (secondary, advances
+└─────────────────────────────────────────────┘    to the waiting view)
 ```
-
-There is no "waiting for email" spinner or countdown rendered on
-this view: the FE polls `email_recovery_status(nonce)` silently in
-the background, and the dialog flips straight to the success toast
-(setup) or to a sign-in redirect (recovery) the moment the canister
-returns a terminal status. If the user does nothing, the entry just
-expires after 30 minutes and the next prepare call gets a fresh
-nonce — there's no useful countdown to render against.
 
 The small shield-check chip on the right of the **From** row carries a
 tooltip explaining the cryptographic-authenticity model (the wording
@@ -1346,9 +1341,83 @@ and Subject rows each have a per-row copy button (top-right of the
 row) that reveals a "Copied to clipboard" tooltip for ~700 ms after
 success — same pattern as `ContinueOnNewDevice.svelte`.
 
+"I've sent the email" is a presentation-only secondary action that
+advances the wizard to **step 2.5** (waiting). The polling loop in
+`SetupEmailRecoveryWizard.svelte` runs continuously from the moment
+`email_recovery_credential_prepare_add` returns, so the canister can
+also flip the wizard straight to a terminal state without the user
+ever clicking it (notably the DoH path, which resolves
+synchronously inside `smtp_request`). The button exists so that
+the screen *visibly responds* to the user's physical action of
+sending the mail, instead of leaving them staring at the unchanged
+compose card while polling happens in the background.
+
 There is no orange warning block, no `Cancel`, and no `Resend` —
 closing and re-opening the dialog issues a fresh nonce naturally, so
 those affordances would only have been visual noise.
+
+**Setup wizard — step 2.5: waiting** (FE shown after the user clicks "I've sent the email"; the file is `WaitingForEmail.svelte`)
+
+The view centres on a spinner with a calibrated time estimate. The
+compose card collapses behind a `<details>` block at the bottom so
+the user can still glance back at the recipient and subject without
+losing their place — useful for the typo case where the email
+bounced and they want to re-open it in the mail app.
+
+```
+Waiting for your email...
+
+We're checking for an email from
+alice@gmail.com.
+
+           ⠋
+
+This usually takes 10–30 seconds after
+you send.
+
+▶  Show what to send                   ← <details> collapsible,
+                                          re-reveals the compose card
+                                          from step 2 (read-only)
+```
+
+There is no "Back" button — closing-and-reopening the dialog is the
+dialog-wide convention. The wizard advances automatically the moment
+the canister returns a terminal status; until then, only the body
+copy changes.
+
+If 60 s elapse on this view without the canister flipping terminal,
+the time-estimate paragraph swaps for a soft troubleshooting nudge.
+The spinner stays — the canister can still resolve at any moment,
+and removing it would imply we've given up.
+
+```
+Waiting for your email...
+
+We're checking for an email from
+alice@gmail.com.
+
+           ⠋
+
+Taking longer than expected. A few things
+to check:
+
+  • Confirm the email was sent from
+    alice@gmail.com (not an alias or a
+    different address).
+  • Check the subject line is exactly:
+      II-Recovery-1a2b3c4d5e6f7081
+  • Check your sent folder — some
+    providers queue outbound mail.
+
+▶  Show what to send                   ← <details> collapsible
+```
+
+The three bullets cover the failure modes we expect at the 60 s
+mark — typo'd subject, wrong From: address (work vs personal), and
+mail still queued client-side — and the cost of showing them is
+near-zero if the canister flips terminal in the next second. The 60 s
+threshold itself is a placeholder; once Plausible funnels have a few
+days of real data, calibrate against the p90 of `Pending → terminal`.
 
 **Setup wizard — step 3: success (no dedicated view)**
 
@@ -1381,11 +1450,12 @@ Pick a recovery method below to sign back in.
        Cancel       (tertiary link → "/")
 ```
 
-**Recovery sign-in — email branch** (the same three steps as setup,
-with terminal step issuing a delegation and signing the user in
-instead of toasting "all set"). Step 2 is identical to the setup-flow
-mockup above except the recipient is `recover@<host>` instead of
-`register@<host>`.
+**Recovery sign-in — email branch** (the same four steps as setup
+— enter address → send confirmation email → waiting → terminal — with
+the terminal step issuing a delegation and signing the user in
+instead of toasting "all set"). Step 2 and step 2.5 are identical to
+the setup-flow mockups above except the recipient is `recover@<host>`
+instead of `register@<host>`.
 
 **Error states**
 
@@ -1515,7 +1585,7 @@ If telemetry later shows the eviction churn making recovery noticeably flaky, th
 The current management surface lives at `src/frontend/src/routes/(new-styling)/manage/(authenticated)/(access-and-recovery)/recovery/+page.svelte` and today only renders the recovery-phrase card. The recovery (sign-in) flow lives at `src/frontend/src/routes/(new-styling)/recovery/+page.svelte` and uses `RecoverIdentityWizard`.
 
 - **Manage page** — rename the page heading from "Recovery phrase" to **"Recovery methods"** (see §8.6 mockup) and the surrounding tab labels accordingly. The `(access-and-recovery)` layout splits into two cards: the existing `ActiveRecoveryPhrase` / `InactiveRecoveryPhrase` / `UnverifiedRecoveryPhrase` card (no functional change beyond moving Verify+Reset into a `More options` dropdown on the unverified state, see §8.6), and a new `ActiveEmailRecovery` / `InactiveEmailRecovery` pair. The inactive state's primary action is `Activate`, which opens the setup wizard. The active state has a `More options` dropdown with `Replace` / `Remove`. The `Remove` path goes through a confirmation dialog (see §8.6) and calls `email_recovery_credential_remove` once; on success the card flips back to inactive. Unlike the phrase card, removal is a first-class action — see the §8.6 note on why email recovery diverges from phrase UX. New svelte components live in the same `recovery/components/` directory next to the phrase ones.
-- **Recovery sign-in page** — refactor `(new-styling)/recovery/+page.svelte` from a single "Get started" entry into a method picker with two `ButtonCard`s: "Recovery phrase" (gray `Shield` icon, opens `RecoverIdentityWizard` as before) and "Recovery email" (gated by the `EMAIL_RECOVERY` feature flag, opens the new `RecoverWithEmailWizard`). The page heading drops from a step-1 "Get started" CTA to a method-agnostic "Pick a recovery method below to sign back in." subtitle. The email-recovery wizard implements the three-step flow from §8.6: enter address → send-the-confirmation-email instructions screen with a live poll spinner → signed-in (terminal state issues the delegation and redirects to the manage page).
+- **Recovery sign-in page** — refactor `(new-styling)/recovery/+page.svelte` from a single "Get started" entry into a method picker with two `ButtonCard`s: "Recovery phrase" (gray `Shield` icon, opens `RecoverIdentityWizard` as before) and "Recovery email" (gated by the `EMAIL_RECOVERY` feature flag, opens the new `RecoverWithEmailWizard`). The page heading drops from a step-1 "Get started" CTA to a method-agnostic "Pick a recovery method below to sign back in." subtitle. The email-recovery wizard implements the four-step flow from §8.6: enter address → send-the-confirmation-email instructions screen → waiting view (`WaitingForEmail.svelte`, the spinner moves here once the user clicks "I've sent the email") → signed-in (terminal state issues the delegation and redirects to the manage page).
 
 DNSSEC bundle assembly (see §7.4) lives in `src/frontend/src/lib/utils/dnssec/` and is reused by both wizards.
 
