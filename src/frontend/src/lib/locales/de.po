@@ -97,6 +97,9 @@ msgstr "Zugriffsmethoden"
 msgid "Account name"
 msgstr "Kontoname"
 
+msgid "Active"
+msgstr "Aktiv"
+
 msgid "Activate"
 msgstr "Aktivieren"
 

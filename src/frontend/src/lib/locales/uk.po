@@ -97,6 +97,9 @@ msgstr "Способи доступу"
 msgid "Account name"
 msgstr "Назва облікового запису"
 
+msgid "Active"
+msgstr "Активний"
+
 msgid "Activate"
 msgstr "Активувати"
 

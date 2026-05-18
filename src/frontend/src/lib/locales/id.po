@@ -97,6 +97,9 @@ msgstr "Metode akses"
 msgid "Account name"
 msgstr "Nama akun"
 
+msgid "Active"
+msgstr "Aktif"
+
 msgid "Activate"
 msgstr "Aktifkan"
 
