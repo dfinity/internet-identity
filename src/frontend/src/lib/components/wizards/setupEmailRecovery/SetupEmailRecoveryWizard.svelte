@@ -72,6 +72,17 @@
         address: string;
         path: Path;
       }
+    // Presentation-only stage entered when the user clicks "I've
+    // sent the email" on the SendConfirmationEmail view. Same fields
+    // as `sending`; the only difference is that the view re-renders
+    // with `sent={true}`. The polling loop runs continuously across
+    // both stages — see the guard in `runPoll`.
+    | {
+        kind: "waiting";
+        challenge: EmailRecoveryChallenge;
+        address: string;
+        path: Path;
+      }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
@@ -229,7 +240,10 @@
     let intervalMs = 1_000;
     let dkimLeafSubmitted = false;
     try {
-      while (polling && stage.kind === "sending") {
+      while (
+        polling &&
+        (stage.kind === "sending" || stage.kind === "waiting")
+      ) {
         const result = await status(nonce);
         if ("RegistrationSucceeded" in result) {
           setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Succeeded);
@@ -304,6 +318,20 @@
   const handleRetry = () => {
     stage = { kind: "enter" };
   };
+
+  // Triggered by SendConfirmationEmail's "I've sent the email"
+  // button. Pure presentation transition — the polling loop already
+  // covers the `waiting` stage via the loop's stage-kind guard, so
+  // we don't restart it here.
+  const handleSent = () => {
+    if (stage.kind !== "sending") return;
+    stage = {
+      kind: "waiting",
+      challenge: stage.challenge,
+      address: stage.address,
+      path: stage.path,
+    };
+  };
 </script>
 
 {#if stage.kind === "enter"}
@@ -317,6 +345,15 @@
     mailbox={`register@${window.location.hostname}`}
     fromAddress={stage.address}
     path={stage.path}
+    onSent={handleSent}
+  />
+{:else if stage.kind === "waiting"}
+  <SendConfirmationEmail
+    nonce={stage.challenge.nonce}
+    mailbox={`register@${window.location.hostname}`}
+    fromAddress={stage.address}
+    path={stage.path}
+    sent
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
