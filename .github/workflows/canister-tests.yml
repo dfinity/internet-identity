@@ -513,6 +513,29 @@ jobs:
       - name: Install icp-cli
         run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
+      # Pin the network launcher (which bundles pocket-ic) because
+      # `icp network start` otherwise fetches `releases/latest`. The
+      # current `latest` (v13.x, published 2026-05-13) ships a
+      # pocket-ic build that strictly rejects canister-signature
+      # delegations whose subnet certificate omits `subnet_type` —
+      # which pocket-ic itself emits on every delegation, breaking
+      # any flow that round-trips a canister sig through the replica
+      # (notably the OpenID + consent e2e tests). Tracked upstream by
+      # dfinity/ic#10226 (fix not yet in any launcher release).
+      # Remove this step once a launcher release including that fix
+      # exists.
+      - name: Pin icp-cli-network-launcher to last working v12
+        run: |
+          launcher_tag=v12.0.0-2026-04-16-04-20
+          launcher_dir="$RUNNER_TEMP/icp-cli-network-launcher-x86_64-linux-$launcher_tag"
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            -o "$RUNNER_TEMP/launcher.tar.gz" \
+            "https://github.com/dfinity/icp-cli-network-launcher/releases/download/$launcher_tag/icp-cli-network-launcher-x86_64-linux-$launcher_tag.tar.gz"
+          tar xzf "$RUNNER_TEMP/launcher.tar.gz" -C "$RUNNER_TEMP"
+          test -x "$launcher_dir/icp-cli-network-launcher"
+          test -x "$launcher_dir/pocket-ic"
+          echo "ICP_CLI_NETWORK_LAUNCHER_PATH=$launcher_dir/icp-cli-network-launcher" >> "$GITHUB_ENV"
+
       # Helps with debugging
       - name: Show versions
         run: |
