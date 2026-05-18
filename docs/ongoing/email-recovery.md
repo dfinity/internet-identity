@@ -802,7 +802,7 @@ Anchor storage already uses `minicbor-derive`, which is forward/backward compati
 
 **Why a `Vec` if v1 only ever holds one entry.** The v1 API caps `email_recovery` at one entry per anchor (see "v1 API invariants" below). The data model is widened to a `Vec` anyway so a future iteration that lets a user bind multiple recovery emails can land without another schema migration. Today the `Vec` is structurally never longer than one; tomorrow we can lift the cap with a pure API-layer change.
 
-Surface for the FE: `IdentityInfo` (returned by `identity_info`) carries a flat `email_recovery: opt EmailRecoveryCredential` field, populated as `anchor.email_recovery.first().cloned()`. The manage-page card renders directly off it without a second canister call. When the v1 cap is lifted, this field becomes a `vec` and the FE renders multiple cards.
+Surface for the FE: `IdentityInfo` (returned by `identity_info`) carries a flat `email_recovery: vec EmailRecoveryCredential` field, populated as `anchor.email_recovery.clone()`. The candid surface widens straight to `vec` rather than `opt` so a future bump past the v1 one-entry cap doesn't need another schema change — the FE renders the recovery-email card off `email_recovery.first()` today, and renders multiple cards once the API cap is lifted. The stored data shape (`Vec` on the anchor) and the wire shape (`vec` on `IdentityInfo`) match, which keeps the conversion at the canister boundary a no-op.
 
 One additional stable map exists alongside this:
 
