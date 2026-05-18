@@ -42,8 +42,12 @@
     type Path,
   } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
+  import {
+    recoverWithEmailFunnel,
+    RecoverWithEmailEvents,
+  } from "$lib/utils/analytics/recoverWithEmailFunnel";
   import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import type { RecoverySuccess } from "./index";
 
   interface Props {
@@ -103,6 +107,43 @@
     polling = false;
   });
 
+  // Plausible funnel: emit `start-email-recovery-recover` when the
+  // wizard mounts. Each milestone calls `trigger(...)`; the terminal
+  // states (signed-in / failed / unsupported) call `close()` to record
+  // duration. See `recoverWithEmailFunnel.ts` for the event shape.
+  //
+  // Belt-and-braces `close()` on unmount: if the user abandons the
+  // wizard mid-flow (Dialog `×`, navigation away, browser back)
+  // without reaching a terminal branch, the funnel's
+  // `trackWindowSession` listener would otherwise stay registered.
+  // A later remount's `init()` would then overwrite the cleanup
+  // pointer, leaking the old listener. `close()` is idempotent (it
+  // only does work if a `start-…` timestamp is set), so calling it
+  // here both fires `end-…` for the abandoned flow and unregisters
+  // the visibility listener cleanly.
+  onMount(() => {
+    recoverWithEmailFunnel.init();
+  });
+  onDestroy(() => {
+    recoverWithEmailFunnel.close();
+  });
+
+  /**
+   * Map a terminal `EmailRecoveryStatus` (`Failed` or `Expired`) to
+   * the variant-name string used as the `reason` property on the
+   * Plausible `*-failed` event.
+   */
+  const failureReason = (variant: EmailRecoveryStatus): string => {
+    if ("Failed" in variant) {
+      const reason = variant.Failed as Record<string, unknown>;
+      return Object.keys(reason)[0] ?? "unknown";
+    }
+    if ("Expired" in variant) {
+      return "Expired";
+    }
+    return "unknown";
+  };
+
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
       const reason = variant.Failed;
@@ -142,6 +183,7 @@
   };
 
   const handleAddressSubmitted = async (address: string) => {
+    recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.AddressSubmitted);
     const domain = address.split("@")[1] ?? "";
 
     // Generate the session keypair the eventual delegation will be
@@ -169,6 +211,7 @@
 
     try {
       const challenge = await prepareDelegation(input, sessionPublicKey);
+      recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.Prepared, { path });
       stage = { kind: "sending", challenge, address, sessionIdentity, path };
       void runPoll(challenge.nonce, domain, sessionIdentity);
     } catch (e) {
@@ -177,6 +220,11 @@
           e.type === "DomainNotAllowlisted" ||
           e.type === "DomainNotSupported"
         ) {
+          recoverWithEmailFunnel.trigger(
+            RecoverWithEmailEvents.UnsupportedDomain,
+            { reason: e.type },
+          );
+          recoverWithEmailFunnel.close();
           stage = { kind: "unsupported", domain };
           return;
         }
@@ -201,6 +249,7 @@
       ) {
         const result = await status(nonce);
         if ("RecoveryReady" in result) {
+          recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.RecoveryReady);
           await retrieveDelegation(
             nonce,
             result.RecoveryReady.user_key,
@@ -211,11 +260,16 @@
           return;
         }
         if ("Failed" in result || "Expired" in result) {
+          recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.Failed, {
+            reason: failureReason(result),
+          });
+          recoverWithEmailFunnel.close();
           stage = { kind: "failed", reason: friendlyError(result) };
           return;
         }
         if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
           dkimLeafSubmitted = true;
+          recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.NeedDkimLeaf);
           const selector = result.NeedDkimLeaf.selector;
           try {
             const walked = await assembleDkimResolution(domain, selector);
@@ -225,7 +279,13 @@
                 hops: walked.hops,
                 extra_chains: walked.extraChains,
               });
+              recoverWithEmailFunnel.trigger(
+                RecoverWithEmailEvents.DkimLeafSubmitted,
+              );
               if ("RecoveryReady" in submission) {
+                recoverWithEmailFunnel.trigger(
+                  RecoverWithEmailEvents.RecoveryReady,
+                );
                 await retrieveDelegation(
                   nonce,
                   submission.RecoveryReady.user_key,
@@ -236,6 +296,10 @@
                 return;
               }
               if ("Failed" in submission || "Expired" in submission) {
+                recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.Failed, {
+                  reason: failureReason(submission),
+                });
+                recoverWithEmailFunnel.close();
                 stage = { kind: "failed", reason: friendlyError(submission) };
                 return;
               }
@@ -269,13 +333,22 @@
         session_key: sessionPublicKey,
         expiration,
       });
+      recoverWithEmailFunnel.trigger(
+        RecoverWithEmailEvents.DelegationRetrieved,
+      );
       await onSignedIn({
         sessionIdentity,
         userKey,
         delegation,
         identityNumber,
       });
+      recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.SignedIn);
+      recoverWithEmailFunnel.close();
     } catch (e) {
+      recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.Failed, {
+        reason: e instanceof Error ? e.message : String(e),
+      });
+      recoverWithEmailFunnel.close();
       stage = {
         kind: "failed",
         reason: e instanceof Error ? e.message : String(e),
