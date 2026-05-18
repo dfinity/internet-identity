@@ -58,6 +58,86 @@ thread_local! {
     static DOH_CACHE: RefCell<DohCache> = RefCell::new(DohCache::default());
 }
 
+// =====================================================================
+// Transform / outcall classification: pure helpers shared by the prod
+// outcall plumbing (next section) and the unit tests (cfg(test)).
+//
+// `transform_doh` and `outcall` need each other's status conventions to
+// stay in lockstep, but only `outcall` can be exercised live in tests.
+// Extracting the two pure step functions here keeps the security-
+// critical invariant — "an `Outcome::NoAnswer` can only originate from
+// our own transform, never from an upstream-reported status" — testable
+// without spinning up an outcall harness.
+// =====================================================================
+
+/// HTTP 200. The transform emits this iff `parse_txt_response`
+/// returned an in-band TXT payload (placed in `body`).
+const HTTP_STATUS_OK: u16 = 200;
+
+/// HTTP 204 ("No Content"). The transform emits this iff
+/// `parse_txt_response` returned [`ParseError::NoAnswer`] — i.e. the
+/// upstream's wire-format response carried RCODE=3 (NXDOMAIN) or an
+/// RCODE=0 empty answer section. [`status_to_outcome`] maps it to
+/// [`Outcome::NoAnswer`].
+const HTTP_STATUS_TRANSFORM_NO_ANSWER: u16 = 204;
+
+/// HTTP 422 ("Unprocessable Entity"). The transform emits this iff
+/// `parse_txt_response` returned a non-NoAnswer parse error — the
+/// upstream returned 200 but the body wasn't a parseable DNS message.
+/// We signal failure via the status code (with an empty body) rather
+/// than via a sentinel body string because any TXT-bytes body the
+/// transform might emit could collide with a legitimate (if unusual)
+/// TXT payload.
+const HTTP_STATUS_TRANSFORM_PARSE_FAILED: u16 = 422;
+
+/// HTTP 502 ("Bad Gateway"). The transform emits this iff the
+/// upstream provider returned anything other than 200 (including a
+/// counterfeit 204). We do NOT pass the upstream status through —
+/// otherwise a misbehaving or adversarial provider could emit 204 to
+/// forge our `NoAnswer` sentinel and trick the quorum into reporting
+/// "this record doesn't exist" when in fact the provider was just
+/// broken. Forcing every upstream non-200 onto a fixed sentinel that
+/// is *not* 204 makes "the answer is `Outcome::NoAnswer`" a property
+/// only our transform can grant.
+const HTTP_STATUS_TRANSFORM_UPSTREAM_ERROR: u16 = 502;
+
+/// Map an upstream `(status, body)` pair to the `(status, body)` the
+/// transform will return to consensus. Pure function so we can unit-
+/// test the security property "an upstream 204 doesn't pass through
+/// as our NoAnswer sentinel" without going through the IC outcall
+/// harness.
+fn classify_upstream(upstream_status: u16, upstream_body: &[u8]) -> (u16, Vec<u8>) {
+    if upstream_status != HTTP_STATUS_OK {
+        // Any non-200 from upstream — including a counterfeit 204 —
+        // collapses onto a single sentinel that callers map to a
+        // generic FetchError. See the doc on
+        // `HTTP_STATUS_TRANSFORM_UPSTREAM_ERROR`.
+        return (HTTP_STATUS_TRANSFORM_UPSTREAM_ERROR, Vec::new());
+    }
+    match parse_txt_response(upstream_body) {
+        Ok(txt) => (HTTP_STATUS_OK, txt),
+        Err(ParseError::NoAnswer) => (HTTP_STATUS_TRANSFORM_NO_ANSWER, Vec::new()),
+        Err(_) => (HTTP_STATUS_TRANSFORM_PARSE_FAILED, Vec::new()),
+    }
+}
+
+/// Map a post-transform `(status, body)` pair to the [`Outcome`] the
+/// quorum step counts. Pure function, paired with [`classify_upstream`]
+/// — anything the transform might emit MUST land in exactly one
+/// branch here, and the only branch that yields [`Outcome::NoAnswer`]
+/// is the one keyed off [`HTTP_STATUS_TRANSFORM_NO_ANSWER`].
+fn status_to_outcome(status: u16, body: Vec<u8>) -> Outcome {
+    match status {
+        HTTP_STATUS_OK => Outcome::Txt(body),
+        HTTP_STATUS_TRANSFORM_NO_ANSWER => Outcome::NoAnswer,
+        // Includes both the parse-failed sentinel (422) and the
+        // upstream-error sentinel (502); the quorum step doesn't
+        // distinguish, and the format string preserves the code for
+        // logs.
+        other => Outcome::FetchError(format!("HTTP {other}")),
+    }
+}
+
 /// Public entry point. Returns the TXT bytes for `name` if at least
 /// the quorum threshold of providers agree.
 ///
@@ -189,7 +269,7 @@ fn now_secs() -> u64 {
 
 #[cfg(not(test))]
 mod prod {
-    use super::Outcome;
+    use super::{classify_upstream, status_to_outcome, Outcome};
     use ic_cdk::api::management_canister::http_request::{
         http_request_with_closure, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
         HttpResponse,
@@ -206,30 +286,6 @@ mod prod {
     /// replica fan-out plus the transform invocation, with refund of
     /// unused cycles. Each cache miss spends ~5× this in total.
     pub(super) const DOH_CALL_CYCLES: u128 = 30_000_000_000;
-
-    pub(super) const HTTP_STATUS_OK: u8 = 200;
-
-    /// HTTP status the transform returns when the wire-format DNS
-    /// response was a valid "no such record" answer (NXDOMAIN or an
-    /// RCODE=0 empty answer section). 204 ("No Content") is a
-    /// defensible bucket for "the request succeeded but there's
-    /// nothing to return", and [`outcall`] maps it to
-    /// [`Outcome::NoAnswer`] so the quorum can count "no record"
-    /// agreement separately from transient outages.
-    pub(super) const HTTP_STATUS_TRANSFORM_NO_ANSWER: u16 = 204;
-
-    /// HTTP status the transform returns when the wire-format DNS
-    /// response can't be parsed down to a TXT RDATA. We deliberately
-    /// signal failure via the *status code*, not via a sentinel body
-    /// string, because any TXT-bytes body the transform might emit
-    /// could collide with a real DKIM/DMARC payload (a sentinel like
-    /// `b"!!doh-malformed"` is bytes-equal to a (legal-but-unusual)
-    /// TXT record). 422 ("Unprocessable Entity") is a defensible
-    /// bucket for "you sent us bytes we can't make sense of"; what
-    /// actually matters is the IC-replica consensus on a non-200,
-    /// which the existing `if response.status != HTTP_STATUS_OK`
-    /// branch in [`outcall`] turns into an `Err`.
-    pub(super) const HTTP_STATUS_TRANSFORM_PARSE_FAILED: u16 = 422;
 
     pub(super) async fn fetch_all(query: &[u8]) -> Vec<Outcome> {
         let futures: Vec<_> = super::PROVIDERS.iter().map(|p| outcall(p, query)).collect();
@@ -262,14 +318,8 @@ mod prod {
         };
         match http_request_with_closure(request, DOH_CALL_CYCLES, transform_doh).await {
             Ok((response,)) => {
-                let status_u16: u16 = response.status.0.try_into().unwrap_or(u16::MAX);
-                if status_u16 == u16::from(HTTP_STATUS_OK) {
-                    Outcome::Txt(response.body)
-                } else if status_u16 == HTTP_STATUS_TRANSFORM_NO_ANSWER {
-                    Outcome::NoAnswer
-                } else {
-                    Outcome::FetchError(format!("HTTP {status_u16}"))
-                }
+                let status: u16 = response.status.0.try_into().unwrap_or(u16::MAX);
+                status_to_outcome(status, response.body)
             }
             Err((_, err)) => Outcome::FetchError(err),
         }
@@ -280,52 +330,24 @@ mod prod {
     /// DoH wire-format responses contain TTLs that decrement once a
     /// second, so replicas making the same query a few hundred ms
     /// apart can observe different bytes — consensus then fails. The
-    /// transform reduces the response to just the parsed TXT bytes,
-    /// which depend only on the resolver's cached answer (stable
-    /// within a given TTL bucket), so all replicas converge.
+    /// transform reduces the response to a fixed `(status, body)`
+    /// pair, computed by the pure [`super::classify_upstream`]
+    /// helper, so all replicas converge.
     ///
-    /// On parse failure we signal the failure out-of-band via a non-
-    /// 200 status code (with empty body) rather than encoding it in
-    /// the body. An in-band sentinel string would risk colliding with
-    /// a legitimate (if unusual) TXT payload and silently turning a
-    /// valid record into a "malformed" failure for the quorum. The
-    /// "no such record" case (NXDOMAIN / empty answer section) is
-    /// reported as a separate status (204) so the quorum step can
-    /// count "everyone agrees there is no record" distinctly from
-    /// "everyone failed to respond".
+    /// The classifier owns the rule that an upstream non-200 — even
+    /// if the upstream literally returned 204 — gets remapped to the
+    /// upstream-error sentinel rather than the NoAnswer sentinel.
+    /// Without that remapping a misbehaving or adversarial provider
+    /// could counterfeit "no record" by returning 204 directly.
     #[allow(clippy::needless_pass_by_value)]
     pub(super) fn transform_doh(response: HttpResponse) -> HttpResponse {
-        use super::ParseError;
         use candid::Nat;
-        if response.status != HTTP_STATUS_OK {
-            // Non-200 upstream responses are passed through untouched
-            // (status preserved, body emptied for consensus) —
-            // replicas converge on the status code even if their
-            // original bodies differed.
-            return HttpResponse {
-                status: response.status,
-                headers: vec![],
-                body: vec![],
-            };
-        }
-        match super::parse_txt_response(&response.body) {
-            Ok(txt) => HttpResponse {
-                status: Nat::from(HTTP_STATUS_OK),
-                headers: vec![],
-                body: txt,
-            },
-            Err(ParseError::NoAnswer) => HttpResponse {
-                // Out-of-band "no record" signal: see `HTTP_STATUS_TRANSFORM_NO_ANSWER`.
-                status: Nat::from(u32::from(HTTP_STATUS_TRANSFORM_NO_ANSWER)),
-                headers: vec![],
-                body: vec![],
-            },
-            Err(_) => HttpResponse {
-                // Out-of-band parse-failure signal: see `HTTP_STATUS_TRANSFORM_PARSE_FAILED`.
-                status: Nat::from(u32::from(HTTP_STATUS_TRANSFORM_PARSE_FAILED)),
-                headers: vec![],
-                body: vec![],
-            },
+        let upstream_status: u16 = response.status.0.try_into().unwrap_or(u16::MAX);
+        let (new_status, new_body) = classify_upstream(upstream_status, &response.body);
+        HttpResponse {
+            status: Nat::from(u32::from(new_status)),
+            headers: vec![],
+            body: new_body,
         }
     }
 }
@@ -676,5 +698,96 @@ mod tests {
         let r = block_on(fetch_txt(&name, "example.com"));
         assert!(matches!(r, Err(DohError::InvalidName(_))));
         assert_eq!(call_count(), 0);
+    }
+
+    // ---- Pure transform/outcall classifier coverage ----
+
+    /// Build a wire-format DoH response carrying one TXT answer.
+    /// Header: ID=0, flags=0x8180 (QR + RD + RA, RCODE=0), QDCOUNT=1,
+    /// ANCOUNT=1. Mirrors the helper in `parser.rs::tests`.
+    fn fake_txt_response(rdata: &[u8]) -> Vec<u8> {
+        use parser::{CLASS_IN, TYPE_TXT};
+        let mut out = Vec::new();
+        out.extend_from_slice(&[0, 0, 0x81, 0x80, 0, 1, 0, 1, 0, 0, 0, 0]);
+        out.extend_from_slice(b"\x07example\x03com\x00\x00\x10\x00\x01");
+        out.extend_from_slice(&[0xC0, 0x0C]);
+        out.extend_from_slice(&TYPE_TXT.to_be_bytes());
+        out.extend_from_slice(&CLASS_IN.to_be_bytes());
+        out.extend_from_slice(&300u32.to_be_bytes());
+        out.extend_from_slice(&(rdata.len() as u16).to_be_bytes());
+        out.extend_from_slice(rdata);
+        out
+    }
+
+    #[test]
+    fn classify_upstream_200_with_valid_txt_yields_ok_and_txt_bytes() {
+        let body = fake_txt_response(b"\x05hello");
+        let (status, out) = classify_upstream(HTTP_STATUS_OK, &body);
+        assert_eq!(status, HTTP_STATUS_OK);
+        assert_eq!(out, b"hello");
+    }
+
+    #[test]
+    fn classify_upstream_200_with_empty_answer_yields_no_answer_sentinel() {
+        // ANCOUNT=0 → parser emits ParseError::NoAnswer.
+        let mut body = Vec::new();
+        body.extend_from_slice(&[0, 0, 0x81, 0x80, 0, 1, 0, 0, 0, 0, 0, 0]);
+        body.extend_from_slice(b"\x07example\x03com\x00\x00\x10\x00\x01");
+        let (status, out) = classify_upstream(HTTP_STATUS_OK, &body);
+        assert_eq!(status, HTTP_STATUS_TRANSFORM_NO_ANSWER);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn classify_upstream_200_with_garbage_yields_parse_failed_sentinel() {
+        let (status, out) = classify_upstream(HTTP_STATUS_OK, b"not a DNS message");
+        assert_eq!(status, HTTP_STATUS_TRANSFORM_PARSE_FAILED);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn classify_upstream_spoofed_204_is_remapped_to_upstream_error() {
+        // The security-relevant case: a misbehaving or adversarial
+        // provider that returns 204 directly must NOT be treated as
+        // the transform's NoAnswer sentinel — that would let a single
+        // bad actor (or three colluding ones, against the quorum)
+        // counterfeit "this record doesn't exist" out of nothing. The
+        // classifier collapses every upstream non-200 onto the
+        // upstream-error sentinel instead, with an empty body.
+        let (status, out) = classify_upstream(HTTP_STATUS_TRANSFORM_NO_ANSWER, b"counterfeit body");
+        assert_eq!(status, HTTP_STATUS_TRANSFORM_UPSTREAM_ERROR);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn classify_upstream_non_200_is_remapped_to_upstream_error() {
+        for upstream in [301u16, 400, 403, 500, 502, 503] {
+            let (status, out) = classify_upstream(upstream, b"whatever body");
+            assert_eq!(
+                status, HTTP_STATUS_TRANSFORM_UPSTREAM_ERROR,
+                "upstream {upstream} should collapse to upstream-error sentinel"
+            );
+            assert!(out.is_empty());
+        }
+    }
+
+    #[test]
+    fn status_to_outcome_maps_each_transform_sentinel() {
+        match status_to_outcome(HTTP_STATUS_OK, b"some-txt".to_vec()) {
+            Outcome::Txt(b) => assert_eq!(b, b"some-txt"),
+            other => panic!("expected Txt, got {other:?}"),
+        }
+        assert_eq!(
+            status_to_outcome(HTTP_STATUS_TRANSFORM_NO_ANSWER, vec![]),
+            Outcome::NoAnswer
+        );
+        match status_to_outcome(HTTP_STATUS_TRANSFORM_PARSE_FAILED, vec![]) {
+            Outcome::FetchError(msg) => assert!(msg.contains("422")),
+            other => panic!("expected FetchError, got {other:?}"),
+        }
+        match status_to_outcome(HTTP_STATUS_TRANSFORM_UPSTREAM_ERROR, vec![]) {
+            Outcome::FetchError(msg) => assert!(msg.contains("502")),
+            other => panic!("expected FetchError, got {other:?}"),
+        }
     }
 }
