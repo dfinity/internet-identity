@@ -1,0 +1,765 @@
+# Production-ready OpenID & SSO
+
+**Status:** Draft — RFC for review. No code yet; this doc supersedes the SSO allowlist gate as the path to production.
+**Last updated:** 2026-05-18
+**Targets:** A series of independent and stacked PRs; see §9 for the dependency layout.
+
+---
+
+## Glossary
+
+| Term | Meaning |
+| ---- | ------- |
+| **OIDC** | OpenID Connect — identity layer on top of OAuth 2.0 (RFC 6749). The IdP signs a JWT asserting the user's identity. |
+| **JWT** | JSON Web Token (RFC 7519). Three base64url segments: header, payload, signature. The payload carries claims (`iss`, `sub`, `aud`, `nonce`, `email`, …). |
+| **JWKS** | JSON Web Key Set (RFC 7517). Public keys the IdP publishes at `jwks_uri`, used to verify the JWT signature. |
+| **`iss` / `sub` / `aud`** | JWT claims: issuer URL, opaque user identifier within that issuer, audience (OAuth client_id). The `(iss, sub, aud)` triple is the canonical key for an `OpenIdCredential`. |
+| **`nonce`** | JWT claim. The IdP echoes whatever value the FE put in the authorize URL — used to bind the JWT to the requesting session. |
+| **Discovery document** | OIDC standard JSON served at `<issuer>/.well-known/openid-configuration`. Declares `issuer`, `jwks_uri`, `authorization_endpoint`, `scopes_supported`, etc. |
+| **II OpenID config** | II-specific indirection served at `<discovery_domain>/.well-known/ii-openid-configuration`. Declares `client_id`, `openid_configuration` URL, optional human `name`. Hop 1 of the two-hop SSO discovery. |
+| **Two-hop discovery** | Hop 1: fetch `<discovery_domain>/.well-known/ii-openid-configuration` to learn `client_id` + the standard OIDC `openid_configuration` URL. Hop 2: fetch that URL to learn `issuer` + `jwks_uri`. |
+| **SSO (in II)** | A discoverable OIDC provider, registered by `discovery_domain` rather than as a hardcoded entry in `open_id_configs`. Backed by `DiscoverableProvider` today. |
+| **FedCM** | Federated Credential Management — browser-native API (`navigator.credentials.get`). Delivers JWTs to the page directly without a popup or redirect. Untouched by this design (see §2). |
+| **`response_mode`** | OAuth parameter controlling how the IdP returns the response. `fragment` puts it in the redirect URL hash (today); `form_post` POSTs it as a form body (proposed). |
+| **Anchor** | The II identity number. Maps to passkeys, OpenID credentials (`OpenIdCredential`), and other authn methods. |
+| **`salt` / `session_pk`** | FE-side artifacts. `salt` is 32 random bytes; `session_pk` is the FE's session public key. `nonce = SHA256(salt | session_pk)` is what the FE puts in the authorize URL. The canister recomputes and matches against the JWT's `nonce` claim, gated on `caller()` equaling the session principal — see §3. |
+| **HTTP outcall** | The IC's `http_request_with_closure` management API. Replicated across consensus nodes; deterministic via a transform function. |
+| **Boundary node** | The HTTPS gateway in front of canister calls. Trusted to terminate TLS but **not** trusted to preserve message integrity beyond what certification provides. |
+
+---
+
+## 1. Background
+
+Internet Identity ships an OpenID/SSO stack that, today, runs behind an allowlist. The allowlist is the load-bearing reason several architectural choices in the current implementation are tolerable: a small fixed set of registered SSO domains means a `Vec<Box<dyn OpenIdProvider>>` doesn't blow up, periodic discovery timers don't fan out, and the cost of broad HTTP outcalls stays bounded.
+
+We want to remove the allowlist and let any user register any SSO domain. That single decision exposes five problems that each need a solution before we can ship:
+
+| # | Problem | Why the allowlist masks it today |
+| - | ------- | -------------------------------- |
+| 1 | The provider registry is a `Vec<Box<dyn OpenIdProvider>>` parallel to a `Vec<DiscoveryState>`, with both holding per-provider mutable state (certs, discovered iss/client_id, last `jwks_uri`). | Bounded by allowlist size, so the vec stays small. Without the allowlist, an unbounded population of registered SSOs grows both vecs without bound. |
+| 2 | OIDC discovery + JWKS fetching runs on always-on timers (every 1 h for discovery, every 15 min for certs, with backoff). | Bounded by allowlist size, so the outcall fanout is constant. Without the allowlist, every newly-registered SSO adds a permanent stream of background outcalls. |
+| 3 | The three HTTP outcalls (`fetch_ii_openid_configuration`, `fetch_discovery`, `fetch_certs`) all pass `max_response_bytes: None`. Transform functions re-serialize but don't validate response size or structure before parsing. | Allowlist gating means only DFINITY-curated domains are reachable from the canister, so the trust assumption is "these domains won't serve giant or malformed bodies." Without the allowlist, anyone can point the canister at anything. |
+| 4 | The OAuth callback uses `response_mode=fragment`. The id_token comes back in the URL hash, the popup page reads `window.location.hash`, and BroadcastChannel forwards it to the opener. | Works with Google. Doesn't work reliably with Okta, Auth0, Apple Sign In (which deprecates fragment for hybrid flows), and is deprecated in OAuth 2.1. Limits which SSO providers we can support. |
+| 5 | `add_discoverable_oidc_config` is the registration endpoint. Anyone (post-allowlist-removal) calling it would persist their SSO domain into `OIDC_CONFIGS` stable state and spawn a permanent discovery timer. | The `is_allowed_discovery_domain` gate rejects calls for non-DFINITY-curated domains. |
+
+Problems 1–4 are architectural: each one needs a concrete redesign that lets the system stay sound when the input population is open. Problem 5 follows from the other four — once 1, 2, 3 are addressed, "anyone can register" becomes a no-op call (the discovery cache absorbs it), and the doc proposes deleting the registration concept entirely.
+
+The four hurdles can be tackled mostly in parallel; the dependency layout is in §9.
+
+### What this doc does **not** redesign
+
+- **The JWT consumption pattern** (`openid_credential_add`, `openid_prepare_delegation`, `openid_get_delegation`, `openid_identity_registration_finish`). The salt + nonce + `caller()` binding that secures the JWT against compromised transports stays exactly as it is — see §3 for why.
+- **FedCM**. The `navigator.credentials.get` path delivers JWTs to the FE directly through the browser; it never touches the redirect callback. Nothing in §7 affects it.
+- **Hardcoded direct providers** (Google, Microsoft, Apple). Configured via the `open_id_configs` init arg, no discovery needed. Their JWKS fetch path benefits from the cache (§5) but their config is not subject to the allowlist removal in §8.
+- **Governance**: who is allowed to register an SSO, rate-limit policy, cycle accounting per registration. These are policy questions, not architecture, and they are out of scope. The architecture in this doc is designed to be safe under "anyone can register" — the cache size cap and per-outcall cycle ceiling are the structural defenses. If a different gating policy is later layered on top, none of the design here has to change.
+
+---
+
+## 2. Goals & non-goals
+
+**Goals**
+
+- Lift the SSO allowlist. Any user can register and use any OIDC-compliant SSO provider.
+- Bound the canister's heap usage from registered SSOs: O(cache_size), not O(registered_count).
+- Eliminate always-on background outcalls for SSO discovery and JWKS fetching. Outcalls happen on demand, are cached, and time out.
+- Make the OAuth callback work across the major OIDC providers (Google, Microsoft, Apple, Okta, Auth0, Keycloak, Authelia, generic OIDC). Concretely: the OAuth flow does not depend on `response_mode=fragment`.
+- Bound the per-outcall blast radius: `max_response_bytes` is set everywhere, transforms reject malformed bodies before parsing, per-call cycle cost is ceilinged.
+- Preserve the security property that a compromised transport cannot redeem a JWT — see §3.
+
+**Non-goals**
+
+- Redesigning FedCM. The browser-native 1-click path does not interact with the OAuth callback or `response_mode`.
+- Replacing hardcoded direct providers (Google / Microsoft / Apple). They stay configured in `open_id_configs`.
+- A governance / rate-limiting / fee policy for SSO registration. The architecture is safe under "anyone can register"; if a policy layer is later added, no design here has to change.
+- Outbound communication to SSO IdPs beyond the discovery + JWKS fetch flows that exist today. We do not, e.g., implement back-channel token exchange or PKCE-based authorization code flow.
+- Backwards compatibility for the existing `response_mode=fragment` callback. The form_post change is a flag-day cutover; see §9 for migration sequencing.
+
+---
+
+## 3. Threat model
+
+The four hurdles change the architecture; they do **not** change the trust model that protects JWT redemption. This section makes that explicit because it's the property that constrains several otherwise-attractive simplifications in §7.
+
+### 3.1 What the existing scheme protects
+
+The FE generates `salt = random(32)` and `nonce = SHA256(salt | session_principal)`. The nonce goes in the authorize URL; the salt stays in FE memory. The IdP signs a JWT whose `nonce` claim equals that value. The FE later passes `(jwt, salt)` to the canister via a **signed** ingress message; the canister recomputes `expected_nonce = SHA256(salt | caller())` and rejects on mismatch.
+
+The three secrets that have to coincide for redemption to succeed:
+
+1. The IdP's signing key — owned by the IdP, not in scope to defend against IdP compromise.
+2. The `salt` — never on the wire except inside signed ingress messages.
+3. The session_sk corresponding to `session_principal` — never leaves the FE; required for the ingress signature so the canister sees `caller() == session_principal`.
+
+Without all three, no actor (boundary node, MITM, replicating outcall transport, malicious DoH provider, …) can redeem a JWT against an anchor that is not their own. This is the load-bearing security property.
+
+### 3.2 What changes under this design
+
+| Change | Effect on trust model |
+| ------ | --------------------- |
+| Stateless verifier + cache (§4, §5) | None. The verifier still runs `SHA256(salt | caller()) == jwt.nonce` against `caller()` from a signed ingress message. The cache holds JWKS + discovery results, not JWTs or salts. |
+| `max_response_bytes` + tighter transforms (§6) | Mitigates cycle-drain and OOM risk from a malicious SSO IdP serving giant or malformed bodies. No effect on JWT redemption. |
+| `response_mode=form_post` (§7) | Adds a new canister POST handler. The handler is anonymous (the POST comes from the IdP, not the user), so it does **not** receive an authenticated `caller()` and cannot itself redeem the JWT. It is a transport translator: parse the form body, return certified HTML, hand off to the FE. The FE then runs the existing salt+nonce+`caller()` flow. |
+| Allowlist removal (§8) | Adds an anonymous `discover_sso(domain)` endpoint. A malicious caller can request discovery for arbitrary domains, which fans out HTTP outcalls. Bounded by per-outcall cycle ceiling (§6) and cache LRU cap (§5). No effect on JWT redemption. |
+
+### 3.3 Attacks explicitly defended
+
+1. **MITM substitutes a different JWT on the way back from the IdP.** A different JWT has a different `nonce`; redemption requires `SHA256(salt | caller()) == jwt.nonce`. Without `salt` and without the session_sk, the attacker can't construct a JWT/principal pair that matches.
+2. **Boundary node tampers with the `form_post` POST response.** The canister POST handler responds via update mode, so the response is certified. A tampered response is rejected by the HTTP gateway.
+3. **Boundary node lies about discovery / JWKS responses** to influence which key verifies a JWT. The HTTP outcall is replicated across consensus nodes; a single node can't unilaterally inject. We further constrain via `max_response_bytes` and transform validation (§6).
+4. **Cache-miss flood from anonymous `discover_sso` calls.** Bounded by (a) the per-outcall cycle cost cap, (b) LRU eviction past the cache size limit (older entries fall out under sustained pressure, sustaining repeat work for the attacker), and (c) standard replicated-outcall pricing on the IC. The doc does not propose additional per-caller rate limiting; if that becomes necessary, it is added at the gating layer, not the architecture layer.
+5. **Replay of a stolen `(jwt, salt)` pair from a different session.** Already defended today: the JWT's `nonce` was computed with the original session's principal, so `caller()` from a different session won't match.
+
+### 3.4 Attacks explicitly **not** defended
+
+- Compromise of the IdP's signing key. Every credential issued by that IdP is at risk; that is the unavoidable trust assumption of any OIDC integration.
+- Compromise of the user's mailbox / device that holds the session_sk. Standard endpoint compromise — out of scope.
+- Phishing the user into completing an OAuth flow on a malicious site impersonating Internet Identity. This is the standard "website phishing" problem; we don't try to solve it in this layer.
+
+---
+
+## 4. Problem 1 — Stateful provider registry
+
+### 4.1 What it looks like today
+
+`src/internet_identity/src/openid.rs:352`:
+
+```rust
+thread_local! {
+    static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider>>> = RefCell::new(vec![]);
+    static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = const { RefCell::new(vec![]) };
+}
+```
+
+And `src/internet_identity/src/openid/generic.rs:427`:
+
+```rust
+thread_local! {
+    static DISCOVERY_TASKS: RefCell<Vec<DiscoveryState>> = const { RefCell::new(vec![]) };
+}
+```
+
+Three parallel collections. `PROVIDERS` holds trait objects, each of which (`DiscoverableProvider`) owns its own `Rc<RefCell<Option<String>>>` cells for the discovered `issuer`, `client_id`, plus the `Rc<RefCell<Vec<Jwk>>>` for the certs. `DISCOVERY_TASKS` holds the *same* `Rc`s indirectly, so the periodic discovery timer and the verifier share state by pointer aliasing.
+
+The reviewer comment at `generic.rs:422-425` flags it explicitly:
+
+> `DISCOVERY_TASKS` is unbounded — a long `allowed_discovery_domains()` list or many admin-configured SSO providers would fan out into many periodic HTTP outcalls.
+
+### 4.2 Why the allowlist matters here
+
+Each entry in `PROVIDERS` / `DISCOVERY_TASKS` carries:
+- ~200 bytes of pointer / `RefCell` overhead,
+- a `Vec<Jwk>` of cached certs (typically ~5 KB for an active provider with 2–4 keys),
+- a per-task discovery state (~few hundred bytes).
+
+With the allowlist set to one entry (`dfinity.org` on prod), this is trivial. Without the allowlist, the population grows with every call to `add_discoverable_oidc_config` and is persisted to stable state. There is no ceiling.
+
+The trait-dispatch design also doesn't earn its complexity. The three implementations (`Provider`, `DiscoverableProvider`, hardcoded fallback) differ only in:
+- whether `issuer` / `client_id` come from a config or from discovery,
+- which `email_verification_scheme` they advertise (`Google`, `Microsoft`, `None`),
+- whether `discovery_domain` is `Some` or `None`.
+
+These are data, not behavior. The `verify()` body is essentially the same in both `Provider::verify` and `DiscoverableProvider::verify` — same JWT decode, same claims parse, same nonce check, same JWKS lookup, same signature verify, same credential build. The "trait" is paying for differences that are at most a few `match` arms.
+
+### 4.3 Solution: data-only registry, free-function verify
+
+Collapse the three collections into one:
+
+```rust
+pub enum OpenIdConfigEntry {
+    /// Hardcoded direct provider (Google, Microsoft, Apple).
+    /// Configured via `open_id_configs` init arg, fixed at canister bring-up.
+    Direct {
+        issuer: String,                                 // may contain {placeholders}
+        client_id: String,
+        jwks_uri: String,
+        email_verification: Option<OpenIdEmailVerificationScheme>,
+    },
+    /// SSO domain registered via `discover_sso` (anonymous, anyone).
+    /// `issuer`, `client_id`, `jwks_uri` are resolved lazily through the
+    /// discovery cache (§5).
+    Sso {
+        discovery_domain: String,
+    },
+}
+
+thread_local! {
+    static CONFIG_REGISTRY: RefCell<Vec<OpenIdConfigEntry>> = RefCell::new(vec![]);
+}
+```
+
+`CONFIG_REGISTRY` holds `Direct` entries from the init arg and is fixed-size at boot. `Sso` entries are not persisted here at all — see §8 for why.
+
+Verification becomes a free function over the registry + the cache:
+
+```rust
+pub fn verify_jwt(
+    jwt: &str,
+    salt: &[u8; 32],
+    discovery_domain: Option<&str>,
+    cache: &mut OidcCache,
+) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
+    // 1. Decode JWT, extract iss + aud.
+    // 2. Resolve the provider:
+    //    - If `discovery_domain` is provided: look up discovery in cache
+    //      (cache fetches on miss, dedup via Pending — §5), then check
+    //      jwt.iss == discovery.issuer && jwt.aud == discovery.client_id.
+    //    - Otherwise: scan CONFIG_REGISTRY for a Direct entry matching
+    //      jwt.iss + jwt.aud (with placeholder substitution as today).
+    // 3. Look up JWKS in cache (fetches on miss). Verify signature.
+    // 4. Recompute expected_nonce = SHA256(salt | caller()), reject on mismatch.
+    // 5. Construct OpenIdCredential from claims.
+}
+```
+
+The `OpenIdProvider` trait, `Provider::create`, `DiscoverableProvider::create`, the `PROVIDERS` thread-local, and the `Rc<RefCell<_>>` plumbing all go away. The "per-provider state" that used to live in trait objects now lives in the cache, keyed by `discovery_domain` (for SSO) or `jwks_uri` (for direct providers' cert fetch).
+
+### 4.4 What survives the refactor
+
+- The `(iss, sub, aud)` triple as the canonical credential key. Storage layout unchanged.
+- The `email_verification_scheme` enum and its `Google` / `Microsoft` semantics. Now a config field on `OpenIdConfigEntry::Direct`, not a trait method.
+- The placeholder substitution for Microsoft's `{tid}` issuer. Same `get_issuer_placeholders` / `replace_issuer_placeholders` helpers, called from `verify_jwt`.
+- The `OpenIDJWTVerificationError` enum and its `From` impls for the various caller-facing error types.
+
+### 4.5 What changes for callers
+
+The four JWT-consuming `#[update]` / `#[query]` methods (`openid_credential_add`, `openid_prepare_delegation`, `openid_get_delegation`, `openid_identity_registration_finish`) get an additional `discovery_domain: Option<String>` parameter. Callers using direct providers (Google/etc.) pass `None`; callers using an SSO pass the domain they registered with. The canister cross-checks the JWT's `iss` against the discovery-resolved issuer for that domain.
+
+See §8 for the full API delta and migration story.
+
+---
+
+## 5. Problem 2 — Timer-driven outcalls
+
+### 5.1 What it looks like today
+
+`src/internet_identity/src/openid/generic.rs:469`:
+
+```rust
+pub fn init_discovery_timers() {
+    set_timer(Duration::ZERO, || spawn(run_discovery_tasks()));
+    set_timer_interval(
+        Duration::from_secs(FETCH_DISCOVERY_INTERVAL_SECONDS),  // 1 h
+        || spawn(run_discovery_tasks()),
+    );
+}
+```
+
+`run_discovery_tasks` walks every entry in `DISCOVERY_TASKS`, fires hop-1 (`fetch_ii_openid_configuration`), then hop-2 (`fetch_discovery`), then — if `jwks_uri` changed — kicks off a `schedule_fetch_certs` chain that re-runs every 15 minutes with backoff on failure. JWKS fetching for hardcoded direct providers runs the same `schedule_fetch_certs` chain, started in `Provider::create`.
+
+Two costs:
+
+1. **Outcall fanout scales linearly with registered SSOs.** With N SSOs, the canister fires roughly `N × (2/h + 4/h) = 6N outcalls/h` indefinitely, regardless of whether any user is signing in.
+2. **Cache liveness assumes the timer.** Verification reads from the in-memory cert vec; if the timer hasn't caught up, the JWT verifies against stale (or missing) keys. A "discovery still pending" branch threads through `Provider::verify` and `DiscoverableProvider::verify`.
+
+The reviewer comment at `generic.rs:422-425` flags the first cost as the blocker for lifting the allowlist.
+
+### 5.2 Solution: on-demand fetch behind an LRU cache with dedup
+
+A single in-heap cache, copy-pasted from the DoH dedup primitive on `feat/doh-fallback` (`src/internet_identity/src/doh/cache.rs`). One instance keyed by `discovery_domain` (caches the combined hop-1 + hop-2 result); a second instance keyed by `jwks_uri` (caches the parsed `Vec<Jwk>`). Both bounded by an LRU cap (§5.5).
+
+```rust
+pub struct OidcCache {
+    discovery: BoundedLruDedupCache<DiscoveryDomain, DiscoveryResult>,
+    jwks:      BoundedLruDedupCache<JwksUri,         Vec<Jwk>>,
+}
+```
+
+`BoundedLruDedupCache<K, V>` is the DoH `DohCache` shape extended with an LRU cap:
+
+```rust
+pub struct BoundedLruDedupCache<K, V> {
+    entries:    HashMap<K, CacheEntry<V>>,
+    pending:    HashMap<K, PendingEntry<V>>,
+    lru_order:  VecDeque<K>,      // most-recently-used at the back
+    capacity:   usize,            // 1000 per cache (§5.5)
+}
+
+pub enum CacheLookup<V> {
+    Hit(V),
+    Wait(WaitForPending<V>),    // future-typed; resolves when publisher completes
+    Fetch(FetchToken<V>),       // caller does the outcall, then publish()
+}
+```
+
+`lookup → Hit | Wait | Fetch` semantics are unchanged from `DohCache::lookup`. `publish(token, result, expires_at, now)` populates the value, evicts the LRU tail if at capacity, wakes every subscriber registered against the `FetchToken`'s shared state. Stale-takeover via `PENDING_STALE_AFTER_SECS = 120s` is unchanged.
+
+### 5.3 Why we copy-paste rather than share with DoH
+
+We considered lifting `Pending` / `WaitForPending` / `FetchToken` into a shared module (`src/internet_identity/src/cache/`). We rejected it:
+
+- The DoH PR series is still in review (`feat/doh-fallback`, see [#3841](https://github.com/dfinity/internet-identity/pull/3841)). Pulling the primitive out would couple two stacks that should be reviewable independently.
+- The primitive is small (~200 lines including tests). The cost of two copies is marginal.
+- Iterating on either implementation in isolation — e.g. adding LRU bounding here that DoH doesn't need, or adding multi-provider quorum logic there that we don't need — is easier when they're not the same code.
+
+If a third caller appears later, that's the moment to extract a shared crate. Until then: two copies, intentionally.
+
+### 5.4 Verification flow
+
+For SSO (`discovery_domain` provided by caller):
+
+```text
+1. cache.discovery.lookup(domain)
+     → Hit(d): use d.openid_configuration / d.issuer / d.jwks_uri
+     → Wait(f): await f, then use the resolved DiscoveryResult
+     → Fetch(t):
+         fetch_ii_openid_configuration(domain)                    // hop 1
+         fetch_discovery(hop1.openid_configuration)                // hop 2
+         validate (§6); combine into DiscoveryResult
+         cache.discovery.publish(t, Ok(result), now + 1h, now)
+         use result
+2. Verify jwt.iss == result.issuer and jwt.aud == result.client_id.
+3. cache.jwks.lookup(result.jwks_uri)
+     → Hit(j) | Wait(f) | Fetch(t) — same shape, fetch is fetch_certs.
+4. Verify JWT signature with the kid-matching JWK.
+5. If kid not in JWKS: cache.jwks.invalidate(jwks_uri) and retry once
+   (key rotation case — without timer-driven refresh, the only way to
+   pick up a new kid is to refetch on miss).
+6. Recompute nonce = SHA256(salt | caller()), reject on mismatch.
+7. Build OpenIdCredential.
+```
+
+For Direct providers (Google/Microsoft/Apple): step 1–2 are replaced by a CONFIG_REGISTRY scan as today. Steps 3–7 are identical.
+
+### 5.5 Cache sizing
+
+1000 entries per cache. At ~5 KB per entry that's ~10 MB across both caches, vs. the canister's 3 GB heap budget — comfortably generous. Sized to absorb every SSO that meaningfully sees traffic at the same time; LRU eviction takes care of the long tail.
+
+Numbers tunable; they live in two consts in the cache module:
+
+```rust
+pub const DISCOVERY_CACHE_CAPACITY: usize = 1000;
+pub const JWKS_CACHE_CAPACITY:      usize = 1000;
+```
+
+Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache headers we've observed, and matches the JWKS rotation window of every mainstream IdP (Google rotates ~every 4–6 h; Microsoft daily; Apple monthly). On TTL lapse, the next verifier call observes a cache miss and re-fetches — same code path as a cold start.
+
+### 5.6 What goes away
+
+- `init_discovery_timers` and `set_timer_interval` for discovery refresh.
+- `schedule_fetch_certs` and its `compute_next_certs_fetch_delay` backoff machinery.
+- `DISCOVERY_TASKS` thread-local.
+- The "discovery still pending" branches in `Provider::verify` / `DiscoverableProvider::verify` — replaced by the cache's `Wait` arm, which an async verifier `await`s through.
+- `Rc<RefCell<Option<String>>>` plumbing on `DiscoverableProvider` — replaced by ordinary cache reads.
+
+### 5.7 Cycle-budget implications
+
+Today's worst case: ~30 Gcycles per outcall × ~6 outcalls/h × N providers = ~180N Gcycles/h, ongoing forever.
+
+Proposed worst case at steady state with a hot cache: ~0 cycles/h (no scheduled outcalls). Per-sign-in cost: ~30 Gcycles on cache miss (cold), ~0 on cache hit (warm). Multiplied by sign-in volume rather than provider count.
+
+For DoS analysis (anonymous `discover_sso` flood): N attacker calls × ~60 Gcycles per cold path (hop-1 + hop-2 + JWKS fetch) = ~60N Gcycles. Bounded by per-call cycle accounting (§6) and the IC's existing reject-on-low-cycles behaviour.
+
+---
+
+## 6. Problem 3 — HTTP outcall safety
+
+### 6.1 What it looks like today
+
+The three outcall sites in `src/internet_identity/src/openid/generic.rs` (lines 651, 684, 901) all share this shape:
+
+```rust
+let request = CanisterHttpRequestArgument {
+    url,
+    method: HttpMethod::GET,
+    body: None,
+    max_response_bytes: None,    // ← unbounded
+    transform: None,
+    headers: vec![ /* Accept + UA */ ],
+};
+let (response,) = http_request_with_closure(request, CALL_CYCLES, transform_fn)
+    .await
+    .map_err(|(_, err)| err)?;
+serde_json::from_slice::<T>(response.body.as_slice())
+```
+
+The transforms (`transform_certs`, `transform_discovery`) re-serialize the JSON body deterministically across replicas — but they do **not** validate response size or content shape before parsing. `transform_certs` traps on `Invalid response status` (good) and on `Invalid JSON` (good), but accepts arbitrarily large bodies.
+
+`max_response_bytes: None` defaults to the IC's per-outcall ceiling (2 MB). Cycle cost scales linearly with bytes returned × replication factor (13 nodes on application subnets), so a 2 MB response is ~30 Gcycles per replica × 13 = ~400 Gcycles per outcall. Multiplied by the timer fanout in §5.1, that's an attractive cycle-drain target if an attacker can register a malicious SSO domain.
+
+### 6.2 Solution: cap, validate, ceiling
+
+Three concrete changes:
+
+**Per-outcall response-size caps.** Each call site declares the maximum it will accept:
+
+```rust
+const HOP1_MAX_RESPONSE_BYTES:   u64 =   8 * 1024;   // ii-openid-configuration
+const HOP2_MAX_RESPONSE_BYTES:   u64 =  64 * 1024;   // openid-configuration
+const JWKS_MAX_RESPONSE_BYTES:   u64 =  64 * 1024;   // jwks.json
+```
+
+Rationale:
+- Hop 1 (`/.well-known/ii-openid-configuration`) is a 3-field JSON document, typically <1 KB. 8 KB gives 8× headroom for whitespace, ordering, and small future additions.
+- Hop 2 (standard OIDC discovery) is larger in practice: Google publishes ~3 KB, Microsoft ~5 KB, Okta ~4–10 KB. 64 KB absorbs the largest IdPs we've measured (Keycloak with many supported algorithms approaches 30 KB).
+- JWKS varies with key rotation overlap. Google publishes 2–3 RSA keys (~1.5 KB each + envelope = ~5 KB), Microsoft sometimes 5–8 keys during rotation (~15 KB), Apple publishes 1–2 keys + EC fallbacks (~2 KB). 64 KB absorbs all of these and a few more rotations' worth of overlap.
+
+When the response exceeds the cap, the IC outcall fails with `SysFatal`; the cache `publish`es `Err`; the verifier returns `OpenIDJWTVerificationError::GenericError("Discovery / JWKS too large")`.
+
+**Transform validation before parse.** Each transform:
+1. Rejects non-200 status (today).
+2. Rejects `Content-Length` exceeding the cap (defense-in-depth — the cap above is the load-bearing one).
+3. Parses as `serde_json::Value` and validates required fields exist with the right types before re-serializing. A response missing `jwks_uri` should fail in the transform, not later in the verifier.
+4. Strips response headers entirely (already done; cement it).
+
+```rust
+fn transform_jwks(response: HttpResponse) -> HttpResponse {
+    if response.status != HTTP_STATUS_OK { return reject(response.status, "bad status"); }
+    if response.body.len() > JWKS_MAX_RESPONSE_BYTES as usize { return reject(200, "too large"); }
+    let Ok(certs) = serde_json::from_slice::<Certs>(&response.body) else {
+        return reject(200, "invalid jwks");
+    };
+    // Sort keys by kid for cross-replica determinism (existing logic).
+    let mut sorted = certs.keys; sorted.sort_by_key(|k| k.kid().map(str::to_owned));
+    let body = serde_json::to_vec(&Certs { keys: sorted }).expect("re-serialize cannot fail");
+    HttpResponse { status: 200.into(), headers: vec![], body }
+}
+```
+
+Where `reject(status, msg)` builds a small canned error response with `headers: vec![]` so the body is deterministic. The verifier sees the canned error and surfaces it as a generic verification failure.
+
+**Per-call cycle ceiling.** Today, `CERTS_CALL_CYCLES = DISCOVERY_CALL_CYCLES = 30 Gcycles`, attached to each `http_request_with_closure` call. With caps in place, the actual ceiling is bounded by `(max_response_bytes × replication_factor × bytes_per_cycle)`. Concretely:
+- Hop 1: 8 KB × 13 × ~400 cycles/byte ≈ 42 Mcycles. Allocate 1 Gcycle (large safety margin).
+- Hop 2: 64 KB × 13 × ~400 ≈ 330 Mcycles. Allocate 5 Gcycles.
+- JWKS: same as hop 2 — 5 Gcycles.
+
+This is a tightening of today's blanket 30 G allocation, so a cache-miss flood costs the attacker more cycles per attempt while reducing what the canister consumes per outcall.
+
+### 6.3 What's deliberately not done
+
+- **TLS certificate pinning.** The IC's HTTPS outcall layer terminates TLS at the boundary node; we trust the gateway's certificate chain. Pinning per-SSO certs would require an out-of-band trust anchor distribution, which is the kind of governance question (§2) we're explicitly punting on.
+- **Response-header inspection.** We strip headers in the transform; we don't use `Cache-Control` to drive our TTL (we hardcode 1 h, see §5.5). This mirrors today's behaviour and avoids a malicious IdP serving `Cache-Control: max-age=100000000` to pin a poisoned key indefinitely.
+- **HEAD-before-GET to size-check.** Two outcalls instead of one would double the steady-state cost. The `max_response_bytes` cap is the cleaner defense.
+
+---
+
+## 7. Problem 4 — Fragment callback
+
+### 7.1 What it looks like today
+
+`src/frontend/src/lib/utils/openID.ts:130` (`createRedirectURL`):
+
+```ts
+authURL.searchParams.set("response_type", "code id_token");
+authURL.searchParams.set("response_mode", "fragment");
+```
+
+The IdP redirects back to `id.ai/callback#id_token=…&state=…`. The callback page (`src/frontend/src/routes/(new-styling)/callback/+page.svelte`) reads `window.location.href`, posts the URL string through a `BroadcastChannel("redirect_callback")`, and the opener — `requestWithPopup` — parses the fragment via `extractIdTokenFromCallback` (`openID.ts:174`).
+
+For 1-click / top-level navigation (`authorize/+page.svelte:120-134`), the flow is the same callback URL, but instead of a popup-opener the callback page sees `sessionStorage["ii-openid-authorize-state"]` and navigates to `/authorize?flow=openid-resume`, which then reads `window.location.hash` (`authorize/+page.svelte:171`) to recover the JWT.
+
+### 7.2 Why fragment is the problem
+
+Two concrete drivers:
+
+1. **Apple Sign In does not return `name` and `email` claims under `response_mode=fragment`.** It returns them only under `response_mode=form_post`, and only once per user (the first time they authorise the app). Today's flow silently loses these fields on Apple, forcing the FE to display an empty profile or prompt the user manually. This is the operational driver — not a theoretical compatibility argument.
+2. **`response_mode=fragment` interacts badly with OIDC providers that strictly implement the hybrid flow (`response_type=code id_token`).** Okta and Auth0 either reject `fragment` outright for hybrid responses or emit it with subtle deviations (`id_token` placement, error response shape). Apple Sign In deprecates it. OAuth 2.1 drops the implicit / fragment-mode response types from the spec entirely. Without form_post, we're tied to whichever subset of providers honours the legacy mode.
+
+There's also a passive privacy cost: the id_token sitting in the URL fragment is visible to any JS that runs on the callback page (including potentially-stale extensions, dev tools, error-tracking scripts), it survives in browser history if the page isn't replaced, and the `Referer` header strips fragments but not all third-party tooling cooperates. Form_post puts the token in a POST body — never in any URL the browser navigates to.
+
+### 7.3 Solution: form_post + canister translator + structured FE delivery
+
+**FE redirect URL change.** One line:
+
+```ts
+authURL.searchParams.set("response_mode", "form_post");
+```
+
+No FedCM impact: the `requestWithCredentials` path (`openID.ts:46`) doesn't use a redirect URL.
+
+**Canister POST handler.** Add a POST `/callback` route. Today `src/internet_identity/src/http.rs:77-91` rejects everything that isn't `GET` or `OPTIONS`. Two changes:
+
+```rust
+pub fn http_request(req: HttpRequest) -> HttpResponse {
+    match req.method.as_str() {
+        "GET"     => http_get_request(req.url, req.certificate_version),
+        "OPTIONS" => http_options_request(),
+        "POST" if req.url.starts_with("/callback") => {
+            // Query mode can't return certified HTML; upgrade to update.
+            HttpResponse { status_code: 200, headers: vec![], body: ByteBuf::new(), upgrade: Some(true) }
+        }
+        unsupported => method_not_allowed(unsupported),
+    }
+}
+```
+
+And add `http_request_update`:
+
+```rust
+#[update]
+fn http_request_update(req: HttpRequest) -> HttpResponse {
+    if req.method == "POST" && req.url.starts_with("/callback") {
+        return handle_form_post_callback(req.body);
+    }
+    method_not_allowed(&req.method)
+}
+
+fn handle_form_post_callback(body: ByteBuf) -> HttpResponse {
+    // Parse application/x-www-form-urlencoded body. Reject if not exactly
+    // {id_token, state} (any unknown field is fine to ignore, but both
+    // required fields must be present).
+    let (id_token, state) = match parse_form_post(&body) {
+        Ok(v) => v,
+        Err(_) => return form_post_error_page("invalid form body"),
+    };
+    if !is_jwt_charset(&id_token) || id_token.len() > 8192 { return form_post_error_page("invalid id_token"); }
+    if !is_state_charset(&state)   || state.len()    > 64   { return form_post_error_page("invalid state"); }
+    render_callback_landing(&id_token, &state)
+}
+```
+
+`is_jwt_charset` accepts `[A-Za-z0-9_=.-]+` (JWT base64url plus the two `.` segment separators); `is_state_charset` accepts base64url. Both validations are belt-and-suspenders: even if the FE-side `extractIdTokenFromCallback` validation has a bug, the canister-side validation already rejects anything that could break out of the embedded JSON context.
+
+**Certified HTML response.** The page the canister returns:
+
+```html
+<!doctype html>
+<meta charset="utf-8">
+<title>Internet Identity</title>
+<script type="application/json" id="cb">{"id_token":"…","state":"…"}</script>
+<script>
+  // Hash-pinned in CSP — see security_headers() override below.
+  (function () {
+    const data = JSON.parse(document.getElementById('cb').textContent);
+    if (window.opener) {
+      // Popup case: deliver via BroadcastChannel, close ourselves.
+      const bc = new BroadcastChannel('redirect_callback');
+      bc.postMessage(data);
+      bc.close();
+      window.close();
+    } else {
+      // Same-tab / 1-click case: stash and navigate to authorize-resume.
+      sessionStorage.setItem('ii-openid-callback-data', JSON.stringify(data));
+      window.location.replace('/authorize?flow=openid-resume');
+    }
+  })();
+</script>
+```
+
+The inline `<script>` is hash-pinned in the response's CSP (`script-src 'sha256-…'`), so swapping it for a different script is rejected by the browser. The `<script type="application/json">` block is a non-executing context; even if validation has a bug, the embedded JSON can't break out into JS. We embed via `JSON.stringify`-on-the-server-equivalent — the canister builds the JSON via `serde_json::to_string`, which guarantees `<`, `&`, `"` are properly escaped.
+
+**FE consumer changes.**
+
+- `extractIdTokenFromCallback` no longer parses a URL. It receives `{id_token, state}` as the BroadcastChannel message payload directly, validates state matches, returns `id_token`. Three callers in `openID.ts` and one in the test file.
+- `resumeOpenId` in `authorize/+page.svelte` reads from `sessionStorage.getItem('ii-openid-callback-data')` instead of `window.location.hash`, deletes the entry after reading. Same data shape, different source.
+- The callback page (`callback/+page.svelte`) is unchanged — the certified HTML from the canister is what runs the BroadcastChannel + sessionStorage logic directly.
+
+### 7.4 Why the canister POST handler can't consume the JWT itself
+
+Examined in §3, restated here for the §7-only reader: the POST handler runs in an anonymous context (the IdP submits the form). `caller()` is not the user's session principal. The salt + nonce + `caller()` binding that secures JWT redemption against a compromised transport (§3.1) **requires** `caller()` to be the session principal, which only the FE can prove via a signed ingress message.
+
+A scheme that consumes the JWT in the POST handler — even with a canister-issued state token, even with a prepare/redeem dance — fails to preserve this property unless the FE later makes a separate signed call to redeem. At which point the round-trip count matches today's (three IC round-trips per sign-in), and the architecture is more complex with no security gain.
+
+The simple translator preserves the trust shape: form_post body → certified HTML → BroadcastChannel/sessionStorage → existing `openid_prepare_delegation` / `openid_credential_add` from the FE's signed session. End-to-end identical to fragment-mode trust-wise.
+
+### 7.5 Cost
+
+One extra update call (the POST handler) per OAuth callback. ~2-4 s on the IC. The user is already mid-popup at this point, so the latency lands during a step they're watching; the perceived impact is small.
+
+This update call is required for response certification (uncertified HTML responses are rejected by the HTTP gateway, and would also be a critical XSS surface if accepted — see §3.2). It cannot be avoided by routing through query mode.
+
+### 7.6 What's intentionally not changed
+
+- The `state` CSRF check, both in URL construction (`createRedirectURL`) and in callback validation. It moves from URL fragment to form_post body but the semantics are identical.
+- The popup-vs-FedCM-vs-same-tab decision in `requestJWT`. FedCM still wins where available; popup is the fallback; same-tab / 1-click is its own path. All three are unaffected by the form_post change at the API level — only the popup and same-tab paths see a new callback shape.
+- The salt / nonce / `session_pk` plumbing (`createAnonymousNonce`, session.store.ts). Unchanged.
+
+---
+
+## 8. Problem 5 — Allowlist removal and API reshape
+
+### 8.1 What it looks like today
+
+`src/internet_identity/src/openid/generic.rs:248-264`:
+
+```rust
+pub fn allowed_discovery_domains() -> Vec<String> {
+    let configured = state::persistent_state(|ps| ps.sso_discoverable_domains.clone());
+    if let Some(domains) = configured { return domains; }
+    match state::persistent_state(|ps| ps.is_production) {
+        Some(true) => vec!["dfinity.org".to_string()],
+        _          => vec!["beta.dfinity.org".to_string()],
+    }
+}
+
+pub fn is_allowed_discovery_domain(domain: &str) -> bool { /* … */ }
+```
+
+And `src/internet_identity/src/openid.rs:372`:
+
+```rust
+pub fn add_oidc_config(config: DiscoverableOidcConfig) {
+    if !generic::is_allowed_discovery_domain(&config.discovery_domain) {
+        ic_cdk::trap("…not on the canary allowlist");
+    }
+    /* canonicalize, dedupe, persist to OIDC_CONFIGS, spawn timer */
+}
+```
+
+A registered SSO is persisted in stable state (`persistent_state.oidc_configs`), survives upgrades, and contributes a `DiscoveryState` entry plus a periodic discovery timer.
+
+### 8.2 What we want instead
+
+The cache (§5) absorbs anonymous calls for arbitrary domains: hit returns instantly, miss fans out to the two discovery outcalls + the JWKS fetch, publishes to cache. There is no remaining reason for the canister to maintain a persistent list of "registered" SSOs separate from "SSOs currently in cache." The cache is the registry.
+
+That makes "registration" a no-op concept. The user (or anonymous caller, or anyone) telling the canister `discovery_domain = "okta.example.com"` is no different from the canister observing that domain naturally during a JWT verification — both paths just want the cache populated.
+
+### 8.3 New API surface
+
+Add one method, drop one, change four signatures.
+
+**Added.**
+
+```candid
+discover_sso : (text) -> (DiscoverySsoResult);
+
+type DiscoverySsoResult = record {
+    discovery_domain      : text;
+    client_id             : text;
+    issuer                : text;
+    openid_configuration  : text;
+    name                  : opt text;
+};
+```
+
+`discover_sso(domain)` is an `#[update]` (because it may trigger outcalls on a cache miss). It anonymously runs the two-hop discovery via the cache, returns the resolved fields. Anyone can call it. The FE uses the response to build the IdP's authorize URL (it needs `authorization_endpoint`, which comes from hop 2). On a warm cache, this returns in ~2-4 s (the update-call round-trip, no outcall). On a cold cache, ~5-8 s (two outcalls in sequence).
+
+**Removed.**
+
+`add_discoverable_oidc_config` and `discovered_oidc_configs`. The first becomes meaningless once registration isn't a thing; the second is replaced by `discover_sso` returning the same data on demand.
+
+**Changed.**
+
+The four JWT-consuming endpoints each gain a `discovery_domain: opt text` parameter:
+
+```candid
+// Was: openid_credential_add : (IdentityNumber, text, blob)    -> (variant {…});
+//        ^ identity_number   ^ jwt  ^ salt
+// Now:
+openid_credential_add :
+    (IdentityNumber, text, blob, opt text) -> (variant {…});
+//                                ^ discovery_domain (None for hardcoded providers,
+//                                                    Some(domain) for SSO)
+
+// Similarly:
+openid_prepare_delegation        : (text, blob, SessionKey, opt text) -> (…);
+openid_get_delegation            : (text, blob, SessionKey, nat64, opt text) -> (…);
+openid_identity_registration_finish :
+    (OpenIDRegFinishArg with extra `discovery_domain: opt text`) -> (…);
+```
+
+The canister checks: if `discovery_domain = Some(d)`, run the cache lookup, and verify the JWT's `iss` matches the resolved issuer for `d`. If `None`, scan `CONFIG_REGISTRY` for a matching hardcoded provider.
+
+Why the FE-supplied discovery_domain rather than recovering it from JWT.iss?
+
+- Direct providers use a fixed `iss`; SSO providers can have any `iss` (whatever the upstream OIDC says). A `iss → discovery_domain` reverse index would be either incomplete (cache-warmed) or persistent (defeats the point of removing persistent state).
+- The FE knows which SSO domain the user typed / clicked. It has the information for free.
+- Cross-checking JWT.iss against the discovery-resolved issuer is the same security work either way — supplying `discovery_domain` is just specifying which discovery to perform the cross-check against.
+
+### 8.4 Persistent state delta
+
+```rust
+// REMOVED from PersistentState:
+oidc_configs:         Option<Vec<DiscoverableOidcConfig>>,
+sso_discoverable_domains: Option<Vec<String>>,
+// is_production stays — used elsewhere.
+```
+
+Both removals are upgrade-safe: serde tolerates missing fields with `#[serde(default)]`, and any deployment that previously set the init arg can stop setting it without breakage.
+
+### 8.5 Credential storage delta
+
+`OpenIdCredential` (in `src/internet_identity_interface/src/internet_identity/types/openid.rs`) gains an `sso_domain: Option<String>` field stamped at credential creation time. Today this is computed at response time via `openid::generic::sso_fields_for(iss, aud)`, which reverse-scans `DISCOVERY_TASKS`. With `DISCOVERY_TASKS` gone, the runtime lookup has nothing to scan, so we move the value onto the stored credential.
+
+`sso_fields_for` becomes a struct-field read instead of a thread-local scan. Callers in `storage::storable` that today call `sso_fields_for(&c.iss, &c.aud)` read `c.sso_domain` directly.
+
+### 8.6 Migration
+
+Existing credentials in stable storage have no `sso_domain` stamp. There are two upgrade-time approaches:
+
+- **Backfill from `OIDC_CONFIGS`.** The upgrade hook reads the about-to-be-deleted `persistent_state.oidc_configs`. For each registered domain, it runs the discovery cache lookup (cold, so triggers outcalls — this could be deferred until the cache is warm post-upgrade). Then iterates credentials, looking for any whose `iss + aud` matches a discovered provider, and stamps `sso_domain` on each. One-shot, runs in `post_upgrade`. Risk: discovery outcalls from an upgrade hook are unusual; if the upgrade fails the canister rolls back, which is the safe failure mode.
+- **Lazy backfill.** Existing credentials keep `sso_domain = None`. The FE supplies `discovery_domain` on the next use of each credential. The canister, on successful JWT verification with `Some(domain)`, stamps `sso_domain = domain` on the matching stored credential. Slower convergence; no upgrade-time outcalls; works for credentials that are actually used.
+
+The doc proposes **lazy backfill** as the safer option: the only credentials that need their `sso_domain` stamped are credentials that are ever used again, and lazy backfill handles those naturally without an upgrade-time outcall storm. Credentials that are never used again don't matter.
+
+### 8.7 FE changes from the API delta
+
+- `addAccessMethodFlow` (`src/frontend/src/lib/flows/addAccessMethodFlow.svelte.ts`), `authFlow`, `authLastUsedFlow`: when the user is using an SSO credential, pass the SSO domain (already stored client-side as `sso-1-click-domain` for the 1-click case, or recoverable from the credential's metadata for the standard case) as `discovery_domain` in the four updated API methods.
+- The 1-click SSO path (`authorize/+page.svelte:145-167`) replaces its `actor.add_discoverable_oidc_config({...})` call with `actor.discover_sso(domain)`. Same wait + same data returned; just no persistent registration.
+- `discoverSsoConfig` in `src/frontend/src/lib/utils/ssoDiscovery.ts` stops needing the separate `discovered_oidc_configs` round-trip — `discover_sso` returns the same shape directly.
+
+---
+
+## 9. Rollout
+
+### 9.1 Dependency layout
+
+| Track | Scope | Depends on | Parallel with |
+| ----- | ----- | ---------- | ------------- |
+| **A** | §7. Form_post: `http_request_update`, FE BroadcastChannel/sessionStorage delivery, `extractIdTokenFromCallback` + `resumeOpenId` rewrites. | — | B, C |
+| **B** | §6. Outcall safety: `max_response_bytes` caps, transform validation, per-call cycle ceilings. | — | A, C |
+| **C1** | §5. Cache module: copy-pasted DoH dedup primitive, `BoundedLruDedupCache<K, V>`, capacity consts, tests. | — | A, B |
+| **C2** | §4. Wire cache into a new `verify_jwt` free function; remove `OpenIdProvider` trait, `Vec<Box<dyn _>>`, `init_discovery_timers`, `schedule_fetch_certs`, `DISCOVERY_TASKS`. | C1 | A, B |
+| **C3** | §8. Drop allowlist + persistent `OIDC_CONFIGS` / `sso_discoverable_domains`. Add `discover_sso`. Update four API methods to take `discovery_domain: opt text`. Stamp `sso_domain` on new credentials. | C2 | A, B |
+| **C4** | §8.6. Lazy backfill: canister stamps `sso_domain` on existing credentials on first successful use post-upgrade. | C3 | A, B |
+
+Independent surfaces in the codebase:
+
+- A touches `src/internet_identity/src/http.rs` (new POST route + update handler), `src/frontend/src/lib/utils/openID.ts` and `src/frontend/src/routes/(new-styling)/callback/+page.svelte` + `authorize/+page.svelte`.
+- B touches the three `http_request_with_closure` call sites in `src/internet_identity/src/openid/generic.rs`. Standalone diff in the existing architecture.
+- C1 adds a new file `src/internet_identity/src/openid/cache.rs`.
+- C2 rewrites `src/internet_identity/src/openid.rs` and `src/internet_identity/src/openid/generic.rs`.
+- C3 changes the Candid surface (`internet_identity.did`), the four call sites in `main.rs`, the FE actor type, and `PersistentState`.
+- C4 is one branch on the existing `verify_jwt` path.
+
+If B lands before C2, C2 inherits B's caps in the rewritten outcall sites. If C2 lands first, B retargets to the new sites. Either order works.
+
+### 9.2 Suggested PR sequence
+
+```text
+Day 0:
+  PR-A (form_post + FE delivery rewrite)     — opens, reviews on its own track.
+  PR-B (outcall safety)                       — opens, small, lands fast.
+  PR-C1 (cache module + tests)                — opens.
+
+Day 0+N:
+  PR-C2 (cache wiring + provider refactor)    — opens after C1 lands.
+
+Day 0+2N:
+  PR-C3 (API reshape, allowlist removal)      — opens after C2 lands.
+                                                Stacked FE PR opens at the same time
+                                                or in the same PR.
+
+Day 0+3N:
+  PR-C4 (lazy backfill)                       — opens after C3 lands.
+```
+
+A and B can land any time, in any order, mid-stack. They don't gate C.
+
+### 9.3 What changes when this all lands
+
+- Heap memory from registered SSOs: O(cache_size) ≤ ~20 MB.
+- Background outcall fanout: zero. Discovery and JWKS fetching are sign-in-driven.
+- Apple Sign In returns name + email. Okta / Auth0 / Keycloak / Authelia / generic OIDC become viable without per-IdP workarounds for fragment-mode quirks.
+- Anonymous `discover_sso` lets any user point II at any OIDC-compliant SSO. No admin step.
+- Existing flows for Google / Microsoft / Apple direct providers: unchanged user-facing, marginally faster (cached JWKS) on warm.
+
+### 9.4 What doesn't change
+
+- The salt + nonce + `caller()` JWT redemption binding.
+- FedCM as the preferred path where the browser supports it.
+- `OpenIdCredential` `(iss, sub, aud)` storage keying. The schema gains an optional `sso_domain` field; existing data is upgrade-safe.
+- The shape of `openid_credential_remove`, the attribute-sharing layer, the wizard flows.
+
+---
+
+## 10. Open questions
+
+- **Cache size revisit.** 1000 entries per cache is a guess based on "1000 simultaneously-hot SSOs is more than we expect" and "10 MB total heap is comfortably under budget." Once we have telemetry on real-world miss rates we should revisit. If miss rate is non-trivial we either raise the cap or shorten the TTL — both have cycle-budget implications.
+- **TTL on `Pending` entries.** Copied as-is from DoH (`PENDING_STALE_AFTER_SECS = 120s`). 120 s is comfortable for IC HTTP outcalls under normal conditions; if we see verifier latency spikes above that floor we'd revisit.
+- **Lazy backfill convergence.** Credentials that are never used again never get `sso_domain` stamped. The metadata layer (`sso_fields_for` callers) gracefully handles `None` today (renders as the bare domain or falls through to the direct-provider config), so this is not a functional problem — but a future cleanup pass could backfill in bulk if telemetry shows long-tailed credentials hampering attribute-sharing UX.
+- **`response_mode=form_post` and FedCM coexistence.** Today's `requestJWT` falls back to popup when FedCM isn't available. Form_post applies only to the popup path. If a future FedCM upgrade adds a redirect fallback we'd revisit; for now the two paths are independent.
+- **Direct provider JWKS cache behaviour.** Hardcoded providers' JWKS today is fetched eagerly at canister bring-up via `Provider::create`. Under §5 it becomes lazy on first sign-in attempt. First-after-deploy sign-in pays one cache-miss outcall. Acceptable, but worth flagging in the rollout notes.
+- **Migration ordering with the email-recovery DoH cache.** Both stacks copy-paste the same dedup primitive. If both land within a short window, a tactical extraction into a shared module is reasonable; if either is delayed, the two copies are fine indefinitely.
+- **Boundary node throttling.** The IC HTTPS gateway has its own rate-limiting; we haven't measured how anonymous `discover_sso` calls interact with whatever per-canister or per-IP throttle is in effect. Worth testing pre-launch with a synthetic flood.
+
+cc @aterga
