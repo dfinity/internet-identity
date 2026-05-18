@@ -1407,22 +1407,27 @@ mod openid_api {
     }
 }
 
-/// Email-based identity recovery — setup half (binding flow only).
+/// Email-based identity recovery — both halves of the flow.
 ///
 /// See `docs/ongoing/email-recovery.md` (PR #3836) for the full
-/// design, and `crate::email_recovery` for the per-flow logic. The
-/// canister methods below are thin wrappers that handle:
+/// design, and `crate::email_recovery` for the per-flow logic.
 ///
-/// - Authorization (`prepare_add` / `credential_remove` are
-///   authenticated; `status` is anonymous since the nonce is the
-///   only secret needed to poll).
-/// - Wall-clock injection (`now_secs` lifted out of
-///   `ic_cdk::api::time` so the inner functions stay testable).
+/// - **Setup** (binding): `prepare_add` (authenticated) issues a
+///   nonce, `smtp_request` for `register@id.ai` consumes the
+///   verified email and binds the credential to the anchor, and
+///   `credential_remove` (authenticated) detaches it.
+/// - **Recovery** (delegation): `prepare_delegation` (anonymous)
+///   issues a nonce bound to a session_key, `smtp_request` for
+///   `recover@id.ai` consumes the verified email and stamps a
+///   canister-signed delegation seed, and
+///   `email_recovery_get_delegation` (anonymous query) hands the
+///   signed delegation to the FE.
 ///
-/// The recovery half (`prepare_delegation` / `get_delegation` /
-/// `recover@id.ai` dispatch in `smtp_request`) is intentionally not
-/// part of this PR — it needs a stable reverse address index that
-/// is best landed on its own.
+/// The canister methods below are thin wrappers handling
+/// authorization, wall-clock injection (`now_secs` lifted out of
+/// `ic_cdk::api::time` so the inner functions stay testable), and
+/// the FE-facing `Result` shape. `status` is anonymous for both
+/// flows since the nonce is the only secret needed to poll.
 mod email_recovery_api {
     use super::*;
     use crate::authz_utils::check_authorization;
@@ -1443,6 +1448,12 @@ mod email_recovery_api {
     /// anchor in the heap pending-challenge map; an inbound email
     /// with that nonce in `Subject:` completes the binding via
     /// `smtp_request`.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `check_authorization(identity_number)`. Resource exposure
+    /// is bounded by the 10 k pending-map cap (see
+    /// `email_recovery::MAX_PENDING_CHALLENGES`) with 30-minute TTL
+    /// and oldest-first eviction.
     #[update]
     async fn email_recovery_credential_prepare_add(
         identity_number: IdentityNumber,
@@ -1488,6 +1499,19 @@ mod email_recovery_api {
     /// "verification failed" answers, and emitting one would let it
     /// probe the canister for which nonces exist. The FE sees the
     /// outcome via its `email_recovery_status(nonce)` poll.
+    ///
+    /// **Security:** no-oracle on the response *shape* — always
+    /// returns `SmtpResponse::Ok {}` regardless of whether the
+    /// nonce is known, expired, or terminal, so a caller can't
+    /// learn the verification outcome from the response. (Response
+    /// *latency* does differ — an unknown nonce silent-drops in
+    /// microseconds, a valid one on the DoH path runs DKIM/DMARC
+    /// fetches first — but with 64 bits of nonce entropy and a
+    /// 30-minute TTL, timing-based existence probing isn't a
+    /// threat this property is meant to block.) Recipient dispatch
+    /// matches the full `user@domain` against `related_origins`,
+    /// defense-in-depth against a direct caller spoofing just the
+    /// user-part.
     #[update]
     async fn smtp_request(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
@@ -1521,6 +1545,10 @@ mod email_recovery_api {
     /// observably indistinguishable from "the canister forgot it",
     /// which is exactly what we want (the FE shows "timed out, try
     /// again" in either case).
+    ///
+    /// **Security:** unknown-nonce → `Expired` is deliberate: a
+    /// caller without the original `prepare_add` nonce can't
+    /// distinguish "never issued" from "evicted" from "expired".
     #[query]
     fn email_recovery_status(nonce: String) -> EmailRecoveryStatus {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
@@ -1599,6 +1627,10 @@ mod email_recovery_api {
     /// recovery email the anchor doesn't have is surfaced as
     /// `AddressNotRegistered` so the FE can show a meaningful error
     /// if it got into an inconsistent state.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `authz_utils::check_authorization` (same path the other
+    /// authenticated anchor mutators use).
     #[update]
     fn email_recovery_credential_remove(
         identity_number: IdentityNumber,

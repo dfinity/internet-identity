@@ -257,7 +257,8 @@ fn run_submit(
         "{}._domainkey.{}.",
         snapshot.expected_selector, snapshot.registered_domain
     );
-    let expected_wire = super::dns::encode_dns_name_lowercase(&expected_fqdn)?;
+    let expected_wire = crate::dnssec::wire::encode_dns_name_lowercase(&expected_fqdn)
+        .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
     let verified = crate::dnssec::verify_hops_with_clock(
         &hops_internal,
         &zones,
@@ -267,10 +268,12 @@ fn run_submit(
     )
     .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
 
-    let leaf_name = super::dns::decode_dns_name_lowercase(&verified.name.0);
+    let leaf_name = crate::dnssec::wire::decode_dns_name_lowercase(&verified.name.0);
 
     // Step 4: parse the DKIM TXT, get the public key + key type.
-    let txt = super::dns::parse_txt_rdata(&verified.rdata)?;
+    let txt = crate::dnssec::wire::parse_txt_rdata(&verified.rdata).map_err(|_| {
+        EmailRecoveryError::EmailVerificationFailed("DNSSEC TXT RDATA truncated".into())
+    })?;
     if txt.len() > super::MAX_DKIM_TXT_BYTES {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
             "DKIM TXT record at {leaf_name:?} is {} bytes; refusing to admit",
