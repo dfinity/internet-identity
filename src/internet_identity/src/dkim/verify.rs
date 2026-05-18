@@ -927,15 +927,26 @@ mod tests {
             gateway_flags: None,
         };
         // now = 1_700_000_000, t = 1_700_000_030 → 30 s in the future,
-        // inside the 60 s skew window. Must pass the t= check.
+        // inside the 60 s skew window. The t= check must pass; we
+        // assert that directly on the `checks` vec (available on both
+        // outcome variants) rather than via a fall-through `if let`
+        // that would silently skip the assertion if a future refactor
+        // ever made this fixture pass overall.
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        if let DkimVerifyResult::Unverified { reason, .. } = &result {
-            assert_ne!(
-                *reason,
-                VerificationFailReason::SignatureFutureDated,
-                "t=now+30s with 60s skew must not be rejected as future-dated"
-            );
-        }
+        let checks = match &result {
+            DkimVerifyResult::Verified { checks, .. } | DkimVerifyResult::Unverified { checks, .. } => {
+                checks
+            }
+        };
+        let future_check = checks
+            .iter()
+            .find(|c| c.name == DkimCheckName::SignatureNotFromFuture)
+            .expect("SignatureNotFromFuture check must be emitted");
+        assert_eq!(
+            future_check.status,
+            DkimCheckStatus::Pass,
+            "t=now+30s with 60s skew must pass the future-dated check; got {future_check:?}"
+        );
     }
 
     #[test]
