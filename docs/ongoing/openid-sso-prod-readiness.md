@@ -90,7 +90,7 @@ The three secrets that have to coincide for redemption to succeed:
 2. The `salt` — never on the wire except inside signed ingress messages.
 3. The session_sk corresponding to `session_principal` — never leaves the FE; required for the ingress signature so the canister sees `caller() == session_principal`.
 
-Without all three, no actor (boundary node, MITM, replicating outcall transport, malicious DoH provider, …) can redeem a JWT against an anchor that is not their own. This is the load-bearing security property.
+Without all three, no actor (boundary node, MITM, replicating outcall transport, …) can redeem a JWT against an anchor that is not their own. This is the load-bearing security property.
 
 ### 3.2 What changes under this design
 
@@ -165,29 +165,19 @@ These are data, not behavior. The `verify()` body is essentially the same in bot
 Collapse the three collections into one:
 
 ```rust
-pub enum OpenIdConfigEntry {
-    /// Hardcoded direct provider (Google, Microsoft, Apple).
-    /// Configured via `open_id_configs` init arg, fixed at canister bring-up.
-    Direct {
-        issuer: String,                                 // may contain {placeholders}
-        client_id: String,
-        jwks_uri: String,
-        email_verification: Option<OpenIdEmailVerificationScheme>,
-    },
-    /// SSO domain registered via `discover_sso` (anonymous, anyone).
-    /// `issuer`, `client_id`, `jwks_uri` are resolved lazily through the
-    /// discovery cache (§5).
-    Sso {
-        discovery_domain: String,
-    },
+pub struct DirectProviderConfig {
+    issuer: String,                              // may contain {placeholders}
+    client_id: String,
+    jwks_uri: String,
+    email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
 thread_local! {
-    static CONFIG_REGISTRY: RefCell<Vec<OpenIdConfigEntry>> = RefCell::new(vec![]);
+    static CONFIG_REGISTRY: RefCell<Vec<DirectProviderConfig>> = RefCell::new(vec![]);
 }
 ```
 
-`CONFIG_REGISTRY` holds `Direct` entries from the init arg and is fixed-size at boot. `Sso` entries are not persisted here at all — see §8 for why.
+`CONFIG_REGISTRY` holds direct providers (Google, Microsoft, Apple) from the `open_id_configs` init arg and is fixed-size at boot. SSO domains are not stored anywhere on the canister — neither in a registry nor in persistent state. The cache (§5) is the only place SSO discovery data exists, and even there it's transient.
 
 Verification becomes a free function over the registry + the cache:
 
@@ -216,7 +206,7 @@ The `OpenIdProvider` trait, `Provider::create`, `DiscoverableProvider::create`, 
 ### 4.4 What survives the refactor
 
 - The `(iss, sub, aud)` triple as the canonical credential key. Storage layout unchanged.
-- The `email_verification_scheme` enum and its `Google` / `Microsoft` semantics. Now a config field on `OpenIdConfigEntry::Direct`, not a trait method.
+- The `email_verification_scheme` enum and its `Google` / `Microsoft` semantics. Now a config field on `DirectProviderConfig`, not a trait method.
 - The placeholder substitution for Microsoft's `{tid}` issuer. Same `get_issuer_placeholders` / `replace_issuer_placeholders` helpers, called from `verify_jwt`.
 - The `OpenIDJWTVerificationError` enum and its `From` impls for the various caller-facing error types.
 
@@ -255,45 +245,34 @@ The reviewer comment at `generic.rs:422-425` flags the first cost as the blocker
 
 ### 5.2 Solution: on-demand fetch behind an LRU cache with dedup
 
-A single in-heap cache, copy-pasted from the DoH dedup primitive on `feat/doh-fallback` (`src/internet_identity/src/doh/cache.rs`). One instance keyed by `discovery_domain` (caches the combined hop-1 + hop-2 result); a second instance keyed by `jwks_uri` (caches the parsed `Vec<Jwk>`). Both bounded by an LRU cap (§5.5).
-
-```rust
-pub struct OidcCache {
-    discovery: BoundedLruDedupCache<DiscoveryDomain, DiscoveryResult>,
-    jwks:      BoundedLruDedupCache<JwksUri,         Vec<Jwk>>,
-}
-```
-
-`BoundedLruDedupCache<K, V>` is the DoH `DohCache` shape extended with an LRU cap:
+A single globally-shared cache, sized by an LRU cap (§5.4), used by every JWT verification across every caller. Two instances: one keyed by `discovery_domain` (holds the combined hop-1 + hop-2 result), one keyed by `jwks_uri` (holds the parsed `Vec<Jwk>`). Both shapes are identical:
 
 ```rust
 pub struct BoundedLruDedupCache<K, V> {
-    entries:    HashMap<K, CacheEntry<V>>,
-    pending:    HashMap<K, PendingEntry<V>>,
-    lru_order:  VecDeque<K>,      // most-recently-used at the back
-    capacity:   usize,            // 1000 per cache (§5.5)
+    entries:  HashMap<K, CacheEntry<V>>,
+    lru:      VecDeque<K>,        // most-recently-used at the back
+    capacity: usize,              // 1000 (§5.4)
 }
 
-pub enum CacheLookup<V> {
-    Hit(V),
-    Wait(WaitForPending<V>),    // future-typed; resolves when publisher completes
-    Fetch(FetchToken<V>),       // caller does the outcall, then publish()
+enum CacheEntry<V> {
+    /// Fetched and currently usable.
+    Done { value: V, expires_at_secs: u64 },
+    /// First caller is fetching; concurrent arrivals register their `Waker`
+    /// here and resume when the fetch publishes a result.
+    Pending { wakers: Vec<Waker>, started_at_secs: u64 },
 }
 ```
 
-`lookup → Hit | Wait | Fetch` semantics are unchanged from `DohCache::lookup`. `publish(token, result, expires_at, now)` populates the value, evicts the LRU tail if at capacity, wakes every subscriber registered against the `FetchToken`'s shared state. Stale-takeover via `PENDING_STALE_AFTER_SECS = 120s` is unchanged.
+One key, one entry. When a caller looks up a domain or `jwks_uri`:
 
-### 5.3 Why we copy-paste rather than share with DoH
+- `Done` and fresh → `Hit(value)`. Touch the LRU order, return immediately.
+- `Done` and expired → evict, transition to `Pending`, return `Fetch(token)` to the caller. The caller does the outcall, calls `publish(token, result)`.
+- `Pending` → return `Wait(future)`. The future polls `entries[key]`; when the first caller publishes, the state flips to `Done` and every registered waker fires. All waiters get the same bytes from the same outcall.
+- Absent → transition to `Pending`, return `Fetch(token)`. Same as the expired path.
 
-We considered lifting `Pending` / `WaitForPending` / `FetchToken` into a shared module (`src/internet_identity/src/cache/`). We rejected it:
+`Pending` entries older than `PENDING_STALE_AFTER_SECS = 120 s` are treated as abandoned (the publisher trapped post-`.await`); the next caller evicts and starts over, waking any orphaned waiters with an error so they don't hang.
 
-- The DoH PR series is still in review (`feat/doh-fallback`, see [#3841](https://github.com/dfinity/internet-identity/pull/3841)). Pulling the primitive out would couple two stacks that should be reviewable independently.
-- The primitive is small (~200 lines including tests). The cost of two copies is marginal.
-- Iterating on either implementation in isolation — e.g. adding LRU bounding here that DoH doesn't need, or adding multi-provider quorum logic there that we don't need — is easier when they're not the same code.
-
-If a third caller appears later, that's the moment to extract a shared crate. Until then: two copies, intentionally.
-
-### 5.4 Verification flow
+### 5.3 Verification flow
 
 For SSO (`discovery_domain` provided by caller):
 
@@ -320,9 +299,16 @@ For SSO (`discovery_domain` provided by caller):
 
 For Direct providers (Google/Microsoft/Apple): step 1–2 are replaced by a CONFIG_REGISTRY scan as today. Steps 3–7 are identical.
 
-### 5.5 Cache sizing
+### 5.4 Cache sizing and TTL
 
-1000 entries per cache. At ~5 KB per entry that's ~10 MB across both caches, vs. the canister's 3 GB heap budget — comfortably generous. Sized to absorb every SSO that meaningfully sees traffic at the same time; LRU eviction takes care of the long tail.
+1000 entries per cache. Each entry covers one SSO domain (or one `jwks_uri`) across every user of that SSO — the cache is global, not per-anchor — so 1000 is the simultaneous-hot-SSO cap, not the user count. At ~5 KB per entry that's ~10 MB across both caches, vs. the canister's 3 GB heap budget. LRU eviction takes care of the long tail of rarely-used SSOs.
+
+```rust
+pub const DISCOVERY_CACHE_CAPACITY: usize = 1000;
+pub const JWKS_CACHE_CAPACITY:      usize = 1000;
+```
+
+Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache headers we've observed, and is well under the JWKS rotation window of every mainstream IdP (Google rotates ~every 4–6 h; Microsoft daily; Apple monthly). On TTL lapse, the next verifier call observes the entry as expired and re-fetches inline — same code path as a cold start.
 
 Numbers tunable; they live in two consts in the cache module:
 
@@ -333,7 +319,7 @@ pub const JWKS_CACHE_CAPACITY:      usize = 1000;
 
 Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache headers we've observed, and matches the JWKS rotation window of every mainstream IdP (Google rotates ~every 4–6 h; Microsoft daily; Apple monthly). On TTL lapse, the next verifier call observes a cache miss and re-fetches — same code path as a cold start.
 
-### 5.6 What goes away
+### 5.5 What goes away
 
 - `init_discovery_timers` and `set_timer_interval` for discovery refresh.
 - `schedule_fetch_certs` and its `compute_next_certs_fetch_delay` backoff machinery.
@@ -341,7 +327,7 @@ Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache header
 - The "discovery still pending" branches in `Provider::verify` / `DiscoverableProvider::verify` — replaced by the cache's `Wait` arm, which an async verifier `await`s through.
 - `Rc<RefCell<Option<String>>>` plumbing on `DiscoverableProvider` — replaced by ordinary cache reads.
 
-### 5.7 Cycle-budget implications
+### 5.6 Cycle-budget implications
 
 Today's worst case: ~30 Gcycles per outcall × ~6 outcalls/h × N providers = ~180N Gcycles/h, ongoing forever.
 
@@ -427,7 +413,7 @@ This is a tightening of today's blanket 30 G allocation, so a cache-miss flood c
 ### 6.3 What's deliberately not done
 
 - **TLS certificate pinning.** The IC's HTTPS outcall layer terminates TLS at the boundary node; we trust the gateway's certificate chain. Pinning per-SSO certs would require an out-of-band trust anchor distribution, which is the kind of governance question (§2) we're explicitly punting on.
-- **Response-header inspection.** We strip headers in the transform; we don't use `Cache-Control` to drive our TTL (we hardcode 1 h, see §5.5). This mirrors today's behaviour and avoids a malicious IdP serving `Cache-Control: max-age=100000000` to pin a poisoned key indefinitely.
+- **Response-header inspection.** We strip headers in the transform; we don't use `Cache-Control` to drive our TTL (we hardcode 1 h, see §5.4). This mirrors today's behaviour and avoids a malicious IdP serving `Cache-Control: max-age=100000000` to pin a poisoned key indefinitely.
 - **HEAD-before-GET to size-check.** Two outcalls instead of one would double the steady-state cost. The `max_response_bytes` cap is the cleaner defense.
 
 ---
@@ -697,7 +683,7 @@ The doc proposes **lazy backfill** as the safer option: the only credentials tha
 | ----- | ----- | ---------- | ------------- |
 | **A** | §7. Form_post: `http_request_update`, FE BroadcastChannel/sessionStorage delivery, `extractIdTokenFromCallback` + `resumeOpenId` rewrites. | — | B, C |
 | **B** | §6. Outcall safety: `max_response_bytes` caps, transform validation, per-call cycle ceilings. | — | A, C |
-| **C1** | §5. Cache module: copy-pasted DoH dedup primitive, `BoundedLruDedupCache<K, V>`, capacity consts, tests. | — | A, B |
+| **C1** | §5. Cache module: `BoundedLruDedupCache<K, V>`, capacity consts, dedup tests. | — | A, B |
 | **C2** | §4. Wire cache into a new `verify_jwt` free function; remove `OpenIdProvider` trait, `Vec<Box<dyn _>>`, `init_discovery_timers`, `schedule_fetch_certs`, `DISCOVERY_TASKS`. | C1 | A, B |
 | **C3** | §8. Drop allowlist + persistent `OIDC_CONFIGS` / `sso_discoverable_domains`. Add `discover_sso`. Update four API methods to take `discovery_domain: opt text`. Stamp `sso_domain` on new credentials. | C2 | A, B |
 | **C4** | §8.6. Lazy backfill: canister stamps `sso_domain` on existing credentials on first successful use post-upgrade. | C3 | A, B |
@@ -755,11 +741,10 @@ A and B can land any time, in any order, mid-stack. They don't gate C.
 ## 10. Open questions
 
 - **Cache size revisit.** 1000 entries per cache is a guess based on "1000 simultaneously-hot SSOs is more than we expect" and "10 MB total heap is comfortably under budget." Once we have telemetry on real-world miss rates we should revisit. If miss rate is non-trivial we either raise the cap or shorten the TTL — both have cycle-budget implications.
-- **TTL on `Pending` entries.** Copied as-is from DoH (`PENDING_STALE_AFTER_SECS = 120s`). 120 s is comfortable for IC HTTP outcalls under normal conditions; if we see verifier latency spikes above that floor we'd revisit.
+- **TTL on `Pending` entries.** `PENDING_STALE_AFTER_SECS = 120 s` is comfortable for IC HTTP outcalls under normal conditions; if we see verifier latency spikes above that floor we'd revisit.
 - **Lazy backfill convergence.** Credentials that are never used again never get `sso_domain` stamped. The metadata layer (`sso_fields_for` callers) gracefully handles `None` today (renders as the bare domain or falls through to the direct-provider config), so this is not a functional problem — but a future cleanup pass could backfill in bulk if telemetry shows long-tailed credentials hampering attribute-sharing UX.
 - **`response_mode=form_post` and FedCM coexistence.** Today's `requestJWT` falls back to popup when FedCM isn't available. Form_post applies only to the popup path. If a future FedCM upgrade adds a redirect fallback we'd revisit; for now the two paths are independent.
 - **Direct provider JWKS cache behaviour.** Hardcoded providers' JWKS today is fetched eagerly at canister bring-up via `Provider::create`. Under §5 it becomes lazy on first sign-in attempt. First-after-deploy sign-in pays one cache-miss outcall. Acceptable, but worth flagging in the rollout notes.
-- **Migration ordering with the email-recovery DoH cache.** Both stacks copy-paste the same dedup primitive. If both land within a short window, a tactical extraction into a shared module is reasonable; if either is delayed, the two copies are fine indefinitely.
 - **Boundary node throttling.** The IC HTTPS gateway has its own rate-limiting; we haven't measured how anonymous `discover_sso` calls interact with whatever per-canister or per-IP throttle is in effect. Worth testing pre-launch with a synthetic flood.
 
 cc @aterga
