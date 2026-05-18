@@ -599,15 +599,18 @@ Add one method, drop one, change four signatures.
 discover_sso : (text) -> (DiscoverySsoResult);
 
 type DiscoverySsoResult = record {
-    discovery_domain      : text;
-    client_id             : text;
-    issuer                : text;
-    openid_configuration  : text;
-    name                  : opt text;
+    discovery_domain       : text;
+    client_id              : text;
+    issuer                 : text;
+    authorization_endpoint : text;
+    scopes_supported       : opt vec text;
+    name                   : opt text;
 };
 ```
 
-`discover_sso(domain)` is an `#[update]` (because it may trigger outcalls on a cache miss). It anonymously runs the two-hop discovery via the cache, returns the resolved fields. Anyone can call it. The FE uses the response to build the IdP's authorize URL (it needs `authorization_endpoint`, which comes from hop 2). On a warm cache, this returns in ~2-4 s (the update-call round-trip, no outcall). On a cold cache, ~5-8 s (two outcalls in sequence).
+`discover_sso(domain)` is an `#[update]` (because it may trigger outcalls on a cache miss). It anonymously runs the two-hop discovery via the cache and returns every field the FE needs to build the IdP authorize URL — `client_id`, `issuer`, `authorization_endpoint`, `scopes_supported`, optional `name`. The FE no longer fetches anything from the SSO domain itself: the canister is the single point of contact with `<discovery_domain>/.well-known/ii-openid-configuration` and the upstream OIDC provider, both for the discovery the FE needs at sign-in start and for the JWT verification later. On a warm cache, this returns in ~2-4 s (the update-call round-trip, no outcall). On a cold cache, ~5-8 s (two outcalls in sequence).
+
+The same outcalls that satisfy `discover_sso` populate the cache that the JWT verification path consults — so a successful `discover_sso` followed by `openid_prepare_delegation` / `openid_credential_add` skips the discovery outcall on the verify step and only pays for JWKS.
 
 **Removed.**
 
@@ -670,8 +673,10 @@ The doc proposes **lazy backfill** as the safer option: the only credentials tha
 ### 8.7 FE changes from the API delta
 
 - `addAccessMethodFlow` (`src/frontend/src/lib/flows/addAccessMethodFlow.svelte.ts`), `authFlow`, `authLastUsedFlow`: when the user is using an SSO credential, pass the SSO domain (already stored client-side as `sso-1-click-domain` for the 1-click case, or recoverable from the credential's metadata for the standard case) as `discovery_domain` in the four updated API methods.
-- The 1-click SSO path (`authorize/+page.svelte:145-167`) replaces its `actor.add_discoverable_oidc_config({...})` call with `actor.discover_sso(domain)`. Same wait + same data returned; just no persistent registration.
-- `discoverSsoConfig` in `src/frontend/src/lib/utils/ssoDiscovery.ts` stops needing the separate `discovered_oidc_configs` round-trip — `discover_sso` returns the same shape directly.
+- The 1-click SSO path (`authorize/+page.svelte:145-167`) replaces its `actor.add_discoverable_oidc_config({...})` + FE-side discovery chain with a single `actor.discover_sso(domain)` call. Result carries everything needed to build the authorize URL.
+- **`src/frontend/src/lib/utils/ssoDiscovery.ts` is deleted.** All ~560 lines of two-hop fetch, per-hop cache, exponential-backoff retry, abort plumbing, hostname-match validation, HTTPS enforcement, and `DomainNotConfiguredError` classification go away. The canister now does the fetching, caching, and validation; the FE just calls `discover_sso` and reads the result. Removes the only FE-side direct fetch to arbitrary SSO domains (and with it, the CORS, IPv6, and timeout edge cases that module currently handles).
+
+The FE-side simplification has its own cost: `discover_sso` is an update call (~2-4 s warm, ~5-8 s cold) whereas the FE's direct fetches today are ~200-500 ms when the SSO host is fast. For the input-debounce UX in `SignInWithSso.svelte` we accept this tradeoff — the user only ever runs discovery once per SSO before signing in, and the canister-cache means subsequent runs (same domain or other users on the same domain) hit the warm path.
 
 ---
 
@@ -727,6 +732,7 @@ A and B can land any time, in any order, mid-stack. They don't gate C.
 - Background outcall fanout: zero. Discovery and JWKS fetching are sign-in-driven.
 - Apple Sign In returns name + email. Okta / Auth0 / Keycloak / Authelia / generic OIDC become viable without per-IdP workarounds for fragment-mode quirks.
 - Anonymous `discover_sso` lets any user point II at any OIDC-compliant SSO. No admin step.
+- `src/frontend/src/lib/utils/ssoDiscovery.ts` (~560 lines of two-hop fetch + retry + cache + validation) is deleted. The FE no longer makes direct fetches to arbitrary SSO domains.
 - Existing flows for Google / Microsoft / Apple direct providers: unchanged user-facing, marginally faster (cached JWKS) on warm.
 
 ### 9.4 What doesn't change
