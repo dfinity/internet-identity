@@ -208,10 +208,7 @@ fn should_honour_explicit_sso_discoverable_domains() {
     .unwrap();
 
     let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
-    let domains: Vec<String> = discovered
-        .into_iter()
-        .map(|d| d.discovery_domain)
-        .collect();
+    let domains: Vec<String> = discovered.into_iter().map(|d| d.discovery_domain).collect();
     assert_eq!(domains.len(), 2);
     assert!(domains.contains(&"localhost:11107".to_string()));
     assert!(domains.contains(&"acme.example".to_string()));

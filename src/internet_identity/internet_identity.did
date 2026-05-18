@@ -299,6 +299,51 @@ type InternetIdentityInit = record {
     backend_canister_id : opt principal;
     // Backend origin, needed to sync configuration with frontend.
     backend_origin : opt text;
+    // DNSSEC verification configuration. Trust anchors used by any feature
+    // that verifies DNS records against the IANA-rooted DNSSEC chain
+    // (currently the email-recovery DKIM/DMARC flow). See
+    // `docs/ongoing/email-recovery.md` §7.5.
+    //
+    // Wrapped in `opt opt` to match the same set/clear pattern as
+    // `analytics_config` / `dummy_auth`: outer null keeps the previously
+    // stored value across an upgrade, `opt null` clears it, `opt opt c`
+    // sets it to `c`.
+    dnssec_config : opt opt DnssecConfig;
+    // DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
+    // domains for which the canister may fetch DKIM/DMARC TXT records
+    // via HTTP outcalls when no DNSSEC chain is available — see
+    // `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
+    doh_config : opt opt DohConfig;
+};
+
+// DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
+// records consumes the same anchors; not specific to email recovery.
+type DnssecConfig = record {
+    // IANA root KSK trust anchors. Multiple are accepted simultaneously so
+    // KSK rollover is a single config change in the next upgrade arg.
+    root_anchors : vec DnssecRootAnchor;
+};
+
+// One IANA root KSK trust anchor, in the same shape IANA publishes at
+// `data.iana.org/root-anchors/root-anchors.xml`. Only `digest_type = 2`
+// (SHA-256) is accepted; the legacy SHA-1 form is rejected at the
+// verifier boundary.
+type DnssecRootAnchor = record {
+    key_tag : nat16;
+    algorithm : nat8;
+    digest_type : nat8;
+    digest : blob;
+};
+
+// DoH (DNS-over-HTTPS) fallback configuration.
+//
+// The canister will only fetch DKIM/DMARC TXT records via HTTP outcalls
+// for an FQDN whose registered domain is in `allowed_domains`. Cache
+// entries are populated on demand and re-used until `max_cache_age_secs`
+// elapses (default 3600s when null, capped at 24h).
+type DohConfig = record {
+    allowed_domains : vec text;
+    max_cache_age_secs : opt nat64;
 };
 
 type ChallengeKey = text;
@@ -462,6 +507,161 @@ type OpenIdPrepareDelegationResponse = record {
     anchor_number : UserNumber;
 };
 
+// Email-recovery types
+// ====================
+// See `docs/ongoing/email-recovery.md` for the full design. Covers
+// both halves of the flow: setup (binding a recovery email to an
+// anchor) and recovery (proving control of a previously-bound
+// address to obtain a signed delegation).
+
+type EmailRecoveryCredential = record {
+    address : text;
+    created_at : Timestamp;
+    last_used : opt Timestamp;
+};
+
+type EmailRecoveryChallenge = record {
+    nonce : text;
+    expires_at : Timestamp;
+};
+
+type EmailRecoveryDnsInput = record {
+    address : text;
+    dns_proof : opt DnsProofBundle;
+};
+
+type EmailRecoverySubmitDkimLeafArg = record {
+    nonce : text;
+    // The DKIM resolution chain in CNAME order, ending in a TXT. At
+    // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+    // canister side. For the Gmail-style direct-TXT case this is a
+    // single-element vec.
+    hops : vec SignedRRset;
+    // Delegation chains for signed zones touched by `hops` that
+    // weren't already covered by the skeleton chain anchored at
+    // prepare time. Empty for same-zone resolution.
+    extra_chains : vec DelegationChain;
+};
+
+// DNSSEC proof bundle and supporting types — see
+// `internet_identity_interface::types::dnssec`.
+type Rrsig = record {
+    type_covered : nat16;
+    algorithm : nat8;
+    labels : nat8;
+    original_ttl : nat32;
+    expiration : nat32;
+    inception : nat32;
+    key_tag : nat16;
+    signer_name : blob;
+    signature : blob;
+};
+
+type SignedRRset = record {
+    name : blob;
+    rtype : nat16;
+    rdata : vec blob;
+    ttl : nat32;
+    rrsig : Rrsig;
+};
+
+type DelegationLink = record {
+    child_ds : SignedRRset;
+    child_dnskey : SignedRRset;
+};
+
+type DelegationChain = record {
+    links : vec DelegationLink;
+};
+
+type DnsProofBundle = record {
+    root_dnskey : SignedRRset;
+    // One delegation chain per signing zone the bundle touches.
+    // Single-zone direct case (Gmail, iCloud, …): one chain.
+    // Cross-zone CNAME case (Proton, Tutanota, M365 custom domains):
+    // one chain per signing zone touched.
+    chains : vec DelegationChain;
+    // The RRsets being authenticated, in CNAME-resolution order.
+    // Single-leaf case: one hop. CNAME case: intermediate CNAMEs,
+    // then the final TXT.
+    hops : vec SignedRRset;
+};
+
+type EmailRecoveryError = variant {
+    Unauthorized : principal;
+    NonceUnknown;
+    NonceExpired;
+    DomainNotAllowlisted : text;
+    DohFetchFailed : text;
+    DomainNotSupported : text;
+    EmailVerificationFailed : text;
+    DkimLeafMismatch;
+    NoDkimLeafExpected;
+    AddressMismatch;
+    SubjectNotSigned;
+    AddressAlreadyRegistered;
+    AddressNotRegistered;
+    InternalCanisterError : text;
+};
+
+type EmailRecoveryStatus = variant {
+    Pending;
+    NeedDkimLeaf : record { selector : text };
+    RegistrationSucceeded;
+    RecoveryReady : record {
+        user_key : UserKey;
+        expiration : Timestamp;
+        anchor_number : IdentityNumber;
+    };
+    Failed : EmailRecoveryError;
+    Expired;
+};
+
+type EmailRecoveryGetDelegationArgs = record {
+    nonce       : text;
+    session_key : SessionKey;
+    expiration  : Timestamp;
+};
+
+// SMTP gateway types — see `internet_identity_interface::smtp`. Carried
+// forward from PoC #3760 surface (the existing gateway can target this
+// canister without changes).
+type SmtpHeader = record {
+    name : text;
+    value : text;
+};
+
+type SmtpMessage = record {
+    headers : vec SmtpHeader;
+    body : blob;
+};
+
+type SmtpAddress = record {
+    user : text;
+    domain : text;
+};
+
+type SmtpEnvelope = record {
+    from : SmtpAddress;
+    to : SmtpAddress;
+};
+
+type SmtpRequest = record {
+    message : opt SmtpMessage;
+    envelope : opt SmtpEnvelope;
+    gateway_flags : opt vec text;
+};
+
+type SmtpRequestError = record {
+    code : nat64;
+    message : text;
+};
+
+type SmtpResponse = variant {
+    Ok : record {};
+    Err : SmtpRequestError;
+};
+
 // API V2 specific types
 // WARNING: These type are experimental and may change in the future.
 type IdentityNumber = nat64;
@@ -621,6 +821,12 @@ type IdentityInfo = record {
     name : opt text;
     // The timestamp at which the anchor was created
     created_at : opt Timestamp;
+    // Email-recovery credentials bound to this anchor (empty when
+    // none is configured). The canister API currently caps the list
+    // at one entry — the FE renders the recovery-email card from
+    // the first one — but exposing it as a `vec` lets future
+    // multi-credential support land without a candid schema bump.
+    email_recovery : vec EmailRecoveryCredential;
 };
 
 type IdentityInfoError = variant {
@@ -1229,6 +1435,41 @@ service : (opt InternetIdentityInit) -> {
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
     openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
+
+    // Email-recovery protocol
+    // =======================
+    // See `docs/ongoing/email-recovery.md`. Covers both flows:
+    // - Setup: prepare_add (authenticated) → smtp_request for
+    //   register@id.ai → credential bound to the anchor. Removed
+    //   later via credential_remove.
+    // - Recovery: prepare_delegation (anonymous, bound to a
+    //   session_key) → smtp_request for recover@id.ai → canister
+    //   stamps a signed delegation seed. The FE then calls
+    //   email_recovery_get_delegation to retrieve the
+    //   SignedDelegation.
+    // Both flows share the polling status query.
+    email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_status : (text) -> (EmailRecoveryStatus) query;
+    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
+    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
+
+    // SMTP gateway protocol
+    // =====================
+    // The off-chain SMTP gateway forwards every inbound message via
+    // smtp_request. The canister verifies the email cryptographically
+    // and dispatches by recipient: register@id.ai → setup completion,
+    // recover@id.ai → recovery delegation stamping. Always returns Ok
+    // — the gateway shouldn't get a per-message verification signal
+    // back. The FE sees outcomes via the polling status query.
+    smtp_request : (SmtpRequest) -> (SmtpResponse);
+
+    // Called by the gateway at RCPT TO time to decide whether to
+    // accept the connection before pulling the message body. Returns
+    // Ok for register@id.ai / recover@id.ai (case-insensitive), and
+    // 550 (mailbox unavailable) for everything else.
+    smtp_request_validate : (SmtpRequest) -> (SmtpResponse) query;
 
     // HTTP Gateway protocol
     // =====================

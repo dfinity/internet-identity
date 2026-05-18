@@ -19,18 +19,33 @@ base64.workspace = true
 rsa.workspace = true
 minicbor = { workspace = true, features = ["std", "derive"] }
 
+# DNSSEC verifier deps
+p256.workspace = true
+ed25519-dalek.workspace = true
+
 # Captcha deps
 lodepng = "*"
 
 rand = { version = "0.8", default-features = false }
 
 rand_core = { version = "0.6", default-features = false }
+# `rand_chacha` powers the email-recovery PRNG (`email_recovery::rng`).
+# Seeded once per canister lifetime from `raw_rand`; every subsequent
+# nonce draw is local. `default-features = false` drops the `std`
+# feature — matching the `rand` / `rand_core` lines above so the
+# whole `rand_*` family stays on the same no-std-friendly footing.
 rand_chacha = { version = "0.3", default-features = false }
 captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
 
 # OpenID deps
 identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false }
 url = { version = "2.5", default-features = false, features = ["std"] }
+
+# DoH fallback fan-out: pulled in only for `future::join_all`, which
+# lets us await all 5 provider outcalls concurrently rather than
+# serially. `default-features = false` keeps the wasm32 build lean
+# (no executor / threading code).
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
 
 # All IC deps
 candid.workspace = true

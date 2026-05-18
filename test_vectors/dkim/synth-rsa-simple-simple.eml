@@ -1,0 +1,17 @@
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=test.example.com;
+ i=@test.example.com; q=dns/txt; s=test1; t=1777972289; h=from : to :
+ subject : date : message-id;
+ bh=XhrJs2u4lbKf8P2AF3hhF5rc3ozgZ+4qZDninM4tACc=;
+ b=ubW+zxKPfG/3kXewxWXoqyzb6BnOLe59yIZIDxVL8xuTAc7ZCVXfTzSjcLQk1P3G7utxu
+ og0/zUBzUbV71musLJ00JVwchWy2LQEp3NRFNFKXQIEhXhqimil6Rdnpf0FLknW14ty+HOP
+ 1ad9aQxkh05YeyVNpwlejZXSIPby22ryWjvChCzTYfZrM9sQbDUXfBMdxC+ou1eW87+/eas
+ FYxJmjGyGDWGnGOokfQRbNpjfav8bMKeCAPnwG7L8nEUGZwzje4wF3E4mSxBZkQPEmEVQqe
+ mTp6FMNaEp4qyx4rdFTipnr+9tlFAsC2VgnkEKw8GLKYEIASbrAg5PPiN5pQ==
+From: alice@test.example.com
+To: recover@id.ai
+Subject: DKIM verifier test
+Date: Mon, 5 May 2026 12:00:00 +0000
+Message-ID: <test-rsa-relaxed-2026@test.example.com>
+
+This is a DKIM verifier test message.
+Line two.

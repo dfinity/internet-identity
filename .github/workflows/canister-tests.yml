@@ -513,6 +513,29 @@ jobs:
       - name: Install icp-cli
         run: npm install -g @icp-sdk/icp-cli@$(cat .icp-cli-version | tr -d '[:space:]')
 
+      # Pin the network launcher (which bundles pocket-ic) because
+      # `icp network start` otherwise fetches `releases/latest`. The
+      # current `latest` (v13.x, published 2026-05-13) ships a
+      # pocket-ic build that strictly rejects canister-signature
+      # delegations whose subnet certificate omits `subnet_type` —
+      # which pocket-ic itself emits on every delegation, breaking
+      # any flow that round-trips a canister sig through the replica
+      # (notably the OpenID + consent e2e tests). Tracked upstream by
+      # dfinity/ic#10226 (fix not yet in any launcher release).
+      # Remove this step once a launcher release including that fix
+      # exists.
+      - name: Pin icp-cli-network-launcher to last working v12
+        run: |
+          launcher_tag=v12.0.0-2026-04-16-04-20
+          launcher_dir="$RUNNER_TEMP/icp-cli-network-launcher-x86_64-linux-$launcher_tag"
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            -o "$RUNNER_TEMP/launcher.tar.gz" \
+            "https://github.com/dfinity/icp-cli-network-launcher/releases/download/$launcher_tag/icp-cli-network-launcher-x86_64-linux-$launcher_tag.tar.gz"
+          tar xzf "$RUNNER_TEMP/launcher.tar.gz" -C "$RUNNER_TEMP"
+          test -x "$launcher_dir/icp-cli-network-launcher"
+          test -x "$launcher_dir/pocket-ic"
+          echo "ICP_CLI_NETWORK_LAUNCHER_PATH=$launcher_dir/icp-cli-network-launcher" >> "$GITHUB_ENV"
+
       # Helps with debugging
       - name: Show versions
         run: |
@@ -585,7 +608,12 @@ jobs:
           for domain in ${{ env.sso_discoverable_domains }}; do
             sso_domains_vec="$sso_domains_vec\"$domain\"; "
           done
-          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_discoverable_domains = opt vec { $sso_domains_vec } })"
+          # Trust anchor for the DNSSEC chain assembled by the e2e
+          # signer (`src/frontend/tests/e2e-playwright/utils/dnssecTestSigner.ts`).
+          # Derived fresh from the signer's seed so there's no hardcoded
+          # digest to drift out of sync.
+          dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
+          icp canister install internet_identity --wasm internet_identity_backend.wasm.gz --args "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} }; sso_discoverable_domains = opt vec { $sso_domains_vec }; dnssec_config = $dnssec_config })"
           II_CANISTER_ID=$(icp canister status internet_identity --id-only)
           icp canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --args "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           icp canister install test_app --wasm demos/test-app/test_app.wasm

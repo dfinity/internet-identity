@@ -63,6 +63,8 @@ const DEFAULT_INIT: InternetIdentityInit = {
   dummy_auth: [],
   backend_canister_id: [],
   backend_origin: [],
+  doh_config: [],
+  dnssec_config: [],
 };
 
 vi.mock("$lib/globals", () => ({

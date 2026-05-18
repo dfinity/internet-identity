@@ -44,8 +44,12 @@ serde = "1"
 serde_bytes = "0.11"
 serde_cbor = "0.11"
 sha2 = "0.10"
-rsa = "0.9.7"
+rsa = "0.9.10"
 minicbor = "1.0.0"
+
+# DNSSEC verifier deps (PR 1b on docs/ongoing/email-recovery.md §7)
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "sha256"] }
+ed25519-dalek = { version = "2.2", default-features = false }
 
 # Certification
 ic-asset-certification = "3.0.3"

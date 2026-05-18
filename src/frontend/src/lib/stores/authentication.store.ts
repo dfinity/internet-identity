@@ -21,7 +21,8 @@ export interface Authenticated {
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
     | { openid: { iss: string; sub: string } }
-    | { recoveryPhrase: { principal: Principal } };
+    | { recoveryPhrase: { principal: Principal } }
+    | { emailRecovery: { principal: Principal } };
 }
 
 type AuthenticationStore = Readable<Authenticated | undefined> & {

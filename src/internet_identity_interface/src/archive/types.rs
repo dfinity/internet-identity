@@ -39,6 +39,17 @@ pub enum Operation {
     #[serde(rename = "register_anchor_with_openid_credential")]
     RegisterAnchorWithOpenIdCredential { iss: String },
 
+    // Email-recovery credentials. We deliberately carry no payload —
+    // emitting the address (or even just its domain) would let an
+    // archive consumer correlate anchors back to mailbox providers.
+    // The audit log already includes the anchor + timestamp, which
+    // is enough to answer "who changed their recovery email when?"
+    // without leaking the address itself.
+    #[serde(rename = "add_email_recovery")]
+    AddEmailRecovery,
+    #[serde(rename = "remove_email_recovery")]
+    RemoveEmailRecovery,
+
     // Identity name, set for new users in new discoverable passkeys flow
     #[serde(rename = "add_name")]
     AddName,

@@ -23,6 +23,12 @@
     replaceState,
   } from "$app/navigation";
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
+  import InactiveEmailRecovery from "./components/InactiveEmailRecovery.svelte";
+  import ActiveEmailRecovery from "./components/ActiveEmailRecovery.svelte";
+  import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
+  import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
+  import type { EmailRecoveryDnsInput } from "$lib/generated/internet_identity_types";
+  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
     fromMnemonicWithoutValidation,
@@ -46,6 +52,18 @@
   let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
   let unverifiedRecoveryPhrase = $state<string[]>();
   let lockedRecoveryPhraseIdentity = $state<Identity>();
+
+  let showEmailRecoverySetup = $state(false);
+  let removingEmailRecovery = $state(false);
+  /**
+   * Email-recovery binding observable to the FE. The canister
+   * returns it on every `identity_info` call (see
+   * `IdentityInfo.email_recovery`); we mirror that into local
+   * state so the wizard can optimistically flip the card to
+   * "active" right after a successful binding without waiting for
+   * the next route load to re-fetch.
+   */
+  let emailRecovery = $derived(data.identityInfo.email_recovery[0]);
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -236,6 +254,64 @@
     return true;
   };
 
+  // -------------------------------------------------------------
+  // Email-recovery handlers
+  // -------------------------------------------------------------
+
+  /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
+  const prepareAddEmail = (input: EmailRecoveryDnsInput) =>
+    $authenticatedStore.actor
+      .email_recovery_credential_prepare_add(
+        $authenticatedStore.identityNumber,
+        input,
+      )
+      .then(throwCanisterError);
+
+  /** Anonymous wrapper around `email_recovery_status` (query). */
+  const statusEmailRecovery = (nonce: string) =>
+    anonymousActor.email_recovery_status(nonce);
+
+  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
+  const submitEmailDkimLeaf = (
+    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
+  ) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
+  const handleRemoveEmail = async () => {
+    if (emailRecovery === undefined) return;
+    const result =
+      await $authenticatedStore.actor.email_recovery_credential_remove(
+        $authenticatedStore.identityNumber,
+        emailRecovery.address,
+      );
+    if ("Err" in result) {
+      handleError(new Error(JSON.stringify(result.Err)));
+      return;
+    }
+    removingEmailRecovery = false;
+    void invalidateAll();
+    toaster.success({
+      title: $t`Recovery email removed`,
+      description: $t`Your recovery email has been detached from this identity.`,
+    });
+  };
+
+  const handleEmailWizardClosed = () => {
+    showEmailRecoverySetup = false;
+    void invalidateAll();
+  };
+
+  const handleEmailWizardSuccess = (address: string) => {
+    showEmailRecoverySetup = false;
+    void invalidateAll();
+    toaster.success({
+      title: $t`Recovery email added`,
+      description: $t`${address} is now a recovery method.`,
+    });
+  };
+
   // Warn user if they're leaving in the middle of a recovery phrase set-up
   beforeNavigate((navigation) => {
     if (showRecoveryPhraseSetup === undefined || navigation.type !== "leave") {
@@ -264,84 +340,106 @@
 </script>
 
 <header class="flex flex-col gap-3">
-  <h1 class="text-text-primary text-3xl font-medium">{$t`Recovery phrase`}</h1>
+  <h1 class="text-text-primary text-3xl font-medium">
+    {$t`Recovery methods`}
+  </h1>
   <p class="text-text-tertiary text-base">
-    <Trans>A way to regain access to your identity if you ever lose it.</Trans>
+    <Trans>
+      Use these to regain access to your identity if you ever lose it.
+    </Trans>
   </p>
 </header>
 
-<!-- Uses same grid as cards below to match the width of all 3 cards -->
-<div
-  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5"
->
-  <div class="col-span-3 max-sm:col-span-1">
-    {#if isUnverified}
-      <!-- This identity has a recovery phrase that isn't verified yet -->
-      <UnverifiedRecoveryPhrase
-        onReset={() => (showRecoveryPhraseSetup = "reset")}
-        onVerify={() => (showRecoveryPhraseSetup = "verify")}
-      />
-    {:else if recoveryPhraseData !== undefined}
-      <!-- This identity has a verified recovery phrase -->
-      <ActiveRecoveryPhrase
-        onReset={() => (showRecoveryPhraseSetup = "reset")}
-        recoveryPhrase={recoveryPhraseData}
-        {isCurrentAccessMethod}
+<!-- Two-up grid on >=sm so the phrase and email cards sit side-by-
+     side; stacks vertically on mobile. Each card stretches to the
+     row's natural height via grid's default `align-items: stretch`
+     so the two tiles match heights when their content differs. -->
+<div class="mt-10 grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2">
+  {#if isUnverified}
+    <!-- This identity has a recovery phrase that isn't verified yet -->
+    <UnverifiedRecoveryPhrase
+      onReset={() => (showRecoveryPhraseSetup = "reset")}
+      onVerify={() => (showRecoveryPhraseSetup = "verify")}
+    />
+  {:else if recoveryPhraseData !== undefined}
+    <!-- This identity has a verified recovery phrase -->
+    <ActiveRecoveryPhrase
+      onReset={() => (showRecoveryPhraseSetup = "reset")}
+      recoveryPhrase={recoveryPhraseData}
+      {isCurrentAccessMethod}
+    />
+  {:else}
+    <!-- This identity doesn't have a recovery phrase yet -->
+    <InactiveRecoveryPhrase
+      onActivate={() => (showRecoveryPhraseSetup = "activate")}
+    />
+  {/if}
+
+  <!-- Recovery email card. Gated by the EMAIL_RECOVERY feature
+       flag (default false; auto-enabled on beta.id.ai by the
+       flag's init callback). -->
+  {#if $EMAIL_RECOVERY}
+    {#if emailRecovery !== undefined}
+      <ActiveEmailRecovery
+        credential={emailRecovery}
+        onReplace={() => (showEmailRecoverySetup = true)}
+        onRemove={() => (removingEmailRecovery = true)}
       />
     {:else}
-      <!-- This identity doesn't have a recovery phrase yet -->
-      <InactiveRecoveryPhrase
-        onActivate={() => (showRecoveryPhraseSetup = "activate")}
+      <InactiveEmailRecovery
+        onActivate={() => (showEmailRecoverySetup = true)}
       />
     {/if}
-  </div>
+  {/if}
 </div>
 
-<section>
-  <h2 class="text-text-primary mt-10 text-lg font-semibold">
-    {$t`How to stay secure`}
-  </h2>
-  <div
-    class={[
-      // Layout
-      "mt-5 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5",
-      // Articles
-      "[&_article]:border-border-secondary [&_article]:bg-bg-primary [&_article]:rounded-2xl [&_article]:border [&_article]:p-5 [&_article]:not-dark:shadow-sm",
-      // Headings
-      "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
-      // Paragraphs
-      "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
-    ]}
-  >
-    <article>
-      <h3>{$t`Keep it secret`}</h3>
-      <p>
-        <Trans>
-          Your recovery phrase gives full control over your identity. Never
-          share it and only use it on the official website.
-        </Trans>
-      </p>
-    </article>
-    <article>
-      <h3>{$t`Store it safely`}</h3>
-      <p>
-        <Trans>
-          Write down all 24 words correctly and keep them offline. Do not store
-          them in the cloud or on devices.
-        </Trans>
-      </p>
-    </article>
-    <article>
-      <h3>{$t`Replace it anytime`}</h3>
-      <p>
-        <Trans>
-          You can reset your recovery phrase at any time. This keeps your
-          identity secure if it is ever exposed.
-        </Trans>
-      </p>
-    </article>
-  </div>
-</section>
+{#if !$EMAIL_RECOVERY}
+  <section>
+    <h2 class="text-text-primary mt-10 text-lg font-semibold">
+      {$t`How to stay secure`}
+    </h2>
+    <div
+      class={[
+        // Layout
+        "mt-5 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5",
+        // Articles
+        "[&_article]:border-border-secondary [&_article]:bg-bg-primary [&_article]:rounded-2xl [&_article]:border [&_article]:p-5 [&_article]:not-dark:shadow-sm",
+        // Headings
+        "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
+        // Paragraphs
+        "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
+      ]}
+    >
+      <article>
+        <h3>{$t`Keep it secret`}</h3>
+        <p>
+          <Trans>
+            Your recovery phrase gives full control over your identity. Never
+            share it and only use it on the official website.
+          </Trans>
+        </p>
+      </article>
+      <article>
+        <h3>{$t`Store it safely`}</h3>
+        <p>
+          <Trans>
+            Write down all 24 words correctly and keep them offline. Do not
+            store them in the cloud or on devices.
+          </Trans>
+        </p>
+      </article>
+      <article>
+        <h3>{$t`Replace it anytime`}</h3>
+        <p>
+          <Trans>
+            You can reset your recovery phrase at any time. This keeps your
+            identity secure if it is ever exposed.
+          </Trans>
+        </p>
+      </article>
+    </div>
+  </section>
+{/if}
 
 {#if showRecoveryPhraseSetup !== undefined}
   <Dialog
@@ -362,6 +460,27 @@
       }}
       existingRecoveryPhraseType={recoveryPhraseType}
       {unverifiedRecoveryPhrase}
+    />
+  </Dialog>
+{/if}
+
+{#if showEmailRecoverySetup}
+  <Dialog onClose={handleEmailWizardClosed} closeOnOutsideClick={false}>
+    <SetupEmailRecoveryWizard
+      prepare={prepareAddEmail}
+      status={statusEmailRecovery}
+      submitDkimLeaf={submitEmailDkimLeaf}
+      onSuccess={handleEmailWizardSuccess}
+    />
+  </Dialog>
+{/if}
+
+{#if removingEmailRecovery && emailRecovery !== undefined}
+  <Dialog onClose={() => (removingEmailRecovery = false)}>
+    <RemoveEmailRecovery
+      address={emailRecovery.address}
+      onRemove={handleRemoveEmail}
+      onCancel={() => (removingEmailRecovery = false)}
     />
   </Dialog>
 {/if}

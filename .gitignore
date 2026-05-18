@@ -3,6 +3,7 @@
 .idea/
 **/*~
 .windsurf/
+.claude/
 
 # Mac OSX temporary files
 .DS_Store

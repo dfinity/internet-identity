@@ -21,13 +21,21 @@ pub type AccountNumber = u64;
 
 mod api_v2;
 pub mod attributes;
+pub mod dnssec;
+pub mod doh;
+pub mod email_recovery;
 pub mod icrc3;
 pub mod openid;
+pub mod smtp;
 pub mod vc_mvp;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
+pub use crate::internet_identity::types::dnssec::*;
+pub use crate::internet_identity::types::doh::*;
+pub use crate::internet_identity::types::email_recovery::*;
 pub use crate::internet_identity::types::openid::*;
+pub use crate::internet_identity::types::smtp::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -268,6 +276,22 @@ pub struct InternetIdentityInit {
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// DNSSEC trust anchors for any feature that verifies DNS records
+    /// against the IANA-rooted DNSSEC chain (currently the email-recovery
+    /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).
+    ///
+    /// Wrapped in `Option<Option<...>>` to match the same set/clear pattern
+    /// as `analytics_config` and `dummy_auth`: outer `None` keeps the
+    /// previously-stored value across an upgrade, `Some(None)` clears it,
+    /// `Some(Some(c))` sets it to `c`.
+    pub dnssec_config: Option<Option<DnssecConfig>>,
+    /// DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
+    /// domains for which the canister may fetch DKIM / DMARC TXT
+    /// records via HTTP outcalls (covers the consumer-mailbox
+    /// providers whose DNS zones aren't DNSSEC-signed — see
+    /// `docs/ongoing/email-recovery.md` §7.6). Same set/clear pattern
+    /// as `dnssec_config`.
+    pub doh_config: Option<Option<DohConfig>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -402,6 +426,11 @@ pub struct OidcConfig {
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),
+    /// The caller authenticated via an email-recovery delegation.
+    /// Carries the lowercased canonical address whose binding on the
+    /// anchor produced the matching principal — `activity_bookkeeping`
+    /// uses it to bump `last_used` on the credential.
+    EmailRecoveryAddress(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

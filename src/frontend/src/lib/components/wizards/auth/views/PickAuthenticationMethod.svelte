@@ -65,7 +65,7 @@
           manual
         >
           <button
-            class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-1.5 px-2 py-3 text-xs font-medium"
+            class="btn btn-secondary btn-xl flex-1"
             onclick={() => handleContinueWithOpenId(provider)}
             disabled={authenticatingProviderId !== undefined}
             aria-label={$t`Continue with ${name}`}
@@ -78,9 +78,6 @@
                 {@html provider.logo}
               </div>
             {/if}
-            <span aria-hidden="true" class="text-text-tertiary w-full truncate">
-              {name}
-            </span>
           </button>
         </Tooltip>
       {/each}
@@ -95,15 +92,12 @@
         exists.
       -->
       <button
-        class="btn btn-secondary h-auto min-w-0 flex-1 flex-col gap-1.5 px-2 py-3 text-xs font-medium"
+        class="btn btn-secondary btn-xl flex-1"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={$t`Continue with SSO`}
       >
         <SsoIcon class="size-6" />
-        <span aria-hidden="true" class="text-text-tertiary w-full truncate">
-          {$t`SSO`}
-        </span>
       </button>
     </div>
   </div>

@@ -9,6 +9,13 @@ set -euo pipefail
 
 SOURCE_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "$SOURCE_DIR/frontend-arg-helpers.bash"
+# IANA root-anchor fetcher (used to fill dnssec_config in BE init args).
+# shellcheck source=fetch-iana-root-anchors.bash
+source "$SOURCE_DIR/fetch-iana-root-anchors.bash"
+# Default DoH allowlist — shared with deploy-common.bash so beta and
+# prod deploys agree on which domains use the DoH-fallback path.
+# shellcheck source=default-doh-domains.bash
+source "$SOURCE_DIR/default-doh-domains.bash"
 
 # Resolve the HTTPS remote URL for git operations that don't need SSH.
 # gh is authenticated via HTTPS, so this avoids SSH key prompts for
@@ -423,6 +430,7 @@ prepare_staging_backend_argument() {
   if [ ! -s staging_args.txt ]; then
     echo "(null)" > staging_args.txt
   fi
+  patch_email_recovery_init_fields staging_args.txt
   didc_encode_ii_init staging_args.txt > staging_icp_arg.bin
 }
 
@@ -529,6 +537,129 @@ didc_assist_ii_init() {
   run_didc_command_for_ii_init assist | awk '/\(/ {flag=1} flag {print} /\)/ {flag=0}'
 }
 
+# Default DoH allowlist for the email-recovery flow on production.
+# Reads `DEFAULT_DOH_ALLOWED_DOMAINS` from `default-doh-domains.bash`
+# (sourced at the top of this script) so beta and prod always agree.
+#
+# The `II_DOH_DOMAINS` env var overrides — including with the empty
+# string, which yields `allowed_domains = vec {}` (DoH disabled,
+# DNSSEC-only). The check looks for "is the var *set*", not "is it
+# non-empty", so the documented "empty disables" semantics work.
+default_doh_domains_for_prod() {
+  if [ -n "${II_DOH_DOMAINS+set}" ]; then
+    echo "$II_DOH_DOMAINS"
+    return
+  fi
+  # Bash array → comma-separated for the patcher. printf with `,` as
+  # the separator is the simplest portable join; the trailing comma
+  # is dropped by `_be_doh_config_candid`'s per-element loop in
+  # deploy-common.bash and by `build_doh_config_candid_for_prod`'s
+  # equivalent below, which both skip empty elements.
+  local IFS=,
+  echo "${DEFAULT_DOH_ALLOWED_DOMAINS[*]}"
+}
+
+# Render the DoH allowlist as a Candid `opt opt DohConfig` value.
+build_doh_config_candid_for_prod() {
+  local list_csv="$(default_doh_domains_for_prod)"
+  local list=""
+  local IFS=','
+  for d in $list_csv; do
+    d="${d## }"; d="${d%% }"
+    if [ -z "$d" ]; then continue; fi
+    list+="\"$d\"; "
+  done
+  cat <<EOF
+opt opt record {
+      allowed_domains = vec { $list};
+      max_cache_age_secs = opt (3600 : nat64);
+    }
+EOF
+}
+
+# After didc-assist has produced a Candid arg file, replace whatever
+# the user typed (or didn't) for `dnssec_config` and `doh_config` with
+# values fetched live from IANA + the curated DoH allowlist. This keeps
+# the rest of the didc-assist flow (each opt field can stay as null
+# = preserve, or be set explicitly) untouched while making sure these
+# two fields land with operator-controlled values rather than human-
+# typed blobs.
+#
+# Args: <args-file>  (in-place edit)
+#
+# Opt-in: only runs when `II_UPDATE_EMAIL_RECOVERY_INIT=1`. Without
+# the env var the patch is skipped and didc-assist's output is used
+# verbatim — most upgrades want this, since the on-chain values are
+# already set after the first init and `opt null` preserves them.
+patch_email_recovery_init_fields() {
+  local args_file="$1"
+  if [ "${II_UPDATE_EMAIL_RECOVERY_INIT:-0}" != "1" ]; then
+    echo "II_UPDATE_EMAIL_RECOVERY_INIT not set — leaving dnssec_config/doh_config as didc-assist wrote them." >&2
+    return 0
+  fi
+  echo ""
+  echo "=== Filling email-recovery init args (dnssec_config + doh_config) ==="
+  echo ""
+  local anchors_vec
+  anchors_vec="$(fetch_and_review_iana_root_anchors)" || {
+    echo "Failed to fetch IANA root anchors. Unset II_UPDATE_EMAIL_RECOVERY_INIT to skip." >&2
+    return 1
+  }
+  local doh_record="$(build_doh_config_candid_for_prod)"
+  local dnssec_record="opt opt record { root_anchors = $anchors_vec }"
+  # Patch the args file with Node — find/replace the two field
+  # values, or append them inside the record if they aren't there.
+  # didc-assist always emits the field name even when the value is
+  # null, so the find branch is the common path.
+  ARGS_FILE="$args_file" \
+  DNSSEC_RECORD="$dnssec_record" \
+  DOH_RECORD="$doh_record" \
+  node --input-type=module -e '
+    import { readFileSync, writeFileSync } from "fs";
+    const path = process.env.ARGS_FILE;
+    const dnssec = process.env.DNSSEC_RECORD;
+    const doh = process.env.DOH_RECORD;
+    let body = readFileSync(path, "utf8");
+    // Constrain the patcher to the values didc-assist actually emits
+    // for unfilled optional fields — literal `null`. A regex-based
+    // match across a populated value would stop at the first
+    // semicolon, which inside a nested record (e.g. an already-set
+    // `dnssec_config = opt opt record { root_anchors = vec { record {
+    // key_tag = ...; algorithm = ...; }; }; }`) terminates after the
+    // first nested field and leaves the rest of the old value in
+    // place. Rather than write a Candid-aware parser in a one-shot
+    // Node snippet, we patch only `null` values and bail out loudly
+    // otherwise — the human running this script can either reset
+    // the field to `null` in args.txt or edit the new value in by
+    // hand.
+    const replaceField = (name, replacement) => {
+        const nullRe = new RegExp(`(\\b${name}\\s*=\\s*)null(\\s*;)`);
+        const fieldPresentRe = new RegExp(`\\b${name}\\s*=`);
+        if (nullRe.test(body)) {
+            body = body.replace(nullRe, (_, head, tail) => `${head}${replacement}${tail}`);
+        } else if (!fieldPresentRe.test(body)) {
+            // Field not present at all — append inside the outermost
+            // `record { ... }` before the closing brace.
+            const insert = `    ${name} = ${replacement};\n  `;
+            body = body.replace(/(record\s*\{[\s\S]*?)(\}\s*\)\s*$)/, (_, head, tail) => `${head}${insert}${tail}`);
+        } else {
+            throw new Error(
+                `Refusing to patch \`${name}\`: existing value in args.txt is not \`null\`. ` +
+                `Reset it to \`null\` first, or edit the new value in by hand.`
+            );
+        }
+    };
+    if (body.trim() === "(null)") {
+        body = `(\n  opt record {\n    dnssec_config = ${dnssec};\n    doh_config = ${doh};\n  }\n)\n`;
+    } else {
+        replaceField("dnssec_config", dnssec);
+        replaceField("doh_config", doh);
+    }
+    writeFileSync(path, body);
+  '
+  echo "Patched $args_file with IANA-fetched dnssec_config + curated doh_config." >&2
+}
+
 compute_sha256sum_for_args() {
   local ARG_FILE="$1"
   didc_encode_ii_init "$ARG_FILE" | xxd -r -p | sha256sum | cut -f1 -d' '
@@ -566,6 +697,7 @@ prepare_production_backend_argument() {
   if [ ! -s args.txt ]; then
     echo "(null)" > args.txt
   fi
+  patch_email_recovery_init_fields args.txt
   didc_encode_ii_init args.txt > icp_arg.bin
   # icp-cli raw arguments are encoded differently than ic-admin's --arg values (mainnet_arg.bin).
   xxd -r -p icp_arg.bin > mainnet_arg.bin

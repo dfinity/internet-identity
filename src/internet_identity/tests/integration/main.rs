@@ -12,6 +12,7 @@ mod archive_integration;
 mod attributes;
 mod config;
 mod delegation;
+mod email_recovery;
 mod http;
 mod openid;
 mod rollback;
