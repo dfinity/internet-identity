@@ -112,7 +112,7 @@ Without all three, no actor (boundary node, MITM, replicating outcall transport,
 ### 3.4 Attacks explicitly **not** defended
 
 - Compromise of the IdP's signing key. Every credential issued by that IdP is at risk; that is the unavoidable trust assumption of any OIDC integration.
-- Compromise of the user's mailbox / device that holds the session_sk. Standard endpoint compromise — out of scope.
+- Compromise of the user's device / browser that holds the session_sk. Standard endpoint compromise — out of scope.
 - Phishing the user into completing an OAuth flow on a malicious site impersonating Internet Identity. This is the standard "website phishing" problem; we don't try to solve it in this layer.
 
 ---
