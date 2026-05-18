@@ -1,7 +1,12 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { CopyIcon, ExternalLinkIcon, ShieldCheckIcon } from "@lucide/svelte";
+  import {
+    ChevronDownIcon,
+    CopyIcon,
+    ExternalLinkIcon,
+    ShieldCheckIcon,
+  } from "@lucide/svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { waitFor } from "$lib/utils/utils";
   import type { Path } from "$lib/utils/dnssec";
@@ -126,7 +131,7 @@
     </h1>
     <p class="text-text-tertiary text-base font-medium">
       {#if sent}
-        {$t`We're waiting for your email.`}
+        {$t`This usually takes under 30 seconds.`}
       {:else}
         <Trans>Send the email below to confirm.</Trans>
       {/if}
@@ -280,37 +285,42 @@
   </div>
 
   {#if sent}
-    <!-- "Having trouble?" — same collapsible affordance the
-         UnsupportedDomain view uses for "Why isn't this supported?",
-         so users recognise the pattern. Force-opens after
-         `nudgeAfterMs` (60 s) so a stuck user doesn't have to dig. -->
+    <!-- "Having trouble?" — same collapsible pattern as the
+         UnsupportedDomain "Why isn't this supported?" box, so users
+         recognise the affordance. Force-opens after `nudgeAfterMs`
+         (60 s) so a stuck user doesn't have to dig. -->
     <details
       bind:open={troubleOpen}
-      class="border-border-secondary rounded-xl border"
+      class="bg-bg-primary border-border-secondary group rounded-xl border px-4 py-3 not-dark:shadow-sm"
     >
       <summary
-        class="text-text-primary hover:bg-bg-secondary focus-visible:bg-bg-secondary flex cursor-pointer items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-colors outline-none select-none"
+        class="text-text-primary flex cursor-pointer list-none items-center justify-between text-sm font-medium select-none"
       >
-        {$t`Having trouble?`}
+        <span>{$t`Having trouble?`}</span>
+        <ChevronDownIcon
+          class="text-fg-tertiary size-4 transition-transform group-open:rotate-180"
+        />
       </summary>
-      <div class="border-border-tertiary border-t px-4 py-3">
-        <ul
-          class="text-text-tertiary flex list-disc flex-col gap-2 pl-5 text-sm"
-        >
-          <li>
-            {$t`Make sure you sent the email from ${fromAddress} — aliases and forwarders won't work.`}
-          </li>
-          <li>
-            {$t`Make sure the subject line is exactly:`}
-            <code
-              class="bg-bg-secondary text-text-primary mt-1 block rounded px-2 py-1 font-mono text-xs break-all"
-              >{nonce}</code
-            >
-          </li>
-          <li>
-            {$t`Check your sent folder — some providers queue outbound mail.`}
-          </li>
-        </ul>
+      <div
+        class="text-text-tertiary mt-3 flex flex-col gap-3 text-sm font-medium"
+      >
+        <p>
+          <Trans>
+            The email needs to come from
+            <strong class="break-all">{fromAddress}</strong>
+            directly. Aliases and forwarders won't work.
+          </Trans>
+        </p>
+        <p>
+          {$t`Double-check the subject line. It has to be exactly:`}
+          <code
+            class="bg-bg-secondary text-text-primary mt-1 block rounded px-2 py-1 font-mono text-xs break-all"
+            >{nonce}</code
+          >
+        </p>
+        <p>
+          {$t`Some mail providers queue outgoing mail. Check your sent folder to make sure it actually went out.`}
+        </p>
       </div>
     </details>
   {:else}
