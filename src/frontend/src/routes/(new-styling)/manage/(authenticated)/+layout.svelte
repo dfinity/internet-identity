@@ -9,6 +9,7 @@
     CodeIcon,
     LanguagesIcon,
     InfoIcon,
+    ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
@@ -388,11 +389,19 @@
         <li class="contents">
           <NavItem
             href="/manage/access"
-            current={page.url.pathname === "/manage/access" ||
-              page.url.pathname === "/manage/recovery"}
+            current={page.url.pathname === "/manage/access"}
           >
             <KeyRoundIcon class="size-5 sm:max-md:mx-auto" />
-            <span class="sm:max-md:hidden">{$t`Access and recovery`}</span>
+            <span class="sm:max-md:hidden">{$t`Access`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/recovery"
+            current={page.url.pathname === "/manage/recovery"}
+          >
+            <ShieldIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>
       </ul>

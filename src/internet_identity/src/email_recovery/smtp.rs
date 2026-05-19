@@ -253,7 +253,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // DNSSEC path — pre-DKIM-key verification only. Body is
         // dropped after `bh=` validates; status flips to
         // `NeedDkimLeaf { selector }` so the FE submits the leaf.
-        match prepare_partial_verification(&request, &snapshot) {
+        match prepare_partial_verification(&request, &snapshot, now_secs) {
             Ok(partial) => {
                 let selector = partial.selector.clone();
                 pending::with_mut(&nonce, now_secs, |c| {
@@ -422,6 +422,7 @@ fn find_nonce_in(haystack: &str) -> Option<String> {
 fn prepare_partial_verification(
     request: &SmtpRequest,
     snapshot: &PendingSnapshot,
+    now_secs: u64,
 ) -> Result<PartialVerification, EmailRecoveryError> {
     let message = request.message.as_ref().ok_or_else(|| {
         EmailRecoveryError::EmailVerificationFailed("missing message body".into())
@@ -456,6 +457,30 @@ fn prepare_partial_verification(
         ));
     }
 
+    // Signature-header-only tag enforcement (design §5.4). These are
+    // the same checks the DoH path runs inside `crate::dkim::verify`;
+    // running them here closes the DNSSEC-path parity gap surfaced by
+    // the audit: without these, a sender on a DNSSEC-signed domain
+    // could verify with a stale `x=` (replay window stretches to the
+    // RRSIG validity, days–weeks), a future-dated `t=`, or an `h=`
+    // that doesn't cover `Subject` (nonce-rewrite by a MITM). The
+    // DNS-record-dependent tag checks (`i=` alignment under `t=s`,
+    // and `t=y` testing-mode) run later in
+    // `submit_dkim_leaf::run_submit` once the DKIM leaf has been
+    // DNSSEC-verified.
+    crate::dkim::check_signature_not_expired(&sig, now_secs)
+        .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
+    crate::dkim::check_signature_not_from_future(&sig, now_secs)
+        .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
+    // Subject must be in the signed `h=` list (design §5.4). The
+    // challenge nonce lives in `Subject:`; a signature that doesn't
+    // cover it would let a man-in-the-middle rewrite the nonce on a
+    // legitimately-signed email. Runs before the body-hash check
+    // (the order the DoH path uses too) so this fast check on
+    // already-parsed tags fails first when both apply.
+    crate::dkim::check_subject_signed(&sig).map_err(|_| EmailRecoveryError::SubjectNotSigned)?;
+    let subject_signed = true;
+
     // Body hash check (`bh=`). After this passes, the body bytes
     // can't change without breaking the hash, so we drop them.
     let canonical_body = match sig.c_body {
@@ -467,15 +492,6 @@ fn prepare_partial_verification(
         return Err(EmailRecoveryError::EmailVerificationFailed(
             "computed body hash does not match bh=".into(),
         ));
-    }
-
-    // Subject must be in the signed `h=` list. The challenge nonce
-    // lives in `Subject:` (§5.4 of design doc); a signature that
-    // doesn't cover it would let a man-in-the-middle rewrite the
-    // nonce on a legitimately-signed email.
-    let subject_signed = sig.h.iter().any(|h| h.eq_ignore_ascii_case("Subject"));
-    if !subject_signed {
-        return Err(EmailRecoveryError::SubjectNotSigned);
     }
 
     // Compute the canonical signed-headers input and SHA-256 it. The
@@ -520,6 +536,7 @@ fn prepare_partial_verification(
         signature: sig.b.clone(),
         selector: sig.s.clone(),
         signing_domain: sig.d.clone(),
+        signing_auid: sig.i.clone(),
         algorithm: sig.algorithm,
         from_address_lc,
         subject_signed,
@@ -566,11 +583,9 @@ async fn verify_setup_email_doh(
         })?;
     let dkim_fqdn = format!("{}._domainkey.{}", sig.s, domain);
     let dmarc_fqdn = format!("_dmarc.{}", domain);
-    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain).await.map_err(
-        |e| {
-            map_doh_error(e, &domain)
-        },
-    )?;
+    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain)
+        .await
+        .map_err(|e| map_doh_error(e, &domain))?;
     // DMARC: a quorum of providers reporting "no record" is a valid
     // DNS state ("no policy published" per RFC 7489) and lets the
     // verifier fall back to strict alignment (design §6.3). Any other
@@ -594,8 +609,7 @@ async fn verify_setup_email_doh(
     // Run the combined DKIM + DMARC verifier.
     let status = crate::dmarc::verify_email(request, dkim_txt, dmarc_txt_opt, now_secs);
     match status {
-        crate::dmarc::EmailVerificationStatus::Verified { .. } => {
-        }
+        crate::dmarc::EmailVerificationStatus::Verified { .. } => {}
         crate::dmarc::EmailVerificationStatus::Unverified { reason, .. } => {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "{reason:?}"
@@ -874,7 +888,6 @@ pub(crate) fn calculate_email_recovery_seed(
     hasher.finalize().into()
 }
 
-
 #[cfg(not(test))]
 fn now_secs() -> u64 {
     ic_cdk::api::time() / 1_000_000_000
@@ -1104,5 +1117,146 @@ mod tests {
             gateway_flags: None,
         };
         assert_smtp_err_code(handle_smtp_request_validate(req), SMTP_ERR_SYNTAX_ERROR);
+    }
+
+    // ============================================================
+    // DNSSEC-path DKIM tag enforcement — `prepare_partial_verification`
+    // must reject signatures that fail the signature-header-only
+    // checks shared with the DoH path. Regression guards for the
+    // four gaps the parity audit surfaced. The DNS-record-dependent
+    // checks (`i=` AUID alignment, `t=y` testing) belong to
+    // `submit_dkim_leaf::run_submit` and are covered by the unit
+    // tests on the helpers themselves.
+    // ============================================================
+
+    fn dnssec_snapshot(claimed: &str, zone: &str) -> PendingSnapshot {
+        PendingSnapshot {
+            kind: SnapshotKind::Setup { anchor: 10_000 },
+            claimed_address: claimed.into(),
+            registered_domain: zone.into(),
+            is_dnssec_path: true,
+            cached_dmarc_txt: None,
+            partial_set: false,
+            already_terminal: false,
+        }
+    }
+
+    /// Build an `SmtpRequest` with a single DKIM-Signature header
+    /// whose tag content is `dkim_value`. `From:` is set to the same
+    /// address every test uses, the body is `b"hi"`, and the envelope
+    /// is shaped like a register-flow delivery.
+    fn smtp_with_dkim(dkim_value: &str) -> SmtpRequest {
+        use internet_identity_interface::internet_identity::types::smtp::{
+            SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage,
+        };
+        use serde_bytes::ByteBuf;
+        SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "alice".into(),
+                    domain: "example.com".into(),
+                },
+                to: SmtpAddress {
+                    user: "register".into(),
+                    domain: "id.ai".into(),
+                },
+            }),
+            message: Some(SmtpMessage {
+                headers: vec![
+                    SmtpHeader {
+                        name: "From".into(),
+                        value: "alice@example.com".into(),
+                    },
+                    SmtpHeader {
+                        name: "DKIM-Signature".into(),
+                        value: dkim_value.into(),
+                    },
+                ],
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+        }
+    }
+
+    /// Now-pinned at the same value `now_secs()` returns under
+    /// `cfg(test)`. Tests choose `t=` / `x=` relative to this so a
+    /// future skew adjustment doesn't silently break them.
+    const TEST_NOW: u64 = 1_700_000_000;
+
+    #[test]
+    fn dnssec_prepare_rejects_future_dated_t() {
+        // t = now + 1000s, well beyond the shared 60s skew window.
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From:Subject; \
+                          t=1700001000; bh=MTIzNDU2; b=YWJj";
+        let req = smtp_with_dkim(dkim_value);
+        let snap = dnssec_snapshot("alice@example.com", "example.com");
+        match prepare_partial_verification(&req, &snap, TEST_NOW) {
+            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+                assert!(
+                    msg.contains("SignatureFutureDated"),
+                    "DNSSEC path must reject future-dated t=; got {msg}"
+                );
+            }
+            other => panic!("expected SignatureFutureDated, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dnssec_prepare_accepts_future_t_within_skew() {
+        // t = now + 30s, inside the 60s window. The signature-header
+        // checks must pass; we expect later failure on body-hash (the
+        // bh= fixture is intentionally a non-match).
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From:Subject; \
+                          t=1700000030; bh=MTIzNDU2; b=YWJj";
+        let req = smtp_with_dkim(dkim_value);
+        let snap = dnssec_snapshot("alice@example.com", "example.com");
+        let result = prepare_partial_verification(&req, &snap, TEST_NOW);
+        if let Err(EmailRecoveryError::EmailVerificationFailed(msg)) = &result {
+            assert!(
+                !msg.contains("SignatureFutureDated"),
+                "t= within skew must not be rejected as future-dated; got {msg}"
+            );
+        }
+        // Otherwise: fine — we only care that we didn't get the
+        // SignatureFutureDated rejection. Body-hash fail (the bh=
+        // fixture is intentionally a non-match) or any later failure
+        // is acceptable for this regression guard.
+    }
+
+    #[test]
+    fn dnssec_prepare_rejects_expired_x() {
+        // x = now - 1, signature deadline has lapsed.
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From:Subject; \
+                          x=1699999999; bh=MTIzNDU2; b=YWJj";
+        let req = smtp_with_dkim(dkim_value);
+        let snap = dnssec_snapshot("alice@example.com", "example.com");
+        match prepare_partial_verification(&req, &snap, TEST_NOW) {
+            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+                assert!(
+                    msg.contains("SignatureExpired"),
+                    "DNSSEC path must reject signatures past x=; got {msg}"
+                );
+            }
+            other => panic!("expected SignatureExpired, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dnssec_prepare_rejects_missing_subject_in_h() {
+        // h= covers From but not Subject. The challenge nonce lives in
+        // Subject, so a signature that doesn't cover it would let a
+        // MITM rewrite the nonce on a legitimately-signed email.
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From; \
+                          bh=MTIzNDU2; b=YWJj";
+        let req = smtp_with_dkim(dkim_value);
+        let snap = dnssec_snapshot("alice@example.com", "example.com");
+        assert!(matches!(
+            prepare_partial_verification(&req, &snap, TEST_NOW),
+            Err(EmailRecoveryError::SubjectNotSigned)
+        ));
     }
 }

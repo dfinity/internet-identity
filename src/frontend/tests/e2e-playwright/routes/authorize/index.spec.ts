@@ -147,9 +147,7 @@ test("Authorize by signing in from another device", async ({
       if (await menuButton.isVisible()) {
         await menuButton.click();
       }
-      await otherDevicePage
-        .getByRole("link", { name: "Access and recovery" })
-        .click();
+      await otherDevicePage.getByRole("link", { name: "Access" }).click();
 
       // Verify we have two passkeys
       await expect(otherDevicePage.getByText("Unknown")).toHaveCount(2);
