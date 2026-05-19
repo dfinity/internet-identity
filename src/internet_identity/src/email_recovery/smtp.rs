@@ -1244,4 +1244,50 @@ mod tests {
             Err(EmailRecoveryError::SubjectNotSigned)
         ));
     }
+
+    #[test]
+    fn doh_and_dnssec_paths_reject_future_dated_t_with_same_reason() {
+        // Path-parity property: both verification pipelines pull
+        // their tag enforcement from `dkim::tag_checks`, so the same
+        // forged signature MUST surface the same
+        // `VerificationFailReason` regardless of which path observed
+        // it first. Picked future-dated `t=` as the representative
+        // failure because it was one of the gaps the audit closed,
+        // and it short-circuits early in both pipelines without
+        // needing a fully-valid signature behind it. If a future
+        // refactor accidentally bypassed the helper on either side
+        // (the exact bug class this PR closed), this regression
+        // guard fails first.
+        use crate::dkim::{DkimVerifyResult, VerificationFailReason};
+
+        let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                          c=relaxed/relaxed; h=From:Subject; \
+                          t=1700001000; bh=MTIzNDU2; b=YWJj";
+        let req = smtp_with_dkim(dkim_value);
+
+        // DoH path: `verify_dkim` is `dkim::verify::verify` re-
+        // exported. We pass a syntactically-valid DKIM TXT (it's
+        // never read past parsing — the `t=` check fires first).
+        match crate::dkim::verify_dkim(&req, "v=DKIM1; k=rsa; p=AA==", TEST_NOW) {
+            DkimVerifyResult::Unverified { reason, .. } => {
+                assert_eq!(reason, VerificationFailReason::SignatureFutureDated);
+            }
+            other => panic!("DoH path must reject future-dated t=, got {other:?}"),
+        }
+
+        // DNSSEC path: `prepare_partial_verification` runs the
+        // signature-header-only checks at email-arrival time. The
+        // error is wrapped in `EmailVerificationFailed`, but the
+        // Debug-formatted reason name must match the DoH path's.
+        let snap = dnssec_snapshot("alice@example.com", "example.com");
+        match prepare_partial_verification(&req, &snap, TEST_NOW) {
+            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+                assert!(
+                    msg.contains("SignatureFutureDated"),
+                    "DNSSEC path must report the same reason as DoH; got {msg}"
+                );
+            }
+            other => panic!("DNSSEC path must reject future-dated t=, got {other:?}"),
+        }
+    }
 }
