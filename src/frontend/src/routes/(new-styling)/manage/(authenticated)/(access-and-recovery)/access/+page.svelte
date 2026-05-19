@@ -189,6 +189,11 @@
   };
   const handleSwitchConfirmed = async () => {
     if (switchingAccessMethod === undefined) return;
+    const session = get(sessionStore);
+    const createdAtMillis =
+      data.identityInfo.created_at[0] !== undefined
+        ? nanosToMillis(data.identityInfo.created_at[0])
+        : undefined;
     try {
       if (
         "passkey" in switchingAccessMethod &&
@@ -203,7 +208,7 @@
           credentialId: authedId,
         } = await authenticateWithPasskey({
           canisterId,
-          session: get(sessionStore),
+          session,
           credentialIds: [credentialId],
         });
         await authenticationStore.set({
@@ -214,6 +219,7 @@
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber: data.identityNumber,
           name: data.identityInfo.name[0],
+          createdAtMillis,
           authMethod: { passkey: { credentialId: authedId } },
         });
       } else if ("openid" in switchingAccessMethod) {
@@ -229,7 +235,7 @@
                 ssoResult.discovery.scopes_supported,
               ).join(" "),
             })),
-            { nonce: get(sessionStore).nonce, mediation: "optional" },
+            { nonce: session.nonce, mediation: "optional" },
           );
         } else {
           const config = findConfig(iss, aud, metadata);
@@ -245,13 +251,13 @@
               authURL: config.auth_uri,
               authScope: config.auth_scope.join(" "),
             },
-            { nonce: get(sessionStore).nonce, mediation: "optional" },
+            { nonce: session.nonce, mediation: "optional" },
           );
         }
         const { iss: jwtIss, sub } = decodeJWT(jwt);
         const { identity, identityNumber } = await authenticateWithJWT({
           canisterId,
-          session: get(sessionStore),
+          session,
           jwt,
         });
         await authenticationStore.set({
@@ -262,6 +268,7 @@
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber: data.identityNumber,
           name: data.identityInfo.name[0],
+          createdAtMillis,
           authMethod: { openid: { iss: jwtIss, sub, metadata } },
         });
       }
