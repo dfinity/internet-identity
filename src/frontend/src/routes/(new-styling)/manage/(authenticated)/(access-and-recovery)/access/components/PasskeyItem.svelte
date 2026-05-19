@@ -32,7 +32,7 @@
     onRename,
     onRemove,
     onSwitch,
-    isCurrentAccessMethod,
+    isCurrentAccessMethod = false,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});

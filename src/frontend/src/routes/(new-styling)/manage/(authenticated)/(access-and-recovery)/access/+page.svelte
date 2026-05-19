@@ -43,7 +43,7 @@
   let isAddingAccessMethod = $state(false);
   let renamingAccessMethodKey = $state<string>();
   let removingAccessMethodKey = $state<string>();
-  let switchingAccessMethodKey = $state<string>();
+  let _switchingAccessMethodKey = $state<string>();
   let accessMethods = $derived(toAccessMethods(data.identityInfo));
   let pendingRegistrationId = $state(data.pendingRegistrationId);
 
@@ -254,7 +254,7 @@
               onRemove={accessMethods.length > 1
                 ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
-              onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
+              onSwitch={() => (_switchingAccessMethodKey = toKey(accessMethod))}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
@@ -267,7 +267,7 @@
               onUnlink={accessMethods.length > 1
                 ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
-              onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
+              onSwitch={() => (_switchingAccessMethodKey = toKey(accessMethod))}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
