@@ -98,7 +98,7 @@
     <PasskeyIcon class="text-fg-primary size-6" />
     {#if isCurrentAccessMethod}
       <div
-        class="ms-2 inline-flex flex-none shrink-0 items-center gap-1 rounded-full border border-bg-success-secondary bg-bg-success-primary py-0.5 ps-1.5 pe-2 text-xs font-semibold text-fg-success-primary"
+        class="border-bg-success-secondary bg-bg-success-primary text-fg-success-primary ms-2 inline-flex flex-none shrink-0 items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-semibold"
       >
         <div class="bg-fg-success-primary size-1.5 shrink-0 rounded-full"></div>
         {$t`Active`}
