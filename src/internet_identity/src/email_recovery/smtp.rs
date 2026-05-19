@@ -116,9 +116,17 @@ pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-    let to = &envelope.to;
-    if recipient_matches(to, SETUP_RECIPIENT_USER) || recipient_matches(to, RECOVERY_RECIPIENT_USER)
-    {
+    // The gateway may batch multiple `RCPT TO` recipients into a
+    // single envelope. Accept the transaction if at least one
+    // recipient names a mailbox this canister handles — the
+    // dispatcher in `handle_smtp_request` ignores the rest. If none
+    // match, answer 550 ("No such user here") so the gateway bounces
+    // upstream rather than wasting bandwidth pulling the body.
+    let any_known = envelope.to.iter().any(|to| {
+        recipient_matches(to, SETUP_RECIPIENT_USER)
+            || recipient_matches(to, RECOVERY_RECIPIENT_USER)
+    });
+    if any_known {
         return SmtpResponse::Ok {};
     }
     smtp_err(
@@ -149,27 +157,40 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // address (user + domain), case-insensitively, so a direct caller
     // can't bypass dispatch by spoofing just the user-part with a
     // different domain — `smtp_request` is an open update.
+    //
+    // An SMTP envelope may carry multiple `RCPT TO` recipients (e.g.
+    // the gateway batched a multi-recipient transaction). We pick the
+    // *first* one that names a mailbox we handle and ignore the rest;
+    // unknown recipients alongside a known one don't taint the dispatch.
     let envelope = match request.envelope.as_ref() {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-    let recipient_flow = if recipient_matches(&envelope.to, SETUP_RECIPIENT_USER) {
-        RecipientFlow::Setup
-    } else if recipient_matches(&envelope.to, RECOVERY_RECIPIENT_USER) {
-        RecipientFlow::Recovery
-    } else {
-        // Unknown recipient → 550 ("No such user here"). The set of
-        // mailboxes we handle is in the public Candid surface, so
-        // there's no secret to hide and a sender targeting any other
-        // mailbox is a caller error that deserves an SMTP-level
-        // signal. `smtp_request_validate` already returns the same
-        // 550 at RCPT TO time; mirroring it on the update path
-        // closes the gap for callers that skipped validate (or hit
-        // this method directly).
-        return smtp_err(
-            SMTP_ERR_MAILBOX_UNAVAILABLE,
-            "Recipient is not a known mailbox on this canister",
-        );
+    let recipient_flow = envelope.to.iter().find_map(|to| {
+        if recipient_matches(to, SETUP_RECIPIENT_USER) {
+            Some(RecipientFlow::Setup)
+        } else if recipient_matches(to, RECOVERY_RECIPIENT_USER) {
+            Some(RecipientFlow::Recovery)
+        } else {
+            None
+        }
+    });
+    let recipient_flow = match recipient_flow {
+        Some(flow) => flow,
+        None => {
+            // Unknown recipient → 550 ("No such user here"). The set
+            // of mailboxes we handle is in the public Candid surface,
+            // so there's no secret to hide and a sender targeting any
+            // other mailbox is a caller error that deserves an
+            // SMTP-level signal. `smtp_request_validate` already
+            // returns the same 550 at RCPT TO time; mirroring it on
+            // the update path closes the gap for callers that skipped
+            // validate (or hit this method directly).
+            return smtp_err(
+                SMTP_ERR_MAILBOX_UNAVAILABLE,
+                "Recipient is not a known mailbox on this canister",
+            );
+        }
     };
 
     let message = match request.message.as_ref() {
@@ -961,6 +982,10 @@ mod tests {
     }
 
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {
+        smtp_envelope_with_recipients(&[(user, domain)])
+    }
+
+    fn smtp_envelope_with_recipients(recipients: &[(&str, &str)]) -> SmtpRequest {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope,
         };
@@ -970,10 +995,13 @@ mod tests {
                     user: "sender".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
-                    user: user.into(),
-                    domain: domain.into(),
-                },
+                to: recipients
+                    .iter()
+                    .map(|(u, d)| SmtpAddress {
+                        user: (*u).into(),
+                        domain: (*d).into(),
+                    })
+                    .collect(),
             }),
             message: None,
             gateway_flags: None,
@@ -1156,10 +1184,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "register".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -1258,5 +1286,39 @@ mod tests {
             prepare_partial_verification(&req, &snap, TEST_NOW),
             Err(EmailRecoveryError::SubjectNotSigned)
         ));
+    }
+
+    #[test]
+    fn validate_accepts_when_one_of_many_recipients_known() {
+        // The gateway may batch multiple RCPT TOs into one envelope.
+        // As long as at least one names a mailbox we handle, accept
+        // the transaction — the dispatcher ignores the rest.
+        set_related_origins(&["https://id.ai"]);
+        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope_with_recipients(
+            &[("someone-else", "example.com"), ("register", "id.ai")],
+        )));
+    }
+
+    #[test]
+    fn validate_rejects_when_no_recipients_known() {
+        set_related_origins(&["https://id.ai"]);
+        assert_smtp_err_code(
+            handle_smtp_request_validate(smtp_envelope_with_recipients(&[
+                ("someone-else", "example.com"),
+                ("alice", "id.ai"),
+            ])),
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+        );
+    }
+
+    #[test]
+    fn validate_rejects_empty_recipient_list() {
+        // An envelope with no recipients can't address anyone on this
+        // canister — same 550 as an unknown recipient.
+        set_related_origins(&["https://id.ai"]);
+        assert_smtp_err_code(
+            handle_smtp_request_validate(smtp_envelope_with_recipients(&[])),
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+        );
     }
 }

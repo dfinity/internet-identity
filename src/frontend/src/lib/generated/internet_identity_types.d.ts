@@ -1358,7 +1358,16 @@ export interface SignedRRset {
   'rtype' : number,
 }
 export interface SmtpAddress { 'domain' : string, 'user' : string }
-export interface SmtpEnvelope { 'to' : SmtpAddress, 'from' : SmtpAddress }
+export interface SmtpEnvelope {
+  /**
+   * SMTP allows multiple `RCPT TO` recipients per envelope, so this
+   * is a vec. The canister picks the first recognised recipient
+   * (`register@<domain>` or `recover@<domain>`) to decide which flow
+   * to run; unknown recipients in the same vec are ignored.
+   */
+  'to' : Array<SmtpAddress>,
+  'from' : SmtpAddress,
+}
 /**
  * SMTP gateway types — see `internet_identity_interface::smtp`. Carried
  * forward from PoC #3760 surface (the existing gateway can target this
@@ -1374,6 +1383,18 @@ export interface SmtpRequest {
   'message' : [] | [SmtpMessage],
   'gateway_flags' : [] | [Array<string>],
 }
+/**
+ * Error returned by `smtp_request` / `smtp_request_validate`.
+ * 
+ * `code` mirrors the SMTP reply codes the off-chain gateway should
+ * emit upstream:
+ * - `550` (mailbox unavailable) — "No such user here". Returned when
+ * none of the envelope recipients match a mailbox this canister
+ * handles (i.e. neither `register@<domain>` nor `recover@<domain>`,
+ * for any `<domain>` in the deploy's `related_origins`).
+ * - `555` (syntax error) — the request shape itself is malformed
+ * (e.g. missing envelope, oversize address/header/body).
+ */
 export interface SmtpRequestError { 'code' : bigint, 'message' : string }
 export type SmtpResponse = { 'Ok' : {} } |
   { 'Err' : SmtpRequestError };

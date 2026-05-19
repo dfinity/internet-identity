@@ -243,10 +243,10 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "register".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -282,10 +282,10 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "register".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -329,10 +329,10 @@ fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "marketing".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -1059,10 +1059,10 @@ mod dkim_signer {
                         user: from_user.into(),
                         domain: from_domain.into(),
                     },
-                    to: SmtpAddress {
+                    to: vec![SmtpAddress {
                         user: to_user.into(),
                         domain: to_domain.into(),
-                    },
+                    }],
                 }),
                 message: Some(SmtpMessage {
                     headers: vec![
