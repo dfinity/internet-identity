@@ -88,6 +88,16 @@
         sessionIdentity: ECDSAKeyIdentity;
         path: Path;
       }
+    // Presentation-only stage entered when the user clicks "I've
+    // sent the email" on the SendConfirmationEmail view. Same
+    // semantics as in SetupEmailRecoveryWizard — polling continues.
+    | {
+        kind: "waiting";
+        challenge: EmailRecoveryChallenge;
+        address: string;
+        sessionIdentity: ECDSAKeyIdentity;
+        path: Path;
+      }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
@@ -233,7 +243,10 @@
     let intervalMs = 1_000;
     let dkimLeafSubmitted = false;
     try {
-      while (polling && stage.kind === "sending") {
+      while (
+        polling &&
+        (stage.kind === "sending" || stage.kind === "waiting")
+      ) {
         const result = await status(nonce);
         if ("RecoveryReady" in result) {
           recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.RecoveryReady);
@@ -346,6 +359,20 @@
   const handleRetry = () => {
     stage = { kind: "enter" };
   };
+
+  // Pure presentation transition — see SetupEmailRecoveryWizard's
+  // handleSent for the rationale; the polling loop already covers
+  // the `waiting` stage.
+  const handleSent = () => {
+    if (stage.kind !== "sending") return;
+    stage = {
+      kind: "waiting",
+      challenge: stage.challenge,
+      address: stage.address,
+      sessionIdentity: stage.sessionIdentity,
+      path: stage.path,
+    };
+  };
 </script>
 
 {#if stage.kind === "enter"}
@@ -359,6 +386,15 @@
     mailbox={`recover@${window.location.hostname}`}
     fromAddress={stage.address}
     path={stage.path}
+    onSent={handleSent}
+  />
+{:else if stage.kind === "waiting"}
+  <SendConfirmationEmail
+    nonce={stage.challenge.nonce}
+    mailbox={`recover@${window.location.hostname}`}
+    fromAddress={stage.address}
+    path={stage.path}
+    sent
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
