@@ -99,12 +99,11 @@
     {#if isCurrentAccessMethod}
       <div
         class={[
-          "ms-2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
-          "border-[#b8e6c8] bg-[#e6f7ed] text-[#1a7a40]",
+          "ms-2 flex flex-row items-center py-[2px] pr-2 pl-[6px] gap-1 w-[63px] h-[22px] bg-[#ECFDF3] border border-[#ABEFC6] rounded-full flex-none text-xs font-semibold text-[#2d6a44]",
           "dark:border-[#1f4a2e] dark:bg-[#0f2a1a] dark:text-[#4ade80]",
         ]}
       >
-        <div class="bg-bg-success-secondary size-2 rounded-full"></div>
+        <div class="bg-[#19b26a] dark:bg-[#4ade80] size-2 shrink-0 rounded-full"></div>
         {$t`Active`}
       </div>
     {/if}
