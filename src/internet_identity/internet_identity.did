@@ -509,9 +509,10 @@ type OpenIdPrepareDelegationResponse = record {
 
 // Email-recovery types
 // ====================
-// See `docs/ongoing/email-recovery.md` for the full design. This PR
-// only ships the setup half (binding flow); the recovery half lands
-// next.
+// See `docs/ongoing/email-recovery.md` for the full design. Covers
+// both halves of the flow: setup (binding a recovery email to an
+// anchor) and recovery (proving control of a previously-bound
+// address to obtain a signed delegation).
 
 type EmailRecoveryCredential = record {
     address : text;
@@ -1435,10 +1436,18 @@ service : (opt InternetIdentityInit) -> {
     openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
 
-    // Email-recovery protocol — setup half
-    // ====================================
-    // See `docs/ongoing/email-recovery.md`. The recovery half (prepare
-    // a delegation from a verified email) lands in a follow-up PR.
+    // Email-recovery protocol
+    // =======================
+    // See `docs/ongoing/email-recovery.md`. Covers both flows:
+    // - Setup: prepare_add (authenticated) → smtp_request for
+    //   register@id.ai → credential bound to the anchor. Removed
+    //   later via credential_remove.
+    // - Recovery: prepare_delegation (anonymous, bound to a
+    //   session_key) → smtp_request for recover@id.ai → canister
+    //   stamps a signed delegation seed. The FE then calls
+    //   email_recovery_get_delegation to retrieve the
+    //   SignedDelegation.
+    // Both flows share the polling status query.
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
@@ -1450,10 +1459,10 @@ service : (opt InternetIdentityInit) -> {
     // =====================
     // The off-chain SMTP gateway forwards every inbound message via
     // smtp_request. The canister verifies the email cryptographically
-    // and dispatches by recipient (register@id.ai → setup completion).
-    // Always returns Ok — the gateway shouldn't get a per-message
-    // verification signal back. The FE sees outcomes via the polling
-    // status query.
+    // and dispatches by recipient: register@id.ai → setup completion,
+    // recover@id.ai → recovery delegation stamping. Always returns Ok
+    // — the gateway shouldn't get a per-message verification signal
+    // back. The FE sees outcomes via the polling status query.
     smtp_request : (SmtpRequest) -> (SmtpResponse);
 
     // Called by the gateway at RCPT TO time to decide whether to

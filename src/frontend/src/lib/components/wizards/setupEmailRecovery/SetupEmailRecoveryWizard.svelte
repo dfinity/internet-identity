@@ -42,7 +42,11 @@
     type Path,
   } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
-  import { onDestroy } from "svelte";
+  import {
+    setupEmailRecoveryFunnel,
+    SetupEmailRecoveryEvents,
+  } from "$lib/utils/analytics/setupEmailRecoveryFunnel";
+  import { onDestroy, onMount } from "svelte";
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
@@ -68,6 +72,17 @@
         address: string;
         path: Path;
       }
+    // Presentation-only stage entered when the user clicks "I've
+    // sent the email" on the SendConfirmationEmail view. Same fields
+    // as `sending`; the only difference is that the view re-renders
+    // with `sent={true}`. The polling loop runs continuously across
+    // both stages — see the guard in `runPoll`.
+    | {
+        kind: "waiting";
+        challenge: EmailRecoveryChallenge;
+        address: string;
+        path: Path;
+      }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string };
 
@@ -82,6 +97,44 @@
   onDestroy(() => {
     polling = false;
   });
+
+  // Plausible funnel: emit `start-email-recovery-setup` when the
+  // wizard mounts. Each milestone calls `trigger(...)`; the terminal
+  // states (success / failed / unsupported) call `close()` to record
+  // duration. See `setupEmailRecoveryFunnel.ts` for the event shape.
+  //
+  // Belt-and-braces `close()` on unmount: if the user abandons the
+  // wizard mid-flow (Dialog `×`, navigation away, browser back)
+  // without reaching a terminal branch, the funnel's
+  // `trackWindowSession` listener would otherwise stay registered.
+  // A later remount's `init()` would then overwrite the cleanup
+  // pointer, leaking the old listener. `close()` is idempotent (it
+  // only does work if a `start-…` timestamp is set), so calling it
+  // here both fires `end-…` for the abandoned flow and unregisters
+  // the visibility listener cleanly.
+  onMount(() => {
+    setupEmailRecoveryFunnel.init();
+  });
+  onDestroy(() => {
+    setupEmailRecoveryFunnel.close();
+  });
+
+  /**
+   * Map a terminal `EmailRecoveryStatus` (`Failed` or `Expired`) to
+   * the variant-name string used as the `reason` property on the
+   * Plausible `*-failed` event. Falls back to `unknown` so a partial
+   * candid-shape change doesn't drop the event entirely.
+   */
+  const failureReason = (variant: EmailRecoveryStatus): string => {
+    if ("Failed" in variant) {
+      const reason = variant.Failed as Record<string, unknown>;
+      return Object.keys(reason)[0] ?? "unknown";
+    }
+    if ("Expired" in variant) {
+      return "Expired";
+    }
+    return "unknown";
+  };
 
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
@@ -125,6 +178,7 @@
   };
 
   const handleAddressSubmitted = async (address: string) => {
+    setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.AddressSubmitted);
     const domain = address.split("@")[1] ?? "";
 
     // Best-effort DNSSEC skeleton-bundle assembly. The DKIM leaf is
@@ -150,6 +204,9 @@
 
     try {
       const challenge = await prepare(input);
+      setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Prepared, {
+        path,
+      });
       stage = { kind: "sending", challenge, address, path };
       void runPoll(challenge.nonce, domain, address);
     } catch (e) {
@@ -163,6 +220,11 @@
           e.type === "DomainNotAllowlisted" ||
           e.type === "DomainNotSupported"
         ) {
+          setupEmailRecoveryFunnel.trigger(
+            SetupEmailRecoveryEvents.UnsupportedDomain,
+            { reason: e.type },
+          );
+          setupEmailRecoveryFunnel.close();
           stage = { kind: "unsupported", domain };
           return;
         }
@@ -178,19 +240,31 @@
     let intervalMs = 1_000;
     let dkimLeafSubmitted = false;
     try {
-      while (polling && stage.kind === "sending") {
+      while (
+        polling &&
+        (stage.kind === "sending" || stage.kind === "waiting")
+      ) {
         const result = await status(nonce);
         if ("RegistrationSucceeded" in result) {
+          setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Succeeded);
+          setupEmailRecoveryFunnel.close();
           polling = false;
           onSuccess(address);
           return;
         }
         if ("Failed" in result || "Expired" in result) {
+          setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Failed, {
+            reason: failureReason(result),
+          });
+          setupEmailRecoveryFunnel.close();
           stage = { kind: "failed", reason: friendlyError(result) };
           return;
         }
         if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
           dkimLeafSubmitted = true;
+          setupEmailRecoveryFunnel.trigger(
+            SetupEmailRecoveryEvents.NeedDkimLeaf,
+          );
           // Email arrived; the canister has the selector. Walk the
           // single missing DKIM leaf and submit it. If the leaf
           // walk fails we keep the loop alive — the canister-side
@@ -204,12 +278,24 @@
                 hops: walked.hops,
                 extra_chains: walked.extraChains,
               });
+              setupEmailRecoveryFunnel.trigger(
+                SetupEmailRecoveryEvents.DkimLeafSubmitted,
+              );
               if ("RegistrationSucceeded" in submission) {
+                setupEmailRecoveryFunnel.trigger(
+                  SetupEmailRecoveryEvents.Succeeded,
+                );
+                setupEmailRecoveryFunnel.close();
                 polling = false;
                 onSuccess(address);
                 return;
               }
               if ("Failed" in submission || "Expired" in submission) {
+                setupEmailRecoveryFunnel.trigger(
+                  SetupEmailRecoveryEvents.Failed,
+                  { reason: failureReason(submission) },
+                );
+                setupEmailRecoveryFunnel.close();
                 stage = { kind: "failed", reason: friendlyError(submission) };
                 return;
               }
@@ -232,6 +318,20 @@
   const handleRetry = () => {
     stage = { kind: "enter" };
   };
+
+  // Triggered by SendConfirmationEmail's "I've sent the email"
+  // button. Pure presentation transition — the polling loop already
+  // covers the `waiting` stage via the loop's stage-kind guard, so
+  // we don't restart it here.
+  const handleSent = () => {
+    if (stage.kind !== "sending") return;
+    stage = {
+      kind: "waiting",
+      challenge: stage.challenge,
+      address: stage.address,
+      path: stage.path,
+    };
+  };
 </script>
 
 {#if stage.kind === "enter"}
@@ -245,6 +345,15 @@
     mailbox={`register@${window.location.hostname}`}
     fromAddress={stage.address}
     path={stage.path}
+    onSent={handleSent}
+  />
+{:else if stage.kind === "waiting"}
+  <SendConfirmationEmail
+    nonce={stage.challenge.nonce}
+    mailbox={`register@${window.location.hostname}`}
+    fromAddress={stage.address}
+    path={stage.path}
+    sent
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
