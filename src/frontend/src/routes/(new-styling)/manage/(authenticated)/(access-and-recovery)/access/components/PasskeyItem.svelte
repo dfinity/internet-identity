@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "@lucide/svelte";
+  import {
+    ArrowLeftRightIcon,
+    EllipsisVerticalIcon,
+    PencilIcon,
+    Trash2Icon,
+  } from "@lucide/svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -17,6 +22,7 @@
     recoveryPhraseStatus: "missing" | "unverified" | "verified";
     onRename?: () => void;
     onRemove?: () => void;
+    onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
   }
 
@@ -25,6 +31,7 @@
     recoveryPhraseStatus,
     onRename,
     onRemove,
+    onSwitch,
     isCurrentAccessMethod,
   }: Props = $props();
 
@@ -65,6 +72,17 @@
             label: $t`Rename`,
             icon: PencilIcon,
             onClick: onRename,
+          },
+        ]
+      : []),
+    ...(onSwitch !== undefined
+      ? [
+          {
+            label: $t`Switch`,
+            icon: ArrowLeftRightIcon,
+            disabled: isCurrentAccessMethod,
+            tooltip: isCurrentAccessMethod ? $t`Already signed-in` : undefined,
+            onClick: onSwitch,
           },
         ]
       : []),
