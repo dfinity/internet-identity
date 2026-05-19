@@ -79,7 +79,7 @@ test.describe("Dashboard Navigation", () => {
     if (await menuButton.isVisible()) {
       await menuButton.click();
     }
-    await page.getByRole("link", { name: "Access and recovery" }).click();
+    await page.getByRole("link", { name: "Access" }).click();
 
     // Check that we have one passkey listed
     const passkey = await page.getByText("Unknown");
@@ -138,7 +138,7 @@ test.describe("Dashboard Navigation", () => {
       if (await menuButton.isVisible()) {
         await menuButton.click();
       }
-      await page.getByRole("link", { name: "Access and recovery" }).click();
+      await page.getByRole("link", { name: "Access" }).click();
 
       // Switch to second identity
       await removeAuthenticatorForIdentity(identities[0].identityNumber);
