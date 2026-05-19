@@ -25,7 +25,7 @@
     recoveryPhraseStatus,
     onRename,
     onRemove,
-    isCurrentAccessMethod,
+    isCurrentAccessMethod = false,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});

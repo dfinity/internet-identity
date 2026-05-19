@@ -14,7 +14,7 @@
     isCurrentAccessMethod?: boolean;
   }
 
-  const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
+  const { openid, onUnlink, isCurrentAccessMethod = false }: Props = $props();
 
   // `sso_domain` / `sso_name` are populated by the canister at response
   // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
