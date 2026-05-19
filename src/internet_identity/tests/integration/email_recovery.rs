@@ -843,10 +843,16 @@ fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
         }
     }
     // After fulfilling DKIM outcalls, the canister will also fan out
-    // for DMARC. We answer all of those with a 404-equivalent (no
-    // record), which the verifier treats as "no DMARC published" —
-    // and the strict-alignment fallback (DKIM d= == From: domain) is
-    // satisfied by our test setup.
+    // for DMARC. We answer all of those with an authoritative
+    // NXDOMAIN (status=200 + RCODE=3 wire-format body), which the
+    // verifier surfaces as `DohError::NoAnswer` and treats as "no
+    // DMARC published" — the strict-alignment fallback (DKIM `d=` ==
+    // From: domain) is satisfied by our test setup. A bare HTTP 404
+    // would NOT work: per `classify_upstream` in `doh::mod`, any
+    // upstream non-200 collapses onto the upstream-error sentinel
+    // (defending against a counterfeit-NoAnswer attack) and the DMARC
+    // handler would then refuse to fall back, treating it as a real
+    // outage.
     let dmarc_deadline = ticks + 60;
     while ticks < dmarc_deadline {
         env.tick();
@@ -856,15 +862,30 @@ fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
                 subnet_id: req.subnet_id,
                 request_id: req.request_id,
                 response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                    status: 404,
+                    status: 200,
                     headers: vec![],
-                    body: vec![],
+                    body: fake_nxdomain_dns_response(),
                 }),
                 additional_responses: vec![],
             };
             env.mock_canister_http_response(response);
         }
     }
+}
+
+/// Build a wire-format DNS NXDOMAIN response (RCODE=3, ANCOUNT=0).
+/// The parser collapses RCODE=3 onto `ParseError::NoAnswer`, which
+/// the transform turns into `Outcome::NoAnswer` and the quorum
+/// surfaces as `DohError::NoAnswer` — the DMARC handler treats that
+/// as "no policy published" and falls back to strict alignment.
+fn fake_nxdomain_dns_response() -> Vec<u8> {
+    let mut out = Vec::new();
+    // Header: flags=0x8183 (QR + RD + RA + RCODE=3), QDCOUNT=1, ANCOUNT=0.
+    out.extend_from_slice(&[0, 0, 0x81, 0x83, 0, 1, 0, 0, 0, 0, 0, 0]);
+    // Question section — the verifier doesn't re-parse the QNAME, but
+    // a well-formed NXDOMAIN still carries the question echoed back.
+    out.extend_from_slice(b"\x07example\x03com\x00\x00\x10\x00\x01");
+    out
 }
 
 /// Build a wire-format DNS response carrying a single TXT answer
