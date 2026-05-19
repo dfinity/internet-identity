@@ -64,14 +64,9 @@
   </div>
   {#if isCurrentAccessMethod}
     <div
-      class={[
-        "ms-2 flex h-[22px] w-[63px] flex-none flex-row items-center gap-1 rounded-full border border-[#ABEFC6] bg-[#ECFDF3] py-[2px] pr-2 pl-[6px] text-xs font-semibold text-[#2d6a44]",
-        "dark:border-[#1f4a2e] dark:bg-[#0f2a1a] dark:text-[#4ade80]",
-      ]}
+      class="ms-2 inline-flex flex-none shrink-0 items-center gap-1 rounded-full border border-bg-success-secondary bg-bg-success-primary py-0.5 ps-1.5 pe-2 text-xs font-semibold text-fg-success-primary"
     >
-      <div
-        class="size-2 shrink-0 rounded-full bg-[#19b26a] dark:bg-[#4ade80]"
-      ></div>
+      <div class="bg-fg-success-primary size-1.5 shrink-0 rounded-full"></div>
       {$t`Active`}
     </div>
   {/if}
