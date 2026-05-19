@@ -1368,9 +1368,11 @@ export interface SmtpEnvelope {
    * additional recipient can only come from a phishy forwarder
    * trying to exfiltrate the user's canister-signed challenge.
    * Multi-recipient envelopes (and empty ones) are rejected with
-   * code 550. The vec is also capped at 100 entries (RFC 5321
-   * §4.5.3.1.10); envelopes exceeding the cap are rejected with
-   * code 555.
+   * code 551 ("User not local"); single-recipient envelopes whose
+   * recipient isn't one of our reserved mailboxes get 550 ("No
+   * such user here"). The vec is also capped at 100 entries (RFC
+   * 5321 §4.5.3.1.10); envelopes exceeding the cap are rejected
+   * with code 555.
    */
   'to' : Array<SmtpAddress>,
   'from' : SmtpAddress,
@@ -1396,11 +1398,18 @@ export interface SmtpRequest {
  * `code` mirrors the SMTP reply codes the off-chain gateway should
  * emit upstream:
  * - `550` (mailbox unavailable) — "No such user here". Returned when
- * none of the envelope recipients match a mailbox this canister
- * handles (i.e. neither `register@<domain>` nor `recover@<domain>`,
- * for any `<domain>` in the deploy's `related_origins`).
+ * the envelope carries exactly one recipient but it isn't a mailbox
+ * this canister handles (i.e. neither `register@<domain>` nor
+ * `recover@<domain>` for any `<domain>` in `related_origins`).
+ * - `551` (user not local) — envelope-shape rejection. Returned for
+ * empty `to` and for multi-recipient envelopes, even when one of
+ * the recipients is ours. Distinct from 550 so the gateway can tell
+ * "this envelope shape isn't accepted" from "we don't know this
+ * user". Recovery emails never legitimately address a CC/BCC
+ * alongside `register@…` / `recover@…`.
  * - `555` (syntax error) — the request shape itself is malformed
- * (e.g. missing envelope, oversize address/header/body).
+ * (e.g. missing envelope, oversize address/header/body, recipient
+ * list exceeds the 100-entry cap).
  */
 export interface SmtpRequestError { 'code' : bigint, 'message' : string }
 export type SmtpResponse = { 'Ok' : {} } |

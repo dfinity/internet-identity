@@ -45,7 +45,22 @@ pub const MAX_RECIPIENTS: usize = 100;
 
 // --- SMTP error codes (RFC 5321) ---
 
+/// 550 — "Requested action not taken: mailbox unavailable" (RFC 5321
+/// §4.2.2). Used here for the "No such user here" case: the envelope
+/// has exactly one recipient but it's not a mailbox this canister
+/// handles (`register@<d>` / `recover@<d>`).
 pub const SMTP_ERR_MAILBOX_UNAVAILABLE: u64 = 550;
+/// 551 — "User not local; please try `<forward-path>`" (RFC 5321
+/// §4.2.2). Used here for envelopes whose **shape** doesn't fit the
+/// recovery flows we serve: an envelope must carry exactly one
+/// recipient, so empty-`to` and multi-recipient envelopes get 551
+/// (a distinct code from 550 so the gateway can tell "we don't know
+/// this user" from "this envelope shape isn't accepted for us").
+pub const SMTP_ERR_USER_NOT_LOCAL: u64 = 551;
+/// 555 — "Syntax error" (RFC 5321 §4.2.2). Used here for malformed
+/// request payloads (missing envelope, bounds violations on
+/// address/header/body lengths, or recipient lists that blow past
+/// `MAX_RECIPIENTS`).
 pub const SMTP_ERR_SYNTAX_ERROR: u64 = 555;
 
 // --- Candid wire types ---
