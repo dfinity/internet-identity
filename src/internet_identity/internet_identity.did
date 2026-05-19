@@ -644,11 +644,16 @@ type SmtpAddress = record {
 type SmtpEnvelope = record {
     from : SmtpAddress;
     // SMTP allows multiple `RCPT TO` recipients per envelope, so this
-    // is a vec. The canister picks the first recognised recipient
-    // (`register@<domain>` or `recover@<domain>`) to decide which flow
-    // to run; unknown recipients in the same vec are ignored. Capped
-    // at 100 recipients (RFC 5321 §4.5.3.1.10); envelopes exceeding
-    // the cap are rejected with code 555.
+    // is a vec at the wire level. For the recovery flows this canister
+    // serves, however, we require *exactly one* recipient and it must
+    // be `register@<domain>` or `recover@<domain>` — a legitimate
+    // recovery email never targets a CC/BCC alongside us, so any
+    // additional recipient can only come from a phishy forwarder
+    // trying to exfiltrate the user's canister-signed challenge.
+    // Multi-recipient envelopes (and empty ones) are rejected with
+    // code 550. The vec is also capped at 100 entries (RFC 5321
+    // §4.5.3.1.10); envelopes exceeding the cap are rejected with
+    // code 555.
     to : vec SmtpAddress;
 };
 

@@ -94,20 +94,21 @@ fn recipient_matches(
 /// the message body from the sending MTA — to decide whether to
 /// accept the connection at all.
 ///
-/// An SMTP envelope may carry multiple `RCPT TO` recipients (the
-/// gateway can batch them into one canister call). We accept the
-/// transaction if *at least one* recipient names a mailbox we handle;
-/// the [`handle_smtp_request`] dispatcher ignores the rest. If *no*
-/// recipient is recognised we answer 550 (mailbox unavailable, "No
-/// such user here") so the gateway can bounce upstream rather than
-/// pull the body and have us silently drop it — which would waste the
-/// sender's bandwidth and give the sender's MTA no SMTP-level signal
-/// that the address is invalid.
+/// Accepts an envelope iff it carries *exactly one* recipient and
+/// that recipient is `register@<d>` or `recover@<d>` (case-insensitive)
+/// for some `d` in [`super::mailbox_domains`] — i.e. for any host
+/// listed in the `related_origins` deploy arg. On prod that's
+/// typically `id.ai` plus the `*.icp0.io` aliases; on beta it's
+/// `beta.id.ai`. Everything else gets a 550 ("No such user here") so
+/// the gateway bounces upstream.
 ///
-/// Accepts `register@<d>` and `recover@<d>` (case-insensitive) for
-/// any `d` in [`super::mailbox_domains`] — i.e. for any host listed
-/// in the `related_origins` deploy arg. On prod that's typically
-/// `id.ai` plus the `*.icp0.io` aliases; on beta it's `beta.id.ai`.
+/// Multi-recipient envelopes addressed (in part) to one of the
+/// recovery mailboxes are rejected too: a legitimate recovery email
+/// only ever targets `register@…` / `recover@…`, so additional
+/// recipients alongside ours can only come from a phishy forwarder
+/// — accepting them would let an attacker BCC themselves a copy of
+/// the user's canister-signed challenge nonce.
+///
 /// The query is open — anyone can call it — but it has no side
 /// effects and leaks nothing beyond the deploy arg, which is already
 /// public.
@@ -119,23 +120,36 @@ pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-    // The gateway may batch multiple `RCPT TO` recipients into a
-    // single envelope. Accept the transaction if at least one
-    // recipient names a mailbox this canister handles — the
-    // dispatcher in `handle_smtp_request` ignores the rest. If none
-    // match, answer 550 ("No such user here") so the gateway bounces
-    // upstream rather than wasting bandwidth pulling the body.
-    let any_known = envelope.to.iter().any(|to| {
-        recipient_matches(to, SETUP_RECIPIENT_USER)
-            || recipient_matches(to, RECOVERY_RECIPIENT_USER)
-    });
-    if any_known {
+    let to = match single_recipient(envelope) {
+        Some(to) => to,
+        None => {
+            return smtp_err(
+                SMTP_ERR_MAILBOX_UNAVAILABLE,
+                "Recovery emails must have exactly one recipient",
+            );
+        }
+    };
+    if recipient_matches(to, SETUP_RECIPIENT_USER) || recipient_matches(to, RECOVERY_RECIPIENT_USER)
+    {
         return SmtpResponse::Ok {};
     }
     smtp_err(
         SMTP_ERR_MAILBOX_UNAVAILABLE,
         "Recipient is not a known mailbox on this canister",
     )
+}
+
+/// Return the sole recipient of `envelope` if there is exactly one,
+/// or `None` if the envelope is empty or carries more than one
+/// recipient. Multi-recipient envelopes don't fit the recovery flows
+/// (see [`handle_smtp_request_validate`] for the threat-model note).
+fn single_recipient(
+    envelope: &internet_identity_interface::internet_identity::types::smtp::SmtpEnvelope,
+) -> Option<&internet_identity_interface::internet_identity::types::smtp::SmtpAddress> {
+    if envelope.to.len() != 1 {
+        return None;
+    }
+    envelope.to.first()
 }
 
 /// Outcome the canister method in `main.rs` returns to the gateway.
@@ -161,39 +175,42 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // can't bypass dispatch by spoofing just the user-part with a
     // different domain — `smtp_request` is an open update.
     //
-    // An SMTP envelope may carry multiple `RCPT TO` recipients (e.g.
-    // the gateway batched a multi-recipient transaction). We pick the
-    // *first* one that names a mailbox we handle and ignore the rest;
-    // unknown recipients alongside a known one don't taint the dispatch.
+    // We require *exactly one* recipient on the envelope. Multi-
+    // recipient envelopes addressed (in part) to a recovery mailbox
+    // can only come from a phishy forwarder — a legitimate recovery
+    // email never targets a CC/BCC alongside `register@…` /
+    // `recover@…`, so accepting one would let an attacker exfiltrate
+    // the user's canister-signed challenge nonce. Reject with 550 to
+    // mirror what `smtp_request_validate` says at RCPT TO time.
     let envelope = match request.envelope.as_ref() {
         Some(e) => e,
         None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
     };
-    let recipient_flow = envelope.to.iter().find_map(|to| {
-        if recipient_matches(to, SETUP_RECIPIENT_USER) {
-            Some(RecipientFlow::Setup)
-        } else if recipient_matches(to, RECOVERY_RECIPIENT_USER) {
-            Some(RecipientFlow::Recovery)
-        } else {
-            None
-        }
-    });
-    let recipient_flow = match recipient_flow {
-        Some(flow) => flow,
+    let to = match single_recipient(envelope) {
+        Some(to) => to,
         None => {
-            // Unknown recipient → 550 ("No such user here"). The set
-            // of mailboxes we handle is in the public Candid surface,
-            // so there's no secret to hide and a sender targeting any
-            // other mailbox is a caller error that deserves an
-            // SMTP-level signal. `smtp_request_validate` already
-            // returns the same 550 at RCPT TO time; mirroring it on
-            // the update path closes the gap for callers that skipped
-            // validate (or hit this method directly).
             return smtp_err(
                 SMTP_ERR_MAILBOX_UNAVAILABLE,
-                "Recipient is not a known mailbox on this canister",
+                "Recovery emails must have exactly one recipient",
             );
         }
+    };
+    let recipient_flow = if recipient_matches(to, SETUP_RECIPIENT_USER) {
+        RecipientFlow::Setup
+    } else if recipient_matches(to, RECOVERY_RECIPIENT_USER) {
+        RecipientFlow::Recovery
+    } else {
+        // Unknown recipient → 550 ("No such user here"). The set of
+        // mailboxes we handle is in the public Candid surface, so
+        // there's no secret to hide and a sender targeting any other
+        // mailbox is a caller error that deserves an SMTP-level
+        // signal. Mirrors what `smtp_request_validate` returns at
+        // RCPT TO time so callers that skipped validate (or hit this
+        // method directly) get the same answer.
+        return smtp_err(
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+            "Recipient is not a known mailbox on this canister",
+        );
     };
 
     let message = match request.message.as_ref() {
@@ -1292,18 +1309,29 @@ mod tests {
     }
 
     #[test]
-    fn validate_accepts_when_one_of_many_recipients_known() {
-        // The gateway may batch multiple RCPT TOs into one envelope.
-        // As long as at least one names a mailbox we handle, accept
-        // the transaction — the dispatcher ignores the rest.
+    fn validate_rejects_multi_recipient_envelope_even_when_one_is_known() {
+        // Recovery emails only ever target a single `register@…` /
+        // `recover@…` mailbox. Additional recipients alongside one of
+        // ours can only come from a phishy forwarder trying to BCC
+        // itself a copy of the user's canister-signed challenge
+        // nonce — refuse the SMTP transaction outright.
         set_related_origins(&["https://id.ai"]);
-        assert_smtp_ok(handle_smtp_request_validate(smtp_envelope_with_recipients(
-            &[("someone-else", "example.com"), ("register", "id.ai")],
-        )));
+        assert_smtp_err_code(
+            handle_smtp_request_validate(smtp_envelope_with_recipients(&[
+                ("register", "id.ai"),
+                ("someone-else", "example.com"),
+            ])),
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+        );
     }
 
     #[test]
-    fn validate_rejects_when_no_recipients_known() {
+    fn validate_rejects_multi_recipient_even_when_all_unknown() {
+        // Belt and suspenders: the single-recipient rule fires before
+        // the per-recipient match, so multiple unknown recipients
+        // bounce with the same 550 (not a different syntax-level
+        // error). Keeps the response surface predictable for the
+        // gateway.
         set_related_origins(&["https://id.ai"]);
         assert_smtp_err_code(
             handle_smtp_request_validate(smtp_envelope_with_recipients(&[
@@ -1317,7 +1345,7 @@ mod tests {
     #[test]
     fn validate_rejects_empty_recipient_list() {
         // An envelope with no recipients can't address anyone on this
-        // canister — same 550 as an unknown recipient.
+        // canister — same 550 as the multi-recipient case.
         set_related_origins(&["https://id.ai"]);
         assert_smtp_err_code(
             handle_smtp_request_validate(smtp_envelope_with_recipients(&[])),
