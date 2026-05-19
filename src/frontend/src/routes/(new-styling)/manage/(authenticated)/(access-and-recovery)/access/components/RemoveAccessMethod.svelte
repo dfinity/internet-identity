@@ -54,14 +54,14 @@
           {#if type === "openid"}
             <Trans>
               You are about to unlink your last remaining access method. Your
-              recovery phrase will become your sole method of regaining access to
-              this identity.
+              recovery phrase will become your sole method of regaining access
+              to this identity.
             </Trans>
           {:else}
             <Trans>
               You are about to remove your last remaining access method. Your
-              recovery phrase will become your sole method of regaining access to
-              this identity.
+              recovery phrase will become your sole method of regaining access
+              to this identity.
             </Trans>
           {/if}
         </p>

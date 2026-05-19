@@ -34,7 +34,7 @@
     onRename,
     onRemove,
     onSwitch,
-    isCurrentAccessMethod,
+    isCurrentAccessMethod = false,
     isLastAccessMethod = false,
     isSignedInWithRecovery = true,
   }: Props = $props();
@@ -103,12 +103,12 @@
               isCurrentAccessMethod && !isLastAccessMethod
                 ? $t`Switch to another method before removing`
                 : isLastAccessMethod && !isSignedInWithRecovery
-                ? $t`Sign in with a recovery method to remove`
-                : isLegacy && recoveryPhraseStatus !== "verified"
-                ? recoveryPhraseStatus === "unverified"
-                  ? $t`Verify recovery to remove`
-                  : $t`Activate recovery to remove`
-                : undefined,
+                  ? $t`Sign in with a recovery method to remove`
+                  : isLegacy && recoveryPhraseStatus !== "verified"
+                    ? recoveryPhraseStatus === "unverified"
+                      ? $t`Verify recovery to remove`
+                      : $t`Activate recovery to remove`
+                    : undefined,
             onClick: onRemove,
           },
         ]

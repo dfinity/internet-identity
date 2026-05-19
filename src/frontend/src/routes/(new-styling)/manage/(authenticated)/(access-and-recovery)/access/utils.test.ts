@@ -188,15 +188,23 @@ describe("isCurrentAccessMethod", () => {
     const authenticated = {
       authMethod: { recoveryPhrase: { principal: Principal.anonymous() } },
     };
-    expect(isCurrentAccessMethod(authenticated, { passkey: makePasskey(1) })).toBe(false);
-    expect(isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") })).toBe(false);
+    expect(
+      isCurrentAccessMethod(authenticated, { passkey: makePasskey(1) }),
+    ).toBe(false);
+    expect(
+      isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") }),
+    ).toBe(false);
   });
 
   it("returns false when signed in with email recovery", () => {
     const authenticated = {
       authMethod: { emailRecovery: { principal: Principal.anonymous() } },
     };
-    expect(isCurrentAccessMethod(authenticated, { passkey: makePasskey(1) })).toBe(false);
-    expect(isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") })).toBe(false);
+    expect(
+      isCurrentAccessMethod(authenticated, { passkey: makePasskey(1) }),
+    ).toBe(false);
+    expect(
+      isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") }),
+    ).toBe(false);
   });
 });

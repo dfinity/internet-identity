@@ -40,13 +40,14 @@
     >
       <p>
         <Trans>
-          You are about to re-authenticate yourself with another access method on this device.
+          You are about to re-authenticate yourself with another access method
+          on this device.
         </Trans>
       </p>
       <p>
         <Trans>
-          This will become the default method used to authenticate on this device moving
-          forward.
+          This will become the default method used to authenticate on this
+          device moving forward.
         </Trans>
       </p>
     </div>

@@ -25,7 +25,7 @@
     openid,
     onUnlink,
     onSwitch,
-    isCurrentAccessMethod,
+    isCurrentAccessMethod = false,
     isLastAccessMethod = false,
     isSignedInWithRecovery = true,
   }: Props = $props();
@@ -71,8 +71,8 @@
               isCurrentAccessMethod && !isLastAccessMethod
                 ? $t`Switch to another method before unlinking`
                 : isLastAccessMethod && !isSignedInWithRecovery
-                ? $t`Sign in with a recovery method to unlink`
-                : undefined,
+                  ? $t`Sign in with a recovery method to unlink`
+                  : undefined,
             onClick: onUnlink,
           },
         ]

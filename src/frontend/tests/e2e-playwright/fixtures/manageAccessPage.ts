@@ -176,7 +176,9 @@ class PasskeyItem {
     ).toBeDisabled();
   }
 
-  async switch<T>(fn: (dialog: SwitchAccessMethodDialog) => Promise<T>): Promise<T> {
+  async switch<T>(
+    fn: (dialog: SwitchAccessMethodDialog) => Promise<T>,
+  ): Promise<T> {
     await this.#openMoreOptions();
     await this.locator
       .getByRole("menu")

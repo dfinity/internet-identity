@@ -117,7 +117,9 @@ test.describe("Access methods", () => {
       await manageAccessPage.assertPasskeyCount(2);
       await manageAccessPage
         .findPasskey("in-use-passkey")
-        .assertRemoveDisabledWithTooltip("Switch to another method before removing");
+        .assertRemoveDisabledWithTooltip(
+          "Switch to another method before removing",
+        );
     });
   });
 
@@ -127,7 +129,9 @@ test.describe("Access methods", () => {
     await manageAccessPage.assertPasskeyCount(1);
     await manageAccessPage
       .findPasskey(DEFAULT_PASSKEY_NAME)
-      .assertRemoveDisabledWithTooltip("Sign in with a recovery method to remove");
+      .assertRemoveDisabledWithTooltip(
+        "Sign in with a recovery method to remove",
+      );
     await manageAccessPage.assertPasskeyCount(1);
   });
 
@@ -135,7 +139,9 @@ test.describe("Access methods", () => {
     manageAccessPage,
   }) => {
     await manageAccessPage.assertPasskeyCount(1);
-    await manageAccessPage.findPasskey(DEFAULT_PASSKEY_NAME).assertSwitchDisabled();
+    await manageAccessPage
+      .findPasskey(DEFAULT_PASSKEY_NAME)
+      .assertSwitchDisabled();
   });
 
   test("cannot have more than 16 passkeys", async ({
