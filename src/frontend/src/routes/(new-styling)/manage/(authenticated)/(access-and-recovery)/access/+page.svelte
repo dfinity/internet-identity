@@ -17,6 +17,19 @@
   import { authnMethodToPublicKey } from "$lib/utils/webAuthn";
   import { nanosToMillis } from "$lib/utils/time";
   import { goto, invalidateAll } from "$app/navigation";
+  import { canisterId } from "$lib/globals";
+  import { authenticationStore } from "$lib/stores/authentication.store";
+  import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
+  import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
+  import {
+    decodeJWT,
+    findConfig,
+    requestJWT,
+    requestWithPopup,
+    selectAuthScopes,
+  } from "$lib/utils/openID";
+  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import { get } from "svelte/store";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
@@ -24,6 +37,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import OpenIdItem from "./components/OpenIdItem.svelte";
   import PasskeyItem from "./components/PasskeyItem.svelte";
+  import SwitchAccessMethod from "./components/SwitchAccessMethod.svelte";
   import {
     compareAccessMethods,
     toAccessMethods,
@@ -53,6 +67,9 @@
   );
   const removingAccessMethod = $derived(
     accessMethods.find((m) => removingAccessMethodKey === toKey(m)),
+  );
+  const switchingAccessMethod = $derived(
+    accessMethods.find((m) => switchingAccessMethodKey === toKey(m)),
   );
   const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
@@ -170,6 +187,95 @@
       handleError(error);
     }
   };
+  const handleSwitchConfirmed = async () => {
+    if (switchingAccessMethod === undefined) return;
+    try {
+      if (
+        "passkey" in switchingAccessMethod &&
+        "WebAuthn" in switchingAccessMethod.passkey.authn_method
+      ) {
+        const credentialId = new Uint8Array(
+          switchingAccessMethod.passkey.authn_method.WebAuthn.credential_id,
+        );
+        const {
+          identity,
+          identityNumber,
+          credentialId: authedId,
+        } = await authenticateWithPasskey({
+          canisterId,
+          session: get(sessionStore),
+          credentialIds: [credentialId],
+        });
+        await authenticationStore.set({
+          identity,
+          identityNumber,
+          authMethod: { passkey: { credentialId: authedId } },
+        });
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber: data.identityNumber,
+          name: data.identityInfo.name[0],
+          authMethod: { passkey: { credentialId: authedId } },
+        });
+      } else if ("openid" in switchingAccessMethod) {
+        const { iss, aud, metadata, sso_domain } = switchingAccessMethod.openid;
+        const ssoDomain = sso_domain[0];
+        let jwt: string;
+        if (ssoDomain !== undefined) {
+          jwt = await requestWithPopup(
+            discoverSsoConfig(ssoDomain).then((ssoResult) => ({
+              clientId: ssoResult.clientId,
+              authURL: ssoResult.discovery.authorization_endpoint,
+              authScope: selectAuthScopes(
+                ssoResult.discovery.scopes_supported,
+              ).join(" "),
+            })),
+            { nonce: get(sessionStore).nonce, mediation: "optional" },
+          );
+        } else {
+          const config = findConfig(iss, aud, metadata);
+          if (config === undefined)
+            throw new Error(
+              "OpenID authentication is not available for this account.",
+            );
+          jwt = await requestJWT(
+            {
+              issuer: iss,
+              clientId: config.client_id,
+              configURL: config.fedcm_uri[0],
+              authURL: config.auth_uri,
+              authScope: config.auth_scope.join(" "),
+            },
+            { nonce: get(sessionStore).nonce, mediation: "optional" },
+          );
+        }
+        const { iss: jwtIss, sub } = decodeJWT(jwt);
+        const { identity, identityNumber } = await authenticateWithJWT({
+          canisterId,
+          session: get(sessionStore),
+          jwt,
+        });
+        await authenticationStore.set({
+          identity,
+          identityNumber,
+          authMethod: { openid: { iss: jwtIss, sub } },
+        });
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber: data.identityNumber,
+          name: data.identityInfo.name[0],
+          authMethod: { openid: { iss: jwtIss, sub, metadata } },
+        });
+      }
+      switchingAccessMethodKey = undefined;
+      toaster.success({
+        title: $t`Successfully switched access method`,
+        description: $t`This is now the default method used to authenticate moving forward on this device.`,
+      });
+      void invalidateAll();
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
   const handleRemoveConfirmed = async () => {
     if (removingAccessMethod === undefined) {
       return;
@@ -337,6 +443,15 @@
         )}
       />
     {/if}
+  </Dialog>
+{/if}
+
+{#if switchingAccessMethod !== undefined}
+  <Dialog onClose={() => (switchingAccessMethodKey = undefined)}>
+    <SwitchAccessMethod
+      onSwitch={handleSwitchConfirmed}
+      onCancel={() => (switchingAccessMethodKey = undefined)}
+    />
   </Dialog>
 {/if}
 
