@@ -31,6 +31,17 @@ pub const MAX_BODY_BYTES: usize = 5_000;
 pub const MAX_HEADERS: usize = 30;
 pub const MAX_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_HEADER_VALUE_BYTES: usize = 8_192;
+/// Cap on `envelope.to` length. `smtp_request` and
+/// `smtp_request_validate` are both open (anyone can call them), so
+/// without an explicit upper bound an attacker could pad the
+/// recipient list out to the ingress size limit and force per-message
+/// allocation + per-recipient case-insensitive dispatch on every
+/// call. RFC 5321 §4.5.3.1 caps a single SMTP session at 100
+/// recipients, which is far more than the gateway will ever batch in
+/// practice (the canister only handles two reserved mailboxes), so
+/// using the RFC ceiling here just kicks the obvious adversarial case
+/// out without constraining any legitimate gateway flow.
+pub const MAX_RECIPIENTS: usize = 100;
 
 // --- SMTP error codes (RFC 5321) ---
 
@@ -148,6 +159,15 @@ pub fn validate_address_bounds(addr: &SmtpAddress, label: &str) -> Result<(), Sm
 
 pub fn validate_envelope(envelope: &SmtpEnvelope) -> Result<(), SmtpResponse> {
     validate_address_bounds(&envelope.from, "Sender")?;
+    if envelope.to.len() > MAX_RECIPIENTS {
+        return Err(smtp_err(
+            SMTP_ERR_SYNTAX_ERROR,
+            format!(
+                "Too many recipients: {} (max {MAX_RECIPIENTS})",
+                envelope.to.len()
+            ),
+        ));
+    }
     for to in &envelope.to {
         validate_address_bounds(to, "Recipient")?;
     }
@@ -301,6 +321,35 @@ mod tests {
         let resp = validate_envelope(&env).unwrap_err();
         assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
         assert!(err_msg(&resp).contains("Recipient user"));
+    }
+
+    #[test]
+    fn validate_envelope_rejects_too_many_recipients() {
+        // `smtp_request` is open; without a cap an attacker could pad
+        // the recipient list out to the ingress size limit. The bound
+        // here keeps worst-case validation/dispatch costs bounded.
+        let env = SmtpEnvelope {
+            from: addr("ok", "ok.com"),
+            to: (0..(MAX_RECIPIENTS + 1))
+                .map(|_| addr("recover", "id.ai"))
+                .collect(),
+        };
+        let resp = validate_envelope(&env).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("Too many recipients"));
+    }
+
+    #[test]
+    fn validate_envelope_accepts_max_recipients() {
+        // Exactly at the cap must still pass — defines the inclusive
+        // upper bound.
+        let env = SmtpEnvelope {
+            from: addr("ok", "ok.com"),
+            to: (0..MAX_RECIPIENTS)
+                .map(|_| addr("recover", "id.ai"))
+                .collect(),
+        };
+        assert!(validate_envelope(&env).is_ok());
     }
 
     #[test]

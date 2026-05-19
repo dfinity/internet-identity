@@ -1363,7 +1363,9 @@ export interface SmtpEnvelope {
    * SMTP allows multiple `RCPT TO` recipients per envelope, so this
    * is a vec. The canister picks the first recognised recipient
    * (`register@<domain>` or `recover@<domain>`) to decide which flow
-   * to run; unknown recipients in the same vec are ignored.
+   * to run; unknown recipients in the same vec are ignored. Capped
+   * at 100 recipients (RFC 5321 §4.5.3.1.10); envelopes exceeding
+   * the cap are rejected with code 555.
    */
   'to' : Array<SmtpAddress>,
   'from' : SmtpAddress,
@@ -1599,10 +1601,18 @@ export interface _SERVICE {
    */
   'discovered_oidc_configs' : ActorMethod<[], Array<OidcConfig>>,
   /**
-   * Email-recovery protocol — setup half
-   * ====================================
-   * See `docs/ongoing/email-recovery.md`. The recovery half (prepare
-   * a delegation from a verified email) lands in a follow-up PR.
+   * Email-recovery protocol
+   * =======================
+   * See `docs/ongoing/email-recovery.md`. Covers both flows:
+   * - Setup: prepare_add (authenticated) → smtp_request for
+   * register@id.ai → credential bound to the anchor. Removed
+   * later via credential_remove.
+   * - Recovery: prepare_delegation (anonymous, bound to a
+   * session_key) → smtp_request for recover@id.ai → canister
+   * stamps a signed delegation seed. The FE then calls
+   * email_recovery_get_delegation to retrieve the
+   * SignedDelegation.
+   * Both flows share the polling status query.
    */
   'email_recovery_credential_prepare_add' : ActorMethod<
     [IdentityNumber, EmailRecoveryDnsInput],
@@ -1869,10 +1879,10 @@ export interface _SERVICE {
    * =====================
    * The off-chain SMTP gateway forwards every inbound message via
    * smtp_request. The canister verifies the email cryptographically
-   * and dispatches by recipient (register@id.ai → setup completion).
-   * Always returns Ok — the gateway shouldn't get a per-message
-   * verification signal back. The FE sees outcomes via the polling
-   * status query.
+   * and dispatches by recipient: register@id.ai → setup completion,
+   * recover@id.ai → recovery delegation stamping. Always returns Ok
+   * — the gateway shouldn't get a per-message verification signal
+   * back. The FE sees outcomes via the polling status query.
    */
   'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
   /**

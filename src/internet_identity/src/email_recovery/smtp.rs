@@ -94,20 +94,23 @@ fn recipient_matches(
 /// the message body from the sending MTA — to decide whether to
 /// accept the connection at all.
 ///
-/// We must answer here with a 5xx for any recipient we don't intend
-/// to handle, otherwise the gateway will accept the message, pull
-/// the body, and forward it to `smtp_request` (where we'd silently
-/// drop it). That wastes the sender's bandwidth and, more
-/// importantly, gives no SMTP-level signal that the address is
-/// invalid — the sender's MTA never sees a bounce.
+/// An SMTP envelope may carry multiple `RCPT TO` recipients (the
+/// gateway can batch them into one canister call). We accept the
+/// transaction if *at least one* recipient names a mailbox we handle;
+/// the [`handle_smtp_request`] dispatcher ignores the rest. If *no*
+/// recipient is recognised we answer 550 (mailbox unavailable, "No
+/// such user here") so the gateway can bounce upstream rather than
+/// pull the body and have us silently drop it — which would waste the
+/// sender's bandwidth and give the sender's MTA no SMTP-level signal
+/// that the address is invalid.
 ///
 /// Accepts `register@<d>` and `recover@<d>` (case-insensitive) for
 /// any `d` in [`super::mailbox_domains`] — i.e. for any host listed
 /// in the `related_origins` deploy arg. On prod that's typically
 /// `id.ai` plus the `*.icp0.io` aliases; on beta it's `beta.id.ai`.
-/// Everything else gets a 550 (mailbox unavailable). The query is
-/// open — anyone can call it — but it has no side effects and
-/// leaks nothing beyond the deploy arg, which is already public.
+/// The query is open — anyone can call it — but it has no side
+/// effects and leaks nothing beyond the deploy arg, which is already
+/// public.
 pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
     if let Err(e) = validate_smtp_request(&request) {
         return e;

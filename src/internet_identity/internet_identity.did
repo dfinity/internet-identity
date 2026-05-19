@@ -646,7 +646,9 @@ type SmtpEnvelope = record {
     // SMTP allows multiple `RCPT TO` recipients per envelope, so this
     // is a vec. The canister picks the first recognised recipient
     // (`register@<domain>` or `recover@<domain>`) to decide which flow
-    // to run; unknown recipients in the same vec are ignored.
+    // to run; unknown recipients in the same vec are ignored. Capped
+    // at 100 recipients (RFC 5321 §4.5.3.1.10); envelopes exceeding
+    // the cap are rejected with code 555.
     to : vec SmtpAddress;
 };
 
