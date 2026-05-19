@@ -12,9 +12,13 @@
 //! - `recover@id.ai` — recovery completion. *(Reserved; lands in
 //!   the recovery follow-up PR.)*
 //!
-//! Any other recipient is silently dropped (a 200-equivalent
-//! response — we don't want to leak information about which mailbox
-//! names the canister recognises).
+//! Any other recipient is rejected with 550 ("No such user here").
+//! The set of mailboxes this canister recognises is part of the
+//! public Candid surface (anyone can read `register@<d>` /
+//! `recover@<d>` off the .did), so there's no secret to hide on this
+//! axis — a sender targeting an unknown mailbox is a caller error
+//! and surfaces as one. (Per-pending-challenge state, by contrast,
+//! is per-user and stays behind a silent drop further down.)
 //!
 //! The verification pipeline forks by path:
 //!
@@ -124,8 +128,10 @@ pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
 }
 
 /// Outcome the canister method in `main.rs` returns to the gateway.
-/// We only ever return `Ok` for verification results — see the
-/// module-level note on why we don't surface verification failures.
+/// Returns `Err(550)` for an unknown recipient, `Err(555)` for a
+/// malformed request shape, and `Ok` for *verification* outcomes —
+/// see the module-level note on why we don't surface per-message
+/// verification failures.
 pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // Bound-check up front so a malformed gateway-side payload
     // returns a clean syntax error instead of trapping somewhere
@@ -152,9 +158,18 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     } else if recipient_matches(&envelope.to, RECOVERY_RECIPIENT_USER) {
         RecipientFlow::Recovery
     } else {
-        // Drop with Ok — we don't emit a per-recipient signal back
-        // to the gateway.
-        return SmtpResponse::Ok {};
+        // Unknown recipient → 550 ("No such user here"). The set of
+        // mailboxes we handle is in the public Candid surface, so
+        // there's no secret to hide and a sender targeting any other
+        // mailbox is a caller error that deserves an SMTP-level
+        // signal. `smtp_request_validate` already returns the same
+        // 550 at RCPT TO time; mirroring it on the update path
+        // closes the gap for callers that skipped validate (or hit
+        // this method directly).
+        return smtp_err(
+            SMTP_ERR_MAILBOX_UNAVAILABLE,
+            "Recipient is not a known mailbox on this canister",
+        );
     };
 
     let message = match request.message.as_ref() {

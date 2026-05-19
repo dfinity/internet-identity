@@ -313,14 +313,16 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
 }
 
 #[test]
-fn smtp_request_drops_emails_addressed_to_other_recipients() {
+fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
     let env = env();
     let canister_id = setup_canister(&env);
 
-    // Recovery flow recipient is reserved (handled in a follow-up
-    // PR). Today the canister silently drops any non-`register`
-    // recipient — the gateway shouldn't be able to probe the
-    // canister for which mailboxes exist.
+    // The mailbox set this canister handles (`register@<d>` /
+    // `recover@<d>` for any `d` in `related_origins`) is part of the
+    // public Candid surface, so there's nothing to leak by surfacing
+    // an SMTP-level "no such user" — a sender targeting any other
+    // mailbox is a caller error and gets a 550 back so the off-chain
+    // gateway can bounce upstream.
     let request = SmtpRequest {
         envelope: Some(SmtpEnvelope {
             from: SmtpAddress {
@@ -328,7 +330,7 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
                 domain: TEST_DOMAIN.into(),
             },
             to: SmtpAddress {
-                user: "recover".into(),
+                user: "marketing".into(),
                 domain: "id.ai".into(),
             },
         }),
@@ -340,7 +342,7 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
                 },
                 SmtpHeader {
                     name: "To".into(),
-                    value: "recover@id.ai".into(),
+                    value: "marketing@id.ai".into(),
                 },
                 SmtpHeader {
                     name: "Subject".into(),
@@ -352,7 +354,12 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
         gateway_flags: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
-    assert!(matches!(resp, SmtpResponse::Ok {}));
+    match resp {
+        SmtpResponse::Err(e) => {
+            assert_eq!(e.code, 550, "expected 550 for unknown recipient, got {e:?}");
+        }
+        SmtpResponse::Ok {} => panic!("expected 550 Err for unknown recipient, got Ok"),
+    }
 }
 
 #[test]
