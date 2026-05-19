@@ -53,10 +53,6 @@
   const removingAccessMethod = $derived(
     accessMethods.find((m) => removingAccessMethodKey === toKey(m)),
   );
-  const isSignedInWithRecovery = $derived(
-    "recoveryPhrase" in $authenticatedStore.authMethod ||
-      "emailRecovery" in $authenticatedStore.authMethod,
-  );
   const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
     accessMethods.filter((m) => "passkey" in m).length >= MAX_PASSKEYS,
@@ -254,11 +250,7 @@
             <PasskeyItem
               passkey={accessMethod.passkey}
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
-              onRemove={accessMethods.length > 1 &&
-              !(
-                isCurrentAccessMethod($authenticatedStore, accessMethod) &&
-                !isSignedInWithRecovery
-              )
+              onRemove={accessMethods.length > 1
                 ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
               isCurrentAccessMethod={isCurrentAccessMethod(
@@ -270,11 +262,7 @@
           {:else if "openid" in accessMethod}
             <OpenIdItem
               openid={accessMethod.openid}
-              onUnlink={accessMethods.length > 1 &&
-              !(
-                isCurrentAccessMethod($authenticatedStore, accessMethod) &&
-                !isSignedInWithRecovery
-              )
+              onUnlink={accessMethods.length > 1
                 ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
               isCurrentAccessMethod={isCurrentAccessMethod(

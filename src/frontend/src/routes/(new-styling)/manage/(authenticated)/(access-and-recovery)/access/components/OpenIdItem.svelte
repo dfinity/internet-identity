@@ -39,6 +39,10 @@
           {
             label: $t`Unlink`,
             icon: Link2OffIcon,
+            disabled: isCurrentAccessMethod,
+            tooltip: isCurrentAccessMethod
+              ? $t`Switch to another method before removing`
+              : undefined,
             onClick: onUnlink,
           },
         ]

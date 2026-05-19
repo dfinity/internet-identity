@@ -73,9 +73,12 @@
           {
             label: $t`Remove`,
             icon: Trash2Icon,
-            disabled: isLegacy && recoveryPhraseStatus !== "verified",
-            tooltip:
-              isLegacy && recoveryPhraseStatus !== "verified"
+            disabled:
+              isCurrentAccessMethod ||
+              (isLegacy && recoveryPhraseStatus !== "verified"),
+            tooltip: isCurrentAccessMethod
+              ? $t`Switch to another method before removing`
+              : isLegacy && recoveryPhraseStatus !== "verified"
                 ? recoveryPhraseStatus === "unverified"
                   ? $t`Verify recovery to remove`
                   : $t`Activate recovery to remove`
