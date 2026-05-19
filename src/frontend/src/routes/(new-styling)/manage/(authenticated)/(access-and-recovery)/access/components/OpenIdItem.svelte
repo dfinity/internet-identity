@@ -69,9 +69,9 @@
               (isLastAccessMethod && !isSignedInWithRecovery),
             tooltip:
               isCurrentAccessMethod && !isLastAccessMethod
-                ? $t`Switch to another method before removing`
+                ? $t`Switch to another method before unlinking`
                 : isLastAccessMethod && !isSignedInWithRecovery
-                ? $t`Sign in with a recovery method to remove`
+                ? $t`Sign in with a recovery method to unlink`
                 : undefined,
             onClick: onUnlink,
           },
