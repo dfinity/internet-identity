@@ -24,6 +24,7 @@
     onRemove?: () => void;
     onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastAccessMethod?: boolean;
   }
 
   const {
@@ -33,6 +34,7 @@
     onRemove,
     onSwitch,
     isCurrentAccessMethod,
+    isLastAccessMethod = false,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
@@ -92,11 +94,12 @@
             label: $t`Remove`,
             icon: Trash2Icon,
             disabled:
-              isCurrentAccessMethod ||
+              (isCurrentAccessMethod && !isLastAccessMethod) ||
               (isLegacy && recoveryPhraseStatus !== "verified"),
-            tooltip: isCurrentAccessMethod
-              ? $t`Switch to another method before removing`
-              : isLegacy && recoveryPhraseStatus !== "verified"
+            tooltip:
+              isCurrentAccessMethod && !isLastAccessMethod
+                ? $t`Switch to another method before removing`
+                : isLegacy && recoveryPhraseStatus !== "verified"
                 ? recoveryPhraseStatus === "unverified"
                   ? $t`Verify recovery to remove`
                   : $t`Activate recovery to remove`

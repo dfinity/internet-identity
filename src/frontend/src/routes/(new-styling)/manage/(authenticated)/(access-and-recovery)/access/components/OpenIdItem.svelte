@@ -17,10 +17,16 @@
     onUnlink?: () => void;
     onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastAccessMethod?: boolean;
   }
 
-  const { openid, onUnlink, onSwitch, isCurrentAccessMethod }: Props =
-    $props();
+  const {
+    openid,
+    onUnlink,
+    onSwitch,
+    isCurrentAccessMethod,
+    isLastAccessMethod = false,
+  }: Props = $props();
 
   // `sso_domain` / `sso_name` are populated by the canister at response
   // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
@@ -56,10 +62,11 @@
           {
             label: $t`Unlink`,
             icon: Link2OffIcon,
-            disabled: isCurrentAccessMethod,
-            tooltip: isCurrentAccessMethod
-              ? $t`Switch to another method before removing`
-              : undefined,
+            disabled: isCurrentAccessMethod && !isLastAccessMethod,
+            tooltip:
+              isCurrentAccessMethod && !isLastAccessMethod
+                ? $t`Switch to another method before removing`
+                : undefined,
             onClick: onUnlink,
           },
         ]

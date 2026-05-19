@@ -9,8 +9,7 @@
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
   import RenamePasskey from "./components/RenamePasskey.svelte";
-  import RemovePasskey from "./components/RemovePasskey.svelte";
-  import RemoveOpenIdCredential from "./components/RemoveOpenIdCredential.svelte";
+  import RemoveAccessMethod from "./components/RemoveAccessMethod.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { throwCanisterError } from "$lib/utils/utils";
@@ -245,7 +244,6 @@
             );
           jwt = await requestJWT(
             {
-              issuer: iss,
               clientId: config.client_id,
               configURL: config.fedcm_uri[0],
               authURL: config.auth_uri,
@@ -364,7 +362,8 @@
             <PasskeyItem
               passkey={accessMethod.passkey}
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
-              onRemove={accessMethods.length > 1
+              onRemove={accessMethods.length > 1 ||
+              recoveryPhraseStatus === "verified"
                 ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
@@ -372,12 +371,14 @@
                 $authenticatedStore,
                 accessMethod,
               )}
+              isLastAccessMethod={accessMethods.length === 1}
               {recoveryPhraseStatus}
             />
           {:else if "openid" in accessMethod}
             <OpenIdItem
               openid={accessMethod.openid}
-              onUnlink={accessMethods.length > 1
+              onUnlink={accessMethods.length > 1 ||
+              recoveryPhraseStatus === "verified"
                 ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
@@ -385,6 +386,7 @@
                 $authenticatedStore,
                 accessMethod,
               )}
+              isLastAccessMethod={accessMethods.length === 1}
             />
           {/if}
         </li>
@@ -423,33 +425,25 @@
 
 {#if removingAccessMethod !== undefined}
   <Dialog onClose={() => (removingAccessMethodKey = undefined)}>
-    {#if "passkey" in removingAccessMethod}
-      <RemovePasskey
-        onRemove={handleRemoveConfirmed}
-        onCancel={() => (removingAccessMethodKey = undefined)}
-        isCurrentAccessMethod={isCurrentAccessMethod(
-          $authenticatedStore,
-          removingAccessMethod,
-        )}
-      />
-    {/if}
-    {#if "openid" in removingAccessMethod}
-      <RemoveOpenIdCredential
-        onRemove={handleRemoveConfirmed}
-        onCancel={() => (removingAccessMethodKey = undefined)}
-        providerName={openIdName(
-          removingAccessMethod.openid.iss,
-          removingAccessMethod.openid.aud,
-          removingAccessMethod.openid.metadata,
-          removingAccessMethod.openid.sso_name[0],
-          removingAccessMethod.openid.sso_domain[0],
-        ) ?? $t`Unknown`}
-        isCurrentAccessMethod={isCurrentAccessMethod(
-          $authenticatedStore,
-          removingAccessMethod,
-        )}
-      />
-    {/if}
+    <RemoveAccessMethod
+      type={"openid" in removingAccessMethod ? "openid" : "passkey"}
+      onRemove={handleRemoveConfirmed}
+      onCancel={() => (removingAccessMethodKey = undefined)}
+      providerName={"openid" in removingAccessMethod
+        ? (openIdName(
+            removingAccessMethod.openid.iss,
+            removingAccessMethod.openid.aud,
+            removingAccessMethod.openid.metadata,
+            removingAccessMethod.openid.sso_name[0],
+            removingAccessMethod.openid.sso_domain[0],
+          ) ?? $t`Unknown`)
+        : undefined}
+      isCurrentAccessMethod={isCurrentAccessMethod(
+        $authenticatedStore,
+        removingAccessMethod,
+      )}
+      isLastAccessMethod={accessMethods.length === 1}
+    />
   </Dialog>
 {/if}
 
