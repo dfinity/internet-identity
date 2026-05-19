@@ -7,6 +7,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
+  import Badge from "$lib/components/ui/Badge.svelte";
 
   interface Props {
     openid: OpenIdCredential;
@@ -63,12 +64,9 @@
     {/if}
   </div>
   {#if isCurrentAccessMethod}
-    <div
-      class="border-bg-success-secondary bg-bg-success-primary text-fg-success-primary ms-2 inline-flex flex-none shrink-0 items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-semibold"
+    <Badge color="success" size="sm" dot class="ms-2 flex-none"
+      >{$t`Active`}</Badge
     >
-      <div class="bg-fg-success-primary size-1.5 shrink-0 rounded-full"></div>
-      {$t`Active`}
-    </div>
   {/if}
   {#if options.length > 0}
     <Select {options} align="end">

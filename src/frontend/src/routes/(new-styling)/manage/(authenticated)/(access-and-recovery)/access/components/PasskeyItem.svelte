@@ -11,6 +11,7 @@
   import type { Provider } from "$lib/assets/aaguid";
   import { getMetadataString } from "$lib/utils/openID";
   import { getPrimaryOrigin } from "$lib/globals";
+  import Badge from "$lib/components/ui/Badge.svelte";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -97,12 +98,9 @@
   <div class="mb-3 flex h-9 flex-row items-center">
     <PasskeyIcon class="text-fg-primary size-6" />
     {#if isCurrentAccessMethod}
-      <div
-        class="border-bg-success-secondary bg-bg-success-primary text-fg-success-primary ms-2 inline-flex flex-none shrink-0 items-center gap-1 rounded-full border py-0.5 ps-1.5 pe-2 text-xs font-semibold"
+      <Badge color="success" size="sm" dot class="ms-2 flex-none"
+        >{$t`Active`}</Badge
       >
-        <div class="bg-fg-success-primary size-1.5 shrink-0 rounded-full"></div>
-        {$t`Active`}
-      </div>
     {/if}
     {#if isLegacy}
       <div
