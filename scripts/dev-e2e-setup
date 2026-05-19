@@ -97,7 +97,9 @@ kill_tree() {
 }
 
 ensure_prereqs() {
-  for cmd in node npm cargo curl tar; do
+  # pgrep (procps-ng) backs collect_descendants — without it teardown can't
+  # walk the process tree and stray vite/esbuild grandchildren leak.
+  for cmd in node npm cargo curl tar pgrep; do
     command -v "$cmd" >/dev/null || die "Missing required tool: $cmd"
   done
 
@@ -175,10 +177,17 @@ ensure_node_deps() {
 # Used to skip the cargo build + vite when nothing in the canister has changed
 # since the wasm was last produced — the slow path here is `npm run build`,
 # which always runs unconditionally inside `./scripts/build --frontend`.
+#
+# Mirrors the watcher's filter: ignore-list (editor noise, hidden files) rather
+# than an allow-list, so asset changes (.svg/.png/.woff2/...) inside src/frontend
+# correctly invalidate the FE wasm.
 needs_rebuild() {
   local src_dir=$1 wasm=$2
   [[ -f "$wasm" ]] || return 0
-  find "$src_dir" -type f \( -name '*.rs' -o -name '*.toml' -o -name '*.did' -o -name '*.ts' -o -name '*.svelte' -o -name '*.json' \) -newer "$wasm" -print -quit 2>/dev/null | grep -q . && return 0 || return 1
+  find "$src_dir" -type f -newer "$wasm" \
+    ! -name '.*' ! -name '*~' \
+    ! -name '*.swp' ! -name '*.swo' ! -name '*.swx' ! -name '*.tmp' \
+    -print -quit 2>/dev/null | grep -q . && return 0 || return 1
 }
 
 build_canisters() {

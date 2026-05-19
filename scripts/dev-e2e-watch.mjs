@@ -109,20 +109,37 @@ function schedule(target) {
   );
 }
 
+// Ignore-list approach rather than an allow-list: any text/asset under the
+// watched dirs is fair game (.rs/.toml for the canister crate, the full
+// frontend asset tree — .svelte/.ts/.css/.html/.po/.svg/.png/.woff2/... — for
+// the FE bundle). Only suppress editor noise (atomic-save temp files, OS
+// dotfiles, vim's `4913` probe) so a single user save doesn't trigger
+// duplicate rebuilds beyond the per-target debounce.
 function isWatchedFile(filename) {
-  return /\.(rs|toml|did|ts|svelte|json|css|html|po)$/.test(filename);
+  const base = filename.split("/").pop();
+  if (!base) return false;
+  if (base.startsWith(".")) return false; // .DS_Store, .swp, …
+  if (base.endsWith("~")) return false; // emacs / gedit backup
+  if (/\.(swp|swo|swx|tmp)$/.test(base)) return false; // vim swap, atomic temp
+  if (/^\d+$/.test(base)) return false; // vim's atomic-write probe (e.g. "4913")
+  return true;
 }
 
 for (const target of targets) {
   for (const dir of target.dirs) {
     try {
+      // recursive:true is supported on Linux since Node 20 (repo pins
+      // Node 24 via .node-version) and on macOS/Windows historically.
       watch(dir, { recursive: true }, (_event, filename) => {
         if (!filename || !isWatchedFile(filename)) return;
         schedule(target);
       });
       log(`watching ${dir} → ${target.name}`);
     } catch (err) {
+      // Don't keep the watcher running with no watches attached — the user
+      // would silently get a stale canister on every save.
       log(`failed to watch ${dir}: ${err.message}`);
+      process.exit(1);
     }
   }
 }
