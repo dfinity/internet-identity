@@ -88,8 +88,8 @@ msgstr "Cara untuk mendapatkan kembali akses ke identitas Anda jika Anda kehilan
 msgid "About"
 msgstr "Tentang"
 
-msgid "Access and recovery"
-msgstr "Akses dan pemulihan"
+msgid "Access"
+msgstr ""
 
 msgid "Access methods"
 msgstr "Metode akses"
@@ -769,6 +769,9 @@ msgstr "Pulihkan"
 
 msgid "Recover your identity"
 msgstr "Pulihkan identitas Anda"
+
+msgid "Recovery"
+msgstr ""
 
 msgid "Recovery phrase"
 msgstr "Frasa pemulihan"

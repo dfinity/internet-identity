@@ -88,8 +88,8 @@ msgstr "Een manier om weer toegang te krijgen tot uw identiteit als u deze ooit 
 msgid "About"
 msgstr "Over"
 
-msgid "Access and recovery"
-msgstr "Toegang en herstel"
+msgid "Access"
+msgstr ""
 
 msgid "Access methods"
 msgstr "Toegangsmethoden"
@@ -769,6 +769,9 @@ msgstr "Herstellen"
 
 msgid "Recover your identity"
 msgstr "Herstel uw identiteit"
+
+msgid "Recovery"
+msgstr ""
 
 msgid "Recovery phrase"
 msgstr "Herstelzin"
