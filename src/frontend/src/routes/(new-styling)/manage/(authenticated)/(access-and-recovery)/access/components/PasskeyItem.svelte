@@ -25,6 +25,7 @@
     onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
+    isSignedInWithRecovery?: boolean;
   }
 
   const {
@@ -35,6 +36,7 @@
     onSwitch,
     isCurrentAccessMethod,
     isLastAccessMethod = false,
+    isSignedInWithRecovery = true,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
@@ -95,10 +97,13 @@
             icon: Trash2Icon,
             disabled:
               (isCurrentAccessMethod && !isLastAccessMethod) ||
+              (isLastAccessMethod && !isSignedInWithRecovery) ||
               (isLegacy && recoveryPhraseStatus !== "verified"),
             tooltip:
               isCurrentAccessMethod && !isLastAccessMethod
                 ? $t`Switch to another method before removing`
+                : isLastAccessMethod && !isSignedInWithRecovery
+                ? $t`Sign in with a recovery method to remove`
                 : isLegacy && recoveryPhraseStatus !== "verified"
                 ? recoveryPhraseStatus === "unverified"
                   ? $t`Verify recovery to remove`

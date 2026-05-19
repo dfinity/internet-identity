@@ -70,6 +70,9 @@
   const switchingAccessMethod = $derived(
     accessMethods.find((m) => switchingAccessMethodKey === toKey(m)),
   );
+  const isSignedInWithRecovery = $derived(
+    !accessMethods.some((m) => isCurrentAccessMethod($authenticatedStore, m)),
+  );
   const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
     accessMethods.filter((m) => "passkey" in m).length >= MAX_PASSKEYS,
@@ -362,31 +365,27 @@
             <PasskeyItem
               passkey={accessMethod.passkey}
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
-              onRemove={accessMethods.length > 1 ||
-              recoveryPhraseStatus === "verified"
-                ? () => (removingAccessMethodKey = toKey(accessMethod))
-                : undefined}
+              onRemove={() => (removingAccessMethodKey = toKey(accessMethod))}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
               )}
               isLastAccessMethod={accessMethods.length === 1}
+              {isSignedInWithRecovery}
               {recoveryPhraseStatus}
             />
           {:else if "openid" in accessMethod}
             <OpenIdItem
               openid={accessMethod.openid}
-              onUnlink={accessMethods.length > 1 ||
-              recoveryPhraseStatus === "verified"
-                ? () => (removingAccessMethodKey = toKey(accessMethod))
-                : undefined}
+              onUnlink={() => (removingAccessMethodKey = toKey(accessMethod))}
               onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
               )}
               isLastAccessMethod={accessMethods.length === 1}
+              {isSignedInWithRecovery}
             />
           {/if}
         </li>

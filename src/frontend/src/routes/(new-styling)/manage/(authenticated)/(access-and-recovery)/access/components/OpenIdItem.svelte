@@ -18,6 +18,7 @@
     onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
+    isSignedInWithRecovery?: boolean;
   }
 
   const {
@@ -26,6 +27,7 @@
     onSwitch,
     isCurrentAccessMethod,
     isLastAccessMethod = false,
+    isSignedInWithRecovery = true,
   }: Props = $props();
 
   // `sso_domain` / `sso_name` are populated by the canister at response
@@ -62,10 +64,14 @@
           {
             label: $t`Unlink`,
             icon: Link2OffIcon,
-            disabled: isCurrentAccessMethod && !isLastAccessMethod,
+            disabled:
+              (isCurrentAccessMethod && !isLastAccessMethod) ||
+              (isLastAccessMethod && !isSignedInWithRecovery),
             tooltip:
               isCurrentAccessMethod && !isLastAccessMethod
                 ? $t`Switch to another method before removing`
+                : isLastAccessMethod && !isSignedInWithRecovery
+                ? $t`Sign in with a recovery method to remove`
                 : undefined,
             onClick: onUnlink,
           },
