@@ -143,7 +143,7 @@ export class TestSigner {
       envelope: [
         {
           from: { user: fromUser, domain: fromDomain },
-          to: { user: toUser, domain: toDomain },
+          to: [{ user: toUser, domain: toDomain }],
         },
       ],
       message: [
