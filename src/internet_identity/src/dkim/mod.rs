@@ -31,6 +31,7 @@ mod canonicalize;
 mod dns_record;
 mod parse;
 mod signature;
+mod tag_checks;
 #[cfg(test)]
 mod test_vectors;
 mod types;
@@ -60,5 +61,10 @@ pub(crate) use dns_record::{parse_dkim_txt, DkimDnsRecord, KeyType};
 pub(crate) use parse::{parse_dkim_signature, DkimSignature};
 #[allow(unused_imports)]
 pub(crate) use signature::{body_hash_sha256, verify_signature, VerifyOutcome};
+#[allow(unused_imports)]
+pub(crate) use tag_checks::{
+    check_auid_aligned, check_dns_not_testing, check_signature_not_expired,
+    check_signature_not_from_future, check_subject_signed,
+};
 #[allow(unused_imports)]
 pub(crate) use verify::{build_header_hash_input, simple_body};
