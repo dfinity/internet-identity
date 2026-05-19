@@ -448,10 +448,11 @@ fn prepare_partial_verification(
     // the audit: without these, a sender on a DNSSEC-signed domain
     // could verify with a stale `x=` (replay window stretches to the
     // RRSIG validity, days–weeks), a future-dated `t=`, or an `h=`
-    // that doesn't cover `Subject` (nonce-rewrite by a MITM). The DNS
-    // -record-dependent tag checks (`i=` alignment under `t=s`, and
-    // `t=y` testing-mode) run later in `submit_dkim_leaf::run_submit`
-    // once the DKIM leaf has been DNSSEC-verified.
+    // that doesn't cover `Subject` (nonce-rewrite by a MITM). The
+    // DNS-record-dependent tag checks (`i=` alignment under `t=s`,
+    // and `t=y` testing-mode) run later in
+    // `submit_dkim_leaf::run_submit` once the DKIM leaf has been
+    // DNSSEC-verified.
     crate::dkim::check_signature_not_expired(&sig, now_secs)
         .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
     crate::dkim::check_signature_not_from_future(&sig, now_secs)

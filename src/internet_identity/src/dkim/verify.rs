@@ -45,7 +45,7 @@ use super::parse::{parse_dkim_signature, DkimSignature};
 use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
 use super::tag_checks::{
     check_auid_aligned, check_dns_not_testing, check_signature_not_expired,
-    check_signature_not_from_future, check_subject_signed,
+    check_signature_not_from_future, check_subject_signed, CLOCK_SKEW_SECS,
 };
 use super::types::{
     DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
@@ -196,9 +196,9 @@ fn try_verify_signature(
     ));
 
     if let Err(reason) = check_signature_not_from_future(&sig, now_secs) {
-        let detail = sig
-            .t
-            .map(|t| format!("signature claims t={t}, now={now_secs}"));
+        let detail = sig.t.map(|t| {
+            format!("signature claims t={t}, now={now_secs}, beyond {CLOCK_SKEW_SECS}s skew")
+        });
         checks.push(check(
             DkimCheckName::SignatureNotFromFuture,
             DkimCheckStatus::Fail,

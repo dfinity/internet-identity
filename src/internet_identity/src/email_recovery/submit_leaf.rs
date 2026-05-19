@@ -397,9 +397,10 @@ fn run_submit(
 /// DKIM TXT record. Runs at submit time on the DNSSEC path — the
 /// signature-header-only checks (`x=`, `t=`, Subject in `h=`) have
 /// already run at `smtp::prepare_partial_verification`. Shared with
-/// the DoH path via [`crate::dkim::tag_checks`]; extracted so the
-/// DNSSEC-path wiring is unit-testable without spinning up the full
-/// DNSSEC chain validator.
+/// the DoH path via [`crate::dkim::check_dns_not_testing`] and
+/// [`crate::dkim::check_auid_aligned`]; extracted so the DNSSEC-path
+/// wiring is unit-testable without spinning up the full DNSSEC chain
+/// validator.
 fn enforce_dns_record_tag_checks(
     dns_record: &crate::dkim::DkimDnsRecord,
     signing_auid: &str,
