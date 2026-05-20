@@ -104,7 +104,7 @@
               isCurrentAccessMethod && !isLastAccessMethod
                 ? $t`Switch to another method before removing`
                 : isLastAccessMethod && !isSignedInWithRecovery
-                  ? $t`Sign in with a recovery method to remove`
+                  ? $t`Add another method or sign in via recovery to remove`
                   : isLegacy && recoveryPhraseStatus !== "verified"
                     ? recoveryPhraseStatus === "unverified"
                       ? $t`Verify recovery to remove`

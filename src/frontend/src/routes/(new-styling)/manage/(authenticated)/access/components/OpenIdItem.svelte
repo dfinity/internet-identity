@@ -72,7 +72,7 @@
               isCurrentAccessMethod && !isLastAccessMethod
                 ? $t`Switch to another method before unlinking`
                 : isLastAccessMethod && !isSignedInWithRecovery
-                  ? $t`Sign in with a recovery method to unlink`
+                  ? $t`Add another method or sign in via recovery to unlink`
                   : undefined,
             onClick: onUnlink,
           },

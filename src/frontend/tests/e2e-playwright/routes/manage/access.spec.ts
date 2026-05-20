@@ -130,7 +130,7 @@ test.describe("Access methods", () => {
     await manageAccessPage
       .findPasskey(DEFAULT_PASSKEY_NAME)
       .assertRemoveDisabledWithTooltip(
-        "Sign in with a recovery method to remove",
+        "Add another method or sign in via recovery to remove",
       );
     await manageAccessPage.assertPasskeyCount(1);
   });
