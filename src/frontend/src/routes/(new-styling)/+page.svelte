@@ -227,8 +227,15 @@
           {#if selectedIdentity !== undefined}
             <!-- Welcome-back state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
-              <div class="mb-4 flex items-center gap-3 md:gap-4 lg:gap-5">
-                <Logo class="text-fg-primary h-10 shrink-0 md:h-12 lg:h-14" />
+              <div
+                dir="ltr"
+                class="mb-4 flex items-center gap-3 md:gap-4 lg:gap-5"
+              >
+                <Logo
+                  class="text-fg-primary h-10 shrink-0 md:h-12 lg:h-14"
+                  aria-hidden="true"
+                  focusable="false"
+                />
                 <h1
                   class="text-text-primary text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
                 >
@@ -342,8 +349,15 @@
           {:else}
             <!-- Sign-up state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
-              <div class="mb-4 flex items-center gap-3 md:gap-4 lg:gap-5">
-                <Logo class="text-fg-primary h-10 shrink-0 md:h-12 lg:h-14" />
+              <div
+                dir="ltr"
+                class="mb-4 flex items-center gap-3 md:gap-4 lg:gap-5"
+              >
+                <Logo
+                  class="text-fg-primary h-10 shrink-0 md:h-12 lg:h-14"
+                  aria-hidden="true"
+                  focusable="false"
+                />
                 <h1
                   class="text-text-primary text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
                 >
