@@ -85,7 +85,7 @@
         <p>
           <Trans>
             If you proceed, you will no longer be able to sign-in to your
-            identity or dapps using your {providerName} account.
+            identity or apps using your {providerName} account.
           </Trans>
         </p>
       {:else}
