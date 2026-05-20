@@ -236,6 +236,11 @@
       } else if ("openid" in switchingAccessMethod) {
         const { iss, aud, metadata, sso_domain } = switchingAccessMethod.openid;
         const ssoDomain = sso_domain[0];
+        // Pre-select the same account the user is switching to. Most OpenID
+        // providers honor `login_hint` and skip the account picker; this also
+        // reduces the chance of landing on a different anchor (caught by the
+        // identityNumber guard below).
+        const loginHint = getMetadataString(metadata, "email");
         let jwt: string;
         if (ssoDomain !== undefined) {
           jwt = await requestWithPopup(
@@ -246,7 +251,7 @@
                 ssoResult.discovery.scopes_supported,
               ).join(" "),
             })),
-            { nonce: session.nonce, mediation: "optional" },
+            { nonce: session.nonce, mediation: "optional", loginHint },
           );
         } else {
           const config = findConfig(iss, aud, metadata);
@@ -261,7 +266,7 @@
               authURL: config.auth_uri,
               authScope: config.auth_scope.join(" "),
             },
-            { nonce: session.nonce, mediation: "optional" },
+            { nonce: session.nonce, mediation: "optional", loginHint },
           );
         }
         const { iss: jwtIss, sub } = decodeJWT(jwt);
