@@ -903,7 +903,7 @@ fn doh_path_signature_header_umbrella_rejects_future_dated_t() {
             );
         }
         other => {
-            panic!("expected Failed(EmailVerificationFailed(SignatureFutureDated…)), got {other:?}",)
+            panic!("expected Failed(EmailVerificationFailed(SignatureFutureDated…)), got {other:?}")
         }
     }
 }
