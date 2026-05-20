@@ -188,13 +188,6 @@
 
 <div class="flex min-h-dvh flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <header
-    class="relative z-10 flex h-16 flex-row items-center px-4 md:px-6 lg:px-8"
-  >
-    <a href="/" dir="ltr" aria-label={$t`Internet Identity`}>
-      <Logo class="text-fg-primary h-5.5" />
-    </a>
-  </header>
 
   {#if browser}
     <div class="fade-in absolute inset-0 -z-1 hidden opacity-0 md:block">
@@ -234,11 +227,14 @@
           {#if selectedIdentity !== undefined}
             <!-- Welcome-back state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
-              <h1
-                class="text-text-primary mb-4 text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
-              >
-                {$t`Internet Identity`}
-              </h1>
+              <div class="mb-4 flex items-center gap-3 md:gap-4 lg:gap-5">
+                <Logo class="text-fg-primary h-10 shrink-0 md:h-12 lg:h-14" />
+                <h1
+                  class="text-text-primary text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
+                >
+                  {$t`Internet Identity`}
+                </h1>
+              </div>
               <p class="text-text-tertiary mb-10 max-w-md text-base md:text-lg">
                 <Trans>Sign in to manage your identity</Trans>
               </p>
@@ -346,11 +342,14 @@
           {:else}
             <!-- Sign-up state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
-              <h1
-                class="text-text-primary mb-4 text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
-              >
-                {$t`Internet Identity`}
-              </h1>
+              <div class="mb-4 flex items-center gap-3 md:gap-4 lg:gap-5">
+                <Logo class="text-fg-primary h-10 shrink-0 md:h-12 lg:h-14" />
+                <h1
+                  class="text-text-primary text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
+                >
+                  {$t`Internet Identity`}
+                </h1>
+              </div>
               <p
                 class="text-text-tertiary mb-10 max-w-md text-base text-balance md:text-lg"
               >
