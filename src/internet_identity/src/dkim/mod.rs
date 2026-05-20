@@ -15,6 +15,28 @@
 //!   and `ed25519-dalek` workspace deps.
 //! - `verify` — orchestration: multi-signature loop, tag enforcement,
 //!   accept-on-first-pass.
+//! - `tag_checks` — the **tag-contract facade** (two `enforce_*` umbrella
+//!   functions) that both pipelines route their tag enforcement
+//!   through. The facade is the single source of truth so the DoH and
+//!   DNSSEC paths can't drift apart on which tag policies they enforce.
+//!
+//! ## Tag-contract call order
+//!
+//! Within each umbrella the order matters for diagnostics — the first
+//! failing check is what surfaces upstream when an input triggers
+//! multiple rejections. Documented here so a future contributor
+//! reordering checks knows the rationale and doesn't undo it:
+//!
+//! - `enforce_signature_header_tag_contract`: `x=` (expired) → `t=`
+//!   (future-dated) → `Subject` ∈ `h=`. Cheapest-first against a
+//!   parsed signature header.
+//! - `enforce_dns_record_tag_contract`: `t=y` (testing) → `i=` AUID
+//!   alignment. `t=y` is deliberately first: a key the signer has
+//!   marked non-production invalidates the signature regardless of
+//!   any other tag state, so surfacing `TestingMode` ahead of (e.g.)
+//!   `AuidMisaligned` or the structural `AlgorithmKeyTypeMismatch`
+//!   that runs immediately after the umbrella gives the most useful
+//!   diagnostic.
 //!
 //! The verifier consumes a DKIM TXT record (sourced either from a
 //! DNSSEC-verified `DnsProofBundle` cached at prepare time, or via
