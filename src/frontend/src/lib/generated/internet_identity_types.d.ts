@@ -1358,7 +1358,25 @@ export interface SignedRRset {
   'rtype' : number,
 }
 export interface SmtpAddress { 'domain' : string, 'user' : string }
-export interface SmtpEnvelope { 'to' : SmtpAddress, 'from' : SmtpAddress }
+export interface SmtpEnvelope {
+  /**
+   * SMTP allows multiple `RCPT TO` recipients per envelope, so this
+   * is a vec at the wire level. For the recovery flows this canister
+   * serves, however, we require *exactly one* recipient and it must
+   * be `register@<domain>` or `recover@<domain>` — a legitimate
+   * recovery email never targets a CC/BCC alongside us, so any
+   * additional recipient can only come from a phishy forwarder
+   * trying to exfiltrate the user's canister-signed challenge.
+   * Multi-recipient envelopes (and empty ones) are rejected with
+   * code 551 ("User not local"); single-recipient envelopes whose
+   * recipient isn't one of our reserved mailboxes get 550 ("No
+   * such user here"). The vec is also capped at 100 entries (RFC
+   * 5321 §4.5.3.1.10); envelopes exceeding the cap are rejected
+   * with code 555.
+   */
+  'to' : Array<SmtpAddress>,
+  'from' : SmtpAddress,
+}
 /**
  * SMTP gateway types — see `internet_identity_interface::smtp`. Carried
  * forward from PoC #3760 surface (the existing gateway can target this
@@ -1374,6 +1392,25 @@ export interface SmtpRequest {
   'message' : [] | [SmtpMessage],
   'gateway_flags' : [] | [Array<string>],
 }
+/**
+ * Error returned by `smtp_request` / `smtp_request_validate`.
+ * 
+ * `code` mirrors the SMTP reply codes the off-chain gateway should
+ * emit upstream:
+ * - `550` (mailbox unavailable) — "No such user here". Returned when
+ * the envelope carries exactly one recipient but it isn't a mailbox
+ * this canister handles (i.e. neither `register@<domain>` nor
+ * `recover@<domain>` for any `<domain>` in `related_origins`).
+ * - `551` (user not local) — envelope-shape rejection. Returned for
+ * empty `to` and for multi-recipient envelopes, even when one of
+ * the recipients is ours. Distinct from 550 so the gateway can tell
+ * "this envelope shape isn't accepted" from "we don't know this
+ * user". Recovery emails never legitimately address a CC/BCC
+ * alongside `register@…` / `recover@…`.
+ * - `555` (syntax error) — the request shape itself is malformed
+ * (e.g. missing envelope, oversize address/header/body, recipient
+ * list exceeds the 100-entry cap).
+ */
 export interface SmtpRequestError { 'code' : bigint, 'message' : string }
 export type SmtpResponse = { 'Ok' : {} } |
   { 'Err' : SmtpRequestError };
@@ -1578,10 +1615,18 @@ export interface _SERVICE {
    */
   'discovered_oidc_configs' : ActorMethod<[], Array<OidcConfig>>,
   /**
-   * Email-recovery protocol — setup half
-   * ====================================
-   * See `docs/ongoing/email-recovery.md`. The recovery half (prepare
-   * a delegation from a verified email) lands in a follow-up PR.
+   * Email-recovery protocol
+   * =======================
+   * See `docs/ongoing/email-recovery.md`. Covers both flows:
+   * - Setup: prepare_add (authenticated) → smtp_request for
+   * register@id.ai → credential bound to the anchor. Removed
+   * later via credential_remove.
+   * - Recovery: prepare_delegation (anonymous, bound to a
+   * session_key) → smtp_request for recover@id.ai → canister
+   * stamps a signed delegation seed. The FE then calls
+   * email_recovery_get_delegation to retrieve the
+   * SignedDelegation.
+   * Both flows share the polling status query.
    */
   'email_recovery_credential_prepare_add' : ActorMethod<
     [IdentityNumber, EmailRecoveryDnsInput],
@@ -1848,10 +1893,10 @@ export interface _SERVICE {
    * =====================
    * The off-chain SMTP gateway forwards every inbound message via
    * smtp_request. The canister verifies the email cryptographically
-   * and dispatches by recipient (register@id.ai → setup completion).
-   * Always returns Ok — the gateway shouldn't get a per-message
-   * verification signal back. The FE sees outcomes via the polling
-   * status query.
+   * and dispatches by recipient: register@id.ai → setup completion,
+   * recover@id.ai → recovery delegation stamping. Always returns Ok
+   * — the gateway shouldn't get a per-message verification signal
+   * back. The FE sees outcomes via the polling status query.
    */
   'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
   /**

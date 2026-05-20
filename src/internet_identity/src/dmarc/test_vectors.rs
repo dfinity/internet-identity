@@ -101,10 +101,10 @@ fn parse_eml(raw: &[u8]) -> SmtpRequest {
                 user: "alice".into(),
                 domain: "test.example.com".into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "recover".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers,
