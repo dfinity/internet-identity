@@ -672,3 +672,208 @@ mod tests {
         assert!(enforce_dns_record_tag_contract(&s.i, &s.d, &r).is_ok());
     }
 }
+
+// =====================================================================
+// Property-based tests — facade-vs-helpers parity guarantee.
+//
+// The umbrellas (`enforce_*_tag_contract`) are defined as the ordered
+// chain of their constituent `check_*` helpers. That contract holds
+// trivially for the 7 hand-written umbrella unit tests in
+// `mod tests`, but the *generative* guarantee is the one we care
+// about: across arbitrary inputs, the umbrella's verdict can never
+// disagree with the per-helper conjunction, and the umbrella's
+// failure reason is exactly the first-failing helper's. If a future
+// refactor accidentally dropped a check from an umbrella, these
+// properties would fail on the first generated input that triggers
+// the dropped check — long before the bug could ship.
+//
+// `proptest` is a dev-dep (see `Cargo.toml`) — no production-build
+// impact.
+// =====================================================================
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use crate::dkim::{Algorithm, BodyCanon, DkimDnsRecord, HeaderCanon, KeyType};
+    use proptest::prelude::*;
+
+    /// Strategy for a `DkimSignature` with the fields the tag-contract
+    /// checks actually read: `t`, `x`, `h`, `i`, `d`. The other fields
+    /// get fixed placeholder values — the checks never look at them,
+    /// and randomising them would just slow the runner without
+    /// adding coverage.
+    ///
+    /// `i` is constructed in one of three modes so AUID alignment hits
+    /// every branch with non-trivial frequency: exact match against
+    /// `d`, a label-anchored subdomain of `d`, or an unrelated domain.
+    /// Without this the random-string generator would land on
+    /// "unrelated" almost every time and the strict/loose distinction
+    /// would never get exercised.
+    fn arb_signature() -> impl Strategy<Value = DkimSignature> {
+        let labels = "[a-z]{1,6}";
+        let d_strat = (labels, labels).prop_map(|(a, b)| format!("{a}.{b}"));
+
+        let h_strat = prop::collection::vec(
+            prop_oneof![
+                Just("From".to_string()),
+                Just("Subject".to_string()),
+                Just("Date".to_string()),
+                Just("To".to_string()),
+            ],
+            0..6,
+        );
+
+        // `t=` / `x=` (and the property's `now` below) all draw from
+        // `0..3_000_000_000` — a range broad enough to make
+        // before/within-skew/after-skew transitions hit every branch
+        // of the umbrella with non-trivial frequency, but small
+        // enough that `now.saturating_add(CLOCK_SKEW_SECS)` never
+        // saturates. The umbrella is `saturating_add`-correct by
+        // construction (no panic possible for any `u64`), so cases
+        // near `u64::MAX` add no extra coverage worth slowing the
+        // generator down for.
+        let small_time = 0u64..3_000_000_000u64;
+        let t_strat = prop::option::of(small_time.clone());
+        let x_strat = prop::option::of(small_time);
+
+        (
+            d_strat,
+            h_strat,
+            t_strat,
+            x_strat,
+            any::<u8>(),
+            "[a-z]{0,8}",
+        )
+            .prop_flat_map(|(d, h, t, x, mode, local)| {
+                let d_clone = d.clone();
+                let i_strat = match mode % 3 {
+                    // Aligned: same domain.
+                    0 => Just(format!("{local}@{d_clone}")).boxed(),
+                    // Subdomain (loose-mode aligned, strict-mode misaligned).
+                    1 => Just(format!("{local}@sub.{d_clone}")).boxed(),
+                    // Unrelated.
+                    _ => Just(format!("{local}@unrelated.example")).boxed(),
+                };
+                i_strat.prop_map(move |i| DkimSignature {
+                    version: 1,
+                    algorithm: Algorithm::RsaSha256,
+                    d: d.clone(),
+                    s: "sel".into(),
+                    c_header: HeaderCanon::Relaxed,
+                    c_body: BodyCanon::Relaxed,
+                    h: h.clone(),
+                    l: None,
+                    bh: vec![0u8; 32],
+                    b: vec![0u8; 256],
+                    t,
+                    x,
+                    i,
+                })
+            })
+    }
+
+    fn arb_dns_record() -> impl Strategy<Value = DkimDnsRecord> {
+        (any::<bool>(), any::<bool>()).prop_map(|(testing, strict_auid)| DkimDnsRecord {
+            key_type: KeyType::Rsa,
+            public_key: vec![0u8; 1],
+            testing,
+            strict_auid,
+        })
+    }
+
+    /// Assert that `umbrella`'s verdict matches the conjunction of an
+    /// ordered list of per-helper results, AND that on rejection the
+    /// umbrella surfaces exactly the first failing helper's reason.
+    /// Captures the "umbrella is the ordered chain of its constituent
+    /// checks" contract in one place so adding a new umbrella later
+    /// is a single call rather than a copy-pasted if-let-else
+    /// cascade.
+    fn assert_facade_parity(
+        helpers: &[Result<(), VerificationFailReason>],
+        umbrella: Result<Vec<DkimCheck>, (VerificationFailReason, Vec<DkimCheck>)>,
+    ) -> Result<(), TestCaseError> {
+        let first_fail = helpers.iter().find_map(|r| r.clone().err());
+        match (umbrella, first_fail) {
+            (Ok(_), None) => Ok(()),
+            (Err((reason, _)), Some(expected)) => {
+                prop_assert_eq!(reason, expected);
+                Ok(())
+            }
+            (Ok(_), Some(missed)) => {
+                prop_assert!(
+                    false,
+                    "umbrella accepted but a helper rejected with {missed:?}"
+                );
+                Ok(())
+            }
+            (Err((spurious, _)), None) => {
+                prop_assert!(
+                    false,
+                    "umbrella rejected with {spurious:?} but no helper did"
+                );
+                Ok(())
+            }
+        }
+    }
+
+    proptest! {
+        /// The signature-header umbrella accepts iff every constituent
+        /// check accepts, and on rejection its reason matches the first-
+        /// failing helper in the umbrella's documented order (x= → t= →
+        /// Subject).
+        #[test]
+        fn header_umbrella_matches_helpers_for_any_input(
+            sig in arb_signature(),
+            now in 0u64..3_000_000_000u64,
+        ) {
+            assert_facade_parity(
+                &[
+                    check_signature_not_expired(&sig, now),
+                    check_signature_not_from_future(&sig, now),
+                    check_subject_signed(&sig),
+                ],
+                enforce_signature_header_tag_contract(&sig, now),
+            )?;
+        }
+
+        /// The DNS-record umbrella accepts iff every constituent check
+        /// accepts, and on rejection its reason matches the first-
+        /// failing helper in the umbrella's documented order (t=y →
+        /// AUID).
+        #[test]
+        fn dns_record_umbrella_matches_helpers_for_any_input(
+            sig in arb_signature(),
+            dns in arb_dns_record(),
+        ) {
+            assert_facade_parity(
+                &[
+                    check_dns_not_testing(&dns),
+                    check_auid_aligned(&sig.i, &sig.d, dns.strict_auid),
+                ],
+                enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns),
+            )?;
+        }
+
+        /// Calling either umbrella twice on the same input gives the
+        /// same verdict — captures the "no hidden state" property
+        /// that would silently break if someone added a `thread_local`
+        /// cache to a helper.
+        #[test]
+        fn umbrellas_are_deterministic(
+            sig in arb_signature(),
+            dns in arb_dns_record(),
+            now in 0u64..3_000_000_000u64,
+        ) {
+            let a = enforce_signature_header_tag_contract(&sig, now);
+            let b = enforce_signature_header_tag_contract(&sig, now);
+            // `Result<Vec<DkimCheck>, _>` implements PartialEq — direct
+            // structural comparison works.
+            prop_assert_eq!(a.is_ok(), b.is_ok());
+            prop_assert_eq!(a, b);
+
+            let a = enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns);
+            let b = enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns);
+            prop_assert_eq!(a, b);
+        }
+    }
+}
