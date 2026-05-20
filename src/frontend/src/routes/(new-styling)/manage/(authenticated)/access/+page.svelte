@@ -71,7 +71,8 @@
     accessMethods.find((m) => switchingAccessMethodKey === toKey(m)),
   );
   const isSignedInWithRecovery = $derived(
-    !accessMethods.some((m) => isCurrentAccessMethod($authenticatedStore, m)),
+    "recoveryPhrase" in $authenticatedStore.authMethod ||
+      "emailRecovery" in $authenticatedStore.authMethod,
   );
   const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
