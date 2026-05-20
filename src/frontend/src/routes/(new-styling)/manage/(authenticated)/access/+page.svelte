@@ -236,11 +236,20 @@
       } else if ("openid" in switchingAccessMethod) {
         const { iss, aud, metadata, sso_domain } = switchingAccessMethod.openid;
         const ssoDomain = sso_domain[0];
-        // Pre-select the same account the user is switching to. Most OpenID
-        // providers honor `login_hint` and skip the account picker; this also
-        // reduces the chance of landing on a different anchor (caught by the
-        // identityNumber guard below).
-        const loginHint = getMetadataString(metadata, "email");
+        // Re-use the loginHint we stored the last time this identity signed in
+        // via an OpenID/SSO method — most providers honor it and skip the
+        // account picker. Authoritative source is the lastUsedIdentitiesStore
+        // (populated from `decodeJWT(...).loginHint` on each sign-in).
+        const lastUsed = get(lastUsedIdentitiesStore).identities[
+          data.identityNumber.toString()
+        ];
+        const lastUsedAuthMethod = lastUsed?.authMethod;
+        const loginHint =
+          lastUsedAuthMethod !== undefined && "openid" in lastUsedAuthMethod
+            ? lastUsedAuthMethod.openid.loginHint
+            : lastUsedAuthMethod !== undefined && "sso" in lastUsedAuthMethod
+              ? lastUsedAuthMethod.sso.loginHint
+              : undefined;
         let jwt: string;
         if (ssoDomain !== undefined) {
           jwt = await requestWithPopup(
@@ -269,7 +278,7 @@
             { nonce: session.nonce, mediation: "optional", loginHint },
           );
         }
-        const { iss: jwtIss, sub } = decodeJWT(jwt);
+        const { iss: jwtIss, sub, loginHint: jwtLoginHint } = decodeJWT(jwt);
         const { identity, identityNumber } = await authenticateWithJWT({
           canisterId,
           session,
@@ -293,7 +302,9 @@
           identityNumber,
           name: data.identityInfo.name[0],
           createdAtMillis,
-          authMethod: { openid: { iss: jwtIss, sub, metadata } },
+          authMethod: {
+            openid: { iss: jwtIss, sub, loginHint: jwtLoginHint, metadata },
+          },
         });
       }
       switchingAccessMethodKey = undefined;
