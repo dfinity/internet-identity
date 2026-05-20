@@ -47,7 +47,7 @@ msgid "{domainInput}'s SSO returned error \"{0}\"."
 msgstr "SSO milik {domainInput} mengembalikan kesalahan \"{0}\"."
 
 msgid "{identityName} has been removed from this device."
-msgstr "{identityName} telah dihapus dari perangkat ini."
+msgstr "{identityName} telah dihapus dari perangkat ini"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
@@ -68,7 +68,7 @@ msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a f
 msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Internet Identity tampilan baru yang modern. Desain baru ini intuitif dan lebih mudah dinavigasi, sehingga pengalaman pengguna menjadi lebih lancar."
 
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
-msgstr "<0>Integrasi Google, Apple, dan Microsoft:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami melihat tingkat putus registrasi sebesar 50%, menunjukkan kebutuhan akan metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami telah berintegrasi dengan Google, Apple, dan Microsoft sebagai opsi autentikasi alternatif."
+msgstr "<0>Integrasi Google, Apple, dan Microsoft:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami mencatat tingkat pengunduran diri sebesar 50%, menunjukkan perlunya metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami telah mengintegrasikan layanan Google, Apple, dan Microsoft sebagai opsi autentikasi alternatif."
 
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Pelajari lebih lanjut</0> tentang passkey"
@@ -350,7 +350,7 @@ msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
-msgstr "Masukkan nama untuk identitas Anda untuk menyelesaikan peningkatan. Setelah diatur, nama tidak dapat diubah nanti."
+msgstr "Masukkan nama untuk menyelesaikan peningkatan identitas Anda. Setelah ditetapkan, nama tersebut tidak dapat diubah nanti."
 
 msgid "Enter characters"
 msgstr "Masukkan karakter"
@@ -456,7 +456,7 @@ msgid "I have written it down"
 msgstr "Saya sudah mencatatnya"
 
 msgid "Identities on this device"
-msgstr "Identitas di perangkat ini"
+msgstr "Identitas pada perangkat ini"
 
 msgid "Identity already upgraded"
 msgstr "Identitas sudah ditingkatkan"
@@ -489,7 +489,7 @@ msgid "In use on another account."
 msgstr "Digunakan di akun lain."
 
 msgid "Incorrect recovery phrase. Please try again."
-msgstr "Frasa pemulihan salah. Silakan coba lagi."
+msgstr "Frasa pemulihan salah. Silahkan coba lagi."
 
 msgid "Incorrect spelling"
 msgstr "Ejaan salah"
@@ -501,7 +501,7 @@ msgid "Incorrect. Try again with the new code."
 msgstr "Salah. Coba lagi dengan kode baru."
 
 msgid "Interaction canceled. Please try again."
-msgstr "Interaksi dibatalkan. Silakan coba lagi."
+msgstr "Interaksi dibatalkan. Silahkan coba lagi."
 
 msgid "Internet Identity"
 msgstr "Internet Identity"
@@ -537,7 +537,7 @@ msgid "Invalid code link"
 msgstr "Tautan kode tidak valid"
 
 msgid "Invalid code. Please check and try again."
-msgstr "Kode tidak valid. Silakan periksa dan coba lagi."
+msgstr "Kode tidak valid. Silahkan periksa dan coba lagi."
 
 msgid "Invalid domain"
 msgstr "Domain tidak valid"
@@ -558,13 +558,13 @@ msgid "It looks like you're trying to sign in from a social app. Follow these st
 msgstr "Tampaknya Anda mencoba masuk dari aplikasi sosial. Ikuti langkah-langkah ini untuk melanjutkan:"
 
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Peramban bawaan aplikasi ini tidak didukung."
+msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Browser bawaan aplikasi ini tidak didukung."
 
 msgid "It seems like an invalid authentication request was received."
 msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
-msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
+msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba browser lain; jika masalah berlanjut, hubungi dukungan."
 
 msgid "It seems like the request could not be processed."
 msgstr "Tampaknya permintaan tidak dapat diproses."
@@ -591,7 +591,7 @@ msgid "Last used"
 msgstr "Terakhir digunakan"
 
 msgid "Learn how to open links in your browser"
-msgstr "Pelajari cara membuka tautan di peramban Anda"
+msgstr "Pelajari cara membuka tautan di browser Anda"
 
 msgid "Legacy"
 msgstr "Legacy"
@@ -702,10 +702,10 @@ msgid "Only enter the code from that device if you initiated this process <0>you
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
 
 msgid "Open in browser"
-msgstr "Buka di peramban"
+msgstr "Buka di browser"
 
 msgid "Open in browser to continue"
-msgstr "Buka di peramban untuk melanjutkan"
+msgstr "Buka di browser untuk melanjutkan"
 
 msgid "Open menu"
 msgstr "Buka menu"
@@ -738,10 +738,10 @@ msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your 
 msgstr "Passkey tahan phishing, sulit dicuri, dan dapat disinkronkan di perangkat Anda melalui penyedia seperti Google, Apple, atau Microsoft. <0>Pelajari lebih lanjut.</0>"
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
-msgstr "Passkey tidak tersedia di perangkat atau peramban ini. Silakan pilih metode akses lain untuk melanjutkan."
+msgstr "Passkey tidak tersedia di perangkat atau browser ini. Silahkan pilih metode akses lain untuk melanjutkan."
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue."
-msgstr "Passkey tidak tersedia di perangkat atau peramban ini. Silakan pilih metode masuk lain untuk melanjutkan."
+msgstr "Passkey tidak tersedia di perangkat atau browser ini. Silahkan pilih metode masuk lain untuk melanjutkan."
 
 msgid "Passkeys not available here"
 msgstr "Passkey tidak tersedia di sini"
@@ -756,7 +756,7 @@ msgid "Pick something recognizable, like your name"
 msgstr "Pilih sesuatu yang mudah dikenali, seperti nama Anda"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
-msgstr "Silakan kembali ke <0>perangkat Anda yang ada</0> dan pilih <1>Mulai ulang</1> untuk mencoba lagi."
+msgstr "Silahkan kembali ke <0>perangkat Anda yang ada</0> dan pilih <1>Mulai ulang</1> untuk mencoba lagi."
 
 msgid "Powered by"
 msgstr "Didukung oleh"
@@ -795,7 +795,7 @@ msgid "Remove from this device"
 msgstr "Hapus dari perangkat ini"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr "Hapus identitas yang tidak Anda gunakan. Anda dapat menambahkannya kembali kapan saja dengan masuk lagi."
+msgstr "Hapus akun yang tidak Anda gunakan. Anda dapat menambahkannya kembali kapan saja dengan masuk kembali."
 
 msgid "Remove passkey"
 msgstr "Hapus passkey"
@@ -921,7 +921,7 @@ msgid "Sign out"
 msgstr "Keluar"
 
 msgid "Sign out and keep identity"
-msgstr "Keluar dan simpan identitas"
+msgstr "Keluar dan pertahankan identitas"
 
 msgid "Sign out and remove from device"
 msgstr "Keluar dan hapus dari perangkat"
@@ -939,7 +939,7 @@ msgid "Sign-up"
 msgstr "Pendaftaran"
 
 msgid "Signed in"
-msgstr "Sudah masuk"
+msgstr "Masuk"
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
@@ -1015,7 +1015,7 @@ msgid "Switch identity"
 msgstr "Ganti identitas"
 
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
-msgstr "Ketuk pada <0>bilah alamat</0> dan <1>buka di peramban</1>."
+msgstr "Ketuk pada <0>bilah alamat</0> dan <1>buka di browser</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Ketuk pada tombol <0>kembali</0> yang disorot."
@@ -1042,7 +1042,7 @@ msgid "The phrase was entered correctly but belongs to a product other than Inte
 msgstr "Frasa dimasukkan dengan benar tetapi milik produk selain Internet Identity."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
-msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika masalah berlanjut, hubungi pengembang."
+msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba browser lain; jika masalah berlanjut, hubungi pengembang."
 
 msgid "This app has moved to the new Internet Identity"
 msgstr "Aplikasi ini telah pindah ke Internet Identity baru"
@@ -1105,7 +1105,7 @@ msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
 
 msgid "Undo"
-msgstr "Urungkan"
+msgstr "Batal"
 
 msgid "Unknown"
 msgstr "Tidak diketahui"
@@ -1132,7 +1132,7 @@ msgid "Unsupported browser"
 msgstr "Peramban tidak didukung"
 
 msgid "Unsupported Browser"
-msgstr "Peramban Tidak Didukung"
+msgstr "Browser Tidak Didukung"
 
 msgid "Unverified origin"
 msgstr "Asal tidak terverifikasi"
@@ -1165,16 +1165,16 @@ msgid "Use existing identity"
 msgstr "Gunakan identitas yang ada"
 
 msgid "Verify"
-msgstr "Verifikasi"
+msgstr "Memverifikasi"
 
 msgid "Verify recovery to remove"
-msgstr "Verifikasi pemulihan untuk menghapus"
+msgstr "Memverifikasi pemulihan untuk menghapus"
 
 msgid "Verify you are human"
-msgstr "Verifikasi bahwa Anda manusia"
+msgstr "Memverifikasi bahwa Anda manusia"
 
 msgid "Verify your recovery phrase"
-msgstr "Verifikasi frasa pemulihan Anda"
+msgstr "Memverifikasi frasa pemulihan Anda"
 
 msgid "Verifying..."
 msgstr "Memverifikasi..."
@@ -1231,7 +1231,7 @@ msgid "Write down your recovery phrase in order and verify it afterwards. Store 
 msgstr "Catat frasa pemulihan Anda sesuai urutan dan verifikasi setelahnya. Simpan dengan aman dan jangan bagikan. Jika hilang, Anda akan kehilangan akses."
 
 msgid "Wrong domain was set. Please try again."
-msgstr "Domain yang salah diatur. Silakan coba lagi."
+msgstr "Domain yang salah diatur. Silahkan coba lagi."
 
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Anda <0>tidak dapat</0> mengubah nama ini setelah diatur."
@@ -1252,7 +1252,7 @@ msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "Anda dapat keluar dan menyimpan identitas Anda untuk login lebih cepat di lain waktu, atau menghapusnya sepenuhnya dari perangkat ini."
+msgstr "Anda dapat keluar dan menyimpan identitas Anda untuk masuk lebih cepat di lain waktu, atau menghapusnya sepenuhnya dari perangkat ini."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Anda dapat memulihkan identitas Anda sekarang, verifikasi bahwa Anda menyimpannya dengan benar."
