@@ -163,11 +163,24 @@ pub(crate) fn auid_aligns(i: &str, d: &str, strict: bool) -> bool {
 //
 // Return shape:
 //   Ok(trail)             — every check passed; trail has one
-//                            `DkimCheck::Pass` entry per check that ran.
+//                            `DkimCheck::Pass` entry per check that
+//                            participates in the diagnostic trail.
+//                            Not every check does: `t=y` testing-mode
+//                            in `enforce_dns_record_tag_contract` is a
+//                            meta-flag on the DNS record (RFC 6376
+//                            §3.6.1), not a pass/fail-able step, and
+//                            there is no corresponding `DkimCheckName`
+//                            variant — it never emits a trail entry.
+//                            All other checks emit a Pass entry on
+//                            success.
 //   Err((reason, trail))  — `reason` is the first-failing
-//                            `VerificationFailReason`; trail has the
-//                            `Pass` entries from earlier checks plus
-//                            the `Fail` entry of the one that broke.
+//                            `VerificationFailReason`. The trail
+//                            carries the `Pass` entries from earlier
+//                            checks; the failing step itself appends
+//                            its `Fail` entry iff that step normally
+//                            participates in the trail. (`t=y` is the
+//                            only exception: on rejection it returns
+//                            with the trail unchanged.)
 // Symmetric with [`super::verify::try_verify_signature`]; the DoH
 // pipeline appends the trail to its accumulator, the DNSSEC pipeline
 // discards.
@@ -267,9 +280,10 @@ pub(crate) fn enforce_dns_record_tag_contract(
     if let Err(reason) = check_dns_not_testing(dns) {
         // No `DkimCheckName` variant for testing mode — RFC 6376
         // §3.6.1 treats `t=y` as a meta-flag on the record, not a
-        // pass/fail-able step. The trail records the `Fail` against
-        // the `DnsRecordParsed` step's downstream effect via the
-        // surfaced `VerificationFailReason::TestingMode`.
+        // pass/fail-able step. Return without appending a trail entry:
+        // the surfaced `VerificationFailReason::TestingMode` is the
+        // sole signal upstream. (See the "Return shape" note above
+        // for the documented exception.)
         return Err((reason, trail));
     }
 

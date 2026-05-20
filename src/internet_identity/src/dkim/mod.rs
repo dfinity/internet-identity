@@ -65,8 +65,7 @@ pub(crate) use signature::{body_hash_sha256, verify_signature, VerifyOutcome};
 pub(crate) use tag_checks::{
     // The two umbrellas (`enforce_*_tag_contract`) are the facade
     // both verification pipelines call into; the individual
-    // `check_*` helpers remain reachable for fine-grained unit tests
-    // and the property-based parity tests in `tag_checks::proptest`.
+    // `check_*` helpers remain reachable for fine-grained unit tests.
     check_auid_aligned,
     check_dns_not_testing,
     check_signature_not_expired,

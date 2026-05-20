@@ -505,6 +505,7 @@ fn verify_ed25519_prehashed(
 // Tests for the DNS-record tag contract live alongside the umbrella
 // in `crate::dkim::tag_checks::tests`. The DNSSEC submit-side mapping
 // of `(VerificationFailReason, _) → EmailRecoveryError::
-// EmailVerificationFailed` is a trivial one-liner that the existing
-// `email_recovery::smtp::tests::doh_and_dnssec_paths_reject_*`
-// regression guards already exercise end-to-end.
+// EmailVerificationFailed` is a trivial one-liner; the DNSSEC-prepare
+// half of the same pattern (the `?` mapping inside
+// `prepare_partial_verification`) is exercised end-to-end by
+// `email_recovery::smtp::tests::dnssec_prepare_rejects_*`.
