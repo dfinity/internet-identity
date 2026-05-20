@@ -328,7 +328,7 @@ test.describe("Access methods", () => {
     });
 
     test("when removing a passkey", async ({ manageAccessPage }) => {
-      // Rename current
+      // Rename current so we can identify it after adding a second passkey
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
         .rename(async (dialog) => {
@@ -336,17 +336,24 @@ test.describe("Access methods", () => {
           await dialog.submit();
         });
 
-      // Add another, since we cannot remove a single passkey
+      // Add another passkey — the active method cannot be removed, so we
+      // cancel removal on the non-active one instead
       await manageAccessPage.add((dialog) => dialog.passkey());
-
-      // Then remove the current passkey, but cancel instead of confirm
-      await manageAccessPage
-        .findPasskey("in-use-passkey")
-        .remove((dialog) => dialog.cancel());
-
-      // Cleanup additional passkey and undo renaming of current
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
+        .rename(async (dialog) => {
+          await dialog.fill("additional-passkey");
+          await dialog.submit();
+        });
+
+      // Cancel removal of the non-active passkey
+      await manageAccessPage
+        .findPasskey("additional-passkey")
+        .remove((dialog) => dialog.cancel());
+
+      // Cleanup: remove the additional passkey and restore the original name
+      await manageAccessPage
+        .findPasskey("additional-passkey")
         .remove((dialog) => dialog.confirm());
       await manageAccessPage
         .findPasskey("in-use-passkey")
