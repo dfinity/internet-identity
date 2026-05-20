@@ -7,6 +7,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
+  import Badge from "$lib/components/ui/Badge.svelte";
 
   interface Props {
     openid: OpenIdCredential;
@@ -47,7 +48,7 @@
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">
-  <div class="text-fg-primary relative size-6">
+  <div class="text-fg-primary size-6">
     {#if isSso || logo === undefined}
       <!--
         SSO credentials render the generic SSO icon. We also fall back
@@ -61,12 +62,12 @@
       <!-- eslint-disable-next-line svelte/no-at-html-tags -- logo is a trusted SVG string sourced from the backend canister's openid_configs -->
       {@html logo}
     {/if}
-    {#if isCurrentAccessMethod}
-      <div
-        class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
-      ></div>
-    {/if}
   </div>
+  {#if isCurrentAccessMethod}
+    <Badge color="success" size="sm" dot class="ms-2 flex-none"
+      >{$t`Active`}</Badge
+    >
+  {/if}
   {#if options.length > 0}
     <Select {options} align="end">
       <button

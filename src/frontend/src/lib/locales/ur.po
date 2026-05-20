@@ -97,6 +97,9 @@ msgstr "رسائی کے طریقے"
 msgid "Account name"
 msgstr "اکاؤنٹ کا نام"
 
+msgid "Active"
+msgstr "فعال"
+
 msgid "Activate"
 msgstr "فعال کریں"
 

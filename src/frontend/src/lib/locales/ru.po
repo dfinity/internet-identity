@@ -97,6 +97,9 @@ msgstr "Способы доступа"
 msgid "Account name"
 msgstr "Имя аккаунта"
 
+msgid "Active"
+msgstr "Активный"
+
 msgid "Activate"
 msgstr "Активировать"
 
