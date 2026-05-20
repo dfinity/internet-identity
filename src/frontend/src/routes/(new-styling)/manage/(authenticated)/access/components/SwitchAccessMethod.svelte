@@ -40,8 +40,7 @@
     >
       <p>
         <Trans>
-          You are about to re-authenticate yourself with another access method
-          on this device.
+          You are about to re-authenticate yourself with another access method.
         </Trans>
       </p>
       <p>
