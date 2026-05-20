@@ -12,6 +12,7 @@ import type {
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { toHex } from "$lib/utils/utils";
+import { Principal } from "@icp-sdk/core/principal";
 
 const makePasskey = (id: number, lastAuth?: bigint): AuthnMethodData => ({
   authn_method: {
@@ -128,11 +129,11 @@ describe("toKey", () => {
     expect(toKey(accessMethod)).toBe(expected);
   });
 
-  it("creates key for openid using iss + sub", () => {
+  it("creates key for openid as JSON-encoded (iss, sub, aud) triple", () => {
     const accessMethod: AccessMethod = {
       openid: makeOpenId("issuer", "subject"),
     };
-    expect(toKey(accessMethod)).toBe("issuersubject");
+    expect(toKey(accessMethod)).toBe(JSON.stringify(["issuer", "subject", ""]));
   });
 
   it("throws on unknown type", () => {
@@ -181,5 +182,29 @@ describe("isCurrentAccessMethod", () => {
     };
     const accessMethod: AccessMethod = { passkey: makePasskey(1) };
     expect(isCurrentAccessMethod(authenticated, accessMethod)).toBe(false);
+  });
+
+  it("returns false when signed in with recovery phrase", () => {
+    const authenticated = {
+      authMethod: { recoveryPhrase: { principal: Principal.anonymous() } },
+    };
+    expect(
+      isCurrentAccessMethod(authenticated, { passkey: makePasskey(1) }),
+    ).toBe(false);
+    expect(
+      isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") }),
+    ).toBe(false);
+  });
+
+  it("returns false when signed in with email recovery", () => {
+    const authenticated = {
+      authMethod: { emailRecovery: { principal: Principal.anonymous() } },
+    };
+    expect(
+      isCurrentAccessMethod(authenticated, { passkey: makePasskey(1) }),
+    ).toBe(false);
+    expect(
+      isCurrentAccessMethod(authenticated, { openid: makeOpenId("i", "s") }),
+    ).toBe(false);
   });
 });

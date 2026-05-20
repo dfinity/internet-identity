@@ -1,6 +1,10 @@
 <script lang="ts">
   import { getMetadataString, openIdLogo, openIdName } from "$lib/utils/openID";
-  import { EllipsisVerticalIcon, Link2OffIcon } from "@lucide/svelte";
+  import {
+    ArrowLeftRightIcon,
+    EllipsisVerticalIcon,
+    Link2OffIcon,
+  } from "@lucide/svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
@@ -12,10 +16,20 @@
   interface Props {
     openid: OpenIdCredential;
     onUnlink?: () => void;
+    onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastAccessMethod?: boolean;
+    isSignedInWithRecovery?: boolean;
   }
 
-  const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
+  const {
+    openid,
+    onUnlink,
+    onSwitch,
+    isCurrentAccessMethod = false,
+    isLastAccessMethod = false,
+    isSignedInWithRecovery = false,
+  }: Props = $props();
 
   // `sso_domain` / `sso_name` are populated by the canister at response
   // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
@@ -34,17 +48,37 @@
     openIdLogo(openid.iss, openid.aud, openid.metadata, ssoDomain),
   );
   const displayName = $derived(name ?? $t`SSO`);
-  const options = $derived(
-    onUnlink !== undefined
+  const options = $derived([
+    ...(onSwitch !== undefined
+      ? [
+          {
+            label: $t`Switch`,
+            icon: ArrowLeftRightIcon,
+            disabled: isCurrentAccessMethod,
+            tooltip: isCurrentAccessMethod ? $t`Already signed-in` : undefined,
+            onClick: onSwitch,
+          },
+        ]
+      : []),
+    ...(onUnlink !== undefined
       ? [
           {
             label: $t`Unlink`,
             icon: Link2OffIcon,
+            disabled:
+              (isCurrentAccessMethod && !isLastAccessMethod) ||
+              (isLastAccessMethod && !isSignedInWithRecovery),
+            tooltip:
+              isCurrentAccessMethod && !isLastAccessMethod
+                ? $t`Switch to another method before unlinking`
+                : isLastAccessMethod && !isSignedInWithRecovery
+                  ? $t`Add another method or sign in via recovery to unlink`
+                  : undefined,
             onClick: onUnlink,
           },
         ]
-      : [],
-  );
+      : []),
+  ]);
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">

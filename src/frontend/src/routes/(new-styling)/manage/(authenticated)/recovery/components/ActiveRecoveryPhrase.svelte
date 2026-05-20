@@ -6,6 +6,7 @@
   import { nanosToMillis } from "$lib/utils/time";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
+  import Badge from "$lib/components/ui/Badge.svelte";
 
   type Props = {
     recoveryPhrase: AuthnMethodData;
@@ -34,12 +35,12 @@
   ]}
 >
   <div class="mb-3 flex h-9 flex-row items-center">
-    <div class="relative">
+    <div class="mb-3 flex h-9 flex-row items-center">
       <ShieldCheckIcon class="text-fg-success-primary size-6" />
       {#if isCurrentAccessMethod}
-        <div
-          class="bg-bg-success-secondary border-bg-primary absolute top-0 -right-0.25 size-2.5 rounded-full border-2"
-        ></div>
+        <Badge color="success" size="sm" dot class="ms-2 flex-none"
+          >{$t`Active`}</Badge
+        >
       {/if}
     </div>
     <button
