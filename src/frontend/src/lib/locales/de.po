@@ -88,14 +88,17 @@ msgstr "Eine Möglichkeit, den Zugang zu Ihrer Identität wiederzuerlangen, fall
 msgid "About"
 msgstr "Info"
 
-msgid "Access and recovery"
-msgstr "Zugriff und Wiederherstellung"
+msgid "Access"
+msgstr ""
 
 msgid "Access methods"
 msgstr "Zugriffsmethoden"
 
 msgid "Account name"
 msgstr "Kontoname"
+
+msgid "Active"
+msgstr "Aktiv"
 
 msgid "Activate"
 msgstr "Aktivieren"
@@ -769,6 +772,9 @@ msgstr "Wiederherstellen"
 
 msgid "Recover your identity"
 msgstr "Stellen Sie Ihre Identität wieder her"
+
+msgid "Recovery"
+msgstr ""
 
 msgid "Recovery phrase"
 msgstr "Wiederherstellungsphrase"

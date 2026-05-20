@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "@lucide/svelte";
+  import {
+    ArrowLeftRightIcon,
+    EllipsisVerticalIcon,
+    PencilIcon,
+    Trash2Icon,
+  } from "@lucide/svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -11,13 +16,17 @@
   import type { Provider } from "$lib/assets/aaguid";
   import { getMetadataString } from "$lib/utils/openID";
   import { getPrimaryOrigin } from "$lib/globals";
+  import Badge from "$lib/components/ui/Badge.svelte";
 
   interface Props {
     passkey: AuthnMethodData;
     recoveryPhraseStatus: "missing" | "unverified" | "verified";
     onRename?: () => void;
     onRemove?: () => void;
+    onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastAccessMethod?: boolean;
+    isSignedInWithRecovery?: boolean;
   }
 
   const {
@@ -25,7 +34,10 @@
     recoveryPhraseStatus,
     onRename,
     onRemove,
-    isCurrentAccessMethod,
+    onSwitch,
+    isCurrentAccessMethod = false,
+    isLastAccessMethod = false,
+    isSignedInWithRecovery = false,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
@@ -68,18 +80,36 @@
           },
         ]
       : []),
+    ...(onSwitch !== undefined
+      ? [
+          {
+            label: $t`Switch`,
+            icon: ArrowLeftRightIcon,
+            disabled: isCurrentAccessMethod,
+            tooltip: isCurrentAccessMethod ? $t`Already signed-in` : undefined,
+            onClick: onSwitch,
+          },
+        ]
+      : []),
     ...(onRemove !== undefined
       ? [
           {
             label: $t`Remove`,
             icon: Trash2Icon,
-            disabled: isLegacy && recoveryPhraseStatus !== "verified",
+            disabled:
+              (isCurrentAccessMethod && !isLastAccessMethod) ||
+              (isLastAccessMethod && !isSignedInWithRecovery) ||
+              (isLegacy && recoveryPhraseStatus !== "verified"),
             tooltip:
-              isLegacy && recoveryPhraseStatus !== "verified"
-                ? recoveryPhraseStatus === "unverified"
-                  ? $t`Verify recovery to remove`
-                  : $t`Activate recovery to remove`
-                : undefined,
+              isCurrentAccessMethod && !isLastAccessMethod
+                ? $t`Switch to another method before removing`
+                : isLastAccessMethod && !isSignedInWithRecovery
+                  ? $t`Add another method or sign in via recovery to remove`
+                  : isLegacy && recoveryPhraseStatus !== "verified"
+                    ? recoveryPhraseStatus === "unverified"
+                      ? $t`Verify recovery to remove`
+                      : $t`Activate recovery to remove`
+                    : undefined,
             onClick: onRemove,
           },
         ]
@@ -95,14 +125,12 @@
 
 <div>
   <div class="mb-3 flex h-9 flex-row items-center">
-    <div class="relative">
-      <PasskeyIcon class="text-fg-primary size-6" />
-      {#if isCurrentAccessMethod}
-        <div
-          class="bg-bg-success-secondary border-bg-primary absolute top-0 -right-0.25 size-2.5 rounded-full border-2"
-        ></div>
-      {/if}
-    </div>
+    <PasskeyIcon class="text-fg-primary size-6" />
+    {#if isCurrentAccessMethod}
+      <Badge color="success" size="sm" dot class="ms-2 flex-none"
+        >{$t`Active`}</Badge
+      >
+    {/if}
     {#if isLegacy}
       <div
         class={[

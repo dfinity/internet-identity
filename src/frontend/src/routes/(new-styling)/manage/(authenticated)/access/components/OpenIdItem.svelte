@@ -1,20 +1,35 @@
 <script lang="ts">
   import { getMetadataString, openIdLogo, openIdName } from "$lib/utils/openID";
-  import { EllipsisVerticalIcon, Link2OffIcon } from "@lucide/svelte";
+  import {
+    ArrowLeftRightIcon,
+    EllipsisVerticalIcon,
+    Link2OffIcon,
+  } from "@lucide/svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
+  import Badge from "$lib/components/ui/Badge.svelte";
 
   interface Props {
     openid: OpenIdCredential;
     onUnlink?: () => void;
+    onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastAccessMethod?: boolean;
+    isSignedInWithRecovery?: boolean;
   }
 
-  const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
+  const {
+    openid,
+    onUnlink,
+    onSwitch,
+    isCurrentAccessMethod = false,
+    isLastAccessMethod = false,
+    isSignedInWithRecovery = false,
+  }: Props = $props();
 
   // `sso_domain` / `sso_name` are populated by the canister at response
   // time via `openid::generic::sso_fields_for(iss, aud)`. Candid `opt
@@ -33,21 +48,41 @@
     openIdLogo(openid.iss, openid.aud, openid.metadata, ssoDomain),
   );
   const displayName = $derived(name ?? $t`SSO`);
-  const options = $derived(
-    onUnlink !== undefined
+  const options = $derived([
+    ...(onSwitch !== undefined
+      ? [
+          {
+            label: $t`Switch`,
+            icon: ArrowLeftRightIcon,
+            disabled: isCurrentAccessMethod,
+            tooltip: isCurrentAccessMethod ? $t`Already signed-in` : undefined,
+            onClick: onSwitch,
+          },
+        ]
+      : []),
+    ...(onUnlink !== undefined
       ? [
           {
             label: $t`Unlink`,
             icon: Link2OffIcon,
+            disabled:
+              (isCurrentAccessMethod && !isLastAccessMethod) ||
+              (isLastAccessMethod && !isSignedInWithRecovery),
+            tooltip:
+              isCurrentAccessMethod && !isLastAccessMethod
+                ? $t`Switch to another method before unlinking`
+                : isLastAccessMethod && !isSignedInWithRecovery
+                  ? $t`Add another method or sign in via recovery to unlink`
+                  : undefined,
             onClick: onUnlink,
           },
         ]
-      : [],
-  );
+      : []),
+  ]);
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">
-  <div class="text-fg-primary relative size-6">
+  <div class="text-fg-primary size-6">
     {#if isSso || logo === undefined}
       <!--
         SSO credentials render the generic SSO icon. We also fall back
@@ -61,12 +96,12 @@
       <!-- eslint-disable-next-line svelte/no-at-html-tags -- logo is a trusted SVG string sourced from the backend canister's openid_configs -->
       {@html logo}
     {/if}
-    {#if isCurrentAccessMethod}
-      <div
-        class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
-      ></div>
-    {/if}
   </div>
+  {#if isCurrentAccessMethod}
+    <Badge color="success" size="sm" dot class="ms-2 flex-none"
+      >{$t`Active`}</Badge
+    >
+  {/if}
   {#if options.length > 0}
     <Select {options} align="end">
       <button

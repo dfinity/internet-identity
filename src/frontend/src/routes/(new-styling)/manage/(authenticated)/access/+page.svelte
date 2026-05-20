@@ -9,14 +9,26 @@
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
   import RenamePasskey from "./components/RenamePasskey.svelte";
-  import RemovePasskey from "./components/RemovePasskey.svelte";
-  import RemoveOpenIdCredential from "./components/RemoveOpenIdCredential.svelte";
+  import RemoveAccessMethod from "./components/RemoveAccessMethod.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { throwCanisterError } from "$lib/utils/utils";
   import { authnMethodToPublicKey } from "$lib/utils/webAuthn";
   import { nanosToMillis } from "$lib/utils/time";
   import { goto, invalidateAll } from "$app/navigation";
+  import { canisterId } from "$lib/globals";
+  import { authenticationStore } from "$lib/stores/authentication.store";
+  import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
+  import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
+  import {
+    decodeJWT,
+    findConfig,
+    requestJWT,
+    requestWithPopup,
+    selectAuthScopes,
+  } from "$lib/utils/openID";
+  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import { get } from "svelte/store";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
@@ -24,6 +36,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import OpenIdItem from "./components/OpenIdItem.svelte";
   import PasskeyItem from "./components/PasskeyItem.svelte";
+  import SwitchAccessMethod from "./components/SwitchAccessMethod.svelte";
   import {
     compareAccessMethods,
     toAccessMethods,
@@ -43,6 +56,7 @@
   let isAddingAccessMethod = $state(false);
   let renamingAccessMethodKey = $state<string>();
   let removingAccessMethodKey = $state<string>();
+  let switchingAccessMethodKey = $state<string>();
   let accessMethods = $derived(toAccessMethods(data.identityInfo));
   let pendingRegistrationId = $state(data.pendingRegistrationId);
 
@@ -52,6 +66,13 @@
   );
   const removingAccessMethod = $derived(
     accessMethods.find((m) => removingAccessMethodKey === toKey(m)),
+  );
+  const switchingAccessMethod = $derived(
+    accessMethods.find((m) => switchingAccessMethodKey === toKey(m)),
+  );
+  const isSignedInWithRecovery = $derived(
+    "recoveryPhrase" in $authenticatedStore.authMethod ||
+      "emailRecovery" in $authenticatedStore.authMethod,
   );
   const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
@@ -169,6 +190,134 @@
       handleError(error);
     }
   };
+  const handleSwitchConfirmed = async () => {
+    if (switchingAccessMethod === undefined) return;
+    const session = get(sessionStore);
+    const createdAtMillis =
+      data.identityInfo.created_at[0] !== undefined
+        ? nanosToMillis(data.identityInfo.created_at[0])
+        : undefined;
+    try {
+      if (
+        "passkey" in switchingAccessMethod &&
+        "WebAuthn" in switchingAccessMethod.passkey.authn_method
+      ) {
+        const credentialId = new Uint8Array(
+          switchingAccessMethod.passkey.authn_method.WebAuthn.credential_id,
+        );
+        const {
+          identity,
+          identityNumber,
+          credentialId: authedId,
+        } = await authenticateWithPasskey({
+          canisterId,
+          session,
+          credentialIds: [credentialId],
+        });
+        // Guard against the assertion resolving to a different anchor (e.g.
+        // shared authenticator). We're only switching the active method for
+        // *this* identity — anything else is a programming error or attack.
+        if (identityNumber !== data.identityNumber) {
+          throw new Error(
+            "Authenticated identity does not match the identity being managed.",
+          );
+        }
+        await authenticationStore.set({
+          identity,
+          identityNumber,
+          authMethod: { passkey: { credentialId: authedId } },
+        });
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: data.identityInfo.name[0],
+          createdAtMillis,
+          authMethod: { passkey: { credentialId: authedId } },
+        });
+      } else if ("openid" in switchingAccessMethod) {
+        const { iss, aud, metadata, sso_domain } = switchingAccessMethod.openid;
+        const ssoDomain = sso_domain[0];
+        // Re-use the loginHint we stored the last time this identity signed in
+        // via an OpenID/SSO method — most providers honor it and skip the
+        // account picker. Authoritative source is the lastUsedIdentitiesStore
+        // (populated from `decodeJWT(...).loginHint` on each sign-in).
+        const lastUsed = get(lastUsedIdentitiesStore).identities[
+          data.identityNumber.toString()
+        ];
+        const lastUsedAuthMethod = lastUsed?.authMethod;
+        const loginHint =
+          lastUsedAuthMethod !== undefined && "openid" in lastUsedAuthMethod
+            ? lastUsedAuthMethod.openid.loginHint
+            : lastUsedAuthMethod !== undefined && "sso" in lastUsedAuthMethod
+              ? lastUsedAuthMethod.sso.loginHint
+              : undefined;
+        let jwt: string;
+        if (ssoDomain !== undefined) {
+          jwt = await requestWithPopup(
+            discoverSsoConfig(ssoDomain).then((ssoResult) => ({
+              clientId: ssoResult.clientId,
+              authURL: ssoResult.discovery.authorization_endpoint,
+              authScope: selectAuthScopes(
+                ssoResult.discovery.scopes_supported,
+              ).join(" "),
+            })),
+            { nonce: session.nonce, mediation: "optional", loginHint },
+          );
+        } else {
+          const config = findConfig(iss, aud, metadata);
+          if (config === undefined)
+            throw new Error(
+              "OpenID authentication is not available for this account.",
+            );
+          jwt = await requestJWT(
+            {
+              clientId: config.client_id,
+              configURL: config.fedcm_uri[0],
+              authURL: config.auth_uri,
+              authScope: config.auth_scope.join(" "),
+            },
+            { nonce: session.nonce, mediation: "optional", loginHint },
+          );
+        }
+        const { iss: jwtIss, sub, loginHint: jwtLoginHint } = decodeJWT(jwt);
+        const { identity, identityNumber } = await authenticateWithJWT({
+          canisterId,
+          session,
+          jwt,
+        });
+        // The OAuth popup lets the user pick any account — if they choose one
+        // linked to a different anchor, the JWT authenticates to that anchor.
+        // Refuse the switch so we don't leak the wrong identity into the
+        // last-used store or the active session.
+        if (identityNumber !== data.identityNumber) {
+          throw new Error(
+            "Authenticated identity does not match the identity being managed.",
+          );
+        }
+        await authenticationStore.set({
+          identity,
+          identityNumber,
+          authMethod: { openid: { iss: jwtIss, sub } },
+        });
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: data.identityInfo.name[0],
+          createdAtMillis,
+          authMethod: {
+            openid: { iss: jwtIss, sub, loginHint: jwtLoginHint, metadata },
+          },
+        });
+      }
+      switchingAccessMethodKey = undefined;
+      toaster.success({
+        title: $t`Successfully switched access method`,
+        description: $t`This is now the default method used to authenticate moving forward on this device.`,
+      });
+      void invalidateAll();
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
   const handleRemoveConfirmed = async () => {
     if (removingAccessMethod === undefined) {
       return;
@@ -250,25 +399,27 @@
             <PasskeyItem
               passkey={accessMethod.passkey}
               onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
-              onRemove={accessMethods.length > 1
-                ? () => (removingAccessMethodKey = toKey(accessMethod))
-                : undefined}
+              onRemove={() => (removingAccessMethodKey = toKey(accessMethod))}
+              onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
               )}
+              isLastAccessMethod={accessMethods.length === 1}
+              {isSignedInWithRecovery}
               {recoveryPhraseStatus}
             />
           {:else if "openid" in accessMethod}
             <OpenIdItem
               openid={accessMethod.openid}
-              onUnlink={accessMethods.length > 1
-                ? () => (removingAccessMethodKey = toKey(accessMethod))
-                : undefined}
+              onUnlink={() => (removingAccessMethodKey = toKey(accessMethod))}
+              onSwitch={() => (switchingAccessMethodKey = toKey(accessMethod))}
               isCurrentAccessMethod={isCurrentAccessMethod(
                 $authenticatedStore,
                 accessMethod,
               )}
+              isLastAccessMethod={accessMethods.length === 1}
+              {isSignedInWithRecovery}
             />
           {/if}
         </li>
@@ -307,18 +458,9 @@
 
 {#if removingAccessMethod !== undefined}
   <Dialog onClose={() => (removingAccessMethodKey = undefined)}>
-    {#if "passkey" in removingAccessMethod}
-      <RemovePasskey
-        onRemove={handleRemoveConfirmed}
-        onCancel={() => (removingAccessMethodKey = undefined)}
-        isCurrentAccessMethod={isCurrentAccessMethod(
-          $authenticatedStore,
-          removingAccessMethod,
-        )}
-      />
-    {/if}
     {#if "openid" in removingAccessMethod}
-      <RemoveOpenIdCredential
+      <RemoveAccessMethod
+        type="openid"
         onRemove={handleRemoveConfirmed}
         onCancel={() => (removingAccessMethodKey = undefined)}
         providerName={openIdName(
@@ -332,8 +474,29 @@
           $authenticatedStore,
           removingAccessMethod,
         )}
+        isLastAccessMethod={accessMethods.length === 1}
+      />
+    {:else}
+      <RemoveAccessMethod
+        type="passkey"
+        onRemove={handleRemoveConfirmed}
+        onCancel={() => (removingAccessMethodKey = undefined)}
+        isCurrentAccessMethod={isCurrentAccessMethod(
+          $authenticatedStore,
+          removingAccessMethod,
+        )}
+        isLastAccessMethod={accessMethods.length === 1}
       />
     {/if}
+  </Dialog>
+{/if}
+
+{#if switchingAccessMethod !== undefined}
+  <Dialog onClose={() => (switchingAccessMethodKey = undefined)}>
+    <SwitchAccessMethod
+      onSwitch={handleSwitchConfirmed}
+      onCancel={() => (switchingAccessMethodKey = undefined)}
+    />
   </Dialog>
 {/if}
 

@@ -145,6 +145,10 @@ struct Snapshot {
     headers_digest: [u8; 32],
     signature: Vec<u8>,
     signing_domain: String,
+    /// Parsed `i=` (AUID) from the email's DKIM-Signature header.
+    /// Needed at submit time to check `i=` alignment with `d=` once
+    /// the DKIM record's `t=s` flag is known. See design §5.4.
+    signing_auid: String,
     algorithm: crate::dkim::Algorithm,
     from_address_lc: String,
 }
@@ -199,6 +203,7 @@ impl Snapshot {
             headers_digest: partial.headers_digest,
             signature: partial.signature.clone(),
             signing_domain: partial.signing_domain.clone(),
+            signing_auid: partial.signing_auid.clone(),
             algorithm: partial.algorithm,
             from_address_lc: partial.from_address_lc.clone(),
         })
@@ -286,6 +291,22 @@ fn run_submit(
     let dns_record = crate::dkim::parse_dkim_txt(txt_str).map_err(|e| {
         EmailRecoveryError::EmailVerificationFailed(format!("DKIM DNS record: {e}"))
     })?;
+
+    // DNS-record-dependent DKIM tag contract (design §5.4). Routes
+    // through the same shared umbrella the DoH path calls so the
+    // `t=y` and AUID-alignment policies stay in lock-step across
+    // pipelines. The trail the umbrella builds is the DoH-side
+    // diagnostic; we discard it here because the DNSSEC path
+    // collapses every failure into a single `EmailRecoveryError`.
+    if let Err((reason, _trail)) = crate::dkim::enforce_dns_record_tag_contract(
+        &snapshot.signing_auid,
+        &snapshot.signing_domain,
+        &dns_record,
+    ) {
+        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            "{reason:?}"
+        )));
+    }
 
     // Step 5: complete the cryptographic signature check.
     //
@@ -481,3 +502,10 @@ fn verify_ed25519_prehashed(
     }
 }
 
+// Tests for the DNS-record tag contract live alongside the umbrella
+// in `crate::dkim::tag_checks::tests`. The DNSSEC submit-side mapping
+// of `(VerificationFailReason, _) → EmailRecoveryError::
+// EmailVerificationFailed` is a trivial one-liner; the DNSSEC-prepare
+// half of the same pattern (the `?` mapping inside
+// `prepare_partial_verification`) is exercised end-to-end by
+// `email_recovery::smtp::tests::dnssec_prepare_rejects_*`.

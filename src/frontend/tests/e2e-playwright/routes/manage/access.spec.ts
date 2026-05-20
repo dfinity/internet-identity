@@ -111,44 +111,37 @@ test.describe("Access methods", () => {
       await manageAccessPage.assertPasskeyExists("in-use-passkey");
     });
 
-    test("which is currently in use", async ({
-      page,
+    test("currently in use passkey is disabled when other methods exist", async ({
       manageAccessPage,
-      identities,
-      signInWithIdentity,
-      setCredentialsForIdentity,
     }) => {
-      // Remove currently in use passkey
       await manageAccessPage.assertPasskeyCount(2);
       await manageAccessPage
         .findPasskey("in-use-passkey")
-        .remove(async (dialog) => {
-          await dialog.assertSignOutWarningShown();
-          await dialog.confirm();
-        });
-
-      await page.waitForURL(II_URL); // Expect to be signed out
-      await manageAccessPage.goto(); // Go back to the manage page
-
-      // Remove the credential corresponding to the removed passkey
-      await setCredentialsForIdentity(
-        identities[0].identityNumber,
-        identities[0].credentials.slice(1),
-      );
-
-      // Sign in with the new passkey and assert it's the only passkey
-      await signInWithIdentity(page, identities[0].identityNumber);
-      await manageAccessPage.assertPasskeyCount(1);
-      await manageAccessPage.assertPasskeyExists("additional-passkey");
+        .assertRemoveDisabledWithTooltip(
+          "Switch to another method before removing",
+        );
     });
   });
 
-  test("cannot remove a single passkey", async ({ manageAccessPage }) => {
+  test("cannot remove a single passkey without a recovery method", async ({
+    manageAccessPage,
+  }) => {
     await manageAccessPage.assertPasskeyCount(1);
     await manageAccessPage
       .findPasskey(DEFAULT_PASSKEY_NAME)
-      .assertUnremovable();
+      .assertRemoveDisabledWithTooltip(
+        "Add another method or sign in via recovery to remove",
+      );
     await manageAccessPage.assertPasskeyCount(1);
+  });
+
+  test("switch is disabled when already signed in with that passkey", async ({
+    manageAccessPage,
+  }) => {
+    await manageAccessPage.assertPasskeyCount(1);
+    await manageAccessPage
+      .findPasskey(DEFAULT_PASSKEY_NAME)
+      .assertSwitchDisabled();
   });
 
   test("cannot have more than 16 passkeys", async ({
@@ -335,7 +328,7 @@ test.describe("Access methods", () => {
     });
 
     test("when removing a passkey", async ({ manageAccessPage }) => {
-      // Rename current
+      // Rename current so we can identify it after adding a second passkey
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
         .rename(async (dialog) => {
@@ -343,17 +336,24 @@ test.describe("Access methods", () => {
           await dialog.submit();
         });
 
-      // Add another, since we cannot remove a single passkey
+      // Add another passkey — the active method cannot be removed, so we
+      // cancel removal on the non-active one instead
       await manageAccessPage.add((dialog) => dialog.passkey());
-
-      // Then remove the current passkey, but cancel instead of confirm
-      await manageAccessPage
-        .findPasskey("in-use-passkey")
-        .remove((dialog) => dialog.cancel());
-
-      // Cleanup additional passkey and undo renaming of current
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
+        .rename(async (dialog) => {
+          await dialog.fill("additional-passkey");
+          await dialog.submit();
+        });
+
+      // Cancel removal of the non-active passkey
+      await manageAccessPage
+        .findPasskey("additional-passkey")
+        .remove((dialog) => dialog.cancel());
+
+      // Cleanup: remove the additional passkey and restore the original name
+      await manageAccessPage
+        .findPasskey("additional-passkey")
         .remove((dialog) => dialog.confirm());
       await manageAccessPage
         .findPasskey("in-use-passkey")

@@ -88,14 +88,17 @@ msgstr "Un moyen de retrouver l’accès à votre identité si jamais vous la pe
 msgid "About"
 msgstr "À propos"
 
-msgid "Access and recovery"
-msgstr "Accès et récupération"
+msgid "Access"
+msgstr ""
 
 msgid "Access methods"
 msgstr "Méthodes d’accès"
 
 msgid "Account name"
 msgstr "Nom du compte"
+
+msgid "Active"
+msgstr "Actif"
 
 msgid "Activate"
 msgstr "Activer"
@@ -769,6 +772,9 @@ msgstr "Récupérer"
 
 msgid "Recover your identity"
 msgstr "Récupérez votre identité"
+
+msgid "Recovery"
+msgstr ""
 
 msgid "Recovery phrase"
 msgstr "Phrase de récupération"

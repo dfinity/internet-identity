@@ -43,6 +43,7 @@ use super::canonicalize::{relaxed_body, relaxed_header};
 use super::dns_record::parse_dkim_txt;
 use super::parse::{parse_dkim_signature, DkimSignature};
 use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
+use super::tag_checks::{enforce_dns_record_tag_contract, enforce_signature_header_tag_contract};
 use super::types::{
     DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
     VerificationFailReason,
@@ -50,13 +51,6 @@ use super::types::{
 use internet_identity_interface::internet_identity::types::smtp::{SmtpHeader, SmtpRequest};
 
 const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
-
-/// How far a signature's claimed signing time (`t=`) may sit in the
-/// future relative to the canister's clock before we reject it as
-/// future-dated. 60 seconds matches the DNSSEC verifier's
-/// `CLOCK_SKEW_SECS` and absorbs the worst-case sender / canister
-/// clock-skew while still rejecting signatures dated months ahead.
-const CLOCK_SKEW_SECS: u64 = 60;
 
 /// Verify an `SmtpRequest` against an already-trusted DKIM TXT record.
 ///
@@ -177,69 +171,18 @@ fn try_verify_signature(
         None,
     ));
 
-    // (x=) Expiration. If the signer set it and we're past it, reject.
-    if let Some(x) = sig.x {
-        if now_secs > x {
-            let detail = format!("signature expired at {x}, now {now_secs}");
-            checks.push(check(
-                DkimCheckName::SignatureNotExpired,
-                DkimCheckStatus::Fail,
-                Some(detail),
-            ));
-            return Err((VerificationFailReason::SignatureExpired, checks));
+    // Signature-header-only tag contract: x= not expired, t= not
+    // future-dated, Subject in h=. Both pipelines route through the
+    // same umbrella so the contract can't drift; the trail the
+    // umbrella builds is appended verbatim to our per-check
+    // accumulator.
+    match enforce_signature_header_tag_contract(&sig, now_secs) {
+        Ok(mut trail) => checks.append(&mut trail),
+        Err((reason, mut trail)) => {
+            checks.append(&mut trail);
+            return Err((reason, checks));
         }
     }
-    checks.push(check(
-        DkimCheckName::SignatureNotExpired,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    // (t=) Future-dated check. `t=` is the time the signer claims it
-    // signed the message; one beyond `now + CLOCK_SKEW_SECS` is either
-    // a misconfigured signer or a manipulated replay. The PoC parsed
-    // this tag but didn't validate it — design §5.4 calls it out as a
-    // must-enforce.
-    if let Some(t) = sig.t {
-        if t > now_secs.saturating_add(CLOCK_SKEW_SECS) {
-            let detail = format!(
-                "signature claims t={t}, now={now_secs}, beyond {CLOCK_SKEW_SECS}s skew"
-            );
-            checks.push(check(
-                DkimCheckName::SignatureNotFromFuture,
-                DkimCheckStatus::Fail,
-                Some(detail),
-            ));
-            return Err((VerificationFailReason::SignatureFutureDated, checks));
-        }
-    }
-    checks.push(check(
-        DkimCheckName::SignatureNotFromFuture,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    // `h=` must include `Subject`. The `From` requirement is enforced
-    // at parse time (RFC 6376 §5.4 hard-requires it); `Subject` is the
-    // email-recovery-specific tightening from design §5.4 — the
-    // challenge nonce lives in `Subject:`, so a signature that doesn't
-    // cover Subject would let a MITM rewrite the nonce on a
-    // legitimately-signed email. Every mainstream sender we care about
-    // already signs Subject; rejecting the niche signer that doesn't
-    // is the right trade-off.
-    if !sig.h.iter().any(|n| n.eq_ignore_ascii_case("subject")) {
-        checks.push(check(
-            DkimCheckName::SubjectSigned,
-            DkimCheckStatus::Fail,
-            Some("h= does not include the Subject header".to_string()),
-        ));
-        return Err((VerificationFailReason::SubjectNotSigned, checks));
-    }
-    checks.push(check(
-        DkimCheckName::SubjectSigned,
-        DkimCheckStatus::Pass,
-        None,
-    ));
 
     // Parse the DNS record now — we need its t=s flag to know how
     // strict to be on i= alignment.
@@ -265,28 +208,30 @@ fn try_verify_signature(
         None,
     ));
 
-    // (i=) AUID alignment. RFC 6376 §3.5: i= MUST refer to a domain that
-    // is `d=` or a subdomain of `d=`. With t=s set in the DNS record,
-    // subdomains are NOT allowed.
-    if !auid_aligns(&sig.i, &sig.d, dns.strict_auid) {
-        let detail = format!(
-            "i={} does not align with d={} (t=s={})",
-            sig.i, sig.d, dns.strict_auid
-        );
-        checks.push(check(
-            DkimCheckName::AuidAlignsWithDomain,
-            DkimCheckStatus::Fail,
-            Some(detail),
-        ));
-        return Err((VerificationFailReason::AuidMisaligned, checks));
+    // DNS-record-dependent tag contract: i= AUID aligned with d= per
+    // the record's t=s flag, and the record itself isn't t=y
+    // (testing). Routed through the same umbrella the DNSSEC path's
+    // submit step calls, so the contract stays in lock-step. Note
+    // the ordering shift relative to historical DoH-path code: the
+    // umbrella runs t=y first (a testing-flagged key invalidates a
+    // signature regardless of other tag state, so surfacing
+    // TestingMode first is more informative), then AUID. Pre-refactor
+    // ordering put t=y last among the DNS-record checks; if a
+    // signature triggered both TestingMode and AlgorithmKeyTypeMismatch
+    // the prior code surfaced the latter, this code surfaces
+    // TestingMode.
+    match enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns) {
+        Ok(mut trail) => checks.append(&mut trail),
+        Err((reason, mut trail)) => {
+            checks.append(&mut trail);
+            return Err((reason, checks));
+        }
     }
-    checks.push(check(
-        DkimCheckName::AuidAlignsWithDomain,
-        DkimCheckStatus::Pass,
-        None,
-    ));
 
-    // DNS k= must match the signature's algorithm family.
+    // DNS k= must match the signature's algorithm family. Not a tag
+    // policy check (it's a wire-format compatibility check between
+    // the key type and the signing algorithm) so it stays outside
+    // the tag-contract umbrella.
     if !dns.key_type.matches_signature_alg(sig.algorithm) {
         checks.push(check(
             DkimCheckName::PublicKeyTypeMatches,
@@ -303,11 +248,6 @@ fn try_verify_signature(
         DkimCheckStatus::Pass,
         None,
     ));
-
-    // DNS t=y testing mode. Treat as inconclusive — never `Verified`.
-    if dns.testing {
-        return Err((VerificationFailReason::TestingMode, checks));
-    }
 
     // Body hash check (bh=) — canonicalise the body, hash, compare.
     let canonical_body = match sig.c_body {
@@ -400,26 +340,6 @@ fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -
         status,
         detail,
     }
-}
-
-/// Check whether `i=` aligns with `d=` per RFC 6376 §3.5.
-///
-/// `i=` is `[<local-part>]@<domain>`. The right side must equal `d=`
-/// or — when `t=s` is **clear** in the DNS record — be a subdomain of
-/// `d=`. With `t=s` set, only exact match is permitted.
-fn auid_aligns(i: &str, d: &str, strict: bool) -> bool {
-    let i_domain = i.split_once('@').map_or(i, |(_, dom)| dom);
-    if i_domain == d {
-        return true;
-    }
-    if strict {
-        return false;
-    }
-    // Allow strict subdomain match: i_domain ends with ".d=" — note we
-    // check the dot prefix so `evilexample.com` cannot fool `example.com`.
-    i_domain.len() > d.len()
-        && i_domain.ends_with(d)
-        && i_domain.as_bytes()[i_domain.len() - d.len() - 1] == b'.'
 }
 
 /// Construct the byte sequence the DKIM signature is computed over per
@@ -574,29 +494,9 @@ pub(crate) fn simple_body(body: &[u8]) -> Vec<u8> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn auid_aligns_exact_match() {
-        assert!(auid_aligns("alice@example.com", "example.com", false));
-        assert!(auid_aligns("alice@example.com", "example.com", true));
-    }
-
-    #[test]
-    fn auid_aligns_subdomain_when_not_strict() {
-        assert!(auid_aligns("alice@mail.example.com", "example.com", false));
-        assert!(!auid_aligns("alice@mail.example.com", "example.com", true));
-    }
-
-    #[test]
-    fn auid_does_not_match_evil_suffix() {
-        // evilexample.com must not match example.com via suffix.
-        assert!(!auid_aligns("alice@evilexample.com", "example.com", false));
-    }
-
-    #[test]
-    fn auid_handles_local_only() {
-        // No '@' → treat the whole thing as the domain.
-        assert!(auid_aligns("example.com", "example.com", false));
-    }
+    // Tests for `auid_aligns` live alongside the helper itself in
+    // [`super::super::tag_checks::tests`], since it's now shared with
+    // the DNSSEC verification path.
 
     #[test]
     fn blank_b_tag_strips_simple_value() {
@@ -670,10 +570,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![SmtpHeader {
@@ -711,10 +611,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -759,10 +659,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -805,10 +705,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -851,10 +751,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -878,10 +778,7 @@ mod tests {
             DkimVerifyResult::Unverified { reason, .. } => {
                 assert_eq!(reason, VerificationFailReason::SignatureFutureDated);
             }
-            other => panic!(
-                "expected Unverified(SignatureFutureDated), got {:?}",
-                other
-            ),
+            other => panic!("expected Unverified(SignatureFutureDated), got {:?}", other),
         }
     }
 
@@ -906,10 +803,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![
@@ -934,9 +831,8 @@ mod tests {
         // ever made this fixture pass overall.
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         let checks = match &result {
-            DkimVerifyResult::Verified { checks, .. } | DkimVerifyResult::Unverified { checks, .. } => {
-                checks
-            }
+            DkimVerifyResult::Verified { checks, .. }
+            | DkimVerifyResult::Unverified { checks, .. } => checks,
         };
         let future_check = checks
             .iter()
@@ -968,10 +864,10 @@ mod tests {
                     user: "alice".into(),
                     domain: "example.com".into(),
                 },
-                to: SmtpAddress {
+                to: vec![SmtpAddress {
                     user: "recover".into(),
                     domain: "id.ai".into(),
-                },
+                }],
             }),
             message: Some(SmtpMessage {
                 headers: vec![

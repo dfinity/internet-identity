@@ -243,10 +243,10 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "register".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -282,10 +282,10 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "register".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -313,24 +313,26 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
 }
 
 #[test]
-fn smtp_request_drops_emails_addressed_to_other_recipients() {
+fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
     let env = env();
     let canister_id = setup_canister(&env);
 
-    // Recovery flow recipient is reserved (handled in a follow-up
-    // PR). Today the canister silently drops any non-`register`
-    // recipient — the gateway shouldn't be able to probe the
-    // canister for which mailboxes exist.
+    // The mailbox set this canister handles (`register@<d>` /
+    // `recover@<d>` for any `d` in `related_origins`) is part of the
+    // public Candid surface, so there's nothing to leak by surfacing
+    // an SMTP-level "no such user" — a sender targeting any other
+    // mailbox is a caller error and gets a 550 back so the off-chain
+    // gateway can bounce upstream.
     let request = SmtpRequest {
         envelope: Some(SmtpEnvelope {
             from: SmtpAddress {
                 user: "alice".into(),
                 domain: TEST_DOMAIN.into(),
             },
-            to: SmtpAddress {
-                user: "recover".into(),
+            to: vec![SmtpAddress {
+                user: "marketing".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers: vec![
@@ -340,7 +342,7 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
                 },
                 SmtpHeader {
                     name: "To".into(),
-                    value: "recover@id.ai".into(),
+                    value: "marketing@id.ai".into(),
                 },
                 SmtpHeader {
                     name: "Subject".into(),
@@ -352,7 +354,12 @@ fn smtp_request_drops_emails_addressed_to_other_recipients() {
         gateway_flags: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
-    assert!(matches!(resp, SmtpResponse::Ok {}));
+    match resp {
+        SmtpResponse::Err(e) => {
+            assert_eq!(e.code, 550, "expected 550 for unknown recipient, got {e:?}");
+        }
+        SmtpResponse::Ok {} => panic!("expected 550 Err for unknown recipient, got Ok"),
+    }
 }
 
 #[test]
@@ -789,6 +796,152 @@ fn full_setup_flow_binds_credential_to_anchor() {
         .expect("remove should succeed");
 }
 
+// ===================================================================
+// Tag-contract umbrella smoke tests.
+//
+// `dkim::tag_checks` exposes two umbrella functions
+// (`enforce_signature_header_tag_contract`,
+// `enforce_dns_record_tag_contract`) that both verification pipelines
+// route their tag enforcement through. Unit and property tests in
+// `dkim::tag_checks::tests` cover the umbrellas' verdict directly; the
+// two tests below close the loop by exercising each umbrella through
+// the canister's public API on the DoH path — submit a synthetic email
+// that triggers exactly the failure the umbrella is supposed to catch,
+// then assert the canister surfaces it on the polled status. If a
+// future refactor wires `smtp_request` past an umbrella (the bug class
+// that motivated the facade), these tests fail loudly at the
+// integration boundary.
+//
+// Both tests reuse the same DoH happy-path harness as
+// `full_setup_flow_binds_credential_to_anchor`: PocketIC environment,
+// real RSA-signed DKIM email, DoH outcalls fulfilled with a custom TXT.
+// Only the failure shape differs — they're deliberately tiny.
+// ===================================================================
+
+/// Drive the canister through one full DoH-path `smtp_request` using
+/// a caller-supplied builder. The builder gets the test signer, the
+/// challenge nonce, and the canister's `now_secs`, and returns the
+/// `(signed_email, dkim_txt)` pair: the SMTP request to submit, and
+/// the DKIM TXT the DoH mock should serve. Returns the polled
+/// `EmailRecoveryStatus` after the pipeline runs.
+///
+/// Shared helper for the umbrella smoke tests below so each test body
+/// stays at "what's different about this scenario" granularity.
+fn run_doh_path_smoke(
+    build: impl FnOnce(&dkim_signer::TestSigner, &str, u64) -> (SignedEmail, Vec<u8>),
+) -> EmailRecoveryStatus {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let (signed, dkim_txt) = build(&signer, &challenge.nonce, now_secs);
+
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+
+    fulfill_doh_outcalls(&env, &dkim_txt);
+
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+    // Verification failures on the DoH path still return `Ok` to the
+    // gateway (the per-message error goes on the pending challenge);
+    // the gateway would otherwise be able to probe which nonces exist.
+    assert!(
+        matches!(resp, SmtpResponse::Ok {}),
+        "smtp_request must return Ok regardless of verification outcome, got {resp:?}"
+    );
+
+    api::email_recovery_status(&env, canister_id, &challenge.nonce).expect("status call failed")
+}
+
+#[test]
+fn doh_path_signature_header_umbrella_rejects_future_dated_t() {
+    // Sign an email with `t=now + 10_000s` — well beyond the 60-second
+    // skew window in `dkim::tag_checks::CLOCK_SKEW_SECS`. The signature
+    // is otherwise structurally valid (correct `bh=`, correct crypto
+    // signature over a real RSA key) so the rejection has to come from
+    // `enforce_signature_header_tag_contract` short-circuiting at the
+    // `t=` check before body-hash or signature verification runs.
+    //
+    // Validates the *signature-header-only* umbrella is in the
+    // smtp_request → verify_email → verify_dkim call chain.
+    let status = run_doh_path_smoke(|signer, nonce, now_secs| {
+        let signed = signer.sign_email(SignedEmailParams {
+            from: TEST_ADDRESS,
+            to: "register@id.ai",
+            subject: nonce,
+            body: TEST_BODY,
+            timestamp: now_secs + 10_000,
+        });
+        // verify_dkim short-circuits before it parses the record, but
+        // the DoH mock still needs to satisfy the provider quorum so
+        // the canister can read past the fetch.
+        (signed, signer.public_txt_record())
+    });
+
+    match status {
+        EmailRecoveryStatus::Failed(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+            assert!(
+                msg.contains("SignatureFutureDated"),
+                "expected SignatureFutureDated in failure message, got {msg:?}",
+            );
+        }
+        other => {
+            panic!("expected Failed(EmailVerificationFailed(SignatureFutureDated…)), got {other:?}")
+        }
+    }
+}
+
+#[test]
+fn doh_path_dns_record_umbrella_rejects_testing_mode_key() {
+    // Sign an email with valid timestamps and Subject coverage, then
+    // serve a DKIM TXT with `; t=y` appended. The signature-header-only
+    // umbrella accepts, `parse_dkim_txt` admits the record, and
+    // `enforce_dns_record_tag_contract` rejects on the `t=y`
+    // testing-mode check — *before* k= match, body hash, or signature
+    // verification. Validates the *DNS-record-aware* umbrella is in
+    // the call chain and that the canister-served DKIM TXT actually
+    // routes through it.
+    let status = run_doh_path_smoke(|signer, nonce, now_secs| {
+        let signed = signer.sign_email(SignedEmailParams {
+            from: TEST_ADDRESS,
+            to: "register@id.ai",
+            subject: nonce,
+            body: TEST_BODY,
+            timestamp: now_secs,
+        });
+        let mut txt = signer.public_txt_record();
+        txt.extend_from_slice(b"; t=y");
+        (signed, txt)
+    });
+
+    match status {
+        EmailRecoveryStatus::Failed(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+            assert!(
+                msg.contains("TestingMode"),
+                "expected TestingMode in failure message, got {msg:?}",
+            );
+        }
+        other => panic!("expected Failed(EmailVerificationFailed(TestingMode…)), got {other:?}"),
+    }
+}
+
 /// Drive PocketIC forward until each of the 5 DoH provider outcalls
 /// has been seen, fulfilling them with the supplied DKIM TXT bytes.
 /// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
@@ -1052,10 +1205,10 @@ mod dkim_signer {
                         user: from_user.into(),
                         domain: from_domain.into(),
                     },
-                    to: SmtpAddress {
+                    to: vec![SmtpAddress {
                         user: to_user.into(),
                         domain: to_domain.into(),
-                    },
+                    }],
                 }),
                 message: Some(SmtpMessage {
                     headers: vec![

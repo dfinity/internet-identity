@@ -25,7 +25,7 @@
 #   NO_CHECKS          : true | false
 #   REMAINING_ARGS[]   : leftover positional args (deploy-pr-to-beta reads PR#)
 
-readonly WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
+readonly PROXY_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
 readonly IC_NETWORK="ic"
 
 # Default DoH allowlist for the email-recovery flow — single source
@@ -647,14 +647,15 @@ EOF
 }
 
 # -------------------------
-# Wallet-proxied install runner (honours DRY_RUN)
+# Proxy-routed install runner (honours DRY_RUN)
 # -------------------------
-# Falls back to dfx for the actual upgrade because the staging canisters
-# are controlled by a dfx wallet (`cvthj-wyaaa-aaaad-aaaaq-cai`) that
-# routes via `wallet_call`. icp-cli's `--proxy` expects a custom proxy
-# canister exposing a `proxy` method instead, so pointing it at the
-# wallet trips `Canister has no update method 'proxy'`. See PR #3815
-# where the same pattern was applied to `make-upgrade-proposal`.
+# Routes the upgrade through the proxy canister at PROXY_CANISTER_ID,
+# which is the legacy staging wallet reinstalled with the icp-cli proxy
+# WASM (see
+# https://cli.internetcomputer.org/0.2/migration/from-dfx/#replacing-the-dfx-wallet-canister).
+# The proxy keeps the wallet's canister ID — and therefore its
+# controllership of the staging canisters — but now exposes the `proxy`
+# method icp-cli's `--proxy` expects.
 #
 # Args: <canister_id> <wasm_path> <install_arg_candid_text>
 run_icp_install() {
@@ -668,13 +669,12 @@ run_icp_install() {
     fi
 
     local cmd=(
-        dfx canister
-            --network "$IC_NETWORK"
-            --wallet "$WALLET_CANISTER_ID"
-            install "$canister_id"
+        icp canister install "$canister_id"
+            -e "$IC_NETWORK"
+            --proxy "$PROXY_CANISTER_ID"
             --mode upgrade
             --wasm "$wasm_path"
-            --argument "$install_arg"
+            --args "$install_arg"
     )
 
     if [ "$DRY_RUN" = true ]; then

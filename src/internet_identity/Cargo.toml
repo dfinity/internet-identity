@@ -70,5 +70,10 @@ canister_tests.workspace = true
 regex.workspace = true
 pretty_assertions.workspace = true
 ic-response-verification.workspace = true
+# Property-based tests for the DKIM tag-contract facade in
+# `src/dkim/tag_checks.rs`: generate random `(DkimSignature,
+# DkimDnsRecord, now)` triples and assert the umbrella's verdict
+# matches the conjunction of the individual `check_*` helpers.
+proptest.workspace = true
 flate2 = "1.0"
 getrandom = "0.2"
