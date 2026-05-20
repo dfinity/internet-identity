@@ -77,9 +77,8 @@
         <Tooltip
           label={option.tooltip ?? ""}
           hidden={option.tooltip === undefined ? true : undefined}
-          direction="down"
-          align="end"
-          distance="0.5rem"
+          direction="right"
+          distance="0.9rem"
         >
           <button
             class={[
