@@ -420,6 +420,11 @@ request_verification_command() {
 
 STAGING_BACKEND_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
 STAGING_FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai"
+# Proxy canister routing the wallet_call-equivalent install path for
+# staging. Same canister id as `PROXY_CANISTER_ID` in deploy-common.bash;
+# kept independent here because make-upgrade-proposal doesn't source
+# that file.
+STAGING_PROXY_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
 PROD_FRONTEND_CANISTER_ID="uqzsh-gqaaa-aaaaq-qaada-cai"
 
 prepare_staging_backend_argument() {
@@ -450,7 +455,7 @@ deploy_staging_backend() {
   # tell icp-cli to read the file as hex.
   icp canister install "$STAGING_BACKEND_CANISTER_ID" \
     -e ic \
-    --proxy cvthj-wyaaa-aaaad-aaaaq-cai \
+    --proxy "$STAGING_PROXY_CANISTER_ID" \
     --mode upgrade \
     --wasm ./internet_identity.wasm.gz \
     --args-file ./staging_icp_arg.bin \
@@ -463,7 +468,7 @@ deploy_staging_frontend() {
   # the hex-encoded args read from a file.
   icp canister install "$STAGING_FRONTEND_CANISTER_ID" \
     -e ic \
-    --proxy cvthj-wyaaa-aaaad-aaaaq-cai \
+    --proxy "$STAGING_PROXY_CANISTER_ID" \
     --mode upgrade \
     --wasm ./internet_identity_frontend.wasm.gz \
     --args-file ./staging_icp_frontend_arg.bin \
