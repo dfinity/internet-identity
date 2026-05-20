@@ -1302,12 +1302,17 @@ if [ "$IS_RECONFIGURE" = "true" ]; then
 
   # Pre-populate the steps that don't apply when re-using the on-chain
   # wasm. The keys must match what confirm_cmd / confirm_manual /
-  # record compute internally; see those helpers above.
+  # record compute internally; see those helpers above. "Release tag"
+  # is read back in the main flow (below) so subsequent
+  # `--continue --name <checklist-basename>` runs use the resolved
+  # release tag rather than the basename.
   jq -n \
+    --arg release_tag "$TAG_NAME" \
     --arg upgrade_type "$RECONFIGURE_TYPE" \
     --arg git_fetch_cmd "git fetch $REPO_HTTPS_URL --tags --force" \
     --arg git_tag_cmd "git tag -f $TAG_NAME" \
     '[
+      {name: "Release tag",                 value: $release_tag},
       {name: "Upgrade type",                value: $upgrade_type},
       {name: $git_fetch_cmd,                value: "Done"},
       {name: $git_tag_cmd,                  value: "Done"},
@@ -1322,6 +1327,23 @@ if [ "$IS_RECONFIGURE" = "true" ]; then
 fi
 
 echo Checklist file: "$CHECKLIST_FILE"
+
+# Authoritative TAG_NAME comes from the checklist. --reconfigure writes
+# a "Release tag" entry whose value differs from the checklist filename
+# (the file is named reconfigure-<role>-<date>.json, but TAG_NAME has to
+# be the original release-* tag so downstream commands fetch the right
+# wasm/commit). Sync here so `--continue --name <basename>` is robust
+# against the basename — and for --new / older checklists, stash
+# TAG_NAME on first run so the invariant holds going forward.
+RECORDED_TAG="$(checklist_get 'Release tag')"
+if [ -n "$RECORDED_TAG" ]; then
+  if [ "$RECORDED_TAG" != "$TAG_NAME" ]; then
+    echo "Note: using release tag '$RECORDED_TAG' from checklist (not '$TAG_NAME' from --name)." >&2
+  fi
+  TAG_NAME="$RECORDED_TAG"
+else
+  checklist_add "Release tag" "$TAG_NAME"
+fi
 
 record "Start time" date +"%Y-%m-%d %H:%M:%S"
 
