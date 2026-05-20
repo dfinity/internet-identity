@@ -63,6 +63,8 @@ NOT_MOCKED_COMMANDS=(
   printf
   update_release_text
   detect_archive_hash_change
+  detect_ii_hash_change
+  detect_frontend_hash_change
   download_wasms
   request_verification_command
   deploy_release_candidate
@@ -337,16 +339,25 @@ resolve_release_tag() {
   git tag --points-at "$commit" | grep "^release-" | sort | head -1 || true
 }
 
-detect_archive_hash_change() {
-  # Compare local archive.wasm.gz sha256 against the archive attached to the
-  # release that corresponds to the previous proposal-backend-*. Emits "true"
-  # or "false" on stdout. Falls back to "true" if the previous archive can't
-  # be fetched, so the BE proposal includes the archive hash in the
-  # conservative case.
+# Compare a local wasm against the wasm attached to the release that
+# corresponds to the previous proposal-<role>-*. Emits "true" / "false"
+# on stdout. Falls back to "true" on any lookup/download failure so the
+# proposal stays conservative (verify-hash includes the hash, headline
+# reads as a Wasm upgrade) when we can't tell.
+#
+# Args:
+#   $1 proposal-prefix    proposal-backend | proposal-frontend
+#   $2 release-filename   filename under the GH release assets
+#   $3 local-wasm-path    path on disk to compare against
+detect_release_wasm_change() {
+  local proposal_prefix="$1"
+  local release_filename="$2"
+  local local_wasm="$3"
+
   local prev_proposal_tag
-  prev_proposal_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
+  prev_proposal_tag=$(git tag -l "${proposal_prefix}-*" | sort -V | tail -1)
   if [ -z "$prev_proposal_tag" ]; then
-    echo "No previous proposal-backend-* tag found; treating archive as changed." >&2
+    echo "No previous ${proposal_prefix}-* tag found; treating ${release_filename} as changed." >&2
     echo "true"
     return
   fi
@@ -354,33 +365,49 @@ detect_archive_hash_change() {
   local prev_release_tag
   prev_release_tag=$(resolve_release_tag "$prev_proposal_tag")
   if [ -z "$prev_release_tag" ]; then
-    echo "Could not resolve ${prev_proposal_tag} to a release-* tag; treating archive as changed." >&2
+    echo "Could not resolve ${prev_proposal_tag} to a release-* tag; treating ${release_filename} as changed." >&2
     echo "true"
     return
   fi
 
-  local prev_archive
-  prev_archive=$(mktemp)
+  local prev_wasm
+  prev_wasm=$(mktemp)
 
-  if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_release_tag}/archive.wasm.gz" -o "$prev_archive"; then
-    rm -f "$prev_archive"
-    echo "Could not download ${prev_release_tag}/archive.wasm.gz; treating archive as changed." >&2
+  if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_release_tag}/${release_filename}" -o "$prev_wasm"; then
+    rm -f "$prev_wasm"
+    echo "Could not download ${prev_release_tag}/${release_filename}; treating as changed." >&2
     echo "true"
     return
   fi
 
   local prev_sha curr_sha
-  prev_sha=$(sha256 "$prev_archive")
-  curr_sha=$(sha256 ./archive.wasm.gz)
-  rm -f "$prev_archive"
-  echo "Previous archive (${prev_release_tag}): $prev_sha" >&2
-  echo "Current archive:                        $curr_sha" >&2
+  prev_sha=$(sha256 "$prev_wasm")
+  curr_sha=$(sha256 "$local_wasm")
+  rm -f "$prev_wasm"
+  echo "Previous ${release_filename} (${prev_release_tag}): $prev_sha" >&2
+  echo "Current ${release_filename}:                        $curr_sha" >&2
 
   if [ "$prev_sha" = "$curr_sha" ]; then
     echo "false"
   else
     echo "true"
   fi
+}
+
+# Per-wasm wrappers — the script uses these as `record` commands so the
+# output is captured in the checklist as a "true"/"false" flag.
+detect_archive_hash_change() {
+  detect_release_wasm_change "proposal-backend" "archive.wasm.gz" ./archive.wasm.gz
+}
+
+detect_ii_hash_change() {
+  # The GH release asset is internet_identity_production.wasm.gz, but
+  # download_wasms saves it locally as internet_identity.wasm.gz.
+  detect_release_wasm_change "proposal-backend" "internet_identity_production.wasm.gz" ./internet_identity.wasm.gz
+}
+
+detect_frontend_hash_change() {
+  detect_release_wasm_change "proposal-frontend" "internet_identity_frontend.wasm.gz" ./internet_identity_frontend.wasm.gz
 }
 
 download_wasms() {
@@ -801,6 +828,35 @@ EOF
   fi
 }
 
+# Heading and proposal title vary based on whether the wasm differs from
+# what's currently on chain. Args-only proposals (the wasm in the
+# proposal matches the on-chain wasm) read as "Configuration Change"
+# instead of "Upgrade", since the only effective change is the install
+# args.
+#
+# Args: <canister: Backend | Frontend> <wasm-changed: true | false>
+proposal_heading() {
+  local canister="$1"
+  local wasm_changed="$2"
+  if [ "$wasm_changed" = "true" ]; then
+    echo "${canister} Canister Upgrade"
+  else
+    echo "${canister} Canister Configuration Change"
+  fi
+}
+
+proposal_title() {
+  local canister="$1"
+  local wasm_changed="$2"
+  local short_sha
+  short_sha=$(git rev-parse --short "$TAG_NAME")
+  if [ "$wasm_changed" = "true" ]; then
+    echo "Upgrade Internet Identity ${canister} Canister to ${short_sha}"
+  else
+    echo "Update Internet Identity ${canister} Canister install args (commit ${short_sha})"
+  fi
+}
+
 download_proposal_text() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
 
@@ -825,7 +881,7 @@ download_proposal_text() {
   if should_upgrade_backend "$upgrade_type"; then
     # Find last backend proposal tag
     local last_backend_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
-    
+
     if [ -z "$last_backend_tag" ]; then
       echo "No previous proposal-backend-* tag found."
       echo "Available release tags:"
@@ -837,11 +893,13 @@ download_proposal_text() {
       fi
     fi
 
-    local commit_range="${last_backend_tag}..${TAG_NAME}"
-    backend_commits=$(git log --format='* %s' --no-merges "$commit_range" -- "${backend_paths[@]}")
-    
-    cat > backend_proposal.md << EOF
-# Backend Canister Upgrade
+    local backend_wasm_changed="$(checklist_must_get 'II WASM changed')"
+    local backend_heading="$(proposal_heading 'Backend' "$backend_wasm_changed")"
+    if [ "$backend_wasm_changed" = "true" ]; then
+      local commit_range="${last_backend_tag}..${TAG_NAME}"
+      backend_commits=$(git log --format='* %s' --no-merges "$commit_range" -- "${backend_paths[@]}")
+      cat > backend_proposal.md << EOF
+# ${backend_heading}
 
 ## What's Changed
 _Since \`${last_backend_tag}\`_
@@ -850,12 +908,28 @@ ${backend_commits}
 
 [Full release notes](https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME)
 EOF
+    else
+      # Args-only: wasm bytes match what's on chain. There are no commits
+      # to enumerate (same release tag), so leave a TODO comment for the
+      # human to describe the install-args change before submitting.
+      cat > backend_proposal.md << EOF
+# ${backend_heading}
+
+This proposal updates the backend canister install arguments without changing the Wasm. The Wasm bytes in this proposal match the one currently installed on chain (from \`${last_backend_tag}\`).
+
+## What's Changed
+
+<!-- TODO: Describe the install-args change here, then delete this comment. -->
+
+[Full release notes](https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME)
+EOF
+    fi
   fi
-  
+
   if should_upgrade_frontend "$upgrade_type"; then
     # Find last frontend proposal tag
     local last_frontend_tag=$(git tag -l "proposal-frontend-*" | sort -V | tail -1)
-    
+
     if [ -z "$last_frontend_tag" ]; then
       echo "No previous proposal-frontend-* tag found."
       echo "Available release tags:"
@@ -867,11 +941,13 @@ EOF
       fi
     fi
 
-    local commit_range="${last_frontend_tag}..${TAG_NAME}"
-    frontend_commits=$(git log --format='* %s' --no-merges "$commit_range" -- "${frontend_paths[@]}")
-    
-    cat > frontend_proposal.md << EOF
-# Frontend Canister Upgrade
+    local frontend_wasm_changed="$(checklist_must_get 'Frontend WASM changed')"
+    local frontend_heading="$(proposal_heading 'Frontend' "$frontend_wasm_changed")"
+    if [ "$frontend_wasm_changed" = "true" ]; then
+      local commit_range="${last_frontend_tag}..${TAG_NAME}"
+      frontend_commits=$(git log --format='* %s' --no-merges "$commit_range" -- "${frontend_paths[@]}")
+      cat > frontend_proposal.md << EOF
+# ${frontend_heading}
 
 ## What's Changed
 _Since \`${last_frontend_tag}\`_
@@ -880,6 +956,19 @@ ${frontend_commits}
 
 [Full release notes](https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME)
 EOF
+    else
+      cat > frontend_proposal.md << EOF
+# ${frontend_heading}
+
+This proposal updates the frontend canister install arguments without changing the Wasm. The Wasm bytes in this proposal match the one currently installed on chain (from \`${last_frontend_tag}\`).
+
+## What's Changed
+
+<!-- TODO: Describe the install-args change here, then delete this comment. -->
+
+[Full release notes](https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME)
+EOF
+    fi
   fi
 }
 
@@ -907,7 +996,7 @@ dry_run_proposal() {
       --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
       --dry-run \
       --summary-file ./backend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")"
+      --proposal-title "$(proposal_title 'Backend' "$(checklist_must_get 'II WASM changed')")"
   fi
 
   if should_upgrade_frontend "$upgrade_type"; then
@@ -929,7 +1018,7 @@ dry_run_proposal() {
       --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
       --dry-run \
       --summary-file ./frontend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")"
+      --proposal-title "$(proposal_title 'Frontend' "$(checklist_must_get 'Frontend WASM changed')")"
   fi
 }
 
@@ -986,7 +1075,7 @@ make_backend_proposal() {
     --arg mainnet_arg.bin \
     --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
     --summary-file ./backend_proposal.md \
-    --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")" \
+    --proposal-title "$(proposal_title 'Backend' "$(checklist_must_get 'II WASM changed')")" \
     2>&1 | tee /dev/stderr)
   parse_proposal_id "$output" "backend proposal number"
 }
@@ -1011,7 +1100,7 @@ make_frontend_proposal() {
     --arg mainnet_frontend_arg.bin \
     --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
     --summary-file ./frontend_proposal.md \
-    --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")" \
+    --proposal-title "$(proposal_title 'Frontend' "$(checklist_must_get 'Frontend WASM changed')")" \
     2>&1 | tee /dev/stderr)
   parse_proposal_id "$output" "frontend proposal number"
 }
@@ -1144,14 +1233,21 @@ confirm_cmd download_wasms
 if should_upgrade_backend "$UPGRADE_TYPE"; then
   record "II WASM hash" sha256 internet_identity.wasm.gz
   record "Archive WASM hash" sha256 archive.wasm.gz
-  # Auto-detect whether the archive wasm differs from the previous
+  # Auto-detect whether each backend wasm differs from the previous
   # proposal-backend-* release. The BE proposal's verify-hash command
-  # includes --archive-hash only when this says "true".
+  # includes --archive-hash only when "Archive changed" is "true", and
+  # the proposal title/heading switch to "configuration change" wording
+  # when "II WASM changed" is "false".
+  record "II WASM changed" detect_ii_hash_change
   record "Archive changed" detect_archive_hash_change
 fi
 
 if should_upgrade_frontend "$UPGRADE_TYPE"; then
   record "Frontend WASM hash" sha256 internet_identity_frontend.wasm.gz
+  # Used the same way as "II WASM changed" above — flips the FE
+  # proposal title/heading to "configuration change" wording when the
+  # wasm matches what's already on chain.
+  record "Frontend WASM changed" detect_frontend_hash_change
 fi
 
 confirm_manual "Request Run Verification Command" request_verification_command
