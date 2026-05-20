@@ -723,10 +723,15 @@ mod property_tests {
             0..6,
         );
 
-        // 1 % chance of t= or x= sliding far past `u64::MAX / 2` —
-        // we want common-case coverage near `now ± skew`, plus the
-        // odd extreme to confirm `saturating_add` keeps the umbrella
-        // panic-free.
+        // `t=` / `x=` (and the property's `now` below) all draw from
+        // `0..3_000_000_000` — a range broad enough to make
+        // before/within-skew/after-skew transitions hit every branch
+        // of the umbrella with non-trivial frequency, but small
+        // enough that `now.saturating_add(CLOCK_SKEW_SECS)` never
+        // saturates. The umbrella is `saturating_add`-correct by
+        // construction (no panic possible for any `u64`), so cases
+        // near `u64::MAX` add no extra coverage worth slowing the
+        // generator down for.
         let small_time = 0u64..3_000_000_000u64;
         let t_strat = prop::option::of(small_time.clone());
         let x_strat = prop::option::of(small_time);
