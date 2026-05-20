@@ -28,7 +28,7 @@
     onSwitch,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
-    isSignedInWithRecovery = true,
+    isSignedInWithRecovery = false,
   }: Props = $props();
 
   // `sso_domain` / `sso_name` are populated by the canister at response

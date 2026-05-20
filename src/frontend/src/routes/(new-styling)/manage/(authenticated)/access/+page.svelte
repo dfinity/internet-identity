@@ -213,13 +213,21 @@
           session,
           credentialIds: [credentialId],
         });
+        // Guard against the assertion resolving to a different anchor (e.g.
+        // shared authenticator). We're only switching the active method for
+        // *this* identity — anything else is a programming error or attack.
+        if (identityNumber !== data.identityNumber) {
+          throw new Error(
+            "Authenticated identity does not match the identity being managed.",
+          );
+        }
         await authenticationStore.set({
           identity,
           identityNumber,
           authMethod: { passkey: { credentialId: authedId } },
         });
         lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber: data.identityNumber,
+          identityNumber,
           name: data.identityInfo.name[0],
           createdAtMillis,
           authMethod: { passkey: { credentialId: authedId } },
@@ -261,13 +269,22 @@
           session,
           jwt,
         });
+        // The OAuth popup lets the user pick any account — if they choose one
+        // linked to a different anchor, the JWT authenticates to that anchor.
+        // Refuse the switch so we don't leak the wrong identity into the
+        // last-used store or the active session.
+        if (identityNumber !== data.identityNumber) {
+          throw new Error(
+            "Authenticated identity does not match the identity being managed.",
+          );
+        }
         await authenticationStore.set({
           identity,
           identityNumber,
           authMethod: { openid: { iss: jwtIss, sub } },
         });
         lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber: data.identityNumber,
+          identityNumber,
           name: data.identityInfo.name[0],
           createdAtMillis,
           authMethod: { openid: { iss: jwtIss, sub, metadata } },
@@ -424,25 +441,36 @@
 
 {#if removingAccessMethod !== undefined}
   <Dialog onClose={() => (removingAccessMethodKey = undefined)}>
-    <RemoveAccessMethod
-      type={"openid" in removingAccessMethod ? "openid" : "passkey"}
-      onRemove={handleRemoveConfirmed}
-      onCancel={() => (removingAccessMethodKey = undefined)}
-      providerName={"openid" in removingAccessMethod
-        ? (openIdName(
-            removingAccessMethod.openid.iss,
-            removingAccessMethod.openid.aud,
-            removingAccessMethod.openid.metadata,
-            removingAccessMethod.openid.sso_name[0],
-            removingAccessMethod.openid.sso_domain[0],
-          ) ?? $t`Unknown`)
-        : undefined}
-      isCurrentAccessMethod={isCurrentAccessMethod(
-        $authenticatedStore,
-        removingAccessMethod,
-      )}
-      isLastAccessMethod={accessMethods.length === 1}
-    />
+    {#if "openid" in removingAccessMethod}
+      <RemoveAccessMethod
+        type="openid"
+        onRemove={handleRemoveConfirmed}
+        onCancel={() => (removingAccessMethodKey = undefined)}
+        providerName={openIdName(
+          removingAccessMethod.openid.iss,
+          removingAccessMethod.openid.aud,
+          removingAccessMethod.openid.metadata,
+          removingAccessMethod.openid.sso_name[0],
+          removingAccessMethod.openid.sso_domain[0],
+        ) ?? $t`Unknown`}
+        isCurrentAccessMethod={isCurrentAccessMethod(
+          $authenticatedStore,
+          removingAccessMethod,
+        )}
+        isLastAccessMethod={accessMethods.length === 1}
+      />
+    {:else}
+      <RemoveAccessMethod
+        type="passkey"
+        onRemove={handleRemoveConfirmed}
+        onCancel={() => (removingAccessMethodKey = undefined)}
+        isCurrentAccessMethod={isCurrentAccessMethod(
+          $authenticatedStore,
+          removingAccessMethod,
+        )}
+        isLastAccessMethod={accessMethods.length === 1}
+      />
+    {/if}
   </Dialog>
 {/if}
 

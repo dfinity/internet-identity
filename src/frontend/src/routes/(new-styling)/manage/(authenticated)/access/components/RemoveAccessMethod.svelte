@@ -5,14 +5,12 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
-  interface Props {
+  type Props = {
     onRemove: () => Promise<void>;
     onCancel: () => void;
-    type: "passkey" | "openid";
-    providerName?: string;
     isCurrentAccessMethod?: boolean;
     isLastAccessMethod?: boolean;
-  }
+  } & ({ type: "passkey" } | { type: "openid"; providerName: string });
 
   const {
     onRemove,
@@ -21,7 +19,7 @@
     providerName,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
-  }: Props = $props();
+  }: Props & { providerName?: string } = $props();
 
   let isRemoving = $state(false);
 
@@ -54,14 +52,14 @@
           {#if type === "openid"}
             <Trans>
               You are about to unlink your last remaining access method. Your
-              recovery phrase will become your sole method of regaining access
-              to this identity.
+              recovery method will become your sole way of regaining access to
+              this identity.
             </Trans>
           {:else}
             <Trans>
               You are about to remove your last remaining access method. Your
-              recovery phrase will become your sole method of regaining access
-              to this identity.
+              recovery method will become your sole way of regaining access to
+              this identity.
             </Trans>
           {/if}
         </p>

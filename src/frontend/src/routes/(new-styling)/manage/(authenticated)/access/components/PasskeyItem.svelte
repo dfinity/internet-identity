@@ -37,7 +37,7 @@
     onSwitch,
     isCurrentAccessMethod = false,
     isLastAccessMethod = false,
-    isSignedInWithRecovery = true,
+    isSignedInWithRecovery = false,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
