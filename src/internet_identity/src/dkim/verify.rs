@@ -43,10 +43,7 @@ use super::canonicalize::{relaxed_body, relaxed_header};
 use super::dns_record::parse_dkim_txt;
 use super::parse::{parse_dkim_signature, DkimSignature};
 use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
-use super::tag_checks::{
-    check_auid_aligned, check_dns_not_testing, check_signature_not_expired,
-    check_signature_not_from_future, check_subject_signed, CLOCK_SKEW_SECS,
-};
+use super::tag_checks::{enforce_dns_record_tag_contract, enforce_signature_header_tag_contract};
 use super::types::{
     DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
     VerificationFailReason,
@@ -174,57 +171,18 @@ fn try_verify_signature(
         None,
     ));
 
-    // (x=) Expiration, (t=) future-dated, and Subject-in-`h=` are
-    // signature-header-only checks shared with the DNSSEC verification
-    // path (`email_recovery::smtp::prepare_partial_verification`).
-    // Single source of truth: see [`super::tag_checks`].
-    if let Err(reason) = check_signature_not_expired(&sig, now_secs) {
-        let detail = sig
-            .x
-            .map(|x| format!("signature expired at {x}, now {now_secs}"));
-        checks.push(check(
-            DkimCheckName::SignatureNotExpired,
-            DkimCheckStatus::Fail,
-            detail,
-        ));
-        return Err((reason, checks));
+    // Signature-header-only tag contract: x= not expired, t= not
+    // future-dated, Subject in h=. Both pipelines route through the
+    // same umbrella so the contract can't drift; the trail the
+    // umbrella builds is appended verbatim to our per-check
+    // accumulator.
+    match enforce_signature_header_tag_contract(&sig, now_secs) {
+        Ok(mut trail) => checks.append(&mut trail),
+        Err((reason, mut trail)) => {
+            checks.append(&mut trail);
+            return Err((reason, checks));
+        }
     }
-    checks.push(check(
-        DkimCheckName::SignatureNotExpired,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    if let Err(reason) = check_signature_not_from_future(&sig, now_secs) {
-        let detail = sig.t.map(|t| {
-            format!("signature claims t={t}, now={now_secs}, beyond {CLOCK_SKEW_SECS}s skew")
-        });
-        checks.push(check(
-            DkimCheckName::SignatureNotFromFuture,
-            DkimCheckStatus::Fail,
-            detail,
-        ));
-        return Err((reason, checks));
-    }
-    checks.push(check(
-        DkimCheckName::SignatureNotFromFuture,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    if let Err(reason) = check_subject_signed(&sig) {
-        checks.push(check(
-            DkimCheckName::SubjectSigned,
-            DkimCheckStatus::Fail,
-            Some("h= does not include the Subject header".to_string()),
-        ));
-        return Err((reason, checks));
-    }
-    checks.push(check(
-        DkimCheckName::SubjectSigned,
-        DkimCheckStatus::Pass,
-        None,
-    ));
 
     // Parse the DNS record now — we need its t=s flag to know how
     // strict to be on i= alignment.
@@ -250,28 +208,30 @@ fn try_verify_signature(
         None,
     ));
 
-    // (i=) AUID alignment — shared helper. RFC 6376 §3.5: `i=` MUST
-    // refer to a domain that is `d=` or, when DNS `t=s` is clear, a
-    // subdomain of `d=`. Single source of truth: see [`super::tag_checks`].
-    if let Err(reason) = check_auid_aligned(&sig.i, &sig.d, dns.strict_auid) {
-        let detail = format!(
-            "i={} does not align with d={} (t=s={})",
-            sig.i, sig.d, dns.strict_auid
-        );
-        checks.push(check(
-            DkimCheckName::AuidAlignsWithDomain,
-            DkimCheckStatus::Fail,
-            Some(detail),
-        ));
-        return Err((reason, checks));
+    // DNS-record-dependent tag contract: i= AUID aligned with d= per
+    // the record's t=s flag, and the record itself isn't t=y
+    // (testing). Routed through the same umbrella the DNSSEC path's
+    // submit step calls, so the contract stays in lock-step. Note
+    // the ordering shift relative to historical DoH-path code: the
+    // umbrella runs t=y first (a testing-flagged key invalidates a
+    // signature regardless of other tag state, so surfacing
+    // TestingMode first is more informative), then AUID. Pre-refactor
+    // ordering put t=y last among the DNS-record checks; if a
+    // signature triggered both TestingMode and AlgorithmKeyTypeMismatch
+    // the prior code surfaced the latter, this code surfaces
+    // TestingMode.
+    match enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns) {
+        Ok(mut trail) => checks.append(&mut trail),
+        Err((reason, mut trail)) => {
+            checks.append(&mut trail);
+            return Err((reason, checks));
+        }
     }
-    checks.push(check(
-        DkimCheckName::AuidAlignsWithDomain,
-        DkimCheckStatus::Pass,
-        None,
-    ));
 
-    // DNS k= must match the signature's algorithm family.
+    // DNS k= must match the signature's algorithm family. Not a tag
+    // policy check (it's a wire-format compatibility check between
+    // the key type and the signing algorithm) so it stays outside
+    // the tag-contract umbrella.
     if !dns.key_type.matches_signature_alg(sig.algorithm) {
         checks.push(check(
             DkimCheckName::PublicKeyTypeMatches,
@@ -288,13 +248,6 @@ fn try_verify_signature(
         DkimCheckStatus::Pass,
         None,
     ));
-
-    // DNS `t=y` testing-mode flag — shared helper. Treat as
-    // inconclusive: never accept a signature under a key the signer
-    // has explicitly declared non-production.
-    if let Err(reason) = check_dns_not_testing(&dns) {
-        return Err((reason, checks));
-    }
 
     // Body hash check (bh=) — canonicalise the body, hash, compare.
     let canonical_body = match sig.c_body {
