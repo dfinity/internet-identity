@@ -30,7 +30,6 @@ fn ii_canister_serves_http_assets() -> Result<(), RejectResponse> {
     let assets: Vec<(&str, Option<&str>)> = vec![
         ("/.config.did.bin", None),
         ("/.well-known/ic-domains", None),
-        ("/.well-known/ic-smtp-canister-id", None),
     ];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());

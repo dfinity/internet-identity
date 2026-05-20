@@ -69,7 +69,11 @@ fn default_frontend_args() -> InternetIdentityFrontendArgs {
 #[test]
 fn frontend_canister_serves_http_assets() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 2;
-    let assets: Vec<(&str, Option<&str>)> = vec![("/", None), ("/.well-known/ic-domains", None)];
+    let assets: Vec<(&str, Option<&str>)> = vec![
+        ("/", None),
+        ("/.well-known/ic-domains", None),
+        ("/.well-known/ic-smtp-canister-id", None),
+    ];
     let env = env();
     let canister_id =
         install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
@@ -153,6 +157,43 @@ fn frontend_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
         content_type, "application/json",
         "unexpected Content-Type header value"
     );
+    verify_frontend_security_headers(&http_response.headers);
+
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        request,
+        http_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
+    Ok(())
+}
+
+/// Verifies that `.well-known/ic-smtp-canister-id` serves the configured backend canister principal.
+#[test]
+fn frontend_canister_serves_ic_smtp_canister_id() -> Result<(), RejectResponse> {
+    const CERTIFICATION_VERSION: u16 = 2;
+    let env = env();
+    let args = default_frontend_args();
+    let expected_principal = args.backend_canister_id.to_text();
+    let canister_id = install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), args);
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/ic-smtp-canister-id".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+
+    assert_eq!(http_response.status_code, 200);
+    assert_eq!(
+        String::from_utf8_lossy(&http_response.body),
+        expected_principal,
+    );
+
     verify_frontend_security_headers(&http_response.headers);
 
     let result = verify_response_certification(

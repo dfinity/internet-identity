@@ -387,6 +387,15 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
         content_type: ContentType::OCTETSTREAM,
     });
 
+    // Advertises the II backend canister principal so external SMTP
+    // infrastructure can discover it from a well-known path on the II domain.
+    assets.push(AssetUtilAsset {
+        url_path: "/.well-known/ic-smtp-canister-id".to_string(),
+        content: config.backend_canister_id.to_text().into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
+
     // Add .well-known/webauthn for passkey sharing if related_origins is configured
     if let Some(related_origins) = &config.related_origins {
         let content = json!({
