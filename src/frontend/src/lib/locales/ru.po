@@ -88,8 +88,8 @@ msgstr "Способ восстановить доступ, если вы его
 msgid "About"
 msgstr "О сервисе"
 
-msgid "Access and recovery"
-msgstr "Доступ и восстановление"
+msgid "Access"
+msgstr ""
 
 msgid "Access methods"
 msgstr "Способы доступа"
@@ -772,6 +772,9 @@ msgstr "Восстановить доступ"
 
 msgid "Recover your identity"
 msgstr "Восстановить доступ к вашей Internet Identity"
+
+msgid "Recovery"
+msgstr ""
 
 msgid "Recovery phrase"
 msgstr "Резервная фраза"

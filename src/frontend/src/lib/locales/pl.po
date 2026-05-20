@@ -88,8 +88,8 @@ msgstr "Sposób na odzyskanie dostępu do swojej tożsamości, jeśli ją kiedyk
 msgid "About"
 msgstr "O nas"
 
-msgid "Access and recovery"
-msgstr "Dostęp i odzyskiwanie"
+msgid "Access"
+msgstr ""
 
 msgid "Access methods"
 msgstr "Metody dostępu"
@@ -772,6 +772,9 @@ msgstr "Odzyskaj"
 
 msgid "Recover your identity"
 msgstr "Odzyskaj swoją tożsamość"
+
+msgid "Recovery"
+msgstr ""
 
 msgid "Recovery phrase"
 msgstr "Fraza odzyskiwania"

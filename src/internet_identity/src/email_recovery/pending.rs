@@ -138,6 +138,13 @@ pub struct PartialVerification {
     /// header. Used at `submit_dkim_leaf` time for the
     /// From↔d= / d=↔leaf-owner-name alignment checks.
     pub signing_domain: String,
+    /// Parsed `i=` (Agent or User Identifier, RFC 6376 §3.5) from
+    /// the email's DKIM-Signature header. Stashed here so
+    /// `submit_dkim_leaf` can run the AUID-aligns-with-`d=` check
+    /// once the DKIM TXT's `t=s` flag is available — `t=s` decides
+    /// whether subdomains of `d=` are permitted in `i=`. Defaults to
+    /// `@d=` per the parser when `i=` is absent.
+    pub signing_auid: String,
     /// Algorithm parsed from `a=` so `submit_dkim_leaf` can pick
     /// the right verifier (RSA-SHA256 or Ed25519-SHA256).
     pub algorithm: crate::dkim::Algorithm,

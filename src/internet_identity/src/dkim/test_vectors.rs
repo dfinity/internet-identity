@@ -72,10 +72,10 @@ fn parse_eml(raw: &[u8]) -> SmtpRequest {
     SmtpRequest {
         envelope: Some(SmtpEnvelope {
             from,
-            to: SmtpAddress {
+            to: vec![SmtpAddress {
                 user: "recover".into(),
                 domain: "id.ai".into(),
-            },
+            }],
         }),
         message: Some(SmtpMessage {
             headers,

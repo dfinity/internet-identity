@@ -684,7 +684,10 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const SmtpAddress = IDL.Record({ 'domain' : IDL.Text, 'user' : IDL.Text });
-  const SmtpEnvelope = IDL.Record({ 'to' : SmtpAddress, 'from' : SmtpAddress });
+  const SmtpEnvelope = IDL.Record({
+    'to' : IDL.Vec(SmtpAddress),
+    'from' : SmtpAddress,
+  });
   const SmtpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const SmtpMessage = IDL.Record({
     'body' : IDL.Vec(IDL.Nat8),

@@ -31,10 +31,36 @@ pub const MAX_BODY_BYTES: usize = 5_000;
 pub const MAX_HEADERS: usize = 30;
 pub const MAX_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_HEADER_VALUE_BYTES: usize = 8_192;
+/// Cap on `envelope.to` length. `smtp_request` and
+/// `smtp_request_validate` are both open (anyone can call them), so
+/// without an explicit upper bound an attacker could pad the
+/// recipient list out to the ingress size limit and force per-message
+/// allocation + per-recipient case-insensitive dispatch on every
+/// call. RFC 5321 §4.5.3.1 caps a single SMTP session at 100
+/// recipients, which is far more than the gateway will ever batch in
+/// practice (the canister only handles two reserved mailboxes), so
+/// using the RFC ceiling here just kicks the obvious adversarial case
+/// out without constraining any legitimate gateway flow.
+pub const MAX_RECIPIENTS: usize = 100;
 
 // --- SMTP error codes (RFC 5321) ---
 
+/// 550 — "Requested action not taken: mailbox unavailable" (RFC 5321
+/// §4.2.2). Used here for the "No such user here" case: the envelope
+/// has exactly one recipient but it's not a mailbox this canister
+/// handles (`register@<d>` / `recover@<d>`).
 pub const SMTP_ERR_MAILBOX_UNAVAILABLE: u64 = 550;
+/// 551 — "User not local; please try `<forward-path>`" (RFC 5321
+/// §4.2.2). Used here for envelopes whose **shape** doesn't fit the
+/// recovery flows we serve: an envelope must carry exactly one
+/// recipient, so empty-`to` and multi-recipient envelopes get 551
+/// (a distinct code from 550 so the gateway can tell "we don't know
+/// this user" from "this envelope shape isn't accepted for us").
+pub const SMTP_ERR_USER_NOT_LOCAL: u64 = 551;
+/// 555 — "Syntax error" (RFC 5321 §4.2.2). Used here for malformed
+/// request payloads (missing envelope, bounds violations on
+/// address/header/body lengths, or recipient lists that blow past
+/// `MAX_RECIPIENTS`).
 pub const SMTP_ERR_SYNTAX_ERROR: u64 = 555;
 
 // --- Candid wire types ---
@@ -60,7 +86,14 @@ pub struct SmtpAddress {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SmtpEnvelope {
     pub from: SmtpAddress,
-    pub to: SmtpAddress,
+    /// SMTP allows multiple `RCPT TO` recipients per envelope, so this
+    /// is a `Vec`. The canister-side dispatcher picks the first
+    /// recognised recipient to decide which flow to run; unknown
+    /// recipients in the same vec are ignored. The wire-level
+    /// `smtp_request_validate` query refuses the SMTP transaction
+    /// (550 — "No such user here") only when *no* recipient is
+    /// recognised, mirroring how `RCPT TO` interacts with the gateway.
+    pub to: Vec<SmtpAddress>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -141,7 +174,18 @@ pub fn validate_address_bounds(addr: &SmtpAddress, label: &str) -> Result<(), Sm
 
 pub fn validate_envelope(envelope: &SmtpEnvelope) -> Result<(), SmtpResponse> {
     validate_address_bounds(&envelope.from, "Sender")?;
-    validate_address_bounds(&envelope.to, "Recipient")?;
+    if envelope.to.len() > MAX_RECIPIENTS {
+        return Err(smtp_err(
+            SMTP_ERR_SYNTAX_ERROR,
+            format!(
+                "Too many recipients: {} (max {MAX_RECIPIENTS})",
+                envelope.to.len()
+            ),
+        ));
+    }
+    for to in &envelope.to {
+        validate_address_bounds(to, "Recipient")?;
+    }
     Ok(())
 }
 
@@ -260,7 +304,7 @@ mod tests {
     fn validate_envelope_rejects_oversized_user() {
         let env = SmtpEnvelope {
             from: addr(&"x".repeat(MAX_EMAIL_USER_BYTES + 1), "ok.com"),
-            to: addr("a", "ok.com"),
+            to: vec![addr("a", "ok.com")],
         };
         let resp = validate_envelope(&env).unwrap_err();
         assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
@@ -271,10 +315,69 @@ mod tests {
     fn validate_envelope_rejects_oversized_domain() {
         let env = SmtpEnvelope {
             from: addr("ok", "ok.com"),
-            to: addr("a", &"d".repeat(MAX_EMAIL_DOMAIN_BYTES + 1)),
+            to: vec![addr("a", &"d".repeat(MAX_EMAIL_DOMAIN_BYTES + 1))],
         };
         let resp = validate_envelope(&env).unwrap_err();
         assert!(err_msg(&resp).contains("Recipient domain"));
+    }
+
+    #[test]
+    fn validate_envelope_rejects_any_oversized_recipient() {
+        // Bounds checking must run over every recipient in the vec —
+        // not just the first — otherwise a malformed RCPT TO further
+        // down the list could slip past.
+        let env = SmtpEnvelope {
+            from: addr("ok", "ok.com"),
+            to: vec![
+                addr("recover", "id.ai"),
+                addr(&"x".repeat(MAX_EMAIL_USER_BYTES + 1), "ok.com"),
+            ],
+        };
+        let resp = validate_envelope(&env).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("Recipient user"));
+    }
+
+    #[test]
+    fn validate_envelope_rejects_too_many_recipients() {
+        // `smtp_request` is open; without a cap an attacker could pad
+        // the recipient list out to the ingress size limit. The bound
+        // here keeps worst-case validation/dispatch costs bounded.
+        let env = SmtpEnvelope {
+            from: addr("ok", "ok.com"),
+            to: (0..(MAX_RECIPIENTS + 1))
+                .map(|_| addr("recover", "id.ai"))
+                .collect(),
+        };
+        let resp = validate_envelope(&env).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("Too many recipients"));
+    }
+
+    #[test]
+    fn validate_envelope_accepts_max_recipients() {
+        // Exactly at the cap must still pass — defines the inclusive
+        // upper bound.
+        let env = SmtpEnvelope {
+            from: addr("ok", "ok.com"),
+            to: (0..MAX_RECIPIENTS)
+                .map(|_| addr("recover", "id.ai"))
+                .collect(),
+        };
+        assert!(validate_envelope(&env).is_ok());
+    }
+
+    #[test]
+    fn validate_envelope_accepts_empty_to_vec() {
+        // Bounds-only check: an empty `to` vec is shape-valid here.
+        // The recipient-dispatch logic in `email_recovery::smtp`
+        // separately rejects "no known recipient" with 550 — that
+        // semantic isn't this helper's job.
+        let env = SmtpEnvelope {
+            from: addr("ok", "ok.com"),
+            to: vec![],
+        };
+        assert!(validate_envelope(&env).is_ok());
     }
 
     #[test]
@@ -319,7 +422,7 @@ mod tests {
         let req = SmtpRequest {
             envelope: Some(SmtpEnvelope {
                 from: addr("alice", "gmail.com"),
-                to: addr("recover", "id.ai"),
+                to: vec![addr("recover", "id.ai")],
             }),
             message: None,
             gateway_flags: None,

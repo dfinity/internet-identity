@@ -126,9 +126,7 @@ test.describe("First visit", () => {
       if (await existingMenuButton.isVisible()) {
         await existingMenuButton.click();
       }
-      await existingDevicePage
-        .getByRole("link", { name: "Access and recovery" })
-        .click();
+      await existingDevicePage.getByRole("link", { name: "Access" }).click();
       await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
       // Switch to new device and verify we are signed in
