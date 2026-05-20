@@ -244,7 +244,7 @@ export const removePasskey = async (
     ),
   ).toBeVisible();
   const signedInMessage = page.getByText(
-    "As you are currently signed in with this passkey, you will be signed out.",
+    "As you are currently signed in with this access method, you will be signed out immediately after removal.",
   );
   if (isCurrent) {
     await expect(signedInMessage).toBeVisible();
@@ -253,7 +253,7 @@ export const removePasskey = async (
   }
 
   // Remove the passkey
-  await page.getByRole("button", { name: "Remove passkey" }).click();
+  await page.getByRole("button", { name: "Remove" }).click();
 
   // Wait for the remove dialog to close
   await expect(
