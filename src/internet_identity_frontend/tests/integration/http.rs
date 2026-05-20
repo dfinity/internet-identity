@@ -194,6 +194,15 @@ fn frontend_canister_serves_ic_smtp_canister_id() -> Result<(), RejectResponse> 
         expected_principal,
     );
 
+    let (_, content_type) = http_response
+        .headers
+        .iter()
+        .find(|(name, _)| name.to_lowercase() == "content-type")
+        .expect("Content-Type header not found");
+    assert_eq!(
+        content_type, "text/plain",
+        "unexpected Content-Type header value"
+    );
     verify_frontend_security_headers(&http_response.headers);
 
     let result = verify_response_certification(

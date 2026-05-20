@@ -393,7 +393,7 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
         url_path: "/.well-known/ic-smtp-canister-id".to_string(),
         content: config.backend_canister_id.to_text().into_bytes(),
         encoding: ContentEncoding::Identity,
-        content_type: ContentType::OCTETSTREAM,
+        content_type: ContentType::TXT,
     });
 
     // Add .well-known/webauthn for passkey sharing if related_origins is configured
