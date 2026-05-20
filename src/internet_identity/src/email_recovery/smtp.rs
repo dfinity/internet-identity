@@ -514,28 +514,32 @@ fn prepare_partial_verification(
         ));
     }
 
-    // Signature-header-only tag enforcement (design §5.4). These are
-    // the same checks the DoH path runs inside `crate::dkim::verify`;
-    // running them here closes the DNSSEC-path parity gap surfaced by
-    // the audit: without these, a sender on a DNSSEC-signed domain
-    // could verify with a stale `x=` (replay window stretches to the
-    // RRSIG validity, days–weeks), a future-dated `t=`, or an `h=`
-    // that doesn't cover `Subject` (nonce-rewrite by a MITM). The
-    // DNS-record-dependent tag checks (`i=` alignment under `t=s`,
-    // and `t=y` testing-mode) run later in
+    // Signature-header-only tag contract (design §5.4): `x=` not
+    // expired, `t=` not future-dated, `Subject` ∈ `h=`. Single shared
+    // umbrella with the DoH path — adding a new signature-header
+    // check there means both paths pick it up at once. Closes the
+    // DNSSEC-path parity gap surfaced by the audit (without these,
+    // the DNSSEC path admitted signatures the DoH path rejected).
+    // The DNS-record-dependent tag checks (`i=` alignment under
+    // `t=s`, `t=y` testing-mode) run later in
     // `submit_dkim_leaf::run_submit` once the DKIM leaf has been
     // DNSSEC-verified.
-    crate::dkim::check_signature_not_expired(&sig, now_secs)
-        .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
-    crate::dkim::check_signature_not_from_future(&sig, now_secs)
-        .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
-    // Subject must be in the signed `h=` list (design §5.4). The
-    // challenge nonce lives in `Subject:`; a signature that doesn't
-    // cover it would let a man-in-the-middle rewrite the nonce on a
-    // legitimately-signed email. Runs before the body-hash check
-    // (the order the DoH path uses too) so this fast check on
-    // already-parsed tags fails first when both apply.
-    crate::dkim::check_subject_signed(&sig).map_err(|_| EmailRecoveryError::SubjectNotSigned)?;
+    //
+    // Subject coverage and the DoH path's diagnostic trail are both
+    // satisfied by the umbrella; we surface `SubjectNotSigned`
+    // separately because it's user-actionable (the FE shows a
+    // dedicated copy) whereas the other failures all fold into
+    // `EmailVerificationFailed`.
+    if let Err((reason, _trail)) =
+        crate::dkim::enforce_signature_header_tag_contract(&sig, now_secs)
+    {
+        return Err(match reason {
+            crate::dkim::VerificationFailReason::SubjectNotSigned => {
+                EmailRecoveryError::SubjectNotSigned
+            }
+            other => EmailRecoveryError::EmailVerificationFailed(format!("{other:?}")),
+        });
+    }
     let subject_signed = true;
 
     // Body hash check (`bh=`). After this passes, the body bytes

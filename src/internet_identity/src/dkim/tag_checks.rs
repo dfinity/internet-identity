@@ -1,4 +1,5 @@
-//! Shared DKIM tag-enforcement checks.
+//! Shared DKIM tag-enforcement checks and the **tag-contract facade**
+//! both verification pipelines call into.
 //!
 //! The DKIM verifier runs as two different pipelines depending on
 //! whether the sender's domain is DNSSEC-signed:
@@ -15,24 +16,37 @@
 //! Without a shared check surface the two pipelines drift: an earlier
 //! audit found the DNSSEC path silently bypassing `t=` (future-dated),
 //! `x=` (expiration), `i=` (AUID alignment), and DNS `t=y` (testing
-//! mode), all of which the DoH path enforces. These helpers are the
-//! single source of truth that both pipelines call into.
+//! mode), all of which the DoH path enforces. To make that class of
+//! drift impossible to reintroduce, both pipelines now go through the
+//! *same two umbrella functions*:
 //!
-//! Helpers are split by *what data they need*, not by *which pipeline
-//! calls them*:
+//! - [`enforce_signature_header_tag_contract`] — runs the three
+//!   signature-header-only checks (`x=`, `t=`, Subject in `h=`).
+//!   Called at email-arrival time on both paths.
+//! - [`enforce_dns_record_tag_contract`] — runs the two DNS-record-
+//!   dependent checks (`t=y` testing mode, `i=` AUID alignment under
+//!   `t=s`). Called as soon as the DKIM TXT record is trusted.
 //!
-//! - Signature-header-only: [`check_signature_not_expired`],
-//!   [`check_signature_not_from_future`], [`check_subject_signed`].
-//!   Both pipelines have access to these inputs as soon as the
-//!   `DKIM-Signature` header is parsed.
-//! - DNS-record-dependent: [`check_auid_aligned`] (needs the DNS
-//!   record's `t=s` flag), [`check_dns_not_testing`] (the `t=y` flag).
-//!   The DoH pipeline has the DNS bytes up front; the DNSSEC pipeline
-//!   gets them only after `submit_dkim_leaf`.
+//! Adding a new tag policy means changing exactly one of those two
+//! functions; both pipelines pick the change up automatically.
+//! The individual `check_*` helpers stay public so the per-policy
+//! decision logic is independently unit-testable and reachable from
+//! the property-based parity tests, but no production caller should
+//! invoke them directly — go through the umbrellas.
+//!
+//! ## Diagnostic trail
+//!
+//! The DoH pipeline surfaces a `Vec<DkimCheck>` to the FE so a UI can
+//! render "which step failed". The DNSSEC pipeline doesn't need that
+//! granularity (its failure is wrapped into a single
+//! `EmailRecoveryError`). To keep one source of truth for *what the
+//! trail looks like for each check*, the umbrellas build and return
+//! the trail themselves; the DoH path appends it to its accumulator,
+//! the DNSSEC path discards.
 
 use super::dns_record::DkimDnsRecord;
 use super::parse::DkimSignature;
-use super::types::VerificationFailReason;
+use super::types::{DkimCheck, DkimCheckName, DkimCheckStatus, VerificationFailReason};
 
 /// How far a signature's claimed signing time (`t=`) may sit in the
 /// future relative to the canister's clock before we reject it as
@@ -137,6 +151,166 @@ pub(crate) fn auid_aligns(i: &str, d: &str, strict: bool) -> bool {
     i_domain.len() > d.len()
         && i_domain.ends_with(d)
         && i_domain.as_bytes()[i_domain.len() - d.len() - 1] == b'.'
+}
+
+// =====================================================================
+// Tag-contract facade.
+//
+// The two umbrella functions below are the *only* tag-enforcement
+// entry points production code should use. Both pipelines call into
+// them at the appropriate point in their flow; adding a new tag check
+// means amending exactly one umbrella and both pipelines pick it up.
+//
+// Return shape:
+//   Ok(trail)             — every check passed; trail has one
+//                            `DkimCheck::Pass` entry per check that
+//                            participates in the diagnostic trail.
+//                            Not every check does: `t=y` testing-mode
+//                            in `enforce_dns_record_tag_contract` is a
+//                            meta-flag on the DNS record (RFC 6376
+//                            §3.6.1), not a pass/fail-able step, and
+//                            there is no corresponding `DkimCheckName`
+//                            variant — it never emits a trail entry.
+//                            All other checks emit a Pass entry on
+//                            success.
+//   Err((reason, trail))  — `reason` is the first-failing
+//                            `VerificationFailReason`. The trail
+//                            carries the `Pass` entries from earlier
+//                            checks; the failing step itself appends
+//                            its `Fail` entry iff that step normally
+//                            participates in the trail. (`t=y` is the
+//                            only exception: on rejection it returns
+//                            with the trail unchanged.)
+// Symmetric with [`super::verify::try_verify_signature`]; the DoH
+// pipeline appends the trail to its accumulator, the DNSSEC pipeline
+// discards.
+// =====================================================================
+
+/// Run the three signature-header-only DKIM tag checks (design §5.4):
+/// `x=` not expired, `t=` not future-dated, `Subject` ∈ `h=`. Called
+/// as soon as the `DKIM-Signature` header has been parsed.
+///
+/// On the **DoH path** this runs inside
+/// [`super::verify::try_verify_signature`] right after the
+/// canonicalisation check. On the **DNSSEC path** it runs in
+/// `email_recovery::smtp::prepare_partial_verification` so the
+/// partial-verification record is only stashed if the email already
+/// satisfies the signature-header-only contract.
+pub(crate) fn enforce_signature_header_tag_contract(
+    sig: &DkimSignature,
+    now_secs: u64,
+) -> Result<Vec<DkimCheck>, (VerificationFailReason, Vec<DkimCheck>)> {
+    let mut trail: Vec<DkimCheck> = Vec::new();
+
+    if let Err(reason) = check_signature_not_expired(sig, now_secs) {
+        let detail = sig
+            .x
+            .map(|x| format!("signature expired at {x}, now {now_secs}"));
+        trail.push(check(
+            DkimCheckName::SignatureNotExpired,
+            DkimCheckStatus::Fail,
+            detail,
+        ));
+        return Err((reason, trail));
+    }
+    trail.push(check(
+        DkimCheckName::SignatureNotExpired,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    if let Err(reason) = check_signature_not_from_future(sig, now_secs) {
+        let detail = sig.t.map(|t| {
+            format!("signature claims t={t}, now={now_secs}, beyond {CLOCK_SKEW_SECS}s skew")
+        });
+        trail.push(check(
+            DkimCheckName::SignatureNotFromFuture,
+            DkimCheckStatus::Fail,
+            detail,
+        ));
+        return Err((reason, trail));
+    }
+    trail.push(check(
+        DkimCheckName::SignatureNotFromFuture,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    if let Err(reason) = check_subject_signed(sig) {
+        trail.push(check(
+            DkimCheckName::SubjectSigned,
+            DkimCheckStatus::Fail,
+            Some("h= does not include the Subject header".to_string()),
+        ));
+        return Err((reason, trail));
+    }
+    trail.push(check(
+        DkimCheckName::SubjectSigned,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    Ok(trail)
+}
+
+/// Run the two DNS-record-dependent DKIM tag checks (design §5.4):
+/// reject if the record has `t=y` (testing mode) set, then require
+/// `i=` to align with `d=` per the record's `t=s` flag. Called once
+/// the DKIM TXT is trusted.
+///
+/// On the **DoH path** this runs inside
+/// [`super::verify::try_verify_signature`] after `parse_dkim_txt`. On
+/// the **DNSSEC path** it runs in
+/// `email_recovery::submit_leaf::run_submit` after the chain
+/// validator returns the verified record. Takes `(i, d)` rather than
+/// the whole `DkimSignature` so the DNSSEC submit side — which only
+/// has the cached `PartialVerification` — can call it without
+/// rehydrating the full signature struct.
+pub(crate) fn enforce_dns_record_tag_contract(
+    i: &str,
+    d: &str,
+    dns: &DkimDnsRecord,
+) -> Result<Vec<DkimCheck>, (VerificationFailReason, Vec<DkimCheck>)> {
+    let mut trail: Vec<DkimCheck> = Vec::new();
+
+    // `t=y` testing mode comes before AUID alignment because a
+    // testing-flagged key invalidates any production signature
+    // regardless of how `i=`/`d=` line up — the verdict is more
+    // fundamental and worth surfacing first.
+    if let Err(reason) = check_dns_not_testing(dns) {
+        // No `DkimCheckName` variant for testing mode — RFC 6376
+        // §3.6.1 treats `t=y` as a meta-flag on the record, not a
+        // pass/fail-able step. Return without appending a trail entry:
+        // the surfaced `VerificationFailReason::TestingMode` is the
+        // sole signal upstream. (See the "Return shape" note above
+        // for the documented exception.)
+        return Err((reason, trail));
+    }
+
+    if let Err(reason) = check_auid_aligned(i, d, dns.strict_auid) {
+        let detail = format!("i={i} does not align with d={d} (t=s={})", dns.strict_auid);
+        trail.push(check(
+            DkimCheckName::AuidAlignsWithDomain,
+            DkimCheckStatus::Fail,
+            Some(detail),
+        ));
+        return Err((reason, trail));
+    }
+    trail.push(check(
+        DkimCheckName::AuidAlignsWithDomain,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    Ok(trail)
+}
+
+fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -> DkimCheck {
+    DkimCheck {
+        name,
+        status,
+        detail,
+    }
 }
 
 #[cfg(test)]
@@ -346,5 +520,155 @@ mod tests {
             check_dns_not_testing(&dns(true, false)).unwrap_err(),
             VerificationFailReason::TestingMode
         );
+    }
+
+    // ---- Umbrella facade tests ----
+    //
+    // Each umbrella chains its constituent helpers and returns the
+    // first failing reason along with a `Vec<DkimCheck>` trail that
+    // the DoH path appends to its accumulator. Tests assert: (a) all
+    // pass → `Ok(trail)` with every check `Pass`; (b) one failing
+    // input → `Err((expected_reason, trail))` with the failed step
+    // last; (c) the umbrella stops at the first failure (no later
+    // checks contribute).
+
+    use crate::dkim::DkimCheckStatus as Status;
+
+    #[test]
+    fn signature_header_umbrella_all_pass_returns_full_trail() {
+        let s = sig_with(
+            Some(1_000_000), // t= in the past
+            Some(2_000_000), // x= in the future
+            vec!["From", "Subject"],
+            "alice@example.com",
+            "example.com",
+        );
+        let trail = enforce_signature_header_tag_contract(&s, 1_500_000).expect("must pass");
+        assert_eq!(trail.len(), 3);
+        for c in &trail {
+            assert_eq!(c.status, Status::Pass, "every check should pass; got {c:?}");
+        }
+        // Order is contract-defined: x= first, then t=, then Subject.
+        assert_eq!(trail[0].name, DkimCheckName::SignatureNotExpired);
+        assert_eq!(trail[1].name, DkimCheckName::SignatureNotFromFuture);
+        assert_eq!(trail[2].name, DkimCheckName::SubjectSigned);
+    }
+
+    #[test]
+    fn signature_header_umbrella_short_circuits_on_first_failure() {
+        // x= expired (fails first) AND Subject missing AND t= future:
+        // umbrella must surface SignatureExpired and stop walking.
+        let s = sig_with(
+            Some(9_999_999), // t= future-dated (later check)
+            Some(900_000),   // x= already past
+            vec!["From"],    // Subject missing (later check)
+            "alice@example.com",
+            "example.com",
+        );
+        match enforce_signature_header_tag_contract(&s, 1_000_000) {
+            Err((VerificationFailReason::SignatureExpired, trail)) => {
+                // Only the failing entry plus zero passes before it.
+                assert_eq!(trail.len(), 1);
+                assert_eq!(trail[0].name, DkimCheckName::SignatureNotExpired);
+                assert_eq!(trail[0].status, Status::Fail);
+            }
+            other => panic!("expected SignatureExpired, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn signature_header_umbrella_subject_failure_surfaces_after_earlier_passes() {
+        let s = sig_with(
+            None,
+            None,
+            vec!["From"], // Subject missing
+            "alice@example.com",
+            "example.com",
+        );
+        match enforce_signature_header_tag_contract(&s, 1_000_000) {
+            Err((VerificationFailReason::SubjectNotSigned, trail)) => {
+                // Two preceding passes (x=, t=) plus the SubjectSigned Fail.
+                assert_eq!(trail.len(), 3);
+                assert_eq!(trail[2].name, DkimCheckName::SubjectSigned);
+                assert_eq!(trail[2].status, Status::Fail);
+            }
+            other => panic!("expected SubjectNotSigned, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dns_record_umbrella_all_pass_returns_alignment_pass_only() {
+        // t=y clear, i=/d= aligned. The umbrella runs t=y first (no
+        // dedicated DkimCheck variant — see doc on the umbrella) then
+        // AuidAlignsWithDomain. So a clean pass yields exactly one
+        // Pass entry: AuidAlignsWithDomain.
+        let trail =
+            enforce_dns_record_tag_contract("alice@example.com", "example.com", &dns(false, false))
+                .expect("must pass");
+        assert_eq!(trail.len(), 1);
+        assert_eq!(trail[0].name, DkimCheckName::AuidAlignsWithDomain);
+        assert_eq!(trail[0].status, Status::Pass);
+    }
+
+    #[test]
+    fn dns_record_umbrella_testing_mode_surfaces_first() {
+        // t=y set AND AUID misaligned: TestingMode wins because the
+        // umbrella checks it first (a testing-flagged key invalidates
+        // the signature regardless of `i=`/`d=` state). No trail
+        // entries for testing mode (RFC 6376 §3.6.1 treats it as a
+        // meta-flag).
+        match enforce_dns_record_tag_contract(
+            "alice@evil.com",
+            "example.com",
+            &dns(true, false), // testing=true
+        ) {
+            Err((VerificationFailReason::TestingMode, trail)) => {
+                assert!(trail.is_empty(), "TestingMode emits no trail entry");
+            }
+            other => panic!("expected TestingMode, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dns_record_umbrella_auid_failure_after_testing_pass() {
+        match enforce_dns_record_tag_contract(
+            "alice@evil.com",
+            "example.com",
+            &dns(false, false), // testing clear, AUID misaligned
+        ) {
+            Err((VerificationFailReason::AuidMisaligned, trail)) => {
+                assert_eq!(trail.len(), 1);
+                assert_eq!(trail[0].name, DkimCheckName::AuidAlignsWithDomain);
+                assert_eq!(trail[0].status, Status::Fail);
+            }
+            other => panic!("expected AuidMisaligned, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn umbrellas_chain_to_match_individual_helpers() {
+        // The umbrellas are nothing but ordered chains of the
+        // individual `check_*` helpers. If for any input the umbrella
+        // disagreed with the helpers about pass/fail, that would
+        // mean a check silently slipped out of the chain — the exact
+        // bug class this design is meant to make impossible.
+        let s = sig_with(
+            None,
+            None,
+            vec!["From", "Subject"],
+            "alice@example.com",
+            "example.com",
+        );
+        let r = dns(false, false);
+
+        // Both individual helpers AND the umbrella accept this input.
+        assert!(check_signature_not_expired(&s, 1_000_000).is_ok());
+        assert!(check_signature_not_from_future(&s, 1_000_000).is_ok());
+        assert!(check_subject_signed(&s).is_ok());
+        assert!(check_dns_not_testing(&r).is_ok());
+        assert!(check_auid_aligned(&s.i, &s.d, r.strict_auid).is_ok());
+
+        assert!(enforce_signature_header_tag_contract(&s, 1_000_000).is_ok());
+        assert!(enforce_dns_record_tag_contract(&s.i, &s.d, &r).is_ok());
     }
 }

@@ -292,13 +292,21 @@ fn run_submit(
         EmailRecoveryError::EmailVerificationFailed(format!("DKIM DNS record: {e}"))
     })?;
 
-    // DNS-record-dependent DKIM tag enforcement (design §5.4). See
-    // [`enforce_dns_record_tag_checks`].
-    enforce_dns_record_tag_checks(
-        &dns_record,
+    // DNS-record-dependent DKIM tag contract (design §5.4). Routes
+    // through the same shared umbrella the DoH path calls so the
+    // `t=y` and AUID-alignment policies stay in lock-step across
+    // pipelines. The trail the umbrella builds is the DoH-side
+    // diagnostic; we discard it here because the DNSSEC path
+    // collapses every failure into a single `EmailRecoveryError`.
+    if let Err((reason, _trail)) = crate::dkim::enforce_dns_record_tag_contract(
         &snapshot.signing_auid,
         &snapshot.signing_domain,
-    )?;
+        &dns_record,
+    ) {
+        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            "{reason:?}"
+        )));
+    }
 
     // Step 5: complete the cryptographic signature check.
     //
@@ -390,26 +398,6 @@ fn run_submit(
         return Err(EmailRecoveryError::AddressMismatch);
     }
 
-    Ok(())
-}
-
-/// Apply the DKIM tag checks that depend on flags published in the
-/// DKIM TXT record. Runs at submit time on the DNSSEC path — the
-/// signature-header-only checks (`x=`, `t=`, Subject in `h=`) have
-/// already run at `smtp::prepare_partial_verification`. Shared with
-/// the DoH path via [`crate::dkim::check_dns_not_testing`] and
-/// [`crate::dkim::check_auid_aligned`]; extracted so the DNSSEC-path
-/// wiring is unit-testable without spinning up the full DNSSEC chain
-/// validator.
-fn enforce_dns_record_tag_checks(
-    dns_record: &crate::dkim::DkimDnsRecord,
-    signing_auid: &str,
-    signing_domain: &str,
-) -> Result<(), EmailRecoveryError> {
-    crate::dkim::check_dns_not_testing(dns_record)
-        .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
-    crate::dkim::check_auid_aligned(signing_auid, signing_domain, dns_record.strict_auid)
-        .map_err(|reason| EmailRecoveryError::EmailVerificationFailed(format!("{reason:?}")))?;
     Ok(())
 }
 
@@ -514,86 +502,10 @@ fn verify_ed25519_prehashed(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::dkim::{DkimDnsRecord, KeyType};
-
-    fn dns(testing: bool, strict_auid: bool) -> DkimDnsRecord {
-        DkimDnsRecord {
-            key_type: KeyType::Rsa,
-            // 1-byte placeholder — `enforce_dns_record_tag_checks`
-            // never looks at the key material.
-            public_key: vec![0u8; 1],
-            testing,
-            strict_auid,
-        }
-    }
-
-    #[test]
-    fn enforce_rejects_dns_record_with_testing_flag() {
-        // t=y published on the DKIM record — never accept the
-        // signature, even if everything else lines up.
-        let r =
-            enforce_dns_record_tag_checks(&dns(true, false), "alice@example.com", "example.com");
-        match r {
-            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
-                assert!(msg.contains("TestingMode"), "got {msg}");
-            }
-            other => panic!("expected TestingMode rejection, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn enforce_rejects_subdomain_auid_when_dns_strict_set() {
-        // `i=alice@mail.example.com`, `d=example.com`, DNS `t=s` set →
-        // strict alignment requires exact match; reject.
-        let r = enforce_dns_record_tag_checks(
-            &dns(false, true),
-            "alice@mail.example.com",
-            "example.com",
-        );
-        match r {
-            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
-                assert!(msg.contains("AuidMisaligned"), "got {msg}");
-            }
-            other => panic!("expected AuidMisaligned rejection, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn enforce_accepts_subdomain_auid_when_dns_loose() {
-        // Same i=/d=, DNS `t=s` clear (default) → subdomain alignment
-        // is allowed.
-        let r = enforce_dns_record_tag_checks(
-            &dns(false, false),
-            "alice@mail.example.com",
-            "example.com",
-        );
-        assert!(r.is_ok(), "expected Ok, got {r:?}");
-    }
-
-    #[test]
-    fn enforce_accepts_exact_auid_match() {
-        let r =
-            enforce_dns_record_tag_checks(&dns(false, true), "alice@example.com", "example.com");
-        assert!(r.is_ok(), "expected Ok, got {r:?}");
-    }
-
-    #[test]
-    fn enforce_rejects_evil_suffix_auid() {
-        // `evilexample.com` must not match `example.com` even in
-        // loose-alignment mode (label-anchored suffix).
-        let r = enforce_dns_record_tag_checks(
-            &dns(false, false),
-            "alice@evilexample.com",
-            "example.com",
-        );
-        match r {
-            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
-                assert!(msg.contains("AuidMisaligned"), "got {msg}");
-            }
-            other => panic!("expected AuidMisaligned rejection, got {other:?}"),
-        }
-    }
-}
+// Tests for the DNS-record tag contract live alongside the umbrella
+// in `crate::dkim::tag_checks::tests`. The DNSSEC submit-side mapping
+// of `(VerificationFailReason, _) → EmailRecoveryError::
+// EmailVerificationFailed` is a trivial one-liner; the DNSSEC-prepare
+// half of the same pattern (the `?` mapping inside
+// `prepare_partial_verification`) is exercised end-to-end by
+// `email_recovery::smtp::tests::dnssec_prepare_rejects_*`.
