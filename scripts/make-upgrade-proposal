@@ -28,13 +28,17 @@ print_help() {
 	Performs or guides the steps in the Internet Identity release SOP checklist.
 
 	To start a new release process, run:
-	  ./make-upgrade-proposal.sh --new --name release-\$(date +%Y-%m-%d)
+	  ./make-upgrade-proposal --new --name release-\$(date +%Y-%m-%d)
 
 	To start a new release process on the same day as a previous release, run:
-	  ./make-upgrade-proposal.sh --new --name release-\$(date +%Y-%m-%d)-v2
+	  ./make-upgrade-proposal --new --name release-\$(date +%Y-%m-%d)-v2
 
 	To continue an existing release process, run:
-	  ./make-upgrade-proposal.sh --continue --name <release-used-on-new>
+	  ./make-upgrade-proposal --continue --name <release-used-on-new>
+
+	To create an args-only proposal that re-uses the wasm currently on
+	chain (auto-resolved from the latest proposal-\\<role\\>-* tag), run:
+	  ./make-upgrade-proposal --reconfigure
 
 	EOF
 }
@@ -44,17 +48,30 @@ source "$SOURCE_DIR/clap.bash"
 # Define options
 clap.define long=new desc="Start a new release branch" variable=IS_NEW_RELEASE nargs=0 default="false"
 clap.define long=continue desc="Continue with an existing release branch" variable=CONTINUE nargs=0 default="false"
+clap.define long=reconfigure desc="Args-only proposal: re-use the wasm currently on chain (auto-resolved from latest proposal-<role>-* tag)" variable=IS_RECONFIGURE nargs=0 default="false"
 clap.define long=name desc="The name of the new release branch" variable=TAG_NAME
 # Source the output file ------------------------------------------------------
 source "$(clap.build)"
 
-if [ "$IS_NEW_RELEASE" = "true" ] && [ "$CONTINUE" = "true" ]; then
-  echo "Cannot specify both --new and --continue" >&2
+# Exactly one mode flag must be set. --reconfigure is incompatible with
+# --new/--continue because it owns both TAG_NAME and CHECKLIST_FILE
+# selection internally — there's nothing left to specify or resume.
+mode_count=0
+[ "$IS_NEW_RELEASE" = "true" ] && mode_count=$((mode_count + 1))
+[ "$CONTINUE" = "true" ] && mode_count=$((mode_count + 1))
+[ "$IS_RECONFIGURE" = "true" ] && mode_count=$((mode_count + 1))
+
+if [ "$mode_count" -eq 0 ]; then
+  echo "Must specify one of --new, --continue, --reconfigure" >&2
+  exit 1
+fi
+if [ "$mode_count" -gt 1 ]; then
+  echo "--new, --continue, --reconfigure are mutually exclusive" >&2
   exit 1
 fi
 
-if [ "$IS_NEW_RELEASE" = "false" ] && [ "$CONTINUE" = "false" ]; then
-  echo "Must specify either --new or --continue" >&2
+if [ "$IS_RECONFIGURE" = "true" ] && [ -n "${TAG_NAME+x}" ]; then
+  echo "--name is not allowed with --reconfigure (the release tag is auto-resolved from the latest proposal-<role>-* tag)" >&2
   exit 1
 fi
 
@@ -102,28 +119,33 @@ execute() {
 
 RELEASE_NAME_PATTERN="^release-[0-9]{4}-[0-9]{2}-[0-9]{2}"
 
-if [ -z "${TAG_NAME+x}" ]; then
-  echo "Must specify TAG_NAME"
-  echo ""
-  echo "Make sure to checkout the latest main branch,"
-  echo "and then create a git release tag: release-yyyy-mm-dd"
-  echo ""
-  echo "Then use the following command to start: TAG_NAME=release-yyyy-mm-dd ./scripts/make_upgrade_proposal --new"
-  exit 1;
-fi
+# --new / --continue require an explicit --name. --reconfigure resolves
+# it later (from the latest proposal-<role>-* tag), so defer the
+# TAG_NAME and CHECKLIST_FILE setup until after the helpers are defined.
+if [ "$IS_RECONFIGURE" != "true" ]; then
+  if [ -z "${TAG_NAME+x}" ]; then
+    echo "Must specify TAG_NAME"
+    echo ""
+    echo "Make sure to checkout the latest main branch,"
+    echo "and then create a git release tag: release-yyyy-mm-dd"
+    echo ""
+    echo "Then use the following command to start: TAG_NAME=release-yyyy-mm-dd ./scripts/make_upgrade_proposal --new"
+    exit 1;
+  fi
 
-if [ "$IS_NEW_RELEASE" = "true" ]; then
-  CHECKLIST_FILE="${SOURCE_DIR}/${TAG_NAME}.json"
+  if [ "$IS_NEW_RELEASE" = "true" ]; then
+    CHECKLIST_FILE="${SOURCE_DIR}/${TAG_NAME}.json"
 
-  echo "[]" >"$CHECKLIST_FILE"
-else
+    echo "[]" >"$CHECKLIST_FILE"
+  else
 
-  CHECKLIST_FILE="${SOURCE_DIR}/${TAG_NAME}.json"
+    CHECKLIST_FILE="${SOURCE_DIR}/${TAG_NAME}.json"
 
-  if [ ! -f "$CHECKLIST_FILE" ]; then
-    echo "Error: Checklist '$CHECKLIST_FILE' not found!" >&2
-    exit 1
-fi
+    if [ ! -f "$CHECKLIST_FILE" ]; then
+      echo "Error: Checklist '$CHECKLIST_FILE' not found!" >&2
+      exit 1
+    fi
+  fi
 fi
 
 TOP_DIR=$(execute git rev-parse --show-toplevel)
@@ -1207,6 +1229,97 @@ create_forum_post() {
     echo "$url"
   fi
 }
+
+# --reconfigure: derive TAG_NAME from the latest proposal-<role>-* tag
+# and pre-populate the checklist so the wasm/tag/release-page steps
+# don't fire. Runs here (rather than at clap-parse time) because it
+# needs select_canisters_to_upgrade and resolve_release_tag.
+if [ "$IS_RECONFIGURE" = "true" ]; then
+  echo "=== --reconfigure mode (args-only proposal) ==="
+  echo "Re-uses the wasm currently on chain — only the install args"
+  echo "change. The release tag is auto-resolved from the most recent"
+  echo "proposal-<role>-* tag."
+  echo ""
+
+  RECONFIGURE_TYPE=$(select_canisters_to_upgrade)
+
+  # Make sure proposal-*-* tags are fresh enough to resolve.
+  git fetch "$REPO_HTTPS_URL" --tags --force >&2
+
+  resolve_latest_release_for() {
+    local role="$1"
+    local prop_tag
+    prop_tag=$(git tag -l "proposal-${role}-*" | sort -V | tail -1)
+    if [ -z "$prop_tag" ]; then
+      echo "No proposal-${role}-* tag found; nothing to reconfigure." >&2
+      return 1
+    fi
+    local release_tag
+    release_tag=$(resolve_release_tag "$prop_tag")
+    if [ -z "$release_tag" ]; then
+      echo "Could not resolve ${prop_tag} to a release-* tag." >&2
+      return 1
+    fi
+    echo "$release_tag"
+  }
+
+  if should_upgrade_backend "$RECONFIGURE_TYPE"; then
+    BE_RELEASE_TAG=$(resolve_latest_release_for backend) || exit 1
+  fi
+  if should_upgrade_frontend "$RECONFIGURE_TYPE"; then
+    FE_RELEASE_TAG=$(resolve_latest_release_for frontend) || exit 1
+  fi
+
+  if [ "$RECONFIGURE_TYPE" = "both" ]; then
+    # The script has one TAG_NAME, so reconfiguring both at once only
+    # works if the latest BE and FE proposals point at the same release.
+    # Otherwise we'd have to download two different wasms with two
+    # different release tags, which the rest of the script isn't wired
+    # for. Tell the user to do them separately.
+    if [ "$BE_RELEASE_TAG" != "$FE_RELEASE_TAG" ]; then
+      echo "Latest backend proposal points at $BE_RELEASE_TAG;" >&2
+      echo "latest frontend proposal points at $FE_RELEASE_TAG." >&2
+      echo "Run --reconfigure separately for each canister." >&2
+      exit 1
+    fi
+    TAG_NAME="$BE_RELEASE_TAG"
+  elif [ "$RECONFIGURE_TYPE" = "backend" ]; then
+    TAG_NAME="$BE_RELEASE_TAG"
+  else
+    TAG_NAME="$FE_RELEASE_TAG"
+  fi
+
+  # Pick a unique checklist filename — never overwrite a prior run.
+  # Format: reconfigure-<role>-<date>[-vN].json
+  RECONFIGURE_DATE=$(date +%Y-%m-%d)
+  RECONFIGURE_BASE="reconfigure-${RECONFIGURE_TYPE}-${RECONFIGURE_DATE}"
+  CHECKLIST_FILE="${SOURCE_DIR}/${RECONFIGURE_BASE}.json"
+  RECONFIGURE_VARIANT=2
+  while [ -f "$CHECKLIST_FILE" ]; do
+    CHECKLIST_FILE="${SOURCE_DIR}/${RECONFIGURE_BASE}-v${RECONFIGURE_VARIANT}.json"
+    RECONFIGURE_VARIANT=$((RECONFIGURE_VARIANT + 1))
+  done
+
+  # Pre-populate the steps that don't apply when re-using the on-chain
+  # wasm. The keys must match what confirm_cmd / confirm_manual /
+  # record compute internally; see those helpers above.
+  jq -n \
+    --arg upgrade_type "$RECONFIGURE_TYPE" \
+    --arg git_fetch_cmd "git fetch $REPO_HTTPS_URL --tags --force" \
+    --arg git_tag_cmd "git tag -f $TAG_NAME" \
+    '[
+      {name: "Upgrade type",                value: $upgrade_type},
+      {name: $git_fetch_cmd,                value: "Done"},
+      {name: $git_tag_cmd,                  value: "Done"},
+      {name: "New tag pushed",              value: "Done"},
+      {name: "wait_for_release",            value: "Done"},
+      {name: "Review release page update",  value: "Done"}
+    ]' > "$CHECKLIST_FILE"
+
+  echo "Resolved release tag: ${TAG_NAME}"
+  echo "Created checklist:    ${CHECKLIST_FILE}"
+  echo ""
+fi
 
 echo Checklist file: "$CHECKLIST_FILE"
 
