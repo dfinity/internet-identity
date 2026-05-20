@@ -52,5 +52,12 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
         content_type: ContentType::OCTETSTREAM,
     });
 
+    assets.push(Asset {
+        url_path: "/.well-known/ic-smtp-canister-id".to_string(),
+        content: ic_cdk::api::id().to_text().into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
+
     assets
 }
