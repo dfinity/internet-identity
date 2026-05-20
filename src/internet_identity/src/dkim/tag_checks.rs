@@ -736,7 +736,14 @@ mod property_tests {
         let t_strat = prop::option::of(small_time.clone());
         let x_strat = prop::option::of(small_time);
 
-        (d_strat, h_strat, t_strat, x_strat, any::<u8>(), "[a-z]{0,8}")
+        (
+            d_strat,
+            h_strat,
+            t_strat,
+            x_strat,
+            any::<u8>(),
+            "[a-z]{0,8}",
+        )
             .prop_flat_map(|(d, h, t, x, mode, local)| {
                 let d_clone = d.clone();
                 let i_strat = match mode % 3 {
@@ -774,6 +781,41 @@ mod property_tests {
         })
     }
 
+    /// Assert that `umbrella`'s verdict matches the conjunction of an
+    /// ordered list of per-helper results, AND that on rejection the
+    /// umbrella surfaces exactly the first failing helper's reason.
+    /// Captures the "umbrella is the ordered chain of its constituent
+    /// checks" contract in one place so adding a new umbrella later
+    /// is a single call rather than a copy-pasted if-let-else
+    /// cascade.
+    fn assert_facade_parity(
+        helpers: &[Result<(), VerificationFailReason>],
+        umbrella: Result<Vec<DkimCheck>, (VerificationFailReason, Vec<DkimCheck>)>,
+    ) -> Result<(), TestCaseError> {
+        let first_fail = helpers.iter().find_map(|r| r.clone().err());
+        match (umbrella, first_fail) {
+            (Ok(_), None) => Ok(()),
+            (Err((reason, _)), Some(expected)) => {
+                prop_assert_eq!(reason, expected);
+                Ok(())
+            }
+            (Ok(_), Some(missed)) => {
+                prop_assert!(
+                    false,
+                    "umbrella accepted but a helper rejected with {missed:?}"
+                );
+                Ok(())
+            }
+            (Err((spurious, _)), None) => {
+                prop_assert!(
+                    false,
+                    "umbrella rejected with {spurious:?} but no helper did"
+                );
+                Ok(())
+            }
+        }
+    }
+
     proptest! {
         /// The signature-header umbrella accepts iff every constituent
         /// check accepts, and on rejection its reason matches the first-
@@ -784,28 +826,14 @@ mod property_tests {
             sig in arb_signature(),
             now in 0u64..3_000_000_000u64,
         ) {
-            let r_x = check_signature_not_expired(&sig, now);
-            let r_t = check_signature_not_from_future(&sig, now);
-            let r_subject = check_subject_signed(&sig);
-            let umbrella = enforce_signature_header_tag_contract(&sig, now);
-
-            // Verdict parity.
-            let all_helpers_pass = r_x.is_ok() && r_t.is_ok() && r_subject.is_ok();
-            prop_assert_eq!(all_helpers_pass, umbrella.is_ok());
-
-            // Reason parity on failure.
-            if let Err((reason, _trail)) = umbrella {
-                let expected = if let Err(e) = r_x {
-                    e
-                } else if let Err(e) = r_t {
-                    e
-                } else if let Err(e) = r_subject {
-                    e
-                } else {
-                    panic!("umbrella rejected but no helper did");
-                };
-                prop_assert_eq!(reason, expected);
-            }
+            assert_facade_parity(
+                &[
+                    check_signature_not_expired(&sig, now),
+                    check_signature_not_from_future(&sig, now),
+                    check_subject_signed(&sig),
+                ],
+                enforce_signature_header_tag_contract(&sig, now),
+            )?;
         }
 
         /// The DNS-record umbrella accepts iff every constituent check
@@ -817,23 +845,13 @@ mod property_tests {
             sig in arb_signature(),
             dns in arb_dns_record(),
         ) {
-            let r_testing = check_dns_not_testing(&dns);
-            let r_auid = check_auid_aligned(&sig.i, &sig.d, dns.strict_auid);
-            let umbrella = enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns);
-
-            let all_helpers_pass = r_testing.is_ok() && r_auid.is_ok();
-            prop_assert_eq!(all_helpers_pass, umbrella.is_ok());
-
-            if let Err((reason, _trail)) = umbrella {
-                let expected = if let Err(e) = r_testing {
-                    e
-                } else if let Err(e) = r_auid {
-                    e
-                } else {
-                    panic!("umbrella rejected but no helper did");
-                };
-                prop_assert_eq!(reason, expected);
-            }
+            assert_facade_parity(
+                &[
+                    check_dns_not_testing(&dns),
+                    check_auid_aligned(&sig.i, &sig.d, dns.strict_auid),
+                ],
+                enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns),
+            )?;
         }
 
         /// Calling either umbrella twice on the same input gives the
