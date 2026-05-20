@@ -172,14 +172,16 @@
 
         // If even the best candidate clips, clamp into the viewport so the
         // tooltip is fully visible even when no anchored placement fits.
-        bestLeft = Math.max(
-          margin,
-          Math.min(bestLeft, window.innerWidth - tooltipRect.width - margin),
-        );
-        bestTop = Math.max(
-          margin,
-          Math.min(bestTop, window.innerHeight - tooltipRect.height - margin),
-        );
+        if (bestScore > 0) {
+          bestLeft = Math.max(
+            margin,
+            Math.min(bestLeft, window.innerWidth - tooltipRect.width - margin),
+          );
+          bestTop = Math.max(
+            margin,
+            Math.min(bestTop, window.innerHeight - tooltipRect.height - margin),
+          );
+        }
 
         tooltipRef.style.top = `${bestTop}px`;
         tooltipRef.style.left = `${bestLeft}px`;

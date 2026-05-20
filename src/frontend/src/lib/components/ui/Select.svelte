@@ -77,7 +77,7 @@
         <Tooltip
           label={option.tooltip ?? ""}
           hidden={option.tooltip === undefined ? true : undefined}
-          direction="right"
+          direction="left"
           distance="0.9rem"
         >
           <button
