@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "@lucide/svelte";
+  import {
+    ArrowLeftRightIcon,
+    EllipsisVerticalIcon,
+    PencilIcon,
+    Trash2Icon,
+  } from "@lucide/svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -18,7 +23,10 @@
     recoveryPhraseStatus: "missing" | "unverified" | "verified";
     onRename?: () => void;
     onRemove?: () => void;
+    onSwitch?: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastAccessMethod?: boolean;
+    isSignedInWithRecovery?: boolean;
   }
 
   const {
@@ -26,7 +34,10 @@
     recoveryPhraseStatus,
     onRename,
     onRemove,
-    isCurrentAccessMethod,
+    onSwitch,
+    isCurrentAccessMethod = false,
+    isLastAccessMethod = false,
+    isSignedInWithRecovery = true,
   }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
@@ -69,18 +80,36 @@
           },
         ]
       : []),
+    ...(onSwitch !== undefined
+      ? [
+          {
+            label: $t`Switch`,
+            icon: ArrowLeftRightIcon,
+            disabled: isCurrentAccessMethod,
+            tooltip: isCurrentAccessMethod ? $t`Already signed-in` : undefined,
+            onClick: onSwitch,
+          },
+        ]
+      : []),
     ...(onRemove !== undefined
       ? [
           {
             label: $t`Remove`,
             icon: Trash2Icon,
-            disabled: isLegacy && recoveryPhraseStatus !== "verified",
+            disabled:
+              (isCurrentAccessMethod && !isLastAccessMethod) ||
+              (isLastAccessMethod && !isSignedInWithRecovery) ||
+              (isLegacy && recoveryPhraseStatus !== "verified"),
             tooltip:
-              isLegacy && recoveryPhraseStatus !== "verified"
-                ? recoveryPhraseStatus === "unverified"
-                  ? $t`Verify recovery to remove`
-                  : $t`Activate recovery to remove`
-                : undefined,
+              isCurrentAccessMethod && !isLastAccessMethod
+                ? $t`Switch to another method before removing`
+                : isLastAccessMethod && !isSignedInWithRecovery
+                  ? $t`Sign in with a recovery method to remove`
+                  : isLegacy && recoveryPhraseStatus !== "verified"
+                    ? recoveryPhraseStatus === "unverified"
+                      ? $t`Verify recovery to remove`
+                      : $t`Activate recovery to remove`
+                    : undefined,
             onClick: onRemove,
           },
         ]
