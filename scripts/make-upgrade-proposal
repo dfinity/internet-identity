@@ -429,20 +429,74 @@ detect_release_wasm_change() {
   fi
 }
 
+# Compare a local wasm sha256 against the on-chain module_hash of a
+# canister on mainnet. This is the authoritative source for "is this
+# an args-only proposal?" — looking at GitHub release artifacts (or
+# proposal-<role>-* tags, which we used to do) is misleading because a
+# release can exist without ever having been adopted by a proposal
+# (rejected proposal, manually-pushed tag, leftover from a draft).
+# Falls back to "true" on any failure so the proposal stays
+# conservative when we can't tell.
+#
+# Args:
+#   $1 canister-id        principal of the canister to query
+#   $2 local-wasm-path    path on disk to compare against
+detect_canister_wasm_change() {
+  local canister_id="$1"
+  local local_wasm="$2"
+
+  if [ ! -r "$local_wasm" ]; then
+    echo "Local wasm '${local_wasm}' is missing or unreadable; treating ${canister_id}'s wasm as changed." >&2
+    echo "true"
+    return
+  fi
+
+  # --public reads module_hash from the state tree (no controllership
+  # needed); --identity anonymous avoids the "failed to read password"
+  # prompt that fires when the default identity is encrypted.
+  local onchain_hash
+  if ! onchain_hash=$(icp canister status "$canister_id" -e ic --public --identity anonymous --json 2>/dev/null | jq -er '.module_hash'); then
+    echo "Could not read on-chain module_hash for ${canister_id}; treating as changed." >&2
+    echo "true"
+    return
+  fi
+  # The state tree returns module_hash as "0x<hex>"; sha256sum on the
+  # local wasm produces just "<hex>". Strip the prefix before comparing.
+  onchain_hash="${onchain_hash#0x}"
+
+  local local_hash
+  local_hash=$(sha256 "$local_wasm")
+
+  echo "On-chain module_hash (${canister_id}): $onchain_hash" >&2
+  echo "Local wasm hash:                              $local_hash" >&2
+
+  if [ "$onchain_hash" = "$local_hash" ]; then
+    echo "false"
+  else
+    echo "true"
+  fi
+}
+
 # Per-wasm wrappers — the script uses these as `record` commands so the
 # output is captured in the checklist as a "true"/"false" flag.
+#
+# `detect_archive_hash_change` deliberately still compares against the
+# previous release's archive.wasm.gz (not on-chain), because the
+# archive bytes aren't a directly-queryable canister's module_hash —
+# they're stored inside the II BE's state and the BE installs them
+# into child canisters on demand. The flag is used solely to decide
+# whether to include `--archive-hash` in the verify-hash command voters
+# run; it's not the args-only-vs-upgrade detection.
 detect_archive_hash_change() {
   detect_release_wasm_change "proposal-backend" "archive.wasm.gz" ./archive.wasm.gz
 }
 
 detect_ii_hash_change() {
-  # The GH release asset is internet_identity_production.wasm.gz, but
-  # download_wasms saves it locally as internet_identity.wasm.gz.
-  detect_release_wasm_change "proposal-backend" "internet_identity_production.wasm.gz" ./internet_identity.wasm.gz
+  detect_canister_wasm_change "$PROD_BACKEND_CANISTER_ID" ./internet_identity.wasm.gz
 }
 
 detect_frontend_hash_change() {
-  detect_release_wasm_change "proposal-frontend" "internet_identity_frontend.wasm.gz" ./internet_identity_frontend.wasm.gz
+  detect_canister_wasm_change "$PROD_FRONTEND_CANISTER_ID" ./internet_identity_frontend.wasm.gz
 }
 
 download_wasms() {
@@ -480,6 +534,7 @@ request_verification_command() {
   echo "./scripts/verify-hash ${cmd_parts[@]}"
 }
 
+PROD_BACKEND_CANISTER_ID="rdmx6-jaaaa-aaaaa-aaadq-cai"
 STAGING_BACKEND_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
 STAGING_FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai"
 # Proxy canister routing the wallet_call-equivalent install path for
@@ -1023,7 +1078,7 @@ dry_run_proposal() {
       --nns-url "https://ic0.app" \
       propose-to-change-nns-canister \
       --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
-      --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+      --canister-id "$PROD_BACKEND_CANISTER_ID" \
       --mode upgrade \
       --wasm-module-path ./internet_identity.wasm.gz \
       --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
@@ -1103,7 +1158,7 @@ make_backend_proposal() {
     --nns-url "https://ic0.app" \
     propose-to-change-nns-canister \
     --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
-    --canister-id rdmx6-jaaaa-aaaaa-aaadq-cai \
+    --canister-id "$PROD_BACKEND_CANISTER_ID" \
     --mode upgrade \
     --wasm-module-path ./internet_identity.wasm.gz \
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
