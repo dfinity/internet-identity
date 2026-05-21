@@ -376,6 +376,17 @@ detect_release_wasm_change() {
   local release_filename="$2"
   local local_wasm="$3"
 
+  # The whole point of the "fall back to 'true' on failure" contract is
+  # to avoid aborting the SOP run if the comparison can't be made. Bail
+  # out cleanly before any command that would crash under `set -e` —
+  # most likely cause is a re-run where `download_wasms` was already
+  # marked Done in the checklist but the local artifacts were wiped.
+  if [ ! -r "$local_wasm" ]; then
+    echo "Local wasm '${local_wasm}' is missing or unreadable; treating ${release_filename} as changed." >&2
+    echo "true"
+    return
+  fi
+
   local prev_proposal_tag
   prev_proposal_tag=$(git tag -l "${proposal_prefix}-*" | sort -V | tail -1)
   if [ -z "$prev_proposal_tag" ]; then
@@ -394,9 +405,12 @@ detect_release_wasm_change() {
 
   local prev_wasm
   prev_wasm=$(mktemp)
+  # RETURN trap fires on every exit path (curl failure, sha256 failure
+  # under set -e, normal return) so the mktemp doesn't leak. Bash's
+  # RETURN trap is function-local — no need to clear it explicitly.
+  trap 'rm -f "$prev_wasm"' RETURN
 
   if ! curl -fsSL "https://github.com/dfinity/internet-identity/releases/download/${prev_release_tag}/${release_filename}" -o "$prev_wasm"; then
-    rm -f "$prev_wasm"
     echo "Could not download ${prev_release_tag}/${release_filename}; treating as changed." >&2
     echo "true"
     return
@@ -405,7 +419,6 @@ detect_release_wasm_change() {
   local prev_sha curr_sha
   prev_sha=$(sha256 "$prev_wasm")
   curr_sha=$(sha256 "$local_wasm")
-  rm -f "$prev_wasm"
   echo "Previous ${release_filename} (${prev_release_tag}): $prev_sha" >&2
   echo "Current ${release_filename}:                        $curr_sha" >&2
 
