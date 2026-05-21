@@ -647,6 +647,34 @@ EOF
 }
 
 # -------------------------
+# Render the frontend canister's `init_args.path` file from its template
+# if it's missing. `icp canister install` loads the whole `icp.yaml`
+# project before it processes our inline `--args`, and the project loader
+# fails fast when any `init_args.path` reference is missing on disk.
+#
+# Normally `npm install`'s `postinstall` hook (see PR #3827) renders this
+# file, but neither deploy script depends on a fresh `npm install` — they
+# pull CI artifacts (`deploy-pr-to-beta`) or run `scripts/build` directly
+# (`deploy-local-to-beta`), so a clone where `npm install` was never run
+# or `.icp/` was cleaned will trip the loader.
+#
+# Idempotent: returns immediately if the file is already there. The
+# render script itself falls back to anonymous-principal placeholders
+# when no local network is up — which is exactly the deploy-to-mainnet
+# case, where `--args` overrides at install time mean the placeholder
+# content is never parsed.
+bootstrap_init_args() {
+    local scripts_dir
+    scripts_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    local rendered="$scripts_dir/../.icp/cache/init-args/internet_identity_frontend.did"
+    if [ -f "$rendered" ]; then
+        return 0
+    fi
+    echo "Rendering frontend init_args stub (icp.yaml project load needs the file)..." >&2
+    "$scripts_dir/render-local-init-args" >&2
+}
+
+# -------------------------
 # Proxy-routed install runner (honours DRY_RUN)
 # -------------------------
 # Routes the upgrade through the proxy canister at PROXY_CANISTER_ID,
@@ -667,6 +695,8 @@ run_icp_install() {
         echo "Error: wasm not found at $wasm_path" >&2
         return 1
     fi
+
+    bootstrap_init_args
 
     local cmd=(
         icp canister install "$canister_id"
