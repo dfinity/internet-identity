@@ -671,7 +671,10 @@ bootstrap_init_args() {
         return 0
     fi
     echo "Rendering frontend init_args stub (icp.yaml project load needs the file)..." >&2
-    "$scripts_dir/render-local-init-args" >&2
+    if ! "$scripts_dir/render-local-init-args" >&2; then
+        echo "Error: failed to render $rendered — cannot proceed with icp install." >&2
+        return 1
+    fi
 }
 
 # -------------------------
@@ -696,8 +699,6 @@ run_icp_install() {
         return 1
     fi
 
-    bootstrap_init_args
-
     local cmd=(
         icp canister install "$canister_id"
             -e "$IC_NETWORK"
@@ -714,6 +715,13 @@ run_icp_install() {
         printf '  %q' "${cmd[@]}"; echo
         return 0
     fi
+
+    # Bootstrap below the dry-run gate so `--dry-run` stays side-effect-free
+    # (no file writes under `.icp/`, no implicit `icp canister create` calls
+    # from `render-local-init-args`). On real runs we surface a render
+    # failure here rather than letting the icp-cli project loader fail in a
+    # less obvious place.
+    bootstrap_init_args || return 1
 
     echo "Upgrading canister $canister_id ..."
     "${cmd[@]}"
