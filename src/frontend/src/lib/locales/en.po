@@ -100,6 +100,9 @@ msgstr "Account name"
 msgid "Active"
 msgstr "Active"
 
+msgid "This is the access method you're currently signed in with."
+msgstr "This is the access method you're currently signed in with."
+
 msgid "Activate"
 msgstr "Activate"
 
@@ -312,6 +315,9 @@ msgstr "Creating identity..."
 
 msgid "Creating passkey..."
 msgstr "Creating passkey..."
+
+msgid "Currently active"
+msgstr "Currently active"
 
 msgid "Currently signed in with this account"
 msgstr "Currently signed in with this account"
