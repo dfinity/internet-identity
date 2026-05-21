@@ -127,8 +127,11 @@
   <div class="mb-3 flex h-9 flex-row items-center">
     <PasskeyIcon class="text-fg-primary size-6" />
     {#if isCurrentAccessMethod}
-      <Badge color="success" size="sm" dot class="ms-2 flex-none"
-        >{$t`Active`}</Badge
+      <Badge
+        color="success"
+        size="sm"
+        dot
+        class="ms-2 flex-none cursor-default select-none">{$t`Active`}</Badge
       >
     {/if}
     {#if isLegacy}

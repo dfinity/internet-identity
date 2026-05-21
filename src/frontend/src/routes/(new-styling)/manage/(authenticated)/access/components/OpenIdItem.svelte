@@ -98,8 +98,11 @@
     {/if}
   </div>
   {#if isCurrentAccessMethod}
-    <Badge color="success" size="sm" dot class="ms-2 flex-none"
-      >{$t`Active`}</Badge
+    <Badge
+      color="success"
+      size="sm"
+      dot
+      class="ms-2 flex-none cursor-default select-none">{$t`Active`}</Badge
     >
   {/if}
   {#if options.length > 0}
