@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageProps } from "./$types";
+  import type { Component } from "svelte";
   import { goto } from "$app/navigation";
   import {
     ArrowUpRightIcon,
@@ -14,7 +15,11 @@
     getDapps,
     type KnownDapp,
   } from "$lib/legacy/flows/dappsExplorer/dapps";
-  import { getMetadataString } from "$lib/utils/openID";
+  import {
+    deriveSmartActions,
+    type SmartActionId,
+  } from "$lib/utils/smartActions";
+  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
 
@@ -22,17 +27,51 @@
     data.identityInfo.name[0] ?? data.identityNumber.toString(),
   );
 
-  const hasEmailRecovery = $derived(
-    data.identityInfo.email_recovery[0] !== undefined,
+  const smartActions = $derived(
+    deriveSmartActions(data.identityInfo, {
+      emailRecoveryEnabled: $EMAIL_RECOVERY,
+    }),
   );
 
-  const hasRecoveryPhrase = $derived(
-    data.identityInfo.authn_methods.some(
-      (m) =>
-        "Recovery" in m.security_settings.purpose &&
-        getMetadataString(m.metadata, "usage") === "recovery_phrase",
-    ),
-  );
+  type SmartActionPresentation = {
+    label: string;
+    icon: Component;
+    onclick: () => void;
+  };
+
+  // Each smart-action descriptor produced by `deriveSmartActions` is
+  // mapped to its concrete button presentation here. Labels are
+  // looked up through `$t` so they re-render on locale change; navigation
+  // uses `goto` with a SvelteKit page state so target pages can
+  // deep-link straight into the relevant wizard via `afterNavigate`.
+  const presentations: Record<SmartActionId, SmartActionPresentation> =
+    $derived({
+      "add-access-method": {
+        label: $t`Add access method`,
+        icon: PlusIcon,
+        onclick: () => goto("/manage/access", { state: { add: true } }),
+      },
+      "setup-email": {
+        label: $t`Set up recovery email`,
+        icon: MailIcon,
+        onclick: () => goto("/manage/recovery", { state: { email: true } }),
+      },
+      "update-email": {
+        label: $t`Update recovery email`,
+        icon: MailIcon,
+        onclick: () => goto("/manage/recovery", { state: { email: true } }),
+      },
+      "setup-phrase": {
+        label: $t`Set up recovery phrase`,
+        icon: ShieldIcon,
+        onclick: () => goto("/manage/recovery", { state: { activate: true } }),
+      },
+      "reset-phrase": {
+        label: $t`Reset recovery phrase`,
+        icon: ShieldIcon,
+        onclick: () => goto("/manage/recovery", { state: { reset: true } }),
+      },
+    });
 
   const featuredApps = $derived.by<KnownDapp[]>(() => {
     const origins = frontendCanisterConfig.featured_dashboard_apps[0] ?? [];
@@ -54,25 +93,17 @@
 </header>
 
 <div class="mt-10 flex flex-wrap gap-2">
-  <a href="/manage/access" class="btn btn-secondary btn-sm rounded-full">
-    <PlusIcon class="size-3.5" />
-    {$t`Add access method`}
-  </a>
-  {#if hasEmailRecovery}
-    <a href="/manage/recovery" class="btn btn-secondary btn-sm rounded-full">
-      <MailIcon class="size-3.5" />
-      {$t`Update recovery email`}
-    </a>
-  {/if}
-  {#if hasRecoveryPhrase}
+  {#each smartActions as action (action.id)}
+    {@const presentation = presentations[action.id]}
+    {@const Icon = presentation.icon}
     <button
-      onclick={() => goto("/manage/recovery", { state: { reset: true } })}
+      onclick={presentation.onclick}
       class="btn btn-secondary btn-sm rounded-full"
     >
-      <ShieldIcon class="size-3.5" />
-      {$t`Reset recovery phrase`}
+      <Icon class="size-3.5" />
+      {presentation.label}
     </button>
-  {/if}
+  {/each}
 </div>
 
 {#if featuredApps.length > 0}
