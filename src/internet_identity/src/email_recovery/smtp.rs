@@ -172,10 +172,16 @@ fn single_recipient(
 /// see the module-level note on why we don't surface per-message
 /// verification failures.
 pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
+    let now_log_secs = now_secs();
+    super::log(now_log_secs, "smtp_request: enter");
     // Bound-check up front so a malformed gateway-side payload
     // returns a clean syntax error instead of trapping somewhere
     // inside the verifier.
     if let Err(e) = validate_smtp_request(&request) {
+        super::log(
+            now_log_secs,
+            format!("smtp_request: rejected malformed_request err={e:?}"),
+        );
         return e;
     }
 
@@ -200,11 +206,21 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // "unknown mailbox" case so the gateway can tell the two apart.
     let envelope = match request.envelope.as_ref() {
         Some(e) => e,
-        None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
+        None => {
+            super::log(now_log_secs, "smtp_request: rejected missing_envelope");
+            return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope");
+        }
     };
     let to = match single_recipient(envelope) {
         Some(to) => to,
         None => {
+            super::log(
+                now_log_secs,
+                format!(
+                    "smtp_request: rejected wrong_recipient_count to_len={}",
+                    envelope.to.len(),
+                ),
+            );
             return smtp_err(
                 SMTP_ERR_USER_NOT_LOCAL,
                 "Recovery emails must have exactly one recipient",
@@ -216,6 +232,10 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     } else if recipient_matches(to, RECOVERY_RECIPIENT_USER) {
         RecipientFlow::Recovery
     } else {
+        super::log(
+            now_log_secs,
+            format!("smtp_request: rejected unknown_mailbox to={to:?}"),
+        );
         // Unknown recipient → 550 ("No such user here"). The set of
         // mailboxes we handle is in the public Candid surface, so
         // there's no secret to hide and a sender targeting any other
@@ -228,10 +248,15 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             "Recipient is not a known mailbox on this canister",
         );
     };
+    super::log(
+        now_log_secs,
+        format!("smtp_request: dispatch to={to:?} flow={recipient_flow:?}"),
+    );
 
     let message = match request.message.as_ref() {
         Some(m) => m,
         None => {
+            super::log(now_log_secs, "smtp_request: drop missing_message");
             return SmtpResponse::Ok {};
         }
     };
@@ -241,10 +266,18 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // challenge for the discovered nonce, treat the message as not
     // for us and silently drop.
     let Some(nonce) = extract_nonce_from_subject(message) else {
+        super::log(now_log_secs, "smtp_request: drop no_nonce_in_subject");
         return SmtpResponse::Ok {};
     };
 
     let now_secs = now_secs();
+    super::log(
+        now_secs,
+        format!(
+            "smtp_request: nonce_extracted nonce={}",
+            super::nonce_for_log(&nonce),
+        ),
+    );
 
     // Snapshot the pending challenge enough to drive the rest of
     // the pipeline. We borrow only briefly so the async outcalls
@@ -295,8 +328,42 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // Either nonce is unknown / expired (None), or the pending
         // entry's kind didn't match the recipient (Some(None)).
         // Drop silently — see module note.
-        _ => return SmtpResponse::Ok {},
+        Some(None) => {
+            super::log(
+                now_secs,
+                format!(
+                    "smtp_request: drop kind_recipient_mismatch nonce={}",
+                    super::nonce_for_log(&nonce),
+                ),
+            );
+            return SmtpResponse::Ok {};
+        }
+        None => {
+            super::log(
+                now_secs,
+                format!(
+                    "smtp_request: drop unknown_or_expired_nonce nonce={}",
+                    super::nonce_for_log(&nonce),
+                ),
+            );
+            return SmtpResponse::Ok {};
+        }
     };
+    super::log(
+        now_secs,
+        format!(
+            "smtp_request: pending_found nonce={} address={} domain={} path={} cached_dmarc={}",
+            super::nonce_for_log(&nonce),
+            snapshot.claimed_address,
+            snapshot.registered_domain,
+            if snapshot.is_dnssec_path {
+                "dnssec"
+            } else {
+                "doh"
+            },
+            snapshot.cached_dmarc_txt.is_some(),
+        ),
+    );
 
     // Idempotency: if the pending entry already moved past
     // `Pending` (a terminal status, or `NeedDkimLeaf` set by an
@@ -304,6 +371,15 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // gateway sometimes redelivers; we silently treat the second
     // call as a no-op rather than risk overwriting state.
     if snapshot.already_terminal || snapshot.partial_set {
+        super::log(
+            now_secs,
+            format!(
+                "smtp_request: drop redelivery nonce={} terminal={} partial_set={}",
+                super::nonce_for_log(&nonce),
+                snapshot.already_terminal,
+                snapshot.partial_set,
+            ),
+        );
         return SmtpResponse::Ok {};
     }
     if snapshot.is_dnssec_path {
@@ -313,12 +389,26 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         match prepare_partial_verification(&request, &snapshot, now_secs) {
             Ok(partial) => {
                 let selector = partial.selector.clone();
+                super::log(
+                    now_secs,
+                    format!(
+                        "smtp_request: dnssec partial_verified nonce={} selector={selector}",
+                        super::nonce_for_log(&nonce),
+                    ),
+                );
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.partial_verification = Some(partial);
                     c.status = PendingStatus::NeedDkimLeaf { selector };
                 });
             }
             Err(e) => {
+                super::log(
+                    now_secs,
+                    format!(
+                        "smtp_request: dnssec partial_failed nonce={} err={e:?}",
+                        super::nonce_for_log(&nonce),
+                    ),
+                );
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.status = PendingStatus::Failed(e);
                 });
@@ -329,35 +419,83 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // verification finishes synchronously inside this one call.
         let outcome = verify_setup_email_doh(&request, &snapshot, now_secs).await;
         match outcome {
-            Ok(()) => match &snapshot.kind {
-                SnapshotKind::Setup { anchor } => {
-                    if let Err(e) = bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
-                        pending::with_mut(&nonce, now_secs, |c| {
-                            c.status = PendingStatus::Failed(e);
-                        });
-                    } else {
-                        pending::with_mut(&nonce, now_secs, |c| {
-                            c.status = PendingStatus::Succeeded;
-                        });
-                    }
-                }
-                SnapshotKind::Recovery { session_pk } => {
-                    match stamp_recovery_delegation(&snapshot, session_pk).await {
-                        Ok(outcome) => {
-                            pending::with_mut(&nonce, now_secs, |c| {
-                                c.recovery_outcome = Some(outcome);
-                                c.status = PendingStatus::Succeeded;
-                            });
-                        }
-                        Err(e) => {
+            Ok(()) => {
+                super::log(
+                    now_secs,
+                    format!(
+                        "smtp_request: doh email_verified nonce={}",
+                        super::nonce_for_log(&nonce),
+                    ),
+                );
+                match &snapshot.kind {
+                    SnapshotKind::Setup { anchor } => {
+                        if let Err(e) =
+                            bind_credential(*anchor, &snapshot.claimed_address, now_secs)
+                        {
+                            super::log(
+                                now_secs,
+                                format!(
+                                    "smtp_request: doh setup_bind_failed nonce={} anchor={anchor} err={e:?}",
+                                    super::nonce_for_log(&nonce),
+                                ),
+                            );
                             pending::with_mut(&nonce, now_secs, |c| {
                                 c.status = PendingStatus::Failed(e);
                             });
+                        } else {
+                            super::log(
+                                now_secs,
+                                format!(
+                                    "smtp_request: doh setup_bound nonce={} anchor={anchor} address={}",
+                                    super::nonce_for_log(&nonce),
+                                    snapshot.claimed_address,
+                                ),
+                            );
+                            pending::with_mut(&nonce, now_secs, |c| {
+                                c.status = PendingStatus::Succeeded;
+                            });
+                        }
+                    }
+                    SnapshotKind::Recovery { session_pk } => {
+                        match stamp_recovery_delegation(&snapshot, session_pk).await {
+                            Ok(outcome) => {
+                                super::log(
+                                    now_secs,
+                                    format!(
+                                        "smtp_request: doh recovery_stamped nonce={} address={}",
+                                        super::nonce_for_log(&nonce),
+                                        snapshot.claimed_address,
+                                    ),
+                                );
+                                pending::with_mut(&nonce, now_secs, |c| {
+                                    c.recovery_outcome = Some(outcome);
+                                    c.status = PendingStatus::Succeeded;
+                                });
+                            }
+                            Err(e) => {
+                                super::log(
+                                    now_secs,
+                                    format!(
+                                        "smtp_request: doh recovery_stamp_failed nonce={} err={e:?}",
+                                        super::nonce_for_log(&nonce),
+                                    ),
+                                );
+                                pending::with_mut(&nonce, now_secs, |c| {
+                                    c.status = PendingStatus::Failed(e);
+                                });
+                            }
                         }
                     }
                 }
-            },
+            }
             Err(reason) => {
+                super::log(
+                    now_secs,
+                    format!(
+                        "smtp_request: doh verify_failed nonce={} err={reason:?}",
+                        super::nonce_for_log(&nonce),
+                    ),
+                );
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.status = PendingStatus::Failed(reason);
                 });

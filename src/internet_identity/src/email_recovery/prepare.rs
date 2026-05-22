@@ -47,7 +47,26 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-    prepare_common(dns_input, now_secs, PendingKind::Register { anchor }).await
+    super::log(
+        now_secs,
+        format!(
+            "prepare_add: anchor={anchor} address={:?} has_dns_proof={}",
+            dns_input.address,
+            dns_input.dns_proof.is_some(),
+        ),
+    );
+    let result = prepare_common(dns_input, now_secs, PendingKind::Register { anchor }).await;
+    super::log(
+        now_secs,
+        match &result {
+            Ok(c) => format!(
+                "prepare_add: ok anchor={anchor} nonce={}",
+                super::nonce_for_log(&c.nonce),
+            ),
+            Err(e) => format!("prepare_add: err anchor={anchor} err={e:?}"),
+        },
+    );
+    result
 }
 
 /// Body of `email_recovery_prepare_delegation(dns_input, session_pk)`.
@@ -62,19 +81,47 @@ pub async fn prepare_delegation(
     session_pk: SessionKey,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+    super::log(
+        now_secs,
+        format!(
+            "prepare_delegation: address={:?} has_dns_proof={} session_pk_len={}",
+            dns_input.address,
+            dns_input.dns_proof.is_some(),
+            session_pk.len(),
+        ),
+    );
     // Cap the FE-supplied `session_pk` length. The pending entry
     // holds this for up to 30 minutes; without a bound an open
     // caller could inflate every challenge they prepare. Real
     // session keys are well under 1 KB regardless of algorithm
     // (Ed25519 ~44 bytes, ECDSA P-256 ~91, RSA-2048 ~294).
     if session_pk.len() > super::MAX_SESSION_KEY_BYTES {
+        super::log(
+            now_secs,
+            format!(
+                "prepare_delegation: err session_pk_too_large len={} max={}",
+                session_pk.len(),
+                super::MAX_SESSION_KEY_BYTES,
+            ),
+        );
         return Err(EmailRecoveryError::InternalCanisterError(format!(
             "session_pk is {} bytes, exceeds the {}-byte limit",
             session_pk.len(),
             super::MAX_SESSION_KEY_BYTES,
         )));
     }
-    prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await
+    let result = prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await;
+    super::log(
+        now_secs,
+        match &result {
+            Ok(c) => format!(
+                "prepare_delegation: ok nonce={}",
+                super::nonce_for_log(&c.nonce),
+            ),
+            Err(e) => format!("prepare_delegation: err err={e:?}"),
+        },
+    );
+    result
 }
 
 /// Shared input-validation + nonce-issuing core. `kind`
@@ -114,7 +161,19 @@ async fn prepare_common(
     // - Neither: reject — the FE will surface a "we can't accept
     //   email from this domain" error.
     let (cached_root_dnskey, cached_zones, cached_dmarc_txt) = if let Some(proof) = dns_proof {
+        super::log(
+            now_secs,
+            format!("prepare_common: path=dnssec domain={registered_domain} address={address}"),
+        );
         let extracted = verify_dnssec_skeleton(proof, &registered_domain, now_secs)?;
+        super::log(
+            now_secs,
+            format!(
+                "prepare_common: dnssec_skeleton verified zones={} dmarc_cached={}",
+                extracted.zones.len(),
+                extracted.dmarc.is_some(),
+            ),
+        );
         (
             Some(extracted.root_dnskey),
             extracted.zones,
@@ -132,6 +191,12 @@ async fn prepare_common(
                 })
                 .unwrap_or(false)
         });
+        super::log(
+            now_secs,
+            format!(
+                "prepare_common: path=doh domain={registered_domain} address={address} allowlisted={allowlisted}"
+            ),
+        );
         if !allowlisted {
             return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
         }

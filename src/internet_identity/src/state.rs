@@ -229,7 +229,18 @@ struct State {
     registration_rate_limit: RefCell<Option<RateLimitState>>,
     // Counter to ensure uniqueness of event data in case multiple events have the same timestamp
     event_data_uniqueness_counter: Cell<u16>,
+    // Debug log for email-recovery flow steps. Heap-resident, not persisted across upgrades,
+    // bounded by `RECOVERY_LOG_MAX_ENTRIES` with oldest-first eviction. Exposed via the
+    // `email_recovery_logs` query so operators can inspect the canister-side view of an
+    // in-flight recovery without re-deploying with extra `ic_cdk::println!` instrumentation.
+    recovery_logs: RefCell<Vec<String>>,
 }
+
+/// Cap on the in-memory email-recovery debug log. Sized to retain
+/// enough recent entries to follow one or two interleaved flows
+/// (each emits ~10 lines) while bounding heap residency: at 256
+/// bytes per line, 1024 lines ≈ 256 KB worst case.
+pub const RECOVERY_LOG_MAX_ENTRIES: usize = 1024;
 
 // Checks if salt is empty and calls `init_salt` to set it.
 pub async fn ensure_salt_set() {
@@ -484,6 +495,25 @@ pub fn invalidate_archive_status_cache() {
     STATE.with(|state| {
         *state.archive_status_cache.borrow_mut() = None;
     })
+}
+
+pub fn recovery_logs<R>(f: impl FnOnce(&Vec<String>) -> R) -> R {
+    STATE.with(|s| f(&s.recovery_logs.borrow()))
+}
+
+/// Append a line to the email-recovery debug log. Evicts oldest
+/// entries when the log would exceed [`RECOVERY_LOG_MAX_ENTRIES`].
+/// Called from inside the recovery flow steps; the
+/// `email_recovery_logs` query exposes the accumulated buffer.
+pub fn push_recovery_log(line: String) {
+    STATE.with(|s| {
+        let mut logs = s.recovery_logs.borrow_mut();
+        if logs.len() >= RECOVERY_LOG_MAX_ENTRIES {
+            let overflow = logs.len() + 1 - RECOVERY_LOG_MAX_ENTRIES;
+            logs.drain(0..overflow);
+        }
+        logs.push(line);
+    });
 }
 
 pub fn get_and_inc_event_data_counter() -> u16 {

@@ -53,6 +53,41 @@ pub use remove::{remove_credential, RemoveError};
 pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
 pub use submit_leaf::submit_dkim_leaf;
 
+/// Append a line to the heap-resident email-recovery debug log.
+/// Each entry is prefixed with the wall-clock second the caller
+/// supplied so an operator reading the log via
+/// `email_recovery_logs` can correlate entries across the flow.
+///
+/// The log is **not** persisted across canister upgrades and is
+/// bounded by [`crate::state::RECOVERY_LOG_MAX_ENTRIES`]; oldest
+/// entries are evicted first when the buffer fills. Intended purely
+/// for debugging the recovery pipeline — production callers should
+/// not depend on its contents.
+pub(crate) fn log(now_secs: u64, msg: impl Into<String>) {
+    crate::state::push_recovery_log(format!("[{}] {}", now_secs, msg.into()));
+}
+
+/// Truncate a nonce for log display. The nonce is a per-challenge
+/// secret (anyone who knows it can poll
+/// `email_recovery_status`/`_get_delegation` for that flow); we
+/// keep only enough of the random suffix to correlate log lines
+/// belonging to the same challenge without leaking the full token.
+pub(crate) fn nonce_for_log(nonce: &str) -> String {
+    // Show the verbose prefix plus the first 4 chars of the random
+    // suffix. With 16 hex chars in the suffix, leaking 4 of them
+    // keeps ~48 bits of entropy in the unrevealed tail.
+    const SHOWN_SUFFIX_CHARS: usize = 4;
+    if let Some(rest) = nonce.strip_prefix(NONCE_PREFIX) {
+        let visible: String = rest.chars().take(SHOWN_SUFFIX_CHARS).collect();
+        format!("{NONCE_PREFIX}{visible}…")
+    } else {
+        // Caller-supplied or malformed nonce — show the same short
+        // amount and mark it as unrecognised.
+        let visible: String = nonce.chars().take(SHOWN_SUFFIX_CHARS).collect();
+        format!("?{visible}…")
+    }
+}
+
 /// Wrapper around `pending::status_of` so the canister method in
 /// `main.rs` doesn't need to know which submodule the heap state
 /// lives in.

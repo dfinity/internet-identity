@@ -55,14 +55,52 @@ pub async fn submit_dkim_leaf(
         extra_chains,
     } = arg;
 
+    super::log(
+        now_secs,
+        format!(
+            "submit_dkim_leaf: enter nonce={} hops={} extra_chains={}",
+            super::nonce_for_log(&nonce),
+            hops.len(),
+            extra_chains.len(),
+        ),
+    );
+
     // Snapshot everything we need under one borrow so the rest of
     // the function works against owned data. Includes early
     // rejection of "not a DNSSEC pending entry" / "not in
     // NeedDkimLeaf state" / etc.
-    let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
-        .ok_or(EmailRecoveryError::NonceUnknown)??;
+    let snapshot = match pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c)) {
+        Some(Ok(s)) => s,
+        Some(Err(e)) => {
+            super::log(
+                now_secs,
+                format!(
+                    "submit_dkim_leaf: snapshot_rejected nonce={} err={e:?}",
+                    super::nonce_for_log(&nonce),
+                ),
+            );
+            return Err(e);
+        }
+        None => {
+            super::log(
+                now_secs,
+                format!(
+                    "submit_dkim_leaf: nonce_unknown nonce={}",
+                    super::nonce_for_log(&nonce),
+                ),
+            );
+            return Err(EmailRecoveryError::NonceUnknown);
+        }
+    };
 
     if let Err(e) = run_submit(&hops, &extra_chains, &snapshot, now_secs) {
+        super::log(
+            now_secs,
+            format!(
+                "submit_dkim_leaf: run_submit_failed nonce={} err={e:?}",
+                super::nonce_for_log(&nonce),
+            ),
+        );
         let cloned = e.clone();
         pending::with_mut(&nonce, now_secs, |c| {
             c.status = PendingStatus::Failed(cloned);
@@ -77,6 +115,14 @@ pub async fn submit_dkim_leaf(
         SnapshotKind::Register { anchor } => {
             match super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
                 Ok(()) => {
+                    super::log(
+                        now_secs,
+                        format!(
+                            "submit_dkim_leaf: setup_bound nonce={} anchor={anchor} address={}",
+                            super::nonce_for_log(&nonce),
+                            snapshot.claimed_address,
+                        ),
+                    );
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.status = PendingStatus::Succeeded;
                         c.partial_verification = None;
@@ -84,6 +130,13 @@ pub async fn submit_dkim_leaf(
                     Ok(EmailRecoveryStatus::RegistrationSucceeded)
                 }
                 Err(e) => {
+                    super::log(
+                        now_secs,
+                        format!(
+                            "submit_dkim_leaf: setup_bind_failed nonce={} anchor={anchor} err={e:?}",
+                            super::nonce_for_log(&nonce),
+                        ),
+                    );
                     let cloned = e.clone();
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.status = PendingStatus::Failed(cloned);
@@ -109,6 +162,14 @@ pub async fn submit_dkim_leaf(
                     let user_key = serde_bytes::ByteBuf::from(outcome.user_key.clone());
                     let expiration = outcome.expiration;
                     let anchor_number = outcome.anchor_number;
+                    super::log(
+                        now_secs,
+                        format!(
+                            "submit_dkim_leaf: recovery_stamped nonce={} anchor={anchor_number} address={}",
+                            super::nonce_for_log(&nonce),
+                            snapshot.claimed_address,
+                        ),
+                    );
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.recovery_outcome = Some(outcome);
                         c.status = PendingStatus::Succeeded;
@@ -121,6 +182,13 @@ pub async fn submit_dkim_leaf(
                     })
                 }
                 Err(e) => {
+                    super::log(
+                        now_secs,
+                        format!(
+                            "submit_dkim_leaf: recovery_stamp_failed nonce={} err={e:?}",
+                            super::nonce_for_log(&nonce),
+                        ),
+                    );
                     let cloned = e.clone();
                     pending::with_mut(&nonce, now_secs, |c| {
                         c.status = PendingStatus::Failed(cloned);

@@ -1485,6 +1485,14 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 
+    // Debug-only. Returns the heap-resident log of recovery-flow
+    // steps (prepare_add, prepare_delegation, smtp_request,
+    // submit_dkim_leaf, credential_remove). Each entry is
+    // "[<unix_secs>] <message>" with truncated nonces / no
+    // session-key bytes. Not persisted across upgrades, bounded
+    // size with oldest-first eviction.
+    email_recovery_logs : () -> (vec text) query;
+
     // SMTP gateway protocol
     // =====================
     // The off-chain SMTP gateway forwards every inbound message via

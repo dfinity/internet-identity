@@ -1636,28 +1636,76 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         address: String,
     ) -> Result<(), EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::log(
+            now_secs,
+            format!("credential_remove: enter anchor={identity_number} address={address:?}"),
+        );
         // Inlined auth + write rather than going through
         // `anchor_operation_with_authz_check` because that helper's
         // `E: From<IdentityUpdateError>` bound is awkward to satisfy
         // for an interface-crate error type (orphan rule).
         let (mut anchor, authz_key) = crate::authz_utils::check_authorization(identity_number)
-            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+            .map_err(|err| {
+                email_recovery::log(
+                    now_secs,
+                    format!("credential_remove: unauthorized anchor={identity_number}"),
+                );
+                EmailRecoveryError::Unauthorized(err.principal)
+            })?;
         crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);
 
         let operation =
             email_recovery::remove_credential(&mut anchor, &address).map_err(|err| match err {
                 crate::email_recovery::RemoveError::NotRegistered => {
+                    email_recovery::log(
+                        now_secs,
+                        format!(
+                            "credential_remove: address_not_registered anchor={identity_number}"
+                        ),
+                    );
                     EmailRecoveryError::AddressNotRegistered
                 }
             })?;
 
-        crate::state::storage_borrow_mut(|storage| storage.write(anchor))
-            .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;
+        crate::state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
+            email_recovery::log(
+                now_secs,
+                format!(
+                    "credential_remove: storage_write_failed anchor={identity_number} err={err:?}"
+                ),
+            );
+            EmailRecoveryError::InternalCanisterError(format!("{err:?}"))
+        })?;
 
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
+        email_recovery::log(
+            now_secs,
+            format!("credential_remove: ok anchor={identity_number}"),
+        );
         Ok(())
     }
 
+    /// Anonymous query. Returns the in-memory debug log accumulated
+    /// by the recovery flow's update methods (`prepare_add`,
+    /// `prepare_delegation`, `smtp_request`, `submit_dkim_leaf`,
+    /// `credential_remove`). Each entry is `[<unix_secs>] <message>`.
+    ///
+    /// The buffer is heap-resident, NOT persisted across upgrades,
+    /// and bounded by `state::RECOVERY_LOG_MAX_ENTRIES` with
+    /// oldest-first eviction once full. Intended purely for
+    /// debugging the recovery pipeline — production callers should
+    /// not depend on its shape or contents.
+    ///
+    /// The log entries do **not** include full nonces or session
+    /// public keys: nonces are truncated by `nonce_for_log`
+    /// (verbose prefix + 4 chars of suffix) so the persistent
+    /// secret isn't recoverable from the buffer, and session keys
+    /// are logged only as a byte count.
+    #[query]
+    fn email_recovery_logs() -> Vec<String> {
+        crate::state::recovery_logs(|logs| logs.clone())
+    }
 }
 
 mod attribute_sharing {
