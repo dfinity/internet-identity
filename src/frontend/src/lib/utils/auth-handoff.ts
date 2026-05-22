@@ -13,6 +13,16 @@ const MSG_AUTH = "ii-handoff:auth";
 
 interface AuthHandoffReady {
   type: typeof MSG_READY;
+  nonce: string;
+}
+
+// Per-handoff nonce shared via the new tab's URL fragment. Defends against a
+// same-origin attacker that can post a forged `ii-handoff:ready` to the
+// opener: without the matching nonce the opener will not send the JWK.
+export const HANDOFF_HASH_KEY = "h";
+
+export function generateHandoffNonce(): string {
+  return crypto.randomUUID();
 }
 
 interface AuthHandoffPayload {
@@ -35,7 +45,9 @@ function isAuthHandoffReady(data: unknown): data is AuthHandoffReady {
     typeof data === "object" &&
     data !== null &&
     "type" in data &&
-    data.type === MSG_READY
+    data.type === MSG_READY &&
+    "nonce" in data &&
+    typeof data.nonce === "string"
   );
 }
 
@@ -159,6 +171,7 @@ export async function deserializeAuth(
 export function sendAuthToOpenedTab(
   target: Window,
   auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
+  expectedNonce: string,
   timeoutMs = 2000,
 ): { cancel: () => void } {
   let cancelled = false;
@@ -168,7 +181,8 @@ export function sendAuthToOpenedTab(
     if (
       event.source !== target ||
       event.origin !== location.origin ||
-      !isAuthHandoffReady(event.data)
+      !isAuthHandoffReady(event.data) ||
+      event.data.nonce !== expectedNonce
     ) {
       return;
     }
@@ -208,6 +222,24 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const nonce = hashParams.get(HANDOFF_HASH_KEY);
+  if (nonce === null) {
+    return Promise.resolve(null);
+  }
+
+  // Strip the nonce from the address bar so it doesn't linger in history,
+  // copy-paste, or share targets.
+  hashParams.delete(HANDOFF_HASH_KEY);
+  const remainingHash = hashParams.toString();
+  history.replaceState(
+    null,
+    "",
+    window.location.pathname +
+      window.location.search +
+      (remainingHash.length > 0 ? `#${remainingHash}` : ""),
+  );
+
   return new Promise((resolve) => {
     let settled = false;
 
@@ -240,7 +272,7 @@ export function receiveAuthFromOpener({
     const timer = setTimeout(() => settle(null), timeoutMs);
 
     opener.postMessage(
-      { type: MSG_READY } satisfies AuthHandoffReady,
+      { type: MSG_READY, nonce } satisfies AuthHandoffReady,
       location.origin,
     );
   });

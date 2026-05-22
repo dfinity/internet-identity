@@ -7,10 +7,41 @@ import { Principal } from "@icp-sdk/core/principal";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   deserializeAuth,
+  generateHandoffNonce,
   receiveAuthFromOpener,
   sendAuthToOpenedTab,
   serializeAuth,
 } from "./auth-handoff";
+
+const TEST_NONCE = "test-nonce-123";
+
+const stubReceiveWindow = (params: {
+  opener: { closed: boolean; postMessage: ReturnType<typeof vi.fn> } | null;
+  hash?: string;
+  messageListeners?: ((e: MessageEvent) => void)[];
+}) => {
+  const { opener, hash = `#h=${TEST_NONCE}`, messageListeners } = params;
+  vi.stubGlobal("window", {
+    ...window,
+    opener,
+    location: {
+      origin: "https://id.ai",
+      hash,
+      pathname: "/manage",
+      search: "",
+    },
+    history: { replaceState: vi.fn() },
+    addEventListener:
+      messageListeners !== undefined
+        ? (type: string, listener: EventListenerOrEventListenerObject) => {
+            if (type === "message") {
+              messageListeners.push(listener as (e: MessageEvent) => void);
+            }
+          }
+        : window.addEventListener.bind(window),
+    removeEventListener: vi.fn(),
+  });
+};
 import type { Authenticated } from "$lib/stores/authentication.store";
 
 type AuthWithoutAgentActor = Omit<
@@ -189,33 +220,30 @@ describe("receiveAuthFromOpener", () => {
   });
 
   it("returns null after timeout when no message arrives", async () => {
-    const mockOpener = { closed: false, postMessage: vi.fn() };
-    vi.stubGlobal("window", {
-      ...window,
-      opener: mockOpener,
-      addEventListener: window.addEventListener.bind(window),
-      removeEventListener: window.removeEventListener.bind(window),
-      location: { origin: "https://id.ai" },
-    });
+    stubReceiveWindow({ opener: { closed: false, postMessage: vi.fn() } });
 
     const result = await receiveAuthFromOpener({ timeoutMs: 50 });
     expect(result).toBeNull();
   }, 1000);
 
   it("returns null immediately when window.opener is null", async () => {
-    vi.stubGlobal("window", {
-      ...window,
-      opener: null,
-    });
+    stubReceiveWindow({ opener: null });
 
     const result = await receiveAuthFromOpener({ timeoutMs: 50 });
     expect(result).toBeNull();
   });
 
   it("returns null immediately when window.opener is closed", async () => {
-    vi.stubGlobal("window", {
-      ...window,
-      opener: { closed: true, postMessage: vi.fn() },
+    stubReceiveWindow({ opener: { closed: true, postMessage: vi.fn() } });
+
+    const result = await receiveAuthFromOpener({ timeoutMs: 50 });
+    expect(result).toBeNull();
+  });
+
+  it("returns null immediately when URL hash has no h= param", async () => {
+    stubReceiveWindow({
+      opener: { closed: false, postMessage: vi.fn() },
+      hash: "",
     });
 
     const result = await receiveAuthFromOpener({ timeoutMs: 50 });
@@ -225,25 +253,10 @@ describe("receiveAuthFromOpener", () => {
   it("ignores messages with wrong event.data.type and stays pending until timeout", async () => {
     const messageListeners: ((e: MessageEvent) => void)[] = [];
     const mockOpener = { closed: false, postMessage: vi.fn() };
-
-    vi.stubGlobal("window", {
-      ...window,
-      opener: mockOpener,
-      location: { origin: "https://id.ai" },
-      addEventListener: (
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (type === "message") {
-          messageListeners.push(listener as (e: MessageEvent) => void);
-        }
-      },
-      removeEventListener: vi.fn(),
-    });
+    stubReceiveWindow({ opener: mockOpener, messageListeners });
 
     const resultPromise = receiveAuthFromOpener({ timeoutMs: 100 });
 
-    // Fire a message with wrong type
     const wrongEvent = new MessageEvent("message", {
       data: { type: "something-else" },
       origin: "https://id.ai",
@@ -260,21 +273,7 @@ describe("receiveAuthFromOpener", () => {
   it("ignores messages with wrong event.origin and stays pending until timeout", async () => {
     const messageListeners: ((e: MessageEvent) => void)[] = [];
     const mockOpener = { closed: false, postMessage: vi.fn() };
-
-    vi.stubGlobal("window", {
-      ...window,
-      opener: mockOpener,
-      location: { origin: "https://id.ai" },
-      addEventListener: (
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (type === "message") {
-          messageListeners.push(listener as (e: MessageEvent) => void);
-        }
-      },
-      removeEventListener: vi.fn(),
-    });
+    stubReceiveWindow({ opener: mockOpener, messageListeners });
 
     const resultPromise = receiveAuthFromOpener({ timeoutMs: 100 });
 
@@ -295,21 +294,7 @@ describe("receiveAuthFromOpener", () => {
     const messageListeners: ((e: MessageEvent) => void)[] = [];
     const mockOpener = { closed: false, postMessage: vi.fn() };
     const wrongSource = { closed: false };
-
-    vi.stubGlobal("window", {
-      ...window,
-      opener: mockOpener,
-      location: { origin: "https://id.ai" },
-      addEventListener: (
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (type === "message") {
-          messageListeners.push(listener as (e: MessageEvent) => void);
-        }
-      },
-      removeEventListener: vi.fn(),
-    });
+    stubReceiveWindow({ opener: mockOpener, messageListeners });
 
     const resultPromise = receiveAuthFromOpener({ timeoutMs: 100 });
 
@@ -325,6 +310,19 @@ describe("receiveAuthFromOpener", () => {
     const result = await resultPromise;
     expect(result).toBeNull();
   }, 1000);
+
+  it("includes the URL-hash nonce in the ready message it posts to opener", async () => {
+    const mockOpener = { closed: false, postMessage: vi.fn() };
+    stubReceiveWindow({ opener: mockOpener });
+
+    // Don't await — we only care about the ready message that fires synchronously.
+    void receiveAuthFromOpener({ timeoutMs: 50 });
+
+    expect(mockOpener.postMessage).toHaveBeenCalledWith(
+      { type: "ii-handoff:ready", nonce: TEST_NONCE },
+      expect.any(String),
+    );
+  });
 });
 
 describe("sendAuthToOpenedTab", () => {
@@ -362,6 +360,7 @@ describe("sendAuthToOpenedTab", () => {
     const { cancel } = sendAuthToOpenedTab(
       targetWindow as unknown as Window,
       auth,
+      TEST_NONCE,
     );
 
     // Cancel SYNCHRONOUSLY — payloadPromise (serializeAuth) is still in-flight.
@@ -373,7 +372,7 @@ describe("sendAuthToOpenedTab", () => {
     // Now fire "ready" — the listener may still be invoked because cleanup
     // races with cancel. The `cancelled` flag is what prevents the post.
     const readyEvent = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready" },
+      data: { type: "ii-handoff:ready", nonce: TEST_NONCE },
       origin: "https://id.ai",
       source: targetWindow as unknown as Window,
     });
@@ -417,6 +416,7 @@ describe("sendAuthToOpenedTab", () => {
     const { cancel } = sendAuthToOpenedTab(
       targetWindow as unknown as Window,
       auth,
+      TEST_NONCE,
     );
 
     // Wait a tick for async serializeAuth to complete and listener to be installed
@@ -426,7 +426,7 @@ describe("sendAuthToOpenedTab", () => {
 
     // Simulate "ready" arriving after cancel
     const readyEvent = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready" },
+      data: { type: "ii-handoff:ready", nonce: TEST_NONCE },
       origin: "https://id.ai",
       source: targetWindow as unknown as Window,
     });
@@ -439,4 +439,64 @@ describe("sendAuthToOpenedTab", () => {
 
     expect(targetWindow.postMessage).not.toHaveBeenCalled();
   }, 1000);
+
+  it("ignores ready messages whose nonce does not match expectedNonce", async () => {
+    const { identity } = await makeIdentity();
+    const auth: AuthWithoutAgentActor = {
+      identityNumber: BigInt(3),
+      identity,
+      authMethod: {
+        openid: { iss: "https://accounts.google.com", sub: "nonce-mismatch" },
+      },
+    };
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+
+    vi.stubGlobal("window", {
+      ...window,
+      location: { origin: "https://id.ai" },
+      addEventListener: (
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+      ) => {
+        if (type === "message") {
+          messageListeners.push(listener as (e: MessageEvent) => void);
+        }
+      },
+      removeEventListener: vi.fn(),
+    });
+
+    sendAuthToOpenedTab(
+      targetWindow as unknown as Window,
+      auth,
+      TEST_NONCE,
+      100,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const spoofedReady = new MessageEvent("message", {
+      data: { type: "ii-handoff:ready", nonce: "wrong-nonce" },
+      origin: "https://id.ai",
+      source: targetWindow as unknown as Window,
+    });
+    for (const listener of messageListeners) {
+      listener(spoofedReady);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(targetWindow.postMessage).not.toHaveBeenCalled();
+  }, 1000);
+});
+
+describe("generateHandoffNonce", () => {
+  it("returns a non-empty string with sufficient entropy", () => {
+    const a = generateHandoffNonce();
+    const b = generateHandoffNonce();
+    expect(typeof a).toBe("string");
+    expect(a.length).toBeGreaterThanOrEqual(16);
+    expect(a).not.toBe(b);
+  });
 });

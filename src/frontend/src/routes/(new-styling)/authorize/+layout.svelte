@@ -19,7 +19,11 @@
   import { get } from "svelte/store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { sendAuthToOpenedTab } from "$lib/utils/auth-handoff";
+  import {
+    HANDOFF_HASH_KEY,
+    generateHandoffNonce,
+    sendAuthToOpenedTab,
+  } from "$lib/utils/auth-handoff";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -286,13 +290,17 @@
                       await goto("/manage");
                       return;
                     }
-                    const w = window.open("/manage", "_blank");
+                    const nonce = generateHandoffNonce();
+                    const w = window.open(
+                      `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
+                      "_blank",
+                    );
                     if (w === null) {
                       await goto("/manage");
                       return;
                     }
                     pendingHandoff?.cancel();
-                    pendingHandoff = sendAuthToOpenedTab(w, auth);
+                    pendingHandoff = sendAuthToOpenedTab(w, auth, nonce);
                   } catch (error) {
                     handleError(error);
                   } finally {
