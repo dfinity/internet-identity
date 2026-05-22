@@ -111,14 +111,13 @@
 
   <!-- Horizontal strip rather than wrap: on narrow viewports the
        three or four pills won't fit on one row, so we scroll them
-       instead of stacking. Negative margin + matching padding lets
-       the row bleed to the viewport edge on mobile so users see
-       half of the next pill peeking out, signalling there's more to
-       scroll. On `sm` and up the strip stays within the content
-       column. The custom selectors hide the scrollbar without
-       disabling scrolling. -->
+       instead of stacking. `min-w-0` lets this flex item shrink
+       below its content's natural width so `overflow-x-auto` can
+       actually do its job inside the 640px column above. The
+       custom selectors hide the scrollbar without disabling
+       scrolling. -->
   <div
-    class="-mx-4 mt-10 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+    class="mt-10 flex min-w-0 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
   >
     {#each smartActions as action (action.id)}
       {@const presentation = presentations[action.id]}
