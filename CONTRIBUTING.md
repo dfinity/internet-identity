@@ -1,6 +1,6 @@
 # Contributing to Internet Identity
 
-Thank you for your interest in contributing to Internet Identity ❤️
+Thank you for your interest in contributing to Internet Identity.
 
 ## Contributing code changes
 
