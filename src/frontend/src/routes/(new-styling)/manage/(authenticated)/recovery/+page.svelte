@@ -337,6 +337,17 @@
     replaceState("", {});
     showRecoveryPhraseSetup = "activate";
   });
+
+  // Trigger recovery phrase reset
+  afterNavigate(() => {
+    if (!("reset" in page.state)) {
+      return;
+    }
+    replaceState("", {});
+    if (recoveryPhraseData !== undefined) {
+      showRecoveryPhraseSetup = "reset";
+    }
+  });
 </script>
 
 <header class="flex flex-col gap-3">

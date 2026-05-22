@@ -39,6 +39,7 @@ export interface InternetIdentityFrontendInit {
   'backend_origin' : string,
   'dev_csp' : [] | [boolean],
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
+  'featured_dashboard_apps' : [] | [Array<string>],
 }
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
