@@ -54,41 +54,51 @@ const ids = (actions: { id: SmartActionId }[]): SmartActionId[] =>
   actions.map((a) => a.id);
 
 describe("deriveSmartActions", () => {
-  it("offers setup actions when no recovery method is configured", () => {
+  it("leads with both setup actions when phrase and email are both missing", () => {
     const result = deriveSmartActions(baseIdentityInfo, {
       emailRecoveryEnabled: true,
     });
     expect(ids(result)).toEqual([
-      "add-access-method",
-      "setup-email",
       "setup-phrase",
+      "setup-email",
+      "add-access-method",
     ]);
   });
 
-  it("swaps to update/reset labels when methods are already configured", () => {
+  it("demotes update and reset actions below add-access-method when both methods are configured", () => {
     const info = withEmailRecovery(withRecoveryPhrase(baseIdentityInfo));
     const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
     expect(ids(result)).toEqual([
       "add-access-method",
-      "update-email",
       "reset-phrase",
+      "update-email",
     ]);
   });
 
-  it("keeps the same position regardless of which methods exist", () => {
+  it("leads with setup-phrase and pushes update-email to the end when only email is configured", () => {
     const info = withEmailRecovery(baseIdentityInfo);
     const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
     expect(ids(result)).toEqual([
+      "setup-phrase",
       "add-access-method",
       "update-email",
-      "setup-phrase",
+    ]);
+  });
+
+  it("leads with setup-email and pushes reset-phrase to the end when only the phrase is configured", () => {
+    const info = withRecoveryPhrase(baseIdentityInfo);
+    const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
+    expect(ids(result)).toEqual([
+      "setup-email",
+      "add-access-method",
+      "reset-phrase",
     ]);
   });
 
   it("omits email actions entirely when the feature flag is off", () => {
     const info = withEmailRecovery(baseIdentityInfo);
     const result = deriveSmartActions(info, { emailRecoveryEnabled: false });
-    expect(ids(result)).toEqual(["add-access-method", "setup-phrase"]);
+    expect(ids(result)).toEqual(["setup-phrase", "add-access-method"]);
   });
 
   it("produces identical output for identical input (stable sort)", () => {
