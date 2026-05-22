@@ -4,6 +4,7 @@
   import { goto } from "$app/navigation";
   import {
     ArrowUpRightIcon,
+    CheckCircleIcon,
     MailIcon,
     PlusIcon,
     ShieldIcon,
@@ -15,10 +16,7 @@
     getDapps,
     type KnownDapp,
   } from "$lib/legacy/flows/dappsExplorer/dapps";
-  import {
-    deriveSmartActions,
-    type SmartActionId,
-  } from "$lib/utils/smartActions";
+  import { deriveSmartActions, type SmartActionId } from "./smartActions";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
@@ -66,6 +64,11 @@
         icon: ShieldIcon,
         onclick: () => goto("/manage/recovery", { state: { activate: true } }),
       },
+      "verify-phrase": {
+        label: $t`Verify recovery phrase`,
+        icon: CheckCircleIcon,
+        onclick: () => goto("/manage/recovery", { state: { verify: true } }),
+      },
       "reset-phrase": {
         label: $t`Reset recovery phrase`,
         icon: ShieldIcon,
@@ -92,13 +95,23 @@
   </h1>
 </header>
 
-<div class="mt-10 flex flex-wrap gap-2">
+<!-- Horizontal strip rather than wrap: on narrow viewports the
+     three or four pills won't fit on one row, so we scroll them
+     instead of stacking. Negative margin + matching padding lets
+     the row bleed to the viewport edge on mobile so users see
+     half of the next pill peeking out, signalling there's more to
+     scroll. On `sm` and up the strip stays within the content
+     column. The custom selectors hide the scrollbar without
+     disabling scrolling. -->
+<div
+  class="-mx-4 mt-10 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+>
   {#each smartActions as action (action.id)}
     {@const presentation = presentations[action.id]}
     {@const Icon = presentation.icon}
     <button
       onclick={presentation.onclick}
-      class="btn btn-secondary btn-sm rounded-full"
+      class="btn btn-secondary btn-sm shrink-0 rounded-full whitespace-nowrap"
     >
       <Icon class="size-3.5" />
       {presentation.label}

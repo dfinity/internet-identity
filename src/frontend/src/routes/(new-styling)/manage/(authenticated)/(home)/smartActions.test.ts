@@ -15,13 +15,20 @@ const baseAuthnMethod: AuthnMethodData = {
   authn_method: { PubKey: { pubkey: new Uint8Array() } },
 };
 
-const recoveryPhraseMethod: AuthnMethodData = {
+const verifiedRecoveryPhraseMethod: AuthnMethodData = {
   ...baseAuthnMethod,
   security_settings: {
     purpose: { Recovery: null },
     protection: { Unprotected: null },
   },
   metadata: [["usage", { String: "recovery_phrase" }]],
+  // A non-empty last_authentication marks the phrase as verified.
+  last_authentication: [BigInt(1)],
+};
+
+const unverifiedRecoveryPhraseMethod: AuthnMethodData = {
+  ...verifiedRecoveryPhraseMethod,
+  last_authentication: [],
 };
 
 const baseIdentityInfo: IdentityInfo = {
@@ -34,9 +41,14 @@ const baseIdentityInfo: IdentityInfo = {
   openid_credentials: [],
 };
 
-const withRecoveryPhrase = (info: IdentityInfo): IdentityInfo => ({
+const withVerifiedRecoveryPhrase = (info: IdentityInfo): IdentityInfo => ({
   ...info,
-  authn_methods: [...info.authn_methods, recoveryPhraseMethod],
+  authn_methods: [...info.authn_methods, verifiedRecoveryPhraseMethod],
+});
+
+const withUnverifiedRecoveryPhrase = (info: IdentityInfo): IdentityInfo => ({
+  ...info,
+  authn_methods: [...info.authn_methods, unverifiedRecoveryPhraseMethod],
 });
 
 const withEmailRecovery = (info: IdentityInfo): IdentityInfo => ({
@@ -66,7 +78,9 @@ describe("deriveSmartActions", () => {
   });
 
   it("demotes update and reset actions below add-access-method when both methods are configured", () => {
-    const info = withEmailRecovery(withRecoveryPhrase(baseIdentityInfo));
+    const info = withEmailRecovery(
+      withVerifiedRecoveryPhrase(baseIdentityInfo),
+    );
     const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
     expect(ids(result)).toEqual([
       "add-access-method",
@@ -86,13 +100,32 @@ describe("deriveSmartActions", () => {
   });
 
   it("leads with setup-email and pushes reset-phrase to the end when only the phrase is configured", () => {
-    const info = withRecoveryPhrase(baseIdentityInfo);
+    const info = withVerifiedRecoveryPhrase(baseIdentityInfo);
     const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
     expect(ids(result)).toEqual([
       "setup-email",
       "add-access-method",
       "reset-phrase",
     ]);
+  });
+
+  it("surfaces verify-phrase above setup-email when the phrase exists but is unverified", () => {
+    const info = withUnverifiedRecoveryPhrase(baseIdentityInfo);
+    const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
+    expect(ids(result)).toEqual([
+      "verify-phrase",
+      "setup-email",
+      "add-access-method",
+    ]);
+  });
+
+  it("never shows reset-phrase alongside verify-phrase", () => {
+    const info = withEmailRecovery(
+      withUnverifiedRecoveryPhrase(baseIdentityInfo),
+    );
+    const result = deriveSmartActions(info, { emailRecoveryEnabled: true });
+    const phraseActions = ids(result).filter((id) => id.endsWith("-phrase"));
+    expect(phraseActions).toEqual(["verify-phrase"]);
   });
 
   it("omits email actions entirely when the feature flag is off", () => {
