@@ -71,7 +71,7 @@
   },
   {
     "name": "OISY Wallet",
-    "oneLiner": "Browser-based multi-chain wallet",
+    "oneLiner": "One wallet for ICP, Bitcoin and Ethereum. No private keys to lose.",
     "website": "https://oisy.com",
     "logo": "oisy_logo.svg",
     "certified_attributes": true
@@ -621,7 +621,7 @@
   },
   {
     "name": "OpenChat",
-    "oneLiner": "Decentralized alternative to WhatsApp",
+    "oneLiner": "Real-time messaging that runs entirely on-chain, with no backend operator.",
     "website": "https://oc.app/",
     "logo": "openchat_logo.webp"
   },
@@ -639,7 +639,7 @@
   },
   {
     "name": "Caffeine",
-    "oneLiner": "Self-writing apps platform: the first complete tech stack designed for AI.",
+    "oneLiner": "Build apps just by describing what you want in plain language.",
     "website": "https://caffeine.ai",
     "authOrigins": [
       "https://caffeine.ai",
