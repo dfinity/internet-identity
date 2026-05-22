@@ -46,8 +46,8 @@ pub enum VerifyOutcome {
 /// Minimum RSA key size in bits, enforced at signature verification
 /// time. The floor sits at **2048**: NIST SP 800-131A deprecated
 /// RSA-1024 for digital-signature verification in 2014 (full
-/// disallowal scheduled by NIST for 2030), and the DKIM ecosystem has
-/// migrated accordingly — every mainstream sender we care about
+/// disallowance scheduled by NIST for 2030), and the DKIM ecosystem
+/// has migrated accordingly — every mainstream sender we care about
 /// (Gmail, Outlook, iCloud, Yahoo, Proton, Fastmail) publishes
 /// RSA-2048 or larger. M3AAWG's *DKIM Key Rotation Best Common
 /// Practices* recommends 2048 as the minimum production key length.
@@ -291,6 +291,13 @@ mod tests {
         let mut rng = rand::rngs::OsRng;
         let private_key = RsaPrivateKey::new(&mut rng, 1024).expect("RSA 1024-bit keygen");
         let public_key = RsaPublicKey::from(&private_key);
+        // Read the actual modulus bit length off the generated key
+        // rather than hardcoding 1024. `RsaPrivateKey::new(rng, n)`
+        // is documented to produce `n.bits() == n`, but reading the
+        // value back exercises the same `PublicKeyParts::n()` call
+        // the verifier itself makes, so this asserts what the
+        // verifier *actually saw* rather than what we asked for.
+        let actual_bits = public_key.n().bits();
         let spki_der = public_key.to_public_key_der().expect("encode SPKI DER");
 
         let outcome = verify_signature(
@@ -307,7 +314,7 @@ mod tests {
             &[0u8; 128],
         );
 
-        assert_eq!(outcome, VerifyOutcome::RsaKeyTooSmall(1024));
+        assert_eq!(outcome, VerifyOutcome::RsaKeyTooSmall(actual_bits));
     }
 
     #[test]

@@ -114,8 +114,9 @@ pub enum VerificationFailReason {
     DnsRecordMalformed(String),
     /// Signature `a=` algorithm doesn't match the DNSKEY's `k=` type.
     AlgorithmKeyTypeMismatch,
-    /// RSA key below the configured minimum (2048 bits — see
-    /// `dkim::signature::RSA_MIN_KEY_BITS` for the rationale).
+    /// RSA key below the configured minimum — see
+    /// `dkim::signature::RSA_MIN_KEY_BITS` for the floor and its
+    /// rationale.
     RsaKeyTooSmall(usize),
     /// Body hash in `bh=` doesn't match the actual body.
     BodyHashMismatch,
