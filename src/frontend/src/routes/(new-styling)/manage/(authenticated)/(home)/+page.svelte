@@ -19,7 +19,7 @@
 
 <header class="flex flex-col gap-3">
   <h1 class="text-text-primary text-3xl font-medium">
-    {$t`Welcome, ${name}!`}
+    {$t`Welcome, ${name}`}
   </h1>
   <p class="text-text-tertiary text-base">
     <Trans>Your identity and sign-in methods at a glance.</Trans>

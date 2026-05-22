@@ -18,7 +18,7 @@
 </FeaturedIcon>
 <h2 class="text-text-primary mb-3 text-2xl font-medium">
   {$t({
-    message: "Something is wrong!",
+    message: "Something is wrong",
     context: "The user entered an incorrect value during a verification step",
   })}
 </h2>
