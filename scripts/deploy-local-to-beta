@@ -101,19 +101,38 @@ fi
 
 # -------------------------
 # Deploy (honours --dry-run)
+#
+# Args are encoded via the pinned didc against each canister's `.did`
+# schema *before* the install runs — see the equivalent comment in
+# deploy-pr-to-beta for the rationale.
 # -------------------------
+ARGS_TMP=$(mktemp -d -t ii-deploy-local-args.XXXXXX)
+trap 'rm -rf "$ARGS_TMP"' EXIT
+
 if [ "$DEPLOY_BE" = true ]; then
     BE_WASM="$ROOT_DIR/internet_identity.wasm.gz"
     echo ""
     echo "=== Deploying backend to $BE_ID ==="
-    run_icp_install "$BE_ID" "$BE_WASM" "$(build_be_install_arg)"
+    encode_install_arg_bin \
+        "$ROOT_DIR/src/internet_identity/internet_identity.did" \
+        "(opt InternetIdentityInit)" \
+        "$(build_be_install_arg)" \
+        "$ARGS_TMP/be.args.bin" \
+        || exit 1
+    run_icp_install "$BE_ID" "$BE_WASM" "$ARGS_TMP/be.args.bin"
 fi
 
 if [ "$DEPLOY_FE" = true ]; then
     FE_WASM="$ROOT_DIR/internet_identity_frontend.wasm.gz"
     echo ""
     echo "=== Deploying frontend to $FE_ID ==="
-    run_icp_install "$FE_ID" "$FE_WASM" "$(build_fe_install_arg)"
+    encode_install_arg_bin \
+        "$ROOT_DIR/src/internet_identity_frontend/internet_identity_frontend.did" \
+        "(InternetIdentityFrontendInit)" \
+        "$(build_fe_install_arg)" \
+        "$ARGS_TMP/fe.args.bin" \
+        || exit 1
+    run_icp_install "$FE_ID" "$FE_WASM" "$ARGS_TMP/fe.args.bin"
 fi
 
 echo ""

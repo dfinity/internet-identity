@@ -16,6 +16,11 @@ source "$SOURCE_DIR/fetch-iana-root-anchors.bash"
 # prod deploys agree on which domains use the DoH-fallback path.
 # shellcheck source=default-doh-domains.bash
 source "$SOURCE_DIR/default-doh-domains.bash"
+# Pinned-didc helper: every `didc encode/decode/assist` call below
+# routes through `$PINNED_DIDC` so the encoded Candid bytes (and their
+# sha256 hashes in the proposal) match across operators and CI.
+# shellcheck source=didc-helpers.bash
+source "$SOURCE_DIR/didc-helpers.bash"
 
 # Resolve the HTTPS remote URL for git operations that don't need SSH.
 # gh is authenticated via HTTPS, so this avoids SSH key prompts for
@@ -553,14 +558,18 @@ prepare_staging_backend_argument() {
     echo "(null)" > staging_args.txt
   fi
   patch_email_recovery_init_fields staging_args.txt
-  didc_encode_ii_init staging_args.txt > staging_icp_arg.bin
+  # didc encode emits hex; collapse to raw bytes so icp-cli's
+  # `--args-format bin` reads it directly (same on-chain bytes as the
+  # production NNS proposal's args).
+  didc_encode_ii_init staging_args.txt | xxd -r -p > staging_icp_arg.bin
 }
 
 prepare_staging_frontend_argument() {
   echo ""
   echo "=== Filling init arguments for STAGING FRONTEND canister ==="
   build_frontend_install_arg "$STAGING_FRONTEND_CANISTER_ID"
-  echo "$FRONTEND_INSTALL_ARG" > staging_icp_frontend_arg.bin
+  # See prepare_staging_backend_argument for why hex → raw.
+  printf '%s' "$FRONTEND_INSTALL_ARG" | xxd -r -p > staging_icp_frontend_arg.bin
 }
 
 deploy_staging_backend() {
@@ -576,7 +585,7 @@ deploy_staging_backend() {
     --mode upgrade \
     --wasm ./internet_identity.wasm.gz \
     --args-file ./staging_icp_arg.bin \
-    --args-format hex
+    --args-format bin
 }
 
 deploy_staging_frontend() {
@@ -589,7 +598,7 @@ deploy_staging_frontend() {
     --mode upgrade \
     --wasm ./internet_identity_frontend.wasm.gz \
     --args-file ./staging_icp_frontend_arg.bin \
-    --args-format hex
+    --args-format bin
 }
 
 test_release_candidate() {
@@ -647,7 +656,8 @@ run_didc_command_for_ii_init() {
   local SUBCOMMAND="$1"
   shift
   local ARGS=("$@")
-  didc "$SUBCOMMAND" -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' "${ARGS[@]}"
+  ensure_pinned_didc || exit 1
+  "$PINNED_DIDC" "$SUBCOMMAND" -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' "${ARGS[@]}"
 }
 
 didc_encode_ii_init() {
@@ -792,7 +802,8 @@ run_didc_command_for_frontend_init() {
   local SUBCOMMAND="$1"
   shift
   local ARGS=("$@")
-  didc "$SUBCOMMAND" -d ./src/internet_identity_frontend/internet_identity_frontend.did -t '(InternetIdentityFrontendInit)' "${ARGS[@]}"
+  ensure_pinned_didc || exit 1
+  "$PINNED_DIDC" "$SUBCOMMAND" -d ./src/internet_identity_frontend/internet_identity_frontend.did -t '(InternetIdentityFrontendInit)' "${ARGS[@]}"
 }
 
 didc_encode_frontend_init() {
@@ -811,7 +822,7 @@ compute_sha256sum_for_frontend_args() {
 }
 
 prepare_production_backend_argument() {
-  echo "You need at least the didc from 2024-07-29 https://github.com/dfinity/candid/releases/tag/2024-07-29"
+  echo "(Using pinned didc $(sed <"$SOURCE_DIR/../.didc-release" 's/#.*$//' | sed '/^$/d').)"
   echo ""
   echo "=== Filling init arguments for PRODUCTION BACKEND canister (InternetIdentityInit) ==="
   echo ""

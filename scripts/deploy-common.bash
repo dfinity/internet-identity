@@ -47,6 +47,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/default-doh-domains.bash"
 # shellcheck source=fetch-iana-root-anchors.bash
 source "$(dirname "${BASH_SOURCE[0]}")/fetch-iana-root-anchors.bash"
 
+# Pinned-didc helper (shared with make-upgrade-proposal). Exposes
+# `ensure_pinned_didc` + `$PINNED_DIDC` so every script encodes /
+# decodes Candid against the same dfinity/candid release listed in
+# `.didc-release`, instead of whatever's on `PATH`.
+# shellcheck source=didc-helpers.bash
+source "$(dirname "${BASH_SOURCE[0]}")/didc-helpers.bash"
+
 # -------------------------
 # Staging environments
 # -------------------------
@@ -372,7 +379,9 @@ check_fe_reachable() {
 }
 
 # Verify the backend URL serves `/.config.did.bin` with a non-empty body.
-# If `didc` is available, additionally check the blob decodes as Candid.
+# Best-effort Candid-decode check uses the pinned didc when it can be
+# fetched; falls back to a body-non-empty assertion if the download
+# fails (e.g. offline).
 #
 # Uses explicit cleanup rather than `trap ... RETURN` — the RETURN trap isn't
 # auto-restored, so a trap set inside a function keeps firing on every
@@ -392,8 +401,8 @@ check_be_reachable() {
     elif [ ! -s "$tmp" ]; then
         echo "  Error: $config_url returned an empty body" >&2
         rc=1
-    elif command -v didc >/dev/null 2>&1; then
-        if ! didc decode "$(xxd -p "$tmp" | tr -d '\n')" >/dev/null 2>&1; then
+    elif ensure_pinned_didc 2>/dev/null; then
+        if ! "$PINNED_DIDC" decode "$(xxd -p "$tmp" | tr -d '\n')" >/dev/null 2>&1; then
             echo "  Error: $config_url did not decode as Candid" >&2
             rc=1
         else
@@ -401,7 +410,7 @@ check_be_reachable() {
         fi
     else
         echo "  OK — $config_url returns HTTP 200 ($(wc -c <"$tmp" | tr -d ' ') bytes)." >&2
-        echo "       (install didc to additionally verify the body decodes as Candid)" >&2
+        echo "       (pinned didc download failed; skipping Candid validation)" >&2
     fi
     rm -f "$tmp"
     return $rc
@@ -589,8 +598,8 @@ prompt_be_extra_args() {
     local related_origins_default="opt vec { \"$FE_URL\" }"
 
     echo "" >&2
-    if ! command -v didc >/dev/null 2>&1; then
-        echo "Note: \`didc\` not installed — skipping BE config decode." >&2
+    if ! ensure_pinned_didc 2>/dev/null; then
+        echo "Note: pinned didc download failed — skipping BE config decode." >&2
         echo "      Defaults below are derived from the staging quad, NOT live values." >&2
         echo "      Hitting Enter through will OVERWRITE any custom-domain config on chain." >&2
     elif [ ! -f "$did_file" ]; then
@@ -605,10 +614,10 @@ prompt_be_extra_args() {
             echo "  Warning: could not fetch BE config; defaults are derived from the staging quad, NOT live values." >&2
         else
             local decoded
-            decoded=$(didc decode -d "$did_file" -t '(InternetIdentityInit)' \
+            decoded=$("$PINNED_DIDC" decode -d "$did_file" -t '(InternetIdentityInit)' \
                 "$(xxd -p "$tmp" | tr -d '\n')" 2>/dev/null || true)
             if [ -z "$decoded" ]; then
-                echo "  Warning: \`didc decode\` failed; defaults are derived from the staging quad." >&2
+                echo "  Warning: \`$PINNED_DIDC decode\` failed; defaults are derived from the staging quad." >&2
             else
                 local parsed
                 parsed=$(_parse_candid_field "backend_origin" "$decoded")
@@ -762,6 +771,49 @@ bootstrap_init_args() {
 }
 
 # -------------------------
+# Encode a Candid text install arg into a raw-binary file using the
+# pinned didc. Validates the args against the canister's `.did` schema
+# (`-d` + `-t`), so a typo lands here rather than as a CanisterError
+# during `install_code`.
+#
+# Args:
+#   $1  Path to the canister's `.did` schema (e.g. internet_identity.did)
+#   $2  Candid type to encode against (e.g. `(opt InternetIdentityInit)`)
+#   $3  Candid text payload (output of build_{fe,be}_install_arg)
+#   $4  Output path for the raw-binary args file
+#
+# Output: writes raw Candid bytes to $4. Returns non-zero (and prints a
+# targeted error) on download / encode failure so the caller can bail
+# before invoking `icp canister install` with a half-baked file.
+encode_install_arg_bin() {
+    local did_file="$1"
+    local candid_type="$2"
+    local candid_text="$3"
+    local out_file="$4"
+
+    if [ ! -f "$did_file" ]; then
+        echo "Error: .did schema not found at $did_file" >&2
+        return 1
+    fi
+    ensure_pinned_didc || return 1
+
+    local hex
+    if ! hex=$("$PINNED_DIDC" encode -d "$did_file" -t "$candid_type" "$candid_text"); then
+        echo "Error: didc encode failed for $did_file / $candid_type" >&2
+        echo "       Candid input was:" >&2
+        echo "$candid_text" | sed 's/^/         /' >&2
+        return 1
+    fi
+    # `didc encode` emits hex; the icp-cli `--args-format bin` path
+    # expects raw bytes, so we collapse hex → bytes with `xxd -r -p`.
+    printf '%s' "$hex" | xxd -r -p > "$out_file"
+    if [ ! -s "$out_file" ]; then
+        echo "Error: encoded args file is empty after xxd conversion: $out_file" >&2
+        return 1
+    fi
+}
+
+# -------------------------
 # Proxy-routed install runner (honours DRY_RUN)
 # -------------------------
 # Routes the upgrade through the proxy canister at PROXY_CANISTER_ID,
@@ -772,14 +824,23 @@ bootstrap_init_args() {
 # controllership of the staging canisters — but now exposes the `proxy`
 # method icp-cli's `--proxy` expects.
 #
-# Args: <canister_id> <wasm_path> <install_arg_candid_text>
+# Args: <canister_id> <wasm_path> <install_arg_bin_file>
+#
+# `install_arg_bin_file` is the raw-binary Candid arg produced by
+# `encode_install_arg_bin` — same format `make-upgrade-proposal` ships
+# in its NNS proposals, so the bytes on chain are bit-identical between
+# both paths.
 run_icp_install() {
     local canister_id="$1"
     local wasm_path="$2"
-    local install_arg="$3"
+    local install_arg_bin="$3"
 
     if [ ! -f "$wasm_path" ]; then
         echo "Error: wasm not found at $wasm_path" >&2
+        return 1
+    fi
+    if [ ! -f "$install_arg_bin" ]; then
+        echo "Error: install-arg binary not found at $install_arg_bin" >&2
         return 1
     fi
 
@@ -789,7 +850,8 @@ run_icp_install() {
             --proxy "$PROXY_CANISTER_ID"
             --mode upgrade
             --wasm "$wasm_path"
-            --args "$install_arg"
+            --args-file "$install_arg_bin"
+            --args-format bin
     )
 
     if [ "$DRY_RUN" = true ]; then

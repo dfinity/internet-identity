@@ -254,23 +254,42 @@ fi
 
 # -------------------------
 # Deploy (honours --dry-run)
+#
+# Args are encoded via the pinned didc against each canister's `.did`
+# schema *before* the install runs, so a typo lands here (with the bad
+# Candid echoed back) rather than as an opaque CanisterError from
+# install_code. The resulting raw-binary file is what icp-cli ships
+# through `--args-file ... --args-format bin` — identical to the bytes
+# `make-upgrade-proposal` puts in its NNS proposals.
 # -------------------------
 if [ "$DEPLOY_BE" = true ]; then
     echo ""
     echo "=== Deploying backend (PR #$PR_NUMBER, run $RUN_ID) to $BE_ID ==="
+    encode_install_arg_bin \
+        "$ROOT_DIR/src/internet_identity/internet_identity.did" \
+        "(opt InternetIdentityInit)" \
+        "$(build_be_install_arg)" \
+        "$ARTIFACT_DIR/internet_identity_backend.args.bin" \
+        || exit 1
     run_icp_install \
         "$BE_ID" \
         "$ARTIFACT_DIR/internet_identity_backend.wasm.gz" \
-        "$(build_be_install_arg)"
+        "$ARTIFACT_DIR/internet_identity_backend.args.bin"
 fi
 
 if [ "$DEPLOY_FE" = true ]; then
     echo ""
     echo "=== Deploying frontend (PR #$PR_NUMBER, run $RUN_ID) to $FE_ID ==="
+    encode_install_arg_bin \
+        "$ROOT_DIR/src/internet_identity_frontend/internet_identity_frontend.did" \
+        "(InternetIdentityFrontendInit)" \
+        "$(build_fe_install_arg)" \
+        "$ARTIFACT_DIR/internet_identity_frontend.args.bin" \
+        || exit 1
     run_icp_install \
         "$FE_ID" \
         "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz" \
-        "$(build_fe_install_arg)"
+        "$ARTIFACT_DIR/internet_identity_frontend.args.bin"
 fi
 
 echo ""
