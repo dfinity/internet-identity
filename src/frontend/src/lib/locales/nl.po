@@ -358,6 +358,9 @@ msgstr "Passkey aanmaken..."
 msgid "Cryptographically authentic"
 msgstr ""
 
+msgid "Currently active"
+msgstr ""
+
 msgid "Currently signed in with this account"
 msgstr "Momenteel ingelogd met dit account"
 
@@ -1192,6 +1195,9 @@ msgid "This identity has already been upgraded to the new experience."
 msgstr "Deze identiteit is al geüpgraded naar de nieuwe ervaring."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
+msgstr ""
+
+msgid "This is the access method you're currently signed in with."
 msgstr ""
 
 msgid "This legacy passkey is no longer usable and should be removed."

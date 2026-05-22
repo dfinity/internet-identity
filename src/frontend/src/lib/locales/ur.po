@@ -358,6 +358,9 @@ msgstr "پاس کی بنائی جا رہی ہے..."
 msgid "Cryptographically authentic"
 msgstr ""
 
+msgid "Currently active"
+msgstr ""
+
 msgid "Currently signed in with this account"
 msgstr "فی الحال اس اکاؤنٹ سے سائن اِن ہیں"
 
@@ -1192,6 +1195,9 @@ msgid "This identity has already been upgraded to the new experience."
 msgstr "یہ شناخت پہلے ہی نئے تجربے پر اپ گریڈ ہو چکی ہے۔"
 
 msgid "This is now the default method used to authenticate moving forward on this device."
+msgstr ""
+
+msgid "This is the access method you're currently signed in with."
 msgstr ""
 
 msgid "This legacy passkey is no longer usable and should be removed."

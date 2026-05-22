@@ -358,6 +358,9 @@ msgstr "Creating passkey..."
 msgid "Cryptographically authentic"
 msgstr "Cryptographically authentic"
 
+msgid "Currently active"
+msgstr "Currently active"
+
 msgid "Currently signed in with this account"
 msgstr "Currently signed in with this account"
 
@@ -1193,6 +1196,9 @@ msgstr "This identity has already been upgraded to the new experience."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
 msgstr "This is now the default method used to authenticate moving forward on this device."
+
+msgid "This is the access method you're currently signed in with."
+msgstr "This is the access method you're currently signed in with."
 
 msgid "This legacy passkey is no longer usable and should be removed."
 msgstr "This legacy passkey is no longer usable and should be removed."
