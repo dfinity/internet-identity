@@ -129,7 +129,7 @@ test.describe("Dashboard Navigation", () => {
       await managePage.assertVisible();
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome back, ${identities[0].name}\\.`),
+          name: new RegExp(`Welcome, ${identities[0].name}\\.`),
         }),
       ).toBeVisible();
 
@@ -150,7 +150,7 @@ test.describe("Dashboard Navigation", () => {
       await managePage.assertVisible();
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome back, ${identities[1].name}\\.`),
+          name: new RegExp(`Welcome, ${identities[1].name}\\.`),
         }),
       ).toBeVisible();
     });

@@ -100,36 +100,42 @@
 <!-- All three zones (welcome heading, smart-action strip, featured
      apps) share the same 640px column from the option-H design so
      the featured-app cards don't balloon to fill a wide manage
-     pane on desktop. -->
-<div class="flex w-full max-w-[40rem] flex-col">
+     pane on desktop. The wrapper is a grid (not flex) and the
+     single column is declared `minmax(0, 1fr)`. That `0` floor
+     forbids the column from growing to fit its content's intrinsic
+     min-width — which is what was happening with the action strip
+     pushing the page into horizontal scroll on narrow viewports.
+     With this hard 0-min, the strip's own `overflow-x-auto` can
+     finally take over. -->
+<div class="grid w-full max-w-[40rem] grid-cols-[minmax(0,1fr)]">
   <header class="flex flex-col gap-3">
     <h1 class="text-text-tertiary text-3xl font-medium tracking-tight">
-      <Trans>Welcome back, <span class="text-text-primary">{name}</span>.</Trans
-      >
+      <Trans>Welcome, <span class="text-text-primary">{name}</span>.</Trans>
     </h1>
   </header>
 
   <!-- Horizontal strip rather than wrap: on narrow viewports the
        three or four pills won't fit on one row, so we scroll them
-       instead of stacking. `min-w-0` lets this flex item shrink
-       below its content's natural width so `overflow-x-auto` can
-       actually do its job inside the 640px column above. The
-       custom selectors hide the scrollbar without disabling
-       scrolling. -->
+       instead of stacking. The grid column above guarantees this
+       block can't be wider than its parent, so `overflow-x-auto`
+       reliably engages. The custom selectors hide the scrollbar
+       without disabling scrolling. -->
   <div
-    class="mt-10 flex min-w-0 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    class="mt-10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
   >
-    {#each smartActions as action (action.id)}
-      {@const presentation = presentations[action.id]}
-      {@const Icon = presentation.icon}
-      <button
-        onclick={presentation.onclick}
-        class="btn btn-secondary btn-sm shrink-0 rounded-full whitespace-nowrap"
-      >
-        <Icon class="size-3.5" />
-        {presentation.label}
-      </button>
-    {/each}
+    <div class="flex gap-2">
+      {#each smartActions as action (action.id)}
+        {@const presentation = presentations[action.id]}
+        {@const Icon = presentation.icon}
+        <button
+          onclick={presentation.onclick}
+          class="btn btn-secondary btn-sm shrink-0 rounded-full whitespace-nowrap"
+        >
+          <Icon class="size-3.5" />
+          {presentation.label}
+        </button>
+      {/each}
+    </div>
   </div>
 
   {#if featuredApps.length > 0}
