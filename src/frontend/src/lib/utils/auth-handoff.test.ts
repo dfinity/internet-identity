@@ -311,11 +311,10 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   }, 1000);
 
-  it("includes the URL-hash nonce in the ready message it posts to opener", async () => {
+  it("includes the URL-hash nonce in the ready message it posts to opener", () => {
     const mockOpener = { closed: false, postMessage: vi.fn() };
     stubReceiveWindow({ opener: mockOpener });
 
-    // Don't await — we only care about the ready message that fires synchronously.
     void receiveAuthFromOpener({ timeoutMs: 50 });
 
     expect(mockOpener.postMessage).toHaveBeenCalledWith(

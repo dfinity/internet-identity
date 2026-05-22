@@ -16,6 +16,7 @@
   import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { HANDOFF_HASH_KEY } from "$lib/utils/auth-handoff";
   import { onMount } from "svelte";
+  import { SvelteURLSearchParams } from "svelte/reactivity";
   import { analytics } from "$lib/utils/analytics/analytics";
   import {
     authenticatedStore,
@@ -226,13 +227,10 @@
 
   afterNavigate(() => {
     isMobileSidebarOpen = false;
-    // Definitive cleanup of the auth-handoff nonce from the URL. The eager
-    // strip inside `receiveAuthFromOpener` runs during load but SvelteKit's
-    // router can re-sync the URL on navigation completion. Doing it here via
-    // SvelteKit's own `replaceState` integrates with the router and sticks.
+    // Sticky cleanup of the handoff nonce; the eager strip can be undone by SvelteKit's router re-syncing.
     const hash = window.location.hash.slice(1);
     if (hash.length === 0) return;
-    const params = new URLSearchParams(hash);
+    const params = new SvelteURLSearchParams(hash);
     if (!params.has(HANDOFF_HASH_KEY)) return;
     params.delete(HANDOFF_HASH_KEY);
     const remaining = params.toString();

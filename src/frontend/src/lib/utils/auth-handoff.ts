@@ -16,9 +16,7 @@ interface AuthHandoffReady {
   nonce: string;
 }
 
-// Per-handoff nonce shared via the new tab's URL fragment. Defends against a
-// same-origin attacker that can post a forged `ii-handoff:ready` to the
-// opener: without the matching nonce the opener will not send the JWK.
+// Nonce in the new tab's URL fragment; opener requires a match before sending JWK.
 export const HANDOFF_HASH_KEY = "h";
 
 export function generateHandoffNonce(): string {
@@ -106,8 +104,7 @@ function deserializeAuthMethod(
 export async function serializeAuth(
   auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
 ): Promise<AuthHandoffPayload> {
-  // _inner is private in TypeScript but accessible at runtime; no public
-  // accessor exists in the SDK for the underlying ECDSAKeyIdentity.
+  // SDK exposes no public accessor for the inner ECDSAKeyIdentity.
   const inner = (auth.identity as unknown as { _inner: ECDSAKeyIdentity })
     ._inner;
   const keyPair = inner.getKeyPair();
@@ -139,7 +136,7 @@ export async function deserializeAuth(
       "jwk",
       payload.sessionPrivateJwk,
       { name: "ECDSA", namedCurve: "P-256" },
-      true,
+      false,
       ["sign"],
     );
     const publicKey = await crypto.subtle.importKey(
@@ -175,7 +172,7 @@ export function sendAuthToOpenedTab(
   timeoutMs = 2000,
 ): { cancel: () => void } {
   let cancelled = false;
-  const payloadPromise = serializeAuth(auth);
+  const payloadPromise = serializeAuth(auth).catch(() => undefined);
 
   const listener = async (event: MessageEvent) => {
     if (
@@ -188,7 +185,7 @@ export function sendAuthToOpenedTab(
     }
     cleanup();
     const payload = await payloadPromise;
-    if (!cancelled) {
+    if (!cancelled && payload !== undefined) {
       target.postMessage(payload, location.origin);
     }
   };
@@ -228,12 +225,7 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
-  // Best-effort eager strip of the nonce from the address bar so it doesn't
-  // linger in history, copy-paste, or share targets. SvelteKit's router
-  // sometimes re-syncs the URL on navigation completion and overrides this,
-  // so the manage authenticated layout does a definitive cleanup in
-  // `afterNavigate` using SvelteKit's own `replaceState`. Preserve
-  // `history.state` so we don't clobber SvelteKit's internal entry.
+  // Eager strip; manage layout does the definitive cleanup in afterNavigate.
   hashParams.delete(HANDOFF_HASH_KEY);
   const remainingHash = hashParams.toString();
   history.replaceState(
