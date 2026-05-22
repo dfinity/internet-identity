@@ -16,8 +16,10 @@
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
+  import { get } from "svelte/store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import { sendAuthToOpenedTab } from "$lib/utils/auth-handoff";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -123,6 +125,7 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+  let pendingHandoff: { cancel: () => void } | undefined;
 
   const handleSignIn = async (identityNumber: bigint) => {
     try {
@@ -262,10 +265,39 @@
                   isIdentityPopoverOpen = false;
                   isAuthDialogOpen = true;
                 }}
-                onManageIdentity={(): Promise<void> => {
+                onManageIdentity={async (): Promise<void> => {
                   isIdentityPopoverOpen = false;
-                  window.open("/manage", "_blank");
-                  return Promise.resolve();
+                  if (selectedIdentity === undefined) return;
+                  try {
+                    isAuthenticating = true;
+                    if (
+                      $authenticationStore?.identityNumber !==
+                      selectedIdentity.identityNumber
+                    ) {
+                      sessionStore.reset();
+                      await authLastUsedFlow.authenticate(
+                        $lastUsedIdentitiesStore.identities[
+                          `${selectedIdentity.identityNumber}`
+                        ],
+                      );
+                    }
+                    const auth = get(authenticationStore);
+                    if (auth === undefined) {
+                      await goto("/manage");
+                      return;
+                    }
+                    const w = window.open("/manage", "_blank");
+                    if (w === null) {
+                      await goto("/manage");
+                      return;
+                    }
+                    pendingHandoff?.cancel();
+                    pendingHandoff = sendAuthToOpenedTab(w, auth);
+                  } catch (error) {
+                    handleError(error);
+                  } finally {
+                    isAuthenticating = false;
+                  }
                 }}
                 onManageIdentities={() => {
                   isIdentityPopoverOpen = false;
