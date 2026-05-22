@@ -430,7 +430,7 @@ msgstr "Fout"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles wat u moet weten over Internet Identity, uw veilige, privacyvriendelijke en gemakkelijke manier om in te loggen op Internet Computer-apps."
 
-msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience real privacy"
+msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr ""
 

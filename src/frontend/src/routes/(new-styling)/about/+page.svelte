@@ -76,7 +76,7 @@
         {$t({
           message: "Experience",
           context:
-            "Used as an action word inviting the reader to try or feel something, e.g. Experience real privacy",
+            "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy",
         })}
       </h1>
       <TextFade

@@ -430,7 +430,7 @@ msgstr "Fehler"
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, sichere und einfache Möglichkeit, sich bei Apps auf dem Internet Computer anzumelden."
 
-msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience real privacy"
+msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr ""
 
