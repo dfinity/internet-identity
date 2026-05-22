@@ -80,10 +80,18 @@
     const origins = frontendCanisterConfig.featured_dashboard_apps[0] ?? [];
     if (origins.length === 0) return [];
     const dapps = getDapps();
+    // De-duplicate: `KnownDapp.hasOrigin` matches a dapp's main
+    // website *or* any of its `authOrigins`, so a config entry
+    // listing both the website and an alias would otherwise push
+    // the same dapp twice and collide on the `{#each}` key below.
+    // The configured list is small (single-digit), so a linear
+    // `includes` check is fine and avoids reaching for a Map/Set.
     const matches: KnownDapp[] = [];
     for (const origin of origins) {
       const dapp = dapps.find((d) => d.hasOrigin(origin));
-      if (dapp !== undefined) matches.push(dapp);
+      if (dapp !== undefined && !matches.includes(dapp)) {
+        matches.push(dapp);
+      }
     }
     return matches;
   });
@@ -135,7 +143,7 @@
           <div class="flex items-start justify-between">
             <img
               src={dapp.logoSrc}
-              alt=""
+              alt={`${dapp.name} logo`}
               width="48"
               height="48"
               class="block size-12 rounded-xl"
