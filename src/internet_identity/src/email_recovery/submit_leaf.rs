@@ -428,14 +428,12 @@ fn verify_rsa_sha256_prehashed(
     digest: &[u8; 32],
     signature: &[u8],
 ) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::VerifyOutcome;
+    use crate::dkim::{VerifyOutcome, RSA_MIN_KEY_BITS};
     use rsa::pkcs1v15::{Signature as RsaSignature, VerifyingKey as RsaVerifyingKey};
     use rsa::pkcs8::DecodePublicKey;
     use rsa::traits::PublicKeyParts;
     use rsa::RsaPublicKey;
     use sha2::Sha256;
-    /// Minimum RSA key size in bits (matches `crate::dkim::signature::RSA_MIN_KEY_BITS`).
-    const RSA_MIN_KEY_BITS: usize = 1024;
 
     let key = match RsaPublicKey::from_public_key_der(key_bytes) {
         Ok(k) => k,
