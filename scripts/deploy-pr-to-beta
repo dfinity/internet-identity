@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./deploy-pr-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) [options] <PR_NUMBER>
+# Usage:
+#   ./deploy-pr-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) [options] <PR_NUMBER>
+#   ./deploy-pr-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) --reconfigure [options]
 #
-# Deploy CI-built artifacts from a pull request's canister-tests.yml run to
-# a staging canister. The PR's workflow run artifacts are fetched first —
-# before we ask the user any install-arg questions — so we can fail fast if
-# CI hasn't produced usable WASMs.
+# Default flow deploys CI-built artifacts from a pull request's
+# canister-tests.yml run. `--reconfigure` drops the PR # and instead
+# finds the CI artifact whose wasm hash matches what's currently on
+# chain, so only the install args change (wasm bytes stay identical).
 
 print_usage() {
     cat <<EOF
-Usage: $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) [--dry-run] [--no-checks] <PR_NUMBER>
+Usage:
+  $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) [--dry-run] [--no-checks] <PR_NUMBER>
+  $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) --reconfigure [--dry-run] [--no-checks]
 
-Download CI-built wasm.gz files from the most recent canister-tests.yml run
-for <PR_NUMBER> and upgrade the selected staging canister(s) to them.
+Default mode downloads CI-built wasm.gz files from the most recent
+canister-tests.yml run for <PR_NUMBER> and upgrades the selected staging
+canister(s) to them.
+
+\`--reconfigure\` is an args-only mode: no PR # is required. For each end
+being deployed the script fetches the on-chain module_hash, locates the
+CI artifact with the matching sha256, and re-installs that same wasm
+with the new install args.
 
 EOF
     print_common_usage
@@ -38,16 +48,25 @@ source "$SCRIPTS_DIR/deploy-common.bash"
 # -------------------------
 parse_common_args "$@" || { rc=$?; if [ "$rc" -eq 2 ]; then print_usage; exit 0; fi; print_usage; exit 1; }
 
-# This script does require a PR number as a positional argument.
+# PR number is required for the normal PR-anchored flow; `--reconfigure`
+# replaces it with an on-chain-hash lookup so no PR # is expected (or
+# allowed — accepting one would be confusing).
 PR_NUMBER=""
-if [ "${#REMAINING_ARGS[@]}" -eq 1 ]; then
+if [ "$IS_RECONFIGURE" = true ]; then
+    if [ "${#REMAINING_ARGS[@]}" -gt 0 ]; then
+        echo "Error: --reconfigure does not accept a PR number (got: ${REMAINING_ARGS[*]})." >&2
+        echo "       --reconfigure fetches the on-chain wasm hash and finds a matching CI artifact." >&2
+        print_usage
+        exit 1
+    fi
+elif [ "${#REMAINING_ARGS[@]}" -eq 1 ]; then
     PR_NUMBER="${REMAINING_ARGS[0]}"
 elif [ "${#REMAINING_ARGS[@]}" -gt 1 ]; then
     echo "Error: expected a single PR number, got: ${REMAINING_ARGS[*]}" >&2
     print_usage
     exit 1
 else
-    echo "Error: PR number is required" >&2
+    echo "Error: PR number is required (or pass --reconfigure for an args-only upgrade)" >&2
     print_usage
     exit 1
 fi
@@ -73,6 +92,84 @@ if [ -z "$GITHUB_TOKEN" ]; then
     exit 1
 fi
 AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
+
+# -------------------------
+# Set up the artifact temp dir early — both code paths below write into
+# it (the regular flow's `unzip` extract; --reconfigure's
+# `find_artifact_by_hash` direct write).
+# -------------------------
+ARTIFACT_DIR=$(mktemp -d -t ii-deploy-pr.XXXXXX)
+cleanup() {
+    if [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then
+        echo "Cleaning up downloaded artifacts (in $ARTIFACT_DIR)..." >&2
+        rm -rf "$ARTIFACT_DIR"
+    fi
+}
+trap cleanup EXIT
+
+# Tracks which CI run each artifact came from, for the per-end deploy
+# log lines below. In the regular flow this is the same id for both
+# ends; under --reconfigure the FE and BE wasms can come from
+# different runs (whatever runs happen to host artifacts with matching
+# hashes).
+declare -A RUN_ID_BY_ARTIFACT=()
+
+# Header line for the per-end "=== Deploying ... ===" log. Set
+# differently by the two flows so the operator can tell at a glance
+# whether they're shipping fresh code or just rotating args.
+deploy_label() {
+    local artifact_name="$1"
+    if [ "$IS_RECONFIGURE" = true ]; then
+        echo "reconfigure, run ${RUN_ID_BY_ARTIFACT[$artifact_name]}"
+    else
+        echo "PR #$PR_NUMBER, run $RUN_ID"
+    fi
+}
+
+if [ "$IS_RECONFIGURE" = true ]; then
+    # -------------------------
+    # --reconfigure flow
+    #
+    # Skip the PR-anchored resolution / job validation entirely. For
+    # each end being deployed, fetch the on-chain module_hash via the
+    # public ic-api endpoint and search recent canister-tests.yml runs
+    # for an artifact whose `sha256(<wasm>.wasm.gz)` matches. That
+    # artifact's wasm becomes the one we re-install, byte-identical to
+    # what's already on chain — only the install args change.
+    # -------------------------
+    echo ""
+    echo "=== --reconfigure: matching CI artifacts to on-chain wasm hashes ==="
+
+    if [ "$DEPLOY_BE" = true ]; then
+        echo "Backend ($BE_ID):"
+        BE_HASH=$(fetch_onchain_module_hash "$BE_ID")
+        if [ -z "$BE_HASH" ]; then
+            echo "  Error: could not fetch on-chain module_hash from ic-api." >&2
+            exit 1
+        fi
+        echo "  on-chain hash: $BE_HASH"
+        BE_RUN_ID=$(find_artifact_by_hash \
+            "internet_identity_backend.wasm.gz" \
+            "$BE_HASH" \
+            "$ARTIFACT_DIR/internet_identity_backend.wasm.gz") || exit 1
+        RUN_ID_BY_ARTIFACT["internet_identity_backend.wasm.gz"]="$BE_RUN_ID"
+    fi
+
+    if [ "$DEPLOY_FE" = true ]; then
+        echo "Frontend ($FE_ID):"
+        FE_HASH=$(fetch_onchain_module_hash "$FE_ID")
+        if [ -z "$FE_HASH" ]; then
+            echo "  Error: could not fetch on-chain module_hash from ic-api." >&2
+            exit 1
+        fi
+        echo "  on-chain hash: $FE_HASH"
+        FE_RUN_ID=$(find_artifact_by_hash \
+            "internet_identity_frontend.wasm.gz" \
+            "$FE_HASH" \
+            "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz") || exit 1
+        RUN_ID_BY_ARTIFACT["internet_identity_frontend.wasm.gz"]="$FE_RUN_ID"
+    fi
+else
 
 echo ""
 echo "Resolving PR #$PR_NUMBER head branch..."
@@ -198,24 +295,11 @@ for tuple in "${ARTIFACTS[@]}"; do
 done
 
 # -------------------------
-# Download CI artifacts into a dedicated temp directory rather than the
-# repo root — the CI artifact names collide with names produced by
-# `scripts/build` locally (e.g. `internet_identity_frontend.wasm.gz`), so
-# extracting into the repo root would overwrite and then (via cleanup)
-# delete the developer's local build outputs. The temp dir is wiped on
-# EXIT regardless of outcome.
-# -------------------------
-ARTIFACT_DIR=$(mktemp -d -t ii-deploy-pr.XXXXXX)
-cleanup() {
-    if [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then
-        echo "Cleaning up downloaded artifacts (in $ARTIFACT_DIR)..." >&2
-        rm -rf "$ARTIFACT_DIR"
-    fi
-}
-trap cleanup EXIT
-
-# -------------------------
-# Download + extract each artifact
+# Download + extract each artifact into $ARTIFACT_DIR (set up earlier
+# alongside its EXIT-trap cleanup). The CI artifact names collide with
+# the names `scripts/build` produces locally, so extracting in the repo
+# root would clobber the developer's working-tree wasms — keep them
+# isolated in the temp dir.
 # -------------------------
 echo ""
 echo "Downloading CI artifacts to $ARTIFACT_DIR..."
@@ -232,7 +316,10 @@ for tuple in "${ARTIFACTS[@]}"; do
         exit 1
     fi
     echo "  Extracted: $ARTIFACT_DIR/$ARTIFACT_NAME"
+    RUN_ID_BY_ARTIFACT["$ARTIFACT_NAME"]="$RUN_ID"
 done
+
+fi  # end of `if [ "$IS_RECONFIGURE" = true ]; ... else ... fi`
 
 # -------------------------
 # Reachability + consistency
@@ -264,7 +351,7 @@ fi
 # -------------------------
 if [ "$DEPLOY_BE" = true ]; then
     echo ""
-    echo "=== Deploying backend (PR #$PR_NUMBER, run $RUN_ID) to $BE_ID ==="
+    echo "=== Deploying backend ($(deploy_label internet_identity_backend.wasm.gz)) to $BE_ID ==="
     encode_install_arg_bin \
         "$ROOT_DIR/src/internet_identity/internet_identity.did" \
         "(opt InternetIdentityInit)" \
@@ -279,7 +366,7 @@ fi
 
 if [ "$DEPLOY_FE" = true ]; then
     echo ""
-    echo "=== Deploying frontend (PR #$PR_NUMBER, run $RUN_ID) to $FE_ID ==="
+    echo "=== Deploying frontend ($(deploy_label internet_identity_frontend.wasm.gz)) to $FE_ID ==="
     encode_install_arg_bin \
         "$ROOT_DIR/src/internet_identity_frontend/internet_identity_frontend.did" \
         "(InternetIdentityFrontendInit)" \

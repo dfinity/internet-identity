@@ -151,6 +151,10 @@ Common options:
   -be                       Shortcut for --end back
   --dry-run                 Print icp canister install commands instead of running them
   --no-checks               Skip reachability and consistency checks
+  --reconfigure             (deploy-pr-to-beta only) Args-only upgrade: no PR #,
+                            script finds the CI artifact whose Wasm hash matches
+                            what's currently on chain and re-uses it, so only the
+                            install args change.
   --update-email-recovery-init
                             Fetch fresh IANA root anchors + set the curated
                             DoH allowlist on this upgrade. Without this flag
@@ -178,6 +182,7 @@ parse_common_args() {
     REBUILD_BE=false
     DRY_RUN=false
     NO_CHECKS=false
+    IS_RECONFIGURE=false
     UPDATE_EMAIL_RECOVERY_INIT=false
     DOH_DOMAINS_ARG=""
     # Distinguishes "--doh-domains was not passed" (use the curated
@@ -274,6 +279,14 @@ parse_common_args() {
                 ;;
             --no-checks)
                 NO_CHECKS=true
+                shift
+                ;;
+            --reconfigure)
+                # Args-only mode (see deploy-pr-to-beta): no PR # required;
+                # the script finds a CI artifact whose Wasm hash matches
+                # whatever's currently on chain so the wasm bytes don't
+                # change across the upgrade.
+                IS_RECONFIGURE=true
                 shift
                 ;;
             --update-email-recovery-init)
@@ -737,6 +750,121 @@ opt opt record {
       max_cache_age_secs = opt (3600 : nat64);
     }
 EOF
+}
+
+# -------------------------
+# `--reconfigure` helpers
+# -------------------------
+# Args-only deploy support: find the CI artifact whose gzipped wasm
+# sha256 matches whatever's currently on chain, so we can upgrade the
+# install args without changing the on-chain wasm bytes. Verified
+# empirically against Staging A: `module_hash` (from canister_status)
+# equals `sha256(internet_identity_backend.wasm.gz)` — i.e. the IC
+# stores the *gzipped* bytes and hashes them, rather than the
+# decompressed module. So no `gunzip` step here.
+
+# Read the on-chain module_hash via the public ic-api endpoint. No
+# authentication, no canister call — just the dashboard's read-only
+# REST surface. Stdout: lowercase hex sha256, or empty on failure.
+fetch_onchain_module_hash() {
+    local canister_id="$1"
+    curl --connect-timeout 10 --max-time 30 -fsSL \
+        "https://ic-api.internetcomputer.org/api/v3/canisters/$canister_id" 2>/dev/null \
+        | jq -r '.module_hash // empty'
+}
+
+# Search recent CI artifacts for one whose .wasm.gz sha256 matches
+# `$2`. Writes the matching wasm.gz to `$3` and prints the run id (for
+# the per-end "=== Deploying ... ===" log line) to stdout. Returns
+# non-zero with a diagnostic if no match is found in the search window.
+#
+# Args:
+#   $1  artifact name (e.g. "internet_identity_backend.wasm.gz")
+#   $2  expected sha256 (lowercase hex)
+#   $3  destination path for the matching wasm.gz
+#
+# Requires: $REPO, $AUTH_HEADER set by the caller (deploy-pr-to-beta
+# initialises both right after PR/auth resolution).
+#
+# Uses the per-repo artifacts endpoint with the `?name=...` filter,
+# which returns up to 100 matching artifacts per page directly — much
+# denser than walking workflow runs (most runs don't host the artifact
+# we want, so per-run scans waste API budget). Searches at most
+# `max_artifacts` artifacts before giving up; bump as needed if the
+# on-chain wasm reliably exceeds the window.
+find_artifact_by_hash() {
+    local artifact_name="$1"
+    local expected_hash="$2"
+    local dest_path="$3"
+    local max_artifacts=300
+
+    echo "  Searching $REPO for $artifact_name with hash $expected_hash (up to $max_artifacts artifacts)..." >&2
+
+    local tmp_zip tmp_dir
+    tmp_zip=$(mktemp -t ii-reconfigure.XXXX.zip)
+    tmp_dir=$(mktemp -d -t ii-reconfigure.XXXX)
+    # shellcheck disable=SC2064 # we want $tmp_* expanded at trap setup
+    trap "rm -rf '$tmp_zip' '$tmp_dir'" RETURN
+
+    local page=1 checked=0 expired_skipped=0
+    while [ "$checked" -lt "$max_artifacts" ]; do
+        local artifacts_json
+        artifacts_json=$(curl -sf -H "$AUTH_HEADER" \
+            "https://api.github.com/repos/$REPO/actions/artifacts?name=$artifact_name&per_page=100&page=$page" \
+            2>/dev/null || echo '{"artifacts":[]}')
+
+        local count
+        count=$(echo "$artifacts_json" | jq '.artifacts | length')
+        if [ "$count" -eq 0 ]; then
+            break
+        fi
+
+        local i
+        for ((i=0; i<count && checked<max_artifacts; i++)); do
+            local expired url run_id branch
+            expired=$(echo "$artifacts_json" | jq -r ".artifacts[$i].expired")
+            if [ "$expired" = "true" ]; then
+                expired_skipped=$((expired_skipped + 1))
+                continue
+            fi
+            url=$(echo "$artifacts_json" | jq -r ".artifacts[$i].archive_download_url")
+            run_id=$(echo "$artifacts_json" | jq -r ".artifacts[$i].workflow_run.id")
+            branch=$(echo "$artifacts_json" | jq -r ".artifacts[$i].workflow_run.head_branch")
+
+            checked=$((checked + 1))
+            if ! curl -sfL -H "$AUTH_HEADER" -o "$tmp_zip" "$url" 2>/dev/null; then
+                continue
+            fi
+            rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+            if ! unzip -o -q "$tmp_zip" -d "$tmp_dir" 2>/dev/null; then
+                continue
+            fi
+            if [ ! -f "$tmp_dir/$artifact_name" ]; then
+                continue
+            fi
+
+            local hash
+            hash=$(shasum -a 256 "$tmp_dir/$artifact_name" | awk '{print $1}')
+            if [ "$hash" = "$expected_hash" ]; then
+                mv "$tmp_dir/$artifact_name" "$dest_path"
+                echo "  Match: run $run_id ($branch)" >&2
+                echo "$run_id"
+                return 0
+            fi
+        done
+
+        page=$((page + 1))
+        if [ "$count" -lt 100 ]; then
+            break  # last page
+        fi
+    done
+
+    echo "  Error: no artifact matching sha256 $expected_hash found in the most recent $checked artifacts" \
+         "(of $artifact_name; $expired_skipped expired skipped)." >&2
+    echo "         The on-chain wasm probably pre-dates GitHub's 90-day artifact retention window, or the" >&2
+    echo "         deploy was performed by a path that didn't go through canister-tests.yml. Fall back to" >&2
+    echo "         the regular PR-anchored flow: \`./scripts/deploy-pr-to-beta -s<env> -fe -be <PR>\`." >&2
+    return 1
 }
 
 # -------------------------
