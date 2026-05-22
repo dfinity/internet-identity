@@ -88,8 +88,13 @@ run_reachability_checks || exit 1
 run_consistency_checks
 
 # -------------------------
-# Prompt for FE extras (only if deploying FE)
+# Prompt for install-arg fields that the operator should review on each
+# upgrade (custom-domain origins, behaviour knobs). See deploy-common.bash
+# for the per-end fields.
 # -------------------------
+if [ "$DEPLOY_BE" = true ]; then
+    prompt_be_extra_args
+fi
 if [ "$DEPLOY_FE" = true ]; then
     prompt_fe_extra_args
 fi

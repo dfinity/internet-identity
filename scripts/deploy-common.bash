@@ -6,10 +6,17 @@
 #   end selection (-fe/-be/--end), dry-run, no-checks, and (for the local
 #   script) the rebuild flags.
 # - Reachability + consistency checks against the selected staging canisters.
-# - Interactive prompting for the small set of install-arg fields we actually
-#   want humans to make decisions about (dev_csp / dummy_auth / analytics_config)
-#   — everything else is derived from the four shared values (BE_ID, FE_ID,
-#   BE_URL, FE_URL) or left opaque via opt null to preserve prior state.
+# - Interactive prompting for the install-arg fields humans should review on
+#   each upgrade:
+#     * `backend_origin` and `related_origins` (FE + BE) — staging environments
+#       often front custom domains in addition to the canister-default URLs,
+#       and silently overwriting the on-chain lists has bitten us in the past;
+#     * the behavior knobs `dev_csp` / `dummy_auth` / `analytics_config` (FE).
+#   Defaults are read from the canister's current `/.config` (FE, Candid text)
+#   or `/.config.did.bin` (BE, decoded via `didc` against the BE `.did`), so
+#   hitting Enter through preserves the existing on-chain values. Everything
+#   else is derived from the shared (BE_ID, FE_ID, BE_URL, FE_URL) quad or left
+#   absent so the BE preserves prior state.
 # - Install-arg builders that emit Candid text for each canister.
 # - An icp install runner that honours --dry-run.
 #
@@ -496,15 +503,16 @@ _parse_candid_field() {
 }
 
 # -------------------------
-# Per-FE interactive prompts for the small set of fields that aren't derived
-# from the shared quad (dev_csp, dummy_auth, analytics_config). fetch_root_key
-# is auto-selected by network.
+# Per-FE interactive prompts for the install-arg fields that aren't tied to
+# the staging quad: `backend_origin`, `related_origins`, `dev_csp`,
+# `dummy_auth`, `analytics_config`. `backend_canister_id` is derived from
+# BE_ID and `fetch_root_key` from the network, so neither is prompted.
 #
 # Fetches the FE canister's current `/.config` so each prompt offers the
-# currently-stored value as its default. Sending `null` on upgrade actively
-# resets these fields on the canister — it is NOT a no-op — so using the
-# current values as defaults preserves behavior when the user just hits
-# Enter.
+# currently-stored value as its default. The FE init type is a required
+# record (not opt), so every prompted field is set on each upgrade — there
+# is no "absent = preserve" path — and using the current values as defaults
+# is the only way hitting Enter through preserves behavior.
 # -------------------------
 prompt_fe_extra_args() {
     # Mainnet is the only target we currently support → fetch_root_key false.
@@ -521,26 +529,102 @@ prompt_fe_extra_args() {
     echo "Fetching current FE config from $config_url ..." >&2
     raw_config=$(curl --connect-timeout 10 --max-time 30 -sfL "$config_url" 2>/dev/null || true)
 
+    # Fallback defaults derived from the staging quad. These match the
+    # canister-default URLs and so will overwrite any custom-domain config
+    # currently on chain — hence the prominent warning when the live
+    # `/.config` couldn't be fetched.
+    local backend_origin_default="\"$BE_URL\""
+    local related_origins_default="opt vec { \"$FE_URL\" }"
     local dev_csp_default="null"
     local dummy_auth_default="null"
     local analytics_default="null"
 
     if [ -n "$raw_config" ]; then
         local parsed
+        parsed=$(_parse_candid_field "backend_origin" "$raw_config");   [ -n "$parsed" ] && backend_origin_default="$parsed"
+        parsed=$(_parse_candid_field "related_origins" "$raw_config");  [ -n "$parsed" ] && related_origins_default="$parsed"
         parsed=$(_parse_candid_field "dev_csp" "$raw_config");          [ -n "$parsed" ] && dev_csp_default="$parsed"
         parsed=$(_parse_candid_field "dummy_auth" "$raw_config");       [ -n "$parsed" ] && dummy_auth_default="$parsed"
         parsed=$(_parse_candid_field "analytics_config" "$raw_config"); [ -n "$parsed" ] && analytics_default="$parsed"
     else
-        echo "  Warning: could not fetch current config; defaulting all three fields to null." >&2
-        echo "           (This will reset them on the canister if you hit Enter through.)" >&2
+        echo "  Warning: could not fetch current config; defaults are derived from the staging quad, NOT live values." >&2
+        echo "           Hitting Enter through will OVERWRITE any custom-domain backend_origin / related_origins on chain." >&2
     fi
 
     echo "" >&2
-    echo "Frontend-only install-arg prompts (hit Enter to keep current value):" >&2
+    echo "Frontend install-arg prompts (hit Enter to keep current value):" >&2
 
-    DEV_CSP_ARG=$(prompt_default "dev_csp (opt bool)" "$dev_csp_default")
-    DUMMY_AUTH_ARG=$(prompt_default "dummy_auth (opt opt DummyAuthConfig)" "$dummy_auth_default")
-    ANALYTICS_ARG=$(prompt_default "analytics_config (opt opt AnalyticsConfig)" "$analytics_default")
+    BACKEND_ORIGIN_ARG=$(prompt_default  "backend_origin (text)"                       "$backend_origin_default")
+    RELATED_ORIGINS_ARG=$(prompt_default "related_origins (opt vec text)"              "$related_origins_default")
+    DEV_CSP_ARG=$(prompt_default         "dev_csp (opt bool)"                          "$dev_csp_default")
+    DUMMY_AUTH_ARG=$(prompt_default      "dummy_auth (opt opt DummyAuthConfig)"        "$dummy_auth_default")
+    ANALYTICS_ARG=$(prompt_default       "analytics_config (opt opt AnalyticsConfig)"  "$analytics_default")
+}
+
+# -------------------------
+# Per-BE interactive prompts for the install-arg fields where the on-chain
+# value matters and the staging-quad-derived default would silently
+# overwrite a custom-domain setup: `backend_origin` and `related_origins`.
+#
+# The BE init type is `opt InternetIdentityInit` where every field is itself
+# `opt` and "absent = preserve previous value", so unlike the FE we *could*
+# stay silent by emitting `null` for both fields — but that resets them
+# rather than preserving, which is just as destructive. Prompting with the
+# decoded on-chain values as defaults makes "hit Enter through" actually
+# preserve current state.
+#
+# The BE config endpoint serves binary Candid (`/.config.did.bin`), so we
+# need `didc` plus the BE `.did` schema to decode it for human-readable
+# field names. If either is missing we fall back to the canister-URL
+# defaults with a loud warning.
+# -------------------------
+prompt_be_extra_args() {
+    local scripts_dir
+    scripts_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    local did_file="$scripts_dir/../src/internet_identity/internet_identity.did"
+    local config_url="${BE_URL}/.config.did.bin"
+
+    # Fallback defaults — see warning text below for what these do on chain.
+    local backend_origin_default="opt \"$BE_URL\""
+    local related_origins_default="opt vec { \"$FE_URL\" }"
+
+    echo "" >&2
+    if ! command -v didc >/dev/null 2>&1; then
+        echo "Note: \`didc\` not installed — skipping BE config decode." >&2
+        echo "      Defaults below are derived from the staging quad, NOT live values." >&2
+        echo "      Hitting Enter through will OVERWRITE any custom-domain config on chain." >&2
+    elif [ ! -f "$did_file" ]; then
+        echo "Note: BE .did schema not found at $did_file — skipping BE config decode." >&2
+        echo "      Defaults below are derived from the staging quad, NOT live values." >&2
+    else
+        echo "Fetching current BE config from $config_url ..." >&2
+        local tmp
+        tmp=$(mktemp)
+        if ! curl --connect-timeout 10 --max-time 30 -sfL "$config_url" -o "$tmp" 2>/dev/null \
+                || [ ! -s "$tmp" ]; then
+            echo "  Warning: could not fetch BE config; defaults are derived from the staging quad, NOT live values." >&2
+        else
+            local decoded
+            decoded=$(didc decode -d "$did_file" -t '(InternetIdentityInit)' \
+                "$(xxd -p "$tmp" | tr -d '\n')" 2>/dev/null || true)
+            if [ -z "$decoded" ]; then
+                echo "  Warning: \`didc decode\` failed; defaults are derived from the staging quad." >&2
+            else
+                local parsed
+                parsed=$(_parse_candid_field "backend_origin" "$decoded")
+                [ -n "$parsed" ] && backend_origin_default="$parsed"
+                parsed=$(_parse_candid_field "related_origins" "$decoded")
+                [ -n "$parsed" ] && related_origins_default="$parsed"
+            fi
+        fi
+        rm -f "$tmp"
+    fi
+
+    echo "" >&2
+    echo "Backend install-arg prompts (hit Enter to keep current value):" >&2
+
+    BE_BACKEND_ORIGIN_ARG=$(prompt_default  "backend_origin (opt text)"       "$backend_origin_default")
+    BE_RELATED_ORIGINS_ARG=$(prompt_default "related_origins (opt vec text)"  "$related_origins_default")
 }
 
 # -------------------------
@@ -557,8 +641,8 @@ build_fe_install_arg() {
 (
   record {
     backend_canister_id = principal "$BE_ID";
-    backend_origin = "$BE_URL";
-    related_origins = opt vec { "$FE_URL" };
+    backend_origin = $BACKEND_ORIGIN_ARG;
+    related_origins = $RELATED_ORIGINS_ARG;
     fetch_root_key = $FETCH_ROOT_KEY_ARG;
     dev_csp = $DEV_CSP_ARG;
     dummy_auth = $DUMMY_AUTH_ARG;
@@ -602,8 +686,8 @@ EXTRA
 (
   opt record {
     backend_canister_id = opt principal "$BE_ID";
-    backend_origin = opt "$BE_URL";
-    related_origins = opt vec { "$FE_URL" };
+    backend_origin = $BE_BACKEND_ORIGIN_ARG;
+    related_origins = $BE_RELATED_ORIGINS_ARG;
 $extra
   }
 )
