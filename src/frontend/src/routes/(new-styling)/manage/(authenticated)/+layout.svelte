@@ -13,7 +13,8 @@
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
-  import { afterNavigate, goto } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
+  import { HANDOFF_HASH_KEY } from "$lib/utils/auth-handoff";
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import {
@@ -225,6 +226,21 @@
 
   afterNavigate(() => {
     isMobileSidebarOpen = false;
+    // Definitive cleanup of the auth-handoff nonce from the URL. The eager
+    // strip inside `receiveAuthFromOpener` runs during load but SvelteKit's
+    // router can re-sync the URL on navigation completion. Doing it here via
+    // SvelteKit's own `replaceState` integrates with the router and sticks.
+    const hash = window.location.hash.slice(1);
+    if (hash.length === 0) return;
+    const params = new URLSearchParams(hash);
+    if (!params.has(HANDOFF_HASH_KEY)) return;
+    params.delete(HANDOFF_HASH_KEY);
+    const remaining = params.toString();
+    const cleanUrl =
+      window.location.pathname +
+      window.location.search +
+      (remaining.length > 0 ? `#${remaining}` : "");
+    replaceState(cleanUrl, page.state);
   });
 
   // Pre-fetch passkey credential ids

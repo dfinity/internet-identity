@@ -228,12 +228,16 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
-  // Strip the nonce from the address bar so it doesn't linger in history,
-  // copy-paste, or share targets.
+  // Best-effort eager strip of the nonce from the address bar so it doesn't
+  // linger in history, copy-paste, or share targets. SvelteKit's router
+  // sometimes re-syncs the URL on navigation completion and overrides this,
+  // so the manage authenticated layout does a definitive cleanup in
+  // `afterNavigate` using SvelteKit's own `replaceState`. Preserve
+  // `history.state` so we don't clobber SvelteKit's internal entry.
   hashParams.delete(HANDOFF_HASH_KEY);
   const remainingHash = hashParams.toString();
   history.replaceState(
-    null,
+    history.state,
     "",
     window.location.pathname +
       window.location.search +
