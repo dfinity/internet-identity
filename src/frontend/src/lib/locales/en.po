@@ -548,8 +548,8 @@ msgstr "Identity number"
 msgid "Identity removed"
 msgstr "Identity removed"
 
-msgid "Identity upgraded"
-msgstr "Identity upgraded"
+msgid "Identity upgraded."
+msgstr "Identity upgraded."
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
@@ -1059,8 +1059,8 @@ msgid "Some mail providers queue outgoing mail. Check your sent folder to make s
 msgstr "Some mail providers queue outgoing mail. Check your sent folder to make sure it actually went out."
 
 msgctxt "The user entered an incorrect value during a verification step"
-msgid "Something is wrong"
-msgstr "Something is wrong"
+msgid "Something is wrong."
+msgstr "Something is wrong."
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
@@ -1374,8 +1374,8 @@ msgstr "We can't verify mail from <0>{domain}</0> yet. Try a different address. 
 msgid "We didn't recognize that activation code."
 msgstr "We didn't recognize that activation code."
 
-msgid "Welcome, {name}"
-msgstr "Welcome, {name}"
+msgid "Welcome, {name}."
+msgstr "Welcome, {name}."
 
 msgid "What are passkeys?"
 msgstr "What are passkeys?"

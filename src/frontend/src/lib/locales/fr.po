@@ -548,7 +548,7 @@ msgstr "Numéro d’identité"
 msgid "Identity removed"
 msgstr "Identité supprimée"
 
-msgid "Identity upgraded"
+msgid "Identity upgraded."
 msgstr ""
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
@@ -1059,7 +1059,7 @@ msgid "Some mail providers queue outgoing mail. Check your sent folder to make s
 msgstr ""
 
 msgctxt "The user entered an incorrect value during a verification step"
-msgid "Something is wrong"
+msgid "Something is wrong."
 msgstr ""
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
@@ -1374,7 +1374,7 @@ msgstr ""
 msgid "We didn't recognize that activation code."
 msgstr "Nous n’avons pas reconnu ce code d’activation."
 
-msgid "Welcome, {name}"
+msgid "Welcome, {name}."
 msgstr ""
 
 msgid "What are passkeys?"
