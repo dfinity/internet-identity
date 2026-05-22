@@ -4,9 +4,9 @@
   import { goto } from "$app/navigation";
   import {
     ArrowUpRightIcon,
-    CheckCircleIcon,
     MailIcon,
     PlusIcon,
+    ShieldAlertIcon,
     ShieldIcon,
   } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
@@ -66,7 +66,7 @@
       },
       "verify-phrase": {
         label: $t`Verify recovery phrase`,
-        icon: CheckCircleIcon,
+        icon: ShieldAlertIcon,
         onclick: () => goto("/manage/recovery", { state: { verify: true } }),
       },
       "reset-phrase": {
@@ -97,75 +97,82 @@
   });
 </script>
 
-<header class="flex flex-col gap-3">
-  <h1 class="text-text-tertiary text-3xl font-medium tracking-tight">
-    <Trans>Welcome back, <span class="text-text-primary">{name}</span>.</Trans>
-  </h1>
-</header>
+<!-- All three zones (welcome heading, smart-action strip, featured
+     apps) share the same 640px column from the option-H design so
+     the featured-app cards don't balloon to fill a wide manage
+     pane on desktop. -->
+<div class="flex w-full max-w-[40rem] flex-col">
+  <header class="flex flex-col gap-3">
+    <h1 class="text-text-tertiary text-3xl font-medium tracking-tight">
+      <Trans>Welcome back, <span class="text-text-primary">{name}</span>.</Trans
+      >
+    </h1>
+  </header>
 
-<!-- Horizontal strip rather than wrap: on narrow viewports the
-     three or four pills won't fit on one row, so we scroll them
-     instead of stacking. Negative margin + matching padding lets
-     the row bleed to the viewport edge on mobile so users see
-     half of the next pill peeking out, signalling there's more to
-     scroll. On `sm` and up the strip stays within the content
-     column. The custom selectors hide the scrollbar without
-     disabling scrolling. -->
-<div
-  class="-mx-4 mt-10 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
->
-  {#each smartActions as action (action.id)}
-    {@const presentation = presentations[action.id]}
-    {@const Icon = presentation.icon}
-    <button
-      onclick={presentation.onclick}
-      class="btn btn-secondary btn-sm shrink-0 rounded-full whitespace-nowrap"
-    >
-      <Icon class="size-3.5" />
-      {presentation.label}
-    </button>
-  {/each}
-</div>
+  <!-- Horizontal strip rather than wrap: on narrow viewports the
+       three or four pills won't fit on one row, so we scroll them
+       instead of stacking. Negative margin + matching padding lets
+       the row bleed to the viewport edge on mobile so users see
+       half of the next pill peeking out, signalling there's more to
+       scroll. On `sm` and up the strip stays within the content
+       column. The custom selectors hide the scrollbar without
+       disabling scrolling. -->
+  <div
+    class="-mx-4 mt-10 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+  >
+    {#each smartActions as action (action.id)}
+      {@const presentation = presentations[action.id]}
+      {@const Icon = presentation.icon}
+      <button
+        onclick={presentation.onclick}
+        class="btn btn-secondary btn-sm shrink-0 rounded-full whitespace-nowrap"
+      >
+        <Icon class="size-3.5" />
+        {presentation.label}
+      </button>
+    {/each}
+  </div>
 
-{#if featuredApps.length > 0}
-  <section class="mt-12 flex flex-col gap-3.5">
-    <h2 class="text-text-primary text-base font-medium tracking-tight">
-      {$t`Featured apps`}
-    </h2>
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {#each featuredApps as dapp (dapp.website)}
-        <a
-          href={dapp.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group bg-bg-primary_alt border-border-secondary hover:border-border-primary flex flex-col gap-5 rounded-xl border p-4 shadow-xs transition-colors"
-        >
-          <div class="flex items-start justify-between">
-            <img
-              src={dapp.logoSrc}
-              alt={`${dapp.name} logo`}
-              width="48"
-              height="48"
-              class="block size-12 rounded-xl"
-            />
-            <ArrowUpRightIcon
-              class="text-text-tertiary group-hover:text-text-primary size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            />
-          </div>
-          <div class="flex flex-col gap-1">
-            <span
-              class="text-text-primary text-base font-semibold tracking-tight"
-            >
-              {dapp.name}
-            </span>
-            {#if dapp.oneLiner !== undefined}
-              <span class="text-text-tertiary text-sm leading-snug">
-                {dapp.oneLiner}
+  {#if featuredApps.length > 0}
+    <section class="mt-12 flex flex-col gap-3.5">
+      <h2 class="text-text-primary text-base font-medium tracking-tight">
+        {$t`Featured apps`}
+      </h2>
+      <div class="grid grid-cols-3 gap-3">
+        {#each featuredApps as dapp (dapp.website)}
+          <a
+            href={dapp.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group bg-bg-primary_alt border-border-secondary hover:border-border-primary flex flex-col gap-5 rounded-xl border p-4 shadow-xs transition-colors"
+          >
+            <div class="flex items-start justify-between">
+              <img
+                src={dapp.logoSrc}
+                alt={`${dapp.name} logo`}
+                width="56"
+                height="56"
+                class="block size-14 rounded-xl"
+              />
+              <ArrowUpRightIcon
+                class="text-text-tertiary group-hover:text-text-primary size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <span
+                class="text-text-primary text-base font-semibold tracking-tight"
+              >
+                {dapp.name}
               </span>
-            {/if}
-          </div>
-        </a>
-      {/each}
-    </div>
-  </section>
-{/if}
+              {#if dapp.oneLiner !== undefined}
+                <span class="text-text-tertiary text-sm leading-snug">
+                  {dapp.oneLiner}
+                </span>
+              {/if}
+            </div>
+          </a>
+        {/each}
+      </div>
+    </section>
+  {/if}
+</div>
