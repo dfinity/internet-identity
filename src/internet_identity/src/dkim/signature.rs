@@ -43,23 +43,13 @@ pub enum VerifyOutcome {
     RsaKeyTooSmall(usize),
 }
 
-/// Minimum RSA key size in bits, enforced at signature verification
-/// time. The floor sits at **2048**: NIST SP 800-131A deprecated
-/// RSA-1024 for digital-signature verification in 2014 (full
-/// disallowance scheduled by NIST for 2030), and the DKIM ecosystem
-/// has migrated accordingly — every mainstream sender we care about
-/// (Gmail, Outlook, iCloud, Yahoo, Proton, Fastmail) publishes
-/// RSA-2048 or larger. M3AAWG's *DKIM Key Rotation Best Common
-/// Practices* recommends 2048 as the minimum production key length.
-///
-/// The previous v1 floor was 1024 (matching RFC 8301's
-/// MUST-NOT-below-1024). Closing a finding from the 2026-05 security
-/// review, the floor was raised to 2048 because the cryptographic
-/// margin was the asymmetrically-weakest part of the verifier's
-/// defence-in-depth posture (SHA-256 hashing, P-256/Ed25519 DNSSEC,
-/// 2048-bit RSA elsewhere). A sender on a 1024-bit-only key would
-/// surface here as `VerifyOutcome::RsaKeyTooSmall(1024)` and would
-/// need to rotate to 2048 before recovery binding will succeed.
+/// Minimum RSA key size in bits, enforced at signature verification.
+/// NIST SP 800-131A deprecated RSA-1024 in 2014 and every mainstream
+/// sender we care about (Gmail, Outlook, iCloud, Yahoo, Proton,
+/// Fastmail) publishes RSA-2048 or larger; M3AAWG recommends 2048 as
+/// the production minimum. A sender stuck on 1024 surfaces as
+/// `VerifyOutcome::RsaKeyTooSmall(1024)` and must rotate before
+/// recovery binding will succeed.
 pub const RSA_MIN_KEY_BITS: usize = 2048;
 
 /// Verify `signature` against `signed_data` using the public key bytes
@@ -263,25 +253,13 @@ mod tests {
         bytes.try_into().expect("32 bytes")
     }
 
-    // ---- RSA_MIN_KEY_BITS floor (2048) ----
-    //
-    // Per the 2026-05 security review (F04), the RSA floor was raised
-    // from 1024 to 2048 to match modern industry guidance. The two
-    // tests below pin the new floor:
-    //
-    // - A real 1024-bit key (the most-common sub-floor size in the
-    //   wild) must be rejected with the exact bit count surfaced in
-    //   the error, so callers can render a useful diagnostic.
-    // - A real 2048-bit key (exactly at the floor) must pass the size
-    //   gate. We don't supply a valid signature, so verification
-    //   falls through to `BadSignature` — distinguishable from
-    //   `RsaKeyTooSmall` and therefore proves the gate didn't fire.
-    //
-    // The integration test
-    // `email_recovery::full_setup_flow_binds_credential_to_anchor`
-    // covers the 2048-bit happy path end-to-end with a real
-    // signature; these two unit tests are the focused floor-boundary
-    // guards.
+    // Boundary guards for `RSA_MIN_KEY_BITS`: a key below the floor
+    // must be rejected with the exact bit count surfaced; a key at
+    // the floor must pass the size gate (verification then falls
+    // through to `BadSignature` on our bogus signature, which is
+    // distinguishable from `RsaKeyTooSmall`). The at-floor happy
+    // path with a real signature is covered end-to-end by
+    // `email_recovery::full_setup_flow_binds_credential_to_anchor`.
 
     #[test]
     fn rsa_below_floor_is_rejected_with_actual_bits() {
@@ -291,12 +269,9 @@ mod tests {
         let mut rng = rand::rngs::OsRng;
         let private_key = RsaPrivateKey::new(&mut rng, 1024).expect("RSA 1024-bit keygen");
         let public_key = RsaPublicKey::from(&private_key);
-        // Read the actual modulus bit length off the generated key
-        // rather than hardcoding 1024. `RsaPrivateKey::new(rng, n)`
-        // is documented to produce `n.bits() == n`, but reading the
-        // value back exercises the same `PublicKeyParts::n()` call
-        // the verifier itself makes, so this asserts what the
-        // verifier *actually saw* rather than what we asked for.
+        // Read the modulus bit length back through the same
+        // `PublicKeyParts::n()` call the verifier uses, so the
+        // assertion matches what the verifier saw.
         let actual_bits = public_key.n().bits();
         let spki_der = public_key.to_public_key_der().expect("encode SPKI DER");
 
@@ -305,12 +280,9 @@ mod tests {
             KeyType::Rsa,
             spki_der.as_bytes(),
             b"any signed data",
-            // 1024-bit RSA emits 128-byte signatures; the length
-            // check inside `verify_rsa_sha256` runs *after* the size
-            // gate, so this only needs to be the right length to
-            // avoid being misclassified as `MalformedSignature`. The
-            // signature bytes are bogus — verification never reaches
-            // them on the size-gate-rejected path.
+            // 128-byte sig matches the 1024-bit modulus; needed only
+            // to dodge `MalformedSignature` since the size gate runs
+            // before the length check.
             &[0u8; 128],
         );
 
@@ -332,18 +304,16 @@ mod tests {
             KeyType::Rsa,
             spki_der.as_bytes(),
             b"any signed data",
-            // 2048-bit RSA emits 256-byte signatures. With a bogus
-            // signature, verification falls through to `BadSignature`
-            // — that's exactly what we want this test to assert,
-            // since `BadSignature` proves we got past the size gate.
+            // 256-byte sig matches the 2048-bit modulus.
             &[0u8; 256],
         );
 
+        // `BadSignature` (vs `RsaKeyTooSmall`) proves the size gate
+        // accepted the at-floor key.
         assert_eq!(
             outcome,
             VerifyOutcome::BadSignature,
-            "expected the size gate to pass and verification to fail \
-             with BadSignature; got {outcome:?}"
+            "expected size gate to pass; got {outcome:?}"
         );
     }
 }
