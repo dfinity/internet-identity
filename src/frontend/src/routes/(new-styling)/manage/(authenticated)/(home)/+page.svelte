@@ -97,16 +97,10 @@
   });
 </script>
 
-<!-- All three zones (welcome heading, smart-action strip, featured
-     apps) share the same 640px column from the option-H design so
-     the featured-app cards don't balloon to fill a wide manage
-     pane on desktop. The wrapper is a grid (not flex) and the
-     single column is declared `minmax(0, 1fr)`. That `0` floor
-     forbids the column from growing to fit its content's intrinsic
-     min-width — which is what was happening with the action strip
-     pushing the page into horizontal scroll on narrow viewports.
-     With this hard 0-min, the strip's own `overflow-x-auto` can
-     finally take over. -->
+<!-- Column max-width matches the option-H design. The 0-min on the
+     single grid column prevents the action strip's content width
+     from dragging the whole page into horizontal scroll on narrow
+     viewports. -->
 <div class="grid w-full max-w-[40rem] grid-cols-[minmax(0,1fr)]">
   <header class="flex flex-col gap-3">
     <h1 class="text-text-tertiary text-3xl font-medium tracking-tight">
@@ -114,17 +108,10 @@
     </h1>
   </header>
 
-  <!-- Horizontal strip rather than wrap: on narrow viewports the
-       three or four pills won't fit on one row, so we scroll them
-       instead of stacking. The grid column above guarantees this
-       block can't be wider than its parent, so `overflow-x-auto`
-       reliably engages.
-       On mobile the strip bleeds outside the page's own px-4
-       padding via `-mx-4`, with `px-4` re-added on the inner row
-       so the first/last buttons keep a 16px breathing margin and
-       the partly-scrolled-off pills hit the viewport edge instead
-       of getting clipped by the page padding. The custom selectors
-       hide the scrollbar without disabling scrolling. -->
+  <!-- Mobile: pills run all the way to the viewport edge so partly-
+       scrolled-off ones aren't clipped by the page's own horizontal
+       padding. Inner padding gives the first/last pill breathing
+       room when fully visible. -->
   <div
     class="-mx-4 mt-10 overflow-x-auto [scrollbar-width:none] sm:mx-0 [&::-webkit-scrollbar]:hidden"
   >
@@ -144,10 +131,9 @@
   </div>
 
   {#if featuredApps.length > 0}
-    <!-- `@container` switches the grid breakpoint to a container
-         query so the cards react to the *section's* width, not the
-         viewport. That keeps them from squishing when the manage
-         pane is narrowed by an open sidebar on a wide screen. -->
+    <!-- React to the manage pane's actual width, not the viewport:
+         the sidebar can leave a wide screen with a narrow content
+         area, and the cards squish if we key off the viewport. -->
     <section class="@container mt-12 flex flex-col gap-3.5">
       <h2 class="text-text-primary text-base font-medium tracking-tight">
         {$t`Featured apps`}
