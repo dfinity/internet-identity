@@ -181,12 +181,11 @@ export function sendAuthToOpenedTab(
 
   window.addEventListener("message", listener);
 
-  let timer: ReturnType<typeof setTimeout>;
-  const cleanup = () => {
+  function cleanup() {
     clearTimeout(timer);
     window.removeEventListener("message", listener);
-  };
-  timer = setTimeout(cleanup, timeoutMs);
+  }
+  const timer = setTimeout(cleanup, timeoutMs);
 
   return {
     cancel: () => {
