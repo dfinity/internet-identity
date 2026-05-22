@@ -319,7 +319,7 @@ fn run_submit(
     // is over `SHA256(signed_data)` (RFC 8463), so the cached
     // digest IS the correct input — we can call it directly.
     use crate::dkim::VerifyOutcome;
-    let outcome = verify_with_prehash(
+    let outcome = crate::dkim::verify_signature_prehashed(
         snapshot.algorithm,
         dns_record.key_type,
         &dns_record.public_key,
@@ -399,105 +399,6 @@ fn run_submit(
     }
 
     Ok(())
-}
-
-/// Verify a DKIM signature against a SHA-256-prehashed signed-data
-/// digest. This is the second-phase verification entry point we
-/// need on the recovery surface — `crate::dkim::verify_signature`
-/// takes the raw `signed_data` and hashes it internally, so it
-/// can't consume the cached 32-byte digest directly.
-fn verify_with_prehash(
-    algorithm: crate::dkim::Algorithm,
-    key_type: crate::dkim::KeyType,
-    key_bytes: &[u8],
-    digest: &[u8; 32],
-    signature: &[u8],
-) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::{Algorithm, VerifyOutcome};
-    if !key_type.matches_signature_alg(algorithm) {
-        return VerifyOutcome::AlgorithmMismatch;
-    }
-    match algorithm {
-        Algorithm::RsaSha256 => verify_rsa_sha256_prehashed(key_bytes, digest, signature),
-        Algorithm::Ed25519Sha256 => verify_ed25519_prehashed(key_bytes, digest, signature),
-    }
-}
-
-fn verify_rsa_sha256_prehashed(
-    key_bytes: &[u8],
-    digest: &[u8; 32],
-    signature: &[u8],
-) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::{VerifyOutcome, RSA_MIN_KEY_BITS};
-    use rsa::pkcs1v15::{Signature as RsaSignature, VerifyingKey as RsaVerifyingKey};
-    use rsa::pkcs8::DecodePublicKey;
-    use rsa::traits::PublicKeyParts;
-    use rsa::RsaPublicKey;
-    use sha2::Sha256;
-
-    let key = match RsaPublicKey::from_public_key_der(key_bytes) {
-        Ok(k) => k,
-        Err(e) => return VerifyOutcome::MalformedKey(format!("RSA SPKI decode: {e}")),
-    };
-    let bits = key.n().bits();
-    if bits < RSA_MIN_KEY_BITS {
-        return VerifyOutcome::RsaKeyTooSmall(bits);
-    }
-    if signature.len() != key.size() {
-        return VerifyOutcome::MalformedSignature(format!(
-            "RSA signature length {} != modulus length {}",
-            signature.len(),
-            key.size()
-        ));
-    }
-    let verifying_key = RsaVerifyingKey::<Sha256>::new(key);
-    let sig = match RsaSignature::try_from(signature) {
-        Ok(s) => s,
-        Err(e) => return VerifyOutcome::MalformedSignature(format!("RSA sig decode: {e}")),
-    };
-    use rsa::signature::hazmat::PrehashVerifier;
-    match verifying_key.verify_prehash(digest, &sig) {
-        Ok(()) => VerifyOutcome::Valid,
-        Err(_) => VerifyOutcome::BadSignature,
-    }
-}
-
-fn verify_ed25519_prehashed(
-    key_bytes: &[u8],
-    digest: &[u8; 32],
-    signature: &[u8],
-) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::VerifyOutcome;
-    use ed25519_dalek::{Signature as Ed25519Signature, Verifier as _, VerifyingKey};
-    let key_array: [u8; 32] = match key_bytes.try_into() {
-        Ok(arr) => arr,
-        Err(_) => {
-            return VerifyOutcome::MalformedKey(format!(
-                "Ed25519 key length {} != 32",
-                key_bytes.len()
-            ));
-        }
-    };
-    let sig_array: [u8; 64] = match signature.try_into() {
-        Ok(arr) => arr,
-        Err(_) => {
-            return VerifyOutcome::MalformedSignature(format!(
-                "Ed25519 signature length {} != 64",
-                signature.len()
-            ));
-        }
-    };
-    let verifying_key = match VerifyingKey::from_bytes(&key_array) {
-        Ok(k) => k,
-        Err(e) => return VerifyOutcome::MalformedKey(format!("Ed25519 key: {e}")),
-    };
-    let sig = Ed25519Signature::from_bytes(&sig_array);
-    // RFC 8463: Ed25519 over `SHA256(signed_data)`. The cached
-    // digest IS the correct verify input.
-    match verifying_key.verify(digest, &sig) {
-        Ok(()) => VerifyOutcome::Valid,
-        Err(_) => VerifyOutcome::BadSignature,
-    }
 }
 
 // Tests for the DNS-record tag contract live alongside the umbrella
