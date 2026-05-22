@@ -118,12 +118,17 @@
        three or four pills won't fit on one row, so we scroll them
        instead of stacking. The grid column above guarantees this
        block can't be wider than its parent, so `overflow-x-auto`
-       reliably engages. The custom selectors hide the scrollbar
-       without disabling scrolling. -->
+       reliably engages.
+       On mobile the strip bleeds outside the page's own px-4
+       padding via `-mx-4`, with `px-4` re-added on the inner row
+       so the first/last buttons keep a 16px breathing margin and
+       the partly-scrolled-off pills hit the viewport edge instead
+       of getting clipped by the page padding. The custom selectors
+       hide the scrollbar without disabling scrolling. -->
   <div
-    class="mt-10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    class="-mx-4 mt-10 overflow-x-auto [scrollbar-width:none] sm:mx-0 [&::-webkit-scrollbar]:hidden"
   >
-    <div class="flex gap-2">
+    <div class="flex gap-2 px-4 sm:px-0">
       {#each smartActions as action (action.id)}
         {@const presentation = presentations[action.id]}
         {@const Icon = presentation.icon}
@@ -139,11 +144,15 @@
   </div>
 
   {#if featuredApps.length > 0}
-    <section class="mt-12 flex flex-col gap-3.5">
+    <!-- `@container` switches the grid breakpoint to a container
+         query so the cards react to the *section's* width, not the
+         viewport. That keeps them from squishing when the manage
+         pane is narrowed by an open sidebar on a wide screen. -->
+    <section class="@container mt-12 flex flex-col gap-3.5">
       <h2 class="text-text-primary text-base font-medium tracking-tight">
         {$t`Featured apps`}
       </h2>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-3 @xl:grid-cols-3">
         {#each featuredApps as dapp (dapp.website)}
           <a
             href={dapp.website}
