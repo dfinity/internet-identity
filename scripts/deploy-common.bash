@@ -900,41 +900,92 @@ bootstrap_init_args() {
 
 # -------------------------
 # Encode a Candid text install arg into a raw-binary file using the
-# pinned didc. Validates the args against the canister's `.did` schema
-# (`-d` + `-t`), so a typo lands here rather than as a CanisterError
-# during `install_code`.
+# pinned didc, validated against the schema embedded *in the wasm being
+# deployed* — not the working tree's `.did`. The local `.did` and the
+# CI artifact's wasm can be from different commits (especially after a
+# rebase or when running `--reconfigure` against an old on-chain wasm),
+# so encoding against the local schema lets the type checker silently
+# pass on a payload the deployed code can't parse. ic-wasm gives us the
+# exact `candid:service` + `candid:args` sections the deployed module
+# advertises, eliminating that drift.
 #
 # Args:
-#   $1  Path to the canister's `.did` schema (e.g. internet_identity.did)
-#   $2  Candid type to encode against (e.g. `(opt InternetIdentityInit)`)
-#   $3  Candid text payload (output of build_{fe,be}_install_arg)
-#   $4  Output path for the raw-binary args file
+#   $1  Path to the wasm being installed (.wasm or .wasm.gz)
+#   $2  Candid text payload (output of build_{fe,be}_install_arg)
+#   $3  Output path for the raw-binary args file
 #
-# Output: writes raw Candid bytes to $4. Returns non-zero (and prints a
-# targeted error) on download / encode failure so the caller can bail
-# before invoking `icp canister install` with a half-baked file.
+# Output: writes raw Candid bytes to $3. Returns non-zero (and prints a
+# targeted error) on download / extract / encode failure so the caller
+# can bail before invoking `icp canister install` with a half-baked
+# file.
 encode_install_arg_bin() {
-    local did_file="$1"
-    local candid_type="$2"
-    local candid_text="$3"
-    local out_file="$4"
+    local wasm_path="$1"
+    local candid_text="$2"
+    local out_file="$3"
 
-    if [ ! -f "$did_file" ]; then
-        echo "Error: .did schema not found at $did_file" >&2
+    if [ ! -f "$wasm_path" ]; then
+        echo "Error: wasm not found at $wasm_path" >&2
+        return 1
+    fi
+    if ! command -v ic-wasm >/dev/null 2>&1; then
+        echo "Error: \`ic-wasm\` not on PATH. Run \`./scripts/bootstrap\` (or" >&2
+        echo "       \`cargo install ic-wasm --version 0.8.5\`) to install it." >&2
         return 1
     fi
     ensure_pinned_didc || return 1
 
+    # ic-wasm needs a raw .wasm input. Decompress to a temp if we were
+    # handed a .wasm.gz (CI artifact). Use a single temp dir for both
+    # the decompressed wasm and the extracted .did so cleanup is easy.
+    local tmp_dir
+    tmp_dir=$(mktemp -d -t ii-encode-args.XXXX)
+    local wasm_for_metadata
+    if [[ "$wasm_path" == *.gz ]]; then
+        wasm_for_metadata="$tmp_dir/wasm-input.wasm"
+        if ! gunzip -c "$wasm_path" > "$wasm_for_metadata"; then
+            echo "Error: failed to gunzip $wasm_path" >&2
+            rm -rf "$tmp_dir"
+            return 1
+        fi
+    else
+        wasm_for_metadata="$wasm_path"
+    fi
+
+    # Extract the full Candid service definition (types + methods) and
+    # the init args type from the wasm's metadata sections — both are
+    # required to type-check the encode. `candid:args` is just the
+    # parenthesised init type (e.g. `(opt InternetIdentityInit)`), so
+    # the caller doesn't have to hard-code the name and can't drift.
+    local did_file="$tmp_dir/wasm-input.did"
+    if ! ic-wasm "$wasm_for_metadata" metadata candid:service > "$did_file" 2>/dev/null \
+            || [ ! -s "$did_file" ]; then
+        echo "Error: failed to extract candid:service metadata from $wasm_path" >&2
+        echo "       (Is this an internet-identity backend / frontend wasm?)" >&2
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    local candid_type
+    candid_type=$(ic-wasm "$wasm_for_metadata" metadata candid:args 2>/dev/null)
+    if [ -z "$candid_type" ]; then
+        echo "Error: failed to extract candid:args metadata from $wasm_path" >&2
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
     local hex
     if ! hex=$("$PINNED_DIDC" encode -d "$did_file" -t "$candid_type" "$candid_text"); then
-        echo "Error: didc encode failed for $did_file / $candid_type" >&2
+        echo "Error: didc encode failed for $wasm_path / $candid_type" >&2
         echo "       Candid input was:" >&2
         echo "$candid_text" | sed 's/^/         /' >&2
+        rm -rf "$tmp_dir"
         return 1
     fi
     # `didc encode` emits hex; the icp-cli `--args-format bin` path
     # expects raw bytes, so we collapse hex → bytes with `xxd -r -p`.
     printf '%s' "$hex" | xxd -r -p > "$out_file"
+
+    rm -rf "$tmp_dir"
+
     if [ ! -s "$out_file" ]; then
         echo "Error: encoded args file is empty after xxd conversion: $out_file" >&2
         return 1

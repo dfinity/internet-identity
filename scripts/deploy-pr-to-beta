@@ -353,8 +353,7 @@ if [ "$DEPLOY_BE" = true ]; then
     echo ""
     echo "=== Deploying backend ($(deploy_label internet_identity_backend.wasm.gz)) to $BE_ID ==="
     encode_install_arg_bin \
-        "$ROOT_DIR/src/internet_identity/internet_identity.did" \
-        "(opt InternetIdentityInit)" \
+        "$ARTIFACT_DIR/internet_identity_backend.wasm.gz" \
         "$(build_be_install_arg)" \
         "$ARTIFACT_DIR/internet_identity_backend.args.bin" \
         || exit 1
@@ -368,8 +367,7 @@ if [ "$DEPLOY_FE" = true ]; then
     echo ""
     echo "=== Deploying frontend ($(deploy_label internet_identity_frontend.wasm.gz)) to $FE_ID ==="
     encode_install_arg_bin \
-        "$ROOT_DIR/src/internet_identity_frontend/internet_identity_frontend.did" \
-        "(InternetIdentityFrontendInit)" \
+        "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz" \
         "$(build_fe_install_arg)" \
         "$ARTIFACT_DIR/internet_identity_frontend.args.bin" \
         || exit 1
