@@ -138,7 +138,7 @@
       <h2 class="text-text-primary text-base font-medium tracking-tight">
         {$t`Featured apps`}
       </h2>
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {#each featuredApps as dapp (dapp.website)}
           <a
             href={dapp.website}
