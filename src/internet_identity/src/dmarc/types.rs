@@ -108,6 +108,12 @@ pub enum EmailVerificationStatus {
         /// DMARC outcome — `Aligned` carries the published policy +
         /// mode, `NoRecord` indicates the caller didn't supply one.
         dmarc: DmarcOutcome,
+        /// Projection of the message exposing only the header values
+        /// DKIM hashed. Threaded through from the DKIM verifier so
+        /// downstream callers can read `From:`, `Subject:`, etc.
+        /// without touching the raw `SmtpMessage` - see
+        /// [`crate::dkim::SignedSmtpMessage`] for the threat model.
+        signed: crate::dkim::SignedSmtpMessage,
         /// Per-step DKIM checks for the winning signature.
         checks: Vec<crate::dkim::DkimCheck>,
     },

@@ -189,6 +189,28 @@ pub fn validate_envelope(envelope: &SmtpEnvelope) -> Result<(), SmtpResponse> {
     Ok(())
 }
 
+/// RFC 5322 §3.6 caps these header names at one occurrence per
+/// message (Subject and the optional fields are 0-or-1; From and
+/// Date are exactly-1). RFC 6376 §8.15 explicitly authorises a
+/// verifier to reject messages that violate §3.6, and that
+/// rejection closes a duplicate-header signature-bypass class:
+/// DKIM picks the bottom instance of a name listed once in `h=`
+/// (RFC 6376 §5.4), while any consumer that walks headers top-
+/// down would see a different value. Refusing the malformed
+/// message at the wire boundary is the cheapest place to remove
+/// the ambiguity for every downstream reader.
+pub const SINGLE_INSTANCE_HEADERS: &[&str] = &[
+    "from",
+    "subject",
+    "date",
+    "to",
+    "cc",
+    "bcc",
+    "reply-to",
+    "sender",
+    "message-id",
+];
+
 pub fn validate_message(message: &SmtpMessage) -> Result<(), SmtpResponse> {
     if message.headers.len() > MAX_HEADERS {
         return Err(smtp_err(
@@ -213,6 +235,21 @@ pub fn validate_message(message: &SmtpMessage) -> Result<(), SmtpResponse> {
                     "Header '{}' value exceeds {MAX_HEADER_VALUE_BYTES} bytes",
                     header.name
                 ),
+            ));
+        }
+    }
+    // RFC 5322 §3.6 + RFC 6376 §8.15: reject duplicated single-
+    // instance headers. See `SINGLE_INSTANCE_HEADERS` for the why.
+    for name in SINGLE_INSTANCE_HEADERS {
+        let count = message
+            .headers
+            .iter()
+            .filter(|h| h.name.eq_ignore_ascii_case(name))
+            .count();
+        if count > 1 {
+            return Err(smtp_err(
+                SMTP_ERR_SYNTAX_ERROR,
+                format!("Header '{name}' appears {count} times; RFC 5322 §3.6 allows at most one"),
             ));
         }
     }
@@ -403,6 +440,147 @@ mod tests {
         };
         let resp = validate_message(&msg).unwrap_err();
         assert!(err_msg(&resp).contains("Body size"));
+    }
+
+    /// RFC 5322 §3.6 + RFC 6376 §8.15: a message with two Subject
+    /// headers is the duplicate-header signature-bypass shape the
+    /// recovery layer must never see. The wire-shape validator
+    /// rejects it with 555 before any downstream code runs, so a
+    /// gateway gets a normal SMTP-level decline at end-of-DATA
+    /// rather than the canister silently dropping it.
+    #[test]
+    fn validate_message_rejects_duplicate_subject() {
+        let msg = SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "II-Recovery-abcdef0123456789".into(),
+                },
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "original".into(),
+                },
+                SmtpHeader {
+                    name: "From".into(),
+                    value: "alice@example.com".into(),
+                },
+            ],
+            body: ByteBuf::from(b"".to_vec()),
+        };
+        let resp = validate_message(&msg).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).to_ascii_lowercase().contains("subject"));
+        assert!(err_msg(&resp).contains("RFC 5322"));
+    }
+
+    /// Header-name comparison must be case-insensitive - an attacker
+    /// could try `Subject` + `subject` to slip past a case-sensitive
+    /// dedupe and still hit the recovery layer's
+    /// `eq_ignore_ascii_case` lookup.
+    #[test]
+    fn validate_message_dedup_is_case_insensitive() {
+        let msg = SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "x".into(),
+                },
+                SmtpHeader {
+                    name: "subject".into(),
+                    value: "y".into(),
+                },
+            ],
+            body: ByteBuf::from(b"".to_vec()),
+        };
+        let resp = validate_message(&msg).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+    }
+
+    /// Every RFC 5322 §3.6 single-instance header is covered, not
+    /// just Subject. A reader could be added in the future against
+    /// any of these.
+    #[test]
+    fn validate_message_rejects_each_single_instance_header_duplicated() {
+        for name in SINGLE_INSTANCE_HEADERS {
+            let msg = SmtpMessage {
+                headers: vec![
+                    SmtpHeader {
+                        name: (*name).into(),
+                        value: "a".into(),
+                    },
+                    SmtpHeader {
+                        name: (*name).into(),
+                        value: "b".into(),
+                    },
+                ],
+                body: ByteBuf::from(b"".to_vec()),
+            };
+            let resp = validate_message(&msg).unwrap_err();
+            assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR, "name={name}");
+            assert!(
+                err_msg(&resp).to_ascii_lowercase().contains(name),
+                "name={name} msg={}",
+                err_msg(&resp)
+            );
+        }
+    }
+
+    /// RFC 6376 §5.5 allows multiple `DKIM-Signature` headers
+    /// (original sender plus forwarder re-sign). The single-instance
+    /// dedupe must not reject them.
+    #[test]
+    fn validate_message_accepts_multiple_dkim_signatures() {
+        let msg = SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "DKIM-Signature".into(),
+                    value: "v=1; a=rsa-sha256; d=a.example; ...".into(),
+                },
+                SmtpHeader {
+                    name: "DKIM-Signature".into(),
+                    value: "v=1; a=rsa-sha256; d=b.example; ...".into(),
+                },
+                SmtpHeader {
+                    name: "From".into(),
+                    value: "alice@example.com".into(),
+                },
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "ok".into(),
+                },
+            ],
+            body: ByteBuf::from(b"".to_vec()),
+        };
+        assert!(validate_message(&msg).is_ok());
+    }
+
+    /// Custom `X-*` headers are not in the single-instance set and
+    /// must be free to repeat - that's exactly the RFC 5322 §3.6
+    /// distinction we encode in `SINGLE_INSTANCE_HEADERS`.
+    #[test]
+    fn validate_message_accepts_duplicate_unconstrained_headers() {
+        let msg = SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "Received".into(),
+                    value: "from a".into(),
+                },
+                SmtpHeader {
+                    name: "Received".into(),
+                    value: "from b".into(),
+                },
+                SmtpHeader {
+                    name: "From".into(),
+                    value: "alice@example.com".into(),
+                },
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "ok".into(),
+                },
+            ],
+            body: ByteBuf::from(b"".to_vec()),
+        };
+        assert!(validate_message(&msg).is_ok());
     }
 
     #[test]

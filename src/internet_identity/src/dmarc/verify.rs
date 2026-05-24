@@ -42,33 +42,26 @@ pub fn verify_email(
     // Step 1: DKIM. If it fails, surface the DKIM verdict directly —
     // there's no point checking alignment against a forged signature.
     let dkim = verify_dkim(email, dkim_txt, now_secs);
-    let (dkim_domain, dkim_checks) = match dkim {
+    let (dkim_domain, signed, dkim_checks) = match dkim {
         DkimVerifyResult::Verified {
             dkim_domain,
+            signed,
             checks,
-        } => (dkim_domain, checks),
+        } => (dkim_domain, signed, checks),
         DkimVerifyResult::Unverified { reason, checks } => {
             return EmailVerificationStatus::Unverified { reason, checks };
         }
     };
 
-    // Step 2: From-header domain. DKIM having returned `Verified`
-    // already implies `email.message.is_some()` — `verify_dkim` would
-    // have returned `Unverified(NoSignature)` otherwise. We still
-    // re-check defensively rather than `.expect(...)` because canister
-    // code on the IC must never trap: an invariant violation should
-    // surface as a structured fail-closed verdict, not as a rolled-back
-    // message with an opaque trap message.
-    let message = match email.message.as_ref() {
-        Some(m) => m,
-        None => {
-            return EmailVerificationStatus::Unverified {
-                reason: VerificationFailReason::NoSignature,
-                checks: dkim_checks,
-            };
-        }
-    };
-    let from_domain = match extract_from_domain(message) {
+    // Step 2: From-header domain. Read from the SignedSmtpMessage so
+    // alignment is computed against the From value DKIM actually
+    // hashed - not whichever instance a top-down walk would pick if
+    // the message had two `From:` headers. The verifier already
+    // rejects messages with duplicated single-instance headers
+    // (RFC 5322 §3.6 / RFC 6376 §8.15), so reaching here implies one
+    // From at most; reading through the view makes that contract
+    // load-bearing in this file rather than implicit.
+    let from_domain = match extract_from_domain(&signed) {
         Ok(d) => d,
         Err(e) => {
             return EmailVerificationStatus::Unverified {
@@ -94,6 +87,7 @@ pub fn verify_email(
             dkim_domain,
             from_domain,
             dmarc: outcome,
+            signed,
             checks: dkim_checks,
         }
     } else {

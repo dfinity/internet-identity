@@ -559,7 +559,13 @@ fn prepare_partial_verification(
     // 32-byte digest is the input both supported algorithms verify
     // over (RSA-SHA256 via PKCS#1 v1.5 prehash, Ed25519-SHA256 via
     // RFC 8463).
-    let signed_data =
+    // `build_header_hash_input` returns both the bytes the signature
+    // is computed over AND a `SignedSmtpMessage` populated from the
+    // same bottom-up walk. We use the bytes for the digest and the
+    // view for the `From:` extraction below - the From we cache is
+    // the one DKIM hashed, not whichever instance a top-down walk of
+    // the raw headers would have picked.
+    let (signed_data, signed_view) =
         crate::dkim::build_header_hash_input(&message.headers, &sig, &dkim_header.value);
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
@@ -568,8 +574,12 @@ fn prepare_partial_verification(
 
     // Verify the From: matches the claimed address; cache the
     // lowercased canonical form so submit_dkim_leaf doesn't re-parse
-    // the message later.
-    let from_address_lc = extract_from_address(message)?;
+    // the message later. The signature itself is verified later in
+    // `submit_dkim_leaf` once the DKIM leaf arrives - until then the
+    // value here is "the From the signer claimed to sign." If the
+    // signature later fails to verify, the pending challenge fails
+    // and the cached value is never used.
+    let from_address_lc = extract_from_address(&signed_view)?;
     if !from_address_lc.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);
     }
@@ -669,44 +679,53 @@ async fn verify_setup_email_doh(
 
     // Run the combined DKIM + DMARC verifier.
     let status = crate::dmarc::verify_email(request, dkim_txt, dmarc_txt_opt, now_secs);
-    match status {
-        crate::dmarc::EmailVerificationStatus::Verified { .. } => {}
+    let signed_view = match status {
+        crate::dmarc::EmailVerificationStatus::Verified { signed, .. } => signed,
         crate::dmarc::EmailVerificationStatus::Unverified { reason, .. } => {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "{reason:?}"
             )));
         }
-    }
+    };
 
     // Verify the From: matches the claimed address. The verifier
     // already checks that From:'s domain aligns with DKIM's d=,
     // and that the domain matches the DMARC record — so the only
     // gap is that an attacker who controls a different mailbox at
     // the same domain could otherwise complete a victim's setup.
-    // Pin the address explicitly here.
-    let from = extract_from_address(message)?;
+    // Pin the address explicitly here, reading through the
+    // SignedSmtpMessage so the From we compare is the one DKIM
+    // hashed (RFC 6376 §5.4 bottom-up), not whichever instance a
+    // raw-message top-down walk would pick.
+    let from = extract_from_address(&signed_view)?;
     if !from.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);
     }
     Ok(())
 }
 
-/// Pull the verified `From:` address out of the message headers and
-/// canonicalise it to lowercase `local@domain`. Returns
+/// Pull the verified `From:` address out of the [`SignedSmtpMessage`]
+/// and canonicalise it to lowercase `local@domain`. Returns
 /// `AddressMismatch` rather than `MalformedFromHeader` because by
 /// this point DKIM verify has already accepted the message; if the
 /// From header is malformed in some way the verifier didn't catch
 /// here, treating it as "doesn't match" gives the same observable
 /// behaviour to the user.
+///
+/// Reads through the view rather than the raw `SmtpMessage`: the
+/// value here is the one DKIM hashed (RFC 6376 §5.4 bottom-up
+/// selection), not whichever instance a top-down walk would pick if
+/// the message had two From headers. The verifier rejects messages
+/// with duplicated single-instance headers (RFC 5322 §3.6 / RFC 6376
+/// §8.15), so reaching here with `header("From")` returning `Some`
+/// already implies a single DKIM-signed From.
 pub(super) fn extract_from_address(
-    message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
+    signed: &crate::dkim::SignedSmtpMessage,
 ) -> Result<String, EmailRecoveryError> {
-    let from_header = message
-        .headers
-        .iter()
-        .find(|h| h.name.eq_ignore_ascii_case("From"))
+    let from_value = signed
+        .header("From")
         .ok_or(EmailRecoveryError::AddressMismatch)?;
-    let value = from_header.value.trim();
+    let value = from_value.trim();
     // `From:` is RFC 5322 `address-list` in the general case, but
     // DMARC requires exactly one mailbox. The DMARC verifier already
     // enforced that, so by the time we're here the value is a
@@ -989,36 +1008,36 @@ mod tests {
         assert_eq!(find_nonce_in("just some random subject"), None);
     }
 
+    fn view_with_from(value: &str) -> crate::dkim::SignedSmtpMessage {
+        use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
+        crate::dkim::SignedSmtpMessage::from_signed_walk(vec![SmtpHeader {
+            name: "From".into(),
+            value: value.into(),
+        }])
+    }
+
     #[test]
     fn extract_from_addrspec_form() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpHeader, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-        let msg = SmtpMessage {
-            headers: vec![SmtpHeader {
-                name: "From".into(),
-                value: "Alice@Gmail.COM".into(),
-            }],
-            body: ByteBuf::new(),
-        };
-        assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+        let view = view_with_from("Alice@Gmail.COM");
+        assert_eq!(extract_from_address(&view).unwrap(), "alice@gmail.com");
     }
 
     #[test]
     fn extract_from_name_addr_form() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpHeader, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-        let msg = SmtpMessage {
-            headers: vec![SmtpHeader {
-                name: "From".into(),
-                value: "\"Alice Example\" <Alice@Gmail.COM>".into(),
-            }],
-            body: ByteBuf::new(),
-        };
-        assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+        let view = view_with_from("\"Alice Example\" <Alice@Gmail.COM>");
+        assert_eq!(extract_from_address(&view).unwrap(), "alice@gmail.com");
+    }
+
+    /// A view with no signed From - DKIM didn't bind a From value,
+    /// so `extract_from_address` must refuse rather than fall back
+    /// to an unsigned read of the raw message.
+    #[test]
+    fn extract_from_rejects_no_signed_from() {
+        let view = crate::dkim::SignedSmtpMessage::empty();
+        assert!(matches!(
+            extract_from_address(&view),
+            Err(EmailRecoveryError::AddressMismatch)
+        ));
     }
 
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {
@@ -1373,6 +1392,212 @@ mod tests {
         assert_smtp_err_code(
             handle_smtp_request_validate(smtp_envelope_with_recipients(&[])),
             SMTP_ERR_USER_NOT_LOCAL,
+        );
+    }
+
+    // =====================================================================
+    // DKIM duplicate-header bypass - headline regression tests.
+    //
+    // The class of bug: DKIM verification picks the bottom instance
+    // of a header listed once in `h=` (RFC 6376 §5.4 bottom-up),
+    // while any code that walks the wire message top-down picks the
+    // top. A signed email with a fresh `II-Recovery-<nonce>` Subject
+    // prepended above the original signed Subject would otherwise
+    // satisfy DKIM (against the bottom) and feed the attacker's
+    // nonce to the recovery layer (the top) - issuing a delegation
+    // for the victim's anchor.
+    //
+    // The fix is layered: `validate_message` rejects the malformed
+    // shape at the wire boundary with 555 (this test), and the
+    // verifier itself refuses to produce a `SignedSmtpMessage` from
+    // it (covered by `dkim::verify::tests::rejects_duplicate_*`).
+    // These tests pin the canister-level binding - the SMTP handler
+    // surfaces the 555 to the gateway, never reaches the
+    // recovery-layer reader.
+    // =====================================================================
+
+    use internet_identity_interface::internet_identity::types::smtp::{
+        SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage,
+    };
+    use serde_bytes::ByteBuf;
+
+    /// Minimal no-op-waker executor. Mirrors the same helper in
+    /// `prepare.rs` / `doh/mod.rs` - `handle_smtp_request` is `async`
+    /// to fit the canister's runtime, but the duplicate-header reject
+    /// short-circuits at `validate_smtp_request` so the future
+    /// resolves synchronously without ever yielding.
+    fn block_on<F: std::future::Future>(mut f: F) -> F::Output {
+        use std::future::Future;
+        use std::pin::Pin;
+        use std::sync::Arc;
+        use std::task::{Context, Poll, Wake, Waker};
+        struct Noop;
+        impl Wake for Noop {
+            fn wake(self: Arc<Self>) {}
+        }
+        let mut f = unsafe { Pin::new_unchecked(&mut f) };
+        let waker = Waker::from(Arc::new(Noop));
+        let mut cx = Context::from_waker(&waker);
+        match Future::poll(f.as_mut(), &mut cx) {
+            Poll::Ready(out) => out,
+            Poll::Pending => panic!("test future returned Pending"),
+        }
+    }
+
+    /// Build a recovery-shaped SmtpRequest with the given headers.
+    /// Envelope is `recover@id.ai`, body is non-empty so the bounds
+    /// checks don't fire on body emptiness.
+    fn recovery_request_with_headers(headers: Vec<SmtpHeader>) -> SmtpRequest {
+        SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "victim".into(),
+                    domain: "example.com".into(),
+                },
+                to: vec![SmtpAddress {
+                    user: "recover".into(),
+                    domain: "id.ai".into(),
+                }],
+            }),
+            message: Some(SmtpMessage {
+                headers,
+                body: ByteBuf::from(b"hi\r\n".to_vec()),
+            }),
+            gateway_flags: None,
+        }
+    }
+
+    /// PoC: the canister-level dispatcher must reject a message with
+    /// a fresh `II-Recovery-…` Subject prepended above the original
+    /// signed Subject, returning the wire-shape 555 - *before* any
+    /// pending-challenge lookup, DKIM verification, or recovery
+    /// delegation work runs.
+    #[test]
+    fn smtp_request_rejects_duplicate_subject_dkim_bypass_poc() {
+        set_related_origins(&["https://id.ai"]);
+        let req = recovery_request_with_headers(vec![
+            // Attacker-injected fresh Subject on top - DKIM didn't
+            // sign this, the recovery-nonce extractor would have
+            // happily picked it up under the old code.
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "II-Recovery-deadbeefcafe1234".into(),
+            },
+            // Original DKIM-signed Subject - RFC 6376 §5.4 bottom-up
+            // selection means DKIM hashes this one.
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "Original benign subject".into(),
+            },
+            SmtpHeader {
+                name: "From".into(),
+                value: "victim@example.com".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                        c=relaxed/relaxed; h=From:Subject; \
+                        bh=MTIzNDU2; b=YWJj"
+                    .into(),
+            },
+        ]);
+        let resp = block_on(handle_smtp_request(req));
+        assert_smtp_err_code(resp, SMTP_ERR_SYNTAX_ERROR);
+    }
+
+    /// PoC: the same shape but with `From` duplicated rather than
+    /// `Subject`. RFC 5322 §3.6 single-instance applies to both, so
+    /// the wire-shape check refuses identically.
+    #[test]
+    fn smtp_request_rejects_duplicate_from_dkim_bypass_poc() {
+        set_related_origins(&["https://id.ai"]);
+        let req = recovery_request_with_headers(vec![
+            // Attacker-injected From on top - points at a different
+            // mailbox under the same DKIM `d=`, would otherwise let
+            // the attacker complete recovery for the victim's anchor.
+            SmtpHeader {
+                name: "From".into(),
+                value: "attacker@example.com".into(),
+            },
+            SmtpHeader {
+                name: "From".into(),
+                value: "victim@example.com".into(),
+            },
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "II-Recovery-deadbeefcafe1234".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                        c=relaxed/relaxed; h=From:Subject; \
+                        bh=MTIzNDU2; b=YWJj"
+                    .into(),
+            },
+        ]);
+        let resp = block_on(handle_smtp_request(req));
+        assert_smtp_err_code(resp, SMTP_ERR_SYNTAX_ERROR);
+    }
+
+    /// Same shape at RCPT-TO time (no message body yet): the validate
+    /// query is envelope-only here, so the duplicate-header check
+    /// doesn't fire - the gateway gets a normal Ok and goes on to
+    /// DATA, where the check then catches the message body.
+    #[test]
+    fn validate_rcpt_to_does_not_check_message_headers() {
+        set_related_origins(&["https://id.ai"]);
+        // No message; validate at RCPT TO time. Must accept since we
+        // can't see headers yet.
+        let req = SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "victim".into(),
+                    domain: "example.com".into(),
+                },
+                to: vec![SmtpAddress {
+                    user: "recover".into(),
+                    domain: "id.ai".into(),
+                }],
+            }),
+            message: None,
+            gateway_flags: None,
+        };
+        assert!(matches!(
+            handle_smtp_request_validate(req),
+            SmtpResponse::Ok {}
+        ));
+    }
+
+    /// Sanity: a single-Subject single-From message passes
+    /// `validate_message` and reaches the recovery layer. Verifies
+    /// the dedupe check doesn't fire on legitimate messages.
+    /// (Recovery will then silently drop because no pending challenge
+    /// matches the synthetic nonce - but `smtp_request` returns Ok,
+    /// which is what we're asserting here.)
+    #[test]
+    fn smtp_request_accepts_legitimate_single_subject_message() {
+        set_related_origins(&["https://id.ai"]);
+        let req = recovery_request_with_headers(vec![
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "II-Recovery-deadbeefcafe1234".into(),
+            },
+            SmtpHeader {
+                name: "From".into(),
+                value: "victim@example.com".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                        c=relaxed/relaxed; h=From:Subject; \
+                        bh=MTIzNDU2; b=YWJj"
+                    .into(),
+            },
+        ]);
+        let resp = block_on(handle_smtp_request(req));
+        assert!(
+            matches!(resp, SmtpResponse::Ok {}),
+            "single-Subject message should pass the wire-shape check; got {resp:?}",
         );
     }
 }

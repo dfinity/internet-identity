@@ -45,10 +45,12 @@ use super::parse::{parse_dkim_signature, DkimSignature};
 use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
 use super::tag_checks::{enforce_dns_record_tag_contract, enforce_signature_header_tag_contract};
 use super::types::{
-    DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
+    DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon, SignedSmtpMessage,
     VerificationFailReason,
 };
-use internet_identity_interface::internet_identity::types::smtp::{SmtpHeader, SmtpRequest};
+use internet_identity_interface::internet_identity::types::smtp::{
+    SmtpHeader, SmtpRequest, SINGLE_INSTANCE_HEADERS,
+};
 
 const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
 
@@ -62,6 +64,26 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyR
             return Unverified(VerificationFailReason::NoSignature, vec![]);
         }
     };
+
+    // RFC 5322 §3.6 + RFC 6376 §8.15: refuse messages with duplicated
+    // single-instance headers BEFORE attempting signature verification.
+    // The wire-shape `validate_message` check normally catches this
+    // first with a 555; this is the architectural backstop that
+    // survives any future weakening of the wire check, and the only
+    // line of defence for code paths that invoke the verifier without
+    // routing through `validate_message`.
+    if let Err((name, count)) = find_duplicate_single_instance_header(&message.headers) {
+        let detail =
+            format!("header '{name}' appears {count} times; RFC 5322 §3.6 allows at most one");
+        return Unverified(
+            VerificationFailReason::MalformedMessage(detail.clone()),
+            vec![check(
+                DkimCheckName::DkimSignaturePresent,
+                DkimCheckStatus::Fail,
+                Some(detail),
+            )],
+        );
+    }
 
     // Find every DKIM-Signature header (case-insensitive). RFC 6376
     // allows multiple; we try them in order and accept on first pass.
@@ -87,7 +109,7 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyR
 
     for dkim_header in &dkim_headers {
         match try_verify_signature(email, message, dkim_header, dkim_txt, now_secs) {
-            Ok((dkim_domain, checks)) => {
+            Ok((dkim_domain, signed, checks)) => {
                 // Per `DkimVerifyResult::Verified.checks` ("checks for
                 // the winning signature"), surface only the successful
                 // attempt's per-step trail — not the accumulated trail
@@ -95,6 +117,7 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyR
                 // DMARC layer) reason about the winning signature only.
                 return DkimVerifyResult::Verified {
                     dkim_domain,
+                    signed,
                     checks,
                 };
             }
@@ -108,20 +131,42 @@ pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyR
     Unverified(last_reason, all_checks)
 }
 
+/// Walk `headers` and return `Err((name, count))` for the first
+/// RFC 5322 §3.6 single-instance header that appears more than once.
+/// `Ok(())` means no §3.6 violation found.
+fn find_duplicate_single_instance_header(
+    headers: &[SmtpHeader],
+) -> Result<(), (&'static str, usize)> {
+    for name in SINGLE_INSTANCE_HEADERS {
+        let count = headers
+            .iter()
+            .filter(|h| h.name.eq_ignore_ascii_case(name))
+            .count();
+        if count > 1 {
+            return Err((name, count));
+        }
+    }
+    Ok(())
+}
+
 #[allow(non_snake_case)]
 fn Unverified(reason: VerificationFailReason, checks: Vec<DkimCheck>) -> DkimVerifyResult {
     DkimVerifyResult::Unverified { reason, checks }
 }
 
-/// Try to verify one specific DKIM-Signature header. Returns the `d=`
-/// domain on success, or a `(reason, partial-checks)` pair on failure.
+/// `(d=, signed_view, checks)` on success.
+type TryVerifyOk = (String, SignedSmtpMessage, Vec<DkimCheck>);
+/// `(reason, partial-checks)` on failure.
+type TryVerifyErr = (VerificationFailReason, Vec<DkimCheck>);
+
+/// Try to verify one specific DKIM-Signature header.
 fn try_verify_signature(
     _email: &SmtpRequest,
     message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
     dkim_header: &SmtpHeader,
     dkim_txt: &str,
     now_secs: u64,
-) -> Result<(String, Vec<DkimCheck>), (VerificationFailReason, Vec<DkimCheck>)> {
+) -> Result<TryVerifyOk, TryVerifyErr> {
     let mut checks: Vec<DkimCheck> = Vec::new();
     checks.push(check(
         DkimCheckName::DkimSignaturePresent,
@@ -272,7 +317,10 @@ fn try_verify_signature(
     // Build the signed-data: relaxed-canonicalise each listed header
     // from `h=`, then append the DKIM-Signature header itself with its
     // `b=` value blanked, *without* a trailing CRLF (RFC 6376 §3.7).
-    let signed_data = build_header_hash_input(&message.headers, &sig, &dkim_header.value);
+    // The same walk yields the `SignedSmtpMessage` we return on
+    // success so downstream callers read only the bytes DKIM hashed.
+    let (signed_data, signed_view) =
+        build_header_hash_input(&message.headers, &sig, &dkim_header.value);
 
     // Cryptographic signature check.
     let outcome = verify_signature(
@@ -289,7 +337,7 @@ fn try_verify_signature(
                 DkimCheckStatus::Pass,
                 None,
             ));
-            Ok((sig.d.clone(), checks))
+            Ok((sig.d.clone(), signed_view, checks))
         }
         VerifyOutcome::BadSignature => {
             checks.push(check(
@@ -343,7 +391,10 @@ fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -
 }
 
 /// Construct the byte sequence the DKIM signature is computed over per
-/// RFC 6376 §3.7:
+/// RFC 6376 §3.7, **and** a [`SignedSmtpMessage`] populated from the
+/// same walk so post-verification code can read header values without
+/// re-deriving the bottom-up choice (and without ever touching the
+/// raw `SmtpMessage`):
 ///
 /// ```text
 /// signed_data = canon(h_header_1) || canon(h_header_2) || ... ||
@@ -354,7 +405,8 @@ fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -
 /// The h= list is processed in the order given; for each name we pick
 /// the *latest* matching header in the message (RFC 6376 §5.4 — bottom-
 /// up pick when multiple instances exist). A name listed in h= that
-/// doesn't appear in the message contributes the empty string.
+/// doesn't appear in the message contributes the empty string to the
+/// hash input and no entry to the view.
 ///
 /// `dkim_header_value` is the original (gateway-supplied) value of the
 /// DKIM-Signature header itself; we blank its `b=` content as the spec
@@ -363,8 +415,12 @@ pub(crate) fn build_header_hash_input(
     all_headers: &[SmtpHeader],
     sig: &DkimSignature,
     dkim_header_value: &str,
-) -> Vec<u8> {
+) -> (Vec<u8>, super::types::SignedSmtpMessage) {
     let mut out: Vec<u8> = Vec::new();
+    // Headers in the order DKIM's walk picks them - fed to
+    // `SignedSmtpMessage::from_signed_walk` at the end so the view
+    // is constructed exactly once and immutable thereafter.
+    let mut picked: Vec<SmtpHeader> = Vec::new();
 
     // Track which occurrence of each name we've already used so we can
     // walk bottom-up correctly when the signer listed the same name
@@ -387,9 +443,15 @@ pub(crate) fn build_header_hash_input(
                 &all_headers[idx].name,
                 &all_headers[idx].value,
             ));
+            // Record the verbatim header (not the canonicalised one)
+            // for the view: downstream callers want to read it as
+            // text, and the canonicalisation is deterministic from
+            // the original so the cryptographic binding still holds.
+            picked.push(all_headers[idx].clone());
         }
         // Else: "header named in h= but not present" — contributes empty
-        // string to the hash input per RFC 6376 §3.7.
+        // string to the hash input per RFC 6376 §3.7, and nothing to
+        // the view (callers reading an absent name see `None`).
     }
 
     // Append the DKIM-Signature header itself, with `b=` value blanked,
@@ -401,7 +463,10 @@ pub(crate) fn build_header_hash_input(
         canon_dkim.truncate(canon_dkim.len() - 2);
     }
     out.extend_from_slice(&canon_dkim);
-    out
+    (
+        out,
+        super::types::SignedSmtpMessage::from_signed_walk(picked),
+    )
 }
 
 /// Blank the value of the `b=` tag in a DKIM-Signature header value
@@ -891,5 +956,276 @@ mod tests {
             }
             other => panic!("expected Unverified(SubjectNotSigned), got {:?}", other),
         }
+    }
+
+    // =====================================================================
+    // SignedSmtpMessage + duplicate-header reject (RFC 5322 §3.6 +
+    // RFC 6376 §8.15). Builds messages directly rather than going
+    // through the full DKIM crypto pipeline - we're testing the walk
+    // + dedupe logic, not the signature math (which the existing
+    // round-trip tests in `tests/integration/email_recovery.rs`
+    // already cover end-to-end).
+    // =====================================================================
+
+    use super::super::types::SignedSmtpMessage;
+    use internet_identity_interface::internet_identity::types::smtp::{
+        SmtpAddress, SmtpEnvelope, SmtpMessage,
+    };
+    use serde_bytes::ByteBuf;
+
+    fn req_with_headers(headers: Vec<SmtpHeader>) -> SmtpRequest {
+        SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: SmtpAddress {
+                    user: "alice".into(),
+                    domain: "example.com".into(),
+                },
+                to: vec![SmtpAddress {
+                    user: "recover".into(),
+                    domain: "id.ai".into(),
+                }],
+            }),
+            message: Some(SmtpMessage {
+                headers,
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+        }
+    }
+
+    /// Duplicate Subject - the exact DKIM-bypass shape - is rejected
+    /// with `MalformedMessage`, regardless of whether the message
+    /// would otherwise have a valid signature. This is the
+    /// architectural backstop that holds even if a future change
+    /// weakens `validate_message`'s wire-shape 555 check.
+    #[test]
+    fn rejects_duplicate_subject_header() {
+        let req = req_with_headers(vec![
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "II-Recovery-fresh-from-attacker".into(),
+            },
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "Original signed subject".into(),
+            },
+            SmtpHeader {
+                name: "From".into(),
+                value: "alice@example.com".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                        c=relaxed/relaxed; h=From:Subject; bh=MTIzNDU2; b=YWJj"
+                    .into(),
+            },
+        ]);
+        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
+        match result {
+            DkimVerifyResult::Unverified { reason, .. } => match reason {
+                VerificationFailReason::MalformedMessage(detail) => {
+                    assert!(
+                        detail.to_ascii_lowercase().contains("subject"),
+                        "detail should name the offending header: {detail}",
+                    );
+                }
+                other => panic!("expected MalformedMessage, got {other:?}"),
+            },
+            other => panic!("expected Unverified(MalformedMessage), got {other:?}"),
+        }
+    }
+
+    /// Every RFC 5322 §3.6 single-instance header is covered, not
+    /// just Subject. Closes the entire class - a future reader
+    /// against any of these names is automatically safe.
+    #[test]
+    fn rejects_duplicate_for_each_single_instance_header() {
+        use internet_identity_interface::internet_identity::types::smtp::SINGLE_INSTANCE_HEADERS;
+        for name in SINGLE_INSTANCE_HEADERS {
+            let req = req_with_headers(vec![
+                SmtpHeader {
+                    name: (*name).into(),
+                    value: "a".into(),
+                },
+                SmtpHeader {
+                    name: (*name).into(),
+                    value: "b".into(),
+                },
+                SmtpHeader {
+                    name: "DKIM-Signature".into(),
+                    value: "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                            c=relaxed/relaxed; h=From:Subject; bh=MTIzNDU2; b=YWJj"
+                        .into(),
+                },
+            ]);
+            let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
+            assert!(
+                matches!(
+                    result,
+                    DkimVerifyResult::Unverified {
+                        reason: VerificationFailReason::MalformedMessage(_),
+                        ..
+                    }
+                ),
+                "name={name}: expected MalformedMessage, got {result:?}",
+            );
+        }
+    }
+
+    /// Multiple `DKIM-Signature` headers must NOT trigger
+    /// `MalformedMessage` - RFC 6376 §5.5 explicitly allows that
+    /// (original sender + forwarder re-sign). The duplicate-header
+    /// reject must be limited to §3.6 single-instance names.
+    #[test]
+    fn allows_multiple_dkim_signature_headers() {
+        let req = req_with_headers(vec![
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "v=1; a=rsa-sha256; d=a.example; s=m; c=relaxed/relaxed; \
+                        h=From:Subject; bh=MTIzNDU2; b=YWJj"
+                    .into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "v=1; a=rsa-sha256; d=b.example; s=m; c=relaxed/relaxed; \
+                        h=From:Subject; bh=MTIzNDU2; b=YWJj"
+                    .into(),
+            },
+            SmtpHeader {
+                name: "From".into(),
+                value: "alice@example.com".into(),
+            },
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "ok".into(),
+            },
+        ]);
+        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
+        // Both signatures will fail the cryptographic check (bogus
+        // bh=/b=) - we don't care which reason surfaces, only that
+        // it's NOT `MalformedMessage`.
+        match result {
+            DkimVerifyResult::Unverified { reason, .. } => assert!(
+                !matches!(reason, VerificationFailReason::MalformedMessage(_)),
+                "multi DKIM-Signature must not trigger MalformedMessage, got {reason:?}",
+            ),
+            DkimVerifyResult::Verified { .. } => {
+                // Equally fine - happy-path is also non-malformed.
+            }
+        }
+    }
+
+    /// `build_header_hash_input` populates the view with the exact
+    /// header instances DKIM's walk picked. For `h=Subject` against a
+    /// message with one Subject, the view's `header("Subject")` is
+    /// that value. This pins the bottom-up contract: any future
+    /// reader through the view inherits "only the bytes DKIM hashed."
+    #[test]
+    fn signed_view_exposes_bottom_up_subject() {
+        let sig = parse_dkim_signature(
+            "v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=mail; \
+                                  h=From:Subject; bh=MTIzNDU2; b=YWJj",
+        )
+        .expect("parse signature");
+        let headers = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "alice@example.com".into(),
+            },
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "the only signed subject".into(),
+            },
+            SmtpHeader {
+                name: "DKIM-Signature".into(),
+                value: "...".into(),
+            },
+        ];
+        let (_bytes, view) = build_header_hash_input(&headers, &sig, "...");
+        assert_eq!(view.header("Subject"), Some("the only signed subject"));
+        assert_eq!(view.header("From"), Some("alice@example.com"));
+    }
+
+    /// A header listed in `h=` but absent from the message contributes
+    /// nothing to the view: `view.header("Date")` returns `None` even
+    /// though the signer asked for it. This is the "DKIM didn't sign
+    /// it" signal the recovery layer relies on.
+    #[test]
+    fn signed_view_returns_none_for_h_listed_but_message_absent() {
+        let sig = parse_dkim_signature(
+            "v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=mail; \
+                                  h=From:Subject:Date; bh=MTIzNDU2; b=YWJj",
+        )
+        .expect("parse signature");
+        let headers = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "alice@example.com".into(),
+            },
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "x".into(),
+            },
+            // No Date header.
+        ];
+        let (_bytes, view) = build_header_hash_input(&headers, &sig, "...");
+        assert_eq!(view.header("Date"), None);
+        assert_eq!(view.header("Subject"), Some("x"));
+    }
+
+    /// A header present in the message but NOT in `h=` is not in the
+    /// view: `view.header("Reply-To")` returns `None` even though the
+    /// raw message had one. An attacker who slips an unsigned header
+    /// into the wire cannot make a downstream reader through the view
+    /// pick it up.
+    #[test]
+    fn signed_view_returns_none_for_message_present_but_not_in_h() {
+        let sig = parse_dkim_signature(
+            "v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=mail; \
+                                  h=From:Subject; bh=MTIzNDU2; b=YWJj",
+        )
+        .expect("parse signature");
+        let headers = vec![
+            SmtpHeader {
+                name: "From".into(),
+                value: "alice@example.com".into(),
+            },
+            SmtpHeader {
+                name: "Subject".into(),
+                value: "x".into(),
+            },
+            SmtpHeader {
+                name: "Reply-To".into(),
+                value: "attacker@evil.example".into(),
+            },
+        ];
+        let (_bytes, view) = build_header_hash_input(&headers, &sig, "...");
+        assert_eq!(view.header("Reply-To"), None);
+    }
+
+    /// `SignedSmtpMessage::empty()` returns `None` for every header,
+    /// matching the fail-closed contract: code that ends up with an
+    /// empty view (e.g. early-return fallbacks) cannot accidentally
+    /// pick up an attacker-controlled value.
+    #[test]
+    fn signed_view_empty_returns_none_for_everything() {
+        let v = SignedSmtpMessage::empty();
+        assert_eq!(v.header("Subject"), None);
+        assert_eq!(v.header("From"), None);
+        assert_eq!(v.header_values("From").count(), 0);
+    }
+
+    /// `header()` lookup is case-insensitive on the name, matching
+    /// how every other header lookup in the codebase works.
+    #[test]
+    fn signed_view_header_lookup_is_case_insensitive() {
+        use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
+        let v = SignedSmtpMessage::from_signed_walk(vec![SmtpHeader {
+            name: "Subject".into(),
+            value: "x".into(),
+        }]);
+        assert_eq!(v.header("SUBJECT"), Some("x"));
+        assert_eq!(v.header("subject"), Some("x"));
+        assert_eq!(v.header("sUbJeCt"), Some("x"));
     }
 }

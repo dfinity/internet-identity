@@ -728,6 +728,154 @@ fn assert_no_doh_outcalls(env: &PocketIc) {
 // above for the DNSSEC path. See `dkim_signer` below for the
 // signing logic shared between both flows.
 
+// ===================================================================
+// DKIM duplicate-header bypass: end-to-end regression tests.
+//
+// The class of bug: DKIM verification picks the bottom instance of a
+// header listed once in `h=` (RFC 6376 §5.4 bottom-up); a top-down
+// reader picks the top. A signed email with a fresh
+// `II-Recovery-<nonce>` Subject prepended above the original signed
+// Subject would otherwise satisfy DKIM (against the bottom) and feed
+// the attacker's nonce to the recovery layer (the top), issuing a
+// delegation for the victim's anchor.
+//
+// The fix is layered: `validate_message` rejects the shape with 555
+// at the wire boundary (this test exercises that), and the DKIM
+// verifier itself refuses to produce a `SignedSmtpMessage` from a
+// duplicate-header message (covered by unit tests in
+// `dkim::verify::tests`). These integration tests pin the end-to-end
+// binding through the canister API.
+// ===================================================================
+
+/// PoC: prepare an email-recovery challenge, sign a real DKIM email
+/// with the canister-issued nonce in `Subject:`, then PREPEND a
+/// second `Subject:` carrying that same nonce above the signed one
+/// (the attack the user demonstrated). Submit via `smtp_request`.
+///
+/// The canister must:
+/// 1. Reject `smtp_request` with code 555 (RFC 5322 §3.6 +
+///    RFC 6376 §8.15 wire-shape decline), AND
+/// 2. Never advance the pending challenge past `Pending` (no
+///    credential bound, no delegation issued).
+///
+/// Either failure would mean the bypass is live.
+#[test]
+fn smtp_request_rejects_dkim_subject_duplicate_attack_poc() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    // Sign an email whose only Subject (signed by DKIM) is unrelated
+    // to the recovery nonce. This stands in for an arbitrary
+    // attacker-held DKIM-valid email from the victim's mailbox.
+    let mut signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: "An ordinary email subject",
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    // Prepend a fresh `II-Recovery-<nonce>` Subject above the signed
+    // one. DKIM picks the bottom (signed); a top-down reader would
+    // pick the top. The wire-shape check must reject the message
+    // before either reader runs.
+    let injected = SmtpHeader {
+        name: "Subject".into(),
+        value: challenge.nonce.clone(),
+    };
+    let headers = &mut signed
+        .request
+        .message
+        .as_mut()
+        .expect("signed message present")
+        .headers;
+    headers.insert(0, injected);
+
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("call failed");
+    match resp {
+        SmtpResponse::Err(e) => assert_eq!(
+            e.code, 555,
+            "expected 555 for RFC 5322 §3.6 violation, got {e:?}",
+        ),
+        SmtpResponse::Ok {} => {
+            panic!("duplicate-Subject DKIM-bypass attack must be rejected at the wire; got Ok",)
+        }
+    }
+
+    // Pending challenge must remain `Pending` (not Succeeded). If
+    // this assertion ever flips, the bypass is live regardless of
+    // the SMTP-level response code.
+    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailRecoveryStatus::Pending),
+        "duplicate-Subject must not advance the challenge; got {status:?}",
+    );
+}
+
+/// Same shape, but the attacker duplicates `From:` instead of
+/// `Subject:`. Different vector, same defence.
+#[test]
+fn smtp_request_rejects_dkim_from_duplicate_attack_poc() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let mut signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    // Prepend a different From above the signed one. DKIM picks the
+    // bottom (signed, = TEST_ADDRESS); a top-down reader would pick
+    // the top.
+    let injected = SmtpHeader {
+        name: "From".into(),
+        value: format!("attacker@{TEST_DOMAIN}"),
+    };
+    let headers = &mut signed
+        .request
+        .message
+        .as_mut()
+        .expect("signed message present")
+        .headers;
+    headers.insert(0, injected);
+
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("call failed");
+    match resp {
+        SmtpResponse::Err(e) => assert_eq!(
+            e.code, 555,
+            "expected 555 for RFC 5322 §3.6 violation, got {e:?}",
+        ),
+        SmtpResponse::Ok {} => {
+            panic!("duplicate-From DKIM-bypass attack must be rejected at the wire; got Ok",)
+        }
+    }
+
+    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailRecoveryStatus::Pending),
+        "duplicate-From must not advance the challenge; got {status:?}",
+    );
+}
+
 #[test]
 fn full_setup_flow_binds_credential_to_anchor() {
     let env = env();

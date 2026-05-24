@@ -11,29 +11,34 @@
 //! try to decode RFC 2047 encoded-words, comments, or quoted-pair
 //! sequences inside display names — those are display concerns and
 //! don't affect the domain we extract for alignment.
+//!
+//! Reads run against [`crate::dkim::SignedSmtpMessage`] rather than
+//! the raw `SmtpMessage`: the view exposes only the From value DKIM
+//! hashed (per RFC 6376 §5.4 bottom-up selection), so a duplicate
+//! From header that the DKIM verifier didn't sign cannot influence
+//! the domain we align against. The verifier itself separately
+//! rejects messages with two From headers (RFC 5322 §3.6 + RFC 6376
+//! §8.15), so reaching here with `header("From")` returning `Some`
+//! already implies a single signed From.
 
-use internet_identity_interface::internet_identity::types::smtp::SmtpMessage;
+use crate::dkim::SignedSmtpMessage;
 
 const FROM_HEADER: &str = "From";
 
-/// Locate exactly one `From:` header in `message`, parse the single
-/// mailbox out of its value, and return the lowercased domain.
+/// Resolve the `From:` domain from the DKIM-signed projection of the
+/// message and return it lowercased.
 ///
 /// Returns `Err` with a human-readable reason on:
-/// - zero or more than one `From:` header,
+/// - no signed `From:` (signer didn't list it in `h=`, or no From in
+///   the message - both mean DKIM doesn't vouch for any From value);
 /// - a header value that's empty / has no `@` / has trailing list
-///   syntax / uses RFC 5322 group syntax (`name:addrs;`),
+///   syntax / uses RFC 5322 group syntax (`name:addrs;`);
 /// - a domain that's empty after `@`.
-pub fn extract_from_domain(message: &SmtpMessage) -> Result<String, String> {
-    let mut iter = message
-        .headers
-        .iter()
-        .filter(|h| h.name.eq_ignore_ascii_case(FROM_HEADER));
-    let from = iter.next().ok_or_else(|| "no From: header".to_string())?;
-    if iter.next().is_some() {
-        return Err("multiple From: headers".to_string());
-    }
-    parse_single_mailbox_domain(&from.value)
+pub fn extract_from_domain(signed: &SignedSmtpMessage) -> Result<String, String> {
+    let from_value = signed
+        .header(FROM_HEADER)
+        .ok_or_else(|| "no DKIM-signed From: header".to_string())?;
+    parse_single_mailbox_domain(from_value)
 }
 
 /// Parse a single-mailbox `From:` value and return the domain
@@ -174,130 +179,125 @@ fn find_address_spec(value: &str) -> Result<Option<(&str, bool)>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
-    use serde_bytes::ByteBuf;
 
-    fn message_with(from_values: &[&str]) -> SmtpMessage {
-        let mut headers: Vec<SmtpHeader> = vec![SmtpHeader {
-            name: "Subject".into(),
-            value: "x".into(),
-        }];
-        for v in from_values {
-            headers.push(SmtpHeader {
+    /// Build a `SignedSmtpMessage` containing only a signed `From:`
+    /// value, mirroring what the DKIM verifier would produce for a
+    /// message whose `h=` listed `From` and supplied the given value.
+    /// Empty `from_values` produces a view with no signed From, used
+    /// to exercise the "DKIM didn't sign From" rejection path.
+    fn view_with_from(from_values: &[&str]) -> SignedSmtpMessage {
+        use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
+        let picked: Vec<SmtpHeader> = from_values
+            .iter()
+            .map(|v| SmtpHeader {
                 name: "From".into(),
                 value: (*v).into(),
-            });
-        }
-        SmtpMessage {
-            headers,
-            body: ByteBuf::from(b"x".to_vec()),
-        }
+            })
+            .collect();
+        SignedSmtpMessage::from_signed_walk(picked)
     }
 
     #[test]
     fn bare_addr_spec() {
-        let m = message_with(&["alice@example.com"]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["alice@example.com"]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
     #[test]
     fn angle_bracketed() {
-        let m = message_with(&["<alice@example.com>"]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["<alice@example.com>"]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
     #[test]
     fn name_addr() {
-        let m = message_with(&["Alice Smith <alice@example.com>"]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["Alice Smith <alice@example.com>"]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
     #[test]
     fn quoted_display_with_comma_in_name() {
         // A `,` inside quotes is part of the display name and must not
         // be mistaken for an address-list separator.
-        let m = message_with(&["\"Smith, Alice\" <alice@example.com>"]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["\"Smith, Alice\" <alice@example.com>"]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
     #[test]
     fn quoted_display_with_colon_in_name() {
-        let m = message_with(&["\"Note: subject\" <alice@example.com>"]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["\"Note: subject\" <alice@example.com>"]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
     #[test]
     fn lowercases_domain() {
-        let m = message_with(&["alice@EXAMPLE.COM"]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["alice@EXAMPLE.COM"]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
     #[test]
     fn strips_trailing_dot() {
-        let m = message_with(&["alice@example.com."]);
-        assert_eq!(extract_from_domain(&m).unwrap(), "example.com");
+        let v = view_with_from(&["alice@example.com."]);
+        assert_eq!(extract_from_domain(&v).unwrap(), "example.com");
     }
 
+    /// No signed From - the view's `header("From")` returns `None`,
+    /// meaning the signer either didn't list From in `h=` or the
+    /// message didn't have one. Both states mean DKIM doesn't vouch
+    /// for any From value and the verifier must refuse alignment.
     #[test]
-    fn rejects_no_from_header() {
-        let m = message_with(&[]);
-        let err = extract_from_domain(&m).unwrap_err();
-        assert!(err.contains("no From"));
-    }
-
-    #[test]
-    fn rejects_multiple_from_headers() {
-        let m = message_with(&["alice@example.com", "bob@example.com"]);
-        let err = extract_from_domain(&m).unwrap_err();
-        assert!(err.contains("multiple"));
+    fn rejects_no_signed_from() {
+        let v = view_with_from(&[]);
+        let err = extract_from_domain(&v).unwrap_err();
+        assert!(err.contains("no DKIM-signed From"));
     }
 
     #[test]
     fn rejects_address_list() {
-        let m = message_with(&["alice@example.com, bob@example.com"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["alice@example.com, bob@example.com"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("address list"));
     }
 
     #[test]
     fn rejects_group_syntax() {
-        let m = message_with(&["recipients: alice@example.com;"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["recipients: alice@example.com;"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("group"));
     }
 
     #[test]
     fn rejects_missing_at() {
-        let m = message_with(&["alice"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["alice"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("'@'"));
     }
 
     #[test]
     fn rejects_empty_value() {
-        let m = message_with(&[""]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&[""]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("empty"));
     }
 
     #[test]
     fn rejects_empty_domain_after_at() {
-        let m = message_with(&["alice@"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["alice@"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("empty domain"));
     }
 
     #[test]
     fn rejects_unclosed_angle_bracket() {
-        let m = message_with(&["<alice@example.com"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["<alice@example.com"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("unclosed"));
     }
 
     #[test]
     fn rejects_nested_angle_brackets() {
-        let m = message_with(&["<<alice@example.com>>"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["<<alice@example.com>>"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("nested"));
     }
 
@@ -306,36 +306,36 @@ mod tests {
         // No angle brackets → the whole value is the addr-spec, so a
         // leading display name with a space would otherwise sneak the
         // last token through as a fake mailbox.
-        let m = message_with(&["Alice alice@example.com"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["Alice alice@example.com"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("whitespace"));
     }
 
     #[test]
     fn rejects_space_around_at_in_bare_addr_spec() {
-        let m = message_with(&["alice @example.com"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["alice @example.com"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("whitespace"));
     }
 
     #[test]
     fn rejects_stray_closing_angle_without_opening() {
-        let m = message_with(&["alice@example.com>"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["alice@example.com>"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("'>' without matching '<'"));
     }
 
     #[test]
     fn rejects_content_after_closing_angle() {
-        let m = message_with(&["<alice@example.com> garbage"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["<alice@example.com> garbage"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("trailing content"));
     }
 
     #[test]
     fn rejects_multiple_closing_angles() {
-        let m = message_with(&["<alice@example.com>>"]);
-        let err = extract_from_domain(&m).unwrap_err();
+        let v = view_with_from(&["<alice@example.com>>"]);
+        let err = extract_from_domain(&v).unwrap_err();
         assert!(err.contains("multiple '>'"));
     }
 }
