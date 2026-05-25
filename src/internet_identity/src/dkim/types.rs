@@ -134,39 +134,3 @@ pub enum VerificationFailReason {
     /// exists, doesn't equal it exactly).
     DmarcMisaligned,
 }
-
-/// DKIM-only verdict, the result of [`super::verify::verify`].
-///
-/// Per RFC 6376 §5.5 / design §5.5, an email may carry multiple
-/// `DKIM-Signature` headers (e.g. original sender + mailing list
-/// forwarder). The DKIM verifier accepts the email as soon as *any
-/// one* signature passes the cryptographic check.
-///
-/// The combined DKIM + DMARC verdict (what callers actually want) is
-/// [`crate::dmarc::EmailVerificationStatus`], returned by
-/// `dmarc::verify_email`.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DkimVerifyResult {
-    /// At least one signature passed.
-    Verified {
-        /// The `d=` of the signature that verified.
-        dkim_domain: String,
-        /// Per-step checks for the winning signature.
-        checks: Vec<DkimCheck>,
-    },
-    /// No signature passed.
-    Unverified {
-        /// Best-fit reason from the most-recently-attempted signature.
-        reason: VerificationFailReason,
-        /// Per-step checks across every signature attempted (each
-        /// signature contributes one block of checks; multi-signature
-        /// emails produce a flat concatenation).
-        checks: Vec<DkimCheck>,
-    },
-}
-
-impl DkimVerifyResult {
-    pub fn is_verified(&self) -> bool {
-        matches!(self, DkimVerifyResult::Verified { .. })
-    }
-}

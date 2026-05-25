@@ -47,6 +47,7 @@ mod remove;
 mod rng;
 pub(crate) mod smtp;
 mod submit_leaf;
+pub(crate) mod typestate;
 
 pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};

@@ -32,10 +32,10 @@
 //!
 //! - **DoH path** (no DNSSEC chain cached at prepare time): fetch
 //!   the DKIM TXT (and DMARC, optionally) via `crate::doh::fetch_txt`,
-//!   run the full `dmarc::verify_email` pipeline against the in-flight
-//!   message body, and finalize — bind the credential and flip
-//!   `status` to a terminal variant. One round-trip, finishes
-//!   synchronously inside this call.
+//!   run the full typestate pipeline (stage 1 → stage 2 → stage 3)
+//!   against the in-flight message body, and finalize — bind the
+//!   credential and flip `status` to a terminal variant. One round-
+//!   trip, finishes synchronously inside this call.
 //!
 //! - **DNSSEC path** (skeleton chain cached at prepare time): we
 //!   don't yet have the DKIM public key (the selector only becomes
@@ -57,14 +57,19 @@
 //! it probe the canister for which nonces exist.
 
 use super::pending::{PartialVerification, PendingKind, PendingStatus};
+use super::typestate::{
+    DkimScopeError, SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext,
+    VerifiedSmtpRequest,
+};
 use crate::email_recovery::pending;
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryCredential, EmailRecoveryError,
 };
+#[cfg(test)]
+use internet_identity_interface::internet_identity::types::smtp::SMTP_ERR_SYNTAX_ERROR;
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
-    SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
+    smtp_err, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE, SMTP_ERR_USER_NOT_LOCAL,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
@@ -125,13 +130,20 @@ fn recipient_matches(
 /// effects and leaks nothing beyond the deploy arg, which is already
 /// public.
 pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
-    if let Err(e) = validate_smtp_request(&request) {
-        return e;
-    }
-    let envelope = match request.envelope.as_ref() {
-        Some(e) => e,
-        None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
+    // Stage 1: bounds + RFC 5322 §3.6 well-formedness. RCPT TO arrives
+    // before the message body so most envelope-only requests skip the
+    // header-uniqueness checks; what stage 1 still catches here is
+    // envelope/address/header/body bounds.
+    let unverified = match UnverifiedSmtpRequest::try_from(request) {
+        Ok(u) => u,
+        Err(rfc_err) => return rfc_err.into(),
     };
+    // Stage 1 guarantees envelope is present (bounds rejects None).
+    let envelope = unverified
+        .raw()
+        .envelope
+        .as_ref()
+        .expect("stage 1 guarantees envelope is present");
     let to = match single_recipient(envelope) {
         Some(to) => to,
         None => {
@@ -172,12 +184,12 @@ fn single_recipient(
 /// see the module-level note on why we don't surface per-message
 /// verification failures.
 pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
-    // Bound-check up front so a malformed gateway-side payload
-    // returns a clean syntax error instead of trapping somewhere
-    // inside the verifier.
-    if let Err(e) = validate_smtp_request(&request) {
-        return e;
-    }
+    // Stage 1: bounds + RFC 5322 §3.6 well-formedness. Failures map to
+    // SMTP 555 (syntax error) per the typestate's `Into<SmtpResponse>`.
+    let unverified = match UnverifiedSmtpRequest::try_from(request) {
+        Ok(u) => u,
+        Err(rfc_err) => return rfc_err.into(),
+    };
 
     // Recipient dispatch. We accept either of the two reserved
     // recipients (`register@id.ai` for setup, `recover@id.ai` for
@@ -198,10 +210,11 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // ("User not local") to mirror what `smtp_request_validate`
     // says at RCPT TO time; 550 is reserved for the single-recipient
     // "unknown mailbox" case so the gateway can tell the two apart.
-    let envelope = match request.envelope.as_ref() {
-        Some(e) => e,
-        None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
-    };
+    let envelope = unverified
+        .raw()
+        .envelope
+        .as_ref()
+        .expect("stage 1 guarantees envelope is present");
     let to = match single_recipient(envelope) {
         Some(to) => to,
         None => {
@@ -229,7 +242,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         );
     };
 
-    let message = match request.message.as_ref() {
+    let message = match unverified.raw().message.as_ref() {
         Some(m) => m,
         None => {
             return SmtpResponse::Ok {};
@@ -310,7 +323,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // DNSSEC path — pre-DKIM-key verification only. Body is
         // dropped after `bh=` validates; status flips to
         // `NeedDkimLeaf { selector }` so the FE submits the leaf.
-        match prepare_partial_verification(&request, &snapshot, now_secs) {
+        match prepare_partial_verification(&unverified, &snapshot, now_secs) {
             Ok(partial) => {
                 let selector = partial.selector.clone();
                 pending::with_mut(&nonce, now_secs, |c| {
@@ -327,7 +340,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     } else {
         // DoH path — the canister can fetch the DKIM TXT itself, so
         // verification finishes synchronously inside this one call.
-        let outcome = verify_setup_email_doh(&request, &snapshot, now_secs).await;
+        let outcome = verify_setup_email_doh(&unverified, &snapshot, now_secs).await;
         match outcome {
             Ok(()) => match &snapshot.kind {
                 SnapshotKind::Setup { anchor } => {
@@ -476,34 +489,43 @@ fn find_nonce_in(haystack: &str) -> Option<String> {
 /// resulting `PartialVerification` record is enough for
 /// `submit_dkim_leaf` to finish the signature check once the FE
 /// supplies the DKIM TXT.
+///
+/// Picks the **bottom-most** `DKIM-Signature` header whose `d=` anchors
+/// in the registered domain (RFC 6376 §5.4 convention: forwarders
+/// prepend their signatures, leaving the originating-domain signer
+/// towards the bottom). Signatures with a different `d=` are skipped
+/// — they belong to forwarders the recovery surface doesn't trust as a
+/// proof of mailbox control.
 fn prepare_partial_verification(
-    request: &SmtpRequest,
+    unverified: &UnverifiedSmtpRequest,
     snapshot: &PendingSnapshot,
     now_secs: u64,
 ) -> Result<PartialVerification, EmailRecoveryError> {
-    let message = request.message.as_ref().ok_or_else(|| {
-        EmailRecoveryError::EmailVerificationFailed("missing message body".into())
-    })?;
+    let zone = &snapshot.registered_domain;
+    let projections: Vec<SignedSmtpRequestProjection> =
+        unverified.clone().try_into().map_err(map_scope_error)?;
 
-    // Use the *first* DKIM-Signature header. RFC 6376 permits
-    // multiple — a forwarder may re-sign — but the recovery surface
-    // only trusts the originating-domain signer (enforced by the `d=`
-    // anchor check below), and that signature is by convention placed
-    // first by every signer we've observed. If the first header is
-    // unparseable or doesn't match the registered domain, we reject
-    // rather than walking the rest of the list: that policy keeps the
-    // attack surface small for an authentication-critical path and
-    // matches what `crate::dkim::verify` does on its main entry.
-    let dkim_header = message
-        .headers
+    // Pick the bottom-most signature whose d= anchors in the registered
+    // zone. Forwarders that prepended their own DKIM-Signature with a
+    // different `d=` are ignored — only the originator's signature
+    // matters for the recovery proof.
+    let proj = projections
         .iter()
-        .find(|h| h.name.eq_ignore_ascii_case("DKIM-Signature"))
+        .rev()
+        .find(|p| {
+            let d = p.signature_domain();
+            d.eq_ignore_ascii_case(zone)
+                || (d.len() > zone.len()
+                    && d.to_ascii_lowercase().ends_with(&zone.to_ascii_lowercase())
+                    && d.as_bytes()[d.len() - zone.len() - 1] == b'.')
+        })
         .ok_or_else(|| {
-            EmailRecoveryError::EmailVerificationFailed("no DKIM-Signature header".into())
+            EmailRecoveryError::EmailVerificationFailed(format!(
+                "no DKIM signature anchors in zone {zone}"
+            ))
         })?;
-    let sig = crate::dkim::parse_dkim_signature(&dkim_header.value).map_err(|e| {
-        EmailRecoveryError::EmailVerificationFailed(format!("DKIM-Signature parse: {e}"))
-    })?;
+    let sig = proj.parsed_signature();
+    let message = proj.message();
 
     // Reject simple/* on the header side. See design §5.2 — the
     // canister-side verifier always uses relaxed header canonicalisation;
@@ -517,21 +539,8 @@ fn prepare_partial_verification(
     // Signature-header-only tag contract (design §5.4): `x=` not
     // expired, `t=` not future-dated, `Subject` ∈ `h=`. Single shared
     // umbrella with the DoH path — adding a new signature-header
-    // check there means both paths pick it up at once. Closes the
-    // DNSSEC-path parity gap surfaced by the audit (without these,
-    // the DNSSEC path admitted signatures the DoH path rejected).
-    // The DNS-record-dependent tag checks (`i=` alignment under
-    // `t=s`, `t=y` testing-mode) run later in
-    // `submit_dkim_leaf::run_submit` once the DKIM leaf has been
-    // DNSSEC-verified.
-    //
-    // Subject coverage and the DoH path's diagnostic trail are both
-    // satisfied by the umbrella; we surface `SubjectNotSigned`
-    // separately because it's user-actionable (the FE shows a
-    // dedicated copy) whereas the other failures all fold into
-    // `EmailVerificationFailed`.
-    if let Err((reason, _trail)) =
-        crate::dkim::enforce_signature_header_tag_contract(&sig, now_secs)
+    // check there means both paths pick it up at once.
+    if let Err((reason, _trail)) = crate::dkim::enforce_signature_header_tag_contract(sig, now_secs)
     {
         return Err(match reason {
             crate::dkim::VerificationFailReason::SubjectNotSigned => {
@@ -560,7 +569,7 @@ fn prepare_partial_verification(
     // over (RSA-SHA256 via PKCS#1 v1.5 prehash, Ed25519-SHA256 via
     // RFC 8463).
     let signed_data =
-        crate::dkim::build_header_hash_input(&message.headers, &sig, &dkim_header.value);
+        crate::dkim::build_header_hash_input(&message.headers, sig, proj.signature_header_raw());
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(&signed_data);
@@ -572,24 +581,6 @@ fn prepare_partial_verification(
     let from_address_lc = extract_from_address(message)?;
     if !from_address_lc.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);
-    }
-
-    // Reject signatures whose `d=` doesn't anchor in the registered
-    // domain (or a strict subdomain of it). A divergent `d=` is
-    // either a forwarder's re-signing (which we don't trust because
-    // the recovery surface needs originating-domain authentication)
-    // or an unrelated relay; either way submit_dkim_leaf would walk
-    // the wrong zone and fail later with `DkimLeafMismatch`.
-    let d = &sig.d;
-    let zone = &snapshot.registered_domain;
-    let d_in_zone = d.eq_ignore_ascii_case(zone)
-        || (d.len() > zone.len()
-            && d.to_ascii_lowercase().ends_with(&zone.to_ascii_lowercase())
-            && d.as_bytes()[d.len() - zone.len() - 1] == b'.');
-    if !d_in_zone {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-            "DKIM d={d} is not within the claimed zone {zone}"
-        )));
     }
 
     Ok(PartialVerification {
@@ -604,37 +595,38 @@ fn prepare_partial_verification(
     })
 }
 
+/// Adapter for the typestate's `DkimScopeError` into the canister's
+/// user-facing `EmailRecoveryError`. Used by both the DoH and DNSSEC
+/// paths so the failure surface stays consistent.
+fn map_scope_error(err: DkimScopeError) -> EmailRecoveryError {
+    EmailRecoveryError::EmailVerificationFailed(format!(
+        "every DKIM-Signature failed to parse: {}",
+        err.per_signature.join("; ")
+    ))
+}
+
 // =========================================================================
 // DoH path: full verification synchronously inside smtp_request.
 // =========================================================================
 
-/// Run the legacy single-pass verification pipeline against a known
-/// pending challenge: fetch the DKIM TXT (and DMARC) via DoH, run
-/// `dmarc::verify_email`, and confirm the From: matches the claimed
-/// address. Returns `Ok(())` on success, or `Err(EmailRecoveryError)`
-/// for a typed reason that's suitable to stash on the pending
-/// challenge for the FE's poll.
+/// Drive stage 2 → stage 3 of the typestate against a known pending
+/// challenge: parse every `DKIM-Signature`, pick the bottom-most
+/// signature whose `d=` matches the claimed-address domain so we know
+/// which selector to fetch, then run the full DKIM + DMARC pipeline
+/// against the fetched (DoH-trusted) DKIM TXT and DMARC TXT. Returns
+/// `Ok(())` on success, or `Err(EmailRecoveryError)` for a typed reason
+/// that the canister stashes on the pending challenge for the FE poll.
+///
+/// Bottom-up selection (RFC 6376 §5.4): forwarders prepend their
+/// signatures, so the originator sits towards the bottom of the list.
+/// Picking that one gives us the originator's selector to fetch — what
+/// the DMARC alignment check downstream needs to see verify cleanly
+/// against the claimed-address domain.
 async fn verify_setup_email_doh(
-    request: &SmtpRequest,
+    unverified: &UnverifiedSmtpRequest,
     snapshot: &PendingSnapshot,
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
-    // We need a selector to fetch the DKIM TXT, and on the DoH path
-    // we don't have one cached at prepare time. Read it directly
-    // from the email's DKIM-Signature header.
-    let message = request.message.as_ref().ok_or_else(|| {
-        EmailRecoveryError::EmailVerificationFailed("missing message body".into())
-    })?;
-    let dkim_header = message
-        .headers
-        .iter()
-        .find(|h| h.name.eq_ignore_ascii_case("DKIM-Signature"))
-        .ok_or_else(|| {
-            EmailRecoveryError::EmailVerificationFailed("no DKIM-Signature header".into())
-        })?;
-    let sig = crate::dkim::parse_dkim_signature(&dkim_header.value).map_err(|e| {
-        EmailRecoveryError::EmailVerificationFailed(format!("DKIM-Signature parse: {e}"))
-    })?;
     let domain = snapshot
         .claimed_address
         .rsplit_once('@')
@@ -642,7 +634,26 @@ async fn verify_setup_email_doh(
         .ok_or_else(|| {
             EmailRecoveryError::InternalCanisterError("stored claimed address has no '@'".into())
         })?;
-    let dkim_fqdn = format!("{}._domainkey.{}", sig.s, domain);
+
+    let projections: Vec<SignedSmtpRequestProjection> =
+        unverified.clone().try_into().map_err(map_scope_error)?;
+
+    // Bottom-up: pick the lowest signature whose d= equals the claimed-
+    // address domain. The DKIM TXT we fetch must be for THIS signer —
+    // if the claimed-address has no signature on this message, the
+    // recovery proof can't be built and we fail closed.
+    let selector = projections
+        .iter()
+        .rev()
+        .find(|p| p.signature_domain().eq_ignore_ascii_case(&domain))
+        .map(|p| p.signature_selector().to_string())
+        .ok_or_else(|| {
+            EmailRecoveryError::EmailVerificationFailed(format!(
+                "no DKIM signature on this message has d={domain}"
+            ))
+        })?;
+
+    let dkim_fqdn = format!("{}._domainkey.{}", selector, domain);
     let dmarc_fqdn = format!("_dmarc.{}", domain);
     let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain)
         .await
@@ -667,24 +678,30 @@ async fn verify_setup_email_doh(
         Some(Err(_)) | None => None,
     };
 
-    // Run the combined DKIM + DMARC verifier.
-    let status = crate::dmarc::verify_email(request, dkim_txt, dmarc_txt_opt, now_secs);
-    match status {
-        crate::dmarc::EmailVerificationStatus::Verified { .. } => {}
-        crate::dmarc::EmailVerificationStatus::Unverified { reason, .. } => {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-                "{reason:?}"
-            )));
-        }
-    }
+    // Stage 3: tries each projection bottom-up. Only the signer
+    // matching the fetched DKIM TXT can verify (the others' public
+    // keys aren't in this record); that signer also has to align with
+    // the From-domain under DMARC.
+    let ctx = VerificationContext {
+        dkim_txt,
+        dmarc_txt: dmarc_txt_opt,
+        now_secs,
+    };
+    let verified = VerifiedSmtpRequest::try_from((projections, &ctx))
+        .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("{:?}", e.last_reason)))?;
 
     // Verify the From: matches the claimed address. The verifier
-    // already checks that From:'s domain aligns with DKIM's d=,
-    // and that the domain matches the DMARC record — so the only
-    // gap is that an attacker who controls a different mailbox at
-    // the same domain could otherwise complete a victim's setup.
-    // Pin the address explicitly here.
-    let from = extract_from_address(message)?;
+    // already checks that From:'s domain aligns with DKIM's d= (and
+    // matches the DMARC record); the gap is that an attacker who
+    // controls a different mailbox at the same domain could otherwise
+    // complete a victim's setup. Pin the address explicitly here,
+    // reading from the *DKIM-bound* From header so the check uses
+    // what the originator's signature covered, not what a forwarder
+    // may have prepended.
+    let from_value = verified
+        .header("From")
+        .ok_or(EmailRecoveryError::AddressMismatch)?;
+    let from = parse_from_address(from_value)?;
     if !from.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);
     }
@@ -706,7 +723,17 @@ pub(super) fn extract_from_address(
         .iter()
         .find(|h| h.name.eq_ignore_ascii_case("From"))
         .ok_or(EmailRecoveryError::AddressMismatch)?;
-    let value = from_header.value.trim();
+    parse_from_address(&from_header.value)
+}
+
+/// Parse a `From:` header *value* (already extracted from the header
+/// list) into the canonical lowercase `local@domain` form. Split out
+/// from `extract_from_address` so the typestate-driven DoH path can
+/// call it directly with `VerifiedSmtpRequest::header("From")` — that
+/// accessor reads from the DKIM-bound headers, which is exactly the
+/// view we want to bind against the claimed address.
+pub(super) fn parse_from_address(value: &str) -> Result<String, EmailRecoveryError> {
+    let value = value.trim();
     // `From:` is RFC 5322 `address-list` in the general case, but
     // DMARC requires exactly one mailbox. The DMARC verifier already
     // enforced that, so by the time we're here the value is a
@@ -1213,6 +1240,12 @@ mod tests {
     /// whose tag content is `dkim_value`. `From:` is set to the same
     /// address every test uses, the body is `b"hi"`, and the envelope
     /// is shaped like a register-flow delivery.
+    ///
+    /// Headers (`From`, `Date`, `Subject`, `DKIM-Signature`) are
+    /// shaped to satisfy stage 1's RFC 5322 §3.6 single-occurrence
+    /// enforcement so the request flows through the typestate without
+    /// failing before reaching the DKIM-specific check the test is
+    /// exercising.
     fn smtp_with_dkim(dkim_value: &str) -> SmtpRequest {
         use internet_identity_interface::internet_identity::types::smtp::{
             SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage,
@@ -1236,6 +1269,14 @@ mod tests {
                         value: "alice@example.com".into(),
                     },
                     SmtpHeader {
+                        name: "Date".into(),
+                        value: "Mon, 1 Jan 2024 00:00:00 +0000".into(),
+                    },
+                    SmtpHeader {
+                        name: "Subject".into(),
+                        value: "II-Recovery-deadbeefcafe1234".into(),
+                    },
+                    SmtpHeader {
                         name: "DKIM-Signature".into(),
                         value: dkim_value.into(),
                     },
@@ -1244,6 +1285,15 @@ mod tests {
             }),
             gateway_flags: None,
         }
+    }
+
+    /// Wrap a test-fixture `SmtpRequest` in stage 1. Used by the
+    /// DNSSEC-prepare regression tests below, which exercise
+    /// `prepare_partial_verification`'s downstream behaviour — stage 1
+    /// is a precondition that test fixtures must satisfy.
+    fn into_unverified(req: SmtpRequest) -> super::UnverifiedSmtpRequest {
+        super::UnverifiedSmtpRequest::try_from(req)
+            .expect("test fixture must satisfy stage 1 RFC checks")
     }
 
     /// Now-pinned at the same value `now_secs()` returns under
@@ -1259,7 +1309,7 @@ mod tests {
                           t=1700001000; bh=MTIzNDU2; b=YWJj";
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
-        match prepare_partial_verification(&req, &snap, TEST_NOW) {
+        match prepare_partial_verification(&into_unverified(req), &snap, TEST_NOW) {
             Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
                 assert!(
                     msg.contains("SignatureFutureDated"),
@@ -1280,7 +1330,7 @@ mod tests {
                           t=1700000030; bh=MTIzNDU2; b=YWJj";
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
-        let result = prepare_partial_verification(&req, &snap, TEST_NOW);
+        let result = prepare_partial_verification(&into_unverified(req), &snap, TEST_NOW);
         if let Err(EmailRecoveryError::EmailVerificationFailed(msg)) = &result {
             assert!(
                 !msg.contains("SignatureFutureDated"),
@@ -1301,7 +1351,7 @@ mod tests {
                           x=1699999999; bh=MTIzNDU2; b=YWJj";
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
-        match prepare_partial_verification(&req, &snap, TEST_NOW) {
+        match prepare_partial_verification(&into_unverified(req), &snap, TEST_NOW) {
             Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
                 assert!(
                     msg.contains("SignatureExpired"),
@@ -1323,7 +1373,7 @@ mod tests {
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
         assert!(matches!(
-            prepare_partial_verification(&req, &snap, TEST_NOW),
+            prepare_partial_verification(&into_unverified(req), &snap, TEST_NOW),
             Err(EmailRecoveryError::SubjectNotSigned)
         ));
     }
