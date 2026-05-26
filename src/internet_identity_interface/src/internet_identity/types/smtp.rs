@@ -307,7 +307,11 @@ fn validate_message_header_uniqueness(message: &SmtpMessage) -> Result<(), SmtpR
     ] {
         check_header_count(&message.headers, name, HeaderCount::AT_MOST_ONE)?;
     }
-    check_header_count(&message.headers, "DKIM-Signature", HeaderCount::AT_LEAST_ONE)?;
+    check_header_count(
+        &message.headers,
+        "DKIM-Signature",
+        HeaderCount::AT_LEAST_ONE,
+    )?;
     Ok(())
 }
 

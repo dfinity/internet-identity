@@ -56,7 +56,7 @@ fn verifies_end_to_end_with_no_dmarc_record_when_dkim_equals_from() {
     let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let verified = run(req, SYNTH_RSA_TXT, None, frozen_now())
         .expect("synth-rsa-relaxed-relaxed.eml must verify");
-    assert_eq!(verified.winning_dkim_domain, "test.example.com");
+    assert_eq!(verified.dkim_domain, "test.example.com");
     assert_eq!(verified.from_domain, "test.example.com");
     assert_eq!(verified.dmarc_outcome, DmarcOutcome::NoRecord);
 }

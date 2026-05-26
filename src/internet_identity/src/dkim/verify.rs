@@ -253,12 +253,11 @@ mod tests {
 
     use super::super::types::VerificationFailReason;
     use crate::email_recovery::typestate::{
-        SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext,
-        VerificationError, VerifiedSmtpRequest,
+        SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext, VerificationError,
+        VerifiedSmtpRequest,
     };
     use internet_identity_interface::internet_identity::types::smtp::{
-        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest, SmtpResponse,
-        SMTP_ERR_SYNTAX_ERROR,
+        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest, SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
     };
     use serde_bytes::ByteBuf;
 

@@ -63,12 +63,13 @@ use std::rc::Rc;
 use crate::dkim::{
     body_hash_sha256, build_header_hash_input, enforce_dns_record_tag_contract,
     enforce_signature_header_tag_contract, parse_dkim_signature, parse_dkim_txt, relaxed_body,
-    simple_body, verify_signature, Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus,
-    DkimSignature, HeaderCanon, VerificationFailReason, VerifyOutcome,
+    simple_body, Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimSignature,
+    HeaderCanon, VerificationFailReason, VerifyOutcome,
 };
 use crate::dmarc::{aligns, parse_dmarc_txt, AlignmentMode, DmarcOutcome};
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_smtp_request, SmtpHeader, SmtpRequest, SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
+    smtp_err, validate_smtp_request, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
+    SMTP_ERR_SYNTAX_ERROR,
 };
 // `validate_smtp_request` (in the wire-types crate) folds bounds and
 // RFC 5322 §3.6 header-uniqueness into a single pass; stage 1 is the
@@ -128,11 +129,17 @@ impl TryFrom<SmtpRequest> for UnverifiedSmtpRequest {
 /// signature check.
 #[derive(Clone, Debug)]
 pub struct SignedSmtpRequestProjection {
-    /// Shared with sibling projections produced by the same stage-1 →
-    /// stage-2 conversion. `Rc` rather than a borrow so we can return
-    /// `Vec<SignedSmtpRequestProjection>` without lifetime parameters
-    /// on the value type — `TryFrom` requires owned outputs.
-    request: Rc<SmtpRequest>,
+    /// The validated message body the signature claims to cover.
+    /// Stage 1's `validate_smtp_request` already enforced "at least
+    /// one DKIM-Signature when message present", so stage 2 only
+    /// produces projections when a message actually exists — we
+    /// encode that invariant in the type by storing the unwrapped
+    /// `SmtpMessage` here instead of carrying around an
+    /// `Option<SmtpMessage>` and unwrapping at each access. Shared
+    /// across sibling projections produced by the same stage-1 →
+    /// stage-2 conversion via `Rc` so the value type doesn't need a
+    /// lifetime parameter — `TryFrom` requires owned outputs.
+    message: Rc<SmtpMessage>,
     /// The exact `DKIM-Signature` header value this projection was
     /// parsed from. Stage 3 needs the original bytes (with `b=`
     /// blanked) to compute the canonical signed-data input per RFC 6376
@@ -178,7 +185,15 @@ impl TryFrom<UnverifiedSmtpRequest> for Vec<SignedSmtpRequestProjection> {
         // 2. The neutral wording keeps the message safe to surface
         // back to the gateway as SMTP 555 (`DkimScopeError →
         // SmtpResponse`) if a misconfigured caller does reach it.
-        let Some(message) = unverified.request.message.as_ref() else {
+        //
+        // Destructure-let-else so the message moves out by value —
+        // each projection then owns its share of an `Rc<SmtpMessage>`
+        // with no further `Option` unwrapping anywhere downstream.
+        let SmtpRequest {
+            message: Some(message),
+            ..
+        } = unverified.request
+        else {
             return Err(DkimScopeError {
                 per_signature: vec!["missing message body".into()],
             });
@@ -203,11 +218,11 @@ impl TryFrom<UnverifiedSmtpRequest> for Vec<SignedSmtpRequestProjection> {
             });
         }
 
-        let request = Rc::new(unverified.request);
+        let message = Rc::new(message);
         Ok(projections
             .into_iter()
             .map(|(hv, sig)| SignedSmtpRequestProjection {
-                request: Rc::clone(&request),
+                message: Rc::clone(&message),
                 signature_header_value: hv,
                 signature: sig,
             })
@@ -257,13 +272,8 @@ impl SignedSmtpRequestProjection {
     /// Crate-private: the validated message body the signature claims
     /// to cover. Same hazard as `parsed_signature()` — the body hash
     /// hasn't been verified yet.
-    pub(crate) fn message(
-        &self,
-    ) -> &internet_identity_interface::internet_identity::types::smtp::SmtpMessage {
-        self.request
-            .message
-            .as_ref()
-            .expect("stage 2 always carries a message")
+    pub(crate) fn message(&self) -> &SmtpMessage {
+        &self.message
     }
 }
 
@@ -304,21 +314,21 @@ pub struct VerifiedSmtpRequest {
     /// parse the message body content (e.g. extract nonces, render
     /// rich content).
     body: Vec<u8>,
-    /// The winning signature's `d=`. `pub(crate)` so the
-    /// `dkim`/`dmarc` test-vector modules can assert which signer was
-    /// admitted. Not exposed publicly — downstream code outside the
-    /// crate reads message content via `header()` and `body()` only.
-    pub(crate) winning_dkim_domain: String,
-    /// From-domain extracted from the winning signature's signed view.
-    /// `pub(crate)` for the same reason as `winning_dkim_domain`.
+    /// DKIM signing domain (`d=`). `pub(crate)` so the `dkim`/`dmarc`
+    /// test-vector modules can assert which signer was admitted. Not
+    /// exposed publicly — downstream code outside the crate reads
+    /// message content via `header()` and `body()` only.
+    pub(crate) dkim_domain: String,
+    /// From-domain extracted from the signed view. `pub(crate)` for
+    /// the same reason as `dkim_domain`.
     pub(crate) from_domain: String,
     /// DMARC outcome (Aligned / NoRecord-with-equality / etc).
     /// `pub(crate)` for the DMARC test-vector assertions.
     pub(crate) dmarc_outcome: DmarcOutcome,
-    /// Per-step DKIM checks for the winning signature. `pub(crate)`
+    /// Per-step DKIM checks. `pub(crate)`
     /// so the DKIM test-vector module can pin individual check
     /// statuses (e.g. `SignatureNotFromFuture = Pass`).
-    pub(crate) winning_checks: Vec<DkimCheck>,
+    pub(crate) checks: Vec<DkimCheck>,
 }
 
 /// Stage 3 failure: no signature verified, or none aligned. Aggregates
@@ -392,7 +402,7 @@ impl<'a> TryFrom<(Vec<SignedSmtpRequestProjection>, &VerificationContext<'a>)>
         // reverse iterator numbers attempts 0, 1, 2 ... in bottom-up
         // order so `per_signature[0]` is always the bottom attempt.
         for (attempt_idx, proj) in projections.iter().rev().enumerate() {
-            match verify_one_signature(proj, ctx.dkim_txt, ctx.now_secs) {
+            match verify_signature(proj, ctx.dkim_txt, ctx.now_secs) {
                 Ok((from_domain, checks)) => {
                     let dkim_domain = proj.signature.d.clone();
                     let dmarc_outcome =
@@ -439,10 +449,10 @@ impl<'a> TryFrom<(Vec<SignedSmtpRequestProjection>, &VerificationContext<'a>)>
     }
 }
 
-/// Verify one specific signature: tag contract, DNS record parse, DNS
-/// tag contract, body-hash, signed-headers canonicalisation, signature
+/// Verify one signature: tag contract, DNS record parse, DNS tag
+/// contract, body-hash, signed-headers canonicalisation, signature
 /// math, From-header extraction. Returns the From-domain on success.
-fn verify_one_signature(
+fn verify_signature(
     proj: &SignedSmtpRequestProjection,
     dkim_txt: &str,
     now_secs: u64,
@@ -538,11 +548,7 @@ fn verify_one_signature(
     ));
 
     // Body hash.
-    let message = proj
-        .request
-        .message
-        .as_ref()
-        .expect("stage 2 always carries a message");
+    let message = proj.message();
     let canonical_body = match sig.c_body {
         BodyCanon::Relaxed => relaxed_body(&message.body),
         BodyCanon::Simple => simple_body(&message.body),
@@ -562,9 +568,11 @@ fn verify_one_signature(
         None,
     ));
 
-    // Build the canonical signed-headers input, then verify.
+    // Build the canonical signed-headers input, then verify. The
+    // full path here avoids a name clash with this module's own
+    // `verify_signature` orchestration helper.
     let signed_data = build_header_hash_input(&message.headers, sig, &proj.signature_header_value);
-    let outcome = verify_signature(
+    let outcome = crate::dkim::verify_signature(
         sig.algorithm,
         dns.key_type,
         &dns.public_key,
@@ -654,15 +662,11 @@ fn verify_one_signature(
 fn build_verified(
     proj: &SignedSmtpRequestProjection,
     from_domain: String,
-    winning_dkim_domain: String,
+    dkim_domain: String,
     dmarc_outcome: DmarcOutcome,
-    winning_checks: Vec<DkimCheck>,
+    checks: Vec<DkimCheck>,
 ) -> VerifiedSmtpRequest {
-    let message = proj
-        .request
-        .message
-        .as_ref()
-        .expect("stage 2 always carries a message");
+    let message = proj.message();
 
     let mut consumed = vec![false; message.headers.len()];
     let mut selected: Vec<usize> = Vec::with_capacity(proj.signature.h.len());
@@ -692,10 +696,10 @@ fn build_verified(
     VerifiedSmtpRequest {
         signed_headers,
         body: message.body.to_vec(),
-        winning_dkim_domain,
+        dkim_domain,
         from_domain,
         dmarc_outcome,
-        winning_checks,
+        checks,
     }
 }
 
