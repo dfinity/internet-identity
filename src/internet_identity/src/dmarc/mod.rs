@@ -62,3 +62,103 @@ pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord};
 pub(crate) use alignment::aligns;
 pub(crate) use from_header::extract_from_domain;
 pub(crate) use parse::parse_dmarc_txt;
+
+/// Compute the DMARC alignment outcome given the DKIM `d=`, the From-
+/// header domain, and the optional published DMARC record bytes.
+///
+/// `pub(crate)` so the email-recovery typestate orchestrator (and the
+/// DMARC unit tests) can drive the alignment check without going
+/// through a cryptographic round-trip. The function is a pure
+/// computation over already-trusted inputs — no I/O.
+pub(crate) fn compute_outcome(
+    dkim_domain: &str,
+    from_domain: &str,
+    dmarc_txt: Option<&str>,
+) -> types::DmarcOutcome {
+    let txt = match dmarc_txt {
+        None => return types::DmarcOutcome::NoRecord,
+        Some(t) => t,
+    };
+    let record = match parse_dmarc_txt(txt) {
+        Ok(r) => r,
+        Err(e) => return types::DmarcOutcome::Malformed(e),
+    };
+    if aligns(dkim_domain, from_domain, record.adkim) {
+        types::DmarcOutcome::Aligned {
+            policy: record.policy,
+            alignment_mode: record.adkim,
+        }
+    } else {
+        types::DmarcOutcome::Misaligned {
+            policy: record.policy,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use types::{AlignmentMode, DmarcOutcome, DmarcPolicy};
+
+    #[test]
+    fn no_record_when_dkim_equals_from() {
+        assert_eq!(
+            compute_outcome("example.com", "example.com", None),
+            DmarcOutcome::NoRecord,
+        );
+    }
+
+    #[test]
+    fn no_record_when_dkim_subdomain_of_from() {
+        // No DMARC record + dkim is a subdomain → still NoRecord at
+        // this layer. The typestate's wrapper then rejects on the
+        // strict equality fallback (only `dkim == from` is accepted
+        // when no record is published).
+        assert_eq!(
+            compute_outcome("mail.example.com", "example.com", None),
+            DmarcOutcome::NoRecord,
+        );
+    }
+
+    #[test]
+    fn aligned_under_relaxed_subdomain() {
+        let txt = "v=DMARC1; p=reject"; // adkim defaults to relaxed
+        assert!(matches!(
+            compute_outcome("mail.example.com", "example.com", Some(txt)),
+            DmarcOutcome::Aligned {
+                policy: DmarcPolicy::Reject,
+                alignment_mode: AlignmentMode::Relaxed,
+            }
+        ));
+    }
+
+    #[test]
+    fn misaligned_under_strict_subdomain() {
+        let txt = "v=DMARC1; p=reject; adkim=s";
+        assert!(matches!(
+            compute_outcome("mail.example.com", "example.com", Some(txt)),
+            DmarcOutcome::Misaligned { .. }
+        ));
+    }
+
+    #[test]
+    fn aligned_strict_exact_match() {
+        let txt = "v=DMARC1; p=reject; adkim=s";
+        assert!(matches!(
+            compute_outcome("example.com", "example.com", Some(txt)),
+            DmarcOutcome::Aligned {
+                alignment_mode: AlignmentMode::Strict,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn malformed_record_surfaces_as_outcome() {
+        let txt = "v=BOGUS";
+        match compute_outcome("example.com", "example.com", Some(txt)) {
+            DmarcOutcome::Malformed(e) => assert!(e.contains("BOGUS")),
+            other => panic!("expected Malformed, got {other:?}"),
+        }
+    }
+}

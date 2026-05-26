@@ -1,13 +1,15 @@
-//! DKIM canonicalisation primitives used by the email-recovery
-//! typestate.
+//! DKIM verification orchestration and canonicalisation primitives.
 //!
-//! This module no longer carries a top-level `verify` entry point —
-//! the canister consumes a [`crate::email_recovery::typestate::VerifiedSmtpRequest`]
-//! produced by stage 3 of the typestate pipeline; the per-signature
-//! DKIM math lives in that module's `verify_one_signature`.
+//! The top-level [`run_signature_check`] runs one signature end-to-end
+//! against an already-trusted DKIM TXT record: tag-contract checks,
+//! body-hash, signed-headers canonicalisation, and the cryptographic
+//! signature verification. It returns the per-step check trail on
+//! success, leaving DMARC alignment + From-domain extraction to the
+//! caller (the email-recovery typestate orchestrates DKIM and DMARC).
 //!
-//! What stays here are two RFC 6376 §3.7 primitives the typestate
-//! (and the DNSSEC-path partial-verification flow) calls into:
+//! Two RFC 6376 §3.7 primitives also live here for the DNSSEC-path
+//! partial-verification flow, which runs everything except the
+//! cryptographic check at email-arrival time:
 //!
 //! - [`build_header_hash_input`] — selects the headers named by `h=`
 //!   from the message bottom-up (RFC 6376 §5.4) and concatenates their
@@ -16,11 +18,216 @@
 //! - [`simple_body`] — the `simple/*` body canonicalisation form.
 //!   (`relaxed_body` lives in [`super::canonicalize`].)
 
-use super::canonicalize::relaxed_header;
+use super::canonicalize::{relaxed_body, relaxed_header};
+use super::dns_record::parse_dkim_txt;
 use super::parse::DkimSignature;
+use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
+use super::tag_checks::{enforce_dns_record_tag_contract, enforce_signature_header_tag_contract};
+use super::types::{
+    BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, HeaderCanon, VerificationFailReason,
+};
 use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
 
 const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
+
+/// Run one DKIM signature end-to-end against an already-trusted DKIM
+/// TXT record. Performs the c=, x=, t=, Subject-in-h=, DNS-record
+/// parse, t=y testing-mode, i= AUID, k= algorithm-family, body-hash,
+/// and signed-headers cryptographic checks; returns the per-step
+/// `DkimCheck` trail on success or a `(reason, partial_trail)` pair
+/// on failure.
+///
+/// Inputs are primitives (no typestate types) so this function is
+/// reusable across both the in-flight DoH path (where the typestate
+/// hands us the parsed signature + raw message) and any future
+/// caller that has the same primitives in hand. DMARC alignment and
+/// From-domain extraction live in `crate::dmarc` and are sequenced
+/// by the typestate orchestrator after this check succeeds.
+pub(crate) fn run_signature_check(
+    sig: &DkimSignature,
+    headers: &[SmtpHeader],
+    body: &[u8],
+    dkim_header_value: &str,
+    dkim_txt: &str,
+    now_secs: u64,
+) -> Result<Vec<DkimCheck>, (VerificationFailReason, Vec<DkimCheck>)> {
+    let mut checks: Vec<DkimCheck> = Vec::new();
+    checks.push(check(
+        DkimCheckName::DkimSignaturePresent,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+    // The signature was parsed before reaching this entry point, so
+    // SignatureParsed and AlgorithmSupported are implicitly Pass.
+    checks.push(check(
+        DkimCheckName::SignatureParsed,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+    checks.push(check(
+        DkimCheckName::AlgorithmSupported,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // (c=) Reject simple/* on the header side (design §5.2).
+    if sig.c_header != HeaderCanon::Relaxed {
+        checks.push(check(
+            DkimCheckName::CanonicalizationSupported,
+            DkimCheckStatus::Fail,
+            Some("header canonicalisation must be relaxed (c=relaxed/...)".into()),
+        ));
+        return Err((VerificationFailReason::UnsupportedCanonicalization, checks));
+    }
+    checks.push(check(
+        DkimCheckName::CanonicalizationSupported,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // Signature-header-only tag contract (x=, t=, Subject ∈ h=).
+    match enforce_signature_header_tag_contract(sig, now_secs) {
+        Ok(mut trail) => checks.append(&mut trail),
+        Err((reason, mut trail)) => {
+            checks.append(&mut trail);
+            return Err((reason, checks));
+        }
+    }
+
+    // Parse the (already-trusted) DKIM TXT record.
+    let dns = match parse_dkim_txt(dkim_txt) {
+        Ok(r) => r,
+        Err(e) => {
+            checks.push(check(
+                DkimCheckName::DnsRecordParsed,
+                DkimCheckStatus::Fail,
+                Some(e.clone()),
+            ));
+            return Err((VerificationFailReason::DnsRecordMalformed(e), checks));
+        }
+    };
+    checks.push(check(
+        DkimCheckName::DnsRecordParsed,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // DNS-record-dependent tag contract (t=y, i= alignment).
+    match enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns) {
+        Ok(mut trail) => checks.append(&mut trail),
+        Err((reason, mut trail)) => {
+            checks.append(&mut trail);
+            return Err((reason, checks));
+        }
+    }
+
+    // DNS k= must match a= family.
+    if !dns.key_type.matches_signature_alg(sig.algorithm) {
+        checks.push(check(
+            DkimCheckName::PublicKeyTypeMatches,
+            DkimCheckStatus::Fail,
+            Some(format!(
+                "DNS k= {:?} does not match signature a= {:?}",
+                dns.key_type, sig.algorithm
+            )),
+        ));
+        return Err((VerificationFailReason::AlgorithmKeyTypeMismatch, checks));
+    }
+    checks.push(check(
+        DkimCheckName::PublicKeyTypeMatches,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // Body hash.
+    let canonical_body = match sig.c_body {
+        BodyCanon::Relaxed => relaxed_body(body),
+        BodyCanon::Simple => simple_body(body),
+    };
+    let computed_bh = body_hash_sha256(&canonical_body, sig.l);
+    if computed_bh.as_slice() != sig.bh.as_slice() {
+        checks.push(check(
+            DkimCheckName::BodyHashValid,
+            DkimCheckStatus::Fail,
+            Some("computed body hash does not match bh=".into()),
+        ));
+        return Err((VerificationFailReason::BodyHashMismatch, checks));
+    }
+    checks.push(check(
+        DkimCheckName::BodyHashValid,
+        DkimCheckStatus::Pass,
+        None,
+    ));
+
+    // Build the canonical signed-headers input, then verify the
+    // cryptographic signature.
+    let signed_data = build_header_hash_input(headers, sig, dkim_header_value);
+    let outcome = verify_signature(
+        sig.algorithm,
+        dns.key_type,
+        &dns.public_key,
+        &signed_data,
+        &sig.b,
+    );
+    match outcome {
+        VerifyOutcome::Valid => {
+            checks.push(check(
+                DkimCheckName::SignatureValid,
+                DkimCheckStatus::Pass,
+                None,
+            ));
+            Ok(checks)
+        }
+        VerifyOutcome::BadSignature => {
+            checks.push(check(
+                DkimCheckName::SignatureValid,
+                DkimCheckStatus::Fail,
+                Some("signature did not validate against public key".into()),
+            ));
+            Err((VerificationFailReason::SignatureInvalid, checks))
+        }
+        VerifyOutcome::MalformedKey(e) => {
+            checks.push(check(
+                DkimCheckName::SignatureValid,
+                DkimCheckStatus::Fail,
+                Some(format!("malformed key: {e}")),
+            ));
+            Err((VerificationFailReason::DnsRecordMalformed(e), checks))
+        }
+        VerifyOutcome::MalformedSignature(e) => {
+            checks.push(check(
+                DkimCheckName::SignatureValid,
+                DkimCheckStatus::Fail,
+                Some(format!("malformed signature: {e}")),
+            ));
+            Err((VerificationFailReason::SignatureMalformed(e), checks))
+        }
+        VerifyOutcome::AlgorithmMismatch => {
+            checks.push(check(
+                DkimCheckName::SignatureValid,
+                DkimCheckStatus::Fail,
+                Some("algorithm/key-type mismatch".into()),
+            ));
+            Err((VerificationFailReason::AlgorithmKeyTypeMismatch, checks))
+        }
+        VerifyOutcome::RsaKeyTooSmall(bits) => {
+            checks.push(check(
+                DkimCheckName::SignatureValid,
+                DkimCheckStatus::Fail,
+                Some(format!("RSA key only {bits} bits")),
+            ));
+            Err((VerificationFailReason::RsaKeyTooSmall(bits), checks))
+        }
+    }
+}
+
+fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -> DkimCheck {
+    DkimCheck {
+        name,
+        status,
+        detail,
+    }
+}
 
 /// Construct the byte sequence the DKIM signature is computed over per
 /// RFC 6376 §3.7:

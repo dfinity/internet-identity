@@ -97,4 +97,4 @@ pub(crate) use tag_checks::{
     enforce_signature_header_tag_contract,
 };
 #[allow(unused_imports)]
-pub(crate) use verify::{build_header_hash_input, simple_body};
+pub(crate) use verify::{build_header_hash_input, run_signature_check, simple_body};

@@ -61,12 +61,9 @@
 use std::rc::Rc;
 
 use crate::dkim::{
-    body_hash_sha256, build_header_hash_input, enforce_dns_record_tag_contract,
-    enforce_signature_header_tag_contract, parse_dkim_signature, parse_dkim_txt, relaxed_body,
-    simple_body, Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimSignature,
-    HeaderCanon, VerificationFailReason, VerifyOutcome,
+    parse_dkim_signature, Algorithm, DkimCheck, DkimSignature, VerificationFailReason,
 };
-use crate::dmarc::{aligns, parse_dmarc_txt, AlignmentMode, DmarcOutcome};
+use crate::dmarc::DmarcOutcome;
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
     SMTP_ERR_SYNTAX_ERROR,
@@ -406,7 +403,7 @@ impl<'a> TryFrom<(Vec<SignedSmtpRequestProjection>, &VerificationContext<'a>)>
                 Ok((from_domain, checks)) => {
                     let dkim_domain = proj.signature.d.clone();
                     let dmarc_outcome =
-                        compute_dmarc_outcome(&dkim_domain, &from_domain, ctx.dmarc_txt);
+                        crate::dmarc::compute_outcome(&dkim_domain, &from_domain, ctx.dmarc_txt);
                     let accepted = match &dmarc_outcome {
                         DmarcOutcome::Aligned { .. } => true,
                         DmarcOutcome::NoRecord => dkim_domain == from_domain,
@@ -449,199 +446,37 @@ impl<'a> TryFrom<(Vec<SignedSmtpRequestProjection>, &VerificationContext<'a>)>
     }
 }
 
-/// Verify one signature: tag contract, DNS record parse, DNS tag
-/// contract, body-hash, signed-headers canonicalisation, signature
-/// math, From-header extraction. Returns the From-domain on success.
+/// Stage 3 orchestrator: runs DKIM verification (via
+/// `crate::dkim::run_signature_check`), then extracts the From-domain
+/// from the now-verified message and returns it for DMARC alignment.
+/// All DKIM-specific work happens in the dkim crate; this function is
+/// just glue between DKIM and DMARC.
 fn verify_signature(
     proj: &SignedSmtpRequestProjection,
     dkim_txt: &str,
     now_secs: u64,
 ) -> Result<(String, Vec<DkimCheck>), (VerificationFailReason, Vec<DkimCheck>)> {
-    let mut checks: Vec<DkimCheck> = Vec::new();
-    checks.push(check(
-        DkimCheckName::DkimSignaturePresent,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-    // The signature was parsed by stage 1 → stage 2, so SignatureParsed
-    // and AlgorithmSupported are implicitly Pass at this point.
-    checks.push(check(
-        DkimCheckName::SignatureParsed,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-    checks.push(check(
-        DkimCheckName::AlgorithmSupported,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    let sig = &proj.signature;
-
-    // (c=) Reject simple/* on the header side (design §5.2).
-    if sig.c_header != HeaderCanon::Relaxed {
-        checks.push(check(
-            DkimCheckName::CanonicalizationSupported,
-            DkimCheckStatus::Fail,
-            Some("header canonicalisation must be relaxed (c=relaxed/...)".into()),
-        ));
-        return Err((VerificationFailReason::UnsupportedCanonicalization, checks));
-    }
-    checks.push(check(
-        DkimCheckName::CanonicalizationSupported,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    // Signature-header-only tag contract (x=, t=, Subject ∈ h=).
-    match enforce_signature_header_tag_contract(sig, now_secs) {
-        Ok(mut trail) => checks.append(&mut trail),
-        Err((reason, mut trail)) => {
-            checks.append(&mut trail);
-            return Err((reason, checks));
-        }
-    }
-
-    // Parse the (already-trusted) DKIM TXT record.
-    let dns = match parse_dkim_txt(dkim_txt) {
-        Ok(r) => r,
-        Err(e) => {
-            checks.push(check(
-                DkimCheckName::DnsRecordParsed,
-                DkimCheckStatus::Fail,
-                Some(e.clone()),
-            ));
-            return Err((VerificationFailReason::DnsRecordMalformed(e), checks));
-        }
-    };
-    checks.push(check(
-        DkimCheckName::DnsRecordParsed,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    // DNS-record-dependent tag contract (t=y, i= alignment).
-    match enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns) {
-        Ok(mut trail) => checks.append(&mut trail),
-        Err((reason, mut trail)) => {
-            checks.append(&mut trail);
-            return Err((reason, checks));
-        }
-    }
-
-    // DNS k= must match a= family.
-    if !dns.key_type.matches_signature_alg(sig.algorithm) {
-        checks.push(check(
-            DkimCheckName::PublicKeyTypeMatches,
-            DkimCheckStatus::Fail,
-            Some(format!(
-                "DNS k= {:?} does not match signature a= {:?}",
-                dns.key_type, sig.algorithm
-            )),
-        ));
-        return Err((VerificationFailReason::AlgorithmKeyTypeMismatch, checks));
-    }
-    checks.push(check(
-        DkimCheckName::PublicKeyTypeMatches,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    // Body hash.
     let message = proj.message();
-    let canonical_body = match sig.c_body {
-        BodyCanon::Relaxed => relaxed_body(&message.body),
-        BodyCanon::Simple => simple_body(&message.body),
-    };
-    let computed_bh = body_hash_sha256(&canonical_body, sig.l);
-    if computed_bh.as_slice() != sig.bh.as_slice() {
-        checks.push(check(
-            DkimCheckName::BodyHashValid,
-            DkimCheckStatus::Fail,
-            Some("computed body hash does not match bh=".into()),
-        ));
-        return Err((VerificationFailReason::BodyHashMismatch, checks));
-    }
-    checks.push(check(
-        DkimCheckName::BodyHashValid,
-        DkimCheckStatus::Pass,
-        None,
-    ));
-
-    // Build the canonical signed-headers input, then verify. The
-    // full path here avoids a name clash with this module's own
-    // `verify_signature` orchestration helper.
-    let signed_data = build_header_hash_input(&message.headers, sig, &proj.signature_header_value);
-    let outcome = crate::dkim::verify_signature(
-        sig.algorithm,
-        dns.key_type,
-        &dns.public_key,
-        &signed_data,
-        &sig.b,
-    );
-    match outcome {
-        VerifyOutcome::Valid => {
-            checks.push(check(
-                DkimCheckName::SignatureValid,
-                DkimCheckStatus::Pass,
-                None,
-            ));
-        }
-        VerifyOutcome::BadSignature => {
-            checks.push(check(
-                DkimCheckName::SignatureValid,
-                DkimCheckStatus::Fail,
-                Some("signature did not validate against public key".into()),
-            ));
-            return Err((VerificationFailReason::SignatureInvalid, checks));
-        }
-        VerifyOutcome::MalformedKey(e) => {
-            checks.push(check(
-                DkimCheckName::SignatureValid,
-                DkimCheckStatus::Fail,
-                Some(format!("malformed key: {e}")),
-            ));
-            return Err((VerificationFailReason::DnsRecordMalformed(e), checks));
-        }
-        VerifyOutcome::MalformedSignature(e) => {
-            checks.push(check(
-                DkimCheckName::SignatureValid,
-                DkimCheckStatus::Fail,
-                Some(format!("malformed signature: {e}")),
-            ));
-            return Err((VerificationFailReason::SignatureMalformed(e), checks));
-        }
-        VerifyOutcome::AlgorithmMismatch => {
-            checks.push(check(
-                DkimCheckName::SignatureValid,
-                DkimCheckStatus::Fail,
-                Some("algorithm/key-type mismatch".into()),
-            ));
-            return Err((VerificationFailReason::AlgorithmKeyTypeMismatch, checks));
-        }
-        VerifyOutcome::RsaKeyTooSmall(bits) => {
-            checks.push(check(
-                DkimCheckName::SignatureValid,
-                DkimCheckStatus::Fail,
-                Some(format!("RSA key only {bits} bits")),
-            ));
-            return Err((VerificationFailReason::RsaKeyTooSmall(bits), checks));
-        }
-    }
-
+    let checks = crate::dkim::run_signature_check(
+        &proj.signature,
+        &message.headers,
+        &message.body,
+        &proj.signature_header_value,
+        dkim_txt,
+        now_secs,
+    )?;
     // Extract the From-domain from the message. The signature's `h=`
     // already lists `From` (the parser enforces it), so what we read
     // here is the From the verifier just bound — even if a forwarder
     // prepended a different unsigned From, the bottom-up scan in
     // `build_header_hash_input` consumed the bottommost (originator)
     // From, and that's what we extract here.
-    let from_domain = match crate::dmarc::extract_from_domain(message) {
-        Ok(d) => d,
-        Err(e) => {
-            return Err((VerificationFailReason::MalformedFromHeader(e), checks));
-        }
-    };
-
+    let from_domain = crate::dmarc::extract_from_domain(message).map_err(|e| {
+        (
+            VerificationFailReason::MalformedFromHeader(e),
+            checks.clone(),
+        )
+    })?;
     Ok((from_domain, checks))
 }
 
@@ -700,44 +535,6 @@ fn build_verified(
         from_domain,
         dmarc_outcome,
         checks,
-    }
-}
-
-/// Compute the DMARC alignment outcome given the DKIM `d=`, the From-
-/// header domain, and the optional published DMARC record. `pub(crate)`
-/// so the DMARC unit tests can pin its behaviour without going through
-/// the cryptographic stage-3 round-trip.
-pub(crate) fn compute_dmarc_outcome(
-    dkim_domain: &str,
-    from_domain: &str,
-    dmarc_txt: Option<&str>,
-) -> DmarcOutcome {
-    let txt = match dmarc_txt {
-        None => return DmarcOutcome::NoRecord,
-        Some(t) => t,
-    };
-    let record = match parse_dmarc_txt(txt) {
-        Ok(r) => r,
-        Err(e) => return DmarcOutcome::Malformed(e),
-    };
-    let adkim: AlignmentMode = record.adkim;
-    if aligns(dkim_domain, from_domain, adkim) {
-        DmarcOutcome::Aligned {
-            policy: record.policy,
-            alignment_mode: adkim,
-        }
-    } else {
-        DmarcOutcome::Misaligned {
-            policy: record.policy,
-        }
-    }
-}
-
-fn check(name: DkimCheckName, status: DkimCheckStatus, detail: Option<String>) -> DkimCheck {
-    DkimCheck {
-        name,
-        status,
-        detail,
     }
 }
 
@@ -965,74 +762,6 @@ mod tests {
             2,
             "expected per-signature reasons to be aggregated; got {err:?}"
         );
-    }
-
-    // ---------------------------------------------------------------
-    // `compute_dmarc_outcome` — DMARC alignment-outcome tests, lifted
-    // out of the deleted `dmarc::verify::compute_outcome`. They drive
-    // the alignment helper directly (no DKIM signature round-trip),
-    // exercising the four `DmarcOutcome` variants.
-    // ---------------------------------------------------------------
-
-    use crate::dmarc::DmarcPolicy;
-
-    #[test]
-    fn dmarc_no_record_when_dkim_equals_from() {
-        let outcome = compute_dmarc_outcome("example.com", "example.com", None);
-        assert_eq!(outcome, DmarcOutcome::NoRecord);
-    }
-
-    #[test]
-    fn dmarc_no_record_when_dkim_subdomain_of_from() {
-        // No DMARC record + dkim is a subdomain → still NoRecord at
-        // this layer. Stage 3's wrapper then rejects on the strict
-        // equality fallback (only `dkim == from` is accepted when no
-        // record is published).
-        let outcome = compute_dmarc_outcome("mail.example.com", "example.com", None);
-        assert_eq!(outcome, DmarcOutcome::NoRecord);
-    }
-
-    #[test]
-    fn dmarc_aligned_under_relaxed_subdomain() {
-        let txt = "v=DMARC1; p=reject"; // adkim defaults to relaxed
-        let outcome = compute_dmarc_outcome("mail.example.com", "example.com", Some(txt));
-        assert!(matches!(
-            outcome,
-            DmarcOutcome::Aligned {
-                policy: DmarcPolicy::Reject,
-                alignment_mode: AlignmentMode::Relaxed,
-            }
-        ));
-    }
-
-    #[test]
-    fn dmarc_misaligned_under_strict_subdomain() {
-        let txt = "v=DMARC1; p=reject; adkim=s";
-        let outcome = compute_dmarc_outcome("mail.example.com", "example.com", Some(txt));
-        assert!(matches!(outcome, DmarcOutcome::Misaligned { .. }));
-    }
-
-    #[test]
-    fn dmarc_aligned_strict_exact_match() {
-        let txt = "v=DMARC1; p=reject; adkim=s";
-        let outcome = compute_dmarc_outcome("example.com", "example.com", Some(txt));
-        assert!(matches!(
-            outcome,
-            DmarcOutcome::Aligned {
-                alignment_mode: AlignmentMode::Strict,
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn dmarc_malformed_record_surfaces_as_outcome() {
-        let txt = "v=BOGUS";
-        let outcome = compute_dmarc_outcome("example.com", "example.com", Some(txt));
-        match outcome {
-            DmarcOutcome::Malformed(e) => assert!(e.contains("BOGUS")),
-            other => panic!("expected Malformed, got {other:?}"),
-        }
     }
 
     #[test]
