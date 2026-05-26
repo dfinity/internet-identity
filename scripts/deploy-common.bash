@@ -672,7 +672,7 @@ bootstrap_init_args() {
     fi
     echo "Rendering frontend init_args stub (icp.yaml project load needs the file)..." >&2
     if ! "$scripts_dir/render-local-init-args" >&2; then
-        echo "Error: failed to render $rendered — cannot proceed with icp install." >&2
+        echo "Error: failed to render $rendered. Cannot proceed with icp install." >&2
         return 1
     fi
 }
