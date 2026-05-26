@@ -63,7 +63,7 @@
    * "active" right after a successful binding without waiting for
    * the next route load to re-fetch.
    */
-  let emailRecovery = $derived(data.identityInfo.email_recovery[0]);
+  let emailRecovery = $derived(data.identityInfo.email_recovery[0]?.[0]);
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -336,6 +336,30 @@
     }
     replaceState("", {});
     showRecoveryPhraseSetup = "activate";
+  });
+
+  // Trigger recovery phrase reset
+  afterNavigate(() => {
+    if (!("reset" in page.state)) {
+      return;
+    }
+    replaceState("", {});
+    if (recoveryPhraseData !== undefined) {
+      showRecoveryPhraseSetup = "reset";
+    }
+  });
+
+  // Trigger email recovery wizard (set up or replace, depending on
+  // whether an email is already bound). Used by the home dashboard's
+  // smart-action strip when EMAIL_RECOVERY is enabled.
+  afterNavigate(() => {
+    if (!("email" in page.state)) {
+      return;
+    }
+    replaceState("", {});
+    if ($EMAIL_RECOVERY) {
+      showEmailRecoverySetup = true;
+    }
   });
 </script>
 
