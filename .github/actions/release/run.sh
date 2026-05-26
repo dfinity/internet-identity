@@ -5,6 +5,14 @@
 
 set -euo pipefail
 
+# NNS-aware proposal-tag resolution: skips rejected/open tags so the
+# changelog baseline is the last *adopted* proposal, not just the
+# highest-numbered tag. Path is resolved relative to this script so it
+# works both in CI ($GITHUB_WORKSPACE-rooted) and during local debug.
+RUN_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../../scripts/proposal-status.bash
+source "$RUN_SH_DIR/../../../scripts/proposal-status.bash"
+
 RELEASE_TAG=${RELEASE_TAG:-${GITHUB_REF_NAME:?No value for tag}}
 
 # Starting the "intro" section where we display a short intro
@@ -140,8 +148,8 @@ resolve_release_tag() {
 # Generate per-canister "What's Changed" section using proposal tags as baselines.
 # Falls back to the GitHub-generated changelog if no proposal tags exist.
 section_changelog=$(mktemp)
-LAST_BACKEND_TAG=$(git tag -l "proposal-backend-*" | sort -V | tail -1 || true)
-LAST_FRONTEND_TAG=$(git tag -l "proposal-frontend-*" | sort -V | tail -1 || true)
+LAST_BACKEND_TAG=$(latest_executed_proposal_tag backend || true)
+LAST_FRONTEND_TAG=$(latest_executed_proposal_tag frontend || true)
 
 if [ -n "$LAST_BACKEND_TAG" ] || [ -n "$LAST_FRONTEND_TAG" ]; then
   >&2 echo "Generating per-canister changelog (backend baseline: ${LAST_BACKEND_TAG:-none}, frontend baseline: ${LAST_FRONTEND_TAG:-none})"

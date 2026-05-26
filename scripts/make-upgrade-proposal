@@ -16,6 +16,10 @@ source "$SOURCE_DIR/fetch-iana-root-anchors.bash"
 # prod deploys agree on which domains use the DoH-fallback path.
 # shellcheck source=default-doh-domains.bash
 source "$SOURCE_DIR/default-doh-domains.bash"
+# NNS-aware proposal-tag resolution: skips rejected/open tags so
+# "the last release" really means "the last release that shipped".
+# shellcheck source=proposal-status.bash
+source "$SOURCE_DIR/proposal-status.bash"
 
 # Resolve the HTTPS remote URL for git operations that don't need SSH.
 # gh is authenticated via HTTPS, so this avoids SSH key prompts for
@@ -388,9 +392,9 @@ detect_release_wasm_change() {
   fi
 
   local prev_proposal_tag
-  prev_proposal_tag=$(git tag -l "${proposal_prefix}-*" | sort -V | tail -1)
+  prev_proposal_tag=$(latest_executed_proposal_tag "${proposal_prefix#proposal-}" || true)
   if [ -z "$prev_proposal_tag" ]; then
-    echo "No previous ${proposal_prefix}-* tag found; treating ${release_filename} as changed." >&2
+    echo "No previous executed ${proposal_prefix}-* tag found; treating ${release_filename} as changed." >&2
     echo "true"
     return
   fi
@@ -969,14 +973,13 @@ download_proposal_text() {
   local frontend_commits=""
 
   if should_upgrade_backend "$upgrade_type"; then
-    # Find last backend proposal tag
-    local last_backend_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
+    local last_backend_tag
+    last_backend_tag=$(latest_executed_proposal_tag backend || true)
 
     if [ -z "$last_backend_tag" ]; then
-      echo "No previous proposal-backend-* tag found."
       echo "Available release tags:"
       git tag -l "release-*" | sort -V | tail -5
-      read -p "Enter the tag or commit of the last backend deployment: " last_backend_tag
+      read -p "Enter the tag or commit of the last ADOPTED backend proposal (e.g. release-2026-05-08 or proposal-backend-141735): " last_backend_tag
       if ! git rev-parse "$last_backend_tag" >/dev/null 2>&1; then
         echo "Error: '$last_backend_tag' is not a valid tag or commit" >&2
         exit 1
@@ -1017,14 +1020,13 @@ EOF
   fi
 
   if should_upgrade_frontend "$upgrade_type"; then
-    # Find last frontend proposal tag
-    local last_frontend_tag=$(git tag -l "proposal-frontend-*" | sort -V | tail -1)
+    local last_frontend_tag
+    last_frontend_tag=$(latest_executed_proposal_tag frontend || true)
 
     if [ -z "$last_frontend_tag" ]; then
-      echo "No previous proposal-frontend-* tag found."
       echo "Available release tags:"
       git tag -l "release-*" | sort -V | tail -5
-      read -p "Enter the tag or commit of the last frontend deployment: " last_frontend_tag
+      read -p "Enter the tag or commit of the last ADOPTED frontend proposal (e.g. release-2026-05-26 or proposal-frontend-141884): " last_frontend_tag
       if ! git rev-parse "$last_frontend_tag" >/dev/null 2>&1; then
         echo "Error: '$last_frontend_tag' is not a valid tag or commit" >&2
         exit 1
@@ -1317,10 +1319,15 @@ if [ "$IS_RECONFIGURE" = "true" ]; then
   resolve_latest_release_for() {
     local role="$1"
     local prop_tag
-    prop_tag=$(git tag -l "proposal-${role}-*" | sort -V | tail -1)
+    prop_tag=$(latest_executed_proposal_tag "$role" || true)
     if [ -z "$prop_tag" ]; then
-      echo "No proposal-${role}-* tag found; nothing to reconfigure." >&2
-      return 1
+      echo "Available release tags:" >&2
+      git tag -l "release-*" | sort -V | tail -5 >&2
+      read -p "Enter the tag or commit of the last ADOPTED ${role} proposal (e.g. release-2026-05-08 or proposal-${role}-141735): " prop_tag
+      if ! git rev-parse "$prop_tag" >/dev/null 2>&1; then
+        echo "Error: '${prop_tag}' is not a valid tag or commit." >&2
+        return 1
+      fi
     fi
     local release_tag
     release_tag=$(resolve_release_tag "$prop_tag")
