@@ -957,12 +957,18 @@ proposal_title() {
 select_commits_for_bucket() {
   local bucket="$1"
   local commit_range="$2"
+  case "$bucket" in
+    be|fe) ;;
+    *) echo "select_commits_for_bucket: unknown bucket '$bucket' (expected be|fe)" >&2; return 1 ;;
+  esac
   local pat='^\*[[:space:]]+([a-z]+)(\(([^)]+)\))?!?:'
   git log --format='* %s' --no-merges "$commit_range" | \
   while IFS= read -r line; do
     [[ "$line" =~ $pat ]] || continue
     local type="${BASH_REMATCH[1]}"
-    local scope_padded=",${BASH_REMATCH[3]},"
+    # Strip whitespace so `feat(be, fe)` routes the same as `feat(be,fe)`.
+    local scope="${BASH_REMATCH[3]//[[:space:]]/}"
+    local scope_padded=",${scope},"
     local has_be=false has_fe=false
     [[ "$scope_padded" == *,be,* ]] && has_be=true
     [[ "$scope_padded" == *,fe,* ]] && has_fe=true
