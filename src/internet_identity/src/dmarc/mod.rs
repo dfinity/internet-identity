@@ -60,7 +60,7 @@ pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord};
 // time and re-check alignment without re-running the full DKIM+DMARC
 // pipeline.
 pub(crate) use alignment::aligns;
-pub(crate) use from_header::extract_from_domain;
+pub(crate) use from_header::parse_single_mailbox_domain as extract_from_value;
 pub(crate) use parse::parse_dmarc_txt;
 
 /// Compute the DMARC alignment outcome given the DKIM `d=`, the From-

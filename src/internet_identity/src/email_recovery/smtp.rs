@@ -66,11 +66,9 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryCredential, EmailRecoveryError,
 };
-#[cfg(test)]
-use internet_identity_interface::internet_identity::types::smtp::SMTP_ERR_SYNTAX_ERROR;
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
-    SMTP_ERR_USER_NOT_LOCAL,
+    SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
@@ -183,18 +181,13 @@ fn single_recipient(
 /// see the module-level note on why we don't surface per-message
 /// verification failures.
 pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
-    // Bounds first — cheap memory-abuse defence and keeps the
-    // failure-code lattice predictable.
-    if let Err(e) = validate_smtp_request(&request) {
-        return e;
-    }
-
-    // Recipient dispatch runs ahead of stage 1's RFC §3.6 checks so
+    // Recipient dispatch runs ahead of the typestate conversion so
     // misdirected mail (550 "No such user here") and bad-envelope
     // shapes (551 "User not local") get a specific SMTP-level signal
-    // regardless of how well-formed the message body is. The borrows
-    // taken here are scoped to this block so `request` can be moved
-    // into stage 1 once the dispatch decision is in hand.
+    // regardless of how well-formed the message body is. We read the
+    // envelope from the wire `SmtpRequest` directly since the
+    // typestate (`UnverifiedSmtpRequest`) doesn't carry it — only the
+    // typed message ends up there.
     //
     // We accept either of the two reserved recipients
     // (`register@id.ai` for setup, `recover@id.ai` for recovery);
@@ -216,10 +209,10 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // says at RCPT TO time; 550 is reserved for the single-recipient
     // "unknown mailbox" case so the gateway can tell the two apart.
     let recipient_flow = {
-        let envelope = request
-            .envelope
-            .as_ref()
-            .expect("validate_smtp_request guarantees envelope is present");
+        let envelope = match request.envelope.as_ref() {
+            Some(e) => e,
+            None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
+        };
         let to = match single_recipient(envelope) {
             Some(to) => to,
             None => {
@@ -234,10 +227,6 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         } else if recipient_matches(to, RECOVERY_RECIPIENT_USER) {
             RecipientFlow::Recovery
         } else {
-            // Unknown recipient → 550. The set of mailboxes we handle
-            // is in the public Candid surface, so there's no secret
-            // to hide and a sender targeting any other mailbox is a
-            // caller error that deserves an SMTP-level signal.
             return smtp_err(
                 SMTP_ERR_MAILBOX_UNAVAILABLE,
                 "Recipient is not a known mailbox on this canister",
@@ -245,30 +234,22 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         }
     };
 
-    // Stage 1: RFC 5322 §3.6 well-formedness. Bounds already passed
-    // above; this catches header-uniqueness violations and turns
-    // them into SMTP 555 (syntax error). Consumes `request`, which
-    // we no longer need by itself — the rest of the pipeline reads
-    // through `unverified`.
+    // Stage 1: bounds + RFC 5322 §3.6 well-formedness via the
+    // typestate's builder. Failures map to SMTP 555.
     let unverified = match UnverifiedSmtpRequest::try_from(request) {
         Ok(u) => u,
         Err(resp) => return resp,
     };
 
-    // Extract the canister-issued nonce from the Subject header. If
-    // there's no Subject, no `II-Recovery-` prefix, or no pending
-    // challenge for the discovered nonce, treat the message as not
-    // for us and silently drop. Scoped so the `message` borrow
-    // doesn't outlive the move of `unverified` into the verification
-    // helper below.
+    // Extract the canister-issued nonce from the Subject field. If
+    // there's no message body (envelope-only), no `II-Recovery-`
+    // prefix, or no pending challenge for the discovered nonce, treat
+    // the message as not for us and silently drop.
     let nonce = {
-        let Some(message) = unverified.raw().message.as_ref() else {
-            // Recipient is one of ours but the gateway hasn't
-            // delivered a body. Treat as a no-op — the gateway can
-            // retry once the body lands.
+        let Some(message) = unverified.message() else {
             return SmtpResponse::Ok {};
         };
-        match extract_nonce_from_subject(message) {
+        match find_nonce_in(message.subject()) {
             Some(n) => n,
             None => return SmtpResponse::Ok {},
         }
@@ -462,19 +443,11 @@ enum RecipientFlow {
 /// Returns the nonce in **canonical** form (the prefix as the
 /// canister emits it, plus the suffix lowercased), so the caller
 /// can hand it directly to the pending map without re-normalising.
-fn extract_nonce_from_subject(
-    message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
-) -> Option<String> {
-    let subject = message
-        .headers
-        .iter()
-        .find(|h| h.name.eq_ignore_ascii_case("Subject"))?;
-    find_nonce_in(&subject.value)
-}
-
-/// Same logic as `extract_nonce_from_subject` but takes the raw
-/// header value — extracted into its own function so the unit
-/// tests can drive it without a full `SmtpMessage`.
+/// Locate an `II-Recovery-…` nonce inside the Subject header value.
+/// Case-insensitive on the prefix; matches up to the first non-
+/// hex-digit byte after the prefix. Returns the nonce in canonical
+/// form (prefix as the canister emits it + lowercased suffix) so the
+/// caller can hand it straight to the pending map.
 fn find_nonce_in(haystack: &str) -> Option<String> {
     let prefix = super::NONCE_PREFIX;
     // Case-insensitive search: the user might paste the prefix in
@@ -573,8 +546,8 @@ fn prepare_partial_verification(
     // Body hash check (`bh=`). After this passes, the body bytes
     // can't change without breaking the hash, so we drop them.
     let canonical_body = match sig.c_body {
-        crate::dkim::BodyCanon::Relaxed => crate::dkim::relaxed_body(&message.body),
-        crate::dkim::BodyCanon::Simple => crate::dkim::simple_body(&message.body),
+        crate::dkim::BodyCanon::Relaxed => crate::dkim::relaxed_body(message.body()),
+        crate::dkim::BodyCanon::Simple => crate::dkim::simple_body(message.body()),
     };
     let computed_bh = crate::dkim::body_hash_sha256(&canonical_body, sig.l);
     if computed_bh.as_slice() != sig.bh.as_slice() {
@@ -583,12 +556,13 @@ fn prepare_partial_verification(
         ));
     }
 
-    // Compute the canonical signed-headers input and SHA-256 it. The
-    // 32-byte digest is the input both supported algorithms verify
-    // over (RSA-SHA256 via PKCS#1 v1.5 prehash, Ed25519-SHA256 via
-    // RFC 8463).
+    // Compute the canonical signed-headers input and SHA-256 it.
+    // Reconstruct the wire-shape header list from the typed message
+    // (the typestate's helper does this in the same order stage 3
+    // would, so the DoH and DNSSEC paths hash the same bytes).
+    let headers = super::typestate::reconstruct_wire_headers(message, proj.signature_header_raw());
     let signed_data =
-        crate::dkim::build_header_hash_input(&message.headers, sig, proj.signature_header_raw());
+        crate::dkim::build_header_hash_input(&headers, sig, proj.signature_header_raw());
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(&signed_data);
@@ -596,8 +570,10 @@ fn prepare_partial_verification(
 
     // Verify the From: matches the claimed address; cache the
     // lowercased canonical form so submit_dkim_leaf doesn't re-parse
-    // the message later.
-    let from_address_lc = extract_from_address(message)?;
+    // the message later. The typed message exposes the From value
+    // directly, so we go through `parse_from_address` only for the
+    // RFC 5321 §4.5.3.1 bounds + lowercasing.
+    let from_address_lc = parse_from_address(message.mail_from())?;
     if !from_address_lc.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);
     }
@@ -727,30 +703,17 @@ async fn verify_setup_email_doh(
     Ok(())
 }
 
-/// Pull the verified `From:` address out of the message headers and
-/// canonicalise it to lowercase `local@domain`. Returns
-/// `AddressMismatch` rather than `MalformedFromHeader` because by
-/// this point DKIM verify has already accepted the message; if the
-/// From header is malformed in some way the verifier didn't catch
-/// here, treating it as "doesn't match" gives the same observable
-/// behaviour to the user.
-pub(super) fn extract_from_address(
-    message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
-) -> Result<String, EmailRecoveryError> {
-    let from_header = message
-        .headers
-        .iter()
-        .find(|h| h.name.eq_ignore_ascii_case("From"))
-        .ok_or(EmailRecoveryError::AddressMismatch)?;
-    parse_from_address(&from_header.value)
-}
-
-/// Parse a `From:` header *value* (already extracted from the header
-/// list) into the canonical lowercase `local@domain` form. Split out
-/// from `extract_from_address` so the typestate-driven DoH path can
-/// call it directly with `VerifiedSmtpRequest::header("From")` — that
-/// accessor reads from the DKIM-bound headers, which is exactly the
-/// view we want to bind against the claimed address.
+/// Parse a `From:` header *value* into the canonical lowercase
+/// `local@domain` form. The DoH path calls this with
+/// [`VerifiedSmtpRequest::header("From")`] (the DKIM-bound view); the
+/// DNSSEC partial-verification path calls it with the typed message's
+/// `from()` field (single-occurrence-enforced at stage 1, so it's
+/// the bytes a forwarder couldn't have prepended).
+///
+/// Returns `AddressMismatch` rather than `MalformedFromHeader`
+/// because by the time this runs we've already accepted the message
+/// upstream; the only thing this rejection signals is "the address
+/// doesn't bind to the claimed mailbox."
 pub(super) fn parse_from_address(value: &str) -> Result<String, EmailRecoveryError> {
     let value = value.trim();
     // `From:` is RFC 5322 `address-list` in the general case, but
@@ -1036,35 +999,19 @@ mod tests {
     }
 
     #[test]
-    fn extract_from_addrspec_form() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpHeader, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-        let msg = SmtpMessage {
-            headers: vec![SmtpHeader {
-                name: "From".into(),
-                value: "Alice@Gmail.COM".into(),
-            }],
-            body: ByteBuf::new(),
-        };
-        assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+    fn parse_from_addrspec_form() {
+        assert_eq!(
+            parse_from_address("Alice@Gmail.COM").unwrap(),
+            "alice@gmail.com"
+        );
     }
 
     #[test]
-    fn extract_from_name_addr_form() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpHeader, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-        let msg = SmtpMessage {
-            headers: vec![SmtpHeader {
-                name: "From".into(),
-                value: "\"Alice Example\" <Alice@Gmail.COM>".into(),
-            }],
-            body: ByteBuf::new(),
-        };
-        assert_eq!(extract_from_address(&msg).unwrap(), "alice@gmail.com");
+    fn parse_from_name_addr_form() {
+        assert_eq!(
+            parse_from_address("\"Alice Example\" <Alice@Gmail.COM>").unwrap(),
+            "alice@gmail.com",
+        );
     }
 
     fn smtp_envelope(user: &str, domain: &str) -> SmtpRequest {

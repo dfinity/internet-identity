@@ -210,7 +210,7 @@ fn verifies_synthetic_rsa_relaxed_relaxed() {
     let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let verified = run(req, SYNTH_RSA_TXT, None, frozen_now())
         .expect("synth-rsa-relaxed-relaxed.eml must verify");
-    assert_eq!(verified.dkim_domain, "test.example.com");
+    assert_eq!(verified.dkim_domain(), "test.example.com");
 }
 
 #[test]
@@ -218,7 +218,7 @@ fn verifies_synthetic_rsa_relaxed_simple_body() {
     let req = parse_eml(SYNTH_RSA_RELAXED_SIMPLE);
     let verified = run(req, SYNTH_RSA_TXT, None, frozen_now())
         .expect("synth-rsa-relaxed-simple.eml must verify");
-    assert_eq!(verified.dkim_domain, "test.example.com");
+    assert_eq!(verified.dkim_domain(), "test.example.com");
 }
 
 #[test]

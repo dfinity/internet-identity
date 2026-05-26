@@ -56,9 +56,9 @@ fn verifies_end_to_end_with_no_dmarc_record_when_dkim_equals_from() {
     let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let verified = run(req, SYNTH_RSA_TXT, None, frozen_now())
         .expect("synth-rsa-relaxed-relaxed.eml must verify");
-    assert_eq!(verified.dkim_domain, "test.example.com");
-    assert_eq!(verified.from_domain, "test.example.com");
-    assert_eq!(verified.dmarc_outcome, DmarcOutcome::NoRecord);
+    assert_eq!(verified.dkim_domain(), "test.example.com");
+    assert_eq!(verified.mail_from_domain(), "test.example.com");
+    assert_eq!(verified.dmarc_outcome(), &DmarcOutcome::NoRecord);
 }
 
 #[test]
@@ -68,8 +68,8 @@ fn verifies_end_to_end_with_aligned_dmarc_strict() {
     let verified = run(req, SYNTH_RSA_TXT, Some(dmarc_txt), frozen_now())
         .expect("strict-aligned DMARC must verify");
     assert_eq!(
-        verified.dmarc_outcome,
-        DmarcOutcome::Aligned {
+        verified.dmarc_outcome(),
+        &DmarcOutcome::Aligned {
             policy: DmarcPolicy::Reject,
             alignment_mode: AlignmentMode::Strict,
         }
@@ -83,8 +83,8 @@ fn verifies_end_to_end_with_aligned_dmarc_relaxed_default() {
     let verified = run(req, SYNTH_RSA_TXT, Some(dmarc_txt), frozen_now())
         .expect("relaxed-aligned DMARC must verify");
     assert_eq!(
-        verified.dmarc_outcome,
-        DmarcOutcome::Aligned {
+        verified.dmarc_outcome(),
+        &DmarcOutcome::Aligned {
             policy: DmarcPolicy::Quarantine,
             alignment_mode: AlignmentMode::Relaxed,
         }
@@ -116,8 +116,8 @@ fn verifies_end_to_end_when_dmarc_record_has_unknown_tags() {
     let verified = run(req, SYNTH_RSA_TXT, Some(dmarc_txt), frozen_now())
         .expect("unknown-tag DMARC must still verify");
     assert_eq!(
-        verified.dmarc_outcome,
-        DmarcOutcome::Aligned {
+        verified.dmarc_outcome(),
+        &DmarcOutcome::Aligned {
             policy: DmarcPolicy::Reject,
             alignment_mode: AlignmentMode::Strict,
         }
