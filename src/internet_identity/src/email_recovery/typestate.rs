@@ -142,6 +142,22 @@ impl HeaderCount {
     }
 }
 
+impl std::fmt::Display for HeaderCount {
+    /// Human-readable rendering used in `RfcError → SmtpResponse` so
+    /// the gateway-facing SMTP 555 message doesn't leak the internal
+    /// `min` / `max` struct shape (`{:?}` debug output would).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (self.min, self.max) {
+            (1, Some(1)) => write!(f, "exactly once"),
+            (0, Some(1)) => write!(f, "at most once"),
+            (1, None) => write!(f, "at least once"),
+            // Fallback for any future constant we forget to spell out.
+            (min, Some(max)) => write!(f, "between {min} and {max} times"),
+            (min, None) => write!(f, "at least {min} times"),
+        }
+    }
+}
+
 impl From<RfcError> for SmtpResponse {
     fn from(err: RfcError) -> SmtpResponse {
         match err {
@@ -154,7 +170,7 @@ impl From<RfcError> for SmtpResponse {
                 SMTP_ERR_SYNTAX_ERROR,
                 format!(
                     "RFC 5322 §3.6 violation: header '{header}' appears {found} times, \
-                     expected {expected:?}"
+                     expected {expected}"
                 ),
             ),
         }
@@ -285,14 +301,15 @@ impl TryFrom<UnverifiedSmtpRequest> for Vec<SignedSmtpRequestProjection> {
         // Stage 1 enforces "DKIM-Signature must appear at least once
         // when message present", so an absent message here is the
         // envelope-only case — which doesn't have signatures to scope
-        // and shouldn't have reached stage 2 in the first place. We
-        // surface this as an aggregated empty diagnostic rather than
-        // panicking; callers that legitimately want to stop after
-        // stage 1 (the `smtp_request_validate` query) don't call
-        // through to stage 2 at all.
+        // and shouldn't have reached stage 2 in the first place.
+        // Callers that legitimately want to stop after stage 1 (the
+        // `smtp_request_validate` query) don't call through to stage
+        // 2. The neutral wording keeps the message safe to surface
+        // back to the gateway as SMTP 555 (`DkimScopeError →
+        // SmtpResponse`) if a misconfigured caller does reach it.
         let Some(message) = unverified.request.message.as_ref() else {
             return Err(DkimScopeError {
-                per_signature: vec!["stage 2 reached without a message body — caller bug".into()],
+                per_signature: vec!["missing message body".into()],
             });
         };
 
@@ -751,6 +768,18 @@ fn verify_one_signature(
 
 /// Construct the final `VerifiedSmtpRequest` from the winning
 /// signature's projection.
+///
+/// Header selection mirrors `build_header_hash_input` (RFC 6376 §5.4
+/// bottom-up): for each `h=` entry we pick the latest matching
+/// (not-yet-consumed) header in the message. The selected set is then
+/// emitted in **message source order** so `header(name)`'s reverse
+/// scan walks bottom-up over the actual message and returns the
+/// instance the first `h=` entry consumed — i.e., the same bytes the
+/// signer hashed.
+///
+/// Worst case is O(|h| · |headers|): a `Vec<bool>` mask gives O(1)
+/// per-index "already consumed" checks, replacing the prior
+/// `Vec<usize>::contains` linear scan.
 fn build_verified(
     proj: &SignedSmtpRequestProjection,
     from_domain: String,
@@ -763,35 +792,35 @@ fn build_verified(
         .message
         .as_ref()
         .expect("stage 2 always carries a message");
-    // Materialise the subset of headers covered by h=. We pick the
-    // bottom-most matching header per name (same convention as
-    // `build_header_hash_input`) so multi-occurrence edge cases agree
-    // with the bytes the signature math saw. Stage 1's single-
-    // occurrence checks make this a no-op simplification for the
-    // recovery-relevant headers.
-    let mut signed_headers: Vec<SmtpHeader> = Vec::new();
-    let mut consumed: Vec<usize> = Vec::new();
+
+    let mut consumed = vec![false; message.headers.len()];
+    let mut selected: Vec<usize> = Vec::with_capacity(proj.signature.h.len());
     for h_name in &proj.signature.h {
-        let mut chosen: Option<usize> = None;
         for (idx, hdr) in message.headers.iter().enumerate().rev() {
-            if hdr.name.eq_ignore_ascii_case(h_name) && !consumed.contains(&idx) {
-                chosen = Some(idx);
+            if !consumed[idx] && hdr.name.eq_ignore_ascii_case(h_name) {
+                consumed[idx] = true;
+                selected.push(idx);
                 break;
             }
-        }
-        if let Some(idx) = chosen {
-            consumed.push(idx);
-            signed_headers.push(message.headers[idx].clone());
         }
         // h= name absent from the message contributes nothing — DKIM
         // signed the empty string for it; from the caller's perspective
         // `header()` will return None, which matches "DKIM does not
         // vouch for this header."
     }
-    let body = message.body.to_vec();
+    // Sort ascending so `signed_headers` is in true message source
+    // order. `.iter().rev()` in `header()` then walks bottom-up, and
+    // for a name covered N times by `h=` it finds the bottom-most
+    // surviving instance — the one the first `h=` entry consumed.
+    selected.sort_unstable();
+    let signed_headers: Vec<SmtpHeader> = selected
+        .into_iter()
+        .map(|idx| message.headers[idx].clone())
+        .collect();
+
     VerifiedSmtpRequest {
         signed_headers,
-        body,
+        body: message.body.to_vec(),
         winning_dkim_domain,
         from_domain,
         dmarc_outcome,
@@ -1281,38 +1310,58 @@ mod tests {
 
     #[test]
     fn stage3_iterates_bottom_up() {
-        // Two DKIM-Signatures in source order: forwarder at the top (s=forwarder),
-        // originator at the bottom (s=mail). Stage 3 iterates bottom-up per
-        // RFC 6376 §5.4, so the first signature attempted (per_signature[0])
-        // must be the originator's, not the forwarder's. We don't need real
-        // crypto to assert this — both signatures will body-hash-fail against
-        // the synthetic bh= and a non-matching DKIM TXT, but the attempt
-        // ORDER is observable via the failure trail.
+        // Two DKIM-Signatures in source order. Each one fails for a
+        // DIFFERENT reason (chosen so the per-signature trail of one
+        // can't be confused with the other), so the iteration order
+        // is genuinely observable from `VerificationError`:
+        //
+        // - TOP signature (`s=forwarder`) uses `c=simple/simple` →
+        //   `UnsupportedCanonicalization` (rejected at the canon-
+        //   check step before body-hash runs).
+        // - BOTTOM signature (`s=mail`) uses `c=relaxed/relaxed` but
+        //   a synthetic `bh=` that won't match the test body →
+        //   `BodyHashMismatch`.
+        //
+        // Bottom-up iteration must visit `mail` FIRST, so
+        // `per_signature[0].1` is `BodyHashMismatch`. If a future
+        // refactor accidentally flipped iteration direction, the
+        // assertions below would surface
+        // `UnsupportedCanonicalization` in `per_signature[0].1`
+        // instead — the test catches that mistake.
         let mut req = well_formed_request();
-        // The fixture already has s=mail; add a forwarder-style signature
-        // *above* it (by inserting earlier in the headers vec).
         let msg = req.message.as_mut().unwrap();
-        // Find the original DKIM-Signature position and insert before it
-        // so the forwarder's lands above.
-        let original_pos = msg
+        // Replace the well-formed fixture's DKIM-Signature with the
+        // bottom (`s=mail`) candidate. The signature header value is
+        // a known body-hash mismatch (bh=MTIzNDU2 vs body "hi").
+        msg.headers
+            .retain(|h| !h.name.eq_ignore_ascii_case("DKIM-Signature"));
+        msg.headers.push(header(
+            "DKIM-Signature",
+            "v=1; a=rsa-sha256; d=example.com; s=mail; \
+             c=relaxed/relaxed; h=From:Subject:Date; bh=MTIzNDU2; b=YWJj",
+        ));
+        // Insert the forwarder (`c=simple/simple`) above the mail
+        // signature. Source order is now: [forwarder, ..., mail].
+        let mail_pos = msg
             .headers
             .iter()
             .position(|h| h.name.eq_ignore_ascii_case("DKIM-Signature"))
             .unwrap();
         msg.headers.insert(
-            original_pos,
+            mail_pos,
             header(
                 "DKIM-Signature",
                 "v=1; a=rsa-sha256; d=example.com; s=forwarder; \
-                 c=relaxed/relaxed; h=From:Subject:Date; bh=MTIzNDU2; b=ZGVm",
+                 c=simple/simple; h=From:Subject:Date; bh=MTIzNDU2; b=ZGVm",
             ),
         );
-        // Source order is now: [forwarder, mail]. Bottom-up iteration
-        // visits `mail` first.
+
         let unverified = UnverifiedSmtpRequest::try_from(req).unwrap();
         let projections: Vec<SignedSmtpRequestProjection> = unverified.try_into().unwrap();
+        // Source-order sanity: forwarder appears before mail.
         assert_eq!(projections[0].signature_selector(), "forwarder");
         assert_eq!(projections[1].signature_selector(), "mail");
+
         let ctx = VerificationContext {
             dkim_txt: "v=DKIM1; p=YWJj",
             dmarc_txt: None,
@@ -1320,26 +1369,35 @@ mod tests {
         };
         let err: VerificationError = VerifiedSmtpRequest::try_from((projections, &ctx))
             .expect_err("expected verification to fail");
-        // Stage 3 visits per_signature in attempt order; with two
-        // projections that means [bottom(mail), top(forwarder)]. We
-        // can't read the selector off `per_signature` directly (it
-        // carries reason + checks, not the signature), but we know
-        // the attempt-index 0 corresponds to the bottom-most
-        // projection.
+
         assert_eq!(
             err.per_signature.len(),
             2,
             "expected both signatures attempted; got {err:?}"
         );
-        // First attempt is index 0 in the err's per_signature list;
-        // its (attempt_idx, _, _) field is also 0.
+
+        // The observable order check: the FIRST entry's failure
+        // reason must come from the BOTTOM signature (mail,
+        // BodyHashMismatch). A top-down iteration would surface
+        // UnsupportedCanonicalization here instead.
         assert_eq!(
-            err.per_signature[0].0, 0,
-            "first attempt must be attempt index 0 (the bottom signature)"
+            err.per_signature[0].1,
+            VerificationFailReason::BodyHashMismatch,
+            "first attempt must be the bottom signature; got {:?}",
+            err.per_signature[0].1,
         );
         assert_eq!(
-            err.per_signature[1].0, 1,
-            "second attempt must be attempt index 1 (the top signature)"
+            err.per_signature[1].1,
+            VerificationFailReason::UnsupportedCanonicalization,
+            "second attempt must be the top signature; got {:?}",
+            err.per_signature[1].1,
+        );
+        // `last_reason` mirrors the most-recent (top) attempt, also
+        // observable here.
+        assert_eq!(
+            err.last_reason,
+            VerificationFailReason::UnsupportedCanonicalization,
+            "last_reason must reflect the final attempt (the top signature)",
         );
     }
 }
