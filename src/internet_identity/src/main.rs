@@ -979,11 +979,17 @@ mod v2_api {
             .collect();
 
         // Anchor stores email recoveries as a Vec; the candid surface
-        // exposes the full list. The canister API currently enforces
-        // ≤1 entry, so the FE picks the first to render the recovery-
-        // email card — but a future bump to N>1 won't need a candid
-        // schema change.
-        let email_recovery = state::anchor(identity_number).email_recovery.clone();
+        // exposes the full list as an `opt vec`, with `None` when no
+        // recovery email is configured. The canister API currently
+        // enforces ≤1 entry, so the FE picks the first to render the
+        // recovery-email card — but a future bump to N>1 won't need a
+        // candid schema change.
+        let stored_email_recovery = state::anchor(identity_number).email_recovery.clone();
+        let email_recovery = if stored_email_recovery.is_empty() {
+            None
+        } else {
+            Some(stored_email_recovery)
+        };
 
         let identity_info = IdentityInfo {
             authn_methods: anchor_info

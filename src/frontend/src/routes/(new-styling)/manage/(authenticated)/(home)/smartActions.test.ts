@@ -54,11 +54,13 @@ const withUnverifiedRecoveryPhrase = (info: IdentityInfo): IdentityInfo => ({
 const withEmailRecovery = (info: IdentityInfo): IdentityInfo => ({
   ...info,
   email_recovery: [
-    {
-      address: "user@example.com",
-      created_at: BigInt(0),
-      last_used: [],
-    },
+    [
+      {
+        address: "user@example.com",
+        created_at: BigInt(0),
+        last_used: [],
+      },
+    ],
   ],
 });
 
