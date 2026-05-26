@@ -954,6 +954,423 @@ fn doh_path_dns_record_umbrella_rejects_testing_mode_key() {
     }
 }
 
+// ===================================================================
+// RFC 5322 §3.6 duplicate-header regression tests
+// ===================================================================
+//
+// These exercise the header-smuggling bypass class against the
+// canister's smtp_request entrypoint. Each test constructs a message
+// that duplicates a header RFC 5322 §3.6 only permits once
+// (`From`/`Subject`/`To`/…) and asserts the canister rejects it with
+// SMTP 555 at the input-validation layer, *before* any dispatch or
+// DKIM verification runs.
+//
+// The Subject test reproduces the exact bypass reported against
+// beta.id.ai: with an old DKIM-valid email from the victim, the
+// attacker prepends a fresh `Subject: II-Recovery-<nonce>` line.
+// extract_nonce_from_subject reads the FIRST Subject (attacker's
+// nonce → looks up the live pending challenge), while the canister's
+// DKIM verifier walks `h=Subject` bottom-up (RFC 6376 §5.4) and
+// hashes the LAST Subject — the original signed value. Both checks
+// pass against different data → recovery completes against an
+// attacker-controlled session. The fix is a single occurrence check
+// at input-validation time.
+
+#[test]
+fn regression_smtp_request_rejects_duplicate_subject_header_bypass() {
+    // Reproduces the reported bypass end-to-end on the DoH path: full
+    // pending challenge, real DKIM-signed email, attacker prepends a
+    // Subject header containing the live nonce.
+    //
+    // Pre-fix expected outcome: smtp_request returns Ok and the
+    // canister-side status advances to `RegistrationSucceeded` (the
+    // attacker can now act as the victim). This test panics with a
+    // diagnostic in that case so the bypass is obvious in CI output.
+    //
+    // Post-fix expected outcome: smtp_request returns 555 ("Header
+    // 'Subject' must appear at most once") and the status remains
+    // `Pending`.
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+
+    // Sign an email whose Subject is NOT the recovery nonce — this
+    // stands in for an OLD legitimately-signed email the attacker
+    // intercepted.
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: "Lunch tomorrow?",
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+
+    // Mutate the signed request: prepend a Subject header carrying
+    // the live recovery nonce. The DKIM-signed Subject remains in the
+    // message unchanged.
+    let mut request = signed.request;
+    let headers = &mut request
+        .message
+        .as_mut()
+        .expect("signed message present")
+        .headers;
+    headers.insert(
+        0,
+        SmtpHeader {
+            name: "Subject".into(),
+            value: challenge.nonce.clone(),
+        },
+    );
+
+    let dkim_txt = signer.public_txt_record();
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+
+    // Drive PocketIC forward. On the fix branch, validate_message
+    // rejects before any outcalls fire; the helper just ticks the env
+    // without finding anything. On the pre-fix path, outcalls *do*
+    // fire and must be fulfilled so the bypass can complete.
+    fulfill_doh_outcalls(&env, &dkim_txt);
+
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+
+    match resp {
+        SmtpResponse::Err(e) => {
+            assert_eq!(
+                e.code, 555,
+                "expected 555 (RFC 5321 syntax error) for duplicate Subject, got {e:?}",
+            );
+        }
+        SmtpResponse::Ok {} => {
+            let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+                .expect("status call failed");
+            panic!(
+                "BYPASS REACHED: duplicate-Subject message was NOT rejected at input \
+                 validation. smtp_request returned Ok and pending status advanced to \
+                 {status:?}. This is the header-smuggling bypass reported against \
+                 beta.id.ai: extract_nonce_from_subject reads the first Subject \
+                 (attacker's nonce) while DKIM `h=Subject` verifies the last Subject \
+                 (the originally signed value)."
+            );
+        }
+    }
+}
+
+#[test]
+fn regression_smtp_request_rejects_duplicate_from_header() {
+    // Two From headers must be rejected at input validation. On the
+    // DoH path the DMARC verifier's `extract_from_domain` already
+    // rejects multiple From headers separately — but the canister
+    // returns Ok with a failed pending status, not 555 — and the
+    // DNSSEC path has *no* such check (see the cross-account-takeover
+    // test below for the full bypass demonstration). Putting the
+    // duplicate-From rejection at the input-validation layer covers
+    // both paths uniformly and surfaces 555 instead of "Ok + failed
+    // status".
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    let request = SmtpRequest {
+        envelope: Some(SmtpEnvelope {
+            from: SmtpAddress {
+                user: "alice".into(),
+                domain: TEST_DOMAIN.into(),
+            },
+            to: vec![SmtpAddress {
+                user: "recover".into(),
+                domain: "id.ai".into(),
+            }],
+        }),
+        message: Some(SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "From".into(),
+                    value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "From".into(),
+                    value: "mallory@evil.example.com".into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
+                },
+                SmtpHeader {
+                    name: "To".into(),
+                    value: "recover@id.ai".into(),
+                },
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "II-Recovery-deadbeefcafebabe".into(),
+                },
+            ],
+            body: ByteBuf::from(b"hello".to_vec()),
+        }),
+        gateway_flags: None,
+    };
+
+    let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
+    match resp {
+        SmtpResponse::Err(e) => assert_eq!(
+            e.code, 555,
+            "expected 555 (RFC 5321 syntax error) for duplicate From, got {e:?}",
+        ),
+        SmtpResponse::Ok {} => panic!(
+            "duplicate-From message was NOT rejected at input validation. \
+             extract_from_address would silently pick the first From, which \
+             would let an attacker present a different From to the canister \
+             than the one DKIM/DMARC verified."
+        ),
+    }
+}
+
+#[test]
+fn regression_smtp_request_rejects_duplicate_to_header() {
+    // Two To headers — RFC 5322 §3.6 forbids it. Same shape as the
+    // From test: on main, the message passes input validation and
+    // gets silently dropped at dispatch; on the fix branch, the
+    // validator rejects with 555.
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    let request = SmtpRequest {
+        envelope: Some(SmtpEnvelope {
+            from: SmtpAddress {
+                user: "alice".into(),
+                domain: TEST_DOMAIN.into(),
+            },
+            to: vec![SmtpAddress {
+                user: "recover".into(),
+                domain: "id.ai".into(),
+            }],
+        }),
+        message: Some(SmtpMessage {
+            headers: vec![
+                SmtpHeader {
+                    name: "From".into(),
+                    value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
+                },
+                SmtpHeader {
+                    name: "To".into(),
+                    value: "recover@id.ai".into(),
+                },
+                SmtpHeader {
+                    name: "To".into(),
+                    value: "register@id.ai".into(),
+                },
+                SmtpHeader {
+                    name: "Subject".into(),
+                    value: "II-Recovery-deadbeefcafebabe".into(),
+                },
+            ],
+            body: ByteBuf::from(b"hello".to_vec()),
+        }),
+        gateway_flags: None,
+    };
+
+    let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
+    match resp {
+        SmtpResponse::Err(e) => assert_eq!(
+            e.code, 555,
+            "expected 555 (RFC 5321 syntax error) for duplicate To, got {e:?}",
+        ),
+        SmtpResponse::Ok {} => panic!(
+            "duplicate-To message was NOT rejected at input validation. \
+             RFC 5322 §3.6 forbids it."
+        ),
+    }
+}
+
+#[test]
+fn regression_smtp_request_rejects_cross_account_takeover_via_dnssec_path() {
+    // Cross-account takeover via combined Subject+From duplication on
+    // the DNSSEC path. This is the *worst* shape of the bypass class:
+    // ANY user with one DKIM-valid email from a given domain can
+    // claim recovery of ANY OTHER user's account at id.ai in the same
+    // domain.
+    //
+    // Mechanism on the DNSSEC path (no fix applied):
+    //   1. The attacker (mallory@TEST_DOMAIN) holds an old, ordinary
+    //      DKIM-signed email from their own mailbox — Subject is
+    //      whatever they originally wrote.
+    //   2. The attacker calls prepare_add claiming the victim's
+    //      address (alice@TEST_DOMAIN). Pending challenge stores
+    //      claimed_address = alice@TEST_DOMAIN against the attacker's
+    //      anchor.
+    //   3. The attacker submits the old email with TWO prepended
+    //      headers:
+    //          Subject: <victim's nonce>
+    //          From:    alice@TEST_DOMAIN
+    //      followed by the original signed Subject and From below.
+    //   4. The canister's `prepare_partial_verification` walks DKIM
+    //      `h=From:Subject` bottom-up (RFC 6376 §5.4): hashes the
+    //      mallory From + original Subject → signature matches.
+    //   5. `extract_from_address` reads the TOP From via `.find()` →
+    //      alice@TEST_DOMAIN, which matches the pending challenge's
+    //      claimed_address. Recovery state advances to NeedDkimLeaf
+    //      against the attacker's anchor.
+    //   6. The attacker walks submit_dkim_leaf → credential is bound
+    //      to the attacker's anchor against the victim's address.
+    //
+    // The DoH path catches duplicate From at `dmarc::extract_from_domain`
+    // (verify.rs:71) which rejects "multiple From: headers", so this
+    // shape is DoH-path-immune even pre-fix. The DNSSEC path uses the
+    // cached `from_address_lc` for alignment instead and never invokes
+    // `extract_from_domain` against the live message, so it is fully
+    // exploitable.
+    //
+    // Pre-fix expected outcome: smtp_request returns Ok and the
+    // pending status advances to `NeedDkimLeaf` against the attacker
+    // anchor. Test panics with a diagnostic.
+    //
+    // Post-fix expected outcome: smtp_request returns 555 ("Header
+    // 'Subject' must appear at most once") — the duplicate-Subject
+    // rule catches this first; even removing it, duplicate-From would
+    // trip the same input-validation guard.
+    use internet_identity_interface::internet_identity::types::DnssecConfig;
+
+    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let dkim_txt = dkim.public_txt_record();
+    let env = env();
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC initial time fits in u32");
+    let dmarc_txt = b"v=DMARC1; p=none;";
+    let chain =
+        dnssec_signer::build_chain(TEST_DOMAIN, TEST_SELECTOR, &dkim_txt, Some(dmarc_txt), now_secs);
+
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        dnssec_config: Some(Some(DnssecConfig {
+            root_anchors: vec![chain.anchor],
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
+
+    // The attacker's identity claims the victim's address.
+    let (id, p) = fresh_identity(&env, canister_id);
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(DnsProofBundle {
+            hops: chain.dmarc_leaf.clone().map_or(vec![], |l| vec![l]),
+            ..chain.skeleton.clone()
+        }),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("prepare_add call failed")
+        .expect("prepare_add should succeed");
+
+    // The attacker's old, legitimately-DKIM-signed email — Subject
+    // and From are whatever they originally were on the wire.
+    const ATTACKER_ADDRESS: &str = "mallory@test.example.com";
+    let signed = dkim.sign_email(SignedEmailParams {
+        from: ATTACKER_ADDRESS,
+        to: "register@id.ai",
+        subject: "Coffee on Thursday",
+        body: TEST_BODY,
+        timestamp: time(&env) / 1_000_000_000,
+    });
+
+    // Forge the cross-account message: prepend TWO headers carrying
+    // the victim's address and the fresh recovery nonce. The signed
+    // headers stay below, unmodified.
+    let mut request = signed.request;
+    let headers = &mut request
+        .message
+        .as_mut()
+        .expect("signed message present")
+        .headers;
+    headers.insert(
+        0,
+        SmtpHeader {
+            name: "Subject".into(),
+            value: challenge.nonce.clone(),
+        },
+    );
+    headers.insert(
+        0,
+        SmtpHeader {
+            name: "From".into(),
+            value: TEST_ADDRESS.into(),
+        },
+    );
+
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+
+    // No DoH outcalls on the DNSSEC path (DKIM key + DMARC TXT are
+    // already cached on the pending challenge). Still drive PocketIC
+    // forward a few ticks so the canister can run the pipeline.
+    for _ in 0..30 {
+        env.tick();
+    }
+
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+
+    match resp {
+        SmtpResponse::Err(e) => {
+            assert_eq!(
+                e.code, 555,
+                "expected 555 (RFC 5321 syntax error) for combined-duplicate cross-account \
+                 takeover attempt, got {e:?}",
+            );
+        }
+        SmtpResponse::Ok {} => {
+            let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+                .expect("status call failed");
+            panic!(
+                "CROSS-ACCOUNT BYPASS REACHED: a DKIM-signed email from {ATTACKER_ADDRESS} \
+                 was accepted as a recovery message for {TEST_ADDRESS}. smtp_request returned \
+                 Ok and pending status advanced to {status:?} against an attacker-controlled \
+                 anchor. With submit_dkim_leaf the credential would now bind to the attacker."
+            );
+        }
+    }
+}
+
 /// Drive PocketIC forward until each of the 5 DoH provider outcalls
 /// has been seen, fulfilling them with the supplied DKIM TXT bytes.
 /// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
