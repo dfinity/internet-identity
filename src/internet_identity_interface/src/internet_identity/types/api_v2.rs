@@ -85,14 +85,14 @@ pub struct IdentityInfo {
     pub metadata: HashMap<String, MetadataEntryV2>,
     pub name: Option<String>,
     pub created_at: Option<Timestamp>,
-    /// Email-recovery credentials bound to this anchor. Empty for
+    /// Email-recovery credentials bound to this anchor. `None` for
     /// anchors with no recovery email configured. The canister API
     /// currently caps the list at one entry — the FE picks the
     /// first to render the recovery-email card's active vs inactive
     /// state without round-tripping a separate query. Exposing it as
     /// a `vec` lets future multi-credential support land without a
     /// candid schema bump.
-    pub email_recovery: Vec<crate::internet_identity::types::EmailRecoveryCredential>,
+    pub email_recovery: Option<Vec<crate::internet_identity::types::EmailRecoveryCredential>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
