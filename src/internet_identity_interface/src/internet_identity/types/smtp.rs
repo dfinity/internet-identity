@@ -31,6 +31,29 @@ pub const MAX_BODY_BYTES: usize = 5_000;
 pub const MAX_HEADERS: usize = 30;
 pub const MAX_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_HEADER_VALUE_BYTES: usize = 8_192;
+
+/// Headers that RFC 5322 §3.6 requires to appear exactly once in a
+/// message. Counted case-insensitively.
+const REQUIRED_EXACTLY_ONCE: &[&str] = &["From", "Date"];
+
+/// Headers that RFC 5322 §3.6 allows zero or one of, but never
+/// duplicates. Reading code in this canister (`extract_from_address`,
+/// `extract_nonce_from_subject`, DKIM-Signature lookup) uses `.find()`
+/// and would silently pick the first occurrence — a duplicate header
+/// is a header-smuggling vector against DKIM signature coverage, so
+/// we reject the whole message at the input-bounds layer instead.
+const ALLOWED_AT_MOST_ONCE: &[&str] = &[
+    "Sender",
+    "Reply-To",
+    "To",
+    "Cc",
+    "Bcc",
+    "Subject",
+    "Message-ID",
+    "In-Reply-To",
+    "References",
+];
+
 /// Cap on `envelope.to` length. `smtp_request` and
 /// `smtp_request_validate` are both open (anyone can call them), so
 /// without an explicit upper bound an attacker could pad the
@@ -225,6 +248,43 @@ pub fn validate_message(message: &SmtpMessage) -> Result<(), SmtpResponse> {
             ),
         ));
     }
+    validate_header_occurrences(&message.headers)?;
+    Ok(())
+}
+
+/// Enforce RFC 5322 §3.6 header occurrence rules: `From` and `Date`
+/// must appear exactly once; `Sender`, `Reply-To`, `To`, `Cc`, `Bcc`,
+/// `Subject`, `Message-ID`, `In-Reply-To`, and `References` must not
+/// appear more than once. Case-insensitive per RFC 5322 §1.2.2.
+///
+/// Headers not listed (trace headers, `Resent-*`, `Comments`,
+/// `Keywords`, and any `X-*`/optional-field) may repeat freely under
+/// the RFC and are not checked here.
+pub fn validate_header_occurrences(headers: &[SmtpHeader]) -> Result<(), SmtpResponse> {
+    let count = |name: &str| {
+        headers
+            .iter()
+            .filter(|h| h.name.eq_ignore_ascii_case(name))
+            .count()
+    };
+    for &name in REQUIRED_EXACTLY_ONCE {
+        let c = count(name);
+        if c != 1 {
+            return Err(smtp_err(
+                SMTP_ERR_SYNTAX_ERROR,
+                format!("Header '{name}' must appear exactly once (RFC 5322 §3.6), found {c}"),
+            ));
+        }
+    }
+    for &name in ALLOWED_AT_MOST_ONCE {
+        let c = count(name);
+        if c > 1 {
+            return Err(smtp_err(
+                SMTP_ERR_SYNTAX_ERROR,
+                format!("Header '{name}' must appear at most once (RFC 5322 §3.6), found {c}"),
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -415,6 +475,163 @@ mod tests {
         let resp = validate_smtp_request(&req).unwrap_err();
         assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
         assert!(err_msg(&resp).contains("envelope"));
+    }
+
+    fn header(name: &str, value: &str) -> SmtpHeader {
+        SmtpHeader {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
+    fn message_with(headers: Vec<SmtpHeader>) -> SmtpMessage {
+        SmtpMessage {
+            headers,
+            body: ByteBuf::from(b"hi".to_vec()),
+        }
+    }
+
+    /// Minimal RFC-5322-conformant header set: From and Date present
+    /// exactly once, everything optional absent.
+    fn minimal_headers() -> Vec<SmtpHeader> {
+        vec![
+            header("From", "alice@example.com"),
+            header("Date", "Mon, 26 May 2026 12:00:00 +0000"),
+        ]
+    }
+
+    #[test]
+    fn validate_header_occurrences_minimal_ok() {
+        assert!(validate_header_occurrences(&minimal_headers()).is_ok());
+    }
+
+    #[test]
+    fn validate_header_occurrences_rejects_missing_from() {
+        let headers = vec![header("Date", "Mon, 26 May 2026 12:00:00 +0000")];
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("'From' must appear exactly once"));
+        assert!(err_msg(&resp).contains("found 0"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_rejects_missing_date() {
+        let headers = vec![header("From", "alice@example.com")];
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert!(err_msg(&resp).contains("'Date' must appear exactly once"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_rejects_duplicate_from() {
+        let mut headers = minimal_headers();
+        headers.push(header("From", "mallory@example.com"));
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert!(err_msg(&resp).contains("'From' must appear exactly once"));
+        assert!(err_msg(&resp).contains("found 2"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_rejects_duplicate_date() {
+        let mut headers = minimal_headers();
+        headers.push(header("Date", "Tue, 27 May 2026 12:00:00 +0000"));
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert!(err_msg(&resp).contains("'Date' must appear exactly once"));
+        assert!(err_msg(&resp).contains("found 2"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_rejects_duplicate_subject() {
+        // The motivating case: nonce extraction in
+        // `extract_nonce_from_subject` uses `.find()` and would silently
+        // pick the first Subject. A duplicate Subject lets a sender
+        // sign one Subject under DKIM and present another to the
+        // canister's nonce lookup. We refuse the whole message.
+        let mut headers = minimal_headers();
+        headers.push(header("Subject", "first"));
+        headers.push(header("Subject", "second"));
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert!(err_msg(&resp).contains("'Subject' must appear at most once"));
+        assert!(err_msg(&resp).contains("found 2"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_rejects_duplicate_to() {
+        let mut headers = minimal_headers();
+        headers.push(header("To", "recover@id.ai"));
+        headers.push(header("To", "register@id.ai"));
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert!(err_msg(&resp).contains("'To' must appear at most once"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_case_insensitive() {
+        // "FROM" and "from" must be counted as the same header.
+        let headers = vec![
+            header("FROM", "alice@example.com"),
+            header("from", "mallory@example.com"),
+            header("Date", "Mon, 26 May 2026 12:00:00 +0000"),
+        ];
+        let resp = validate_header_occurrences(&headers).unwrap_err();
+        assert!(err_msg(&resp).contains("'From' must appear exactly once"));
+        assert!(err_msg(&resp).contains("found 2"));
+    }
+
+    #[test]
+    fn validate_header_occurrences_allows_repeated_optional() {
+        // Optional / extension headers (X-*) may repeat freely per
+        // RFC 5322 §3.6.8.
+        let mut headers = minimal_headers();
+        headers.push(header("X-Custom", "one"));
+        headers.push(header("X-Custom", "two"));
+        headers.push(header("Comments", "a"));
+        headers.push(header("Comments", "b"));
+        assert!(validate_header_occurrences(&headers).is_ok());
+    }
+
+    #[test]
+    fn validate_header_occurrences_allows_repeated_trace() {
+        // Received and Resent-* may repeat per RFC 5322 §3.6.6 / §3.6.7.
+        let mut headers = minimal_headers();
+        headers.push(header("Received", "from a"));
+        headers.push(header("Received", "from b"));
+        headers.push(header("Resent-From", "x@example.com"));
+        headers.push(header("Resent-From", "y@example.com"));
+        assert!(validate_header_occurrences(&headers).is_ok());
+    }
+
+    #[test]
+    fn validate_header_occurrences_all_singletons_ok() {
+        // Every at-most-once header present exactly once is legal.
+        let headers = vec![
+            header("From", "alice@example.com"),
+            header("Date", "Mon, 26 May 2026 12:00:00 +0000"),
+            header("Sender", "alice@example.com"),
+            header("Reply-To", "alice@example.com"),
+            header("To", "recover@id.ai"),
+            header("Cc", "bob@example.com"),
+            header("Bcc", "carol@example.com"),
+            header("Subject", "II-Recovery-nonce"),
+            header("Message-ID", "<id@example.com>"),
+            header("In-Reply-To", "<prev@example.com>"),
+            header("References", "<prev@example.com>"),
+        ];
+        assert!(validate_header_occurrences(&headers).is_ok());
+    }
+
+    #[test]
+    fn validate_message_rejects_duplicate_subject() {
+        // End-to-end through validate_message: duplicate Subject must
+        // be rejected by the canister entrypoint via validate_message,
+        // not just by the standalone helper.
+        let msg = message_with(vec![
+            header("From", "alice@example.com"),
+            header("Date", "Mon, 26 May 2026 12:00:00 +0000"),
+            header("Subject", "first"),
+            header("Subject", "second"),
+        ]);
+        let resp = validate_message(&msg).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("'Subject' must appear at most once"));
     }
 
     #[test]
