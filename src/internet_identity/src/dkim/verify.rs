@@ -246,18 +246,19 @@ mod tests {
     // through stage 1 (well-formedness) → stage 2 (parse signatures)
     // → stage 3 (cryptographic + DMARC check), and asserts on the
     // `VerificationError.last_reason`. The new shape catches a wider
-    // class of malformed inputs (RFC violations surface earlier as
-    // `RfcError` via stage 1) but the DKIM-specific reasons asserted
+    // class of malformed inputs (wire-shape problems surface earlier
+    // as SMTP 555 via stage 1) but the DKIM-specific reasons asserted
     // here flow through stage 3 unchanged.
     // ---------------------------------------------------------------
 
     use super::super::types::VerificationFailReason;
     use crate::email_recovery::typestate::{
-        HeaderCount, RfcError, SignedSmtpRequestProjection, UnverifiedSmtpRequest,
-        VerificationContext, VerificationError, VerifiedSmtpRequest,
+        SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext,
+        VerificationError, VerifiedSmtpRequest,
     };
     use internet_identity_interface::internet_identity::types::smtp::{
-        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest,
+        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest, SmtpResponse,
+        SMTP_ERR_SYNTAX_ERROR,
     };
     use serde_bytes::ByteBuf;
 
@@ -319,11 +320,11 @@ mod tests {
     fn no_signature_surfaces_as_stage1_rfc_violation() {
         // Stage 1 catches "no DKIM-Signature" before any DKIM-layer
         // code runs. The user-visible meaning is unchanged ("no
-        // signature on this message") but the type that carries it
-        // is now `RfcError`, not `VerificationFailReason::NoSignature`
-        // — encoding the fact that this is a wire-shape problem the
-        // canister boundary can return as SMTP 555 without doing any
-        // cryptographic work.
+        // signature on this message") but the verdict now flows
+        // through `validate_smtp_request`'s SMTP 555 surface —
+        // encoding the fact that this is a wire-shape problem the
+        // canister boundary returns to the gateway without doing
+        // any cryptographic work.
         let req = SmtpRequest {
             envelope: Some(SmtpEnvelope {
                 from: addr("alice", "example.com"),
@@ -339,14 +340,13 @@ mod tests {
             }),
             gateway_flags: None,
         };
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        match err {
-            RfcError::HeaderCount {
-                header: "DKIM-Signature",
-                found: 0,
-                expected,
-            } => assert_eq!(expected, HeaderCount::AT_LEAST_ONE),
-            other => panic!("expected missing-DKIM-Signature, got {other:?}"),
+        match UnverifiedSmtpRequest::try_from(req).unwrap_err() {
+            SmtpResponse::Err(e) => {
+                assert_eq!(e.code, SMTP_ERR_SYNTAX_ERROR);
+                assert!(e.message.contains("'DKIM-Signature'"));
+                assert!(e.message.contains("at least once"));
+            }
+            other => panic!("expected SmtpResponse::Err(555), got {other:?}"),
         }
     }
 

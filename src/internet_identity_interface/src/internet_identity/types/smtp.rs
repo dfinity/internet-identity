@@ -228,9 +228,19 @@ pub fn validate_message(message: &SmtpMessage) -> Result<(), SmtpResponse> {
     Ok(())
 }
 
-/// Bounds-check both halves of an `SmtpRequest`: the envelope (always)
+/// Validate both halves of an `SmtpRequest`: the envelope (always)
 /// and the message body if present. Per the PoC review, the validate
 /// path must accept envelope-only requests for `smtp_request_validate`.
+///
+/// Covers two layers in one pass so callers don't have to compose them
+/// themselves:
+///
+/// 1. **Bounds** — address/header/body/recipient-count caps, plus
+///    envelope presence.
+/// 2. **RFC 5322 §3.6 header uniqueness** (only when a message is
+///    present): `From`/`Date`/`Subject` exactly once,
+///    `Sender`/`Reply-To`/`To`/`Cc`/`Bcc`/`Message-ID`/`In-Reply-To`/
+///    `References` at most once, `DKIM-Signature` at least once.
 pub fn validate_smtp_request(request: &SmtpRequest) -> Result<(), SmtpResponse> {
     let envelope = request
         .envelope
@@ -239,8 +249,87 @@ pub fn validate_smtp_request(request: &SmtpRequest) -> Result<(), SmtpResponse> 
     validate_envelope(envelope)?;
     if let Some(message) = &request.message {
         validate_message(message)?;
+        validate_message_header_uniqueness(message)?;
     }
     Ok(())
+}
+
+/// Header-count constraint for the RFC 5322 §3.6 well-formedness pass.
+/// Private to this module — only `validate_message_header_uniqueness`
+/// needs the type.
+#[derive(Clone, Copy)]
+struct HeaderCount {
+    min: usize,
+    max: Option<usize>,
+}
+
+impl HeaderCount {
+    const EXACTLY_ONE: Self = Self {
+        min: 1,
+        max: Some(1),
+    };
+    const AT_MOST_ONE: Self = Self {
+        min: 0,
+        max: Some(1),
+    };
+    const AT_LEAST_ONE: Self = Self { min: 1, max: None };
+
+    fn accepts(self, count: usize) -> bool {
+        count >= self.min && self.max.map(|m| count <= m).unwrap_or(true)
+    }
+}
+
+impl std::fmt::Display for HeaderCount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (self.min, self.max) {
+            (1, Some(1)) => write!(f, "exactly once"),
+            (0, Some(1)) => write!(f, "at most once"),
+            (1, None) => write!(f, "at least once"),
+            (min, Some(max)) => write!(f, "between {min} and {max} times"),
+            (min, None) => write!(f, "at least {min} times"),
+        }
+    }
+}
+
+fn validate_message_header_uniqueness(message: &SmtpMessage) -> Result<(), SmtpResponse> {
+    check_header_count(&message.headers, "From", HeaderCount::EXACTLY_ONE)?;
+    check_header_count(&message.headers, "Date", HeaderCount::EXACTLY_ONE)?;
+    check_header_count(&message.headers, "Subject", HeaderCount::EXACTLY_ONE)?;
+    for name in [
+        "Sender",
+        "Reply-To",
+        "To",
+        "Cc",
+        "Bcc",
+        "Message-ID",
+        "In-Reply-To",
+        "References",
+    ] {
+        check_header_count(&message.headers, name, HeaderCount::AT_MOST_ONE)?;
+    }
+    check_header_count(&message.headers, "DKIM-Signature", HeaderCount::AT_LEAST_ONE)?;
+    Ok(())
+}
+
+fn check_header_count(
+    headers: &[SmtpHeader],
+    name: &'static str,
+    expected: HeaderCount,
+) -> Result<(), SmtpResponse> {
+    let found = headers
+        .iter()
+        .filter(|h| h.name.eq_ignore_ascii_case(name))
+        .count();
+    if expected.accepts(found) {
+        Ok(())
+    } else {
+        Err(smtp_err(
+            SMTP_ERR_SYNTAX_ERROR,
+            format!(
+                "RFC 5322 §3.6 violation: header '{name}' must appear {expected} (found {found})"
+            ),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -428,5 +517,148 @@ mod tests {
             gateway_flags: None,
         };
         assert!(validate_smtp_request(&req).is_ok());
+    }
+
+    // --- RFC 5322 §3.6 header uniqueness ---
+
+    fn header(name: &str, value: &str) -> SmtpHeader {
+        SmtpHeader {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
+    /// Build a minimal RFC §3.6-compliant `SmtpRequest` for the
+    /// uniqueness tests. Extra headers can be appended on top of the
+    /// returned value.
+    fn well_formed_request() -> SmtpRequest {
+        SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: addr("alice", "example.com"),
+                to: vec![addr("recover", "id.ai")],
+            }),
+            message: Some(SmtpMessage {
+                headers: vec![
+                    header("From", "alice@example.com"),
+                    header("Date", "Mon, 1 Jan 2024 00:00:00 +0000"),
+                    header("Subject", "II-Recovery-deadbeefcafe1234"),
+                    header(
+                        "DKIM-Signature",
+                        "v=1; a=rsa-sha256; d=example.com; s=mail; \
+                         c=relaxed/relaxed; h=From:Subject:Date; bh=MTIzNDU2; b=YWJj",
+                    ),
+                ],
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+        }
+    }
+
+    #[test]
+    fn well_formed_request_passes_validation() {
+        assert!(validate_smtp_request(&well_formed_request()).is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_from() {
+        let mut req = well_formed_request();
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .push(header("From", "evil@elsewhere.example"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("'From'"));
+        assert!(err_msg(&resp).contains("exactly once"));
+        assert!(err_msg(&resp).contains("found 2"));
+    }
+
+    #[test]
+    fn rejects_missing_from() {
+        let mut req = well_formed_request();
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .retain(|h| !h.name.eq_ignore_ascii_case("From"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert!(err_msg(&resp).contains("'From'"));
+        assert!(err_msg(&resp).contains("found 0"));
+    }
+
+    #[test]
+    fn rejects_duplicate_date() {
+        let mut req = well_formed_request();
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .push(header("Date", "Tue, 2 Jan 2024 00:00:00 +0000"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert!(err_msg(&resp).contains("'Date'"));
+    }
+
+    #[test]
+    fn rejects_duplicate_subject() {
+        let mut req = well_formed_request();
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .push(header("Subject", "another"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert!(err_msg(&resp).contains("'Subject'"));
+    }
+
+    #[test]
+    fn rejects_duplicate_message_id() {
+        let mut req = well_formed_request();
+        let msg = req.message.as_mut().unwrap();
+        msg.headers.push(header("Message-ID", "<a@example.com>"));
+        msg.headers.push(header("Message-ID", "<b@example.com>"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert!(err_msg(&resp).contains("'Message-ID'"));
+        assert!(err_msg(&resp).contains("at most once"));
+    }
+
+    #[test]
+    fn at_most_once_headers_accept_zero_or_one() {
+        // Reply-To absent is fine.
+        assert!(validate_smtp_request(&well_formed_request()).is_ok());
+        // Reply-To once is fine.
+        let mut req = well_formed_request();
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .push(header("Reply-To", "alice-reply@example.com"));
+        assert!(validate_smtp_request(&req).is_ok());
+    }
+
+    #[test]
+    fn rejects_missing_dkim_signature_when_message_present() {
+        let mut req = well_formed_request();
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .retain(|h| !h.name.eq_ignore_ascii_case("DKIM-Signature"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert!(err_msg(&resp).contains("'DKIM-Signature'"));
+        assert!(err_msg(&resp).contains("at least once"));
+    }
+
+    #[test]
+    fn header_uniqueness_check_is_case_insensitive() {
+        let mut req = well_formed_request();
+        // Lowercase "from" must still trip the duplicate-From check.
+        req.message
+            .as_mut()
+            .unwrap()
+            .headers
+            .push(header("from", "another@example.com"));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert!(err_msg(&resp).contains("'From'"));
     }
 }

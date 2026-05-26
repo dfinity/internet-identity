@@ -252,7 +252,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // through `unverified`.
     let unverified = match UnverifiedSmtpRequest::try_from(request) {
         Ok(u) => u,
-        Err(rfc_err) => return rfc_err.into(),
+        Err(resp) => return resp,
     };
 
     // Extract the canister-issued nonce from the Subject header. If

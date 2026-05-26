@@ -301,28 +301,26 @@ fn rejects_wrong_public_key() {
 fn rejects_missing_dkim_signature_header() {
     // The DNS layer in production never delivers a message without a
     // DKIM-Signature; we exercise the negative path by stripping it.
-    // Under the typestate the rejection moves up to stage 1 — the
-    // RFC 5322 §3.6 well-formedness pass enforces ≥1 DKIM-Signature
-    // when a message is present. The visible verdict is therefore an
-    // `RfcError::HeaderCount` rather than a `VerificationFailReason`
-    // — but the meaning is the same: "we can't reason about this
-    // message because it has no signature."
-    use crate::email_recovery::typestate::{HeaderCount, RfcError};
+    // Under the typestate the rejection moves up to stage 1 —
+    // `validate_smtp_request` in the wire-types crate enforces RFC
+    // 5322 §3.6 (≥1 DKIM-Signature when a message is present), and
+    // stage 1's `TryFrom` surfaces the failure as the same
+    // `SmtpResponse::Err(555)` the gateway would receive.
+    use internet_identity_interface::internet_identity::types::smtp::{
+        SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
+    };
     let mut req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let message = req.message.as_mut().unwrap();
     message
         .headers
         .retain(|h| !h.name.eq_ignore_ascii_case("DKIM-Signature"));
-    let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-    match err {
-        RfcError::HeaderCount {
-            header: "DKIM-Signature",
-            found: 0,
-            expected,
-        } => {
-            assert_eq!(expected, HeaderCount::AT_LEAST_ONE);
+    match UnverifiedSmtpRequest::try_from(req).unwrap_err() {
+        SmtpResponse::Err(e) => {
+            assert_eq!(e.code, SMTP_ERR_SYNTAX_ERROR);
+            assert!(e.message.contains("'DKIM-Signature'"));
+            assert!(e.message.contains("at least once"));
         }
-        other => panic!("expected missing DKIM-Signature, got {other:?}"),
+        other => panic!("expected SmtpResponse::Err(555), got {other:?}"),
     }
 }
 

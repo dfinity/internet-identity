@@ -70,6 +70,9 @@ use crate::dmarc::{aligns, parse_dmarc_txt, AlignmentMode, DmarcOutcome};
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpHeader, SmtpRequest, SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
 };
+// `validate_smtp_request` (in the wire-types crate) folds bounds and
+// RFC 5322 §3.6 header-uniqueness into a single pass; stage 1 is the
+// thin typestate marker over that contract.
 
 // =========================================================================
 // Stage 1 — UnverifiedSmtpRequest
@@ -94,149 +97,17 @@ impl UnverifiedSmtpRequest {
     }
 }
 
-/// Why stage 1 rejected an `SmtpRequest`. Always maps to SMTP 555
-/// (syntax error) at the canister boundary.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RfcError {
-    /// Bounds check failed. Carries the formatted [`SmtpResponse`] from
-    /// `validate_smtp_request` so the canister boundary can return it
-    /// verbatim.
-    Bounds(SmtpResponse),
-    /// RFC 5322 §3.6 header-uniqueness violation.
-    HeaderCount {
-        header: &'static str,
-        found: usize,
-        expected: HeaderCount,
-    },
-}
-
-/// Allowed-multiplicity bound on a header name. Encoded as
-/// `(min, max)` so a single check applies to all of the RFC 5322 §3.6
-/// uniqueness classes uniformly: `EXACTLY_ONE`, `AT_MOST_ONE`, and
-/// `AT_LEAST_ONE` are predefined constants below.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct HeaderCount {
-    min: usize,
-    max: Option<usize>,
-}
-
-impl HeaderCount {
-    /// Must appear exactly once when the message is present (RFC 5322
-    /// §3.6 "originator fields" + `Subject` / `Date`).
-    pub const EXACTLY_ONE: Self = Self {
-        min: 1,
-        max: Some(1),
-    };
-    /// May be omitted, but if present must appear only once (the rest
-    /// of the §3.6 "MUST NOT occur more than once" set).
-    pub const AT_MOST_ONE: Self = Self {
-        min: 0,
-        max: Some(1),
-    };
-    /// Must appear at least once when the message is present (used for
-    /// `DKIM-Signature`).
-    pub const AT_LEAST_ONE: Self = Self { min: 1, max: None };
-
-    fn accepts(&self, count: usize) -> bool {
-        count >= self.min && self.max.map(|m| count <= m).unwrap_or(true)
-    }
-}
-
-impl std::fmt::Display for HeaderCount {
-    /// Human-readable rendering used in `RfcError → SmtpResponse` so
-    /// the gateway-facing SMTP 555 message doesn't leak the internal
-    /// `min` / `max` struct shape (`{:?}` debug output would).
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match (self.min, self.max) {
-            (1, Some(1)) => write!(f, "exactly once"),
-            (0, Some(1)) => write!(f, "at most once"),
-            (1, None) => write!(f, "at least once"),
-            // Fallback for any future constant we forget to spell out.
-            (min, Some(max)) => write!(f, "between {min} and {max} times"),
-            (min, None) => write!(f, "at least {min} times"),
-        }
-    }
-}
-
-impl From<RfcError> for SmtpResponse {
-    fn from(err: RfcError) -> SmtpResponse {
-        match err {
-            RfcError::Bounds(resp) => resp,
-            RfcError::HeaderCount {
-                header,
-                found,
-                expected,
-            } => smtp_err(
-                SMTP_ERR_SYNTAX_ERROR,
-                format!(
-                    "RFC 5322 §3.6 violation: header '{header}' appears {found} times, \
-                     expected {expected}"
-                ),
-            ),
-        }
-    }
-}
-
 impl TryFrom<SmtpRequest> for UnverifiedSmtpRequest {
-    type Error = RfcError;
+    /// Stage 1's validation contract is whatever `validate_smtp_request`
+    /// returns — bounds + RFC 5322 §3.6 header uniqueness, folded into
+    /// one pass in the wire-types crate. The error type is the
+    /// wire-shape [`SmtpResponse`] so the canister boundary can
+    /// surface it back to the gateway verbatim.
+    type Error = SmtpResponse;
 
-    fn try_from(request: SmtpRequest) -> Result<Self, RfcError> {
-        // Bounds first — preserves the existing 555 responses for
-        // oversized inputs verbatim.
-        if let Err(resp) = validate_smtp_request(&request) {
-            return Err(RfcError::Bounds(resp));
-        }
-
-        // RFC 5322 §3.6 single-occurrence enforcement, only when a
-        // message is present. `smtp_request_validate` (RCPT TO time)
-        // sends envelope-only requests and must still produce a stage-1
-        // value — those skip the header checks entirely.
-        if let Some(message) = &request.message {
-            check_count(&message.headers, "From", HeaderCount::EXACTLY_ONE)?;
-            check_count(&message.headers, "Date", HeaderCount::EXACTLY_ONE)?;
-            check_count(&message.headers, "Subject", HeaderCount::EXACTLY_ONE)?;
-
-            for name in [
-                "Sender",
-                "Reply-To",
-                "To",
-                "Cc",
-                "Bcc",
-                "Message-ID",
-                "In-Reply-To",
-                "References",
-            ] {
-                check_count(&message.headers, name, HeaderCount::AT_MOST_ONE)?;
-            }
-
-            check_count(
-                &message.headers,
-                "DKIM-Signature",
-                HeaderCount::AT_LEAST_ONE,
-            )?;
-        }
-
+    fn try_from(request: SmtpRequest) -> Result<Self, SmtpResponse> {
+        validate_smtp_request(&request)?;
         Ok(UnverifiedSmtpRequest { request })
-    }
-}
-
-fn check_count(
-    headers: &[SmtpHeader],
-    name: &'static str,
-    expected: HeaderCount,
-) -> Result<(), RfcError> {
-    let found = headers
-        .iter()
-        .filter(|h| h.name.eq_ignore_ascii_case(name))
-        .count();
-    if expected.accepts(found) {
-        Ok(())
-    } else {
-        Err(RfcError::HeaderCount {
-            header: name,
-            found,
-            expected,
-        })
     }
 }
 
@@ -954,180 +825,32 @@ mod tests {
         UnverifiedSmtpRequest::try_from(well_formed_request()).expect("well-formed must pass");
     }
 
+    /// Stage 1's full bounds + RFC 5322 §3.6 contract lives in
+    /// `validate_smtp_request` (see the wire-types crate for the
+    /// per-rule unit tests). Here we just exercise the propagation:
+    /// a validator failure must reach the caller as `SmtpResponse::Err`
+    /// with the SMTP 555 code, so the canister boundary can return it
+    /// to the gateway without further mapping.
     #[test]
-    fn stage1_rejects_duplicate_from() {
+    fn stage1_propagates_validator_failure_as_smtp_555() {
+        use internet_identity_interface::internet_identity::types::smtp::SMTP_ERR_SYNTAX_ERROR;
         let mut req = well_formed_request();
         req.message
             .as_mut()
             .unwrap()
             .headers
             .push(header("From", "evil@elsewhere.example"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RfcError::HeaderCount {
-                    header: "From",
-                    found: 2,
-                    ..
-                }
-            ),
-            "expected duplicate-From, got {err:?}"
-        );
-    }
-
-    #[test]
-    fn stage1_rejects_missing_from() {
-        let mut req = well_formed_request();
-        req.message
-            .as_mut()
-            .unwrap()
-            .headers
-            .retain(|h| !h.name.eq_ignore_ascii_case("From"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RfcError::HeaderCount {
-                    header: "From",
-                    found: 0,
-                    ..
-                }
-            ),
-            "expected missing-From, got {err:?}"
-        );
-    }
-
-    #[test]
-    fn stage1_rejects_duplicate_subject() {
-        let mut req = well_formed_request();
-        req.message
-            .as_mut()
-            .unwrap()
-            .headers
-            .push(header("Subject", "another subject"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RfcError::HeaderCount {
-                    header: "Subject",
-                    found: 2,
-                    ..
-                }
-            ),
-            "expected duplicate-Subject, got {err:?}"
-        );
-    }
-
-    #[test]
-    fn stage1_rejects_duplicate_date() {
-        let mut req = well_formed_request();
-        req.message
-            .as_mut()
-            .unwrap()
-            .headers
-            .push(header("Date", "Tue, 2 Jan 2024 00:00:00 +0000"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RfcError::HeaderCount {
-                    header: "Date",
-                    found: 2,
-                    ..
-                }
-            ),
-            "expected duplicate-Date, got {err:?}"
-        );
-    }
-
-    #[test]
-    fn stage1_rejects_duplicate_message_id() {
-        let mut req = well_formed_request();
-        let msg = req.message.as_mut().unwrap();
-        msg.headers.push(header("Message-ID", "<a@example.com>"));
-        msg.headers.push(header("Message-ID", "<b@example.com>"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RfcError::HeaderCount {
-                    header: "Message-ID",
-                    found: 2,
-                    ..
-                }
-            ),
-            "expected duplicate-Message-ID, got {err:?}"
-        );
-    }
-
-    #[test]
-    fn stage1_at_most_once_headers_allow_zero_or_one() {
-        // Reply-To absent is fine.
-        UnverifiedSmtpRequest::try_from(well_formed_request()).expect("Reply-To absent is fine");
-        // Reply-To once is fine.
-        let mut req = well_formed_request();
-        req.message
-            .as_mut()
-            .unwrap()
-            .headers
-            .push(header("Reply-To", "alice-reply@example.com"));
-        UnverifiedSmtpRequest::try_from(req).expect("Reply-To once is fine");
-    }
-
-    #[test]
-    fn stage1_rejects_missing_dkim_signature_when_message_present() {
-        let mut req = well_formed_request();
-        req.message
-            .as_mut()
-            .unwrap()
-            .headers
-            .retain(|h| !h.name.eq_ignore_ascii_case("DKIM-Signature"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        match err {
-            RfcError::HeaderCount {
-                header: "DKIM-Signature",
-                found: 0,
-                expected,
-            } => {
-                assert_eq!(expected, HeaderCount::AT_LEAST_ONE);
+        match UnverifiedSmtpRequest::try_from(req).unwrap_err() {
+            SmtpResponse::Err(e) => {
+                assert_eq!(e.code, SMTP_ERR_SYNTAX_ERROR);
+                assert!(
+                    e.message.contains("'From'"),
+                    "expected SMTP message to name 'From', got {:?}",
+                    e.message
+                );
             }
-            other => panic!("expected missing-DKIM-Signature, got {other:?}"),
+            other => panic!("expected SmtpResponse::Err, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn stage1_propagates_bounds_failure() {
-        let req = SmtpRequest {
-            envelope: None,
-            message: None,
-            gateway_flags: None,
-        };
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(matches!(err, RfcError::Bounds(_)));
-    }
-
-    #[test]
-    fn stage1_header_count_uses_case_insensitive_match() {
-        // The DKIM-Signature in the fixture uses canonical casing;
-        // adding a lowercase "from" header should still trip the
-        // duplicate-From check.
-        let mut req = well_formed_request();
-        req.message
-            .as_mut()
-            .unwrap()
-            .headers
-            .push(header("from", "another@example.com"));
-        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
-        assert!(matches!(
-            err,
-            RfcError::HeaderCount {
-                header: "From",
-                found: 2,
-                ..
-            }
-        ));
     }
 
     // --- Stage 2 tests ---
