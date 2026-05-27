@@ -112,10 +112,7 @@
   };
 
   const handleConfirmSignOutAndRemove = () => {
-    const identity = $lastUsedIdentitiesStore.selected;
-    if (identity !== undefined) {
-      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
-    }
+    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
     window.location.replace("/");
   };
 
@@ -478,14 +475,20 @@
   </Dialog>
 {/if}
 
-{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
-  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
-    <SignOutConfirmation
-      identity={$lastUsedIdentitiesStore.selected}
-      onSignOut={handleConfirmSignOut}
-      onSignOutAndRemove={handleConfirmSignOutAndRemove}
-    />
-  </Dialog>
+{#if isSignOutDialogOpen}
+  {@const currentIdentity =
+    $lastUsedIdentitiesStore.identities[
+      $authenticatedStore.identityNumber.toString()
+    ]}
+  {#if currentIdentity !== undefined}
+    <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+      <SignOutConfirmation
+        identity={currentIdentity}
+        onSignOut={handleConfirmSignOut}
+        onSignOutAndRemove={handleConfirmSignOutAndRemove}
+      />
+    </Dialog>
+  {/if}
 {/if}
 
 {#if isReauthDialogOpen}
