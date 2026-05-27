@@ -146,12 +146,17 @@ resolve_release_tag() {
 }
 
 # Generate per-canister "What's Changed" section using proposal tags as baselines.
-# Falls back to the GitHub-generated changelog if no proposal tags exist.
+# Falls back to the GitHub-generated changelog if either lookup couldn't confirm
+# a baseline — `|| true` would conflate "no executed tag" with "transient API
+# failure", letting a partial per-canister changelog silently hide one side's
+# changes when only the other side resolved.
 section_changelog=$(mktemp)
-LAST_BACKEND_TAG=$(latest_executed_proposal_tag backend || true)
-LAST_FRONTEND_TAG=$(latest_executed_proposal_tag frontend || true)
+BACKEND_OK=1
+LAST_BACKEND_TAG=$(latest_executed_proposal_tag backend) || BACKEND_OK=0
+FRONTEND_OK=1
+LAST_FRONTEND_TAG=$(latest_executed_proposal_tag frontend) || FRONTEND_OK=0
 
-if [ -n "$LAST_BACKEND_TAG" ] || [ -n "$LAST_FRONTEND_TAG" ]; then
+if [ "$BACKEND_OK" = "1" ] && [ "$FRONTEND_OK" = "1" ]; then
   >&2 echo "Generating per-canister changelog (backend baseline: ${LAST_BACKEND_TAG:-none}, frontend baseline: ${LAST_FRONTEND_TAG:-none})"
   echo "## What's Changed" >> "$section_changelog"
   echo "" >> "$section_changelog"
@@ -188,7 +193,7 @@ if [ -n "$LAST_BACKEND_TAG" ] || [ -n "$LAST_FRONTEND_TAG" ]; then
     fi
   fi
 else
-  >&2 echo "No proposal tags found, using GitHub-generated changelog"
+  >&2 echo "Could not resolve both baselines (backend ok=${BACKEND_OK}, frontend ok=${FRONTEND_OK}); using GitHub-generated changelog"
   echo "$INPUT_CHANGELOG" > "$section_changelog"
 fi
 

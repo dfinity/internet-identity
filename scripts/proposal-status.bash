@@ -25,10 +25,12 @@ nns_proposal_status() {
 
 # Walk `proposal-<role>-*` tags newest→oldest and print the first whose
 # NNS status is EXECUTED.
-# Exit 0 + tag on stdout → found
-# Exit 1                 → no EXECUTED tag (genuine empty / all
-#                          rejected, OR API failures). Stderr says
-#                          which, so callers can phrase prompts.
+# Exit 0 + tag on stdout → confirmed EXECUTED with no unreachable tags above
+# Exit 1                 → no usable baseline: genuine empty / all rejected /
+#                          API failures, including the stale-baseline guard
+#                          where an EXECUTED tag was found below a tag whose
+#                          status couldn't be confirmed. Stderr says which,
+#                          so callers can phrase prompts.
 # Bounded at 20 tags scanned: the executed baseline is always within
 # the most recent handful and this keeps API load trivially small.
 # Args: $1 = "backend" | "frontend"
@@ -41,7 +43,17 @@ latest_executed_proposal_tag() {
     [[ "$id" =~ ^[0-9]+$ ]] && [ "$id" -ge 100000 ] || continue
     if status=$(nns_proposal_status "$id"); then
       seen_success=1
-      [ "$status" = "EXECUTED" ] && { echo "$tag"; return 0; }
+      if [ "$status" = "EXECUTED" ]; then
+        if [ "$seen_transient" = "1" ]; then
+          # A newer tag's status couldn't be confirmed, so we can't tell
+          # if it was actually EXECUTED. Returning this older tag would
+          # silently use a stale baseline — let the caller fall back.
+          echo "Refusing ${tag} as baseline: a newer tag's NNS status was unreachable, ${tag} may be stale." >&2
+          return 1
+        fi
+        echo "$tag"
+        return 0
+      fi
       echo "Skipping ${tag} (status: ${status})" >&2
     else
       seen_transient=1
