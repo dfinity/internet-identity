@@ -1,7 +1,7 @@
 # Production-ready OpenID & SSO
 
 **Status:** Draft — RFC for review. No code yet; this doc supersedes the SSO allowlist gate as the path to production.
-**Last updated:** 2026-05-18
+**Last updated:** 2026-05-27
 **Targets:** A series of independent and stacked PRs; see §9 for the dependency layout.
 
 ---
@@ -22,7 +22,7 @@
 | **FedCM** | Federated Credential Management — browser-native API (`navigator.credentials.get`). Delivers JWTs to the page directly without a popup or redirect. Untouched by this design (see §2). |
 | **`response_mode`** | OAuth parameter controlling how the IdP returns the response. `fragment` puts it in the redirect URL hash (today); `form_post` POSTs it as a form body (proposed). |
 | **Anchor** | The II identity number. Maps to passkeys, OpenID credentials (`OpenIdCredential`), and other authn methods. |
-| **`salt` / `session_pk`** | FE-side artifacts. `salt` is 32 random bytes; `session_pk` is the FE's session public key. `nonce = SHA256(salt | session_pk)` is what the FE puts in the authorize URL. The canister recomputes and matches against the JWT's `nonce` claim, gated on `caller()` equaling the session principal — see §3. |
+| **`salt` / `session_pk`** | FE-side artifacts. `salt` is 32 random bytes; `session_pk` is the FE's session public key. `nonce = SHA256(salt &#124; session_pk)` is what the FE puts in the authorize URL. The canister recomputes and matches against the JWT's `nonce` claim, gated on `caller()` equaling the session principal — see §3. |
 | **HTTP outcall** | The IC's `http_request_with_closure` management API. Replicated across consensus nodes; deterministic via a transform function. |
 | **Boundary node** | The HTTPS gateway in front of canister calls. Trusted to terminate TLS but **not** trusted to preserve message integrity beyond what certification provides. |
 
@@ -96,7 +96,7 @@ Without all three, no actor (boundary node, MITM, replicating outcall transport,
 
 | Change | Effect on trust model |
 | ------ | --------------------- |
-| Stateless verifier + cache (§4, §5) | None. The verifier still runs `SHA256(salt | caller()) == jwt.nonce` against `caller()` from a signed ingress message. The cache holds JWKS + discovery results, not JWTs or salts. |
+| Stateless verifier + cache (§4, §5) | None. The verifier still runs `SHA256(salt &#124; caller()) == jwt.nonce` against `caller()` from a signed ingress message. The cache holds JWKS + discovery results, not JWTs or salts. |
 | `max_response_bytes` + tighter transforms (§6) | Mitigates cycle-drain and OOM risk from a malicious SSO IdP serving giant or malformed bodies. No effect on JWT redemption. |
 | `response_mode=form_post` (§7) | Adds a new canister POST handler. The handler is anonymous (the POST comes from the IdP, not the user), so it does **not** receive an authenticated `caller()` and cannot itself redeem the JWT. It is a transport translator: parse the form body, return certified HTML, hand off to the FE. The FE then runs the existing salt+nonce+`caller()` flow. |
 | Allowlist removal (§8) | Adds an anonymous `discover_sso(domain)` endpoint. A malicious caller can request discovery for arbitrary domains, which fans out HTTP outcalls. Bounded by per-outcall cycle ceiling (§6) and cache LRU cap (§5). No effect on JWT redemption. |
@@ -105,7 +105,7 @@ Without all three, no actor (boundary node, MITM, replicating outcall transport,
 
 1. **MITM substitutes a different JWT on the way back from the IdP.** A different JWT has a different `nonce`; redemption requires `SHA256(salt | caller()) == jwt.nonce`. Without `salt` and without the session_sk, the attacker can't construct a JWT/principal pair that matches.
 2. **Boundary node tampers with the `form_post` POST response.** The canister POST handler responds via update mode, so the response is certified. A tampered response is rejected by the HTTP gateway.
-3. **Boundary node lies about discovery / JWKS responses** to influence which key verifies a JWT. The HTTP outcall is replicated across consensus nodes; a single node can't unilaterally inject. We further constrain via `max_response_bytes` and transform validation (§6).
+3. **Upstream network intermediary tampers with discovery / JWKS responses** to influence which key verifies a JWT. HTTPS outcalls are replicated — each replica fetches independently and consensus requires the (transform-applied) response to match across all of them, so a single tampered path is dropped. We further constrain via `max_response_bytes` and transform validation (§6).
 4. **Cache-miss flood from anonymous `discover_sso` calls.** Bounded by (a) the per-outcall cycle cost cap, (b) LRU eviction past the cache size limit (older entries fall out under sustained pressure, sustaining repeat work for the attacker), and (c) standard replicated-outcall pricing on the IC. The doc does not propose additional per-caller rate limiting; if that becomes necessary, it is added at the gating layer, not the architecture layer.
 5. **Replay of a stolen `(jwt, salt)` pair from a different session.** Already defended today: the JWT's `nonce` was computed with the original session's principal, so `caller()` from a different session won't match.
 
@@ -113,7 +113,7 @@ Without all three, no actor (boundary node, MITM, replicating outcall transport,
 
 - Compromise of the IdP's signing key. Every credential issued by that IdP is at risk; that is the unavoidable trust assumption of any OIDC integration.
 - Compromise of the user's device / browser that holds the session_sk. Standard endpoint compromise — out of scope.
-- Phishing the user into completing an OAuth flow on a malicious site impersonating Internet Identity. This is the standard "website phishing" problem; we don't try to solve it in this layer.
+- Phishing the user into completing an OAuth flow on a malicious site impersonating Internet Identity. This is the standard "website phishing" problem; we don't try to solve it in this layer. The II-specific `<discovery_domain>/.well-known/ii-openid-configuration` file is a soft mitigation against a *registered SSO* being phishable — an attacker can't trivially pose as an existing SSO without controlling that domain's `.well-known/` path — but it does not defend against a user being lured to a fake II frontend.
 
 ---
 
@@ -162,7 +162,7 @@ These are data, not behavior. The `verify()` body is essentially the same in bot
 
 ### 4.3 Solution: data-only registry, free-function verify
 
-Collapse the three collections into one:
+Collapse the three collections into one. The word **"Direct"** in the type name is deliberate: this registry holds providers **configured directly at boot from `open_id_configs`** (Google / Microsoft / Apple) — i.e. the opposite of SSO. SSO domains are never in this registry; their resolved config lives only in the cache (§5).
 
 ```rust
 pub struct DirectProviderConfig {
@@ -245,21 +245,29 @@ The reviewer comment at `generic.rs:422-425` flags the first cost as the blocker
 
 ### 5.2 Solution: on-demand fetch behind an LRU cache with dedup
 
-A single globally-shared cache, sized by an LRU cap (§5.4), used by every JWT verification across every caller. Two instances: one keyed by `discovery_domain` (holds the combined hop-1 + hop-2 result), one keyed by `jwks_uri` (holds the parsed `Vec<Jwk>`). Both shapes are identical:
+**Two caches**, both globally shared (not per-anchor) and used by every JWT verification:
+
+- `cache.discovery` — keyed by `discovery_domain`, holds the combined hop-1 + hop-2 result.
+- `cache.jwks` — keyed by `jwks_uri`, holds the parsed `Vec<Jwk>`.
+
+Both share the same shape:
 
 ```rust
 pub struct BoundedLruDedupCache<K, V> {
     entries:  HashMap<K, CacheEntry<V>>,
     lru:      VecDeque<K>,        // most-recently-used at the back
-    capacity: usize,              // 1000 (§5.4)
+    capacity: usize,              // 100 (§5.4)
 }
 
 enum CacheEntry<V> {
     /// Fetched and currently usable.
     Done { value: V, expires_at_secs: u64 },
-    /// First caller is fetching; concurrent arrivals register their `Waker`
-    /// here and resume when the fetch publishes a result.
-    Pending { wakers: Vec<Waker>, started_at_secs: u64 },
+    /// First caller is fetching; concurrent arrivals register a subscriber
+    /// here and are notified when the fetch publishes a result. Implemented
+    /// using the same `Waker`-backed primitive as `src/internet_identity/
+    /// src/doh/cache.rs` — a subscriber is a Rust async task `Waker`
+    /// captured when the future first polls Pending.
+    Pending { subscribers: Vec<Waker>, started_at_secs: u64 },
 }
 ```
 
@@ -267,10 +275,54 @@ One key, one entry. When a caller looks up a domain or `jwks_uri`:
 
 - `Done` and fresh → `Hit(value)`. Touch the LRU order, return immediately.
 - `Done` and expired → evict, transition to `Pending`, return `Fetch(token)` to the caller. The caller does the outcall, calls `publish(token, result)`.
-- `Pending` → return `Wait(future)`. The future polls `entries[key]`; when the first caller publishes, the state flips to `Done` and every registered waker fires. All waiters get the same bytes from the same outcall.
+- `Pending` → return `Wait(future)`. The future polls `entries[key]`; when the first caller publishes, the state flips to `Done` and every registered subscriber is woken. All waiters get the same bytes from the same outcall.
 - Absent → transition to `Pending`, return `Fetch(token)`. Same as the expired path.
 
-`Pending` entries older than `PENDING_STALE_AFTER_SECS = 120 s` are treated as abandoned (the publisher trapped post-`.await`); the next caller evicts and starts over, waking any orphaned waiters with an error so they don't hang.
+`Pending` entries older than `PENDING_STALE_AFTER_SECS = 120 s` are treated as abandoned (the publisher trapped post-`.await`); the next caller evicts and starts over, waking any orphaned subscribers with an error so they don't hang.
+
+#### 5.2.1 Lifecycle of one SSO
+
+The diagram traces a single SSO domain (`acme.com`) through cache miss → warm hit → TTL expiry → eviction. The discovery and JWKS caches behave identically; this shows the discovery cache.
+
+```mermaid
+sequenceDiagram
+    actor User1
+    actor User2
+    actor User3
+    actor User4
+    participant V as verify_jwt
+    participant C as cache.discovery
+    participant IdP as acme.com
+    Note over C: cache empty
+    User1->>V: openid_credential_add(jwt, salt, "acme.com")
+    V->>C: lookup("acme.com")
+    C-->>V: Fetch(token) — cold miss
+    V->>IdP: GET /.well-known/ii-openid-configuration
+    IdP-->>V: hop-1 body
+    V->>IdP: GET /.well-known/openid-configuration
+    IdP-->>V: hop-2 body
+    V->>C: publish(token, Done{value, expires_at = now+1h})
+    V-->>User1: Ok(credential)
+    Note over C: acme.com → Done, fresh
+    User2->>V: openid_credential_add(...)
+    V->>C: lookup("acme.com")
+    C-->>V: Hit(value) — warm
+    V-->>User2: Ok(credential) (no outcalls)
+    Note over C: 70 minutes pass — entry expired
+    User3->>V: openid_credential_add(...)
+    V->>C: lookup("acme.com")
+    C-->>V: Fetch(token) — expired, re-fetch
+    V->>IdP: hop-1 + hop-2
+    IdP-->>V: fresh data
+    V->>C: publish(token, Done{...})
+    V-->>User3: Ok(credential)
+    Note over C: 100+ other SSOs accessed, acme.com falls off the LRU tail
+    User4->>V: openid_credential_add(...)
+    V->>C: lookup("acme.com")
+    C-->>V: Fetch(token) — evicted, cold path again
+```
+
+The `cache.jwks` lookup that follows step 2 of every flow above is identical in shape — keyed by `jwks_uri` instead of `discovery_domain`.
 
 ### 5.3 Verification flow
 
@@ -301,23 +353,14 @@ For Direct providers (Google/Microsoft/Apple): step 1–2 are replaced by a CONF
 
 ### 5.4 Cache sizing and TTL
 
-1000 entries per cache. Each entry covers one SSO domain (or one `jwks_uri`) across every user of that SSO — the cache is global, not per-anchor — so 1000 is the simultaneous-hot-SSO cap, not the user count. At ~5 KB per entry that's ~10 MB across both caches, vs. the canister's 3 GB heap budget. LRU eviction takes care of the long tail of rarely-used SSOs.
+Start at **100 entries per cache**, tune up if telemetry (§11) shows non-trivial miss rates. Each entry covers one SSO domain (or one `jwks_uri`) across every user of that SSO — the cache is global, not per-anchor — so 100 is the simultaneous-hot-SSO cap, not the user count. At ~5 KB per entry that's ~1 MB across both caches, vs. the canister's 3 GB heap budget. LRU eviction takes care of the long tail of rarely-used SSOs.
 
 ```rust
-pub const DISCOVERY_CACHE_CAPACITY: usize = 1000;
-pub const JWKS_CACHE_CAPACITY:      usize = 1000;
+pub const DISCOVERY_CACHE_CAPACITY: usize = 100;
+pub const JWKS_CACHE_CAPACITY:      usize = 100;
 ```
 
-Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache headers we've observed, and is well under the JWKS rotation window of every mainstream IdP (Google rotates ~every 4–6 h; Microsoft daily; Apple monthly). On TTL lapse, the next verifier call observes the entry as expired and re-fetches inline — same code path as a cold start.
-
-Numbers tunable; they live in two consts in the cache module:
-
-```rust
-pub const DISCOVERY_CACHE_CAPACITY: usize = 1000;
-pub const JWKS_CACHE_CAPACITY:      usize = 1000;
-```
-
-Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache headers we've observed, and matches the JWKS rotation window of every mainstream IdP (Google rotates ~every 4–6 h; Microsoft daily; Apple monthly). On TTL lapse, the next verifier call observes a cache miss and re-fetches — same code path as a cold start.
+Entry TTL: 1 hour for both. Matches the upstream OIDC discovery doc cache headers we've observed, and is well under the JWKS rotation window of every mainstream IdP (Google rotates ~every 4–6 h; Microsoft daily; Apple monthly). On TTL lapse, the next verifier call observes the entry as expired (per `CacheEntry::Done { expires_at_secs }` from §5.2 — checked inline on every `lookup`) and re-fetches inline, same code path as a cold start.
 
 ### 5.5 What goes away
 
@@ -333,7 +376,13 @@ Today's worst case: ~30 Gcycles per outcall × ~6 outcalls/h × N providers = ~1
 
 Proposed worst case at steady state with a hot cache: ~0 cycles/h (no scheduled outcalls). Per-sign-in cost: ~30 Gcycles on cache miss (cold), ~0 on cache hit (warm). Multiplied by sign-in volume rather than provider count.
 
-For DoS analysis (anonymous `discover_sso` flood): N attacker calls × ~60 Gcycles per cold path (hop-1 + hop-2 + JWKS fetch) = ~60N Gcycles. Bounded by per-call cycle accounting (§6) and the IC's existing reject-on-low-cycles behaviour.
+For DoS analysis (anonymous `discover_sso` flood): II runs on a **system subnet**, so the "reject-on-low-cycles" pressure model used on application subnets does not apply — cycle exhaustion is not the relevant failure mode. The structural defenses are instead:
+
+1. **Per-call cycle ceilings from §6** (~5 Gcycles per hop-2 / JWKS call after the `max_response_bytes` cap). One cold-path discovery costs ~11 Gcycles total. A sustained 1 RPS flood costs ~38 Tcycles/h — measurable, not crippling.
+2. **LRU cap (§5.4)** forces an attacker hammering distinct domains to do repeat work — each domain is at best a single cache slot they can hold, and only by continuing to call faster than other traffic evicts them.
+3. **Boundary node throttling** is the policy lever if a real flood materialises. The HTTPS gateway in front of canister calls can rate-limit per-IP / per-canister; this is not exercised by today's traffic but is the right layer to engage if needed (see §10 open question).
+
+The cache-miss-flood entry in §3.3 is the canonical analysis of this attack — repeated here at the cycle level to show the per-replica cost is bounded.
 
 ---
 
@@ -412,13 +461,45 @@ This is a tightening of today's blanket 30 G allocation, so a cache-miss flood c
 
 ### 6.3 What's deliberately not done
 
-- **TLS certificate pinning.** The IC's HTTPS outcall layer terminates TLS at the boundary node; we trust the gateway's certificate chain. Pinning per-SSO certs would require an out-of-band trust anchor distribution, which is the kind of governance question (§2) we're explicitly punting on.
+- **TLS certificate pinning.** HTTPS outcalls run independently from each replica directly to the SSO origin (no boundary node in the outcall path); each replica verifies the upstream cert against the public CA system, and consensus requires every replica to see a matching (transform-applied) response. We rely on the public CA system as the trust anchor. Pinning per-SSO certs would require an out-of-band trust anchor distribution, which is the kind of governance question (§2) we're explicitly punting on.
 - **Response-header inspection.** We strip headers in the transform; we don't use `Cache-Control` to drive our TTL (we hardcode 1 h, see §5.4). This mirrors today's behaviour and avoids a malicious IdP serving `Cache-Control: max-age=100000000` to pin a poisoned key indefinitely.
 - **HEAD-before-GET to size-check.** Two outcalls instead of one would double the steady-state cost. The `max_response_bytes` cap is the cleaner defense.
 
 ---
 
 ## 7. Problem 4 — Fragment callback
+
+### 7.0 TL;DR
+
+1. **Today**: the IdP redirects to `id.ai/callback#id_token=…&state=…`. JS reads the URL hash and forwards the token to the opener via BroadcastChannel. Apple Sign In drops `name`/`email` claims under fragment; OAuth 2.1 drops fragment-mode entirely.
+2. **Proposed**: the IdP POSTs `{id_token, state}` as a form body to the canister's `/callback`. The canister handles the POST in **update mode** (so the response is certified) and returns an HTML page that delivers `{id_token, state}` to the FE — via `BroadcastChannel` for the popup case, via `sessionStorage` for the same-tab case. The FE then runs the existing salt + nonce + `caller()` flow against the canister's JWT-consuming API methods.
+3. **Why the canister can't just consume the JWT itself**: the form_post POST arrives anonymously (it's the IdP making the request, not the user), so the canister doesn't see a `caller()` it can match against the JWT's nonce. The salt+nonce+`caller()` binding from §3 requires a signed ingress message from the user's session. The canister's POST handler is a **transport translator** — parse, certify, hand off.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Opener as Opener tab (id.ai)
+    participant Popup as Popup window
+    participant IdP as SSO IdP
+    participant Canister as II canister
+    User->>Opener: clicks "Sign in with Acme"
+    Opener->>Popup: window.open(authURL with response_mode=form_post)
+    Popup->>IdP: GET /authorize?...
+    User->>IdP: authenticates
+    IdP->>Canister: POST /callback (form: id_token, state)
+    Note over Canister: update mode → response is certified
+    Canister->>Canister: validate form body
+    Canister-->>IdP: 200 + certified HTML (script reads {id_token, state})
+    IdP-->>Popup: 200 (HTML forwarded as the POST response)
+    Popup->>Popup: parse JSON-embedded {id_token, state}
+    Popup->>Opener: BroadcastChannel("redirect_callback")
+    Popup-->>Popup: window.close()
+    Opener->>Canister: openid_credential_add(jwt, salt, "acme.com") (signed ingress)
+    Note over Canister: salt + nonce + caller() flow from §3
+    Canister-->>Opener: Ok(credential)
+```
+
+For the same-tab (no-opener) variant, the popup steps collapse: the canister's HTML script writes `{id_token, state}` into `sessionStorage` and navigates to `/authorize?flow=openid-resume`, which reads from sessionStorage instead of a BroadcastChannel.
 
 ### 7.1 What it looks like today
 
@@ -437,7 +518,7 @@ For 1-click / top-level navigation (`authorize/+page.svelte:120-134`), the flow 
 
 Two concrete drivers:
 
-1. **Apple Sign In does not return `name` and `email` claims under `response_mode=fragment`.** It returns them only under `response_mode=form_post`, and only once per user (the first time they authorise the app). Today's flow silently loses these fields on Apple, forcing the FE to display an empty profile or prompt the user manually. This is the operational driver — not a theoretical compatibility argument.
+1. **Apple Sign In does not return `name` and `email` claims under `response_mode=fragment`.** It returns them only under `response_mode=form_post`, and only once per user (the first time they authorise the app). Today's flow silently loses these fields on Apple, forcing the FE to display an empty profile or prompt the user manually. This is the operational driver — not a theoretical compatibility argument. *Manually confirmed against Apple Sign In during early SSO investigation.*
 2. **`response_mode=fragment` interacts badly with OIDC providers that strictly implement the hybrid flow (`response_type=code id_token`).** Okta and Auth0 either reject `fragment` outright for hybrid responses or emit it with subtle deviations (`id_token` placement, error response shape). Apple Sign In deprecates it. OAuth 2.1 drops the implicit / fragment-mode response types from the spec entirely. Without form_post, we're tied to whichever subset of providers honours the legacy mode.
 
 There's also a passive privacy cost: the id_token sitting in the URL fragment is visible to any JS that runs on the callback page (including potentially-stale extensions, dev tools, error-tracking scripts), it survives in browser history if the page isn't replaced, and the `Referer` header strips fragments but not all third-party tooling cooperates. Form_post puts the token in a POST body — never in any URL the browser navigates to.
@@ -596,7 +677,8 @@ Add one method, drop one, change four signatures.
 **Added.**
 
 ```candid
-discover_sso : (text) -> (DiscoverySsoResult);
+discover_sso       : (text) -> (DiscoverySsoResult);
+discover_sso_query : (text) -> (opt DiscoverySsoResult) query;
 
 type DiscoverySsoResult = record {
     discovery_domain       : text;
@@ -609,6 +691,8 @@ type DiscoverySsoResult = record {
 ```
 
 `discover_sso(domain)` is an `#[update]` (because it may trigger outcalls on a cache miss). It anonymously runs the two-hop discovery via the cache and returns every field the FE needs to build the IdP authorize URL — `client_id`, `issuer`, `authorization_endpoint`, `scopes_supported`, optional `name`. The FE no longer fetches anything from the SSO domain itself: the canister is the single point of contact with `<discovery_domain>/.well-known/ii-openid-configuration` and the upstream OIDC provider, both for the discovery the FE needs at sign-in start and for the JWT verification later. On a warm cache, this returns in ~2-4 s (the update-call round-trip, no outcall). On a cold cache, ~5-8 s (two outcalls in sequence).
+
+`discover_sso_query(domain)` is the query-mode shortcut: it returns `Some(result)` if the cache already holds a fresh entry for `domain`, or `None` on miss / expired / pending. The FE calls this first and only falls back to the update method if it returns `None`. On a warm cache this is a ~100-300 ms certified query — the user sees no progress spinner. On a miss, the FE falls through to `discover_sso` and surfaces a spinner (see §8.7).
 
 The same outcalls that satisfy `discover_sso` populate the cache that the JWT verification path consults — so a successful `discover_sso` followed by `openid_prepare_delegation` / `openid_credential_add` skips the discovery outcall on the verify step and only pays for JWKS.
 
@@ -657,18 +741,87 @@ Both removals are upgrade-safe: serde tolerates missing fields with `#[serde(def
 
 ### 8.5 Credential storage delta
 
-`OpenIdCredential` (in `src/internet_identity_interface/src/internet_identity/types/openid.rs`) gains an `sso_domain: Option<String>` field stamped at credential creation time. Today this is computed at response time via `openid::generic::sso_fields_for(iss, aud)`, which reverse-scans `DISCOVERY_TASKS`. With `DISCOVERY_TASKS` gone, the runtime lookup has nothing to scan, so we move the value onto the stored credential.
+The storage `OpenIdCredential` (at `src/internet_identity/src/openid.rs:83`) gains two fields:
 
-`sso_fields_for` becomes a struct-field read instead of a thread-local scan. Callers in `storage::storable` that today call `sso_fields_for(&c.iss, &c.aud)` read `c.sso_domain` directly.
+```rust
+pub struct OpenIdCredential {
+    pub iss: Iss,
+    pub sub: Sub,
+    pub aud: Aud,
+    pub last_usage_timestamp: Option<Timestamp>,
+    pub metadata: HashMap<String, MetadataEntryV2>,
+    pub sso_domain: Option<String>,   // NEW — None for direct providers; Some(domain) for SSO
+    pub sso_name:   Option<String>,   // NEW — human label served at hop-1 (may be None even for SSO)
+}
+```
+
+Today these values are computed at response time via `openid::generic::sso_fields_for(iss, aud)`, which reverse-scans `DISCOVERY_TASKS`. After this change, the runtime lookup goes away and the values are stamped onto the stored credential at creation.
+
+`sso_fields_for` becomes a struct-field read instead of a thread-local scan. Callers in `storage::storable` that today call `sso_fields_for(&c.iss, &c.aud)` read `c.sso_domain` / `c.sso_name` directly. New credentials created during the SSO flow have these fields stamped at creation using the in-memory `sso_fields_for` lookup that exists today.
 
 ### 8.6 Migration
 
-Existing credentials in stable storage have no `sso_domain` stamp. There are two upgrade-time approaches:
+Existing credentials in stable storage have no `sso_domain` / `sso_name` stamp. The mapping `(iss, aud) → (discovery_domain, name)` that we'd need to backfill them lives **only** in `DISCOVERY_TASKS` today — and `DISCOVERY_TASKS` is a thread-local rebuilt by the timer after every canister upgrade. It is not authoritative across the boundary we need to cross.
 
-- **Backfill from `OIDC_CONFIGS`.** The upgrade hook reads the about-to-be-deleted `persistent_state.oidc_configs`. For each registered domain, it runs the discovery cache lookup (cold, so triggers outcalls — this could be deferred until the cache is warm post-upgrade). Then iterates credentials, looking for any whose `iss + aud` matches a discovered provider, and stamps `sso_domain` on each. One-shot, runs in `post_upgrade`. Risk: discovery outcalls from an upgrade hook are unusual; if the upgrade fails the canister rolls back, which is the safe failure mode.
-- **Lazy backfill.** Existing credentials keep `sso_domain = None`. The FE supplies `discovery_domain` on the next use of each credential. The canister, on successful JWT verification with `Some(domain)`, stamps `sso_domain = domain` on the matching stored credential. Slower convergence; no upgrade-time outcalls; works for credentials that are actually used.
+Migration is therefore the **first PR in the rollout** (PR-M, §9). It's a separate, narrow change that lands before any of the architecture tracks. The shape:
 
-The doc proposes **lazy backfill** as the safer option: the only credentials that need their `sso_domain` stamped are credentials that are ever used again, and lazy backfill handles those naturally without an upgrade-time outcall storm. Credentials that are never used again don't matter.
+**1. Storage gains `sso_domain` and `sso_name`** (see §8.5). New credentials stamp them at creation via the existing `sso_fields_for` lookup. No behavior change for users.
+
+**2. New init/upgrade arg field:**
+
+```rust
+pub struct SsoCredentialMigrationEntry {
+    pub discovery_domain: String,
+    pub issuer:           String,  // matches jwt.iss
+    pub client_id:        String,  // matches jwt.aud
+    pub sso_name:         Option<String>,
+}
+
+// On the existing InternetIdentityInit / upgrade arg struct:
+pub sso_credential_migration: Option<Vec<SsoCredentialMigrationEntry>>,
+```
+
+**3. `post_upgrade` consumes the arg.** If `sso_credential_migration = Some(entries)`, iterate every `OpenIdCredential` in stable storage; for each one with `sso_domain.is_none()`, look up `(iss, aud)` in `entries` (linear scan is fine — `entries` is the registered-SSO count, currently small), stamp `sso_domain` and `sso_name` if a match is found. Already-stamped credentials are skipped — the migration is idempotent.
+
+**4. Deployer workflow.** Before submitting the upgrade proposal, the deployer queries the running canister's existing `discovered_oidc_configs` query, which returns `Vec<OidcConfig { discovery_domain, client_id, issuer, name, ... }>` — the resolved view of every registered SSO. Transcribe into `sso_credential_migration` and embed in the NNS upgrade proposal. The proposal itself is the audit trail of which credentials get re-keyed:
+
+```mermaid
+sequenceDiagram
+    actor Deployer
+    participant Canister as Running canister (pre-M)
+    participant NNS as NNS
+    participant Storage as Stable storage
+    Note over Canister: DISCOVERY_TASKS warm, OIDC_CONFIGS holds domains
+    Deployer->>Canister: dfx canister call discovered_oidc_configs '()'
+    Canister-->>Deployer: [(domain, issuer, client_id, name), …]
+    Deployer->>Deployer: build sso_credential_migration from result
+    Deployer->>NNS: file upgrade proposal (PR-M wasm + migration arg)
+    NNS->>NNS: vote passes
+    NNS->>Canister: install_code(args = upgrade { sso_credential_migration: Some([…]) })
+    Note over Canister: post_upgrade runs
+    Canister->>Storage: iterate OpenIdCredentials where sso_domain.is_none()
+    loop For each unstamped credential
+        Canister->>Canister: match (iss, aud) against migration entries
+        alt match found
+            Canister->>Storage: stamp sso_domain + sso_name
+        else no match
+            Note right of Canister: leave None (FE renders bare iss)
+        end
+    end
+    Note over Canister: future upgrades pass None — no-op
+```
+
+**Edge cases:**
+
+| Case | Handling |
+| ---- | -------- |
+| Registered SSO whose discovery was failing when the deployer ran the pre-flight query | Missing from the arg → credential stays `sso_domain = None` → FE renders bare `iss` (matches today's behavior when `DISCOVERY_TASKS` doesn't have the entry). Deployer can re-query later and re-submit a follow-up upgrade with the corrected arg. |
+| Deployer forgets a domain | Same as above — recoverable by re-running with corrected arg. |
+| New credential created between PR-M deploy and a later upgrade | Stamped at creation via the in-memory `sso_fields_for` path. No backfill needed. |
+| Re-running the migration | Idempotent on `sso_domain.is_some()` — only `None` credentials are visited. |
+| Direct-provider credentials (Google/Microsoft/Apple) | `sso_domain` stays `None` by design. The migration entries don't include direct providers; only SSO domains. |
+
+After PR-M lands, every existing SSO credential is stamped from authoritative data captured at a known point in time. Tracks A / B / C1…C3 proceed without further migration concern. C2 can delete `DISCOVERY_TASKS` and `sso_fields_for` without worrying about old credentials. The `sso_credential_migration` field stays in the arg type forever (defaults to `None`); the type can be retired in a later cleanup PR once the team is confident no further migrations are needed.
 
 ### 8.7 FE changes from the API delta
 
@@ -678,29 +831,48 @@ The doc proposes **lazy backfill** as the safer option: the only credentials tha
 
 The FE-side simplification has its own cost: `discover_sso` is an update call (~2-4 s warm, ~5-8 s cold) whereas the FE's direct fetches today are ~200-500 ms when the SSO host is fast. For the input-debounce UX in `SignInWithSso.svelte` we accept this tradeoff — the user only ever runs discovery once per SSO before signing in, and the canister-cache means subsequent runs (same domain or other users on the same domain) hit the warm path.
 
+**Progress indication.** The FE calls `discover_sso_query` first; on `Some(result)` it proceeds immediately, no spinner. On `None` it falls through to the `discover_sso` update call and renders a `Resolving acme.com…` spinner with a soft cancel control. The same spinner also fires the `sso_signin_discovery_cold` plausible event (§11) so we can correlate user-perceived latency with cold-cache rate. The cold-path latency is the dominant user-perceived cost of canister-side discovery; visual feedback turns a perceived hang into a known-quantity wait.
+
 ---
 
 ## 9. Rollout
 
 ### 9.1 Dependency layout
 
+```mermaid
+graph TD
+    M["PR-M — Credential migration (§8.5, §8.6)<br/>storage gains sso_domain + sso_name<br/>+ sso_credential_migration upgrade arg"]
+    A["PR-A — form_post + FE delivery (§7)"]
+    B["PR-B — outcall safety (§6)"]
+    C1["PR-C1 — cache module (§5)"]
+    C2["PR-C2 — verify_jwt + remove DISCOVERY_TASKS (§4, §5)"]
+    C3["PR-C3 — API reshape + allowlist removal (§8)"]
+    M ==> C2
+    C1 --> C2
+    C2 --> C3
+    M -.-> A
+    M -.-> B
+```
+
 | Track | Scope | Depends on | Parallel with |
 | ----- | ----- | ---------- | ------------- |
-| **A** | §7. Form_post: `http_request_update`, FE BroadcastChannel/sessionStorage delivery, `extractIdTokenFromCallback` + `resumeOpenId` rewrites. | — | B, C |
-| **B** | §6. Outcall safety: `max_response_bytes` caps, transform validation, per-call cycle ceilings. | — | A, C |
-| **C1** | §5. Cache module: `BoundedLruDedupCache<K, V>`, capacity consts, dedup tests. | — | A, B |
-| **C2** | §4. Wire cache into a new `verify_jwt` free function; remove `OpenIdProvider` trait, `Vec<Box<dyn _>>`, `init_discovery_timers`, `schedule_fetch_certs`, `DISCOVERY_TASKS`. | C1 | A, B |
-| **C3** | §8. Drop allowlist + persistent `OIDC_CONFIGS` / `sso_discoverable_domains`. Add `discover_sso`. Update four API methods to take `discovery_domain: opt text`. Stamp `sso_domain` on new credentials. | C2 | A, B |
-| **C4** | §8.6. Lazy backfill: canister stamps `sso_domain` on existing credentials on first successful use post-upgrade. | C3 | A, B |
+| **M** | §8.5 + §8.6. Storage adds `sso_domain` + `sso_name`. Stamp on new credentials. Add `sso_credential_migration` upgrade arg. `post_upgrade` backfills existing credentials from arg. **Lands first.** | — | (nothing depends on M except the architecture tracks landing after it) |
+| **A** | §7. Form_post: `http_request_update`, FE BroadcastChannel/sessionStorage delivery, `extractIdTokenFromCallback` + `resumeOpenId` rewrites. | M (soft) | B, C |
+| **B** | §6. Outcall safety: `max_response_bytes` caps, transform validation, per-call cycle ceilings. | M (soft) | A, C |
+| **C1** | §5. Cache module: `BoundedLruDedupCache<K, V>`, capacity consts, dedup tests. | M (soft) | A, B |
+| **C2** | §4. Wire cache into a new `verify_jwt` free function; remove `OpenIdProvider` trait, `Vec<Box<dyn _>>`, `init_discovery_timers`, `schedule_fetch_certs`, `DISCOVERY_TASKS`. | **M (hard)**, C1 | A, B |
+| **C3** | §8. Drop allowlist + persistent `OIDC_CONFIGS` / `sso_discoverable_domains`. Add `discover_sso` / `discover_sso_query`. Update four API methods to take `discovery_domain: opt text`. | C2 | A, B |
+
+**Soft vs hard dependencies.** A/B/C1 don't *technically* require M, but landing M first keeps `main` releasable at every step (no half-migrated state where storage and runtime diverge). C2 is a **hard** dependency on M: it deletes `DISCOVERY_TASKS`, and `sso_fields_for` can't reverse-scan it any more — so every credential must already carry its `sso_domain` from PR-M.
 
 Independent surfaces in the codebase:
 
+- M touches `src/internet_identity/src/openid.rs` (storage struct), the `InternetIdentityInit` arg type, `post_upgrade`, and any test fixtures that build `OpenIdCredential`s.
 - A touches `src/internet_identity/src/http.rs` (new POST route + update handler), `src/frontend/src/lib/utils/openID.ts` and `src/frontend/src/routes/(new-styling)/callback/+page.svelte` + `authorize/+page.svelte`.
 - B touches the three `http_request_with_closure` call sites in `src/internet_identity/src/openid/generic.rs`. Standalone diff in the existing architecture.
 - C1 adds a new file `src/internet_identity/src/openid/cache.rs`.
 - C2 rewrites `src/internet_identity/src/openid.rs` and `src/internet_identity/src/openid/generic.rs`.
 - C3 changes the Candid surface (`internet_identity.did`), the four call sites in `main.rs`, the FE actor type, and `PersistentState`.
-- C4 is one branch on the existing `verify_jwt` path.
 
 If B lands before C2, C2 inherits B's caps in the rewritten outcall sites. If C2 lands first, B retargets to the new sites. Either order works.
 
@@ -708,27 +880,30 @@ If B lands before C2, C2 inherits B's caps in the rewritten outcall sites. If C2
 
 ```text
 Day 0:
-  PR-A (form_post + FE delivery rewrite)     — opens, reviews on its own track.
-  PR-B (outcall safety)                       — opens, small, lands fast.
-  PR-C1 (cache module + tests)                — opens.
+  PR-M  (credential storage + migration arg)  — opens first, narrow review,
+                                                lands ahead of everything else.
+                                                NNS upgrade proposal carries the
+                                                sso_credential_migration arg.
 
 Day 0+N:
-  PR-C2 (cache wiring + provider refactor)    — opens after C1 lands.
+  PR-A  (form_post + FE delivery rewrite)     — opens once M is in.
+  PR-B  (outcall safety)                       — opens once M is in. Small, lands fast.
+  PR-C1 (cache module + tests)                 — opens once M is in.
 
 Day 0+2N:
+  PR-C2 (cache wiring + provider refactor)    — opens after M + C1 land.
+
+Day 0+3N:
   PR-C3 (API reshape, allowlist removal)      — opens after C2 lands.
                                                 Stacked FE PR opens at the same time
                                                 or in the same PR.
-
-Day 0+3N:
-  PR-C4 (lazy backfill)                       — opens after C3 lands.
 ```
 
-A and B can land any time, in any order, mid-stack. They don't gate C.
+A and B can land any time, in any order, after M, but before C2 they're standalone improvements; they don't gate C.
 
 ### 9.3 What changes when this all lands
 
-- Heap memory from registered SSOs: O(cache_size) ≤ ~20 MB.
+- Heap memory from registered SSOs: O(cache_size) ≤ ~2 MB at the starting 100-entry cap.
 - Background outcall fanout: zero. Discovery and JWKS fetching are sign-in-driven.
 - Apple Sign In returns name + email. Okta / Auth0 / Keycloak / Authelia / generic OIDC become viable without per-IdP workarounds for fragment-mode quirks.
 - Anonymous `discover_sso` lets any user point II at any OIDC-compliant SSO. No admin step.
@@ -739,18 +914,58 @@ A and B can land any time, in any order, mid-stack. They don't gate C.
 
 - The salt + nonce + `caller()` JWT redemption binding.
 - FedCM as the preferred path where the browser supports it.
-- `OpenIdCredential` `(iss, sub, aud)` storage keying. The schema gains an optional `sso_domain` field; existing data is upgrade-safe.
+- `OpenIdCredential` `(iss, sub, aud)` storage keying. The schema gains optional `sso_domain` and `sso_name` fields; existing data is migrated by PR-M.
 - The shape of `openid_credential_remove`, the attribute-sharing layer, the wizard flows.
 
 ---
 
 ## 10. Open questions
 
-- **Cache size revisit.** 1000 entries per cache is a guess based on "1000 simultaneously-hot SSOs is more than we expect" and "10 MB total heap is comfortably under budget." Once we have telemetry on real-world miss rates we should revisit. If miss rate is non-trivial we either raise the cap or shorten the TTL — both have cycle-budget implications.
-- **TTL on `Pending` entries.** `PENDING_STALE_AFTER_SECS = 120 s` is comfortable for IC HTTP outcalls under normal conditions; if we see verifier latency spikes above that floor we'd revisit.
-- **Lazy backfill convergence.** Credentials that are never used again never get `sso_domain` stamped. The metadata layer (`sso_fields_for` callers) gracefully handles `None` today (renders as the bare domain or falls through to the direct-provider config), so this is not a functional problem — but a future cleanup pass could backfill in bulk if telemetry shows long-tailed credentials hampering attribute-sharing UX.
+- **Cache size revisit.** Starting cap is 100 per cache (conservative); telemetry from §11 (`oidc_cache_hits_total / oidc_cache_misses_total` ratio over a 1-week window, evictions per hour) drives the decision to raise. If miss rate stays under, say, 5% we leave it; if it climbs we either raise the cap or shorten the TTL.
+- **TTL on `Pending` entries.** `PENDING_STALE_AFTER_SECS = 120 s` is comfortable for IC HTTP outcalls under normal conditions. The §11 `oidc_outcall_duration_seconds` histogram is the metric that drives revisits: if the 99p climbs near 120 s we lower the timeout or widen the stale-after window depending on which way the latency tail goes.
+- **Residual unstamped credentials post-migration.** If PR-M misses an SSO (failing discovery at snapshot time, deployer error), credentials for that domain stay `sso_domain = None`. The metadata layer handles `None` today (renders the bare iss), so this is not a functional break — but a follow-up upgrade with a corrected `sso_credential_migration` arg can stamp the residual.
 - **`response_mode=form_post` and FedCM coexistence.** Today's `requestJWT` falls back to popup when FedCM isn't available. Form_post applies only to the popup path. If a future FedCM upgrade adds a redirect fallback we'd revisit; for now the two paths are independent.
-- **Direct provider JWKS cache behaviour.** Hardcoded providers' JWKS today is fetched eagerly at canister bring-up via `Provider::create`. Under §5 it becomes lazy on first sign-in attempt. First-after-deploy sign-in pays one cache-miss outcall. Acceptable, but worth flagging in the rollout notes.
-- **Boundary node throttling.** The IC HTTPS gateway has its own rate-limiting; we haven't measured how anonymous `discover_sso` calls interact with whatever per-canister or per-IP throttle is in effect. Worth testing pre-launch with a synthetic flood.
+- **Direct provider JWKS cache behaviour.** Hardcoded providers' JWKS today is fetched eagerly at canister bring-up via `Provider::create`. Under §5 it becomes lazy on first sign-in attempt. First-after-deploy sign-in pays one cache-miss outcall — masked from the user by the `discover_sso_query` shortcut for the SSO path, but direct providers don't go through `discover_sso`, so the cold-pay hits the JWT verification call itself. Acceptable but worth flagging in the rollout notes.
+- **Boundary node throttling.** The IC HTTPS gateway has its own rate-limiting; we haven't measured how anonymous `discover_sso` calls interact with whatever per-canister or per-IP throttle is in effect. Worth testing pre-launch with a synthetic flood. Tied to the DoS analysis reframing in §5.6.
+
+---
+
+## 11. Observability
+
+The architecture removes the timer-driven cache-warming background, so cold-cache latency surfaces directly on user-perceived sign-in time. Without telemetry, we can't tell a warm canister from a cold one, or detect when the cap (§5.4) is too tight. The metrics below are the load-bearing ones; the §10 open questions reference them by name.
+
+### 11.1 Cache health (gauges + counters)
+
+| Metric | Type | Labels | Purpose |
+| ------ | ---- | ------ | ------- |
+| `oidc_cache_entries` | gauge | `cache="discovery" \| "jwks"`, `state="done" \| "pending"` | Current cache occupancy. Watches for cap saturation (`done` near `100`) and pending-storm pathology (`pending` non-trivially > 0 for sustained periods). |
+| `oidc_cache_hits_total` | counter | `cache` | Numerator of the hit-rate ratio. |
+| `oidc_cache_misses_total` | counter | `cache`, `reason="cold" \| "expired" \| "evicted"` | Denominator — `cold` is a never-seen domain, `expired` is TTL lapse, `evicted` is LRU pressure. The split tells us whether to raise the cap (much `evicted`) or extend the TTL (much `expired`). |
+| `oidc_cache_evictions_total` | counter | `cache` | Cap-pressure signal. Climbing trends are the trigger to raise the cap. |
+
+### 11.2 SSO credential distribution (histograms)
+
+| Metric | Type | Labels | Purpose |
+| ------ | ---- | ------ | ------- |
+| `oidc_sso_credentials_per_domain` | histogram | — | Number of `OpenIdCredential`s grouped by `sso_domain`. Reports tail-thickness of registered SSOs (do users actually use the long tail?). Drives whether the cap can stay low. Bonus per L749 reviewer. |
+| `oidc_outcall_duration_seconds` | histogram | `hop="1" \| "2" \| "jwks"` | Latency of each outcall hop. Drives the `PENDING_STALE_AFTER_SECS` decision in §10 and lets us correlate user-perceived cold latency with backend cause. |
+
+### 11.3 Plausible funnels
+
+Existing `sso_signin_started` / `sso_signin_completed` events stay. New events:
+
+- `sso_signin_discovery_cold` — emitted when the FE has to call `discover_sso` (update mode) because `discover_sso_query` returned `None`. Lets us measure how often users experience the cold-cache spinner described in §8.7.
+- `sso_signin_discovery_query_hit` — emitted on the warm path. Numerator of the warm-rate from the user's perspective.
+
+These feed the §10 "Cache size revisit" decision — high cold-rate is the trigger to raise the cap.
+
+### 11.4 Migration verification (one-shot)
+
+For PR-M specifically, two metrics are added temporarily:
+
+- `oidc_credential_migration_total` — gauge of the count of credentials successfully stamped during `post_upgrade`. Read once post-upgrade, then unchanged.
+- `oidc_credential_unstamped_total` — gauge of credentials with `sso_domain = None` that we'd expect to be stamped (i.e. that match a known SSO `iss`/`aud` pattern but missed the migration arg). Drives the §10 residual question.
+
+Both can be retired once we're satisfied migration is complete and the team is confident no further upgrades will carry the arg.
 
 cc @aterga
