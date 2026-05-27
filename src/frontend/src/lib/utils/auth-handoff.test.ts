@@ -38,7 +38,6 @@ const stubReceiveWindow = (params: {
       pathname: "/manage",
       search: "",
     },
-    history: { replaceState: vi.fn() },
     addEventListener:
       messageListeners !== undefined
         ? (type: string, listener: EventListenerOrEventListenerObject) => {

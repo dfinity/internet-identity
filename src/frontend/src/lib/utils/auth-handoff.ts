@@ -131,7 +131,10 @@ export function sendAuthToOpenedTab(
       const receiverDer = fromBase64(
         event.data.publicKeyDer,
       ) as DerEncodedPublicKey;
+
+      console.log(receiverDer);
       const receiverPublicKey = { toDer: () => receiverDer };
+      console.log(receiverPublicKey);
 
       const newChain = await DelegationChain.create(
         auth.identity,
@@ -142,8 +145,10 @@ export function sendAuthToOpenedTab(
           targets: [canisterId],
         },
       );
+      console.log("New delegation chain created:", newChain);
 
       if (!cancelled) {
+        console.log("Sending auth payload to opened tab...", auth);
         const payload: AuthHandoffPayload = {
           type: MSG_AUTH,
           identityNumber: auth.identityNumber.toString(),
@@ -186,23 +191,12 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
-  const hashParams = new URLSearchParams(window.location.hash.slice(1));
-  const nonce = hashParams.get(HANDOFF_HASH_KEY);
+  const nonce = new URLSearchParams(window.location.hash.slice(1)).get(
+    HANDOFF_HASH_KEY,
+  );
   if (nonce === null) {
     return Promise.resolve(null);
   }
-
-  // Strip the nonce from the URL before any async work so it never reaches
-  // the address bar or navigation history.
-  hashParams.delete(HANDOFF_HASH_KEY);
-  const remainingHash = hashParams.toString();
-  history.replaceState(
-    history.state,
-    "",
-    window.location.pathname +
-      window.location.search +
-      (remainingHash.length > 0 ? `#${remainingHash}` : ""),
-  );
 
   return new Promise((resolve) => {
     let settled = false;
