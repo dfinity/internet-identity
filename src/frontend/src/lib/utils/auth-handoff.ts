@@ -4,8 +4,10 @@ import {
   ECDSAKeyIdentity,
   isDelegationValid,
 } from "@icp-sdk/core/identity";
+import type { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import type { Authenticated } from "$lib/stores/authentication.store";
+import { canisterId } from "$lib/globals";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
 
 const MSG_READY = "ii-handoff:ready";
@@ -14,20 +16,12 @@ const MSG_AUTH = "ii-handoff:auth";
 interface AuthHandoffReady {
   type: typeof MSG_READY;
   nonce: string;
-}
-
-// Nonce in the new tab's URL fragment; opener requires a match before sending JWK.
-export const HANDOFF_HASH_KEY = "h";
-
-export function generateHandoffNonce(): string {
-  return crypto.randomUUID();
+  publicKeyDer: string;
 }
 
 interface AuthHandoffPayload {
   type: typeof MSG_AUTH;
   identityNumber: string;
-  sessionPrivateJwk: JsonWebKey;
-  sessionPublicJwk: JsonWebKey;
   chainJson: string;
   authMethod: SerializedAuthMethod;
 }
@@ -38,6 +32,13 @@ type SerializedAuthMethod =
   | { kind: "recoveryPhrase"; principal: string }
   | { kind: "emailRecovery"; principal: string };
 
+// Nonce in the new tab's URL fragment; opener requires a match before sending auth.
+export const HANDOFF_HASH_KEY = "h";
+
+export function generateHandoffNonce(): string {
+  return crypto.randomUUID();
+}
+
 function isAuthHandoffReady(data: unknown): data is AuthHandoffReady {
   return (
     typeof data === "object" &&
@@ -45,7 +46,9 @@ function isAuthHandoffReady(data: unknown): data is AuthHandoffReady {
     "type" in data &&
     data.type === MSG_READY &&
     "nonce" in data &&
-    typeof data.nonce === "string"
+    typeof data.nonce === "string" &&
+    "publicKeyDer" in data &&
+    typeof data.publicKeyDer === "string"
   );
 }
 
@@ -101,70 +104,6 @@ function deserializeAuthMethod(
   };
 }
 
-export async function serializeAuth(
-  auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
-): Promise<AuthHandoffPayload> {
-  // SDK exposes no public accessor for the inner ECDSAKeyIdentity.
-  const inner = (auth.identity as unknown as { _inner: ECDSAKeyIdentity })
-    ._inner;
-  const keyPair = inner.getKeyPair();
-  const sessionPrivateJwk = await crypto.subtle.exportKey(
-    "jwk",
-    keyPair.privateKey,
-  );
-  const sessionPublicJwk = await crypto.subtle.exportKey(
-    "jwk",
-    keyPair.publicKey,
-  );
-  const chainJson = JSON.stringify(auth.identity.getDelegation().toJSON());
-
-  return {
-    type: MSG_AUTH,
-    identityNumber: auth.identityNumber.toString(),
-    sessionPrivateJwk,
-    sessionPublicJwk,
-    chainJson,
-    authMethod: serializeAuthMethod(auth.authMethod),
-  };
-}
-
-export async function deserializeAuth(
-  payload: AuthHandoffPayload,
-): Promise<Omit<Authenticated, "agent" | "actor" | "salt" | "nonce"> | null> {
-  try {
-    const privateKey = await crypto.subtle.importKey(
-      "jwk",
-      payload.sessionPrivateJwk,
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["sign"],
-    );
-    const publicKey = await crypto.subtle.importKey(
-      "jwk",
-      payload.sessionPublicJwk,
-      { name: "ECDSA", namedCurve: "P-256" },
-      true,
-      ["verify"],
-    );
-    const inner = await ECDSAKeyIdentity.fromKeyPair({ privateKey, publicKey });
-    const chain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
-
-    if (!isDelegationValid(chain)) {
-      return null;
-    }
-
-    const identity = DelegationIdentity.fromDelegation(inner, chain);
-
-    return {
-      identityNumber: BigInt(payload.identityNumber),
-      identity,
-      authMethod: deserializeAuthMethod(payload.authMethod),
-    };
-  } catch {
-    return null;
-  }
-}
-
 export function sendAuthToOpenedTab(
   target: Window,
   auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
@@ -172,7 +111,6 @@ export function sendAuthToOpenedTab(
   timeoutMs = 2000,
 ): { cancel: () => void } {
   let cancelled = false;
-  const payloadPromise = serializeAuth(auth).catch(() => undefined);
 
   const listener = async (event: MessageEvent) => {
     if (
@@ -184,9 +122,38 @@ export function sendAuthToOpenedTab(
       return;
     }
     cleanup();
-    const payload = await payloadPromise;
-    if (!cancelled && payload !== undefined) {
-      target.postMessage(payload, location.origin);
+
+    if (cancelled) {
+      return;
+    }
+
+    try {
+      const receiverDer = fromBase64(
+        event.data.publicKeyDer,
+      ) as DerEncodedPublicKey;
+      const receiverPublicKey = { toDer: () => receiverDer };
+
+      const newChain = await DelegationChain.create(
+        auth.identity,
+        receiverPublicKey,
+        new Date(Date.now() + 30 * 60 * 1000),
+        {
+          previous: auth.identity.getDelegation(),
+          targets: [canisterId],
+        },
+      );
+
+      if (!cancelled) {
+        const payload: AuthHandoffPayload = {
+          type: MSG_AUTH,
+          identityNumber: auth.identityNumber.toString(),
+          chainJson: JSON.stringify(newChain.toJSON()),
+          authMethod: serializeAuthMethod(auth.authMethod),
+        };
+        target.postMessage(payload, location.origin);
+      }
+    } catch {
+      // Chain creation failed — receiver will time out and fall back to login.
     }
   };
 
@@ -225,7 +192,8 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
-  // Eager strip; manage layout does the definitive cleanup in afterNavigate.
+  // Strip the nonce from the URL before any async work so it never reaches
+  // the address bar or navigation history.
   hashParams.delete(HANDOFF_HASH_KEY);
   const remainingHash = hashParams.toString();
   history.replaceState(
@@ -238,6 +206,7 @@ export function receiveAuthFromOpener({
 
   return new Promise((resolve) => {
     let settled = false;
+    let localInnerKey: ECDSAKeyIdentity | undefined;
 
     const settle = (
       value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce"> | null,
@@ -251,7 +220,7 @@ export function receiveAuthFromOpener({
       resolve(value);
     };
 
-    const listener = async (event: MessageEvent) => {
+    const listener = (event: MessageEvent) => {
       if (
         event.source !== opener ||
         event.origin !== location.origin ||
@@ -259,17 +228,58 @@ export function receiveAuthFromOpener({
       ) {
         return;
       }
-      const auth = await deserializeAuth(event.data);
-      settle(auth);
+
+      const innerKey = localInnerKey;
+      if (innerKey === undefined) {
+        settle(null);
+        return;
+      }
+
+      try {
+        const chain = DelegationChain.fromJSON(
+          JSON.parse(event.data.chainJson) as Parameters<
+            typeof DelegationChain.fromJSON
+          >[0],
+        );
+
+        if (!isDelegationValid(chain)) {
+          settle(null);
+          return;
+        }
+
+        const identity = DelegationIdentity.fromDelegation(innerKey, chain);
+
+        settle({
+          identityNumber: BigInt(event.data.identityNumber),
+          identity,
+          authMethod: deserializeAuthMethod(event.data.authMethod),
+        });
+      } catch {
+        settle(null);
+      }
     };
 
     window.addEventListener("message", listener);
 
     const timer = setTimeout(() => settle(null), timeoutMs);
 
-    opener.postMessage(
-      { type: MSG_READY, nonce } satisfies AuthHandoffReady,
-      location.origin,
-    );
+    ECDSAKeyIdentity.generate({ extractable: false })
+      .then((innerKey) => {
+        if (settled) {
+          return;
+        }
+        localInnerKey = innerKey;
+        const derKey = innerKey.getPublicKey().toDer();
+
+        opener.postMessage(
+          {
+            type: MSG_READY,
+            nonce,
+            publicKeyDer: toBase64(derKey),
+          } satisfies AuthHandoffReady,
+          location.origin,
+        );
+      })
+      .catch(() => settle(null));
   });
 }

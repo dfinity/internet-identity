@@ -12,13 +12,8 @@ export const authenticateWithSession = async ({
   session: Pick<Session, "identity">;
   expiration?: number;
 }): Promise<DelegationIdentity> => {
-  // Extractable so the auth-handoff utility can export the JWK pair when
-  // passing the delegation to a new tab (e.g. "Manage your Internet Identity"
-  // popover → cold /manage tab). XSS with code execution can already sign
-  // with the identity, so the extractability flag adds no meaningful guard
-  // against that threat model.
   const targetIdentity = await ECDSAKeyIdentity.generate({
-    extractable: true,
+    extractable: false,
   });
   const delegation = await DelegationChain.create(
     session.identity,

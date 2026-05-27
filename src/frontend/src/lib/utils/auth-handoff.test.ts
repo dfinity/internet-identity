@@ -2,18 +2,26 @@ import {
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
+  isDelegationValid,
 } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
-  deserializeAuth,
   generateHandoffNonce,
   receiveAuthFromOpener,
   sendAuthToOpenedTab,
-  serializeAuth,
 } from "./auth-handoff";
+import { toBase64 } from "./utils";
 
 const TEST_NONCE = "test-nonce-123";
+const TEST_CANISTER_ID = "rdmx6-jaaaa-aaaaa-aaadq-cai";
+
+vi.mock("$lib/globals", () => {
+  // vi.mock is hoisted — use require() to avoid TDZ issues with top-level consts.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Principal } = require("@icp-sdk/core/principal");
+  return { canisterId: Principal.fromText("rdmx6-jaaaa-aaaaa-aaadq-cai") };
+});
 
 const stubReceiveWindow = (params: {
   opener: { closed: boolean; postMessage: ReturnType<typeof vi.fn> } | null;
@@ -42,6 +50,7 @@ const stubReceiveWindow = (params: {
     removeEventListener: vi.fn(),
   });
 };
+
 import type { Authenticated } from "$lib/stores/authentication.store";
 
 type AuthWithoutAgentActor = Omit<
@@ -49,169 +58,391 @@ type AuthWithoutAgentActor = Omit<
   "agent" | "actor" | "salt" | "nonce"
 >;
 
-async function makeIdentity(): Promise<{
-  inner: ECDSAKeyIdentity;
-  chain: DelegationChain;
-  identity: DelegationIdentity;
-}> {
-  const signer = await ECDSAKeyIdentity.generate({ extractable: true });
-  const session = await ECDSAKeyIdentity.generate({ extractable: true });
+async function makeOpenerAuth(
+  authMethod?: AuthWithoutAgentActor["authMethod"],
+): Promise<AuthWithoutAgentActor> {
+  const root = await ECDSAKeyIdentity.generate({ extractable: false });
+  const session = await ECDSAKeyIdentity.generate({ extractable: false });
   const chain = await DelegationChain.create(
-    signer,
+    root,
     session.getPublicKey(),
     new Date(Date.now() + 30 * 60 * 1000),
   );
   const identity = DelegationIdentity.fromDelegation(session, chain);
-  return { inner: session, chain, identity };
+  return {
+    identityNumber: BigInt(42),
+    identity,
+    authMethod: authMethod ?? {
+      openid: { iss: "https://accounts.google.com", sub: "u1" },
+    },
+  };
 }
 
-describe("serializeAuth / deserializeAuth round-trip", () => {
-  it("passkey authMethod — credentialId bytes preserved", async () => {
-    const { identity } = await makeIdentity();
-    const credentialId = new Uint8Array([1, 2, 3, 4, 5, 6]);
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(12345),
-      identity,
-      authMethod: { passkey: { credentialId } },
-    };
+async function makeReceiverKey(): Promise<{
+  innerKey: ECDSAKeyIdentity;
+  publicKeyDer: string;
+}> {
+  const innerKey = await ECDSAKeyIdentity.generate({ extractable: false });
+  const publicKeyDer = toBase64(innerKey.getPublicKey().toDer());
+  return { innerKey, publicKeyDer };
+}
 
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
+function stubSenderWindow(
+  messageListeners: ((e: MessageEvent) => void)[],
+): void {
+  vi.stubGlobal("location", { origin: "https://id.ai" });
+  vi.stubGlobal("window", {
+    ...window,
+    location: { origin: "https://id.ai" },
+    addEventListener: (
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+    ) => {
+      if (type === "message") {
+        messageListeners.push(listener as (e: MessageEvent) => void);
+      }
+    },
+    removeEventListener: vi.fn(),
+  });
+}
 
-    expect(restored).not.toBeNull();
-    expect(restored!.authMethod).toEqual({ passkey: { credentialId } });
+async function fireReadyAndWait(
+  messageListeners: ((e: MessageEvent) => void)[],
+  targetWindow: { postMessage: ReturnType<typeof vi.fn> },
+  publicKeyDer: string,
+  nonce = TEST_NONCE,
+): Promise<void> {
+  const readyEvent = new MessageEvent("message", {
+    data: { type: "ii-handoff:ready", nonce, publicKeyDer },
+    origin: "https://id.ai",
+    source: targetWindow as unknown as Window,
+  });
+  for (const listener of messageListeners) {
+    listener(readyEvent);
+  }
+  await vi.waitUntil(() => targetWindow.postMessage.mock.calls.length > 0, {
+    timeout: 1500,
+  });
+}
+
+describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("openid authMethod — iss and sub preserved", async () => {
-    const { identity } = await makeIdentity();
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(99),
-      identity,
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "12345678" },
-      },
-    };
+  it("round-trip with passkey authMethod — receiver builds valid DelegationIdentity", async () => {
+    const credentialId = new Uint8Array([1, 2, 3, 4, 5]);
+    const auth = await makeOpenerAuth({ passkey: { credentialId } });
+    const { innerKey, publicKeyDer } = await makeReceiverKey();
 
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
 
-    expect(restored).not.toBeNull();
-    expect(restored!.authMethod).toEqual({
-      openid: { iss: "https://accounts.google.com", sub: "12345678" },
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
+
+    const [payload] = targetWindow.postMessage.mock.calls[0];
+    expect(payload.type).toBe("ii-handoff:auth");
+
+    const newChain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
+    expect(isDelegationValid(newChain)).toBe(true);
+
+    const receiverIdentity = DelegationIdentity.fromDelegation(
+      innerKey,
+      newChain,
+    );
+    expect(receiverIdentity.getPrincipal().toText()).toBe(
+      auth.identity.getPrincipal().toText(),
+    );
+    expect(payload.authMethod).toEqual({
+      kind: "passkey",
+      credentialId: expect.any(String),
     });
-  });
+    expect(payload.identityNumber).toBe("42");
+  }, 2000);
 
-  it("recoveryPhrase authMethod — principal preserved", async () => {
-    const { identity } = await makeIdentity();
-    const principal = Principal.fromText("2vxsx-fae");
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(1),
-      identity,
-      authMethod: { recoveryPhrase: { principal } },
-    };
+  it("round-trip with openid authMethod — principal preserved", async () => {
+    const auth = await makeOpenerAuth({
+      openid: { iss: "https://accounts.google.com", sub: "u1" },
+    });
+    const { innerKey, publicKeyDer } = await makeReceiverKey();
 
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
 
-    expect(restored).not.toBeNull();
-    expect(restored!.authMethod).toEqual({ recoveryPhrase: { principal } });
-  });
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
-  it("emailRecovery authMethod — principal preserved", async () => {
-    const { identity } = await makeIdentity();
-    const principal = Principal.fromText("2vxsx-fae");
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(1),
-      identity,
-      authMethod: { emailRecovery: { principal } },
-    };
-
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
-
-    expect(restored).not.toBeNull();
-    expect(restored!.authMethod).toEqual({ emailRecovery: { principal } });
-  });
-
-  it("DelegationChain publicKey survives serialize → deserialize", async () => {
-    const { chain, identity } = await makeIdentity();
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(7),
-      identity,
-      authMethod: {
-        openid: { iss: "https://appleid.apple.com", sub: "abc" },
-      },
-    };
-
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
-
-    expect(restored).not.toBeNull();
-    const restoredChain = restored!.identity.getDelegation();
-    expect(Array.from(restoredChain.publicKey)).toEqual(
-      Array.from(chain.publicKey),
+    const [payload] = targetWindow.postMessage.mock.calls[0];
+    const newChain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
+    const receiverIdentity = DelegationIdentity.fromDelegation(
+      innerKey,
+      newChain,
     );
-  });
-
-  it("restored identity has the same getPrincipal() as the original", async () => {
-    const { identity } = await makeIdentity();
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(42),
-      identity,
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "xyz" },
-      },
-    };
-
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
-
-    expect(restored).not.toBeNull();
-    expect(restored!.identity.getPrincipal().toText()).toBe(
-      identity.getPrincipal().toText(),
+    expect(receiverIdentity.getPrincipal().toText()).toBe(
+      auth.identity.getPrincipal().toText(),
     );
-  });
+    expect(payload.authMethod).toEqual({
+      kind: "openid",
+      iss: "https://accounts.google.com",
+      sub: "u1",
+    });
+  }, 2000);
 
-  it("identityNumber preserved for a large bigint", async () => {
-    const { identity } = await makeIdentity();
-    const bigNumber = BigInt("9999999999999999");
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: bigNumber,
-      identity,
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "big" },
-      },
-    };
+  it("round-trip with recoveryPhrase authMethod", async () => {
+    const auth = await makeOpenerAuth({
+      recoveryPhrase: { principal: Principal.fromText("2vxsx-fae") },
+    });
+    const { publicKeyDer } = await makeReceiverKey();
 
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
 
-    expect(restored).not.toBeNull();
-    expect(restored!.identityNumber).toBe(bigNumber);
-  });
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
-  it("deserializeAuth returns null for an expired delegation", async () => {
-    const signer = await ECDSAKeyIdentity.generate({ extractable: true });
-    const session = await ECDSAKeyIdentity.generate({ extractable: true });
-    const chain = await DelegationChain.create(
-      signer,
+    const [payload] = targetWindow.postMessage.mock.calls[0];
+    expect(payload.authMethod).toEqual({
+      kind: "recoveryPhrase",
+      principal: "2vxsx-fae",
+    });
+  }, 2000);
+
+  it("round-trip with emailRecovery authMethod", async () => {
+    const auth = await makeOpenerAuth({
+      emailRecovery: { principal: Principal.fromText("2vxsx-fae") },
+    });
+    const { publicKeyDer } = await makeReceiverKey();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
+
+    const [payload] = targetWindow.postMessage.mock.calls[0];
+    expect(payload.authMethod).toEqual({
+      kind: "emailRecovery",
+      principal: "2vxsx-fae",
+    });
+  }, 2000);
+
+  it("new chain has targets set to the II canister principal", async () => {
+    const auth = await makeOpenerAuth();
+    const { publicKeyDer } = await makeReceiverKey();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
+
+    const [payload] = targetWindow.postMessage.mock.calls[0];
+    const newChain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
+
+    const lastDelegation =
+      newChain.delegations[newChain.delegations.length - 1];
+    expect(lastDelegation.delegation.targets).toBeDefined();
+    const targets = lastDelegation.delegation.targets!;
+    expect(targets.length).toBe(1);
+    expect(targets[0].toText()).toBe(TEST_CANISTER_ID);
+  }, 2000);
+
+  it("new chain expiration is within 30 minutes from now", async () => {
+    const auth = await makeOpenerAuth();
+    const { publicKeyDer } = await makeReceiverKey();
+    const before = Date.now();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
+
+    const [payload] = targetWindow.postMessage.mock.calls[0];
+    const newChain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
+
+    const lastDelegation =
+      newChain.delegations[newChain.delegations.length - 1];
+    const expirationMs = Number(
+      lastDelegation.delegation.expiration / BigInt(1_000_000),
+    );
+    expect(expirationMs).toBeGreaterThan(before);
+    expect(expirationMs).toBeLessThanOrEqual(before + 30 * 60 * 1000 + 1000);
+  }, 2000);
+
+  it("expired root delegation — receiver gets an invalid chain", async () => {
+    const root = await ECDSAKeyIdentity.generate({ extractable: false });
+    const session = await ECDSAKeyIdentity.generate({ extractable: false });
+    const expiredChain = await DelegationChain.create(
+      root,
       session.getPublicKey(),
       new Date(Date.now() - 1000),
     );
-    const identity = DelegationIdentity.fromDelegation(session, chain);
+    const identity = DelegationIdentity.fromDelegation(session, expiredChain);
     const auth: AuthWithoutAgentActor = {
       identityNumber: BigInt(1),
       identity,
       authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "x" },
+        openid: { iss: "https://accounts.google.com", sub: "expired" },
       },
     };
+    const { publicKeyDer } = await makeReceiverKey();
 
-    const payload = await serializeAuth(auth);
-    const restored = await deserializeAuth(payload);
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
 
-    expect(restored).toBeNull();
-  });
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+
+    const readyEvent = new MessageEvent("message", {
+      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      origin: "https://id.ai",
+      source: targetWindow as unknown as Window,
+    });
+    for (const listener of messageListeners) {
+      listener(readyEvent);
+    }
+
+    // Wait for chain creation; may or may not call postMessage depending on
+    // whether DelegationChain.create propagates expiry. Either way the
+    // resulting chain must fail isDelegationValid on the receiver side.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    if (targetWindow.postMessage.mock.calls.length > 0) {
+      const [payload] = targetWindow.postMessage.mock.calls[0];
+      const newChain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
+      expect(isDelegationValid(newChain)).toBe(false);
+    }
+  }, 2000);
+
+  it("cancel before ready arrives — no auth message posted", async () => {
+    const auth = await makeOpenerAuth();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    const { cancel } = sendAuthToOpenedTab(
+      targetWindow as unknown as Window,
+      auth,
+      TEST_NONCE,
+    );
+
+    cancel();
+
+    const { publicKeyDer } = await makeReceiverKey();
+    const readyEvent = new MessageEvent("message", {
+      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      origin: "https://id.ai",
+      source: targetWindow as unknown as Window,
+    });
+    for (const listener of messageListeners) {
+      listener(readyEvent);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(targetWindow.postMessage).not.toHaveBeenCalled();
+  }, 2000);
+
+  it("ignores ready messages whose nonce does not match expectedNonce", async () => {
+    const auth = await makeOpenerAuth();
+    const { publicKeyDer } = await makeReceiverKey();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    sendAuthToOpenedTab(
+      targetWindow as unknown as Window,
+      auth,
+      TEST_NONCE,
+      100,
+    );
+
+    const spoofedReady = new MessageEvent("message", {
+      data: {
+        type: "ii-handoff:ready",
+        nonce: "wrong-nonce",
+        publicKeyDer,
+      },
+      origin: "https://id.ai",
+      source: targetWindow as unknown as Window,
+    });
+    for (const listener of messageListeners) {
+      listener(spoofedReady);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(targetWindow.postMessage).not.toHaveBeenCalled();
+  }, 2000);
+
+  it("ignores ready messages from wrong source", async () => {
+    const auth = await makeOpenerAuth();
+    const { publicKeyDer } = await makeReceiverKey();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    const wrongSource = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    sendAuthToOpenedTab(
+      targetWindow as unknown as Window,
+      auth,
+      TEST_NONCE,
+      100,
+    );
+
+    const wrongSourceReady = new MessageEvent("message", {
+      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      origin: "https://id.ai",
+      source: wrongSource as unknown as Window,
+    });
+    for (const listener of messageListeners) {
+      listener(wrongSourceReady);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(targetWindow.postMessage).not.toHaveBeenCalled();
+  }, 2000);
+
+  it("ignores ready messages with wrong origin", async () => {
+    const auth = await makeOpenerAuth();
+    const { publicKeyDer } = await makeReceiverKey();
+
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const targetWindow = { postMessage: vi.fn(), closed: false };
+    stubSenderWindow(messageListeners);
+
+    sendAuthToOpenedTab(
+      targetWindow as unknown as Window,
+      auth,
+      TEST_NONCE,
+      100,
+    );
+
+    const wrongOriginReady = new MessageEvent("message", {
+      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      origin: "https://evil.example.com",
+      source: targetWindow as unknown as Window,
+    });
+    for (const listener of messageListeners) {
+      listener(wrongOriginReady);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(targetWindow.postMessage).not.toHaveBeenCalled();
+  }, 2000);
 });
 
 describe("receiveAuthFromOpener", () => {
@@ -250,7 +481,7 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   });
 
-  it("ignores messages with wrong event.data.type and stays pending until timeout", async () => {
+  it("ignores messages with wrong event.data.type", async () => {
     const messageListeners: ((e: MessageEvent) => void)[] = [];
     const mockOpener = { closed: false, postMessage: vi.fn() };
     stubReceiveWindow({ opener: mockOpener, messageListeners });
@@ -270,7 +501,7 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   }, 1000);
 
-  it("ignores messages with wrong event.origin and stays pending until timeout", async () => {
+  it("ignores messages with wrong event.origin", async () => {
     const messageListeners: ((e: MessageEvent) => void)[] = [];
     const mockOpener = { closed: false, postMessage: vi.fn() };
     stubReceiveWindow({ opener: mockOpener, messageListeners });
@@ -311,183 +542,112 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   }, 1000);
 
-  it("includes the URL-hash nonce in the ready message it posts to opener", () => {
+  it("includes nonce and publicKeyDer in the ready message it posts to opener", async () => {
     const mockOpener = { closed: false, postMessage: vi.fn() };
     stubReceiveWindow({ opener: mockOpener });
 
-    void receiveAuthFromOpener({ timeoutMs: 50 });
+    void receiveAuthFromOpener({ timeoutMs: 200 });
+
+    await vi.waitUntil(() => mockOpener.postMessage.mock.calls.length > 0, {
+      timeout: 500,
+    });
 
     expect(mockOpener.postMessage).toHaveBeenCalledWith(
-      { type: "ii-handoff:ready", nonce: TEST_NONCE },
+      expect.objectContaining({
+        type: "ii-handoff:ready",
+        nonce: TEST_NONCE,
+        publicKeyDer: expect.any(String),
+      }),
       expect.any(String),
     );
-  });
-});
-
-describe("sendAuthToOpenedTab", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("synchronous cancel() during in-flight serialize prevents postMessage", async () => {
-    const { identity } = await makeIdentity();
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(2),
-      identity,
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "sync-cancel" },
-      },
-    };
-
-    const messageListeners: ((e: MessageEvent) => void)[] = [];
-    const targetWindow = { postMessage: vi.fn(), closed: false };
-
-    vi.stubGlobal("window", {
-      ...window,
-      location: { origin: "https://id.ai" },
-      addEventListener: (
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (type === "message") {
-          messageListeners.push(listener as (e: MessageEvent) => void);
-        }
-      },
-      removeEventListener: vi.fn(),
-    });
-
-    const { cancel } = sendAuthToOpenedTab(
-      targetWindow as unknown as Window,
-      auth,
-      TEST_NONCE,
-    );
-
-    // Cancel SYNCHRONOUSLY — payloadPromise (serializeAuth) is still in-flight.
-    // The listener is already installed by this point (race fix), so a "ready"
-    // message could arrive and trigger the listener; the `cancelled` guard
-    // inside the listener must prevent the postMessage.
-    cancel();
-
-    // Now fire "ready" — the listener may still be invoked because cleanup
-    // races with cancel. The `cancelled` flag is what prevents the post.
-    const readyEvent = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: TEST_NONCE },
-      origin: "https://id.ai",
-      source: targetWindow as unknown as Window,
-    });
-    for (const listener of messageListeners) {
-      listener(readyEvent);
-    }
-
-    // Wait for any pending microtasks (serializeAuth + the await inside listener)
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    expect(targetWindow.postMessage).not.toHaveBeenCalled();
   }, 1000);
 
-  it("cancel() removes listener before ready arrives — subsequent ready does not trigger a post", async () => {
-    const { identity } = await makeIdentity();
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(1),
-      identity,
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "cancel-test" },
-      },
-    };
-
-    const messageListeners: ((e: MessageEvent) => void)[] = [];
-    const targetWindow = { postMessage: vi.fn(), closed: false };
-
-    vi.stubGlobal("window", {
-      ...window,
-      location: { origin: "https://id.ai" },
-      addEventListener: (
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (type === "message") {
-          messageListeners.push(listener as (e: MessageEvent) => void);
-        }
-      },
-      removeEventListener: vi.fn(),
-    });
-
-    const { cancel } = sendAuthToOpenedTab(
-      targetWindow as unknown as Window,
-      auth,
-      TEST_NONCE,
+  it("returns null when the received delegation chain is already expired", async () => {
+    const root = await ECDSAKeyIdentity.generate({ extractable: false });
+    const session = await ECDSAKeyIdentity.generate({ extractable: false });
+    const expiredChain = await DelegationChain.create(
+      root,
+      session.getPublicKey(),
+      new Date(Date.now() - 1000),
     );
 
-    // Wait a tick for async serializeAuth to complete and listener to be installed
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    const messageListeners: ((e: MessageEvent) => void)[] = [];
+    const mockOpener = { closed: false, postMessage: vi.fn() };
+    stubReceiveWindow({ opener: mockOpener, messageListeners });
 
-    cancel();
+    const resultPromise = receiveAuthFromOpener({ timeoutMs: 500 });
 
-    // Simulate "ready" arriving after cancel
-    const readyEvent = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: TEST_NONCE },
+    await vi.waitUntil(() => mockOpener.postMessage.mock.calls.length > 0, {
+      timeout: 500,
+    });
+
+    const authEvent = new MessageEvent("message", {
+      data: {
+        type: "ii-handoff:auth",
+        identityNumber: "1",
+        chainJson: JSON.stringify(expiredChain.toJSON()),
+        authMethod: {
+          kind: "openid",
+          iss: "https://accounts.google.com",
+          sub: "x",
+        },
+      },
       origin: "https://id.ai",
-      source: targetWindow as unknown as Window,
+      source: mockOpener as unknown as Window,
     });
     for (const listener of messageListeners) {
-      listener(readyEvent);
+      listener(authEvent);
     }
 
-    // Give it a tick to process
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    const result = await resultPromise;
+    expect(result).toBeNull();
+  }, 2000);
 
-    expect(targetWindow.postMessage).not.toHaveBeenCalled();
-  }, 1000);
-
-  it("ignores ready messages whose nonce does not match expectedNonce", async () => {
-    const { identity } = await makeIdentity();
-    const auth: AuthWithoutAgentActor = {
-      identityNumber: BigInt(3),
-      identity,
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "nonce-mismatch" },
-      },
-    };
+  it("auth message arrives before localInnerKey is set — resolves to null", async () => {
+    let resolveKeyGeneration!: (key: ECDSAKeyIdentity) => void;
+    const deferredKey = new Promise<ECDSAKeyIdentity>((resolve) => {
+      resolveKeyGeneration = resolve;
+    });
+    vi.spyOn(ECDSAKeyIdentity, "generate").mockReturnValueOnce(deferredKey);
 
     const messageListeners: ((e: MessageEvent) => void)[] = [];
-    const targetWindow = { postMessage: vi.fn(), closed: false };
+    const mockOpener = { closed: false, postMessage: vi.fn() };
+    stubReceiveWindow({ opener: mockOpener, messageListeners });
 
-    vi.stubGlobal("window", {
-      ...window,
-      location: { origin: "https://id.ai" },
-      addEventListener: (
-        type: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (type === "message") {
-          messageListeners.push(listener as (e: MessageEvent) => void);
-        }
-      },
-      removeEventListener: vi.fn(),
-    });
+    const resultPromise = receiveAuthFromOpener({ timeoutMs: 500 });
 
-    sendAuthToOpenedTab(
-      targetWindow as unknown as Window,
-      auth,
-      TEST_NONCE,
-      100,
+    const root = await ECDSAKeyIdentity.generate({ extractable: false });
+    const session = await ECDSAKeyIdentity.generate({ extractable: false });
+    const chain = await DelegationChain.create(
+      root,
+      session.getPublicKey(),
+      new Date(Date.now() + 30 * 60 * 1000),
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    const spoofedReady = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: "wrong-nonce" },
+    const authEvent = new MessageEvent("message", {
+      data: {
+        type: "ii-handoff:auth",
+        identityNumber: "42",
+        chainJson: JSON.stringify(chain.toJSON()),
+        authMethod: {
+          kind: "openid",
+          iss: "https://accounts.google.com",
+          sub: "race-test",
+        },
+      },
       origin: "https://id.ai",
-      source: targetWindow as unknown as Window,
+      source: mockOpener as unknown as Window,
     });
     for (const listener of messageListeners) {
-      listener(spoofedReady);
+      listener(authEvent);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    const result = await resultPromise;
+    expect(result).toBeNull();
 
-    expect(targetWindow.postMessage).not.toHaveBeenCalled();
-  }, 1000);
+    const cleanupKey = await ECDSAKeyIdentity.generate({ extractable: false });
+    resolveKeyGeneration(cleanupKey);
+  }, 3000);
 });
 
 describe("generateHandoffNonce", () => {
