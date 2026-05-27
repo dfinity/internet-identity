@@ -54,7 +54,20 @@ fn relaxed_header_value(value: &str) -> String {
     // before the first non-WSP byte (handles step 5's "WSP after colon"
     // case since the colon is consumed by the caller); strip trailing
     // WSP at the end.
-    let bytes = value.as_bytes();
+    // FIXME(gateway): defensively strip any trailing CR/LF the SMTP
+    // gateway leaks into header values. Per RFC 5322 §2.2 the CRLF that
+    // terminates a header line is structural framing, not field-body —
+    // the gateway should be stripping it during parsing and the value
+    // we receive should never end with `\r` or `\n`. Today's beta
+    // gateway leaves it attached (e.g. `Subject` arrives as
+    // " II-Recovery-…\r\n"), which makes our DKIM hash input end with
+    // `…\r\n\r\n` instead of `…\r\n` and breaks every signature with
+    // SignatureInvalid. Once the gateway parser is corrected this
+    // workaround can be removed and `is_wsp` left at its RFC-strict
+    // SP/HTAB definition. See https://github.com/dfinity/internet-identity/pull/3934
+    // for the debug-log query that surfaced the problem.
+    let trimmed = value.trim_end_matches(['\r', '\n']);
+    let bytes = trimmed.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
     let mut last_was_sp = true; // true so leading WSP is dropped (step 5)
@@ -79,7 +92,8 @@ fn relaxed_header_value(value: &str) -> String {
         i += 1;
     }
     // Step 4: strip trailing WSP. Above loop already collapses runs to
-    // a single SP, so at most one trailing SP can exist now.
+    // a single SP, so at most one trailing SP can exist now. (Trailing
+    // CR/LF was already removed at the top of the function.)
     if out.last() == Some(&b' ') {
         out.pop();
     }
@@ -221,6 +235,49 @@ mod tests {
     fn relaxed_header_unfolds_continuation_with_space() {
         let h = relaxed_header("X-Note", "first\r\n  second");
         assert_eq!(s(&h), "x-note:first second\r\n");
+    }
+
+    // The beta SMTP gateway currently leaves the structural line
+    // terminator attached to each header value (e.g. delivers the
+    // Subject as " II-Recovery-…\r\n" instead of " II-Recovery-…").
+    // Per RFC 5322 §2.2 the CRLF is framing, not field-body, and a
+    // strictly RFC-correct canonicalizer wouldn't see it. Until the
+    // gateway parser is fixed we tolerate the trailing terminator so
+    // DKIM verification doesn't fail with a misleading SignatureInvalid
+    // on every well-formed inbound message.
+    #[test]
+    fn relaxed_header_strips_trailing_line_terminator() {
+        let h = relaxed_header("Subject", " II-Recovery-deadbeef\r\n");
+        assert_eq!(s(&h), "subject:II-Recovery-deadbeef\r\n");
+    }
+
+    #[test]
+    fn relaxed_header_strips_trailing_terminator_with_wsp() {
+        let h = relaxed_header("Subject", " hello \t\r\n");
+        assert_eq!(s(&h), "subject:hello\r\n");
+    }
+
+    #[test]
+    fn relaxed_header_strips_bare_trailing_lf() {
+        let h = relaxed_header("Subject", " hello\n");
+        assert_eq!(s(&h), "subject:hello\r\n");
+    }
+
+    #[test]
+    fn relaxed_header_folded_value_with_trailing_terminator() {
+        // The DKIM-Signature value from a Gmail-signed message: folded
+        // multi-line, with the structural CRLF still attached at the
+        // end. The unfold step must still handle the internal CRLF+WSP
+        // boundaries, and the trailing CRLF must not leak into the
+        // canonical form.
+        let h = relaxed_header(
+            "DKIM-Signature",
+            " v=1; a=rsa-sha256;\r\n        d=gmail.com; s=20251104;\r\n        b=AAAA\r\n",
+        );
+        assert_eq!(
+            s(&h),
+            "dkim-signature:v=1; a=rsa-sha256; d=gmail.com; s=20251104; b=AAAA\r\n",
+        );
     }
 
     #[test]

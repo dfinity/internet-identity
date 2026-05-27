@@ -114,11 +114,11 @@ class CreateRecoveryPhraseWizard {
 
   async retry(): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", { name: "Something is wrong!" }),
+      this.#view.getByRole("heading", { name: "Something is wrong" }),
     ).toBeVisible();
     await this.#view.getByRole("button", { name: "Retry" }).click();
     await expect(
-      this.#view.getByRole("heading", { name: "Something is wrong!" }),
+      this.#view.getByRole("heading", { name: "Something is wrong" }),
     ).toBeHidden();
   }
 

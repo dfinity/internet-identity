@@ -15,7 +15,12 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { authnMethodToPublicKey } from "$lib/utils/webAuthn";
   import { nanosToMillis } from "$lib/utils/time";
-  import { goto, invalidateAll } from "$app/navigation";
+  import {
+    afterNavigate,
+    goto,
+    invalidateAll,
+    replaceState,
+  } from "$app/navigation";
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
@@ -360,6 +365,15 @@
       handleError(error);
     }
   };
+
+  // Deep-link entry: open the Add Access Method wizard when navigated
+  // to with page state `{ add: true }` (set by the home dashboard's
+  // smart-action strip).
+  afterNavigate(() => {
+    if (!("add" in page.state)) return;
+    replaceState("", {});
+    isAddingAccessMethod = true;
+  });
 </script>
 
 <header class="flex flex-col gap-3">

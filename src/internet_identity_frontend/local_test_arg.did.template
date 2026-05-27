@@ -10,5 +10,10 @@
     analytics_config = null;
     dummy_auth = null;
     dev_csp = opt true;
+    featured_dashboard_apps = opt vec {
+      "https://caffeine.ai";
+      "https://oisy.com";
+      "https://oc.app";
+    };
   },
 )
