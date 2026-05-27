@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 msgid "(anything, leave it blank)"
-msgstr ""
+msgstr "(что угодно, оставьте пустым)"
 
 msgid "{0} logo"
 msgstr "{0} логотип"
@@ -23,7 +23,7 @@ msgid "{0} user"
 msgstr "{0} пользователь"
 
 msgid "{address} is now a recovery method."
-msgstr ""
+msgstr "{address} теперь является методом восстановления."
 
 msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
@@ -38,7 +38,7 @@ msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {
 msgstr "Домен {domainInput} не опубликовал /.well-known/ii-openid-configuration (HTTP {0})."
 
 msgid "{domainInput} took too long to respond. Try again in a moment."
-msgstr ""
+msgstr "{domainInput} слишком долго не отвечал. Попробуйте снова через некоторое время."
 
 msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
 msgstr "Файл /.well-known/ii-openid-configuration домена {domainInput} имеет неверный формат."
@@ -74,13 +74,13 @@ msgid "{providerName} name:"
 msgstr "Имя {providerName}:"
 
 msgid "<0>{address}</0> will no longer be able to sign in to your identity."
-msgstr ""
+msgstr "<0>{address}</0> больше не сможет выполнять вход в вашу учётную запись."
 
 msgid "<0>Completely redesigned interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
-msgstr ""
+msgstr "<0>Полностью переработанный интерфейс:</0> Мы обновили Internet Identity, придав ему современный и свежий облик. Новый дизайн интуитивно понятен и удобен в навигации, обеспечивая более плавный пользовательский опыт."
 
 msgid "<0>Google, Apple and Microsoft integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
-msgstr ""
+msgstr "<0>Интеграция с Google, Apple и Microsoft:</0> Несмотря на то что Passkeys становятся всё более зрелой технологией, они ещё не стали повсеместными. Мы наблюдали 50%-й отсев в нашем процессе регистрации, что указывает на потребность в альтернативных методах аутентификации. Чтобы сделать Internet Identity доступным для ещё более широкой аудитории, мы интегрировали Google, Apple и Microsoft в качестве альтернативных вариантов входа."
 
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Узнайте больше</0> о ключах доступа"
@@ -89,19 +89,19 @@ msgid "<0>Never</0> enter a code from another source."
 msgstr "<0>Никогда</0> не вводите код из другого источника."
 
 msgid "<0>No more identity numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
-msgstr ""
+msgstr "<0>Больше никаких номеров учётной записи:</0> Как объяснялось выше, Passkeys позволяют обойтись без запоминания или хранения номера учётной записи. Вход теперь проще и удобнее."
 
 msgid "<0>Seamless passkey integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
-msgstr ""
+msgstr "<0>Бесшовная интеграция Passkeys:</0> Мы по-прежнему делаем ставку на Passkeys как на будущее безопасной аутентификации. Internet Identity 2.0 использует новейшие стандарты ключей доступа для повышения безопасности и удобства использования."
 
 msgid "A 24-word phrase you write down and keep offline."
-msgstr ""
+msgstr "Фраза из 24 слов, которую вы записываете и храните офлайн."
 
 msgid "About"
 msgstr "О сервисе"
 
 msgid "Access"
-msgstr ""
+msgstr "Доступ"
 
 msgid "Access methods"
 msgstr "Способы доступа"
@@ -113,19 +113,16 @@ msgid "Activate"
 msgstr "Активировать"
 
 msgid "Activate recovery email"
-msgstr ""
+msgstr "Активировать резервный email"
 
 msgid "Activate recovery phrase"
-msgstr ""
+msgstr "Активировать резервную фразу"
 
 msgid "Activate recovery to remove"
 msgstr "Чтобы удалить, сначала активируйте резервную фразу"
 
-msgid "Activate your recovery phrase so that you can recover your identity at any point."
-msgstr "Активируйте вашу резервную фразу, чтобы вы могли восстановить доступ в любой момент."
-
 msgid "Activated"
-msgstr ""
+msgstr "Активирован"
 
 msgid "Active"
 msgstr "Активный"
@@ -134,7 +131,7 @@ msgid "Add a passkey"
 msgstr "Добавить ключ доступа"
 
 msgid "Add a recovery email"
-msgstr ""
+msgstr "Добавить резервный email"
 
 msgid "Add access method"
 msgstr "Добавить способ доступа"
@@ -146,10 +143,10 @@ msgid "Add another identity"
 msgstr "Добавить"
 
 msgid "Add another method or sign in via recovery to remove"
-msgstr ""
+msgstr "Добавьте другой метод или войдите через восстановление, чтобы удалить"
 
 msgid "Add another method or sign in via recovery to unlink"
-msgstr ""
+msgstr "Добавьте другой метод или войдите через восстановление, чтобы отключить"
 
 msgid "Add another passkey"
 msgstr "Добавить другой ключ доступа"
@@ -170,16 +167,16 @@ msgid "Allow to access this info"
 msgstr "Разрешить доступ к этим данным"
 
 msgid "Already signed-in"
-msgstr ""
+msgstr "Вы уже вошли"
 
 msgid "Are you sure?"
 msgstr "Вы уверены?"
 
 msgid "As you are currently signed in with this access method, you will be signed out immediately after removal."
-msgstr ""
+msgstr "Поскольку вы в данный момент вошли с помощью этого метода доступа, вы будете немедленно выведены из системы после его удаления."
 
 msgid "As you are currently signed in with this access method, you will be signed out immediately after unlinking."
-msgstr ""
+msgstr "Поскольку вы в данный момент вошли с помощью этого метода доступа, вы будете немедленно выведены из системы после его отключения."
 
 msgid "Attribute sharing failed"
 msgstr "Не удалось передать атрибуты"
@@ -203,7 +200,7 @@ msgid "Before you continue"
 msgstr "Прежде чем продолжить"
 
 msgid "Body"
-msgstr ""
+msgstr "Тело письма"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Включив эту функцию, вы сможете создавать несколько аккаунтов для одного приложения и легко переключаться между ними (например, рабочий, личный или демонстрационный)."
@@ -212,7 +209,7 @@ msgid "Can't find your identity?"
 msgstr "Не получилось зайти?"
 
 msgid "Can't use this email"
-msgstr ""
+msgstr "Невозможно использовать этот email"
 
 msgid "Cancel"
 msgstr "Отмена"
@@ -274,9 +271,6 @@ msgstr "Домен компании"
 msgid "company.domain.com"
 msgstr "company.domain.com"
 
-msgid "Complete set-up"
-msgstr "Завершить настройку"
-
 msgid "Confirm sign-in"
 msgstr "Подтвердить вход"
 
@@ -314,16 +308,16 @@ msgid "Continue with SSO"
 msgstr "Продолжить с SSO"
 
 msgid "Copied to clipboard"
-msgstr ""
+msgstr "Скопировано в буфер обмена"
 
 msgid "Copy recipient address"
-msgstr ""
+msgstr "Скопировать адрес получателя"
 
 msgid "Copy subject"
-msgstr ""
+msgstr "Скопировать тему"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
-msgstr ""
+msgstr "Не удалось загрузить настройки SSO с {domainInput}. Попросите вашего администратора SSO убедиться, что /.well-known/ii-openid-configuration доступен."
 
 msgid "Create account"
 msgstr "Создать аккаунт"
@@ -356,10 +350,10 @@ msgid "Creating passkey..."
 msgstr "Создание ключа доступа..."
 
 msgid "Cryptographically authentic"
-msgstr ""
+msgstr "Криптографически подлинный"
 
 msgid "Currently active"
-msgstr ""
+msgstr "Активный в данный момент"
 
 msgid "Currently signed in with this account"
 msgstr "В данный момент вошли с этим аккаунтом"
@@ -368,28 +362,25 @@ msgid "Currently signed in with this passkey"
 msgstr "В данный момент вошли с этим ключом доступа"
 
 msgid "Currently signed in with this recovery phrase"
-msgstr ""
+msgstr "В данный момент вошли с этой резервной фразой"
 
 msgid "Default"
 msgstr "По умолчанию"
 
 msgid "Deny all"
-msgstr ""
+msgstr "Запретить всё"
 
 msgid "Discoverable passkeys"
 msgstr "Вход без паролей"
-
-msgid "Dismiss"
-msgstr "Отклонить"
 
 msgid "Do you want to continue?"
 msgstr "Хотите продолжить?"
 
 msgid "Double-check the subject line. It has to match the one above exactly."
-msgstr ""
+msgstr "Проверьте тему письма. Она должна точно совпадать с указанной выше."
 
 msgid "Each email carries a cryptographic signature that proves it really came from your inbox. The only party you trust is your mail provider, with nothing else in between."
-msgstr ""
+msgstr "Каждое письмо содержит криптографическую подпись, подтверждающую, что оно действительно отправлено из вашего почтового ящика. Единственная сторона, которой вы доверяете, — это ваш почтовый провайдер, без каких-либо посредников."
 
 msgid "Easy access"
 msgstr "Простой вход"
@@ -404,7 +395,7 @@ msgid "Edit account"
 msgstr "Редактировать аккаунт"
 
 msgid "Email address"
-msgstr ""
+msgstr "Адрес электронной почты"
 
 msgid "Email:"
 msgstr "Email:"
@@ -435,7 +426,7 @@ msgstr "Всё, что нужно знать об Internet Identity — ваше
 
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
-msgstr ""
+msgstr "Ощутите"
 
 msgid "Export JSON"
 msgstr "Экспортировать JSON"
@@ -446,20 +437,23 @@ msgstr "Часто задаваемые вопросы и поддержка"
 msgid "FAQs"
 msgstr "Часто задаваемые вопросы"
 
+msgid "Featured apps"
+msgstr "Популярные приложения"
+
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Например, пользователь А входит в Internet Identity через свой аккаунт Google «A@gmail.com», а затем использует Internet Identity для аутентификации в приложении Z. Google никогда не узнает, что пользователь вошёл в приложение Z через Internet Identity. Приложение Z тоже не узнает, что пользователь А использовал Google для входа в Internet Identity."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
-msgstr ""
+msgstr "Забудьте о запоминании сложных имён пользователей и паролей. С Passkeys достаточно просто выбрать своё имя для входа. Быстро, безопасно и без лишних усилий."
 
 msgid "From"
-msgstr ""
+msgstr "От"
 
 msgid "Full control"
 msgstr "Полный контроль"
 
 msgid "Full ownership"
-msgstr ""
+msgstr "Полное владение"
 
 msgid "Generating code..."
 msgstr "Генерация кода..."
@@ -486,7 +480,7 @@ msgid "Has not been used yet"
 msgstr "Еще не использовано"
 
 msgid "Having trouble?"
-msgstr ""
+msgstr "Возникли проблемы?"
 
 msgid "Help & FAQ"
 msgstr "Помощь и FAQ"
@@ -516,7 +510,7 @@ msgid "How to stay secure"
 msgstr "Как оставаться в безопасности"
 
 msgid "I acknowledge"
-msgstr ""
+msgstr "Я подтверждаю"
 
 msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
 msgstr "Я несу ответственность за свою резервную фразу, и она не может быть восстановлена из Internet Identity в случае утери."
@@ -525,7 +519,7 @@ msgid "I have written it down"
 msgstr "Я записал(а) это"
 
 msgid "I've sent the email"
-msgstr ""
+msgstr "Я отправил(а) письмо"
 
 msgid "Identities on this device"
 msgstr "Список учётных записей на этом устройстве"
@@ -552,13 +546,13 @@ msgid "Identity removed"
 msgstr "Учётная запись удалена"
 
 msgid "Identity upgraded."
-msgstr ""
+msgstr "Учётная запись обновлена."
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
-msgstr ""
+msgstr "Если вы администрируете <0>{domain}</0>, включение DNSSEC у вашего регистратора домена обычно занимает несколько кликов. После распространения изменений этот адрес заработает автоматически. Никаких дополнительных действий с нашей стороны не потребуется."
 
 msgid "If you proceed, you will no longer be able to sign-in to your identity or apps using your {providerName} account."
-msgstr ""
+msgstr "Если вы продолжите, вы больше не сможете входить в свою учётную запись или приложения с помощью аккаунта {providerName}."
 
 msgid "In use on another account."
 msgstr "Используется на другом аккаунте."
@@ -591,16 +585,13 @@ msgid "Internet Identity is an authentication system for applications running on
 msgstr "Internet Identity — это система аутентификации для приложений, работающих на <0>Internet Computer</0>. Вместо традиционных имен пользователей и паролей она использует ключи, созданные с помощью <1>ключей доступа</1> или других систем аутентификации, таких как Google, Microsoft или Apple."
 
 msgid "Internet Identity is as secure as the authentication methods it uses (like Google, Apple, Microsoft, or Passkeys). That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
-msgstr ""
-
-msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
-msgstr "Internet Identity используется для безопасного входа и подключения к приложениям с помощью ключей доступа."
+msgstr "Internet Identity настолько же безопасен, насколько безопасны методы аутентификации, которые он использует (например, Google, Apple, Microsoft или Passkeys). Это означает, что он построен на основе передовых технологий безопасности. Когда вы выбираете Passkeys, доступ защищён методом разблокировки вашего устройства (Face ID или отпечаток пальца), что делает вход таким же простым, как разблокировка телефона."
 
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity позволяет вам безопасно получать доступ к приложениям и сервисам без необходимости создавать пароли, делиться личными данными или отказываться от контроля."
 
-msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background. You don't need to manage anything."
-msgstr ""
+msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background. You don’t need to manage anything."
+msgstr "Internet Identity никогда не передаёт ваши личные данные, такие как email, приложениям или сайтам. Вместо этого он создаёт уникальный псевдоним для вас в каждом приложении. Каждое приложение получает свой собственный, поэтому они не могут отслеживать вас между сервисами. Всё это происходит автоматически в фоновом режиме. Вам ничем не нужно управлять."
 
 msgid "Internet Identity number"
 msgstr "Номер Internet Identity"
@@ -725,9 +716,6 @@ msgstr "Мой аккаунт {application}"
 msgid "My account"
 msgstr "Мой аккаунт"
 
-msgid "My identity"
-msgstr "Моя учётная запись"
-
 msgid "n/a"
 msgstr "н/д"
 
@@ -756,16 +744,13 @@ msgid "No. Your face ID or fingerprint is only used to create or unlock your pas
 msgstr "Нет. Face ID или отпечаток пальца используются только для создания или разблокировки вашего ключа доступа. Ваши биометрические данные никогда не передаются в Internet Identity и недоступны сайтам или приложениям, которыми вы пользуетесь."
 
 msgid "Not activated"
-msgstr ""
+msgstr "Не активирован"
 
 msgid "Not upgraded"
 msgstr "Не обновлено"
 
 msgid "Not verified"
-msgstr ""
-
-msgid "Number of access methods"
-msgstr "Количество способов доступа"
+msgstr "Не подтверждён"
 
 msgid "One or more words are wrong or out of order."
 msgstr "Одно или несколько слов введены неверно или не по порядку."
@@ -780,7 +765,7 @@ msgid "Open in browser to continue"
 msgstr "Открыть в браузере для продолжения"
 
 msgid "Open in mail app"
-msgstr ""
+msgstr "Открыть в почтовом приложении"
 
 msgid "Open menu"
 msgstr "Открыть меню"
@@ -828,7 +813,7 @@ msgid "Password-free"
 msgstr "Без паролей"
 
 msgid "Pick a recovery method below to sign back in."
-msgstr ""
+msgstr "Выберите метод восстановления ниже, чтобы снова войти."
 
 msgid "Pick something recognizable, like your name"
 msgstr "Выберите что-то узнаваемое, например, ваше имя"
@@ -840,34 +825,34 @@ msgid "Powered by"
 msgstr "Разработано"
 
 msgid "Real privacy"
-msgstr ""
+msgstr "Настоящая конфиденциальность"
 
 msgid "Recover"
 msgstr "Восстановить доступ"
 
 msgid "Recover with email"
-msgstr ""
+msgstr "Восстановить через email"
 
 msgid "Recover with phrase"
-msgstr ""
+msgstr "Восстановить с помощью фразы"
 
 msgid "Recover your identity"
 msgstr "Восстановить доступ к вашей Internet Identity"
 
 msgid "Recovery"
-msgstr ""
+msgstr "Восстановление"
 
 msgid "Recovery email"
-msgstr ""
+msgstr "Резервный email"
 
 msgid "Recovery email added"
-msgstr ""
+msgstr "Резервный email добавлен"
 
 msgid "Recovery email removed"
-msgstr ""
+msgstr "Резервный email удалён"
 
 msgid "Recovery methods"
-msgstr ""
+msgstr "Методы восстановления"
 
 msgid "Recovery phrase"
 msgstr "Резервная фраза"
@@ -882,10 +867,10 @@ msgid "Remove"
 msgstr "Удалить"
 
 msgid "Remove and sign out"
-msgstr ""
+msgstr "Удалить и выйти"
 
 msgid "Remove email"
-msgstr ""
+msgstr "Удалить email"
 
 msgid "Remove from this device"
 msgstr "Удалить с этого устройства"
@@ -894,13 +879,13 @@ msgid "Remove identities you don't use. You can add them back anytime by signing
 msgstr "Удалите неиспользуемые учётные записи. Их можно вернуть в любой момент, снова выполнив вход."
 
 msgid "Remove recovery email?"
-msgstr ""
+msgstr "Удалить резервный email?"
 
 msgid "Removing and signing out..."
-msgstr ""
+msgstr "Удаление и выход из системы..."
 
 msgid "Removing email..."
-msgstr ""
+msgstr "Удаление email..."
 
 msgid "Removing passkey..."
 msgstr "Удаление ключа доступа..."
@@ -921,13 +906,16 @@ msgid "Rename this account"
 msgstr "Переименовать этот аккаунт"
 
 msgid "Replace"
-msgstr ""
+msgstr "Заменить"
 
 msgid "Replace it anytime"
 msgstr "Замените её в любое время"
 
 msgid "Reset"
 msgstr "Сбросить"
+
+msgid "Reset recovery phrase"
+msgstr "Сбросить резервную фразу"
 
 msgid "Reset your recovery phrase?"
 msgstr "Сбросить вашу резервную фразу?"
@@ -948,7 +936,7 @@ msgid "Return to application"
 msgstr "Вернуться к приложению"
 
 msgid "Review permissions"
-msgstr ""
+msgstr "Просмотреть разрешения"
 
 msgid "Right now"
 msgstr "Прямо сейчас"
@@ -969,10 +957,7 @@ msgid "Scan the above QR code with your <0>new device</0> or enter the URL manua
 msgstr "Отсканируйте приведенный выше QR-код с вашего <0>нового устройства</0> или введите URL вручную."
 
 msgid "Seamless access"
-msgstr ""
-
-msgid "See how many access methods are within your identity and manage your recovery phrase."
-msgstr "Посмотрите на способы доступа в свою учётную запись и управляйте своей резервной фразой."
+msgstr "Бесшовный доступ"
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Выберите <0>Открыть в Safari</0> или <1>Открыть в Chrome</1>."
@@ -981,16 +966,22 @@ msgid "Select each word in the correct order:"
 msgstr "Выберите каждое слово в правильном порядке:"
 
 msgid "Send an email from your inbox."
-msgstr ""
+msgstr "Отправьте письмо из вашего почтового ящика."
 
 msgid "Send the email below to confirm."
-msgstr ""
+msgstr "Отправьте письмо ниже для подтверждения."
 
 msgid "Session timed out"
 msgstr "Время сессии истекло"
 
 msgid "Set as default sign-in"
 msgstr "Установить как вход по умолчанию"
+
+msgid "Set up recovery email"
+msgstr "Настроить резервный email"
+
+msgid "Set up recovery phrase"
+msgstr "Настроить резервную фразу"
 
 msgid "Share {label}"
 msgstr "Поделиться: {label}"
@@ -1005,7 +996,7 @@ msgid "Sign in again to continue where you left off."
 msgstr "Войдите снова, чтобы продолжить с того места, где вы остановились."
 
 msgid "Sign in by sending a signed email from your inbox."
-msgstr ""
+msgstr "Войдите, отправив подписанное письмо из вашего почтового ящика."
 
 msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
 msgstr "Войдите или создайте учётную запись, чтобы пользоваться приложениями без паролей и без передачи персональных данных."
@@ -1059,11 +1050,11 @@ msgid "Simplify your sign-in"
 msgstr "Новый способ входа"
 
 msgid "Some mail providers queue outgoing mail. Check your sent folder to make sure it actually went out."
-msgstr ""
+msgstr "Некоторые почтовые провайдеры помещают исходящие письма в очередь. Проверьте папку «Отправленные», чтобы убедиться, что письмо действительно было отправлено."
 
 msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong."
-msgstr ""
+msgstr "Что-то не так."
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Что-то пошло не так при создании делегирования. Пожалуйста, попробуйте снова; если проблема сохраняется, обратитесь в службу поддержки."
@@ -1114,40 +1105,40 @@ msgid "Stored securely on your device, in your password manager, or on a securit
 msgstr "Надежно хранится на вашем устройстве, в вашем менеджере паролей или на ключе безопасности."
 
 msgid "Subject"
-msgstr ""
+msgstr "Тема"
 
 msgid "Submit"
 msgstr "Отправить"
 
 msgid "Successfully recovered your identity"
-msgstr ""
+msgstr "Доступ к учётной записи успешно восстановлен"
 
 msgid "Successfully restored access to your identity"
 msgstr "Доступ успешно восстановлен"
 
 msgid "Successfully switched access method"
-msgstr ""
+msgstr "Метод доступа успешно изменён"
 
 msgid "Support"
 msgstr "Поддержка"
 
 msgid "Switch"
-msgstr ""
+msgstr "Сменить"
 
 msgid "Switch access method"
-msgstr ""
+msgstr "Сменить метод доступа"
 
 msgid "Switch identity"
 msgstr "Сменить учётную запись"
 
 msgid "Switch to another method before removing"
-msgstr ""
+msgstr "Переключитесь на другой метод, прежде чем удалить"
 
 msgid "Switch to another method before unlinking"
-msgstr ""
+msgstr "Переключитесь на другой метод, прежде чем отключить"
 
 msgid "Switching..."
-msgstr ""
+msgstr "Переключение..."
 
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Нажмите на <0>адресную строку</0> и <1>откройте в браузере</1>."
@@ -1171,13 +1162,13 @@ msgid "The <0>new device</0> is preparing to continue."
 msgstr "Ваше <0>новое устройство</0> готовится продолжить."
 
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
-msgstr ""
+msgstr "Письмо должно быть отправлено непосредственно с указанного выше адреса. Псевдонимы и переадресаторы не подойдут."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Интеграция с Google, Microsoft и Apple использует стандартный протокол аутентификации OpenID. Это тот же протокол, который стоит за кнопками «Войти через Google» в других приложениях."
 
 msgid "The most reliable backup. Stored entirely by you, on paper. It does not depend on any account, service, or provider, and only you can use, lose, or replace it."
-msgstr ""
+msgstr "Самый надёжный способ резервного копирования. Хранится исключительно у вас, на бумаге. Не зависит ни от какого аккаунта, сервиса или провайдера, и только вы можете её использовать, потерять или заменить."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Фраза была введена правильно, но принадлежит продукту, отличному от Internet Identity."
@@ -1195,10 +1186,10 @@ msgid "This identity has already been upgraded to the new experience."
 msgstr "Эта учётная запись уже была обновлена до нового интерфейса."
 
 msgid "This is now the default method used to authenticate moving forward on this device."
-msgstr ""
+msgstr "Теперь это метод по умолчанию для аутентификации на этом устройстве в дальнейшем."
 
 msgid "This is the access method you're currently signed in with."
-msgstr ""
+msgstr "Это метод доступа, с помощью которого вы в данный момент вошли в систему."
 
 msgid "This legacy passkey is no longer usable and should be removed."
 msgstr "Этот устаревший ключ доступа больше не может быть использован и должен быть удален."
@@ -1216,16 +1207,16 @@ msgid "This SSO is already linked to your identity."
 msgstr "Этот SSO уже привязан к вашей учётной записи."
 
 msgid "This usually takes under 30 seconds."
-msgstr ""
+msgstr "Обычно это занимает менее 30 секунд."
 
 msgid "This will become the default method used to authenticate on this device moving forward."
-msgstr ""
+msgstr "Это станет методом по умолчанию для аутентификации на этом устройстве в дальнейшем."
 
 msgid "To"
-msgstr ""
+msgstr "Кому"
 
 msgid "To accept email from a domain we either need DNSSEC at its apex (so we can cryptographically validate the DKIM key your provider uses) or for the domain to be on our list of known mailbox providers."
-msgstr ""
+msgstr "Для принятия писем от домена нам необходимо либо наличие DNSSEC на его вершине (чтобы мы могли криптографически проверить DKIM-ключ вашего провайдера), либо чтобы домен был в нашем списке известных почтовых провайдеров."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Чтобы подтвердить, что это вы, введите код ниже на вашем <0>существующем устройстве</0>."
@@ -1246,10 +1237,10 @@ msgid "To finish setting up your passkey, follow the instructions shown on your 
 msgstr "Чтобы завершить настройку вашего ключа доступа, следуйте инструкциям, показанным на вашем <0>новом устройстве</0>."
 
 msgid "Try a different address"
-msgstr ""
+msgstr "Попробуйте другой адрес"
 
 msgid "Try again"
-msgstr ""
+msgstr "Попробовать снова"
 
 msgid "Type each word in the correct order:"
 msgstr "Введите каждое слово в правильном порядке:"
@@ -1258,13 +1249,13 @@ msgid "Type the characters exactly as shown below"
 msgstr "Введите символы точно так, как показано ниже"
 
 msgid "Type the email address you registered as your recovery method. We'll ask you to send a signed email from this inbox to confirm."
-msgstr ""
+msgstr "Введите адрес электронной почты, который вы зарегистрировали в качестве метода восстановления. Мы попросим вас отправить подписанное письмо из этого почтового ящика для подтверждения."
 
 msgid "Type the email address you want to use to recover this Internet Identity. We'll ask you to send a signed email from this inbox to confirm."
-msgstr ""
+msgstr "Введите адрес электронной почты, который вы хотите использовать для восстановления этой учётной записи Internet Identity. Мы попросим вас отправить подписанное письмо из этого почтового ящика для подтверждения."
 
 msgid "Type your 24 recovery words."
-msgstr ""
+msgstr "Введите ваши 24 слова для восстановления."
 
 msgid "Unable to complete setup"
 msgstr "Не удалось завершить настройку"
@@ -1282,19 +1273,19 @@ msgid "Unknown"
 msgstr "Неизвестно"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience (no repeated signing) while still giving each session its own identity."
-msgstr ""
+msgstr "В отличие от многих систем аутентификации Web3, требующих ручного подписания каждого действия, Internet Identity создаёт аутентифицированные сессии для каждого приложения. Это обеспечивает как безопасность, так и удобство (без повторного подписания), при этом каждой сессии присваивается собственный идентификатор."
 
 msgid "Unlink"
 msgstr "Отключить"
 
 msgid "Unlink and sign out"
-msgstr ""
+msgstr "Отключить и выйти"
 
 msgid "Unlinking and signing out..."
-msgstr ""
+msgstr "Отключение и выход из системы..."
 
 msgid "Unlinking..."
-msgstr ""
+msgstr "Отключение..."
 
 msgid "Unlock and reset"
 msgstr "Разблокировать и сбросить"
@@ -1307,6 +1298,9 @@ msgstr "Неподдерживаемый браузер"
 
 msgid "Unverified origin"
 msgstr "Непроверенный источник"
+
+msgid "Update recovery email"
+msgstr "Обновить резервный email"
 
 msgid "Upgrade"
 msgstr "Начать обновление"
@@ -1336,13 +1330,16 @@ msgid "Use existing identity"
 msgstr "Уже есть аккаунт? Войти"
 
 msgid "Use these to regain access to your identity if you ever lose it."
-msgstr ""
+msgstr "Используйте их для восстановления доступа к вашей учётной записи, если вы его когда-либо потеряете."
 
 msgid "Verification failed"
-msgstr ""
+msgstr "Проверка не пройдена"
 
 msgid "Verify"
 msgstr "Проверить"
+
+msgid "Verify recovery phrase"
+msgstr "Подтвердить резервную фразу"
 
 msgid "Verify recovery to remove"
 msgstr "Чтобы удалить, сначала подтвердите резервную фразу"
@@ -1351,7 +1348,7 @@ msgid "Verify you are human"
 msgstr "Подтвердите, что вы человек"
 
 msgid "Verify your email"
-msgstr ""
+msgstr "Подтвердите ваш email"
 
 msgid "Verify your recovery phrase"
 msgstr "Подтвердите вашу резервную фразу"
@@ -1360,7 +1357,7 @@ msgid "Verifying..."
 msgstr "Проверка..."
 
 msgid "Verifying…"
-msgstr ""
+msgstr "Проверка…"
 
 msgid "View your last used identities"
 msgstr "Просмотреть ваши последние использованные учётные записи"
@@ -1372,16 +1369,16 @@ msgid "Waiting for your new device"
 msgstr "Ожидание вашего нового устройства"
 
 msgid "Waiting to receive…"
-msgstr ""
+msgstr "Ожидание получения…"
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
-msgstr ""
+msgstr "Мы пока не можем верифицировать почту от <0>{domain}</0>. Попробуйте другой адрес. Gmail, iCloud, Outlook, Fastmail и Proton поддерживаются."
 
 msgid "We didn't recognize that activation code."
 msgstr "Мы не распознали этот код активации."
 
-msgid "Welcome, {name}."
-msgstr ""
+msgid "Welcome, <0>{name}</0>."
+msgstr "Добро пожаловать, <0>{name}</0>."
 
 msgid "What are passkeys?"
 msgstr "Что такое ключи доступа?"
@@ -1402,10 +1399,10 @@ msgid "What's your name?"
 msgstr "Как вас зовут?"
 
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you (without ever sharing your personal info or a password)."
-msgstr ""
+msgstr "Когда вы создаёте ключ доступа, ваше устройство генерирует два связанных ключа. Один остаётся в безопасности на вашем устройстве, а второй передаётся приложению или сервису. Вместе они подтверждают, что это именно вы (никогда не передавая ваши личные данные или пароль)."
 
 msgid "Why isn't this supported?"
-msgstr ""
+msgstr "Почему это не поддерживается?"
 
 msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
 msgstr "С помощью ключей доступа вы теперь можете использовать свой отпечаток пальца, лицо или блокировку экрана, чтобы быстро и безопасно подтвердить, что это действительно вы."
@@ -1432,13 +1429,13 @@ msgid "You already have a {name} account linked"
 msgstr "У вас уже есть связанный аккаунт {name}"
 
 msgid "You are about to re-authenticate yourself with another access method."
-msgstr ""
+msgstr "Вы собираетесь пройти повторную аутентификацию с помощью другого метода доступа."
 
 msgid "You are about to remove your last remaining access method. Your recovery method will become your sole way of regaining access to this identity."
-msgstr ""
+msgstr "Вы собираетесь удалить свой последний оставшийся метод доступа. Ваш метод восстановления станет единственным способом восстановления доступа к этой учётной записи."
 
 msgid "You are about to unlink your last remaining access method. Your recovery method will become your sole way of regaining access to this identity."
-msgstr ""
+msgstr "Вы собираетесь отключить свой последний оставшийся метод доступа. Ваш метод восстановления станет единственным способом восстановления доступа к этой учётной записи."
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Вы обновляете ID <0>{identityNumber}</0>"
@@ -1456,13 +1453,13 @@ msgid "You can either sign out and keep your identity saved for a faster login n
 msgstr "Вы можете выйти, сохранив свои данные для более быстрого входа в следующий раз, или полностью убрать их с этого устройства."
 
 msgid "You can manage your access methods on this page."
-msgstr ""
+msgstr "Вы можете управлять своими методами доступа на этой странице."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
 msgstr "Вы можете сбросить свою резервную фразу в любое время — это защитит вашу учётную запись, если фраза окажется скомпрометирована."
 
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
-msgstr ""
+msgstr "Вы можете использовать её сейчас для восстановления, но убедитесь, что сохранили её правильно, чтобы впоследствии можно было на неё рассчитывать."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Вы достигли максимального количества ключей доступа"
@@ -1483,7 +1480,7 @@ msgid "You're about to sign in."
 msgstr "Вы собираетесь войти."
 
 msgid "You're about to unlink your {providerName} account."
-msgstr ""
+msgstr "Вы собираетесь отключить ваш аккаунт {providerName}."
 
 msgid "You're all set. Your identity has been created."
 msgstr "Все готово. Ваша учётная запись создана."
@@ -1494,29 +1491,20 @@ msgstr "Все готово. Ваш ключ доступа зарегистри
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Вы входите как <0>{name}</0>."
 
-msgid "Your identity and sign-in methods at a glance."
-msgstr "Ваша учётная запись и способы входа — всё в одном месте."
-
-msgid "Your identity name is currently not editable. It is only ever visible to you."
-msgstr "Имя учётной записи пока нельзя изменить. Оно видно только вам."
-
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
-msgstr ""
+msgstr "Ваши ключи доступа и резервная фраза не затронуты. Вы можете добавить резервный email снова в любое время."
 
 msgid "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."
-msgstr ""
+msgstr "DKIM-ключ вашего провайдера проверяется путём кворумного консенсуса среди независимых DNS-резолверов."
 
 msgid "Your provider's DKIM key is verified end-to-end via DNSSEC. No trusted intermediaries."
-msgstr ""
+msgstr "DKIM-ключ вашего провайдера проверяется сквозным способом через DNSSEC. Никаких доверенных посредников."
 
 msgid "Your recovery email has been detached from this identity."
-msgstr ""
+msgstr "Ваш резервный email был отвязан от этой учётной записи."
 
 msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
 msgstr "Резервная фраза даёт полный контроль над вашей учётной записью. Никогда никому её не сообщайте и вводите только на официальном сайте."
-
-msgid "Your recovery phrase is active, verify you saved it correctly."
-msgstr "Ваша резервная фраза активна, проверьте, что вы сохранили ее правильно."
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Ваша резервная фраза теперь активна и может быть сброшена в любое время."
