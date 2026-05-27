@@ -198,9 +198,7 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
         CacheLookup::Wait(fut) => {
             return fut.await;
         }
-        CacheLookup::Fetch(token) => {
-            token
-        }
+        CacheLookup::Fetch(token) => token,
     };
 
     // Fan out to every provider in parallel, then decide.

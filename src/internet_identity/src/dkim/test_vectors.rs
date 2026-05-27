@@ -23,7 +23,7 @@
 
 use super::types::VerificationFailReason;
 use crate::email_recovery::typestate::{
-    SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext, VerificationError,
+    SignedSmtpRequest, UnverifiedSmtpRequest, VerificationContext, VerificationError,
     VerifiedSmtpRequest,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
@@ -194,7 +194,7 @@ fn run(
 ) -> Result<VerifiedSmtpRequest, VerificationError> {
     let unverified = UnverifiedSmtpRequest::try_from(req)
         .expect("fixture must satisfy stage 1 (bounds + RFC 5322 §3.6)");
-    let projections: Vec<SignedSmtpRequestProjection> = unverified
+    let signed: SignedSmtpRequest = unverified
         .try_into()
         .expect("fixture must parse at least one DKIM-Signature");
     let ctx = VerificationContext {
@@ -202,7 +202,7 @@ fn run(
         dmarc_txt,
         now_secs: now,
     };
-    VerifiedSmtpRequest::try_from((projections, &ctx))
+    VerifiedSmtpRequest::try_from((signed, &ctx))
 }
 
 #[test]
@@ -301,27 +301,20 @@ fn rejects_wrong_public_key() {
 fn rejects_missing_dkim_signature_header() {
     // The DNS layer in production never delivers a message without a
     // DKIM-Signature; we exercise the negative path by stripping it.
-    // Under the typestate the rejection moves up to stage 1 —
-    // `validate_smtp_request` in the wire-types crate enforces RFC
-    // 5322 §3.6 (≥1 DKIM-Signature when a message is present), and
-    // stage 1's `TryFrom` surfaces the failure as the same
-    // `SmtpResponse::Err(555)` the gateway would receive.
-    use internet_identity_interface::internet_identity::types::smtp::{
-        SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
-    };
+    // Under the typestate the rejection happens at stage 2 — DKIM
+    // isn't an RFC 5322 §3.6 header, so stage 1 lets it pass through
+    // into `other_headers`; stage 2 walks that slice for signatures
+    // and fails with `DkimScopeError::NoSignature` when none are
+    // present.
+    use crate::email_recovery::typestate::DkimScopeError;
     let mut req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let message = req.message.as_mut().unwrap();
     message
         .headers
         .retain(|h| !h.name.eq_ignore_ascii_case("DKIM-Signature"));
-    match UnverifiedSmtpRequest::try_from(req).unwrap_err() {
-        SmtpResponse::Err(e) => {
-            assert_eq!(e.code, SMTP_ERR_SYNTAX_ERROR);
-            assert!(e.message.contains("'DKIM-Signature'"));
-            assert!(e.message.contains("at least once"));
-        }
-        other => panic!("expected SmtpResponse::Err(555), got {other:?}"),
-    }
+    let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must accept");
+    let err = SignedSmtpRequest::try_from(unverified).expect_err("stage 2 must reject");
+    assert!(matches!(err, DkimScopeError::NoSignature));
 }
 
 #[test]

@@ -460,11 +460,11 @@ mod tests {
 
     use super::super::types::VerificationFailReason;
     use crate::email_recovery::typestate::{
-        SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext, VerificationError,
+        SignedSmtpRequest, UnverifiedSmtpRequest, VerificationContext, VerificationError,
         VerifiedSmtpRequest,
     };
     use internet_identity_interface::internet_identity::types::smtp::{
-        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest, SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
+        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest,
     };
     use serde_bytes::ByteBuf;
 
@@ -511,7 +511,7 @@ mod tests {
         now_secs: u64,
     ) -> Result<VerifiedSmtpRequest, VerificationError> {
         let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must pass");
-        let projections: Vec<SignedSmtpRequestProjection> = unverified
+        let signed: SignedSmtpRequest = unverified
             .try_into()
             .expect("stage 2 must yield a projection");
         let ctx = VerificationContext {
@@ -519,18 +519,16 @@ mod tests {
             dmarc_txt: None,
             now_secs,
         };
-        VerifiedSmtpRequest::try_from((projections, &ctx))
+        VerifiedSmtpRequest::try_from((signed, &ctx))
     }
 
     #[test]
-    fn no_signature_surfaces_as_stage1_rfc_violation() {
-        // Stage 1 catches "no DKIM-Signature" before any DKIM-layer
-        // code runs. The user-visible meaning is unchanged ("no
-        // signature on this message") but the verdict now flows
-        // through `validate_smtp_request`'s SMTP 555 surface —
-        // encoding the fact that this is a wire-shape problem the
-        // canister boundary returns to the gateway without doing
-        // any cryptographic work.
+    fn no_signature_surfaces_at_stage2() {
+        // DKIM-Signature isn't RFC 5322 §3.6, so stage 1 doesn't
+        // enforce it. The rejection surfaces at stage 2, which walks
+        // `other_headers` for `DKIM-Signature` entries and errors out
+        // if none are present.
+        use crate::email_recovery::typestate::DkimScopeError;
         let req = SmtpRequest {
             envelope: Some(SmtpEnvelope {
                 from: addr("alice", "example.com"),
@@ -546,14 +544,9 @@ mod tests {
             }),
             gateway_flags: None,
         };
-        match UnverifiedSmtpRequest::try_from(req).unwrap_err() {
-            SmtpResponse::Err(e) => {
-                assert_eq!(e.code, SMTP_ERR_SYNTAX_ERROR);
-                assert!(e.message.contains("'DKIM-Signature'"));
-                assert!(e.message.contains("at least once"));
-            }
-            other => panic!("expected SmtpResponse::Err(555), got {other:?}"),
-        }
+        let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must accept");
+        let err = SignedSmtpRequest::try_from(unverified).expect_err("stage 2 must reject");
+        assert!(matches!(err, DkimScopeError::NoSignature));
     }
 
     #[test]

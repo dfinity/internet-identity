@@ -58,7 +58,7 @@
 
 use super::pending::{PartialVerification, PendingKind, PendingStatus};
 use super::typestate::{
-    DkimScopeError, SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext,
+    DkimScopeError, SignedSmtpRequest, UnverifiedSmtpRequest, VerificationContext,
     VerifiedSmtpRequest,
 };
 use crate::email_recovery::pending;
@@ -238,21 +238,21 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // typestate's builder. Failures map to SMTP 555.
     let unverified = match UnverifiedSmtpRequest::try_from(request) {
         Ok(u) => u,
-        Err(resp) => return resp,
+        Err(err) => return err.into(),
     };
 
     // Extract the canister-issued nonce from the Subject field. If
-    // there's no message body (envelope-only), no `II-Recovery-`
-    // prefix, or no pending challenge for the discovered nonce, treat
-    // the message as not for us and silently drop.
-    let nonce = {
-        let Some(message) = unverified.message() else {
-            return SmtpResponse::Ok {};
-        };
-        match find_nonce_in(message.subject()) {
-            Some(n) => n,
-            None => return SmtpResponse::Ok {},
-        }
+    // there's no message body (envelope-only), no Subject header, no
+    // `II-Recovery-` prefix, or no pending challenge for the
+    // discovered nonce, treat the message as not for us and silently
+    // drop.
+    let nonce = match unverified
+        .message()
+        .and_then(|m| m.subject())
+        .and_then(find_nonce_in)
+    {
+        Some(n) => n,
+        None => return SmtpResponse::Ok {},
     };
 
     let now_secs = now_secs();
@@ -494,15 +494,14 @@ fn prepare_partial_verification(
     now_secs: u64,
 ) -> Result<PartialVerification, EmailRecoveryError> {
     let zone = &snapshot.registered_domain;
-    let projections: Vec<SignedSmtpRequestProjection> =
-        unverified.try_into().map_err(map_scope_error)?;
+    let signed: SignedSmtpRequest = unverified.try_into().map_err(map_scope_error)?;
 
     // Pick the bottom-most signature whose d= anchors in the registered
     // zone. Forwarders that prepended their own DKIM-Signature with a
     // different `d=` are ignored — only the originator's signature
     // matters for the recovery proof.
-    let proj = projections
-        .iter()
+    let proj = signed
+        .projections()
         .rev()
         .find(|p| {
             let d = p.signature_domain();
@@ -594,10 +593,14 @@ fn prepare_partial_verification(
 /// user-facing `EmailRecoveryError`. Used by both the DoH and DNSSEC
 /// paths so the failure surface stays consistent.
 fn map_scope_error(err: DkimScopeError) -> EmailRecoveryError {
-    EmailRecoveryError::EmailVerificationFailed(format!(
-        "every DKIM-Signature failed to parse: {}",
-        err.per_signature.join("; ")
-    ))
+    let msg = match err {
+        DkimScopeError::NoSignature => "no DKIM-Signature header present".to_string(),
+        DkimScopeError::AllFailedToParse(diagnostics) => format!(
+            "every DKIM-Signature failed to parse: {}",
+            diagnostics.join("; ")
+        ),
+    };
+    EmailRecoveryError::EmailVerificationFailed(msg)
 }
 
 // =========================================================================
@@ -630,15 +633,14 @@ async fn verify_setup_email_doh(
             EmailRecoveryError::InternalCanisterError("stored claimed address has no '@'".into())
         })?;
 
-    let projections: Vec<SignedSmtpRequestProjection> =
-        unverified.try_into().map_err(map_scope_error)?;
+    let signed: SignedSmtpRequest = unverified.try_into().map_err(map_scope_error)?;
 
     // Bottom-up: pick the lowest signature whose d= equals the claimed-
     // address domain. The DKIM TXT we fetch must be for THIS signer —
     // if the claimed-address has no signature on this message, the
     // recovery proof can't be built and we fail closed.
-    let selector = projections
-        .iter()
+    let selector = signed
+        .projections()
         .rev()
         .find(|p| p.signature_domain().eq_ignore_ascii_case(&domain))
         .map(|p| p.signature_selector().to_string())
@@ -682,7 +684,7 @@ async fn verify_setup_email_doh(
         dmarc_txt: dmarc_txt_opt,
         now_secs,
     };
-    let verified = VerifiedSmtpRequest::try_from((projections, &ctx))
+    let verified = VerifiedSmtpRequest::try_from((signed, &ctx))
         .map_err(|e| EmailRecoveryError::EmailVerificationFailed(format!("{:?}", e.last_reason)))?;
 
     // Verify the From: matches the claimed address. The verifier

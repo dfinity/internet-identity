@@ -230,11 +230,9 @@ fn status_flips_to_expired_after_ttl() {
 }
 
 /// Headers that satisfy the typestate's stage-1 RFC 5322 §3.6
-/// well-formedness pass (exactly-once `From`/`Date`/`Subject`, at-
-/// least-once `DKIM-Signature`). The DKIM-Signature value here is a
-/// placeholder — the silent-drop tests below short-circuit before
-/// any DKIM math runs, so the placeholder's bh=/b= never get
-/// validated.
+/// well-formedness pass (exactly-once `From`/`Date`/`Subject`). The
+/// silent-drop tests below short-circuit before stage 2, so no
+/// DKIM-Signature header is needed.
 fn silent_drop_headers(subject_value: &str) -> Vec<SmtpHeader> {
     vec![
         SmtpHeader {
@@ -252,16 +250,6 @@ fn silent_drop_headers(subject_value: &str) -> Vec<SmtpHeader> {
         SmtpHeader {
             name: "Subject".into(),
             value: subject_value.into(),
-        },
-        // Placeholder signature — never actually verified on the
-        // silent-drop path. Present only so stage 1's "at least one
-        // DKIM-Signature when message present" check passes.
-        SmtpHeader {
-            name: "DKIM-Signature".into(),
-            value: "v=1; a=rsa-sha256; d=test.example.com; s=test1; \
-                    c=relaxed/relaxed; h=From:Subject:Date; \
-                    bh=MTIzNDU2; b=YWJj"
-                .into(),
         },
     ]
 }
@@ -350,6 +338,10 @@ fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
                 SmtpHeader {
                     name: "From".into(),
                     value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
                 },
                 SmtpHeader {
                     name: "To".into(),

@@ -63,7 +63,7 @@
    * "active" right after a successful binding without waiting for
    * the next route load to re-fetch.
    */
-  let emailRecovery = $derived(data.identityInfo.email_recovery[0]);
+  let emailRecovery = $derived(data.identityInfo.email_recovery[0]?.[0]);
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(

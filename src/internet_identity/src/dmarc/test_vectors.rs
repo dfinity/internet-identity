@@ -16,7 +16,7 @@ use super::types::{AlignmentMode, DmarcOutcome, DmarcPolicy};
 use crate::dkim::test_vectors::parse_eml;
 use crate::dkim::VerificationFailReason;
 use crate::email_recovery::typestate::{
-    SignedSmtpRequestProjection, UnverifiedSmtpRequest, VerificationContext, VerificationError,
+    SignedSmtpRequest, UnverifiedSmtpRequest, VerificationContext, VerificationError,
     VerifiedSmtpRequest,
 };
 
@@ -40,7 +40,7 @@ fn run(
 ) -> Result<VerifiedSmtpRequest, VerificationError> {
     let unverified = UnverifiedSmtpRequest::try_from(req)
         .expect("fixture must satisfy stage 1 (bounds + RFC 5322 §3.6)");
-    let projections: Vec<SignedSmtpRequestProjection> = unverified
+    let signed: SignedSmtpRequest = unverified
         .try_into()
         .expect("fixture must parse at least one DKIM-Signature");
     let ctx = VerificationContext {
@@ -48,7 +48,7 @@ fn run(
         dmarc_txt,
         now_secs: now,
     };
-    VerifiedSmtpRequest::try_from((projections, &ctx))
+    VerifiedSmtpRequest::try_from((signed, &ctx))
 }
 
 #[test]

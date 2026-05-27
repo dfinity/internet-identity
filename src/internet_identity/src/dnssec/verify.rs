@@ -318,11 +318,8 @@ fn verify_root_dnskey(
                 continue;
             }
             had_digest_match = true;
-            match verify_rrsig_under_dnskey(
-                root_dnskey,
-                dnskey_rdata,
-                root_dnskey.rrsig.algorithm,
-            ) {
+            match verify_rrsig_under_dnskey(root_dnskey, dnskey_rdata, root_dnskey.rrsig.algorithm)
+            {
                 Ok(()) => return Ok(()),
                 Err(e) => last_signature_err = Some(e),
             }

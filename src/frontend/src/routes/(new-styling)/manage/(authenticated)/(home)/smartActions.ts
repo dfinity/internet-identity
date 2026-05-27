@@ -61,7 +61,7 @@ const getRecoveryPhraseState = (
 };
 
 const hasEmailRecovery = (identityInfo: IdentityInfo): boolean =>
-  identityInfo.email_recovery[0] !== undefined;
+  identityInfo.email_recovery[0]?.[0] !== undefined;
 
 /**
  * Derives a contextual list of dashboard actions for the user's

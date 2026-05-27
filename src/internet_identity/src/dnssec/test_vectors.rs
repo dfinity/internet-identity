@@ -32,9 +32,7 @@
 //! This module is gated `#[cfg(test)]` at its declaration in
 //! `dnssec/mod.rs`, so no inner gate is needed here.
 
-use super::types::{
-    DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset,
-};
+use super::types::{DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
 use internet_identity_interface::internet_identity::types::DnssecRootAnchor;
 use serde::Deserialize;
 use serde_bytes::ByteBuf;
