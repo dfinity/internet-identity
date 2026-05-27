@@ -10,13 +10,15 @@
 #   each upgrade:
 #     * `backend_origin` and `related_origins` (FE + BE) — staging environments
 #       often front custom domains in addition to the canister-default URLs,
-#       and silently overwriting the on-chain lists has bitten us in the past;
+#       and silently overwriting the on-chain lists has bitten us in the past.
 #     * the behavior knobs `dev_csp` / `dummy_auth` / `analytics_config` (FE).
-#   Defaults are read from the canister's current `/.config` (FE, Candid text)
-#   or `/.config.did.bin` (BE, decoded via `didc` against the BE `.did`), so
-#   hitting Enter through preserves the existing on-chain values. Everything
-#   else is derived from the shared (BE_ID, FE_ID, BE_URL, FE_URL) quad or left
-#   absent so the BE preserves prior state.
+#   FE defaults are parsed from the canister's `/.config` Candid-text endpoint,
+#   which faithfully exposes its required (non-opt) record. The BE's
+#   `/.config.did.bin` only mirrors a `synchronized` subset of init args
+#   (`openid_configs`, …) — `backend_origin` / `related_origins` aren't in
+#   that subset — so the BE prompts default to `null` (= preserve under the
+#   `opt`-field semantics of `InternetIdentityInit`'s `post_upgrade`) and the
+#   operator types `opt "..."` to set explicit new values.
 # - Install-arg builders that emit Candid text for each canister.
 # - An icp install runner that honours --dry-run.
 #
@@ -584,69 +586,33 @@ prompt_fe_extra_args() {
 }
 
 # -------------------------
-# Per-BE interactive prompts for the install-arg fields where the on-chain
-# value matters and the staging-quad-derived default would silently
-# overwrite a custom-domain setup: `backend_origin` and `related_origins`.
+# Per-BE interactive prompts for `backend_origin` and `related_origins`.
 #
-# The BE init type is `opt InternetIdentityInit` where every field is itself
-# `opt` and "absent = preserve previous value", so unlike the FE we *could*
-# stay silent by emitting `null` for both fields — but that resets them
-# rather than preserving, which is just as destructive. Prompting with the
-# decoded on-chain values as defaults makes "hit Enter through" actually
-# preserve current state.
+# The BE init type wraps every field in `opt`, and the canister's
+# `post_upgrade` treats `null` as "leave the previously stored value
+# untouched" — so emitting `null` for either field on upgrade is the
+# safe preserve default, not destructive. Hitting Enter through these
+# prompts therefore guarantees that any custom-domain config currently
+# on chain is left in place; the operator only departs from `null` if
+# they explicitly want to set new values.
 #
-# The BE config endpoint serves binary Candid (`/.config.did.bin`), so we
-# need `didc` plus the BE `.did` schema to decode it for human-readable
-# field names. If either is missing we fall back to the canister-URL
-# defaults with a loud warning.
+# We deliberately don't try to read the live on-chain values back to
+# fill the defaults: the BE's `/.config.did.bin` endpoint only mirrors
+# the `synchronized` subset of init args (currently `openid_configs`
+# and a couple of others), so `backend_origin` / `related_origins`
+# decode as `null` there regardless of what was actually set at last
+# upgrade. Using `null` defaults is honest about that — anything else
+# would imply we know the on-chain values when we don't.
 # -------------------------
 prompt_be_extra_args() {
-    local scripts_dir
-    scripts_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    local did_file="$scripts_dir/../src/internet_identity/internet_identity.did"
-    local config_url="${BE_URL}/.config.did.bin"
-
-    # Fallback defaults — see warning text below for what these do on chain.
-    local backend_origin_default="opt \"$BE_URL\""
-    local related_origins_default="opt vec { \"$FE_URL\" }"
-
     echo "" >&2
-    if ! ensure_pinned_didc 2>/dev/null; then
-        echo "Note: pinned didc download failed — skipping BE config decode." >&2
-        echo "      Defaults below are derived from the staging quad, NOT live values." >&2
-        echo "      Hitting Enter through will OVERWRITE any custom-domain config on chain." >&2
-    elif [ ! -f "$did_file" ]; then
-        echo "Note: BE .did schema not found at $did_file — skipping BE config decode." >&2
-        echo "      Defaults below are derived from the staging quad, NOT live values." >&2
-    else
-        echo "Fetching current BE config from $config_url ..." >&2
-        local tmp
-        tmp=$(mktemp)
-        if ! curl --connect-timeout 10 --max-time 30 -sfL "$config_url" -o "$tmp" 2>/dev/null \
-                || [ ! -s "$tmp" ]; then
-            echo "  Warning: could not fetch BE config; defaults are derived from the staging quad, NOT live values." >&2
-        else
-            local decoded
-            decoded=$("$PINNED_DIDC" decode -d "$did_file" -t '(InternetIdentityInit)' \
-                "$(xxd -p "$tmp" | tr -d '\n')" 2>/dev/null || true)
-            if [ -z "$decoded" ]; then
-                echo "  Warning: \`$PINNED_DIDC decode\` failed; defaults are derived from the staging quad." >&2
-            else
-                local parsed
-                parsed=$(_parse_candid_field "backend_origin" "$decoded")
-                [ -n "$parsed" ] && backend_origin_default="$parsed"
-                parsed=$(_parse_candid_field "related_origins" "$decoded")
-                [ -n "$parsed" ] && related_origins_default="$parsed"
-            fi
-        fi
-        rm -f "$tmp"
-    fi
+    echo "Backend install-arg prompts (Enter = null = preserve previous on-chain value):" >&2
 
-    echo "" >&2
-    echo "Backend install-arg prompts (hit Enter to keep current value):" >&2
-
-    BE_BACKEND_ORIGIN_ARG=$(prompt_default  "backend_origin (opt text)"       "$backend_origin_default")
-    BE_RELATED_ORIGINS_ARG=$(prompt_default "related_origins (opt vec text)"  "$related_origins_default")
+    # Defaults are `null` (preserve). To set a value, type the full
+    # Candid expression at the prompt — e.g. `opt "https://backend.beta.id.ai"`
+    # or `opt vec { "https://beta.id.ai"; "https://beta.identity.icp0.io" }`.
+    BE_BACKEND_ORIGIN_ARG=$(prompt_default  "backend_origin (opt text)"       "null")
+    BE_RELATED_ORIGINS_ARG=$(prompt_default "related_origins (opt vec text)"  "null")
 }
 
 # -------------------------
