@@ -113,7 +113,7 @@ Without all three, no actor (boundary node, MITM, replicating outcall transport,
 
 - Compromise of the IdP's signing key. Every credential issued by that IdP is at risk; that is the unavoidable trust assumption of any OIDC integration.
 - Compromise of the user's device / browser that holds the session_sk. Standard endpoint compromise — out of scope.
-- Phishing the user into completing an OAuth flow on a malicious site impersonating Internet Identity. This is the standard "website phishing" problem; we don't try to solve it in this layer. The II-specific `<discovery_domain>/.well-known/ii-openid-configuration` file is a soft mitigation against a *registered SSO* being phishable — an attacker can't trivially pose as an existing SSO without controlling that domain's `.well-known/` path — but it does not defend against a user being lured to a fake II frontend.
+- Phishing the user into entering credentials on a fake II frontend. This is the standard "website phishing" problem; we don't try to solve it in this layer. Note that the OAuth flow itself is structurally protected: the SSO IdP only redirects to `redirect_uri` values pre-registered for II's `client_id`, so a fake II at `evil.example` cannot complete an OAuth roundtrip against a real registered SSO — the IdP refuses to redirect there. The residual phishing surface is anything the fake II does without involving a real SSO (e.g., harvesting passkey prompts).
 
 ---
 
