@@ -590,7 +590,7 @@ msgstr "Internet Identity اتنی ہی محفوظ ہے جتنے وہ تصدیق
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity آپ کو ایپس اور سروسز تک محفوظ رسائی دیتی ہے، بغیر پاس ورڈ بنائے، ذاتی معلومات شیئر کیے، یا اپنا کنٹرول چھوڑے۔"
 
-msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background. You don’t need to manage anything."
+msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background. You don't need to manage anything."
 msgstr "Internet Identity آپ کا ذاتی ڈیٹا، جیسے آپ کی ای میل، کبھی بھی ایپس یا ویب سائٹس کے ساتھ شیئر نہیں کرتی۔ اس کی بجائے، یہ ہر ایپ میں آپ کے لیے ایک منفرد فرضی نام بناتی ہے۔ ہر ایپ کو ایک مختلف نام ملتا ہے، اس لیے وہ سروسز میں آپ کو ٹریک نہیں کر سکتیں۔ یہ سب پس پردہ خودکار طریقے سے ہوتا ہے۔ آپ کو کچھ بھی منظم کرنے کی ضرورت نہیں۔"
 
 msgid "Internet Identity number"
