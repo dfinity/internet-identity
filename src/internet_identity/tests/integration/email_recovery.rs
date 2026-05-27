@@ -255,6 +255,10 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
                     value: TEST_ADDRESS.into(),
                 },
                 SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
+                },
+                SmtpHeader {
                     name: "To".into(),
                     value: "register@id.ai".into(),
                 },
@@ -292,6 +296,10 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
                 SmtpHeader {
                     name: "From".into(),
                     value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
                 },
                 SmtpHeader {
                     name: "To".into(),
@@ -339,6 +347,10 @@ fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
                 SmtpHeader {
                     name: "From".into(),
                     value: TEST_ADDRESS.into(),
+                },
+                SmtpHeader {
+                    name: "Date".into(),
+                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
                 },
                 SmtpHeader {
                     name: "To".into(),
