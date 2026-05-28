@@ -1,7 +1,6 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { Trans } from "$lib/components/locale";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
@@ -37,15 +36,15 @@
 </p>
 <Checkbox
   bind:checked={isAcknowledged}
-  label={$t`I Acknowledge`}
+  label={$t`I acknowledge`}
   hint={$t`I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost.`}
   size="sm"
   class="mb-8"
 />
-<Button
+<button
+  class="btn btn-primary btn-lg"
   onclick={handleAcknowledge}
   disabled={!isAcknowledged || isGeneratingPhrase}
-  size="lg"
 >
   {#if isGeneratingPhrase}
     <ProgressRing />
@@ -53,4 +52,4 @@
   {:else}
     <span>{$t`Continue`}</span>
   {/if}
-</Button>
+</button>

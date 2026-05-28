@@ -17,7 +17,7 @@ test.describe("First visit", () => {
     await page.waitForURL(II_URL + "/manage");
     await expect(
       page.getByRole("heading", {
-        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
+        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}\\.`),
       }),
     ).toBeVisible();
   });
@@ -126,16 +126,14 @@ test.describe("First visit", () => {
       if (await existingMenuButton.isVisible()) {
         await existingMenuButton.click();
       }
-      await existingDevicePage
-        .getByRole("link", { name: "Access and recovery" })
-        .click();
+      await existingDevicePage.getByRole("link", { name: "Access" }).click();
       await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
       // Switch to new device and verify we are signed in
       await newDevicePage.waitForURL(II_URL + "/manage");
       await expect(
         newDevicePage.getByRole("heading", {
-          name: new RegExp(`Welcome, ${identities[0].name}!`),
+          name: new RegExp(`Welcome, ${identities[0].name}\\.`),
         }),
       ).toBeVisible();
     } finally {
@@ -180,7 +178,7 @@ test.describe("First visit", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -224,7 +222,7 @@ test.describe("First visit", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -263,7 +261,7 @@ test.describe("First visit", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -301,7 +299,7 @@ test.describe("First visit", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -369,7 +367,7 @@ test.describe("First visit", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -426,7 +424,7 @@ test.describe("First visit", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -450,7 +448,7 @@ test.describe("Last used identities listed", () => {
     await page.waitForURL(II_URL + "/manage");
     await expect(
       page.getByRole("heading", {
-        name: new RegExp(`Welcome, ${identities[0].name}!`),
+        name: new RegExp(`Welcome, ${identities[0].name}\\.`),
       }),
     ).toBeVisible();
   });
@@ -549,7 +547,7 @@ test.describe("Last used identities listed", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });
@@ -605,7 +603,7 @@ test.describe("Last used identities listed", () => {
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}!`),
+          name: new RegExp(`Welcome, ${name}\\.`),
         }),
       ).toBeVisible();
     });

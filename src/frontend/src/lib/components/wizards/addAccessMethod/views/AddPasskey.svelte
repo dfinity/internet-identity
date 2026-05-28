@@ -1,6 +1,5 @@
 <script lang="ts">
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -56,9 +55,9 @@
     hidden={!isCancelled}
     manual
   >
-    <Button
+    <button
+      class="btn btn-primary btn-lg"
       onclick={handleCreatePasskey}
-      size="lg"
       disabled={isCreatingPasskey}
     >
       {#if isCreatingPasskey}
@@ -67,14 +66,13 @@
       {:else}
         <span>{$t`Create passkey`}</span>
       {/if}
-    </Button>
+    </button>
   </Tooltip>
-  <Button
+  <button
+    class="btn btn-tertiary btn-lg"
     onclick={continueOnAnotherDevice}
-    variant="tertiary"
-    size="lg"
     disabled={isCreatingPasskey}
   >
     {$t`Continue on another device`}
-  </Button>
+  </button>
 </div>

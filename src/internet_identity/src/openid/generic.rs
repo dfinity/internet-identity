@@ -576,17 +576,16 @@ fn validate_discovery_url(url: &str) -> Result<(), String> {
     match parsed.scheme() {
         "https" => Ok(()),
         "http" => {
-            let host = host_with_port(&parsed)
-                .ok_or_else(|| format!("URL has no host: {url}"))?;
+            let host = host_with_port(&parsed).ok_or_else(|| format!("URL has no host: {url}"))?;
             if is_allowlisted_host(&host) {
                 Ok(())
             } else {
-                Err(format!("http scheme not allowed for non-allowlisted host '{host}'"))
+                Err(format!(
+                    "http scheme not allowed for non-allowlisted host '{host}'"
+                ))
             }
         }
-        other => Err(format!(
-            "expected http(s) scheme, got '{other}'"
-        )),
+        other => Err(format!("expected http(s) scheme, got '{other}'")),
     }
 }
 

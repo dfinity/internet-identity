@@ -4,7 +4,6 @@
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { issuerMatches } from "$lib/utils/openID";
   import { backendCanisterConfig } from "$lib/globals";
@@ -94,13 +93,11 @@
             label={$t`You already have a ${name} account linked`}
             hidden={!hasCredential(provider.issuer)}
           >
-            <Button
+            <button
+              class="btn btn-secondary btn-xl flex-1"
               onclick={() => handleContinueWithOpenId(provider)}
-              variant="secondary"
               disabled={authenticatingProviderId !== undefined ||
                 hasCredential(provider.issuer)}
-              size="xl"
-              class="flex-1"
               aria-label={$t`Continue with ${name}`}
             >
               {#if authenticatingProviderId === provider.client_id}
@@ -111,7 +108,7 @@
                   {@html provider.logo}
                 </div>
               {/if}
-            </Button>
+            </button>
           </Tooltip>
         </Tooltip>
       {/each}
@@ -120,32 +117,29 @@
         screen calls `add_discoverable_oidc_config` on submit; domains not on
         the backend canary allowlist are rejected there.
       -->
-      <Button
+      <button
+        class="btn btn-secondary btn-xl flex-1"
         onclick={signInWithSso}
-        variant="secondary"
         disabled={authenticatingProviderId !== undefined}
-        size="xl"
-        class="flex-1"
         aria-label={$t`Continue with SSO`}
       >
         <SsoIcon class="size-6" />
-      </Button>
+      </button>
     </div>
     <Tooltip
       label={$t`You have reached the maximum number of passkeys`}
       hidden={maxPasskeysReached !== true}
     >
-      <Button
+      <button
+        class="btn btn-secondary btn-xl"
         onclick={continueWithPasskey}
-        variant="secondary"
         disabled={!isPasskeySupported ||
           authenticatingProviderId !== undefined ||
           maxPasskeysReached}
-        size="xl"
       >
         <PasskeyIcon />
         <span>{$t`Continue with passkey`}</span>
-      </Button>
+      </button>
     </Tooltip>
   </div>
 </div>

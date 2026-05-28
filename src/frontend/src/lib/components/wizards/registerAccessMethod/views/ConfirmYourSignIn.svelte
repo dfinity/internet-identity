@@ -1,6 +1,5 @@
 <script lang="ts">
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -43,11 +42,15 @@
     sign-ins.
   </Trans>
 </p>
-<Button onclick={handleCreatePasskey} size="xl" disabled={isCreatingPasskey}>
+<button
+  class="btn btn-primary btn-xl"
+  onclick={handleCreatePasskey}
+  disabled={isCreatingPasskey}
+>
   {#if isCreatingPasskey}
     <ProgressRing />
     <span>{$t`Creating passkey...`}</span>
   {:else}
     <span>{$t`Create passkey`}</span>
   {/if}
-</Button>
+</button>

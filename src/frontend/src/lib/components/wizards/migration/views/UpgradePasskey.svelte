@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { waitFor } from "$lib/utils/utils";
@@ -95,10 +94,9 @@
       hidden={!isCancelled}
       manual
     >
-      <Button
+      <button
+        class="btn btn-primary btn-lg"
         onclick={handleCreate}
-        variant="primary"
-        size="lg"
         type="submit"
         disabled={name.length === 0 || name.length > 64 || isUpgrading}
       >
@@ -108,7 +106,7 @@
         {:else}
           <span>{$t`Upgrade identity`}</span>
         {/if}
-      </Button>
+      </button>
     </Tooltip>
     <p class="text-text-secondary text-center text-xs">
       <Trans>

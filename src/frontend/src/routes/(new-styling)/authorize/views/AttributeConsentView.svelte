@@ -8,7 +8,6 @@
   import { backendCanisterConfig } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import AttributePicker from "./AttributePicker.svelte";
   import {
@@ -229,7 +228,7 @@
     <AuthorizeHeader origin={data.effectiveOrigin} />
     <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
       {#if variant === "openid"}
-        {$t`Review Permissions`}
+        {$t`Review permissions`}
       {:else}
         {$t`Allow to access this info`}
       {/if}
@@ -300,15 +299,14 @@
       onclick={() => handleDenyAll(data.groups)}
       class="text-text-secondary mb-6 self-start text-sm font-medium hover:underline"
     >
-      {$t`Deny All`}
+      {$t`Deny all`}
     </button>
 
-    <Button
+    <button
+      class="btn btn-primary btn-xl w-full"
       onclick={() => handleContinue(data.groups)}
-      size="xl"
-      class="w-full"
     >
       {$t`Continue`}
-    </Button>
+    </button>
   </div>
 {/await}

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -74,6 +73,12 @@
   });
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * Aborts the in-flight `discoverSsoConfig` from a previous keystroke so a
+   * new lookup doesn't pile up behind it. Replaced on every fresh lookup
+   * and aborted on unmount.
+   */
+  let lookupController: AbortController | undefined;
 
   /**
    * Map caught errors to user-actionable copy, or `undefined` for
@@ -94,8 +99,11 @@
       if (e.reason === "http-error" && e.httpStatus !== undefined) {
         return $t`${domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP ${String(e.httpStatus)}).`;
       }
+      if (e.reason === "timeout") {
+        return $t`${domainInput} took too long to respond. Try again in a moment.`;
+      }
       if (e.reason === "network") {
-        return $t`Couldn't reach ${domainInput}. Check the spelling and your network.`;
+        return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
       }
       return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed.`;
     }
@@ -122,12 +130,6 @@
       if (msg.toLowerCase().includes("canary allowlist")) {
         return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
       }
-      if (msg.startsWith("Rate limited:")) {
-        return $t`Too many recent attempts for ${domainInput}. Wait a few minutes.`;
-      }
-      if (msg === "Too many concurrent SSO discovery requests") {
-        return $t`Several SSO sign-ins are in flight already. Wait a moment.`;
-      }
     }
     return undefined;
   };
@@ -152,6 +154,8 @@
       clearTimeout(debounceTimer);
       debounceTimer = undefined;
     }
+    lookupController?.abort();
+    lookupController = undefined;
     isLookingUp = false;
   };
 
@@ -181,22 +185,32 @@
       return;
     }
 
+    const controller = new AbortController();
+    lookupController = controller;
     debounceTimer = setTimeout(async () => {
       debounceTimer = undefined;
       isLookingUp = true;
       // The input may change again while these awaits are in flight; we
       // only apply / error-out when our `trimmed` is still the current
-      // domain, so a stale response can't clobber a fresher one.
+      // domain, so a stale response can't clobber a fresher one. The
+      // matching `lookupController` is also aborted by `invalidatePrepared`,
+      // which causes `discoverSsoConfig` to reject with `AbortError` —
+      // explicitly ignored below since cancellation isn't a user error.
       const matchesCurrent = () => trimmed === domain.trim().toLowerCase();
       try {
         await anonymousActor.add_discoverable_oidc_config({
           discovery_domain: trimmed,
         });
-        const result = await discoverSsoConfig(trimmed);
+        const result = await discoverSsoConfig(trimmed, controller.signal);
         if (matchesCurrent()) {
           preparedResult = result;
         }
       } catch (e) {
+        // Cancelled by a fresher keystroke — silently drop. Distinguishing
+        // on `controller.signal.aborted` (not just the error's name) means
+        // we don't accidentally swallow a hop-2 timeout, which surfaces as
+        // an `AbortError` too but isn't user-initiated.
+        if (controller.signal.aborted) return;
         if (matchesCurrent()) {
           setErrorFrom(e, trimmed);
         }
@@ -235,6 +249,7 @@
     inputRef?.focus();
     return () => {
       if (debounceTimer !== undefined) clearTimeout(debounceTimer);
+      lookupController?.abort();
     };
   });
 </script>
@@ -279,9 +294,8 @@
         {$t`This SSO is already linked to your identity.`}
       </p>
     {/if}
-    <Button
-      variant="primary"
-      size="lg"
+    <button
+      class="btn btn-primary btn-lg"
       type="submit"
       disabled={preparedResult === undefined ||
         isSubmitting ||
@@ -297,7 +311,7 @@
       {:else}
         <span>{$t`Continue`}</span>
       {/if}
-    </Button>
+    </button>
     <button
       type="button"
       onclick={goBack}

@@ -42,6 +42,7 @@ test("should resolve canister id from well-known domain", async () => {
   const wellKnownDomains = [
     "ic0.app",
     "icp0.io",
+    "icp.net",
     "internetcomputer.org",
     "localhost",
   ];
@@ -60,6 +61,34 @@ test("should resolve canister id from well-known domain", async () => {
   }
   // make sure fetch was not called
   expect(global.fetch).toHaveBeenCalledTimes(0);
+});
+
+test("should not infer canister id from adversarial look-alike domains", async () => {
+  // Hostnames like `evil-ic0.app` end with `ic0.app` but are not the IC.
+  // The well-known shortcut must not fire for them; fall through to BN lookup.
+  const fetchMock = vi.fn();
+  fetchMock.mockReturnValue(
+    new Response(null, {
+      status: 200,
+      headers: [["x-ic-canister-id", "bkyz2-fmaaa-aaaaa-qaaaq-cai"]],
+    }),
+  );
+  global.fetch = fetchMock;
+
+  const canisterId = "bkyz2-fmaaa-aaaaa-qaaaq-cai";
+  const lookalikes = [
+    `https://${canisterId}.evil-ic0.app`,
+    `https://${canisterId}.evil-icp0.io`,
+    `https://${canisterId}.evil-icp.net`,
+    `https://${canisterId}.myinternetcomputer.org`,
+  ];
+
+  for (const origin of lookalikes) {
+    await resolveCanisterId({ origin });
+  }
+
+  // BN lookup performed for each (i.e. shortcut did not fire).
+  expect(fetchMock).toHaveBeenCalledTimes(lookalikes.length);
 });
 
 test("should not resolve canister id from malformed header", async () => {

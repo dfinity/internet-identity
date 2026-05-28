@@ -38,11 +38,17 @@ const parseCanisterIdFromHostname = (
   const wellKnownDomains = [
     "ic0.app",
     "icp0.io",
+    "icp.net",
     "internetcomputer.org",
     "localhost",
   ];
 
-  if (wellKnownDomains.some((domain) => hostname.endsWith(domain))) {
+  // Match by exact equality or by a dot boundary so adversarial subdomains
+  // like `evil-ic0.app` are not treated as well-known IC domains.
+  const matchesWellKnown = wellKnownDomains.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+  );
+  if (matchesWellKnown) {
     // The canister is running on a well-known domain, infer the canister ID from the hostname directly
     // (e.g. bd3sg-teaaa-aaaaa-qaaba-cai.localhost -> bd3sg-teaaa-aaaaa-qaaba-cai)
     const domainParts = hostname.split(".");

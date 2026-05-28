@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import { CopyIcon } from "@lucide/svelte";
   import QrCode from "$lib/components/ui/QrCode.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -39,16 +38,15 @@
   </div>
   <QrCode text={url.href} class="size-32 self-center" />
   <Tooltip label={$t`Link copied to clipboard`} hidden={!copied} manual>
-    <Button
+    <button
+      class="btn btn-secondary btn-xl"
       onclick={handleCopyLink}
-      variant="secondary"
-      size="xl"
       aria-label={$t`Pairing link`}
     >
       <span>
         {url.host + url.pathname + url.hash}
       </span>
       <CopyIcon class="size-5" />
-    </Button>
+    </button>
   </Tooltip>
 </div>

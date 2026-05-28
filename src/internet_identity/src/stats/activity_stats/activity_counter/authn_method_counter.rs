@@ -22,6 +22,8 @@ pub struct AuthnMethodCounter {
     pub browser_storage_key_counter: u64,
     /// Number of authentications with an OpenID credential per issuer
     pub openid_credential_auth_counter: Option<HashMap<String, u64>>,
+    /// Number of authentications via an email-recovery delegation.
+    pub email_recovery_counter: Option<u64>,
     /// Number of authentications with a key not fitting any of the above criteria.
     pub other_counter: u64,
 }
@@ -37,6 +39,7 @@ impl ActivityCounter for AuthnMethodCounter {
             recovery_phrase_counter: 0,
             browser_storage_key_counter: 0,
             openid_credential_auth_counter: Some(HashMap::new()),
+            email_recovery_counter: Some(0),
             other_counter: 0,
         }
     }
@@ -57,6 +60,11 @@ impl ActivityCounter for AuthnMethodCounter {
             AuthorizationKey::OpenIdCredentialKey((openid_credential_key, _)) => anchor
                 .openid_credential(openid_credential_key)
                 .and_then(|c| c.last_usage_timestamp),
+            AuthorizationKey::EmailRecoveryAddress(address) => anchor
+                .email_recovery
+                .iter()
+                .find(|c| c.address.eq_ignore_ascii_case(address))
+                .and_then(|c| c.last_used),
         };
 
         // only count authentications on devices that have not already been counted
@@ -105,6 +113,11 @@ impl ActivityCounter for AuthnMethodCounter {
                             .and_modify(|count| *count += 1)
                             .or_insert(1);
                     }
+                }
+            }
+            AuthorizationKey::EmailRecoveryAddress(_) => {
+                if let Some(counter) = &mut self.email_recovery_counter {
+                    *counter += 1;
                 }
             }
         }

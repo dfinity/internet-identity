@@ -36,5 +36,25 @@
         email_verification = opt variant { Microsoft };
       };
     };
+    // Trust anchor for the test DNSSEC chain assembled by the e2e
+    // signer at `src/frontend/tests/e2e-playwright/utils/dnssecTestSigner.ts`.
+    // The root keypair is derived from a fixed seed (`[1u8; 32]`) so the
+    // digest below is deterministic. Candid is static so the bytes have
+    // to be inlined here, but they are *not* the source of truth — to
+    // refresh after a seed change run:
+    //
+    //   node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs
+    //
+    // and replace the record below with the script's output.
+    dnssec_config = opt opt record {
+      root_anchors = vec {
+        record {
+          key_tag = 60_795 : nat16;
+          algorithm = 15 : nat8;
+          digest_type = 2 : nat8;
+          digest = blob "\64\9a\3a\39\ee\9c\7c\3d\4b\f3\b8\79\52\1a\c8\b7\6b\05\d8\59\8f\ac\a5\36\04\ad\a9\a4\d4\23\93\3a";
+        };
+      };
+    };
   },
 )

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
@@ -50,7 +49,7 @@
   </div>
   <div class="mb-8 flex flex-col gap-2">
     <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
-      {$t`Identity upgraded!`}
+      {$t`Identity upgraded.`}
     </h1>
     <p
       class="text-text-tertiary text-center text-base font-medium text-balance"
@@ -61,7 +60,7 @@
       </Trans>
     </p>
   </div>
-  <Button variant="primary" onclick={handleRedirect}>
+  <button class="btn btn-primary" onclick={handleRedirect}>
     {#if countdown >= 0}
       <Trans>
         Go to the app - (<span class="tabular-nums">{countdown}</span>)
@@ -69,5 +68,5 @@
     {:else}
       <Trans>Go to the app</Trans>
     {/if}
-  </Button>
+  </button>
 </div>

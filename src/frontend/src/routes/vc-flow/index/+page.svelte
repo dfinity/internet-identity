@@ -23,6 +23,8 @@
     captcha_config: [],
     dummy_auth: [],
     register_rate_limit: [],
+    doh_config: [],
+    dnssec_config: [],
   });
 </script>
 

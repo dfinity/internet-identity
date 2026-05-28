@@ -52,6 +52,11 @@ mod attributes;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
+mod dkim;
+mod dmarc;
+mod dnssec;
+mod doh;
+mod email_recovery;
 mod http;
 mod ii_domain;
 
@@ -642,6 +647,11 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[query]
+fn whoami() -> Principal {
+    caller()
+}
+
+#[query]
 fn discovered_oidc_configs() -> Vec<OidcConfig> {
     openid::get_discovered_oidc_configs()
 }
@@ -677,6 +687,8 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: None,
+        dnssec_config: Some(persistent_state.dnssec_config.clone()),
+        doh_config: Some(persistent_state.doh_config.clone()),
     })
 }
 
@@ -817,6 +829,18 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.dummy_auth = dummy_auth;
             })
         }
+        if let Some(dnssec_config) = arg.dnssec_config {
+            // Outer Some -> apply: inner None clears, inner Some replaces.
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.dnssec_config = dnssec_config;
+            })
+        }
+        if let Some(doh_config) = arg.doh_config {
+            // Outer Some -> apply: inner None clears, inner Some replaces.
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.doh_config = doh_config;
+            })
+        }
     }
 }
 
@@ -954,6 +978,19 @@ mod v2_api {
             .map(|(k, v)| (k, MetadataEntryV2::from(v)))
             .collect();
 
+        // Anchor stores email recoveries as a Vec; the candid surface
+        // exposes the full list as an `opt vec`, with `None` when no
+        // recovery email is configured. The canister API currently
+        // enforces ≤1 entry, so the FE picks the first to render the
+        // recovery-email card — but a future bump to N>1 won't need a
+        // candid schema change.
+        let stored_email_recovery = state::anchor(identity_number).email_recovery.clone();
+        let email_recovery = if stored_email_recovery.is_empty() {
+            None
+        } else {
+            Some(stored_email_recovery)
+        };
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -967,6 +1004,7 @@ mod v2_api {
             metadata,
             name: anchor_info.name,
             created_at: anchor_info.created_at,
+            email_recovery,
         };
         Ok(identity_info)
     }
@@ -1373,6 +1411,259 @@ mod openid_api {
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
     }
+}
+
+/// Email-based identity recovery — both halves of the flow.
+///
+/// See `docs/ongoing/email-recovery.md` (PR #3836) for the full
+/// design, and `crate::email_recovery` for the per-flow logic.
+///
+/// - **Setup** (binding): `prepare_add` (authenticated) issues a
+///   nonce, `smtp_request` for `register@id.ai` consumes the
+///   verified email and binds the credential to the anchor, and
+///   `credential_remove` (authenticated) detaches it.
+/// - **Recovery** (delegation): `prepare_delegation` (anonymous)
+///   issues a nonce bound to a session_key, `smtp_request` for
+///   `recover@id.ai` consumes the verified email and stamps a
+///   canister-signed delegation seed, and
+///   `email_recovery_get_delegation` (anonymous query) hands the
+///   signed delegation to the FE.
+///
+/// The canister methods below are thin wrappers handling
+/// authorization, wall-clock injection (`now_secs` lifted out of
+/// `ic_cdk::api::time` so the inner functions stay testable), and
+/// the FE-facing `Result` shape. `status` is anonymous for both
+/// flows since the nonce is the only secret needed to poll.
+mod email_recovery_api {
+    use super::*;
+    use crate::authz_utils::check_authorization;
+    use crate::email_recovery;
+    use ic_canister_sig_creation::delegation_signature_msg;
+    use ic_canister_sig_creation::signature_map::CanisterSigInputs;
+    use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
+    use internet_identity_interface::internet_identity::types::email_recovery::{
+        EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
+        EmailRecoveryGetDelegationArgs, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
+    };
+    use internet_identity_interface::internet_identity::types::SessionKey;
+
+    /// Authenticated. Validates the caller owns `identity_number`,
+    /// validates the DNS input shape (DNSSEC bundle if supplied,
+    /// otherwise DoH allowlist gate), and issues a fresh nonce. The
+    /// nonce is stored alongside the claimed address + selector +
+    /// anchor in the heap pending-challenge map; an inbound email
+    /// with that nonce in `Subject:` completes the binding via
+    /// `smtp_request`.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `check_authorization(identity_number)`. Resource exposure
+    /// is bounded by the 10 k pending-map cap (see
+    /// `email_recovery::MAX_PENDING_CHALLENGES`) with 30-minute TTL
+    /// and oldest-first eviction.
+    #[update]
+    async fn email_recovery_credential_prepare_add(
+        identity_number: IdentityNumber,
+        dns_input: EmailRecoveryDnsInput,
+    ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+        check_authorization(identity_number)
+            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::prepare_add(identity_number, dns_input, now_secs).await
+    }
+
+    /// Anonymous. The FE-side counterpart of `prepare_add` for the
+    /// recovery flow: validates the same DNSSEC skeleton chain or
+    /// DoH allowlist, parks a pending challenge bound to the
+    /// FE-supplied `session_key`, and returns the nonce +
+    /// `recover@id.ai` recipient. The anchor isn't resolved here —
+    /// that happens at submit-leaf (or DoH-path smtp_request) time
+    /// from the verified `From:` of the inbound email.
+    ///
+    /// Anonymous because by the time the user reaches for recovery
+    /// they may have lost every authn method on their anchor; the
+    /// DKIM-verified email itself is the credential. The
+    /// nonce-rotation + Subject-visibility defenses (design §3.2)
+    /// stand in for caller authentication.
+    #[update]
+    async fn email_recovery_prepare_delegation(
+        dns_input: EmailRecoveryDnsInput,
+        session_key: SessionKey,
+    ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::prepare_delegation(dns_input, session_key, now_secs).await
+    }
+
+    /// Open update. Called by the off-chain SMTP gateway for every
+    /// inbound message. The canister verifies DKIM + DMARC, looks
+    /// up the pending challenge by the nonce in the `Subject:`
+    /// header, and on success binds the credential to the anchor
+    /// from the pending entry.
+    ///
+    /// We always return `Ok` regardless of the verification verdict
+    /// — the gateway gets no useful signal from per-message
+    /// "verification failed" answers, and emitting one would let it
+    /// probe the canister for which nonces exist. The FE sees the
+    /// outcome via its `email_recovery_status(nonce)` poll.
+    ///
+    /// **Security:** no-oracle on the response *shape* — always
+    /// returns `SmtpResponse::Ok {}` regardless of whether the
+    /// nonce is known, expired, or terminal, so a caller can't
+    /// learn the verification outcome from the response. (Response
+    /// *latency* does differ — an unknown nonce silent-drops in
+    /// microseconds, a valid one on the DoH path runs DKIM/DMARC
+    /// fetches first — but with 64 bits of nonce entropy and a
+    /// 30-minute TTL, timing-based existence probing isn't a
+    /// threat this property is meant to block.) Recipient dispatch
+    /// matches the full `user@domain` against `related_origins`,
+    /// defense-in-depth against a direct caller spoofing just the
+    /// user-part.
+    #[update]
+    async fn smtp_request(
+        request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
+    ) -> internet_identity_interface::internet_identity::types::smtp::SmtpResponse {
+        email_recovery::handle_smtp_request(request).await
+    }
+
+    /// Open query — the off-chain SMTP gateway calls this at
+    /// `RCPT TO` time to decide whether to accept the connection
+    /// before pulling the message body. Returns `Ok` for the two
+    /// recipients we handle (`register@id.ai`, `recover@id.ai`) and
+    /// 550 (mailbox unavailable) for everything else. Without this
+    /// the gateway has no way to know which recipients we accept,
+    /// and falls back to whatever default policy it was deployed
+    /// with — which on the existing II gateway is the postbox PoC's
+    /// "user-part must be a numeric anchor number" rule, rejecting
+    /// `register@id.ai` and `recover@id.ai` outright.
+    #[query]
+    fn smtp_request_validate(
+        request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
+    ) -> internet_identity_interface::internet_identity::types::smtp::SmtpResponse {
+        email_recovery::handle_smtp_request_validate(request)
+    }
+
+    /// Anonymous. The FE polls this with the nonce returned from
+    /// `prepare_add` to drive its "waiting for your email" spinner.
+    /// Polling at 1–5 s cadence is the FE's responsibility; this
+    /// query is cheap.
+    ///
+    /// Returns `EmailRecoveryStatus::Expired` for unknown nonces —
+    /// observably indistinguishable from "the canister forgot it",
+    /// which is exactly what we want (the FE shows "timed out, try
+    /// again" in either case).
+    ///
+    /// **Security:** unknown-nonce → `Expired` is deliberate: a
+    /// caller without the original `prepare_add` nonce can't
+    /// distinguish "never issued" from "evicted" from "expired".
+    #[query]
+    fn email_recovery_status(nonce: String) -> EmailRecoveryStatus {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::pending_status(&nonce, now_secs)
+    }
+
+    /// Anonymous. Phase 2 of the DNSSEC path: once
+    /// `email_recovery_status` returns `NeedDkimLeaf { selector }`,
+    /// the FE walks DNSSEC for `<selector>._domainkey.<domain>` and
+    /// submits the signed RRset here. The canister validates the leaf
+    /// against the chain it cached at prepare time, completes the DKIM
+    /// signature check using the partial-verification record stashed
+    /// at email-arrival time, runs DMARC alignment, and binds the
+    /// credential. Returns the post-call status — typically
+    /// `RegistrationSucceeded` — saving the FE one extra
+    /// `email_recovery_status` round-trip.
+    ///
+    /// Anonymous because this is the only DNSSEC-path move that
+    /// happens before the address-binding finishes. The pending
+    /// challenge nonce is the only authentication; it's a 64-bit
+    /// canister-issued secret that lives only inside one pending
+    /// entry, and the leaf submission is a no-op against any other
+    /// entry.
+    #[update]
+    async fn email_recovery_submit_dkim_leaf(
+        arg: EmailRecoverySubmitDkimLeafArg,
+    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::submit_dkim_leaf(arg, now_secs).await
+    }
+
+    /// **Anonymous query.** Final step of the recovery flow: after
+    /// `email_recovery_status` reports `RecoveryReady { user_key,
+    /// expiration, anchor_number }`, the FE calls this to retrieve
+    /// the actual `SignedDelegation`. Mirrors `openid_get_delegation`
+    /// in shape — the args (`session_key`, `expiration`) must match
+    /// exactly what was stamped at submit-leaf time, otherwise the
+    /// canister-signature store has no entry to return.
+    #[query]
+    fn email_recovery_get_delegation(
+        args: EmailRecoveryGetDelegationArgs,
+    ) -> Result<SignedDelegation, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        let seed = email_recovery::recovery_seed_for_nonce(&args.nonce, now_secs)
+            .ok_or(EmailRecoveryError::NonceUnknown)?;
+
+        crate::state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: DELEGATION_SIG_DOMAIN,
+                seed: &seed,
+                message: &delegation_signature_msg(&args.session_key, args.expiration, None),
+            };
+            sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
+                .map(|signature| SignedDelegation {
+                    delegation: Delegation {
+                        pubkey: args.session_key,
+                        expiration: args.expiration,
+                        targets: None,
+                    },
+                    signature: serde_bytes::ByteBuf::from(signature),
+                })
+                .map_err(|_| {
+                    EmailRecoveryError::InternalCanisterError(
+                        "no canister signature for the supplied (nonce, session_key, expiration); \
+                         either the recovery flow hasn't completed yet, the args don't match \
+                         what was stamped, or the signature has been evicted"
+                            .into(),
+                    )
+                })
+        })
+    }
+
+    /// Authenticated. Detaches the recovery email from the anchor.
+    /// The FE's "Remove" action calls this once; on success the
+    /// management page flips back to the inactive card. Removing a
+    /// recovery email the anchor doesn't have is surfaced as
+    /// `AddressNotRegistered` so the FE can show a meaningful error
+    /// if it got into an inconsistent state.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `authz_utils::check_authorization` (same path the other
+    /// authenticated anchor mutators use).
+    #[update]
+    fn email_recovery_credential_remove(
+        identity_number: IdentityNumber,
+        address: String,
+    ) -> Result<(), EmailRecoveryError> {
+        // Inlined auth + write rather than going through
+        // `anchor_operation_with_authz_check` because that helper's
+        // `E: From<IdentityUpdateError>` bound is awkward to satisfy
+        // for an interface-crate error type (orphan rule).
+        let (mut anchor, authz_key) = crate::authz_utils::check_authorization(identity_number)
+            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+        crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);
+
+        let operation =
+            email_recovery::remove_credential(&mut anchor, &address).map_err(|err| match err {
+                crate::email_recovery::RemoveError::NotRegistered => {
+                    EmailRecoveryError::AddressNotRegistered
+                }
+            })?;
+
+        crate::state::storage_borrow_mut(|storage| storage.write(anchor))
+            .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;
+
+        crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
+        Ok(())
+    }
+
 }
 
 mod attribute_sharing {

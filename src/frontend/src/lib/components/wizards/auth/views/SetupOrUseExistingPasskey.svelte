@@ -1,6 +1,5 @@
 <script lang="ts">
   import { fly } from "svelte/transition";
-  import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { waitFor } from "$lib/utils/utils";
@@ -48,18 +47,21 @@
   </p>
 </div>
 <div class="flex flex-col gap-3">
-  <Button onclick={setupNew} size="lg" disabled={isAuthenticating}>
+  <button
+    class="btn btn-primary btn-lg"
+    onclick={setupNew}
+    disabled={isAuthenticating}
+  >
     {$t`Create new identity`}
-  </Button>
+  </button>
   <Tooltip
     label={$t`Interaction canceled. Please try again.`}
     hidden={!isCancelled}
     manual
   >
-    <Button
+    <button
+      class="btn btn-secondary btn-lg"
       onclick={handleUseExisting}
-      variant="secondary"
-      size="lg"
       disabled={isAuthenticating}
     >
       {#if isAuthenticating}
@@ -68,7 +70,7 @@
       {:else}
         <span>{$t`Use existing identity`}</span>
       {/if}
-    </Button>
+    </button>
   </Tooltip>
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="flex flex-row items-center justify-between gap-4">

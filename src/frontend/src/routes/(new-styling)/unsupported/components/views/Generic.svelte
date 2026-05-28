@@ -5,7 +5,6 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import Header from "$lib/components/layout/Header.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
@@ -23,7 +22,7 @@
             <TriangleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
           </FeaturedIcon>
           <h1 class="text-text-primary mb-3 text-start text-2xl font-medium">
-            {$t`Unsupported Browser`}
+            {$t`Unsupported browser`}
           </h1>
           <p class="text-text-primary mb-5 text-start">
             {$t`It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported.`}
@@ -51,16 +50,15 @@
             </ol>
           </div>
           <p class="self-center">
-            <Button
+            <a
+              class="btn btn-tertiary btn-sm"
               href={UNSUPPORTED_BROWSER_SUPPORT_URL}
               target="_blank"
               rel="noopener noreferrer"
-              variant="tertiary"
-              size="sm"
             >
               <span>{$t`Learn how to open links in your browser`}</span>
               <ArrowRightIcon class="size-4" />
-            </Button>
+            </a>
           </p>
         </div>
       </div>

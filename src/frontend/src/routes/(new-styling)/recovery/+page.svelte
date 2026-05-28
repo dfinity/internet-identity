@@ -1,7 +1,13 @@
 <script lang="ts">
   import Trans from "../../../lib/components/locale/Trans.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { RefreshCcw } from "@lucide/svelte";
+  import {
+    ArrowRightIcon,
+    MailIcon,
+    RefreshCcw,
+    ShieldIcon,
+  } from "@lucide/svelte";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
@@ -10,6 +16,15 @@
     type FoundIdentity,
     RecoverIdentityWizard,
   } from "$lib/components/wizards/recoverIdentity";
+  import {
+    RecoverWithEmailWizard,
+    type RecoverySuccess,
+  } from "$lib/components/wizards/recoverWithEmail";
+  import type {
+    EmailRecoveryDnsInput,
+    EmailRecoveryGetDelegationArgs,
+  } from "$lib/generated/internet_identity_types";
+  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import {
     fromMnemonicWithoutValidation,
@@ -23,8 +38,11 @@
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
+  import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
+  import { transformSignedDelegation } from "$lib/utils/utils";
 
   let showRecoveryDialog = $state(false);
+  let showEmailRecoveryDialog = $state(false);
 
   const handleSubmit = async (
     recoveryPhrase: string[],
@@ -50,6 +68,71 @@
       return { identityNumber, identityInfo };
     } catch (error) {
       showRecoveryDialog = false;
+      handleError(error);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Email-recovery wizard plumbing
+  // -------------------------------------------------------------
+
+  const prepareEmailDelegation = (
+    input: EmailRecoveryDnsInput,
+    sessionPublicKey: Uint8Array,
+  ) =>
+    anonymousActor
+      .email_recovery_prepare_delegation(input, sessionPublicKey)
+      .then(throwCanisterError);
+
+  const emailRecoveryStatus = (nonce: string) =>
+    anonymousActor.email_recovery_status(nonce);
+
+  const submitEmailDkimLeaf = (
+    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
+  ) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
+  const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
+    anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
+
+  /**
+   * Bridge the wizard's "I have a SignedDelegation" output back into
+   * the manage-page session: build a DelegationIdentity, seed the
+   * auth store with the anchor the canister already resolved at
+   * smtp time (carried back via `RecoverySuccess.identityNumber`),
+   * and navigate.
+   */
+  const handleEmailRecoverySignIn = async (success: RecoverySuccess) => {
+    try {
+      const delegationChain = DelegationChain.fromDelegations(
+        [transformSignedDelegation(success.delegation)],
+        new Uint8Array(success.userKey),
+      );
+      const delegationIdentity = DelegationIdentity.fromDelegation(
+        success.sessionIdentity,
+        delegationChain,
+      );
+      await authenticationStore.set({
+        identity: delegationIdentity,
+        identityNumber: success.identityNumber,
+        authMethod: {
+          emailRecovery: {
+            principal: delegationIdentity.getPrincipal(),
+          },
+        },
+      });
+      await preloadData("/manage/access");
+      await goto("/manage/access");
+      toaster.success({
+        title: $t`Successfully recovered your identity`,
+        description: $t`You can manage your access methods on this page.`,
+        duration: 5000,
+      });
+    } catch (error) {
+      showEmailRecoveryDialog = false;
+      authenticationStore.reset();
       handleError(error);
     }
   };
@@ -109,17 +192,60 @@
           {$t`Recover your identity`}
         </h1>
         <p class="text-text-tertiary mb-6 text-base text-pretty">
-          <Trans>
-            Before getting started, find a private place and have your recovery
-            phrase ready. Keep it confidential to protect your identity.
-          </Trans>
+          <Trans>Pick a recovery method below to sign back in.</Trans>
         </p>
-        <button
-          onclick={() => (showRecoveryDialog = true)}
-          class="btn btn-xl mb-3"
-        >
-          {$t`Get started`}
-        </button>
+        <div class="mb-3 flex flex-col gap-2">
+          <ButtonCard
+            onclick={() => (showRecoveryDialog = true)}
+            class="group !flex-col !items-stretch !gap-1 py-4 text-start"
+            aria-label={$t`Recover with phrase`}
+          >
+            <span class="flex w-full items-center gap-3">
+              <ShieldIcon class="text-fg-tertiary size-5 shrink-0" />
+              <span
+                class="text-text-primary grow text-start text-base font-semibold"
+              >
+                {$t`Recovery phrase`}
+              </span>
+              <ArrowRightIcon
+                class={[
+                  "text-fg-tertiary me-3 size-5 shrink-0 transform opacity-0 transition-all duration-200 rtl:-scale-x-100",
+                  "group-enabled:group-hover:me-2 group-enabled:group-hover:opacity-100",
+                  "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
+                ]}
+              />
+            </span>
+            <span class="text-text-tertiary ps-8 text-sm font-normal">
+              {$t`Type your 24 recovery words.`}
+            </span>
+          </ButtonCard>
+          {#if $EMAIL_RECOVERY}
+            <ButtonCard
+              onclick={() => (showEmailRecoveryDialog = true)}
+              class="group !flex-col !items-stretch !gap-1 py-4 text-start"
+              aria-label={$t`Recover with email`}
+            >
+              <span class="flex w-full items-center gap-3">
+                <MailIcon class="text-fg-tertiary size-5 shrink-0" />
+                <span
+                  class="text-text-primary grow text-start text-base font-semibold"
+                >
+                  {$t`Recovery email`}
+                </span>
+                <ArrowRightIcon
+                  class={[
+                    "text-fg-tertiary me-3 size-5 shrink-0 transform opacity-0 transition-all duration-200 rtl:-scale-x-100",
+                    "group-enabled:group-hover:me-2 group-enabled:group-hover:opacity-100",
+                    "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
+                  ]}
+                />
+              </span>
+              <span class="text-text-tertiary ps-8 text-sm font-normal">
+                {$t`Send an email from your inbox.`}
+              </span>
+            </ButtonCard>
+          {/if}
+        </div>
         <a href="/" class="btn btn-secondary btn-xl">
           {$t`Cancel`}
         </a>
@@ -136,6 +262,21 @@
       onSubmit={handleSubmit}
       onSignIn={handleSignIn}
       onCancel={() => (showRecoveryDialog = false)}
+    />
+  </Dialog>
+{/if}
+
+{#if showEmailRecoveryDialog}
+  <Dialog
+    onClose={() => (showEmailRecoveryDialog = false)}
+    closeOnOutsideClick={false}
+  >
+    <RecoverWithEmailWizard
+      prepareDelegation={prepareEmailDelegation}
+      status={emailRecoveryStatus}
+      submitDkimLeaf={submitEmailDkimLeaf}
+      getDelegation={getEmailDelegation}
+      onSignedIn={handleEmailRecoverySignIn}
     />
   </Dialog>
 {/if}

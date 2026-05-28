@@ -1,6 +1,5 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
@@ -77,11 +76,11 @@
     hint={$t`Characters are case-sensitive`}
     error={error ? $t`Incorrect. Try again with the new code.` : undefined}
   />
-  <Button
+  <button
+    class="btn btn-primary btn-lg"
     onclick={handleSubmit}
     type="submit"
     disabled={solution.length === 0 || loading}
-    size="lg"
   >
     {#if loading}
       <ProgressRing />
@@ -89,5 +88,5 @@
     {:else}
       <span>{$t`Verify`}</span>
     {/if}
-  </Button>
+  </button>
 </form>

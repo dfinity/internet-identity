@@ -379,6 +379,11 @@ export interface Delegation {
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
 }
+export interface DelegationChain { 'links' : Array<DelegationLink> }
+export interface DelegationLink {
+  'child_dnskey' : SignedRRset,
+  'child_ds' : SignedRRset,
+}
 export type DeployArchiveResult = {
     /**
      * Initial archive creation is already in progress.
@@ -472,12 +477,123 @@ export interface DeviceWithUsage {
  * discovery at openid_configuration for { issuer, jwks_uri }.
  */
 export interface DiscoverableOidcConfig { 'discovery_domain' : string }
+export interface DnsProofBundle {
+  'root_dnskey' : SignedRRset,
+  /**
+   * The RRsets being authenticated, in CNAME-resolution order.
+   * Single-leaf case: one hop. CNAME case: intermediate CNAMEs,
+   * then the final TXT.
+   */
+  'hops' : Array<SignedRRset>,
+  /**
+   * One delegation chain per signing zone the bundle touches.
+   * Single-zone direct case (Gmail, iCloud, …): one chain.
+   * Cross-zone CNAME case (Proton, Tutanota, M365 custom domains):
+   * one chain per signing zone touched.
+   */
+  'chains' : Array<DelegationChain>,
+}
+/**
+ * DNSSEC trust-anchor list. Any feature that needs DNSSEC-verified DNS
+ * records consumes the same anchors; not specific to email recovery.
+ */
+export interface DnssecConfig {
+  /**
+   * IANA root KSK trust anchors. Multiple are accepted simultaneously so
+   * KSK rollover is a single config change in the next upgrade arg.
+   */
+  'root_anchors' : Array<DnssecRootAnchor>,
+}
+/**
+ * One IANA root KSK trust anchor, in the same shape IANA publishes at
+ * `data.iana.org/root-anchors/root-anchors.xml`. Only `digest_type = 2`
+ * (SHA-256) is accepted; the legacy SHA-1 form is rejected at the
+ * verifier boundary.
+ */
+export interface DnssecRootAnchor {
+  'algorithm' : number,
+  'key_tag' : number,
+  'digest_type' : number,
+  'digest' : Uint8Array | number[],
+}
+/**
+ * DoH (DNS-over-HTTPS) fallback configuration.
+ * 
+ * The canister will only fetch DKIM/DMARC TXT records via HTTP outcalls
+ * for an FQDN whose registered domain is in `allowed_domains`. Cache
+ * entries are populated on demand and re-used until `max_cache_age_secs`
+ * elapses (default 3600s when null, capped at 24h).
+ */
+export interface DohConfig {
+  'max_cache_age_secs' : [] | [bigint],
+  'allowed_domains' : Array<string>,
+}
 export interface DummyAuthConfig {
   /**
    * Prompts user for a index value (0 - 255) when set to true,
    * this is used in e2e to have multiple dummy auth identities.
    */
   'prompt_for_index' : boolean,
+}
+export interface EmailRecoveryChallenge {
+  'nonce' : string,
+  'expires_at' : Timestamp,
+}
+export interface EmailRecoveryCredential {
+  'created_at' : Timestamp,
+  'address' : string,
+  'last_used' : [] | [Timestamp],
+}
+export interface EmailRecoveryDnsInput {
+  'dns_proof' : [] | [DnsProofBundle],
+  'address' : string,
+}
+export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
+  { 'DkimLeafMismatch' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'NonceUnknown' : null } |
+  { 'DohFetchFailed' : string } |
+  { 'NoDkimLeafExpected' : null } |
+  { 'DomainNotSupported' : string } |
+  { 'AddressNotRegistered' : null } |
+  { 'Unauthorized' : Principal } |
+  { 'NonceExpired' : null } |
+  { 'AddressMismatch' : null } |
+  { 'DomainNotAllowlisted' : string } |
+  { 'SubjectNotSigned' : null } |
+  { 'AddressAlreadyRegistered' : null };
+export interface EmailRecoveryGetDelegationArgs {
+  'session_key' : SessionKey,
+  'expiration' : Timestamp,
+  'nonce' : string,
+}
+export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
+  { 'NeedDkimLeaf' : { 'selector' : string } } |
+  {
+    'RecoveryReady' : {
+      'user_key' : UserKey,
+      'expiration' : Timestamp,
+      'anchor_number' : IdentityNumber,
+    }
+  } |
+  { 'RegistrationSucceeded' : null } |
+  { 'Expired' : null } |
+  { 'Pending' : null };
+export interface EmailRecoverySubmitDkimLeafArg {
+  /**
+   * Delegation chains for signed zones touched by `hops` that
+   * weren't already covered by the skeleton chain anchored at
+   * prepare time. Empty for same-zone resolution.
+   */
+  'extra_chains' : Array<DelegationChain>,
+  /**
+   * The DKIM resolution chain in CNAME order, ending in a TXT. At
+   * least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+   * canister side. For the Gmail-style direct-TXT case this is a
+   * single-element vec.
+   */
+  'hops' : Array<SignedRRset>,
+  'nonce' : string,
 }
 export type FrontendHostname = string;
 export type GetAccountError = {
@@ -604,10 +720,6 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
-/**
- * ICRC-3 attribute sharing types
- * ==============================
- */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -711,6 +823,14 @@ export interface IdentityInfo {
   'metadata' : MetadataMapV2,
   'name' : [] | [string],
   /**
+   * Email-recovery credentials bound to this anchor (absent when
+   * none is configured). The canister API currently caps the list
+   * at one entry — the FE renders the recovery-email card from
+   * the first one — but exposing it as a `vec` lets future
+   * multi-credential support land without a candid schema bump.
+   */
+  'email_recovery' : [] | [Array<EmailRecoveryCredential>],
+  /**
    * The timestamp at which the anchor was created
    */
   'created_at' : [] | [Timestamp],
@@ -778,6 +898,13 @@ export type IdentityPropertiesReplaceError = {
  */
 export interface InternetIdentityInit {
   /**
+   * DoH (DNS-over-HTTPS) fallback configuration. Allowlists the
+   * domains for which the canister may fetch DKIM/DMARC TXT records
+   * via HTTP outcalls when no DNSSEC chain is available — see
+   * `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
+   */
+  'doh_config' : [] | [[] | [DohConfig]],
+  /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.
    */
@@ -799,6 +926,18 @@ export interface InternetIdentityInit {
    * If present, list of origins using the new authentication flow.
    */
   'new_flow_origins' : [] | [Array<string>],
+  /**
+   * DNSSEC verification configuration. Trust anchors used by any feature
+   * that verifies DNS records against the IANA-rooted DNSSEC chain
+   * (currently the email-recovery DKIM/DMARC flow). See
+   * `docs/ongoing/email-recovery.md` §7.5.
+   * 
+   * Wrapped in `opt opt` to match the same set/clear pattern as
+   * `analytics_config` / `dummy_auth`: outer null keeps the previously
+   * stored value across an upgrade, `opt null` clears it, `opt opt c`
+   * sets it to `c`.
+   */
+  'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
    * Allowlist of domains that may be registered as discoverable SSO
    * providers via `add_discoverable_oidc_config`. When set, fully replaces
@@ -1173,6 +1312,21 @@ export type RegistrationFlowNextStep = {
     'Finish' : null
   };
 export type RegistrationId = string;
+/**
+ * DNSSEC proof bundle and supporting types — see
+ * `internet_identity_interface::types::dnssec`.
+ */
+export interface Rrsig {
+  'algorithm' : number,
+  'signature' : Uint8Array | number[],
+  'original_ttl' : number,
+  'signer_name' : Uint8Array | number[],
+  'labels' : number,
+  'inception' : number,
+  'expiration' : number,
+  'key_tag' : number,
+  'type_covered' : number,
+}
 export type Salt = Uint8Array | number[];
 export type SessionKey = PublicKey;
 export type SetDefaultAccountError = {
@@ -1196,6 +1350,70 @@ export interface SignedIdAlias {
   'id_alias' : Principal,
   'id_dapp' : Principal,
 }
+export interface SignedRRset {
+  'ttl' : number,
+  'name' : Uint8Array | number[],
+  'rdata' : Array<Uint8Array | number[]>,
+  'rrsig' : Rrsig,
+  'rtype' : number,
+}
+export interface SmtpAddress { 'domain' : string, 'user' : string }
+export interface SmtpEnvelope {
+  /**
+   * SMTP allows multiple `RCPT TO` recipients per envelope, so this
+   * is a vec at the wire level. For the recovery flows this canister
+   * serves, however, we require *exactly one* recipient and it must
+   * be `register@<domain>` or `recover@<domain>` — a legitimate
+   * recovery email never targets a CC/BCC alongside us, so any
+   * additional recipient can only come from a phishy forwarder
+   * trying to exfiltrate the user's canister-signed challenge.
+   * Multi-recipient envelopes (and empty ones) are rejected with
+   * code 551 ("User not local"); single-recipient envelopes whose
+   * recipient isn't one of our reserved mailboxes get 550 ("No
+   * such user here"). The vec is also capped at 100 entries (RFC
+   * 5321 §4.5.3.1.10); envelopes exceeding the cap are rejected
+   * with code 555.
+   */
+  'to' : Array<SmtpAddress>,
+  'from' : SmtpAddress,
+}
+/**
+ * SMTP gateway types — see `internet_identity_interface::smtp`. Carried
+ * forward from PoC #3760 surface (the existing gateway can target this
+ * canister without changes).
+ */
+export interface SmtpHeader { 'value' : string, 'name' : string }
+export interface SmtpMessage {
+  'body' : Uint8Array | number[],
+  'headers' : Array<SmtpHeader>,
+}
+export interface SmtpRequest {
+  'envelope' : [] | [SmtpEnvelope],
+  'message' : [] | [SmtpMessage],
+  'gateway_flags' : [] | [Array<string>],
+}
+/**
+ * Error returned by `smtp_request` / `smtp_request_validate`.
+ * 
+ * `code` mirrors the SMTP reply codes the off-chain gateway should
+ * emit upstream:
+ * - `550` (mailbox unavailable) — "No such user here". Returned when
+ * the envelope carries exactly one recipient but it isn't a mailbox
+ * this canister handles (i.e. neither `register@<domain>` nor
+ * `recover@<domain>` for any `<domain>` in `related_origins`).
+ * - `551` (user not local) — envelope-shape rejection. Returned for
+ * empty `to` and for multi-recipient envelopes, even when one of
+ * the recipients is ours. Distinct from 550 so the gateway can tell
+ * "this envelope shape isn't accepted" from "we don't know this
+ * user". Recovery emails never legitimately address a CC/BCC
+ * alongside `register@…` / `recover@…`.
+ * - `555` (syntax error) — the request shape itself is malformed
+ * (e.g. missing envelope, oversize address/header/body, recipient
+ * list exceeds the 100-entry cap).
+ */
+export interface SmtpRequestError { 'code' : bigint, 'message' : string }
+export type SmtpResponse = { 'Ok' : {} } |
+  { 'Err' : SmtpRequestError };
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1396,6 +1614,46 @@ export interface _SERVICE {
    * ===============
    */
   'discovered_oidc_configs' : ActorMethod<[], Array<OidcConfig>>,
+  /**
+   * Email-recovery protocol
+   * =======================
+   * See `docs/ongoing/email-recovery.md`. Covers both flows:
+   * - Setup: prepare_add (authenticated) → smtp_request for
+   * register@id.ai → credential bound to the anchor. Removed
+   * later via credential_remove.
+   * - Recovery: prepare_delegation (anonymous, bound to a
+   * session_key) → smtp_request for recover@id.ai → canister
+   * stamps a signed delegation seed. The FE then calls
+   * email_recovery_get_delegation to retrieve the
+   * SignedDelegation.
+   * Both flows share the polling status query.
+   */
+  'email_recovery_credential_prepare_add' : ActorMethod<
+    [IdentityNumber, EmailRecoveryDnsInput],
+    { 'Ok' : EmailRecoveryChallenge } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_credential_remove' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_get_delegation' : ActorMethod<
+    [EmailRecoveryGetDelegationArgs],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_prepare_delegation' : ActorMethod<
+    [EmailRecoveryDnsInput, SessionKey],
+    { 'Ok' : EmailRecoveryChallenge } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
+  'email_recovery_submit_dkim_leaf' : ActorMethod<
+    [EmailRecoverySubmitDkimLeafArg],
+    { 'Ok' : EmailRecoveryStatus } |
+      { 'Err' : EmailRecoveryError }
+  >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   /**
@@ -1630,6 +1888,24 @@ export interface _SERVICE {
     { 'Ok' : AccountInfo } |
       { 'Err' : SetDefaultAccountError }
   >,
+  /**
+   * SMTP gateway protocol
+   * =====================
+   * The off-chain SMTP gateway forwards every inbound message via
+   * smtp_request. The canister verifies the email cryptographically
+   * and dispatches by recipient: register@id.ai → setup completion,
+   * recover@id.ai → recovery delegation stamping. Always returns Ok
+   * — the gateway shouldn't get a per-message verification signal
+   * back. The FE sees outcomes via the polling status query.
+   */
+  'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  /**
+   * Called by the gateway at RCPT TO time to decide whether to
+   * accept the connection before pulling the message body. Returns
+   * Ok for register@id.ai / recover@id.ai (case-insensitive), and
+   * 550 (mailbox unavailable) for everything else.
+   */
+  'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
@@ -1641,6 +1917,7 @@ export interface _SERVICE {
     [UserNumber, string],
     VerifyTentativeDeviceResponse
   >,
+  'whoami' : ActorMethod<[], Principal>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
