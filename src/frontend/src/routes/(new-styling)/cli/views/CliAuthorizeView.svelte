@@ -61,9 +61,9 @@
       {#if isDapp}
         <Trans>The CLI gets full access to your account in this app.</Trans>
       {:else}
-        <Trans
-          >The CLI gets its own account, separate from your other apps.</Trans
-        >
+        <Trans>
+          The CLI gets its own account, separate from your other apps.
+        </Trans>
       {/if}
     </p>
 

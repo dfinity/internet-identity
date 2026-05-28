@@ -163,17 +163,8 @@ msgstr "Dodaj lub usuń sposoby logowania za pomocą swojej tożsamości."
 msgid "Advanced identity management"
 msgstr "Zaawansowane zarządzanie tożsamością"
 
-msgid "Allow access"
-msgstr ""
-
-msgid "Allow CLI access"
-msgstr ""
-
 msgid "Allow to access this info"
 msgstr "Zezwól na dostęp do tych informacji"
-
-msgid "Allowing access"
-msgstr ""
 
 msgid "Already signed-in"
 msgstr "Już zalogowano"
@@ -210,9 +201,6 @@ msgstr "Zanim kontynuujesz"
 
 msgid "Body"
 msgstr "Treść"
-
-msgid "Browser opened"
-msgstr ""
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Włączając tę funkcję, możesz utworzyć więcej niż jedno konto dla pojedynczej aplikacji. Łatwo przełączaj się między kontami (np. służbowym, osobistym lub demonstracyjnym)."
@@ -265,12 +253,6 @@ msgstr "Wybierz, które dane chcesz udostępnić"
 msgid "Clear all"
 msgstr "Wyczyść wszystko"
 
-msgid "CLI access"
-msgstr ""
-
-msgid "CLI access not enabled"
-msgstr ""
-
 msgid "Click to reveal"
 msgstr "Kliknij, aby ujawnić"
 
@@ -282,9 +264,6 @@ msgstr "Zamknij menu"
 
 msgid "Code copied to clipboard"
 msgstr "Kod skopiowany do schowka"
-
-msgid "Command-line tools on this device can ask to sign you in to apps."
-msgstr ""
 
 msgid "Company domain"
 msgstr "Domena firmy"
@@ -331,9 +310,6 @@ msgstr "Kontynuuj z SSO"
 msgid "Copied to clipboard"
 msgstr "Skopiowano do schowka"
 
-msgid "Copy install command: {command}"
-msgstr ""
-
 msgid "Copy recipient address"
 msgstr "Kopiuj adres odbiorcy"
 
@@ -342,9 +318,6 @@ msgstr "Kopiuj temat"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Nie udało się załadować ustawień SSO z {domainInput}. Poproś administratora SSO o sprawdzenie, czy /.well-known/ii-openid-configuration jest dostępny."
-
-msgid "Couldn't reach the CLI"
-msgstr ""
 
 msgid "Create account"
 msgstr "Utwórz konto"
@@ -427,17 +400,8 @@ msgstr "Adres e-mail"
 msgid "Email:"
 msgstr "Adres e-mail:"
 
-msgid "Enable CLI access"
-msgstr ""
-
-msgid "Enable CLI access for this device, then try again."
-msgstr ""
-
 msgid "Enable multiple accounts"
 msgstr "Włącz wiele kont"
-
-msgid "Enabled"
-msgstr ""
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Wprowadź nazwę dla swojej tożsamości, aby zakończyć aktualizację. Po ustawieniu nie będzie można jej później zmienić."
@@ -478,9 +442,6 @@ msgstr "Polecane aplikacje"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Na przykład użytkownik A loguje się do Internet Identity za pomocą swojego konta Google „A@gmail.com”, a następnie używa Internet Identity do uwierzytelnienia w aplikacji Z. Google nigdy nie dowie się, że użytkownik jest uwierzytelniony w aplikacji Z, tylko z Internet Identity. Co więcej, aplikacja Z również nigdy nie dowie się, że użytkownik A użył Google do uwierzytelnienia swojego użytkownika Internet Identity."
-
-msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
-msgstr ""
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Zapomnij o zapamiętywaniu skomplikowanych nazw użytkownika i haseł. Dzięki kluczom dostępu wystarczy, że wybierzesz swoje imię, aby się zalogować. Szybko, bezpiecznie i bez kłopotów."
@@ -556,9 +517,6 @@ msgstr "Jestem odpowiedzialny/a za moją frazę odzyskiwania i nie można jej od
 
 msgid "I have written it down"
 msgstr "Zapisałem/am to"
-
-msgid "I'm using the official ICP CLI and I trust this device."
-msgstr ""
 
 msgid "I've sent the email"
 msgstr "Wysłałem/am e-mail"
@@ -668,9 +626,6 @@ msgstr "Wygląda na to, że próbujesz zalogować się z poziomu aplikacji (taki
 msgid "It seems like an invalid authentication request was received."
 msgstr "Wygląda na to, że otrzymano nieprawidłowe żądanie uwierzytelnienia."
 
-msgid "It seems like an invalid CLI authentication request was received."
-msgstr ""
-
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Wygląda na to, że nie udało się nawiązać połączenia z usługą. Spróbuj użyć innej przeglądarki; jeśli problem będzie się powtarzał, skontaktuj się z pomocą techniczną."
 
@@ -701,9 +656,6 @@ msgstr "Dowiedz się, jak otwierać linki w przeglądarce"
 msgid "Legacy"
 msgstr "Starsza wersja"
 
-msgid "Let command-line tools on this device sign in to apps using your identity."
-msgstr ""
-
 msgid "Let's get started"
 msgstr "Zacznijmy"
 
@@ -712,12 +664,6 @@ msgstr "Osiągnięto limit"
 
 msgid "Link copied to clipboard"
 msgstr "Link skopiowany do schowka"
-
-msgid "Linking Internet Identity"
-msgstr ""
-
-msgid "Linking your identity"
-msgstr ""
 
 msgid "Loading permissions"
 msgstr "Ładowanie uprawnień"
@@ -740,20 +686,11 @@ msgstr "Uprość rejestrację i logowanie dzięki Google, Apple lub Microsoft. Z
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Upewnij się, że nikt nie widzi tego, co jest na Twoim ekranie ani tego, co piszesz."
 
-msgid "Make sure the CLI is still running and try again."
-msgstr ""
-
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Upewnij się, że dodasz nową metodę dostępu, aby móc zalogować się następnym razem lub zresetować swoją frazę odzyskiwania."
 
-msgid "Manage how other tools connect to your identity."
-msgstr ""
-
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Zarządzaj swoimi tożsamościami i zachowaj kontrolę nad swoimi aplikacjami i witrynami dzięki panelowi użytkownika. Odkryj Funkcje Pro, aby dalej dostosowywać i zabezpieczać swoje doświadczenie."
-
-msgid "Manage your identity"
-msgstr ""
 
 msgid "Manage your Internet Identity"
 msgstr "Zarządzaj swoją tożsamością Internet Identity"
@@ -815,14 +752,8 @@ msgstr "Nie zaktualizowano"
 msgid "Not verified"
 msgstr "Nie zweryfikowano"
 
-msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
-msgstr ""
-
 msgid "One or more words are wrong or out of order."
 msgstr "Jedno lub więcej słów jest nieprawidłowych lub w złej kolejności."
-
-msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
-msgstr ""
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Kod z tego urządzenia podawaj tylko, jeśli zainicjowałeś/aś ten proces <0>samodzielnie</0>."
@@ -980,9 +911,6 @@ msgstr "Zastąp"
 msgid "Replace it anytime"
 msgstr "Wymień go w dowolnym momencie"
 
-msgid "Requested by"
-msgstr ""
-
 msgid "Reset"
 msgstr "Resetuj"
 
@@ -1006,9 +934,6 @@ msgstr "Powrót do aplikacji"
 
 msgid "Return to application"
 msgstr "Powrót do aplikacji"
-
-msgid "Return to terminal"
-msgstr ""
 
 msgid "Review permissions"
 msgstr "Przejrzyj uprawnienia"
@@ -1057,9 +982,6 @@ msgstr "Skonfiguruj e-mail do odzyskiwania"
 
 msgid "Set up recovery phrase"
 msgstr "Skonfiguruj frazę odzyskiwania"
-
-msgid "Settings"
-msgstr ""
 
 msgid "Share {label}"
 msgstr "Udostępnij {label}"
@@ -1117,9 +1039,6 @@ msgstr "Rejestracja"
 
 msgid "Signed in"
 msgstr "Zalogowano"
-
-msgid "Signing in"
-msgstr ""
 
 msgid "Signing in securely"
 msgstr "Bezpieczne logowanie"
@@ -1241,12 +1160,6 @@ msgstr "<0>Istniejące urządzenie</0> przygotowuje się do kontynuowania."
 
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "<0>Nowe urządzenie</0> przygotowuje się do kontynuowania."
-
-msgid "The CLI gets full access to your account in this app."
-msgstr ""
-
-msgid "The CLI gets its own account, separate from your other apps."
-msgstr ""
 
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
 msgstr "E-mail musi pochodzić bezpośrednio z podanego adresu. Aliasy i przekierowania nie będą działać."
@@ -1494,9 +1407,6 @@ msgstr "Dlaczego to nie jest obsługiwane?"
 msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
 msgstr "Dzięki kluczom dostępu możesz teraz używać odcisku palca, twarzy lub blokady ekranu, aby szybko i bezpiecznie potwierdzić, że to naprawdę Ty."
 
-msgid "with your identity in this app"
-msgstr ""
-
 msgid "with your Internet Identity"
 msgstr "z Twoją Internet Identity"
 
@@ -1535,9 +1445,6 @@ msgstr "Możesz ją dodać z powrotem w dowolnym momencie, logując się tym sam
 
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "Możesz ją dodać z powrotem w dowolnym momencie, logując się tym samym kluczem dostępu."
-
-msgid "You can close this window."
-msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Możesz kontynuować z <0>Użyj istniejącego klucza dostępu</0> w procesie logowania."
@@ -1580,9 +1487,6 @@ msgstr "Wszystko gotowe. Twoja tożsamość została utworzona."
 
 msgid "You're all set. Your passkey has been registered."
 msgstr "Wszystko gotowe. Twój klucz dostępu został zarejestrowany."
-
-msgid "You're signed in"
-msgstr ""
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Logujesz się jako <0>{name}</0>."
