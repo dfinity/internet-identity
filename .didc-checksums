@@ -1,0 +1,23 @@
+# Pinned sha256 hashes for the didc binaries listed in `.didc-release`.
+#
+# Kept in lockstep with `.didc-release` so the helper in
+# `scripts/didc-helpers.bash` can verify each downloaded binary before
+# executing it — without this, the download path is plain HTTPS-with-no-
+# integrity-check (caught by the ZeroPath static-analysis ruleset that
+# guards against unverified-binary-execution patterns).
+#
+# When bumping `.didc-release`, refresh these too. The format is one
+# `<platform> <sha256>` pair per line (whitespace-separated, comments
+# allowed); platforms must match the asset suffix on the
+# dfinity/candid release page (linux64 / macos / arm32).
+#
+# To recompute by hand:
+#   release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
+#   for plat in linux64 macos arm32; do
+#     curl -sfL "https://github.com/dfinity/candid/releases/download/$release/didc-$plat" \
+#       | shasum -a 256 | awk -v p="$plat" '{print p, $1}'
+#   done
+
+linux64 32693c76d9c6fe0f273f2c1ebf7e48ba3c383e925e5afd17dd264a06aed9fbcc
+macos   e7c4f2450ea7eb7535a9fe8853102f6068b2787d6197f6a6587dd96c7f5110bb
+arm32   91303ee9e2ee59824deab45ab86949afcf3f283e8f0780e4665c10db973bbdf3
