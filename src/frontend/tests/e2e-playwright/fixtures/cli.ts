@@ -4,25 +4,37 @@ import { createServer, type Server } from "node:http";
 import { toBase64URL } from "../../../src/lib/utils/utils";
 import { II_URL } from "../utils";
 
+/** What the loopback server does on its next form POST. */
+type CliOutcome = "success" | "identity-mismatch" | "error";
+
 /**
  * Stands in for an ICP CLI binary. It:
- *  - runs a real loopback HTTP server the browser connects to, so the test
- *    exercises the genuine cross-origin path — CORS preflight, mixed content
- *    (https page → http loopback), and Private Network Access — rather than
- *    mocking it;
+ *  - runs a real loopback HTTP server the browser navigates to, so the test
+ *    exercises the genuine top-level form-POST path (https page → http
+ *    loopback) rather than mocking it;
  *  - generates an Ed25519 session keypair (the CLI's ephemeral key, base64url
  *    per the CLI URL contract);
  *  - discovers the authorize path the same way the real CLI does: it reads
  *    `/.well-known/cli-auth-config` and navigates to the advertised path,
- *    rather than hardcoding `/cli`.
+ *    rather than hardcoding `/cli`;
+ *  - on receiving the delegation, redirects the browser back to the `/cli`
+ *    page with a `status` (mirroring the real CLI), so the frontend keeps
+ *    ownership of the success/error/mismatch UI.
  *
  * `receivedDelegation` resolves with the delegation chain JSON once the flow
- * POSTs it to the loopback server.
+ * successfully posts it to the loopback server.
  */
 export type CliFixture = {
   publicKey: string;
   callbackUrl: string;
   receivedDelegation: Promise<unknown>;
+  /**
+   * Sets what the loopback server does on its next form POST. Defaults to
+   * "success". After serving an "identity-mismatch" redirect the server resets
+   * to "success", mirroring the real CLI which keeps listening for a retry
+   * with the correct identity.
+   */
+  setNextOutcome: (outcome: CliOutcome) => void;
   /**
    * Looks up `/.well-known/cli-auth-config` on the II origin and returns the
    * full authorize URL (advertised path + the CLI params in the fragment).
@@ -47,33 +59,53 @@ export const test = base.extend<{ cli: CliFixture }>({
       resolveDelegation = resolve;
     });
 
+    let nextOutcome: CliOutcome = "success";
+    // The discovered login path the server redirects back to; set by
+    // `resolveAuthorizeUrl` once it reads `/.well-known/cli-auth-config`.
+    let loginPath = "/cli";
+
     const server: Server = createServer((req, res) => {
-      const origin = req.headers.origin ?? "*";
-      // The application/json POST is a non-simple cross-origin request, so the
-      // browser sends an OPTIONS preflight first. A real CLI loopback server
-      // must answer it with CORS headers — and, because the request goes from
-      // a public origin to a loopback (local) address, the Private Network
-      // Access header too. Answer the preflight without resolving.
-      if (req.method === "OPTIONS") {
-        res.writeHead(204, {
-          "Access-Control-Allow-Origin": origin,
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Private-Network": "true",
-        });
-        res.end();
-        return;
-      }
+      // The delegation arrives as a top-level form-POST navigation, so there
+      // is no CORS preflight to answer. Read the body, decide the outcome, and
+      // redirect the browser back to the /cli page with a status — exactly
+      // what the real loopback server does.
       let raw = "";
       req.on("data", (chunk) => (raw += chunk));
       req.on("end", () => {
-        res.writeHead(200, { "Access-Control-Allow-Origin": origin });
-        res.end("ok");
+        const url = new URL(loginPath, II_URL);
+        const fragment = new URLSearchParams();
+
+        if (nextOutcome === "identity-mismatch") {
+          // Keep listening so the user can retry with the right identity:
+          // re-supply the request params and let the next post succeed.
+          nextOutcome = "success";
+          fragment.set("public_key", publicKey);
+          fragment.set("callback", callbackUrl);
+          fragment.set("status", "identity-mismatch");
+          url.hash = fragment.toString();
+          res.writeHead(303, { Location: url.toString() });
+          res.end();
+          return;
+        }
+
+        if (nextOutcome === "error") {
+          fragment.set("status", "error");
+          url.hash = fragment.toString();
+          res.writeHead(303, { Location: url.toString() });
+          res.end();
+          return;
+        }
+
+        const delegation = new URLSearchParams(raw).get("delegation");
         try {
-          resolveDelegation(JSON.parse(raw));
+          resolveDelegation(delegation === null ? raw : JSON.parse(delegation));
         } catch {
           resolveDelegation(raw);
         }
+        fragment.set("status", "success");
+        url.hash = fragment.toString();
+        res.writeHead(303, { Location: url.toString() });
+        res.end();
       });
     });
 
@@ -87,6 +119,10 @@ export const test = base.extend<{ cli: CliFixture }>({
       throw new Error("Loopback CLI fixture: server.address() not AddressInfo");
     }
     const callbackUrl = `http://127.0.0.1:${address.port}/callback`;
+
+    const setNextOutcome = (outcome: CliOutcome): void => {
+      nextOutcome = outcome;
+    };
 
     const resolveAuthorizeUrl = async (
       page: Page,
@@ -116,6 +152,7 @@ export const test = base.extend<{ cli: CliFixture }>({
       ) {
         throw new Error("cli-auth-config did not advertise a string path");
       }
+      loginPath = config.path;
       const fragment = new URLSearchParams();
       fragment.set("public_key", publicKey);
       fragment.set("callback", opts.callbackUrl ?? callbackUrl);
@@ -132,6 +169,7 @@ export const test = base.extend<{ cli: CliFixture }>({
       publicKey,
       callbackUrl,
       receivedDelegation,
+      setNextOutcome,
       resolveAuthorizeUrl,
     });
 

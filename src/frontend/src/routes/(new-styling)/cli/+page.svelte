@@ -101,7 +101,9 @@
       return;
     }
     if (!$isAuthenticatedStore) {
-      phase = { kind: "wizard" };
+      if (phase.kind !== "wizard") {
+        phase = { kind: "wizard" };
+      }
       return;
     }
     if (
@@ -109,7 +111,9 @@
       id !== undefined &&
       !cliAccessStore.isEnabled(id)
     ) {
-      phase = { kind: "cli-disabled" };
+      if (phase.kind !== "cli-disabled") {
+        phase = { kind: "cli-disabled" };
+      }
       return;
     }
     // Authenticated user with access (or generic mode) — move forward unless

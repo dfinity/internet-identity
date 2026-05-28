@@ -123,6 +123,36 @@ test("Generic CLI sign-in posts a two-hop delegation chain to the loopback callb
   ).toBeVisible();
 });
 
+test("Identity mismatch shows a toast and lets the user retry in place", async ({
+  page,
+  cli,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(await cli.resolveAuthorizeUrl(page));
+  await signUp(page);
+
+  // The CLI rejects the first delegation as a principal mismatch (the
+  // `login` re-auth path) and redirects back with status=identity-mismatch.
+  cli.setNextOutcome("identity-mismatch");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+  // The redirect-back lands on the sign-in flow with a toast explaining why.
+  await expect(page.getByText("That identity doesn't match")).toBeVisible();
+
+  // Retry with the same discoverable passkey; the second attempt succeeds and
+  // the delegation reaches the loopback server.
+  await signInExisting(page);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+  expect(await cli.receivedDelegation).toMatchObject({
+    delegations: expect.any(Array),
+    publicKey: expect.any(String),
+  });
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+});
+
 test("App mode without CLI access enabled shows the gated error screen", async ({
   page,
   cli,
