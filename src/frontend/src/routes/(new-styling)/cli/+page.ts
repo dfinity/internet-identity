@@ -17,6 +17,21 @@ export type CliParams =
     }
   | { kind: "invalid" };
 
+/**
+ * Outcome the loopback server redirects back with after receiving the
+ * delegation. `success` and `error` arrive on their own; `identity-mismatch`
+ * arrives alongside `public_key`/`callback` so the authorize screen can be
+ * re-shown for an in-place retry.
+ */
+export type CliStatus = "success" | "identity-mismatch" | "error";
+
+const parseStatus = (raw: string | null): CliStatus | undefined => {
+  if (raw === "success" || raw === "identity-mismatch" || raw === "error") {
+    return raw;
+  }
+  return undefined;
+};
+
 const parseBase64Url = (raw: string | null): string | undefined => {
   if (raw === null || raw === "") {
     return undefined;
@@ -82,7 +97,9 @@ const parseTtl = (raw: string | null): number | undefined => {
   return Math.floor(parsed);
 };
 
-export const load: PageLoad = ({ url }): { params: CliParams } => {
+export const load: PageLoad = ({
+  url,
+}): { params: CliParams; status: CliStatus | undefined } => {
   // CLI binaries put `public_key`, `callback`, etc. in the URL fragment so
   // they don't appear in browser history or server logs. The fragment is
   // only available client-side, so this `load` only resolves meaningfully
@@ -91,6 +108,7 @@ export const load: PageLoad = ({ url }): { params: CliParams } => {
   const fragment = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
   const params = new URLSearchParams(fragment);
 
+  const status = parseStatus(params.get("status"));
   const publicKey = parseBase64Url(params.get("public_key"));
   const callback = parseLoopbackCallback(params.get("callback"));
   const ttlMinutes = parseTtl(params.get("ttl"));
@@ -101,7 +119,7 @@ export const load: PageLoad = ({ url }): { params: CliParams } => {
   if (appRaw !== null && appRaw !== "") {
     appHost = parseAppHost(appRaw);
     if (appHost === undefined) {
-      return { params: { kind: "invalid" } };
+      return { params: { kind: "invalid" }, status };
     }
   }
 
@@ -110,9 +128,10 @@ export const load: PageLoad = ({ url }): { params: CliParams } => {
     callback === undefined ||
     ttlMinutes === undefined
   ) {
-    return { params: { kind: "invalid" } };
+    return { params: { kind: "invalid" }, status };
   }
   return {
     params: { kind: "valid", publicKey, callback, ttlMinutes, appHost },
+    status,
   };
 };

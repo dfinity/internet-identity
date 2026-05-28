@@ -20,10 +20,20 @@
 
   const { data }: PageProps = $props();
   const params = $derived(data.params);
+  const status = $derived(data.status);
 
-  // Drop the URL fragment once parsed so the public_key and callback don't
-  // sit in the address bar after the user lands here.
+  // After a mismatch the loopback server redirects back here so the user can
+  // retry with the right identity; surface why before they try again.
   onMount(() => {
+    if (status === "identity-mismatch") {
+      toaster.error({
+        title: $t`That identity doesn't match`,
+        description: $t`Choose the identity you originally linked, then try again.`,
+        duration: 6000,
+      });
+    }
+    // Drop the URL fragment once parsed so the public_key, callback, and
+    // status don't sit in the address bar after the user lands here.
     if (window.location.hash !== "") {
       window.history.replaceState(
         null,
@@ -38,13 +48,24 @@
     | { kind: "authorize" }
     | { kind: "close" }
     | { kind: "cli-disabled" }
-    | { kind: "callback-failed"; message: string };
+    | { kind: "invalid" }
+    | { kind: "error" }
+    | { kind: "authorize-failed"; message: string };
 
   // Selecting the initial phase happens whenever the user signs in / out
   // mid-flow (e.g. switching identities via the header switcher).
   const initialPhase = (): Phase => {
+    // Outcomes the loopback server redirects back with take priority. A
+    // mismatch keeps the request params, so it falls through to the normal
+    // sign-in flow (plus the toast) for an in-place retry.
+    if (status === "success") {
+      return { kind: "close" };
+    }
+    if (status === "error") {
+      return { kind: "error" };
+    }
     if (params.kind !== "valid") {
-      return { kind: "wizard" };
+      return { kind: "invalid" };
     }
     if (!$isAuthenticatedStore) {
       return { kind: "wizard" };
@@ -65,10 +86,15 @@
 
   // Keep phase in sync with auth state changes (e.g. user switches identity
   // from the header switcher). Only auto-resyncs into the authorize/wizard
-  // state; we never bounce the user off a terminal phase (close, error).
+  // state; we never bounce the user off a terminal phase.
   $effect(() => {
     const id = $authenticationStore?.identityNumber;
-    if (phase.kind === "close" || phase.kind === "callback-failed") {
+    if (
+      phase.kind === "close" ||
+      phase.kind === "error" ||
+      phase.kind === "invalid" ||
+      phase.kind === "authorize-failed"
+    ) {
       return;
     }
     if (params.kind !== "valid") {
@@ -102,6 +128,10 @@
     if (authenticated === undefined) {
       return;
     }
+    // On success `cliAuthorize` navigates the browser to the loopback server,
+    // which redirects back here with a status — so a resolved promise means
+    // the chain was built and submitted, not that we stay on this page. Only
+    // failures building the chain land in the catch.
     try {
       await cliAuthorize({
         authenticated,
@@ -110,10 +140,9 @@
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
       });
-      phase = { kind: "close" };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      phase = { kind: "callback-failed", message };
+      phase = { kind: "authorize-failed", message };
     }
   };
 
@@ -138,7 +167,7 @@
   };
 </script>
 
-{#if params.kind !== "valid"}
+{#if phase.kind === "invalid"}
   <AuthPanel>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
       <CircleAlertIcon class="size-6" />
@@ -146,15 +175,31 @@
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
       {$t`Invalid request`}
     </h1>
-    <p class="text-text-tertiary mb-6 text-base">
+    <p class="text-text-tertiary mb-2 text-base">
       <Trans>
         It seems like an invalid CLI authentication request was received.
       </Trans>
     </p>
-    <button class="btn btn-secondary" onclick={() => window.close()}>
-      <RotateCcwIcon class="size-4" />
-      <span>{$t`Return to terminal`}</span>
-    </button>
+    <p class="text-text-tertiary text-base">
+      {$t`You can close this window.`}
+    </p>
+  </AuthPanel>
+{:else if phase.kind === "error"}
+  <AuthPanel>
+    <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
+      <CircleAlertIcon class="size-6" />
+    </FeaturedIcon>
+    <h1 class="text-text-primary mb-3 text-2xl font-medium">
+      {$t`Something went wrong`}
+    </h1>
+    <p class="text-text-tertiary mb-2 text-base">
+      <Trans>
+        The CLI sign-in couldn't be completed. Check the CLI for details.
+      </Trans>
+    </p>
+    <p class="text-text-tertiary text-base">
+      {$t`You can close this window.`}
+    </p>
   </AuthPanel>
 {:else if phase.kind === "wizard"}
   <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-100">
@@ -169,22 +214,22 @@
       </AuthWizard>
     </AuthPanel>
   </div>
-{:else if phase.kind === "authorize"}
+{:else if phase.kind === "authorize" && params.kind === "valid"}
   <CliAuthorizeView appHost={params.appHost} onAuthorize={handleAuthorize} />
 {:else if phase.kind === "cli-disabled"}
   <CliErrorView />
 {:else if phase.kind === "close"}
   <CliCloseWindowView />
-{:else if phase.kind === "callback-failed"}
+{:else if phase.kind === "authorize-failed"}
   <AuthPanel>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
       <CircleAlertIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Couldn't reach the CLI`}
+      {$t`Something went wrong`}
     </h1>
     <p class="text-text-tertiary mb-6 text-base">
-      <Trans>Make sure the CLI is still running and try again.</Trans>
+      <Trans>Couldn't authorize the CLI. Please try again.</Trans>
     </p>
     <p class="text-text-tertiary mb-6 font-mono text-xs">
       {phase.message}

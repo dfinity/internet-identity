@@ -19,7 +19,7 @@ interface CliAuthorizeInput {
   appHost?: string;
   /** Lifetime in minutes. */
   ttlMinutes: number;
-  /** Loopback URL to POST the delegation chain to. */
+  /** Loopback URL the delegation chain is form-POSTed to. */
   callback: string;
 }
 
@@ -28,7 +28,13 @@ const derivationOrigin = (appHost: string | undefined): string =>
 
 /**
  * Builds a two-hop delegation chain rooted at the user's identity and ending
- * at the CLI's public key, then POSTs it to the CLI's loopback callback.
+ * at the CLI's public key, then delivers it to the CLI's loopback callback via
+ * a top-level form-POST navigation.
+ *
+ * A top-level navigation is used instead of `fetch` because Chrome's Local
+ * Network Access gates public-origin→loopback subresource requests behind a
+ * permission prompt. The loopback server reads the form post and redirects the
+ * browser back to `/cli` with a `status` so this page keeps owning the UI.
  *
  * The canister only ever signs a delegation to a freshly-generated,
  * non-extractable browser key — never to the public_key from the URL
@@ -91,15 +97,16 @@ export const cliAuthorize = async ({
     { previous: canisterChain },
   );
 
-  const response = await fetch(callback, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(chain.toJSON()),
-    redirect: "error",
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Callback returned ${response.status} ${response.statusText}`,
-    );
-  }
+  // Submit as a top-level navigation. The browser leaves id.ai for the
+  // loopback server, which redirects back to /cli with a status param.
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = callback;
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "delegation";
+  input.value = JSON.stringify(chain.toJSON());
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
 };
