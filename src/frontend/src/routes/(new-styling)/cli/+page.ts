@@ -1,7 +1,9 @@
 import type { PageLoad } from "./$types";
+import { fromHex } from "$lib/utils/utils";
 
 /** Default delegation lifetime in minutes — matches the previous cli.id.ai. */
 const DEFAULT_TTL_MINUTES = 480;
+const MAX_TTL_MINUTES = 7 * 24 * 60;
 
 export type CliParams =
   | {
@@ -11,70 +13,98 @@ export type CliParams =
       ttlMinutes: number;
       /** Hostname of the dapp the CLI is being authorized for, or undefined
        *  for generic mode. */
-      appHost?: string;
+      appHost: string | undefined;
     }
-  | { kind: "invalid"; reason: string };
+  | { kind: "invalid" };
 
-const isLoopbackCallback = (raw: string): boolean => {
+/** Returns the input unchanged if it hex-decodes, undefined otherwise. */
+const parseHex = (raw: string | null): string | undefined => {
+  if (raw === null || raw === "") {
+    return undefined;
+  }
+  try {
+    fromHex(raw);
+    return raw;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * RFC 8252 — the callback must point at a loopback IP literal so an attacker
+ * can't intercept the delegation by registering a hostile DNS record.
+ */
+const parseLoopbackCallback = (raw: string | null): string | undefined => {
+  if (raw === null || raw === "") {
+    return undefined;
+  }
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    return false;
+    return undefined;
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return false;
+    return undefined;
   }
-  if (url.username !== "" || url.password !== "") {
-    return false;
+  if (url.hostname !== "127.0.0.1" && url.hostname !== "::1") {
+    return undefined;
   }
-  return url.hostname === "127.0.0.1" || url.hostname === "::1";
+  return raw;
 };
 
-const isValidPublicKey = (raw: string): boolean => /^[0-9a-fA-F]+$/.test(raw);
+/**
+ * Returns the normalised hostname if `raw` is a bare hostname (optionally
+ * with mixed case), or undefined if it's not. Rejects port, path, query,
+ * fragment, scheme prefix, and userinfo by requiring the round-trip
+ * through `new URL` to leave only the hostname behind.
+ */
+const parseAppHost = (raw: string): string | undefined => {
+  let url: URL;
+  try {
+    url = new URL(`https://${raw}`);
+  } catch {
+    return undefined;
+  }
+  if (url.hostname.toLowerCase() !== raw.toLowerCase()) {
+    return undefined;
+  }
+  return url.hostname;
+};
 
-const isValidAppHost = (raw: string): boolean => {
-  // Allow standard hostnames; reject anything with whitespace, slashes,
-  // or characters that wouldn't be a legal URL host.
-  return /^[a-zA-Z0-9.-]+$/.test(raw) && raw.length > 0 && raw.length <= 253;
+const parseTtl = (raw: string | null): number | undefined => {
+  if (raw === null) {
+    return DEFAULT_TTL_MINUTES;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_TTL_MINUTES) {
+    return undefined;
+  }
+  return Math.floor(parsed);
 };
 
 export const load: PageLoad = ({ url }): { params: CliParams } => {
-  const publicKey = url.searchParams.get("public_key");
-  const callback = url.searchParams.get("callback");
-  const app = url.searchParams.get("app");
-  const ttlRaw = url.searchParams.get("ttl");
+  const publicKey = parseHex(url.searchParams.get("public_key"));
+  const callback = parseLoopbackCallback(url.searchParams.get("callback"));
+  const ttlMinutes = parseTtl(url.searchParams.get("ttl"));
 
-  if (publicKey === null || publicKey === "") {
-    return { params: { kind: "invalid", reason: "missing-public-key" } };
-  }
-  if (!isValidPublicKey(publicKey)) {
-    return { params: { kind: "invalid", reason: "invalid-public-key" } };
-  }
-  if (callback === null || callback === "") {
-    return { params: { kind: "invalid", reason: "missing-callback" } };
-  }
-  if (!isLoopbackCallback(callback)) {
-    return { params: { kind: "invalid", reason: "invalid-callback" } };
-  }
-
-  let ttlMinutes = DEFAULT_TTL_MINUTES;
-  if (ttlRaw !== null) {
-    const parsed = Number(ttlRaw);
-    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 7 * 24 * 60) {
-      return { params: { kind: "invalid", reason: "invalid-ttl" } };
-    }
-    ttlMinutes = Math.floor(parsed);
-  }
-
+  // `app` is optional. Absent or empty → generic mode. Present → must parse.
+  const appRaw = url.searchParams.get("app");
   let appHost: string | undefined;
-  if (app !== null && app !== "") {
-    if (!isValidAppHost(app)) {
-      return { params: { kind: "invalid", reason: "invalid-app" } };
+  if (appRaw !== null && appRaw !== "") {
+    appHost = parseAppHost(appRaw);
+    if (appHost === undefined) {
+      return { params: { kind: "invalid" } };
     }
-    appHost = app.toLowerCase();
   }
 
+  if (
+    publicKey === undefined ||
+    callback === undefined ||
+    ttlMinutes === undefined
+  ) {
+    return { params: { kind: "invalid" } };
+  }
   return {
     params: { kind: "valid", publicKey, callback, ttlMinutes, appHost },
   };

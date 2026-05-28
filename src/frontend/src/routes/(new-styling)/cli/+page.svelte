@@ -125,7 +125,7 @@
   };
 </script>
 
-{#if params.kind === "invalid"}
+{#if params.kind !== "valid"}
   <AuthPanel>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
       <CircleAlertIcon class="size-6" />
