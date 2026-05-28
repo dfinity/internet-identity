@@ -6,7 +6,13 @@ import {
   throwCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
-import { CLI_GENERIC_DERIVATION_ORIGIN } from "./+page";
+
+/**
+ * Derivation origin to use for generic (non-dapp) CLI sign-in. Kept stable
+ * across the migration from the standalone `cli.id.ai` site to the built-in
+ * `id.ai/cli` route so existing CLI principals stay valid.
+ */
+export const CLI_GENERIC_DERIVATION_ORIGIN = "https://cli.id.ai";
 
 interface CliAuthorizeInput {
   authenticated: Authenticated;

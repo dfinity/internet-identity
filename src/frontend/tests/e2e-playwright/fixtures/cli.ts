@@ -1,7 +1,6 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { test as base } from "@playwright/test";
 import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
 import { toHex } from "../../../src/lib/utils/utils";
 
 /**
@@ -45,11 +44,18 @@ export const test = base.extend<{ cli: CliFixture }>({
         res.end("ok");
       });
     });
+    // `listen(0, …)` asks the OS for an unused port, so concurrent fixture
+    // instances never collide on a hardcoded port.
     await new Promise<void>((resolve) =>
       server.listen(0, "127.0.0.1", () => resolve()),
     );
-    const port = (server.address() as AddressInfo).port;
-    const callbackUrl = `http://127.0.0.1:${port}/callback`;
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error(
+        "Loopback CLI fixture: server.address() not an AddressInfo",
+      );
+    }
+    const callbackUrl = `http://127.0.0.1:${address.port}/callback`;
 
     await use({ publicKeyHex, callbackUrl, receivedDelegation });
 

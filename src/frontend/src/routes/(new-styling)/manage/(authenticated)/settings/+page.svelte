@@ -2,7 +2,7 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
-  import CliAccessSection from "./CliAccessSection.svelte";
+  import CliAccessSection from "./components/CliAccessSection.svelte";
 </script>
 
 <header class="flex flex-col gap-3">

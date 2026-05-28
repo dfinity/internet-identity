@@ -1,12 +1,5 @@
 import type { PageLoad } from "./$types";
 
-/**
- * Derivation origin to use for generic (non-dapp) CLI sign-in. Kept stable
- * across the migration from the standalone `cli.id.ai` site to the built-in
- * `id.ai/cli` route so existing CLI principals stay valid.
- */
-export const CLI_GENERIC_DERIVATION_ORIGIN = "https://cli.id.ai";
-
 /** Default delegation lifetime in minutes — matches the previous cli.id.ai. */
 const DEFAULT_TTL_MINUTES = 480;
 

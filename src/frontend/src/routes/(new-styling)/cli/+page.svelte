@@ -15,7 +15,7 @@
   import CliAuthorizeView from "./views/CliAuthorizeView.svelte";
   import CliCloseWindowView from "./views/CliCloseWindowView.svelte";
   import CliErrorView from "./views/CliErrorView.svelte";
-  import { cliAuthorize } from "./cliAuthorize";
+  import { cliAuthorize } from "./utils";
 
   const { data }: PageProps = $props();
   const params = $derived(data.params);
