@@ -100,13 +100,15 @@ const parseTtl = (raw: string | null): number | undefined => {
 export const load: PageLoad = ({
   url,
 }): { params: CliParams; status: CliStatus | undefined } => {
-  // CLI binaries put `public_key`, `callback`, etc. in the URL fragment so
-  // they don't appear in browser history or server logs. The fragment is
-  // only available client-side, so this `load` only resolves meaningfully
-  // in the browser (`adapter-static` is fine — `load` runs on the client at
-  // navigation time).
-  const fragment = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
-  const params = new URLSearchParams(fragment);
+  // CLI binaries put `public_key`, `callback`, etc. in the URL fragment
+  // because the fragment is never sent to the server — it stays out of server
+  // logs (the address-bar copy is then cleared in `+page.svelte`'s onMount via
+  // `replaceState`). The fragment is only readable in the browser, so reading
+  // `url.hash` here relies on this universal `load` re-running client-side on
+  // hydration/navigation; with `adapter-static` it's empty during prerender.
+  // Requires SvelteKit 2+ — kit 1 made `url.hash` inaccessible from `load`.
+  // `url.hash` is "" or "#…", so slicing one char yields the raw query string.
+  const params = new URLSearchParams(url.hash.slice(1));
 
   const status = parseStatus(params.get("status"));
   const publicKey = parseBase64Url(params.get("public_key"));

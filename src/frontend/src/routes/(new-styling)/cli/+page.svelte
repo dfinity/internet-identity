@@ -3,7 +3,9 @@
   import { isAuthenticatedStore } from "$lib/stores/authentication.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { sessionStore } from "$lib/stores/session.store";
   import { cliAccessStore } from "$lib/stores/cli-access.store";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -11,16 +13,30 @@
   import { t } from "$lib/stores/locale.store";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
+  import { CircleAlertIcon } from "@lucide/svelte";
+  import { get } from "svelte/store";
   import { onMount } from "svelte";
   import CliAuthorizeView from "./views/CliAuthorizeView.svelte";
   import CliCloseWindowView from "./views/CliCloseWindowView.svelte";
   import CliErrorView from "./views/CliErrorView.svelte";
   import { cliAuthorize } from "./utils";
+  import { showIdentitySwitcher } from "./cli-switcher.store";
 
   const { data }: PageProps = $props();
   const params = $derived(data.params);
   const status = $derived(data.status);
+
+  // Authenticates a selected identity from the last-used list. The identity
+  // switcher here only *selects*; the big Continue button is the single point
+  // that actually signs in (see `handleAuthorize`).
+  const authFlow = new AuthLastUsedFlow();
+  $effect(() =>
+    authFlow.init(
+      Object.values($lastUsedIdentitiesStore.identities).map(
+        ({ identityNumber }) => identityNumber,
+      ),
+    ),
+  );
 
   // After a mismatch the loopback server redirects back here so the user can
   // retry with the right identity; surface why before they try again.
@@ -49,15 +65,20 @@
     | { kind: "close" }
     | { kind: "cli-disabled" }
     | { kind: "invalid" }
-    | { kind: "error" }
-    | { kind: "authorize-failed"; message: string };
+    | { kind: "error" };
 
-  // Selecting the initial phase happens whenever the user signs in / out
-  // mid-flow (e.g. switching identities via the header switcher).
+  // In app mode the chosen identity must have CLI access enabled on this
+  // device; otherwise it's a generic CLI sign-in with no gate.
+  const isCliAccessGated = (identityNumber: bigint | undefined): boolean =>
+    params.kind === "valid" &&
+    params.appHost !== undefined &&
+    identityNumber !== undefined &&
+    !cliAccessStore.isEnabled(identityNumber);
+
+  // The phase the page opens on. Outcomes the loopback server redirects back
+  // with take priority; a mismatch keeps the request params, so it falls
+  // through to the sign-in flow (plus the onMount toast) for an in-place retry.
   const initialPhase = (): Phase => {
-    // Outcomes the loopback server redirects back with take priority. A
-    // mismatch keeps the request params, so it falls through to the normal
-    // sign-in flow (plus the toast) for an in-place retry.
     if (status === "success") {
       return { kind: "close" };
     }
@@ -67,60 +88,27 @@
     if (params.kind !== "valid") {
       return { kind: "invalid" };
     }
-    if (!$isAuthenticatedStore) {
-      return { kind: "wizard" };
-    }
-    if (params.appHost !== undefined) {
-      const identityNumber = $authenticationStore?.identityNumber;
-      if (
-        identityNumber !== undefined &&
-        !cliAccessStore.isEnabled(identityNumber)
-      ) {
-        return { kind: "cli-disabled" };
-      }
-    }
-    return { kind: "authorize" };
+    return { kind: "wizard" };
   };
 
   let phase = $state<Phase>(initialPhase());
 
-  // Keep phase in sync with auth state changes (e.g. user switches identity
-  // from the header switcher). Only auto-resyncs into the authorize/wizard
-  // state; we never bounce the user off a terminal phase.
+  // The switcher is only meaningful while the user is choosing how to sign in.
   $effect(() => {
-    const id = $authenticationStore?.identityNumber;
-    if (
-      phase.kind === "close" ||
-      phase.kind === "error" ||
-      phase.kind === "invalid" ||
-      phase.kind === "authorize-failed"
-    ) {
-      return;
-    }
-    if (params.kind !== "valid") {
-      return;
-    }
-    if (!$isAuthenticatedStore) {
-      if (phase.kind !== "wizard") {
-        phase = { kind: "wizard" };
-      }
-      return;
-    }
-    if (
-      params.appHost !== undefined &&
-      id !== undefined &&
-      !cliAccessStore.isEnabled(id)
-    ) {
-      if (phase.kind !== "cli-disabled") {
-        phase = { kind: "cli-disabled" };
-      }
-      return;
-    }
-    // Authenticated user with access (or generic mode) — move forward unless
-    // we're still in the wizard, in which case the wizard's handlers will
-    // advance us themselves.
+    showIdentitySwitcher.set(
+      phase.kind === "wizard" || phase.kind === "authorize",
+    );
+  });
+
+  // The only transition driven by auth state: once an identity has actually
+  // signed in (via the wizard here or the "use another identity" dialog in the
+  // layout), advance from the wizard to the authorize step. Switching identity
+  // only *selects* and never authenticates, so it never triggers this.
+  $effect(() => {
     if (phase.kind === "wizard" && $isAuthenticatedStore) {
-      phase = { kind: "authorize" };
+      phase = isCliAccessGated($authenticationStore?.identityNumber)
+        ? { kind: "cli-disabled" }
+        : { kind: "authorize" };
     }
   });
 
@@ -128,15 +116,31 @@
     if (params.kind !== "valid") {
       return;
     }
-    const authenticated = $authenticationStore;
-    if (authenticated === undefined) {
+    const selected = $lastUsedIdentitiesStore.selected;
+    if (selected === undefined) {
       return;
     }
-    // On success `cliAuthorize` navigates the browser to the loopback server,
-    // which redirects back here with a status — so a resolved promise means
-    // the chain was built and submitted, not that we stay on this page. Only
-    // failures building the chain land in the catch.
     try {
+      // The Continue button is the single sign-in point: switching identity
+      // only selects, so authenticate the selected identity now if it isn't
+      // already the active session.
+      if ($authenticationStore?.identityNumber !== selected.identityNumber) {
+        sessionStore.reset();
+        await authFlow.authenticate(
+          $lastUsedIdentitiesStore.identities[`${selected.identityNumber}`],
+        );
+      }
+      const authenticated = get(authenticationStore);
+      if (authenticated === undefined) {
+        return;
+      }
+      if (isCliAccessGated(authenticated.identityNumber)) {
+        phase = { kind: "cli-disabled" };
+        return;
+      }
+      // On success `cliAuthorize` navigates the browser to the loopback server,
+      // which redirects back here with a status — so a resolved promise means
+      // the chain was built and submitted, not that we stay on this page.
       await cliAuthorize({
         authenticated,
         publicKey: params.publicKey,
@@ -145,8 +149,11 @@
         callback: params.callback,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      phase = { kind: "authorize-failed", message };
+      // Authentication and delegation errors are surfaced the same way as the
+      // rest of the app — a toast (with a graceful notice for a cancelled
+      // prompt) — and the user stays here to click Continue again. The error
+      // screen is reserved for CLI-reported failures (status=error).
+      handleError(error);
     }
   };
 
@@ -224,26 +231,4 @@
   <CliErrorView />
 {:else if phase.kind === "close"}
   <CliCloseWindowView />
-{:else if phase.kind === "authorize-failed"}
-  <AuthPanel>
-    <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-      <CircleAlertIcon class="size-6" />
-    </FeaturedIcon>
-    <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Something went wrong`}
-    </h1>
-    <p class="text-text-tertiary mb-6 text-base">
-      <Trans>Couldn't authorize the CLI. Please try again.</Trans>
-    </p>
-    <p class="text-text-tertiary mb-6 font-mono text-xs">
-      {phase.message}
-    </p>
-    <button
-      class="btn btn-secondary"
-      onclick={() => (phase = { kind: "authorize" })}
-    >
-      <RotateCcwIcon class="size-4" />
-      <span>{$t`Try again`}</span>
-    </button>
-  </AuthPanel>
 {/if}

@@ -2,10 +2,7 @@
   import type { LayoutProps } from "./$types";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { authenticationStore } from "$lib/stores/authentication.store";
-  import { sessionStore } from "$lib/stores/session.store";
   import { t } from "$lib/stores/locale.store";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -16,12 +13,11 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
+  import { showIdentitySwitcher } from "./cli-switcher.store";
 
   const { children }: LayoutProps = $props();
 
   // --- Identity switcher state ---
-  const authLastUsedFlow = new AuthLastUsedFlow();
-
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
@@ -32,35 +28,28 @@
   let identityButtonRef = $state<HTMLElement>();
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
-  let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
 
-  const handleSignIn = async (identityNumber: bigint) => {
-    try {
-      isAuthenticating = true;
-      if ($authenticationStore?.identityNumber !== identityNumber) {
-        sessionStore.reset();
-        await authLastUsedFlow.authenticate(
-          $lastUsedIdentitiesStore.identities[`${identityNumber}`],
-        );
-      }
-      lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    } finally {
-      isIdentityPopoverOpen = false;
-      isAuthDialogOpen = false;
-      isAuthenticating = false;
-    }
+  // Switching identity only *selects* here — unlike the authorize route, it
+  // doesn't sign in. The page's Continue button performs the authentication
+  // for the selected identity, so the user always makes that explicit choice.
+  const handleSelectIdentity = (identityNumber: bigint): Promise<void> => {
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    isIdentityPopoverOpen = false;
+    isAuthDialogOpen = false;
+    return Promise.resolve();
   };
-  const handleSignUp = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
+  // The "use another identity" dialog signs in through its own AuthWizard;
+  // these run once it has authenticated, so they only select and notify.
+  const handleSignUp = async (identityNumber: bigint): Promise<void> => {
+    await handleSelectIdentity(identityNumber);
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
   };
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-  };
+  const handleUpgrade = (identityNumber: bigint): Promise<void> =>
+    handleSelectIdentity(identityNumber);
   const handleRemoveIdentity = (identityNumber: bigint) => {
     const isCurrent = selectedIdentity?.identityNumber === identityNumber;
     if (isCurrent) {
@@ -99,18 +88,12 @@
       });
     }
   };
-
-  $effect(() =>
-    authLastUsedFlow.init(
-      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
-    ),
-  );
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="cli-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header>
-    {#if selectedIdentity !== undefined}
+    {#if selectedIdentity !== undefined && $showIdentitySwitcher}
       <button
         bind:this={identityButtonRef}
         class="btn btn-tertiary ms-auto gap-2.5 pe-3 md:-me-3"
@@ -126,12 +109,7 @@
       {#if isIdentityPopoverOpen}
         <Popover
           anchor={identityButtonRef}
-          onClose={() => {
-            if (isAuthenticating) {
-              return;
-            }
-            isIdentityPopoverOpen = false;
-          }}
+          onClose={() => (isIdentityPopoverOpen = false)}
           direction="down"
           align="end"
           distance="0.75rem"
@@ -140,7 +118,8 @@
           <IdentitySwitcher
             selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
-            onSwitchIdentity={(identityNumber) => handleSignIn(identityNumber)}
+            onSwitchIdentity={(identityNumber) =>
+              handleSelectIdentity(identityNumber)}
             onUseAnotherIdentity={() => {
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
@@ -163,16 +142,9 @@
         </Popover>
       {/if}
       {#if isAuthDialogOpen}
-        <Dialog
-          onClose={() => {
-            if (isAuthenticating) {
-              return;
-            }
-            isAuthDialogOpen = false;
-          }}
-        >
+        <Dialog onClose={() => (isAuthDialogOpen = false)}>
           <AuthWizard
-            onSignIn={handleSignIn}
+            onSignIn={handleSelectIdentity}
             onSignUp={handleSignUp}
             onUpgrade={handleUpgrade}
             onError={(error) => {

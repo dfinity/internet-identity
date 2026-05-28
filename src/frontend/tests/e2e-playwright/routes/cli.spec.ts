@@ -123,6 +123,31 @@ test("Generic CLI sign-in posts a two-hop delegation chain to the loopback callb
   ).toBeVisible();
 });
 
+test("Identity switcher shows while signing in and hides on the success screen", async ({
+  page,
+  cli,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(await cli.resolveAuthorizeUrl(page));
+  await signUp(page);
+
+  // On the authorize step the user is still choosing how to sign in, so the
+  // header switcher is available.
+  const switcher = page.getByRole("button", { name: "Switch identity" });
+  await expect(
+    page.getByRole("button", { name: "Continue", exact: true }),
+  ).toBeVisible();
+  await expect(switcher).toBeVisible();
+
+  // Once authorized and back on the success screen there's nothing to sign in
+  // to, so the switcher is gone.
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+  await expect(switcher).toBeHidden();
+});
+
 test("Identity mismatch shows a toast and lets the user retry in place", async ({
   page,
   cli,
