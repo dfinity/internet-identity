@@ -1,24 +1,34 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
-import { test as base } from "@playwright/test";
-import { createServer, type Server } from "node:http";
+import { test as base, type Page } from "@playwright/test";
 import { toBase64URL } from "../../../src/lib/utils/utils";
 
 /**
- * Simulates the loopback HTTP server an ICP CLI binary stands up to receive
- * the delegation back from `id.ai/cli`. The fixture:
- *  - generates an Ed25519 session keypair (the CLI's ephemeral keypair),
- *  - starts a 127.0.0.1 server that captures the POST body II sends,
- *  - exposes `publicKey` (base64url, matching the CLI URL contract) +
- *    `callbackUrl` to assemble the `id.ai/cli` URL.
+ * Stands in for the loopback server an ICP CLI binary runs to receive the
+ * delegation from `id.ai/cli`. A real HTTP server can't be used here: the
+ * e2e browser launches with `--host-resolver-rules=MAP * localhost:5173`,
+ * which remaps every host (including a `127.0.0.1:<port>` callback) to the
+ * dev server, so the browser could never reach a real loopback server.
+ * Instead we intercept the callback request in the browser via
+ * `page.route`, which runs before host resolution.
  *
- * On test teardown the server is closed.
+ * The fixture generates an Ed25519 session keypair (the CLI's ephemeral
+ * key, base64url-encoded per the CLI URL contract) and exposes
+ * `captureDelegation(page)` to install the interceptor and await the body.
  */
 export type CliFixture = {
   publicKey: string;
   callbackUrl: string;
-  /** Promise that resolves to the delegation chain JSON the CLI received. */
-  receivedDelegation: Promise<unknown>;
+  /**
+   * Installs a route interceptor for {@link callbackUrl} on the page and
+   * returns a promise that resolves with the parsed JSON the CLI flow POSTs
+   * (the delegation chain). Call before triggering the authorize action.
+   */
+  captureDelegation: (page: Page) => Promise<unknown>;
 };
+
+// Arbitrary loopback URL — no server listens here; the request is intercepted
+// in the browser. It only needs to pass the route's loopback validation.
+const CALLBACK_URL = "http://127.0.0.1:54321/callback";
 
 export const test = base.extend<{ cli: CliFixture }>({
   // eslint-disable-next-line no-empty-pattern -- playwright fixtures require the destructure
@@ -28,52 +38,37 @@ export const test = base.extend<{ cli: CliFixture }>({
       new Uint8Array(identity.getPublicKey().toDer()),
     );
 
-    let resolveDelegation: (body: unknown) => void = () => undefined;
-    const receivedDelegation = new Promise<unknown>((resolve) => {
-      resolveDelegation = resolve;
-    });
-
-    const server: Server = createServer((req, res) => {
-      // `Content-Type: application/json` makes the POST a non-simple CORS
-      // request, so the browser sends an OPTIONS preflight first. Reply to
-      // the preflight without touching `receivedDelegation` — the next
-      // request is the real POST with the body.
-      if (req.method === "OPTIONS") {
-        res.statusCode = 204;
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        res.end();
-        return;
-      }
-      let raw = "";
-      req.on("data", (chunk) => (raw += chunk));
-      req.on("end", () => {
-        try {
-          resolveDelegation(JSON.parse(raw));
-        } catch {
-          resolveDelegation(raw);
-        }
-        res.statusCode = 200;
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.end("ok");
+    const captureDelegation = (page: Page): Promise<unknown> =>
+      new Promise((resolve) => {
+        void page.route(CALLBACK_URL, async (route) => {
+          const request = route.request();
+          // The application/json POST is preceded by a CORS preflight;
+          // answer it without resolving, then capture the real POST.
+          if (request.method() === "OPTIONS") {
+            await route.fulfill({
+              status: 204,
+              headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+              },
+            });
+            return;
+          }
+          const body = request.postData();
+          await route.fulfill({
+            status: 200,
+            headers: { "Access-Control-Allow-Origin": "*" },
+            body: "ok",
+          });
+          try {
+            resolve(JSON.parse(body ?? ""));
+          } catch {
+            resolve(body);
+          }
+        });
       });
-    });
-    // `listen(0, …)` asks the OS for an unused port, so concurrent fixture
-    // instances never collide on a hardcoded port.
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", () => resolve()),
-    );
-    const address = server.address();
-    if (address === null || typeof address === "string") {
-      throw new Error(
-        "Loopback CLI fixture: server.address() not an AddressInfo",
-      );
-    }
-    const callbackUrl = `http://127.0.0.1:${address.port}/callback`;
 
-    await use({ publicKey, callbackUrl, receivedDelegation });
-
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await use({ publicKey, callbackUrl: CALLBACK_URL, captureDelegation });
   },
 });
