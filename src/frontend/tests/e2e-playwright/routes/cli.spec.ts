@@ -181,6 +181,11 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
 
+  // On mobile the sidebar nav is behind a menu button; open it first.
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
   await page.getByRole("link", { name: "Settings" }).click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch").click();
