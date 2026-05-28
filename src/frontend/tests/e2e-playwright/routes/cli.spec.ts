@@ -65,15 +65,13 @@ test("Generic CLI sign-in posts a delegation chain to the loopback callback", as
   signInWithIdentity,
   cli,
 }) => {
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identities[0].identityNumber);
-
   await page.goto(
     cliUrl({
       publicKeyHex: cli.publicKeyHex,
       callbackUrl: cli.callbackUrl,
     }),
   );
+  await signInWithIdentity(page, identities[0].identityNumber);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   const body = await cli.receivedDelegation;
@@ -92,9 +90,6 @@ test("Dapp mode without CLI access enabled shows the gated error screen", async 
   signInWithIdentity,
   cli,
 }) => {
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identities[0].identityNumber);
-
   await page.goto(
     cliUrl({
       publicKeyHex: cli.publicKeyHex,
@@ -102,6 +97,7 @@ test("Dapp mode without CLI access enabled shows the gated error screen", async 
       appHost: "nice-name.com",
     }),
   );
+  await signInWithIdentity(page, identities[0].identityNumber);
   await expect(
     page.getByRole("heading", { name: "CLI access not enabled" }),
   ).toBeVisible();
@@ -113,11 +109,7 @@ test("Requested TTL within bounds is honoured", async ({
   signInWithIdentity,
   cli,
 }) => {
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identities[0].identityNumber);
-
   const ttlMinutes = 60; // 1 hour
-  const before = Date.now();
   await page.goto(
     cliUrl({
       publicKeyHex: cli.publicKeyHex,
@@ -125,6 +117,8 @@ test("Requested TTL within bounds is honoured", async ({
       ttlMinutes,
     }),
   );
+  const before = Date.now();
+  await signInWithIdentity(page, identities[0].identityNumber);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   const body = await cli.receivedDelegation;
@@ -141,12 +135,8 @@ test("Requested TTL beyond the backend max is clamped to 30 days", async ({
   signInWithIdentity,
   cli,
 }) => {
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identities[0].identityNumber);
-
   // 60 days — well over the canister's 30-day cap.
   const ttlMinutes = 60 * 24 * 60;
-  const before = Date.now();
   await page.goto(
     cliUrl({
       publicKeyHex: cli.publicKeyHex,
@@ -154,6 +144,8 @@ test("Requested TTL beyond the backend max is clamped to 30 days", async ({
       ttlMinutes,
     }),
   );
+  const before = Date.now();
+  await signInWithIdentity(page, identities[0].identityNumber);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   const body = await cli.receivedDelegation;
@@ -169,11 +161,9 @@ test("Dapp mode succeeds once CLI access is enabled in Settings", async ({
   signInWithIdentity,
   cli,
 }) => {
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identities[0].identityNumber);
-
-  // Enable CLI access for this identity in the Settings page.
+  // Sign in on the manage page and enable CLI access for this identity.
   await page.goto(II_URL + "/manage/settings");
+  await signInWithIdentity(page, identities[0].identityNumber);
   await page.getByRole("switch").click();
   await page
     .getByLabel("I'm using the official ICP CLI and I trust this device.")
@@ -188,6 +178,7 @@ test("Dapp mode succeeds once CLI access is enabled in Settings", async ({
       appHost: "nice-name.com",
     }),
   );
+  await signInWithIdentity(page, identities[0].identityNumber);
   await page.getByRole("button", { name: "Allow access" }).click();
 
   const body = await cli.receivedDelegation;
