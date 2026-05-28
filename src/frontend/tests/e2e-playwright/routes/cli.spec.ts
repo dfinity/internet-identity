@@ -84,7 +84,7 @@ test("Generic CLI sign-in posts a delegation chain to the loopback callback", as
   ).toBeVisible();
 });
 
-test("Dapp mode without CLI access enabled shows the gated error screen", async ({
+test("App mode without CLI access enabled shows the gated error screen", async ({
   page,
   identities,
   signInWithIdentity,
@@ -155,7 +155,7 @@ test("Requested TTL beyond the backend max is clamped to 30 days", async ({
   expect(expMillis - before).toBeGreaterThanOrEqual(thirtyDaysMillis - 60_000);
 });
 
-test("Dapp mode succeeds once CLI access is enabled in Settings", async ({
+test("App mode succeeds once CLI access is enabled in Settings", async ({
   page,
   identities,
   signInWithIdentity,

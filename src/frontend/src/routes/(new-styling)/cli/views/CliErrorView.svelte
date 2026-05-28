@@ -8,9 +8,9 @@
 
 <!--
   Shown when the user has CLI access disabled for this identity on this
-  device and a dapp-mode CLI sign-in is requested. The toggle is purely
-  client-side (localStorage), so we know about the gate before issuing
-  any backend call — the user lands here immediately on page load.
+  device and a CLI sign-in for a specific app is requested. The toggle is
+  purely client-side (localStorage), so we know about the gate before
+  issuing any backend call — the user lands here immediately on page load.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-100">
   <AuthPanel>

@@ -7,7 +7,7 @@
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
-    /** Hostname of the dapp the CLI is being authorized for, or undefined for
+    /** Hostname of the app the CLI is being authorized for, or undefined for
      *  generic mode. */
     appHost?: string;
     onAuthorize: () => Promise<void>;
@@ -26,23 +26,25 @@
     }
   };
 
-  // Mode-dependent copy. Title is short and constant; the dapp hostname
-  // lives in the badge under the connector visual (CliHeader handles it).
-  const isDapp = $derived(appHost !== undefined);
+  // Title is short and constant; the app hostname lives in the badge under
+  // the connector visual (CliHeader handles it).
+  const isAppMode = $derived(appHost !== undefined);
   const command = $derived(
-    isDapp ? `icp identity link ii --app ${appHost}` : "icp identity link ii",
+    isAppMode
+      ? `icp identity link ii --app ${appHost}`
+      : "icp identity link ii",
   );
 </script>
 
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-100">
   <AuthPanel>
-    <CliHeader dappOrigin={isDapp ? `https://${appHost}` : undefined} />
+    <CliHeader appOrigin={isAppMode ? `https://${appHost}` : undefined} />
 
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
-      {isDapp ? $t`Allow CLI access` : $t`Sign in`}
+      {isAppMode ? $t`Allow CLI access` : $t`Sign in`}
     </h1>
     <p class="text-text-tertiary mt-1 text-base">
-      {isDapp
+      {isAppMode
         ? $t`with your identity in this app`
         : $t`with your Internet Identity`}
     </p>
@@ -50,7 +52,7 @@
     <div class="mt-6">
       <TerminalBlock
         {command}
-        progressLine={isDapp
+        progressLine={isAppMode
           ? $t`Linking your identity`
           : $t`Linking Internet Identity`}
         {busy}
@@ -58,7 +60,7 @@
     </div>
 
     <p class="text-text-tertiary mt-4 text-sm text-pretty">
-      {#if isDapp}
+      {#if isAppMode}
         <Trans>The CLI gets full access to your account in this app.</Trans>
       {:else}
         <Trans>
@@ -74,9 +76,9 @@
     >
       {#if busy}
         <ProgressRing class="size-5" />
-        <span>{isDapp ? $t`Allowing access` : $t`Signing in`}</span>
+        <span>{isAppMode ? $t`Allowing access` : $t`Signing in`}</span>
       {:else}
-        <span>{isDapp ? $t`Allow access` : $t`Continue`}</span>
+        <span>{isAppMode ? $t`Allow access` : $t`Continue`}</span>
       {/if}
     </button>
   </AuthPanel>

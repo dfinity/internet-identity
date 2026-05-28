@@ -10,7 +10,7 @@ export type CliParams =
       publicKey: string;
       callback: string;
       ttlMinutes: number;
-      /** Hostname of the dapp the CLI is being authorized for, or undefined
+      /** Hostname of the app the CLI is being authorized for, or undefined
        *  for generic mode. */
       appHost: string | undefined;
     }

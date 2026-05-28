@@ -5,38 +5,38 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 
   interface Props {
-    /** Hostname of the dapp the CLI is being authorized for, or undefined for
+    /** Hostname of the app the CLI is being authorized for, or undefined for
      *  generic mode (CLI signs into II itself). */
-    dappOrigin?: string;
+    appOrigin?: string;
   }
 
-  const { dappOrigin }: Props = $props();
+  const { appOrigin }: Props = $props();
 
-  const dapps = getDapps();
-  const dapp = $derived(
-    dappOrigin !== undefined
-      ? dapps.find((d) => d.hasOrigin(dappOrigin))
+  const apps = getDapps();
+  const app = $derived(
+    appOrigin !== undefined
+      ? apps.find((a) => a.hasOrigin(appOrigin))
       : undefined,
   );
   const hostname = $derived(
-    dappOrigin !== undefined ? new URL(dappOrigin).hostname : undefined,
+    appOrigin !== undefined ? new URL(appOrigin).hostname : undefined,
   );
 </script>
 
 <div class="flex flex-1 flex-col items-center justify-center gap-6 py-5">
-  {#if dappOrigin !== undefined}
+  {#if appOrigin !== undefined}
     <div class="flex items-center gap-3">
       <div
         class={[
           "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-          dapp?.logoSrc === undefined &&
+          app?.logoSrc === undefined &&
             "border-border-tertiary text-fg-primary bg-bg-primary border",
         ]}
       >
-        {#if dapp?.logoSrc !== undefined}
+        {#if app?.logoSrc !== undefined}
           <img
-            src={dapp.logoSrc}
-            alt={`${dapp.name} logo`}
+            src={app.logoSrc}
+            alt={`${app.name} logo`}
             class="h-20 max-w-50 object-contain"
           />
         {:else}

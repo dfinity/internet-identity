@@ -14,7 +14,7 @@ interface CliAuthorizeInput {
   authenticated: Authenticated;
   /** Hex-encoded DER session pubkey supplied by the CLI. */
   publicKeyHex: string;
-  /** Hostname of the dapp the CLI is being authorized for, or undefined for
+  /** Hostname of the app the CLI is being authorized for, or undefined for
    *  generic mode. */
   appHost?: string;
   /** Lifetime in minutes. */
