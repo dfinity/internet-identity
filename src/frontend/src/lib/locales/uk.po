@@ -163,8 +163,17 @@ msgstr "Додайте або видаліть способи входу за д
 msgid "Advanced identity management"
 msgstr "Розширене керування ідентифікатором"
 
+msgid "Allow access"
+msgstr ""
+
+msgid "Allow CLI access"
+msgstr ""
+
 msgid "Allow to access this info"
 msgstr "Дозволити доступ до цієї інформації"
+
+msgid "Allowing access"
+msgstr ""
 
 msgid "Already signed-in"
 msgstr "Вже увійшли"
@@ -201,6 +210,9 @@ msgstr "Перед тим, як продовжити"
 
 msgid "Body"
 msgstr "Тіло листа"
+
+msgid "Browser opened"
+msgstr ""
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Увімкнувши цю функцію, ви можете створити більше одного облікового запису для одного застосунку. Легко перемикайтеся між обліковими записами (наприклад, робочим, особистим або демонстраційним)."
@@ -253,6 +265,12 @@ msgstr "Виберіть, якими даними ви хочете поділи
 msgid "Clear all"
 msgstr "Очистити все"
 
+msgid "CLI access"
+msgstr ""
+
+msgid "CLI access not enabled"
+msgstr ""
+
 msgid "Click to reveal"
 msgstr "Натисніть, щоб показати"
 
@@ -264,6 +282,9 @@ msgstr "Закрити меню"
 
 msgid "Code copied to clipboard"
 msgstr "Код скопійовано до буфера обміну"
+
+msgid "Command-line tools on this device can ask to sign you in to apps."
+msgstr ""
 
 msgid "Company domain"
 msgstr "Домен компанії"
@@ -310,6 +331,9 @@ msgstr "Продовжити з SSO"
 msgid "Copied to clipboard"
 msgstr "Скопійовано до буфера обміну"
 
+msgid "Copy install command: {command}"
+msgstr ""
+
 msgid "Copy recipient address"
 msgstr "Скопіювати адресу одержувача"
 
@@ -318,6 +342,9 @@ msgstr "Скопіювати тему"
 
 msgid "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable."
 msgstr "Не вдалося завантажити налаштування SSO з {domainInput}. Попросіть адміністратора SSO перевірити, що /.well-known/ii-openid-configuration доступний."
+
+msgid "Couldn't reach the CLI"
+msgstr ""
 
 msgid "Create account"
 msgstr "Створити обліковий запис"
@@ -400,8 +427,17 @@ msgstr "Адреса електронної пошти"
 msgid "Email:"
 msgstr "Електронна пошта:"
 
+msgid "Enable CLI access"
+msgstr ""
+
+msgid "Enable CLI access for this device, then try again."
+msgstr ""
+
 msgid "Enable multiple accounts"
 msgstr "Увімкнути кілька облікових записів"
+
+msgid "Enabled"
+msgstr ""
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Введіть ім'я для вашого ідентифікатора, щоб завершити оновлення. Після встановлення його не можна буде змінити пізніше."
@@ -442,6 +478,9 @@ msgstr "Рекомендовані застосунки"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Наприклад, користувач A входить до Internet Identity за допомогою свого облікового запису Google «A@gmail.com», а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не знатиме, що користувач автентифікований у застосунку Z — лише в Internet Identity. Більше того, застосунок Z також ніколи не знатиме, що користувач A використав Google для автентифікації свого облікового запису Internet Identity."
+
+msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
+msgstr ""
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Забудьте про запам'ятовування складних імен користувача та паролів. З ключами доступу ви просто вибираєте своє ім'я для входу. Швидко, безпечно та без зайвих зусиль."
@@ -517,6 +556,9 @@ msgstr "Я несу відповідальність за свою фразу в
 
 msgid "I have written it down"
 msgstr "Я це записав(-ла)"
+
+msgid "I'm using the official ICP CLI and I trust this device."
+msgstr ""
 
 msgid "I've sent the email"
 msgstr "Я надіслав(-ла) листа"
@@ -626,6 +668,9 @@ msgstr "Схоже, ви намагаєтеся увійти зсередини 
 msgid "It seems like an invalid authentication request was received."
 msgstr "Здається, було отримано недійсний запит на автентифікацію."
 
+msgid "It seems like an invalid CLI authentication request was received."
+msgstr ""
+
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Здається, з'єднання зі службою не вдалося встановити. Спробуйте інший браузер; якщо проблема не зникне, зверніться до служби підтримки."
 
@@ -656,6 +701,9 @@ msgstr "Дізнайтеся, як відкривати посилання у в
 msgid "Legacy"
 msgstr "Застарілий"
 
+msgid "Let command-line tools on this device sign in to apps using your identity."
+msgstr ""
+
 msgid "Let's get started"
 msgstr "Почнемо"
 
@@ -664,6 +712,12 @@ msgstr "Досягнуто ліміту"
 
 msgid "Link copied to clipboard"
 msgstr "Посилання скопійовано в буфер обміну"
+
+msgid "Linking Internet Identity"
+msgstr ""
+
+msgid "Linking your identity"
+msgstr ""
 
 msgid "Loading permissions"
 msgstr "Завантаження дозволів"
@@ -686,11 +740,20 @@ msgstr "Зробіть реєстрацію та вхід простими за 
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Переконайтеся, що ніхто не бачить, що на вашому екрані або що ви пишете."
 
+msgid "Make sure the CLI is still running and try again."
+msgstr ""
+
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Переконайтеся, що ви додали новий метод доступу, щоб наступного разу ви могли увійти або скинути свою фразу відновлення."
 
+msgid "Manage how other tools connect to your identity."
+msgstr ""
+
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Керуйте своїми обліковими записами та контролюйте доступ до застосунків і вебсайтів через панель керування. Скористайтеся розширеними функціями для додаткового налаштування та захисту."
+
+msgid "Manage your identity"
+msgstr ""
 
 msgid "Manage your Internet Identity"
 msgstr "Керування вашим Internet Identity"
@@ -752,8 +815,14 @@ msgstr "Не оновлено"
 msgid "Not verified"
 msgstr "Не підтверджено"
 
+msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
+msgstr ""
+
 msgid "One or more words are wrong or out of order."
 msgstr "Одне або кілька слів неправильні або в неправильному порядку."
+
+msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
+msgstr ""
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Вводьте код з цього пристрою лише якщо ви ініціювали цей процес <0>самостійно</0>."
@@ -911,6 +980,9 @@ msgstr "Замінити"
 msgid "Replace it anytime"
 msgstr "Замініть його будь-коли"
 
+msgid "Requested by"
+msgstr ""
+
 msgid "Reset"
 msgstr "Скинути"
 
@@ -934,6 +1006,9 @@ msgstr "Повернутися до застосунку"
 
 msgid "Return to application"
 msgstr "Повернутися до застосунку"
+
+msgid "Return to terminal"
+msgstr ""
 
 msgid "Review permissions"
 msgstr "Переглянути дозволи"
@@ -982,6 +1057,9 @@ msgstr "Налаштувати електронну пошту для відно
 
 msgid "Set up recovery phrase"
 msgstr "Налаштувати фразу відновлення"
+
+msgid "Settings"
+msgstr ""
 
 msgid "Share {label}"
 msgstr "Поділитися {label}"
@@ -1039,6 +1117,9 @@ msgstr "Реєстрація"
 
 msgid "Signed in"
 msgstr "Увійшли"
+
+msgid "Signing in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Безпечний вхід"
@@ -1160,6 +1241,12 @@ msgstr "Ваш <0>наявний пристрій</0> готується до п
 
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "Ваш <0>новий пристрій</0> готується до продовження."
+
+msgid "The CLI gets full access to your account in this app."
+msgstr ""
+
+msgid "The CLI gets its own account, separate from your other apps."
+msgstr ""
 
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
 msgstr "Лист має надійти безпосередньо з наведеної вище адреси. Псевдоніми та переадресація не спрацюють."
@@ -1407,6 +1494,9 @@ msgstr "Чому це не підтримується?"
 msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
 msgstr "З ключами доступу ви тепер можете використовувати свій відбиток пальця, обличчя або блокування екрана, щоб швидко та безпечно підтвердити, що це дійсно ви."
 
+msgid "with your identity in this app"
+msgstr ""
+
 msgid "with your Internet Identity"
 msgstr "за допомогою Internet Identity"
 
@@ -1445,6 +1535,9 @@ msgstr "Ви можете додати її знову будь-коли, уві
 
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "Ви можете додати її знову будь-коли, увійшовши з тим самим ключем доступу."
+
+msgid "You can close this window."
+msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Ви можете продовжити з <0>Використати існуючий ключ доступу</0> у процесі входу."
@@ -1487,6 +1580,9 @@ msgstr "Усе готово. Ваш ідентифікатор створено.
 
 msgid "You're all set. Your passkey has been registered."
 msgstr "Усе готово. Ваш ключ доступу зареєстровано."
+
+msgid "You're signed in"
+msgstr ""
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Ви входите як <0>{name}</0>."

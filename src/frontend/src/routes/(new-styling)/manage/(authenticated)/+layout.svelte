@@ -8,6 +8,7 @@
     LifeBuoyIcon,
     CodeIcon,
     LanguagesIcon,
+    SettingsIcon,
     ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
@@ -313,6 +314,15 @@
           >
             <ShieldIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/settings"
+            current={page.url.pathname === "/manage/settings"}
+          >
+            <SettingsIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Settings`}</span>
           </NavItem>
         </li>
       </ul>
