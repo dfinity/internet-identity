@@ -40,6 +40,19 @@ const expirationMillis = (body: unknown): number => {
   return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
 };
 
+test("cli.id.ai redirects to id.ai/cli, preserving the query string", async ({
+  page,
+  cli,
+}) => {
+  await page.goto(
+    `https://cli.id.ai/?public_key=${cli.publicKeyHex}&callback=${encodeURIComponent(cli.callbackUrl)}`,
+  );
+  await page.waitForURL(`${II_URL}/cli**`);
+  expect(page.url()).toBe(
+    `${II_URL}/cli?public_key=${cli.publicKeyHex}&callback=${encodeURIComponent(cli.callbackUrl)}`,
+  );
+});
+
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/cli");
   await expect(
