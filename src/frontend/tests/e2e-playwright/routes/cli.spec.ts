@@ -2,26 +2,6 @@ import { expect, type Page } from "@playwright/test";
 import { test } from "../fixtures";
 import { addVirtualAuthenticator, II_URL } from "../utils";
 
-/** Builds the {@link https://id.ai/cli} URL with the CLI params in the
- *  fragment (matching the CLI wire format). */
-const cliUrl = (params: {
-  publicKey: string;
-  callbackUrl: string;
-  appHost?: string;
-  ttlMinutes?: number;
-}): string => {
-  const fragment = new URLSearchParams();
-  fragment.set("public_key", params.publicKey);
-  fragment.set("callback", params.callbackUrl);
-  if (params.appHost !== undefined) {
-    fragment.set("app", params.appHost);
-  }
-  if (params.ttlMinutes !== undefined) {
-    fragment.set("ttl", String(params.ttlMinutes));
-  }
-  return `${II_URL}/cli#${fragment.toString()}`;
-};
-
 const cliFragment = (params: {
   publicKey: string;
   callbackUrl: string;
@@ -85,10 +65,26 @@ test("Invalid params show the error screen", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("/.well-known/cli-auth-config advertises the CLI flow path", async ({
+  page,
+}) => {
+  // Same-origin fetch from the II page (the harness can't reach the
+  // dev-server-served canister via Playwright's request context).
+  await page.goto(II_URL);
+  const result = await page.evaluate(async () => {
+    const response = await fetch("/.well-known/cli-auth-config");
+    return {
+      contentType: response.headers.get("content-type"),
+      body: await response.text(),
+    };
+  });
+  expect(result.contentType).toContain("application/json");
+  expect(JSON.parse(result.body)).toEqual({ path: "/cli" });
+});
+
 test("Non-loopback callback is rejected", async ({ page, cli }) => {
   await page.goto(
-    cliUrl({
-      publicKey: cli.publicKey,
+    await cli.resolveAuthorizeUrl(page, {
       callbackUrl: "https://attacker.example.com/cb",
     }),
   );
@@ -102,14 +98,11 @@ test("Generic CLI sign-in posts a two-hop delegation chain to the loopback callb
   cli,
 }) => {
   await addVirtualAuthenticator(page);
-  await page.goto(
-    cliUrl({ publicKey: cli.publicKey, callbackUrl: cli.callbackUrl }),
-  );
+  await page.goto(await cli.resolveAuthorizeUrl(page));
   await signUp(page);
-  const delegation = cli.captureDelegation(page);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  const body = await delegation;
+  const body = await cli.receivedDelegation;
   expect(body).toMatchObject({
     delegations: expect.any(Array),
     publicKey: expect.any(String),
@@ -136,11 +129,7 @@ test("App mode without CLI access enabled shows the gated error screen", async (
 }) => {
   await addVirtualAuthenticator(page);
   await page.goto(
-    cliUrl({
-      publicKey: cli.publicKey,
-      callbackUrl: cli.callbackUrl,
-      appHost: "nice-name.com",
-    }),
+    await cli.resolveAuthorizeUrl(page, { appHost: "nice-name.com" }),
   );
   await signUp(page);
   await expect(
@@ -151,19 +140,13 @@ test("App mode without CLI access enabled shows the gated error screen", async (
 test("Requested TTL within bounds is honoured", async ({ page, cli }) => {
   const ttlMinutes = 60; // 1 hour
   await addVirtualAuthenticator(page);
+  const url = await cli.resolveAuthorizeUrl(page, { ttlMinutes });
   const before = Date.now();
-  await page.goto(
-    cliUrl({
-      publicKey: cli.publicKey,
-      callbackUrl: cli.callbackUrl,
-      ttlMinutes,
-    }),
-  );
+  await page.goto(url);
   await signUp(page);
-  const delegation = cli.captureDelegation(page);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  const expMillis = expirationMillis(await delegation);
+  const expMillis = expirationMillis(await cli.receivedDelegation);
   const requestedMillis = ttlMinutes * 60 * 1000;
   expect(expMillis - before).toBeGreaterThanOrEqual(requestedMillis - 60_000);
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
@@ -175,19 +158,13 @@ test("Requested TTL beyond the backend max is clamped to 30 days", async ({
 }) => {
   const ttlMinutes = 60 * 24 * 60; // 60 days — over the canister's 30-day cap.
   await addVirtualAuthenticator(page);
+  const url = await cli.resolveAuthorizeUrl(page, { ttlMinutes });
   const before = Date.now();
-  await page.goto(
-    cliUrl({
-      publicKey: cli.publicKey,
-      callbackUrl: cli.callbackUrl,
-      ttlMinutes,
-    }),
-  );
+  await page.goto(url);
   await signUp(page);
-  const delegation = cli.captureDelegation(page);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  const expMillis = expirationMillis(await delegation);
+  const expMillis = expirationMillis(await cli.receivedDelegation);
   const thirtyDaysMillis = 30 * 24 * 60 * 60 * 1000;
   expect(expMillis - before).toBeLessThanOrEqual(thirtyDaysMillis + 60_000);
   expect(expMillis - before).toBeGreaterThanOrEqual(thirtyDaysMillis - 60_000);
@@ -216,17 +193,12 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   // Re-authenticate on /cli with the same discoverable passkey; the
   // device-local CLI access flag persists in localStorage for this identity.
   await page.goto(
-    cliUrl({
-      publicKey: cli.publicKey,
-      callbackUrl: cli.callbackUrl,
-      appHost: "nice-name.com",
-    }),
+    await cli.resolveAuthorizeUrl(page, { appHost: "nice-name.com" }),
   );
   await signInExisting(page);
-  const delegation = cli.captureDelegation(page);
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  expect(await delegation).toMatchObject({
+  expect(await cli.receivedDelegation).toMatchObject({
     delegations: expect.any(Array),
     publicKey: expect.any(String),
   });

@@ -396,6 +396,15 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
         content_type: ContentType::TXT,
     });
 
+    // Advertise where the CLI authorize flow lives so the ICP CLI can
+    // discover it from a well-known path on the II domain.
+    assets.push(AssetUtilAsset {
+        url_path: "/.well-known/cli-auth-config".to_string(),
+        content: json!({ "path": "/cli" }).to_string().into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
+    });
+
     // Add .well-known/webauthn for passkey sharing if related_origins is configured
     if let Some(related_origins) = &config.related_origins {
         let content = json!({

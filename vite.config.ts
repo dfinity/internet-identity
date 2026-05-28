@@ -113,10 +113,6 @@ export default defineConfig(({ command, mode }): UserConfig => {
       command !== "serve"
         ? {}
         : {
-            // Bind IPv4 loopback explicitly. Vite's default (`localhost`)
-            // can resolve to IPv6 `::1` only, which Node's fetch (used by the
-            // e2e fixtures, defaulting to 127.0.0.1) then can't reach.
-            host: "127.0.0.1",
             https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
             proxy: {
               "/api": `http://127.0.0.1:${readReplicaPort()}`,
