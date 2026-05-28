@@ -7,11 +7,7 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 
-/**
- * Derivation origin to use for generic (non-dapp) CLI sign-in. Kept stable
- * across the migration from the standalone `cli.id.ai` site to the built-in
- * `id.ai/cli` route so existing CLI principals stay valid.
- */
+/** Derivation origin used when the CLI signs in to II itself (no `app=`). */
 export const CLI_GENERIC_DERIVATION_ORIGIN = "https://cli.id.ai";
 
 interface CliAuthorizeInput {
@@ -27,19 +23,12 @@ interface CliAuthorizeInput {
   callback: string;
 }
 
-/**
- * Derivation origin used for `prepare_account_delegation` / `get_account_delegation`.
- * - Generic CLI sign-in uses `cli.id.ai` so existing principals (issued by the
- *   standalone cli.id.ai site) stay valid after the migration.
- * - Dapp mode uses the dapp's own origin.
- */
 const derivationOrigin = (appHost: string | undefined): string =>
   appHost === undefined ? CLI_GENERIC_DERIVATION_ORIGIN : `https://${appHost}`;
 
 /**
  * Builds a delegation against the supplied session key and POSTs the full
- * chain to the CLI's loopback callback. Mirrors the cli.id.ai protocol so
- * existing CLI binaries can switch endpoints without changes.
+ * chain to the CLI's loopback callback.
  */
 export const cliAuthorize = async ({
   authenticated,

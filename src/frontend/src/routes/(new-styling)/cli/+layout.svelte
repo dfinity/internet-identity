@@ -19,7 +19,7 @@
 
   const { children }: LayoutProps = $props();
 
-  // --- Identity switcher state (mirrors /authorize layout chrome) ---
+  // --- Identity switcher state ---
   const authLastUsedFlow = new AuthLastUsedFlow();
 
   const lastUsedIdentities = $derived(

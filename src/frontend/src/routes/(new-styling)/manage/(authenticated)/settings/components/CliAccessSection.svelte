@@ -21,8 +21,11 @@
 
   let showConfirm = $state(false);
 
-  const handleToggle = (next: boolean) => {
-    if (next) {
+  const handleToggle = (event: Event) => {
+    if (!(event.currentTarget instanceof HTMLInputElement)) {
+      return;
+    }
+    if (event.currentTarget.checked) {
       showConfirm = true;
     } else {
       cliAccessStore.disable(identityNumber);
@@ -47,7 +50,10 @@
 
   <div class="flex flex-1 flex-col gap-1">
     <div class="flex min-h-[1.5rem] flex-row items-center gap-2">
-      <h3 class="text-text-primary text-base font-semibold">
+      <h3
+        id="cli-access-section-title"
+        class="text-text-primary text-base font-semibold"
+      >
         {$t`CLI access`}
       </h3>
       {#if enabled}
@@ -73,7 +79,8 @@
   <div class="shrink-0">
     <Toggle
       checked={enabled}
-      onchange={(e) => handleToggle((e.target as HTMLInputElement).checked)}
+      onchange={handleToggle}
+      aria-labelledby="cli-access-section-title"
     />
   </div>
 </section>

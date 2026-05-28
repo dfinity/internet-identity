@@ -31,6 +31,18 @@ export const test = base.extend<{ cli: CliFixture }>({
     });
 
     const server: Server = createServer((req, res) => {
+      // `Content-Type: application/json` makes the POST a non-simple CORS
+      // request, so the browser sends an OPTIONS preflight first. Reply to
+      // the preflight without touching `receivedDelegation` — the next
+      // request is the real POST with the body.
+      if (req.method === "OPTIONS") {
+        res.statusCode = 204;
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        res.end();
+        return;
+      }
       let raw = "";
       req.on("data", (chunk) => (raw += chunk));
       req.on("end", () => {

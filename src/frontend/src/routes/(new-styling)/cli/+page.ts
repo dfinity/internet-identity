@@ -1,9 +1,8 @@
 import type { PageLoad } from "./$types";
 import { fromHex } from "$lib/utils/utils";
 
-/** Default delegation lifetime in minutes — matches the previous cli.id.ai. */
+/** Default delegation lifetime in minutes. */
 const DEFAULT_TTL_MINUTES = 480;
-const MAX_TTL_MINUTES = 7 * 24 * 60;
 
 export type CliParams =
   | {
@@ -77,7 +76,7 @@ const parseTtl = (raw: string | null): number | undefined => {
     return DEFAULT_TTL_MINUTES;
   }
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_TTL_MINUTES) {
+  if (!Number.isFinite(parsed) || parsed <= 0) {
     return undefined;
   }
   return Math.floor(parsed);
