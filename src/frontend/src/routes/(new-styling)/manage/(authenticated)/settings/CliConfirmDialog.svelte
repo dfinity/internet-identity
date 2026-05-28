@@ -3,7 +3,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
-  import VerifyPanel from "$lib/components/cli/VerifyPanel.svelte";
+  import VerifyPanel from "./VerifyPanel.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
 

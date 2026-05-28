@@ -1,8 +1,8 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import CliHeader from "$lib/components/cli/CliHeader.svelte";
-  import TerminalBlock from "$lib/components/cli/TerminalBlock.svelte";
+  import CliHeader from "../components/CliHeader.svelte";
+  import TerminalBlock from "../components/TerminalBlock.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
 
