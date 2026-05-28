@@ -1,5 +1,5 @@
 import type { PageLoad } from "./$types";
-import { fromHex } from "$lib/utils/utils";
+import { fromBase64URL } from "$lib/utils/utils";
 
 /** Default delegation lifetime in minutes. */
 const DEFAULT_TTL_MINUTES = 480;
@@ -7,6 +7,7 @@ const DEFAULT_TTL_MINUTES = 480;
 export type CliParams =
   | {
       kind: "valid";
+      /** base64url-encoded DER session pubkey supplied by the CLI. */
       publicKey: string;
       callback: string;
       ttlMinutes: number;
@@ -16,13 +17,12 @@ export type CliParams =
     }
   | { kind: "invalid" };
 
-/** Returns the input unchanged if it hex-decodes, undefined otherwise. */
-const parseHex = (raw: string | null): string | undefined => {
+const parseBase64Url = (raw: string | null): string | undefined => {
   if (raw === null || raw === "") {
     return undefined;
   }
   try {
-    fromHex(raw);
+    fromBase64URL(raw);
     return raw;
   } catch {
     return undefined;
@@ -83,12 +83,20 @@ const parseTtl = (raw: string | null): number | undefined => {
 };
 
 export const load: PageLoad = ({ url }): { params: CliParams } => {
-  const publicKey = parseHex(url.searchParams.get("public_key"));
-  const callback = parseLoopbackCallback(url.searchParams.get("callback"));
-  const ttlMinutes = parseTtl(url.searchParams.get("ttl"));
+  // CLI binaries put `public_key`, `callback`, etc. in the URL fragment so
+  // they don't appear in browser history or server logs. The fragment is
+  // only available client-side, so this `load` only resolves meaningfully
+  // in the browser (`adapter-static` is fine — `load` runs on the client at
+  // navigation time).
+  const fragment = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
+  const params = new URLSearchParams(fragment);
+
+  const publicKey = parseBase64Url(params.get("public_key"));
+  const callback = parseLoopbackCallback(params.get("callback"));
+  const ttlMinutes = parseTtl(params.get("ttl"));
 
   // `app` is optional. Absent or empty → generic mode. Present → must parse.
-  const appRaw = url.searchParams.get("app");
+  const appRaw = params.get("app");
   let appHost: string | undefined;
   if (appRaw !== null && appRaw !== "") {
     appHost = parseAppHost(appRaw);

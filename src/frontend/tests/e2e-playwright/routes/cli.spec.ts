@@ -2,22 +2,34 @@ import { expect } from "@playwright/test";
 import { test } from "../fixtures";
 import { II_URL } from "../utils";
 
+/** Returns the {@link https://id.ai/cli} URL with the supplied CLI params
+ *  in the fragment (matching the CLI wire format). */
 const cliUrl = (params: {
-  publicKeyHex: string;
+  publicKey: string;
   callbackUrl: string;
   appHost?: string;
   ttlMinutes?: number;
 }): string => {
-  const url = new URL(II_URL + "/cli");
-  url.searchParams.set("public_key", params.publicKeyHex);
-  url.searchParams.set("callback", params.callbackUrl);
+  const fragmentParams = new URLSearchParams();
+  fragmentParams.set("public_key", params.publicKey);
+  fragmentParams.set("callback", params.callbackUrl);
   if (params.appHost !== undefined) {
-    url.searchParams.set("app", params.appHost);
+    fragmentParams.set("app", params.appHost);
   }
   if (params.ttlMinutes !== undefined) {
-    url.searchParams.set("ttl", String(params.ttlMinutes));
+    fragmentParams.set("ttl", String(params.ttlMinutes));
   }
-  return url.toString();
+  return `${II_URL}/cli#${fragmentParams.toString()}`;
+};
+
+const cliFragment = (params: {
+  publicKey: string;
+  callbackUrl: string;
+}): string => {
+  const fragmentParams = new URLSearchParams();
+  fragmentParams.set("public_key", params.publicKey);
+  fragmentParams.set("callback", params.callbackUrl);
+  return fragmentParams.toString();
 };
 
 /** Returns the chain's first-delegation expiration in milliseconds since epoch. */
@@ -40,17 +52,17 @@ const expirationMillis = (body: unknown): number => {
   return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
 };
 
-test("cli.id.ai redirects to id.ai/cli, preserving the query string", async ({
+test("cli.id.ai redirects to id.ai/cli, preserving the fragment", async ({
   page,
   cli,
 }) => {
-  await page.goto(
-    `https://cli.id.ai/?public_key=${cli.publicKeyHex}&callback=${encodeURIComponent(cli.callbackUrl)}`,
-  );
+  const fragment = cliFragment({
+    publicKey: cli.publicKey,
+    callbackUrl: cli.callbackUrl,
+  });
+  await page.goto(`https://cli.id.ai/#${fragment}`);
   await page.waitForURL(`${II_URL}/cli**`);
-  expect(page.url()).toBe(
-    `${II_URL}/cli?public_key=${cli.publicKeyHex}&callback=${encodeURIComponent(cli.callbackUrl)}`,
-  );
+  expect(page.url()).toBe(`${II_URL}/cli#${fragment}`);
 });
 
 test("Invalid params show the error screen", async ({ page }) => {
@@ -63,7 +75,7 @@ test("Invalid params show the error screen", async ({ page }) => {
 test("Non-loopback callback is rejected", async ({ page, cli }) => {
   await page.goto(
     cliUrl({
-      publicKeyHex: cli.publicKeyHex,
+      publicKey: cli.publicKey,
       callbackUrl: "https://attacker.example.com/cb",
     }),
   );
@@ -80,7 +92,7 @@ test("Generic CLI sign-in posts a delegation chain to the loopback callback", as
 }) => {
   await page.goto(
     cliUrl({
-      publicKeyHex: cli.publicKeyHex,
+      publicKey: cli.publicKey,
       callbackUrl: cli.callbackUrl,
     }),
   );
@@ -88,10 +100,21 @@ test("Generic CLI sign-in posts a delegation chain to the loopback callback", as
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   const body = await cli.receivedDelegation;
+  // The chain is rooted at the user's principal and has two hops:
+  // canister-signed delegation to the ephemeral browser key, then the
+  // ephemeral key's sub-delegation to the CLI's public key.
   expect(body).toMatchObject({
     delegations: expect.any(Array),
     publicKey: expect.any(String),
   });
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "delegations" in body &&
+    Array.isArray(body.delegations)
+  ) {
+    expect(body.delegations.length).toBe(2);
+  }
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
@@ -105,7 +128,7 @@ test("App mode without CLI access enabled shows the gated error screen", async (
 }) => {
   await page.goto(
     cliUrl({
-      publicKeyHex: cli.publicKeyHex,
+      publicKey: cli.publicKey,
       callbackUrl: cli.callbackUrl,
       appHost: "nice-name.com",
     }),
@@ -125,7 +148,7 @@ test("Requested TTL within bounds is honoured", async ({
   const ttlMinutes = 60; // 1 hour
   await page.goto(
     cliUrl({
-      publicKeyHex: cli.publicKeyHex,
+      publicKey: cli.publicKey,
       callbackUrl: cli.callbackUrl,
       ttlMinutes,
     }),
@@ -152,7 +175,7 @@ test("Requested TTL beyond the backend max is clamped to 30 days", async ({
   const ttlMinutes = 60 * 24 * 60;
   await page.goto(
     cliUrl({
-      publicKeyHex: cli.publicKeyHex,
+      publicKey: cli.publicKey,
       callbackUrl: cli.callbackUrl,
       ttlMinutes,
     }),
@@ -186,7 +209,7 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
 
   await page.goto(
     cliUrl({
-      publicKeyHex: cli.publicKeyHex,
+      publicKey: cli.publicKey,
       callbackUrl: cli.callbackUrl,
       appHost: "nice-name.com",
     }),

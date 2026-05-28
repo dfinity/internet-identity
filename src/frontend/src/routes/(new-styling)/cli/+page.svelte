@@ -12,6 +12,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
+  import { onMount } from "svelte";
   import CliAuthorizeView from "./views/CliAuthorizeView.svelte";
   import CliCloseWindowView from "./views/CliCloseWindowView.svelte";
   import CliErrorView from "./views/CliErrorView.svelte";
@@ -19,6 +20,18 @@
 
   const { data }: PageProps = $props();
   const params = $derived(data.params);
+
+  // Drop the URL fragment once parsed so the public_key and callback don't
+  // sit in the address bar after the user lands here.
+  onMount(() => {
+    if (window.location.hash !== "") {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    }
+  });
 
   type Phase =
     | { kind: "wizard" }
@@ -92,7 +105,7 @@
     try {
       await cliAuthorize({
         authenticated,
-        publicKeyHex: params.publicKey,
+        publicKey: params.publicKey,
         appHost: params.appHost,
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
