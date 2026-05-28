@@ -29,12 +29,37 @@ jobs:
             sed -i -e \
               "s/$current_didc_release/$latest_didc_release/g" \
               ".didc-release"
+
+            # Refresh `.didc-checksums` in lockstep with `.didc-release`
+            # so `scripts/didc-helpers.bash` can keep verifying downloads.
+            # Skipping this would land a bot-bump PR that breaks every
+            # caller of the pinned didc on the next CI run.
+            #
+            # Strategy: strip existing `<platform> <sha>` lines (anything
+            # matching one of the three known platform names at column 1)
+            # to keep the header comments, then re-append fresh hashes
+            # at the bottom. Robust to the header growing/shrinking.
+            checksums_tmp=$(mktemp)
+            grep -vE '^(linux64|macos|arm32)[[:space:]]' ./.didc-checksums \
+              > "$checksums_tmp"
+            # Collapse trailing blank lines + add a single separator
+            # before the new hash block.
+            sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}' -i "$checksums_tmp"
+            printf '\n' >> "$checksums_tmp"
+            for plat in linux64 macos arm32; do
+              sha=$(curl --location --fail --silent --show-error \
+                "https://github.com/dfinity/candid/releases/download/$latest_didc_release/didc-$plat" \
+                | shasum -a 256 | awk '{print $1}')
+              printf '%-7s %s\n' "$plat" "$sha" >> "$checksums_tmp"
+            done
+            mv "$checksums_tmp" ./.didc-checksums
+
             echo "updated=1" >> "$GITHUB_OUTPUT"
           else
             echo "updated=0" >> "$GITHUB_OUTPUT"
           fi
 
-          cat ./.didc-release
+          cat ./.didc-release ./.didc-checksums
 
         # If the .didc-release was updated, create a PR.
       - name: Create Pull Request
@@ -43,7 +68,9 @@ jobs:
         with:
           token: ${{ secrets.GIX_BOT_PAT }}
           base: main
-          add-paths: ./.didc-release
+          add-paths: |
+            ./.didc-release
+            ./.didc-checksums
           commit-message: Update didc release
           committer: GitHub <noreply@github.com>
           author: gix-bot <gix-bot@users.noreply.github.com>

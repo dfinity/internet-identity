@@ -233,6 +233,10 @@ pub struct InternetIdentityFrontendArgs {
     /// * allows accessing II using http instead of https
     /// * allows II to connect to localhost on both http and https
     pub dev_csp: Option<bool>,
+    /// Origins of apps to feature on the dashboard home. Each origin is resolved
+    /// against the bundled dapps catalogue (`dapps.json`) at runtime to obtain
+    /// the name, description and logo. Unknown origins are skipped.
+    pub featured_dashboard_apps: Option<Vec<String>>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.

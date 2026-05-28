@@ -8,7 +8,6 @@
     LifeBuoyIcon,
     CodeIcon,
     LanguagesIcon,
-    InfoIcon,
     ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
@@ -26,16 +25,13 @@
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { getMetadataString } from "$lib/utils/openID";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import { Trans } from "$lib/components/locale";
   import type { LayoutProps } from "./$types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
@@ -56,7 +52,6 @@
   let isManageIdentitiesDialogOpen = $state(false);
   let isSignOutDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
-  let isRecoveryPhraseSetUpDismissed = $state(false);
   let isReauthDialogOpen = $state(false);
 
   // --- Derived ---
@@ -65,21 +60,6 @@
     Object.values($lastUsedIdentitiesStore.identities).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
     ),
-  );
-
-  let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
-    () => {
-      const value = data.identityInfo.authn_methods.find(
-        (m) =>
-          "Recovery" in m.security_settings.purpose &&
-          getMetadataString(m.metadata, "usage") === "recovery_phrase",
-      );
-      return value === undefined
-        ? "missing"
-        : value.last_authentication[0] === undefined
-          ? "unverified"
-          : "verified";
-    },
   );
 
   // --- Sign in / sign up / upgrade ---
@@ -132,10 +112,7 @@
   };
 
   const handleConfirmSignOutAndRemove = () => {
-    const identity = $lastUsedIdentitiesStore.selected;
-    if (identity !== undefined) {
-      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
-    }
+    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
     window.location.replace("/");
   };
 
@@ -258,72 +235,6 @@
   });
 </script>
 
-{#snippet recoveryPhraseSetUp()}
-  {#if recoveryPhraseStatus === "missing"}
-    <div class="mb-4 grid size-16">
-      <!-- Progress ring is actually only 85% of the way to
-           make it more clear there's set-up work remaining -->
-      <ProgressRing
-        value={85}
-        strokeWidth={5}
-        class="col-start-1 row-start-1 size-16 text-blue-700 dark:text-blue-300"
-      />
-      <span
-        class="text-text-primary col-start-1 row-start-1 m-auto text-sm font-semibold"
-      >
-        90%
-      </span>
-    </div>
-    <h3 class="text-text-primary mb-1 text-sm font-semibold">
-      {$t`Complete set-up`}
-    </h3>
-    <p class="text-text-secondary mb-4 text-sm">
-      <Trans>
-        Activate your recovery phrase so that you can recover your identity at
-        any point.
-      </Trans>
-    </p>
-    <div class="flex flex-row gap-3">
-      <button
-        onclick={() => (isRecoveryPhraseSetUpDismissed = true)}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Dismiss`}
-      </button>
-      <button
-        onclick={() => goto("/manage/recovery", { state: { activate: true } })}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Activate`}
-      </button>
-    </div>
-  {:else if recoveryPhraseStatus === "unverified"}
-    <InfoIcon class="text-fg-secondary mb-3 size-5" />
-    <h3 class="text-text-primary mb-1 text-sm font-semibold">
-      {$t`Verify your recovery phrase`}
-    </h3>
-    <p class="text-text-secondary mb-4 text-sm">
-      <Trans>
-        Your recovery phrase is active, verify you saved it correctly.
-      </Trans>
-    </p>
-    <div class="flex flex-row gap-3">
-      <button
-        onclick={() => (isRecoveryPhraseSetUpDismissed = true)}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Dismiss`}
-      </button>
-      <button
-        onclick={() => goto("/manage/recovery", { state: { verify: true } })}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Verify`}
-      </button>
-    </div>
-  {/if}
-{/snippet}
-
 <!-- Layout -->
 <div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
   <!-- Sidebar and backdrop on mobile -->
@@ -408,20 +319,6 @@
     </nav>
     <!-- Empty space between top and bottom content-->
     <div class="flex-1"></div>
-    <!-- Recovery phrase set-up guidance -->
-    <div
-      class={[
-        "mx-4 mt-24 mb-6",
-        "bg-bg-secondary rounded-xl p-4",
-        "sm:transition-all sm:transition-discrete sm:starting:scale-95 sm:starting:opacity-0",
-        "sm:max-md:hidden",
-        (recoveryPhraseStatus === "verified" ||
-          isRecoveryPhraseSetUpDismissed) &&
-          "hidden scale-90 opacity-0",
-      ]}
-    >
-      {@render recoveryPhraseSetUp()}
-    </div>
     <!-- Footer navigation -->
     <div class="mb-5 flex flex-col gap-0.5 px-4">
       <ul class="contents">
@@ -461,16 +358,6 @@
         >
           <MenuIcon class="size-5" />
         </button>
-        <!-- Indicator that there's a message in the mobile menu
-             e.g. recovery phrase has not been set-up yet. -->
-        <div
-          class={[
-            "border-bg-primary_alt absolute end-2 top-2 size-2 rounded-full border-2 bg-blue-700 dark:bg-blue-300",
-            (recoveryPhraseStatus === "verified" ||
-              isRecoveryPhraseSetUpDismissed) &&
-              "hidden",
-          ]}
-        ></div>
       </div>
       <!-- Empty space between left and right content -->
       <div class="flex-1"></div>
@@ -588,14 +475,20 @@
   </Dialog>
 {/if}
 
-{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
-  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
-    <SignOutConfirmation
-      identity={$lastUsedIdentitiesStore.selected}
-      onSignOut={handleConfirmSignOut}
-      onSignOutAndRemove={handleConfirmSignOutAndRemove}
-    />
-  </Dialog>
+{#if isSignOutDialogOpen}
+  {@const currentIdentity =
+    $lastUsedIdentitiesStore.identities[
+      $authenticatedStore.identityNumber.toString()
+    ]}
+  {#if currentIdentity !== undefined}
+    <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+      <SignOutConfirmation
+        identity={currentIdentity}
+        onSignOut={handleConfirmSignOut}
+        onSignOutAndRemove={handleConfirmSignOutAndRemove}
+      />
+    </Dialog>
+  {/if}
 {/if}
 
 {#if isReauthDialogOpen}

@@ -98,9 +98,19 @@
     {/if}
   </div>
   {#if isCurrentAccessMethod}
-    <Badge color="success" size="sm" dot class="ms-2 flex-none"
-      >{$t`Active`}</Badge
+    <Tooltip
+      label={$t`Currently active`}
+      description={$t`This is the access method you're currently signed in with.`}
+      direction="up"
     >
+      <Badge
+        color="success"
+        size="sm"
+        dot
+        class="ms-2 flex-none cursor-default select-none"
+        tabindex={0}>{$t`Active`}</Badge
+      >
+    </Tooltip>
   {/if}
   {#if options.length > 0}
     <Select {options} align="end">
