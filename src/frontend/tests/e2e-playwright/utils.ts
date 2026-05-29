@@ -285,16 +285,22 @@ export const openIiTab = async (page: Page): Promise<Page> => {
 
 // HoldToConfirm requires a sustained press; the component's duration is
 // 1500ms, so we hold a bit longer to absorb scheduling jitter. We dispatch
-// the events directly so the helper works the same on desktop and mobile —
-// Playwright's mobile contexts don't deliver keyboard events to focused
-// elements, and touchscreen.tap is too short for the 1500ms gate.
+// the mousedown from inside the page so the helper works the same on
+// desktop and mobile — Playwright's input-device emulation differs across
+// contexts, and the component's mousedown listener fires from any synthetic
+// event. Once the hold completes the controller stops holding on its own,
+// so we don't need to dispatch a matching mouseup.
 export const holdToConfirm = async (page: Page): Promise<void> => {
-  const button = page.getByRole("button", {
-    name: "Hold to confirm you started this",
+  await page.evaluate(() => {
+    const button = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Hold to confirm you started this"]',
+    );
+    if (button === null) {
+      throw new Error("hold-to-confirm button not in DOM");
+    }
+    button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
   });
-  await button.dispatchEvent("mousedown");
   await page.waitForTimeout(1700);
-  await button.dispatchEvent("mouseup");
 };
 
 /**
