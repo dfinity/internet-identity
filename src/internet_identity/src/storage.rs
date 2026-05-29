@@ -101,6 +101,7 @@ use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{
     Memory, MinHeap, RestrictedMemory, StableBTreeMap, StableCell, Storable,
 };
+use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::delegation::check_frontend_length;
@@ -131,6 +132,7 @@ use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
+use storable::openid_jwks::StorableJwks;
 use storable::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
@@ -180,6 +182,7 @@ const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
+const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -219,6 +222,12 @@ const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID: MemoryId =
 
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX);
+
+/// Persistent cache of OpenID provider JWKs, keyed by the provider's `issuer`.
+/// Seeded from `OpenIdConfig.seed_jwks` and written through on every successful
+/// periodic `jwks_uri` fetch, so a provider's keys survive canister upgrades
+/// and are available for JWT verification before the first post-upgrade fetch.
+const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -354,6 +363,12 @@ pub struct Storage<M: Memory> {
     /// there's no need to store it again here. See design §8.2.
     pub(crate) lookup_anchor_with_email_recovery_memory:
         StableBTreeMap<StorableEmailRecoveryAddressHash, StorableAnchorNumber, ManagedMemory<M>>,
+
+    /// Memory wrapper used to report the size of the OpenID JWKS cache memory.
+    openid_jwks_cache_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Persistent per-provider JWK cache, keyed by the provider's `issuer`.
+    /// See [`OPENID_JWKS_CACHE_MEMORY_ID`].
+    openid_jwks_cache_memory: StableBTreeMap<String, StorableJwks, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -439,6 +454,7 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
+        let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -545,6 +561,8 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchor_with_email_recovery_memory: StableBTreeMap::init(
                 lookup_anchor_with_email_recovery_memory,
             ),
+            openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
+            openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
         }
     }
 
@@ -2073,6 +2091,22 @@ impl<M: Memory + Clone> Storage<M> {
         PersistentState::from(self.persistent_state.get().clone())
     }
 
+    /// Reads the persisted JWK cache for the given provider `issuer`, if any.
+    pub fn read_openid_jwks(&self, issuer: &str) -> Option<Vec<Jwk>> {
+        self.openid_jwks_cache_memory
+            .get(&issuer.to_string())
+            .map(|stored| stored.keys)
+    }
+
+    /// Writes (replacing any previous value) the JWK cache for the given
+    /// provider `issuer`. Used both to seed the cache from
+    /// `OpenIdConfig.seed_jwks` and to write through fetched keys so they
+    /// survive canister upgrades.
+    pub fn write_openid_jwks(&mut self, issuer: &str, keys: Vec<Jwk>) {
+        self.openid_jwks_cache_memory
+            .insert(issuer.to_string(), StorableJwks { keys });
+    }
+
     pub fn version(&self) -> u8 {
         self.header.version
     }
@@ -2156,6 +2190,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_anchor_with_email_recovery_memory".to_string(),
                 self.lookup_anchor_with_email_recovery_memory_wrapper.size(),
+            ),
+            (
+                "openid_jwks_cache".to_string(),
+                self.openid_jwks_cache_memory_wrapper.size(),
             ),
         ])
     }

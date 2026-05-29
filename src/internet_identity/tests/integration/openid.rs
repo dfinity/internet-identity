@@ -56,6 +56,40 @@ fn can_link_google_account() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Verifies that a JWT can be verified purely from the JWK cache seeded via
+/// `OpenIdConfig.seed_jwks`, without ever fetching the provider's `jwks_uri`.
+/// No certs HTTP response is mocked here, so a successful add proves the seed
+/// populated the cache.
+#[test]
+fn can_link_google_account_with_seeded_jwks() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_canister_with_seeded_google_jwks(&env);
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+
+    sync_time(&env, test_time);
+
+    // NOTE: deliberately NOT calling `mock_google_certs_response` here — the key
+    // used to verify the JWT must come from the install-time `seed_jwks`.
+    let _ = api::openid_credential_add(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )?;
+
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        1
+    );
+
+    Ok(())
+}
+
 /// Verifies that Microsoft Accounts can be added
 #[test]
 fn can_link_microsoft_account() -> Result<(), RejectResponse> {
@@ -563,6 +597,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
             auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
             fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
             email_verification: None,
+            seed_jwks: None,
         }, OpenIdConfig {
             name: "Microsoft".into(),
             logo: "<svg viewBox=\"0 0 24 24\"><path d=\"M2.5 2.5h9v9h-9zm10 0h9v9h-9zm-10 10h9v9h-9zm10 0h9v9h-9z\" style=\"fill: currentColor;\"></path></svg>".into(),
@@ -574,6 +609,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
             auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
             fedcm_uri: Some("".into()),
             email_verification: None,
+            seed_jwks: None,
         }]),
         archive_config: Some(ArchiveConfig {
             module_hash: wasm_module_hash(&ARCHIVE_WASM),
@@ -609,6 +645,48 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
     mock_microsoft_certs_response(env);
 
     canister_id
+}
+
+/// Installs II with a single Google provider whose JWK cache is seeded — via
+/// `OpenIdConfig.seed_jwks` — with the key that signed the JWT returned by
+/// [`openid_google_test_data`] (kid `763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b`,
+/// the same key served by [`mock_google_certs_response`]).
+///
+/// The seed is expressed exactly as the API expects it: the list of the JWK's
+/// JSON `(field, value)` pairs. Unlike [`setup_canister`], this does NOT mock
+/// the certs HTTP response.
+pub fn setup_canister_with_seeded_google_jwks(env: &PocketIc) -> Principal {
+    // The JWK (as JSON) that signs the test JWT, turned into the `(field, value)`
+    // pair list expected by `seed_jwks`.
+    let google_jwk_json = r#"{"kty":"RSA","use":"sig","alg":"RS256","kid":"763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b","n":"y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw","e":"AQAB"}"#;
+    let jwk_value: serde_json::Value = serde_json::from_str(google_jwk_json).unwrap();
+    let seed_jwks: Vec<(String, String)> = jwk_value
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(field, value)| (field.clone(), value.as_str().unwrap().to_string()))
+        .collect();
+
+    let args = InternetIdentityInit {
+        openid_configs: Some(vec![OpenIdConfig {
+            name: "Google".into(),
+            logo: String::new(),
+            issuer: "https://accounts.google.com".into(),
+            client_id: "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com"
+                .into(),
+            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+            auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+            fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+            email_verification: None,
+            seed_jwks: Some(seed_jwks),
+        }]),
+        canister_creation_cycles_cost: Some(0),
+        ..Default::default()
+    };
+
+    // Cycles are needed before installation because of the async HTTP outcalls.
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
 }
 
 pub fn mock_google_certs_response(env: &PocketIc) {
