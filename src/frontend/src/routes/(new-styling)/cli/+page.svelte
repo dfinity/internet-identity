@@ -200,39 +200,43 @@
 </script>
 
 {#if phase.kind === "invalid"}
-  <AuthPanel>
-    <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-      <CircleAlertIcon class="size-6" />
-    </FeaturedIcon>
-    <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Invalid request`}
-    </h1>
-    <p class="text-text-tertiary mb-2 text-base">
-      <Trans>
-        It seems like an invalid CLI authentication request was received.
-      </Trans>
-    </p>
-    <p class="text-text-tertiary text-base">
-      {$t`You can close this window.`}
-    </p>
-  </AuthPanel>
+  <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
+    <AuthPanel>
+      <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
+        <CircleAlertIcon class="size-6" />
+      </FeaturedIcon>
+      <h1 class="text-text-primary mb-3 text-2xl font-medium">
+        {$t`Invalid request`}
+      </h1>
+      <p class="text-text-tertiary mb-2 text-base">
+        <Trans>
+          It seems like an invalid CLI authentication request was received.
+        </Trans>
+      </p>
+      <p class="text-text-tertiary text-base">
+        {$t`You can close this window.`}
+      </p>
+    </AuthPanel>
+  </div>
 {:else if phase.kind === "error"}
-  <AuthPanel>
-    <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-      <CircleAlertIcon class="size-6" />
-    </FeaturedIcon>
-    <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Something went wrong`}
-    </h1>
-    <p class="text-text-tertiary mb-2 text-base">
-      <Trans>
-        The CLI sign-in couldn't be completed. Check the CLI for details.
-      </Trans>
-    </p>
-    <p class="text-text-tertiary text-base">
-      {$t`You can close this window.`}
-    </p>
-  </AuthPanel>
+  <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
+    <AuthPanel>
+      <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
+        <CircleAlertIcon class="size-6" />
+      </FeaturedIcon>
+      <h1 class="text-text-primary mb-3 text-2xl font-medium">
+        {$t`Something went wrong`}
+      </h1>
+      <p class="text-text-tertiary mb-2 text-base">
+        <Trans>
+          The CLI sign-in couldn't be completed. Check the CLI for details.
+        </Trans>
+      </p>
+      <p class="text-text-tertiary text-base">
+        {$t`You can close this window.`}
+      </p>
+    </AuthPanel>
+  </div>
 {:else if phase.kind === "wizard"}
   <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
     <AuthPanel>
