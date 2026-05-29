@@ -119,6 +119,11 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
+      // After the wizard completes, the access page strips the ?activate=
+      // query via `goto`, which fires the layout's afterNavigate and resets
+      // isMobileSidebarOpen. Waiting for the settled URL avoids a race where
+      // the menu click would be undone by that reset.
+      await existingDevicePage.waitForURL(II_URL + "/manage/access");
       const existingMenuButton = existingDevicePage.getByRole("button", {
         name: "Open menu",
       });

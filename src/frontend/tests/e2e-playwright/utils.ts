@@ -283,13 +283,14 @@ export const openIiTab = async (page: Page): Promise<Page> => {
   return await pagePromise;
 };
 
-// HoldToConfirm requires a sustained press; the component's duration is
-// 1500ms, so we hold a bit longer to absorb scheduling jitter. We dispatch
-// the mousedown from inside the page so the helper works the same on
-// desktop and mobile — Playwright's input-device emulation differs across
-// contexts, and the component's mousedown listener fires from any synthetic
-// event. Once the hold completes the controller stops holding on its own,
-// so we don't need to dispatch a matching mouseup.
+// HoldToConfirm requires a sustained press. We dispatch the mousedown from
+// inside the page so the helper works the same on desktop and mobile —
+// Playwright's input-device emulation differs across contexts, but the
+// component's mousedown listener fires from any synthetic event. The
+// controller releases itself when it reaches the 1500ms duration, so no
+// matching mouseup is needed. After completion the wizard waits 250ms then
+// runs a 380ms slide to the code-entry step; the heading wait absorbs both
+// so the caller doesn't race the transition.
 export const holdToConfirm = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
     const button = document.querySelector<HTMLButtonElement>(
@@ -300,7 +301,12 @@ export const holdToConfirm = async (page: Page): Promise<void> => {
     }
     button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
   });
-  await page.waitForTimeout(1700);
+  await page
+    .getByRole("heading", { level: 1, name: "Enter the code" })
+    .waitFor();
+  // Slide animation is 380ms; let it settle so the first .fill() doesn't
+  // race with the inputs still moving.
+  await page.waitForTimeout(400);
 };
 
 /**
