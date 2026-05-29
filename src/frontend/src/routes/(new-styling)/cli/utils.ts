@@ -21,6 +21,9 @@ interface CliAuthorizeInput {
   ttlMinutes: number;
   /** Loopback URL the delegation chain is form-POSTed to. */
   callback: string;
+  /** Single-use secret from the URL fragment, echoed back so the loopback
+   *  server can tell this page's POST from a stray or forged local request. */
+  nonce: string;
 }
 
 const derivationOrigin = (appHost: string | undefined): string =>
@@ -47,6 +50,7 @@ export const cliAuthorize = async ({
   appHost,
   ttlMinutes,
   callback,
+  nonce,
 }: CliAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
   const effectiveOrigin = derivationOrigin(appHost);
@@ -102,11 +106,18 @@ export const cliAuthorize = async ({
   const form = document.createElement("form");
   form.method = "POST";
   form.action = callback;
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "delegation";
-  input.value = JSON.stringify(chain.toJSON());
-  form.appendChild(input);
+  const delegationInput = document.createElement("input");
+  delegationInput.type = "hidden";
+  delegationInput.name = "delegation";
+  delegationInput.value = JSON.stringify(chain.toJSON());
+  form.appendChild(delegationInput);
+  // Echo the nonce so the loopback server can confirm the POST came from the
+  // page the user logged in through rather than a stray or forged request.
+  const nonceInput = document.createElement("input");
+  nonceInput.type = "hidden";
+  nonceInput.name = "nonce";
+  nonceInput.value = nonce;
+  form.appendChild(nonceInput);
   document.body.appendChild(form);
   form.submit();
 };

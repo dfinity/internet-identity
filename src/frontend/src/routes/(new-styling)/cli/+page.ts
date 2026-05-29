@@ -10,6 +10,9 @@ export type CliParams =
       /** base64url-encoded DER session pubkey supplied by the CLI. */
       publicKey: string;
       callback: string;
+      /** Single-use secret echoed back to the loopback server so it can tell
+       *  this page's POST from a stray or forged local request. */
+      nonce: string;
       ttlMinutes: number;
       /** Hostname of the app the CLI is being authorized for, or undefined
        *  for generic mode. */
@@ -117,6 +120,7 @@ export const load: PageLoad = ({
   const status = parseStatus(params.get("status"));
   const publicKey = parseBase64Url(params.get("public_key"));
   const callback = parseLoopbackCallback(params.get("callback"));
+  const nonce = parseBase64Url(params.get("nonce"));
   const ttlMinutes = parseTtl(params.get("ttl"));
 
   // `app` is optional. Absent or empty → generic mode. Present → must parse.
@@ -132,12 +136,13 @@ export const load: PageLoad = ({
   if (
     publicKey === undefined ||
     callback === undefined ||
+    nonce === undefined ||
     ttlMinutes === undefined
   ) {
     return { params: { kind: "invalid" }, status };
   }
   return {
-    params: { kind: "valid", publicKey, callback, ttlMinutes, appHost },
+    params: { kind: "valid", publicKey, callback, nonce, ttlMinutes, appHost },
     status,
   };
 };

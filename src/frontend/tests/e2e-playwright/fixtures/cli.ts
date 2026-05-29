@@ -26,6 +26,7 @@ type CliOutcome = "success" | "identity-mismatch" | "error";
  */
 export type CliFixture = {
   publicKey: string;
+  nonce: string;
   callbackUrl: string;
   receivedDelegation: Promise<unknown>;
   /**
@@ -53,6 +54,10 @@ export const test = base.extend<{ cli: CliFixture }>({
     const publicKey = toBase64URL(
       new Uint8Array(identity.getPublicKey().toDer()),
     );
+    // The single-use secret the real CLI puts in the URL fragment and the
+    // frontend must echo back in its POST. The loopback stand-in rejects a
+    // POST that doesn't carry it, mirroring the real CLI's nonce gate.
+    const nonce = toBase64URL(crypto.getRandomValues(new Uint8Array(32)));
 
     let resolveDelegation: (body: unknown) => void = () => undefined;
     const receivedDelegation = new Promise<unknown>((resolve) => {
@@ -81,6 +86,7 @@ export const test = base.extend<{ cli: CliFixture }>({
           nextOutcome = "success";
           fragment.set("public_key", publicKey);
           fragment.set("callback", callbackUrl);
+          fragment.set("nonce", nonce);
           fragment.set("status", "identity-mismatch");
           url.hash = fragment.toString();
           res.writeHead(303, { Location: url.toString() });
@@ -96,7 +102,18 @@ export const test = base.extend<{ cli: CliFixture }>({
           return;
         }
 
-        const delegation = new URLSearchParams(raw).get("delegation");
+        const posted = new URLSearchParams(raw);
+        if (posted.get("nonce") !== nonce) {
+          // The frontend didn't echo the shared nonce — the real CLI would
+          // reject this with 403. Redirect with an error status so the test
+          // fails loudly instead of `receivedDelegation` hanging forever.
+          fragment.set("status", "error");
+          url.hash = fragment.toString();
+          res.writeHead(303, { Location: url.toString() });
+          res.end();
+          return;
+        }
+        const delegation = posted.get("delegation");
         try {
           resolveDelegation(delegation === null ? raw : JSON.parse(delegation));
         } catch {
@@ -156,6 +173,7 @@ export const test = base.extend<{ cli: CliFixture }>({
       const fragment = new URLSearchParams();
       fragment.set("public_key", publicKey);
       fragment.set("callback", opts.callbackUrl ?? callbackUrl);
+      fragment.set("nonce", nonce);
       if (opts.appHost !== undefined) {
         fragment.set("app", opts.appHost);
       }
@@ -167,6 +185,7 @@ export const test = base.extend<{ cli: CliFixture }>({
 
     await use({
       publicKey,
+      nonce,
       callbackUrl,
       receivedDelegation,
       setNextOutcome,
