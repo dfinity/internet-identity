@@ -23,33 +23,34 @@
 <!--
   Hardcoded terminal colors so the block reads as a real terminal in both
   themes (light mode uses a slightly softer near-black so it doesn't slam
-  against a white page).
+  against a white page). No `overflow-hidden` so the badge can straddle the
+  top edge; each prefix glyph gets a right margin so the following text keeps
+  a consistent gap regardless of the glyph's width.
 -->
 <div
-  class="relative overflow-hidden rounded-lg p-[18px] font-mono text-sm leading-6 text-[var(--cli-terminal-body)]"
+  class="relative rounded-lg p-[18px] font-mono text-[13px] leading-[1.55] text-[var(--cli-terminal-body)]"
   style="background-color: var(--cli-terminal-bg); border: 1px solid var(--cli-terminal-border);"
   aria-hidden="true"
 >
   {#if showBadge}
     <span
-      class="border-border-tertiary bg-bg-secondary text-text-secondary absolute top-3 right-3 rounded-full border px-3 py-1 font-sans text-xs font-medium"
+      class="border-border-tertiary bg-bg-secondary text-text-secondary absolute top-0 right-4 -translate-y-1/2 rounded-full border px-3 py-1 font-sans text-xs font-medium"
     >
       {$t`Requested by`}
     </span>
   {/if}
   <div>
-    <span class="text-[var(--cli-terminal-prompt)]">$ </span><span
-      class="text-[var(--cli-terminal-em)]">{command}</span
-    >
+    <span class="mr-2 text-[var(--cli-terminal-prompt)] select-none">$</span
+    ><span class="text-[var(--cli-terminal-em)]">{command}</span>
   </div>
   {#if progressLine !== undefined}
     <div>
-      <span class="text-[var(--cli-terminal-ok)]">✓</span>
-      <span>{$t`Browser opened`}</span>
+      <span class="mr-1.5 text-[var(--cli-terminal-ok)] select-none">✓</span
+      ><span>{$t`Browser opened`}</span>
     </div>
     <div>
-      <span class="text-[var(--cli-terminal-prompt)]">·</span>
-      <span>{progressLine}{busy ? "…" : ""}</span>
+      <span class="mr-1.5 text-[var(--cli-terminal-prompt)] select-none">·</span
+      ><span>{progressLine}{busy ? "…" : ""}</span>
     </div>
   {/if}
 </div>

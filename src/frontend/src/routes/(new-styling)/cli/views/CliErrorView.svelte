@@ -12,7 +12,7 @@
   purely client-side (localStorage), so we know about the gate before
   issuing any backend call — the user lands here immediately on page load.
 -->
-<div class="flex w-full justify-center max-sm:flex-1 sm:max-w-100">
+<div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
     <FeaturedIcon size="lg" variant="error" class="mb-5 self-start">
       <LockIcon class="size-6" />

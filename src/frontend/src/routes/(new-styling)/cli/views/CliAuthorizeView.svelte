@@ -36,7 +36,7 @@
   );
 </script>
 
-<div class="flex w-full justify-center max-sm:flex-1 sm:max-w-100">
+<div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
     <CliHeader appOrigin={isAppMode ? `https://${appHost}` : undefined} />
 
@@ -59,7 +59,7 @@
       />
     </div>
 
-    <p class="text-text-tertiary mt-4 text-sm text-pretty">
+    <p class="text-text-secondary mt-4 text-[13px] leading-normal text-pretty">
       {#if isAppMode}
         <Trans>The CLI gets full access to your account in this app.</Trans>
       {:else}
