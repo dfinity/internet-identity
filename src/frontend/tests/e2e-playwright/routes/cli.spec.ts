@@ -20,12 +20,6 @@ const signUp = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "Create identity" }).click();
 };
 
-/** Signs in with the existing discoverable passkey on the current page. */
-const signInExisting = async (page: Page): Promise<void> => {
-  await page.getByRole("button", { name: "Continue with passkey" }).click();
-  await page.getByRole("button", { name: "Use existing identity" }).click();
-};
-
 /** Returns the chain's first-delegation expiration in milliseconds since epoch. */
 const expirationMillis = (body: unknown): number => {
   if (
@@ -193,12 +187,16 @@ test("Identity mismatch shows a toast and lets the user retry in place", async (
   cli.setNextOutcome("identity-mismatch");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  // The redirect-back lands on the sign-in flow with a toast explaining why.
+  // The redirect-back stays on the Continue screen for the last-used identity
+  // (not the method wizard) with a toast explaining why, and the header
+  // switcher is available so the user can pick a different identity in place.
   await expect(page.getByText("That identity doesn't match")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Switch identity" }),
+  ).toBeVisible();
 
-  // Retry with the same discoverable passkey; the second attempt succeeds and
-  // the delegation reaches the loopback server.
-  await signInExisting(page);
+  // Retry in place: the second attempt succeeds and the delegation reaches the
+  // loopback server.
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   expect(await cli.receivedDelegation).toMatchObject({

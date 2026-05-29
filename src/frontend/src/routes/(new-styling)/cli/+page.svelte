@@ -75,9 +75,10 @@
     identityNumber !== undefined &&
     !cliAccessStore.isEnabled(identityNumber);
 
-  // The phase the page opens on. Outcomes the loopback server redirects back
-  // with take priority; a mismatch keeps the request params, so it falls
-  // through to the sign-in flow (plus the onMount toast) for an in-place retry.
+  // The phase the page opens on. The success/error outcomes the loopback
+  // server redirects back with take priority; a mismatch keeps the request
+  // params, so it falls through to the authorize screen (plus the onMount
+  // toast) for an in-place retry.
   const initialPhase = (): Phase => {
     if (status === "success") {
       return { kind: "close" };
@@ -94,13 +95,11 @@
     // (`handleAuthorize`) authenticates the selected identity if it isn't the
     // active session yet, so opening here works even before authentication.
     //
-    // An identity-mismatch redirect falls through to the wizard: the last-used
-    // identity is the one that just mismatched, so the user needs to pick a
-    // different one rather than be re-shown the same Continue screen.
-    if (
-      status === undefined &&
-      get(lastUsedIdentitiesStore).selected !== undefined
-    ) {
+    // This holds on an identity-mismatch redirect too: the user stays on the
+    // Continue screen and picks the right identity from the header switcher
+    // (plus the onMount toast explaining the mismatch), rather than being
+    // dropped back into the method wizard.
+    if (get(lastUsedIdentitiesStore).selected !== undefined) {
       return { kind: "authorize" };
     }
     return { kind: "wizard" };
@@ -229,7 +228,7 @@
     </p>
   </AuthPanel>
 {:else if phase.kind === "wizard"}
-  <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-100">
+  <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
     <AuthPanel>
       <AuthWizard {...wizardSignInHandlers}>
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
