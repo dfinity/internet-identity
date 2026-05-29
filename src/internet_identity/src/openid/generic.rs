@@ -871,6 +871,29 @@ fn compute_next_certs_fetch_delay<T, E>(
     }
 }
 
+/// Merge freshly fetched JWKS into the cache keyed by `kid`: refresh known keys
+/// and append new ones, but never drop a key we've already seen.
+///
+/// Microsoft's `/common/` JWKS endpoint serves an inconsistent subset of its
+/// signing keys during key rollovers (and can even disagree across subnet nodes
+/// within a single outcall). Replacing the cache wholesale lets such a thin
+/// response evict a key that is still signing live tokens, which breaks sign-in
+/// for the affected accounts until a later fetch happens to include it again.
+/// Merging makes the cache converge to the union of every key seen, so a partial
+/// response can no longer lock users out.
+fn merge_certs(cache: &RefCell<Vec<Jwk>>, fetched: Vec<Jwk>) {
+    let mut cached = cache.borrow_mut();
+    for jwk in fetched {
+        match jwk.kid().map(|kid| kid.to_string()) {
+            Some(kid) => match cached.iter_mut().find(|c| c.kid() == Some(kid.as_str())) {
+                Some(existing) => *existing = jwk,
+                None => cached.push(jwk),
+            },
+            None => cached.push(jwk),
+        }
+    }
+}
+
 #[cfg(not(test))]
 fn schedule_fetch_certs(
     jwks_uri: String,
@@ -888,7 +911,7 @@ fn schedule_fetch_certs(
                 let result = fetch_certs(jwks_uri.clone()).await;
                 let next_delay = compute_next_certs_fetch_delay(&result, delay);
                 if let Ok(certs) = result {
-                    certs_reference.replace(certs);
+                    merge_certs(&certs_reference, certs);
                 }
                 schedule_fetch_certs(jwks_uri, certs_reference, next_delay);
             });
@@ -1214,6 +1237,49 @@ fn should_return_error_when_cert_missing() {
         Err(OpenIDJWTVerificationError::GenericError(
             "Certificate not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into()
         ))
+    );
+}
+
+#[cfg(test)]
+fn test_jwks(kids: &[&str]) -> Vec<Jwk> {
+    // `merge_certs` only keys off `kid`, so reuse one valid RSA modulus/exponent
+    // for every key; the actual key material is irrelevant to this test.
+    const N: &str = "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q";
+    let keys: Vec<String> = kids
+        .iter()
+        .map(|kid| {
+            format!(
+                r#"{{"n":"{N}","use":"sig","kty":"RSA","alg":"RS256","kid":"{kid}","e":"AQAB"}}"#
+            )
+        })
+        .collect();
+    serde_json::from_str::<Certs>(&format!(r#"{{"keys":[{}]}}"#, keys.join(",")))
+        .unwrap()
+        .keys
+}
+
+#[test]
+fn merge_certs_keeps_previously_seen_keys() {
+    let cache = RefCell::new(test_jwks(&["kid-a", "kid-b"]));
+
+    // A later fetch returns a thin subset (as `/common/` does mid-rollover) that
+    // omits "kid-b" and introduces a new "kid-c".
+    merge_certs(&cache, test_jwks(&["kid-a", "kid-c"]));
+
+    let mut kids: Vec<String> = cache
+        .borrow()
+        .iter()
+        .map(|key| key.kid().unwrap().to_string())
+        .collect();
+    kids.sort();
+    // "kid-b" survives the thin response and "kid-c" is added.
+    assert_eq!(
+        kids,
+        vec![
+            "kid-a".to_string(),
+            "kid-b".to_string(),
+            "kid-c".to_string()
+        ]
     );
 }
 
