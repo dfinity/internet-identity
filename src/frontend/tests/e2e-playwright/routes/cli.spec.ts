@@ -1,12 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { test } from "../fixtures";
-import {
-  addVirtualAuthenticator,
-  authorizeWithUrl,
-  II_URL,
-  TEST_APP_URL,
-} from "../utils";
+import { addVirtualAuthenticator, authorize, II_URL } from "../utils";
 
 /** Decodes a hex string (as delegation chains encode public keys) to bytes. */
 const hexToBytes = (hex: string): Uint8Array =>
@@ -402,18 +397,12 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   const identityNumber = identities[0].identityNumber;
 
   // Principal the app (nice-name.com) sees via the normal /authorize flow.
-  const authorizePrincipal = await authorizeWithUrl(
-    page,
-    TEST_APP_URL,
-    II_URL,
-    async (authPage) => {
-      await signInWithIdentity(authPage, identityNumber);
-      await authPage
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-    },
-    true, // ICRC-25: account-based delegation, the same system the CLI uses
-  );
+  const authorizePrincipal = await authorize(page, async (authPage) => {
+    await signInWithIdentity(authPage, identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
 
   // Enable device CLI access for the same identity so app mode isn't gated.
   await page.goto(II_URL);
