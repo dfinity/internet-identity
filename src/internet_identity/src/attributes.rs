@@ -1028,6 +1028,7 @@ mod tests {
                     auth_scope: vec![],
                     fedcm_uri: None,
                     email_verification: Some(OpenIdEmailVerificationScheme::Google),
+                    seed_jwks: None,
                 },
                 OpenIdConfig {
                     name: "Microsoft".to_string(),
@@ -1039,6 +1040,7 @@ mod tests {
                     auth_scope: vec![],
                     fedcm_uri: None,
                     email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+                    seed_jwks: None,
                 },
             ]);
         }
@@ -1648,6 +1650,7 @@ mod tests {
                 auth_scope: vec![],
                 fedcm_uri: None,
                 email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+                seed_jwks: None,
             }]);
         }
 
@@ -1739,6 +1742,7 @@ mod tests {
                 auth_scope: vec![],
                 fedcm_uri: None,
                 email_verification: Some(OpenIdEmailVerificationScheme::Google),
+                seed_jwks: None,
             }]);
         }
 
@@ -2013,6 +2017,7 @@ mod tests {
                 auth_scope: vec![],
                 fedcm_uri: None,
                 email_verification: Some(OpenIdEmailVerificationScheme::Google),
+                seed_jwks: None,
             }]);
         }
 

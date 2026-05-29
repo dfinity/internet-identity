@@ -432,6 +432,14 @@ type OpenIdConfig = record {
     auth_scope : vec text;
     fedcm_uri : opt text;
     email_verification : opt OpenIdEmailVerification;
+    // Optional initial set of JWKs used to seed this provider's JWK cache on
+    // install, so JWT verification works before the first jwks_uri fetch and
+    // across upgrades (the cache is persisted in stable memory). The outer vec
+    // is the set of JWKs; each inner vec is one JWK, given as the list of its
+    // JSON (field, value) pairs, e.g. a single RSA key is
+    // vec { vec { record { "kty"; "RSA" }; record { "kid"; "..." };
+    //             record { "n"; "..." }; record { "e"; "AQAB" } } }.
+    seed_jwks : opt vec vec record { text; text };
 };
 
 // SSO provider config that uses two-hop discovery.
