@@ -6,6 +6,7 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   addVirtualAuthenticator,
+  holdToConfirm,
 } from "../../utils";
 import { test } from "../../fixtures";
 import { SSO_OPENID_PORT } from "../../fixtures/sso";
@@ -109,6 +110,7 @@ test("Authorize by signing in from another device", async ({
       await otherDevicePage
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
+      await holdToConfirm(otherDevicePage);
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);

@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import { addVirtualAuthenticator, holdToConfirm, II_URL } from "../utils";
 import { test } from "../fixtures";
 import { SSO_OPENID_PORT } from "../fixtures/sso";
 
@@ -92,6 +92,7 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
+      await holdToConfirm(existingDevicePage);
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);

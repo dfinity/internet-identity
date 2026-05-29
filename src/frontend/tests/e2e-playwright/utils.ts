@@ -283,6 +283,17 @@ export const openIiTab = async (page: Page): Promise<Page> => {
   return await pagePromise;
 };
 
+// HoldToConfirm requires a real press-and-hold; the component's duration is
+// 1500ms, so we hold a bit longer to absorb scheduling jitter.
+export const holdToConfirm = async (page: Page): Promise<void> => {
+  await page
+    .getByRole("button", { name: "Hold to confirm you started this" })
+    .focus();
+  await page.keyboard.down("Space");
+  await page.waitForTimeout(1700);
+  await page.keyboard.up("Space");
+};
+
 /**
  * Waits for nth message to appear in test app
  */
