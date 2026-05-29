@@ -71,7 +71,7 @@
   // device; otherwise it's a generic CLI sign-in with no gate.
   const isCliAccessGated = (identityNumber: bigint | undefined): boolean =>
     params.kind === "valid" &&
-    params.appHost !== undefined &&
+    params.domain !== undefined &&
     identityNumber !== undefined &&
     !cliAccessStore.isEnabled(identityNumber);
 
@@ -158,7 +158,7 @@
       await cliAuthorize({
         authenticated,
         publicKey: params.publicKey,
-        appHost: params.appHost,
+        domain: params.domain,
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
         nonce: params.nonce,
@@ -241,7 +241,7 @@
     </AuthPanel>
   </div>
 {:else if phase.kind === "authorize" && params.kind === "valid"}
-  <CliAuthorizeView appHost={params.appHost} onAuthorize={handleAuthorize} />
+  <CliAuthorizeView domain={params.domain} onAuthorize={handleAuthorize} />
 {:else if phase.kind === "cli-disabled"}
   <CliErrorView />
 {:else if phase.kind === "close"}

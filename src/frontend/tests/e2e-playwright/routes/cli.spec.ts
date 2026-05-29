@@ -214,7 +214,7 @@ test("App mode without CLI access enabled shows the gated error screen", async (
 }) => {
   await addVirtualAuthenticator(page);
   await page.goto(
-    await cli.resolveAuthorizeUrl(page, { appHost: "nice-name.com" }),
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),
   );
   await signUp(page);
   await expect(
@@ -285,7 +285,7 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   // opens directly on the Allow-access screen (like /authorize) — clicking it
   // authenticates that identity and posts the delegation.
   await page.goto(
-    await cli.resolveAuthorizeUrl(page, { appHost: "nice-name.com" }),
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),
   );
   await page.getByRole("button", { name: "Allow access" }).click();
 
@@ -296,4 +296,67 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
+});
+
+/** The hex root public key of a delegation chain (the per-origin account key). */
+const rootPublicKey = (body: unknown): string => {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "publicKey" in body &&
+    typeof body.publicKey === "string"
+  ) {
+    return body.publicKey;
+  }
+  throw new Error("delegation chain missing publicKey");
+};
+
+test("`--app` derives a different identity than generic mode for the same identity", async ({
+  page,
+  cli,
+}) => {
+  // One identity, with device CLI access enabled so app mode isn't gated.
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.waitForURL(II_URL + "/manage/settings");
+  await page.getByRole("switch").click();
+  await page
+    .getByLabel("I'm using the official ICP CLI and I trust this device.")
+    .check();
+  await page.getByRole("button", { name: "Enable CLI access" }).click();
+  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+
+  // Generic sign-in (no `domain`) → delegation rooted at the auth page's
+  // default origin (cli.id.ai).
+  await page.goto(await cli.resolveAuthorizeUrl(page));
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // App-mode sign-in for the same identity with `domain=nice-name.com` →
+  // delegation rooted at that origin instead. Navigate off /cli first so the
+  // second visit is a full load (a fragment-only change wouldn't re-run `load`).
+  await page.goto(II_URL);
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // Same identity, two derivation origins → two distinct root principals. If
+  // `domain` were ignored, these would collide.
+  expect(cli.receivedDelegations.length).toBe(2);
+  expect(rootPublicKey(cli.receivedDelegations[1])).not.toBe(
+    rootPublicKey(cli.receivedDelegations[0]),
+  );
 });

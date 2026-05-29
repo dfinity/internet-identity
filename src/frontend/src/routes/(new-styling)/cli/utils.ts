@@ -14,9 +14,9 @@ interface CliAuthorizeInput {
   authenticated: Authenticated;
   /** base64url-encoded DER session pubkey supplied by the CLI. */
   publicKey: string;
-  /** Hostname of the app the CLI is being authorized for, or undefined for
-   *  generic mode. */
-  appHost?: string;
+  /** Delegation domain to get an identity for, or undefined for generic mode
+   *  (the auth page's own default, e.g. cli.id.ai). */
+  domain?: string;
   /** Lifetime in minutes. */
   ttlMinutes: number;
   /** Loopback URL the delegation chain is form-POSTed to. */
@@ -26,8 +26,8 @@ interface CliAuthorizeInput {
   nonce: string;
 }
 
-const derivationOrigin = (appHost: string | undefined): string =>
-  appHost === undefined ? CLI_GENERIC_DERIVATION_ORIGIN : `https://${appHost}`;
+const derivationOrigin = (domain: string | undefined): string =>
+  domain === undefined ? CLI_GENERIC_DERIVATION_ORIGIN : `https://${domain}`;
 
 /**
  * Builds a two-hop delegation chain rooted at the user's identity and ending
@@ -47,13 +47,13 @@ const derivationOrigin = (appHost: string | undefined): string =>
 export const cliAuthorize = async ({
   authenticated,
   publicKey,
-  appHost,
+  domain,
   ttlMinutes,
   callback,
   nonce,
 }: CliAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
-  const effectiveOrigin = derivationOrigin(appHost);
+  const effectiveOrigin = derivationOrigin(domain);
   const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
 
   const ephemeralIdentity = await ECDSAKeyIdentity.generate({

@@ -29,6 +29,8 @@ export type CliFixture = {
   nonce: string;
   callbackUrl: string;
   receivedDelegation: Promise<unknown>;
+  /** Every delegation received so far, in order (for multi-post tests). */
+  receivedDelegations: unknown[];
   /**
    * Sets what the loopback server does on its next form POST. Defaults to
    * "success". After serving an "identity-mismatch" redirect the server resets
@@ -43,7 +45,7 @@ export type CliFixture = {
    */
   resolveAuthorizeUrl: (
     page: Page,
-    opts?: { appHost?: string; ttlMinutes?: number; callbackUrl?: string },
+    opts?: { domain?: string; ttlMinutes?: number; callbackUrl?: string },
   ) => Promise<string>;
 };
 
@@ -63,6 +65,9 @@ export const test = base.extend<{ cli: CliFixture }>({
     const receivedDelegation = new Promise<unknown>((resolve) => {
       resolveDelegation = resolve;
     });
+    // Every delegation the loopback receives, in order — lets a test that posts
+    // more than once (e.g. comparing derivation origins) read each one.
+    const receivedDelegations: unknown[] = [];
 
     let nextOutcome: CliOutcome = "success";
     // The discovered login path the server redirects back to; set by
@@ -114,11 +119,14 @@ export const test = base.extend<{ cli: CliFixture }>({
           return;
         }
         const delegation = posted.get("delegation");
+        let parsed: unknown;
         try {
-          resolveDelegation(delegation === null ? raw : JSON.parse(delegation));
+          parsed = delegation === null ? raw : JSON.parse(delegation);
         } catch {
-          resolveDelegation(raw);
+          parsed = raw;
         }
+        receivedDelegations.push(parsed);
+        resolveDelegation(parsed);
         fragment.set("status", "success");
         url.hash = fragment.toString();
         res.writeHead(303, { Location: url.toString() });
@@ -144,7 +152,7 @@ export const test = base.extend<{ cli: CliFixture }>({
     const resolveAuthorizeUrl = async (
       page: Page,
       opts: {
-        appHost?: string;
+        domain?: string;
         ttlMinutes?: number;
         callbackUrl?: string;
       } = {},
@@ -174,8 +182,8 @@ export const test = base.extend<{ cli: CliFixture }>({
       fragment.set("public_key", publicKey);
       fragment.set("callback", opts.callbackUrl ?? callbackUrl);
       fragment.set("nonce", nonce);
-      if (opts.appHost !== undefined) {
-        fragment.set("app", opts.appHost);
+      if (opts.domain !== undefined) {
+        fragment.set("domain", opts.domain);
       }
       if (opts.ttlMinutes !== undefined) {
         fragment.set("ttl", String(opts.ttlMinutes));
@@ -188,6 +196,7 @@ export const test = base.extend<{ cli: CliFixture }>({
       nonce,
       callbackUrl,
       receivedDelegation,
+      receivedDelegations,
       setNextOutcome,
       resolveAuthorizeUrl,
     });

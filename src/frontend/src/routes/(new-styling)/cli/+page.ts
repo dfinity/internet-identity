@@ -14,9 +14,9 @@ export type CliParams =
        *  this page's POST from a stray or forged local request. */
       nonce: string;
       ttlMinutes: number;
-      /** Hostname of the app the CLI is being authorized for, or undefined
-       *  for generic mode. */
-      appHost: string | undefined;
+      /** Delegation domain to get an identity for, or undefined for generic
+       *  mode (the auth page's own default, e.g. cli.id.ai). */
+      domain: string | undefined;
     }
   | { kind: "invalid" };
 
@@ -80,7 +80,7 @@ const parseLoopbackCallback = (raw: string | null): string | undefined => {
  * fragment, scheme prefix, and userinfo by requiring the round-trip
  * through `new URL` to leave only the hostname behind.
  */
-const parseAppHost = (raw: string): string | undefined => {
+const parseDomain = (raw: string): string | undefined => {
   let url: URL;
   try {
     url = new URL(`https://${raw}`);
@@ -123,12 +123,12 @@ export const load: PageLoad = ({
   const nonce = parseBase64Url(params.get("nonce"));
   const ttlMinutes = parseTtl(params.get("ttl"));
 
-  // `app` is optional. Absent or empty → generic mode. Present → must parse.
-  const appRaw = params.get("app");
-  let appHost: string | undefined;
-  if (appRaw !== null && appRaw !== "") {
-    appHost = parseAppHost(appRaw);
-    if (appHost === undefined) {
+  // `domain` is optional. Absent or empty → generic mode. Present → must parse.
+  const domainRaw = params.get("domain");
+  let domain: string | undefined;
+  if (domainRaw !== null && domainRaw !== "") {
+    domain = parseDomain(domainRaw);
+    if (domain === undefined) {
       return { params: { kind: "invalid" }, status };
     }
   }
@@ -142,7 +142,7 @@ export const load: PageLoad = ({
     return { params: { kind: "invalid" }, status };
   }
   return {
-    params: { kind: "valid", publicKey, callback, nonce, ttlMinutes, appHost },
+    params: { kind: "valid", publicKey, callback, nonce, ttlMinutes, domain },
     status,
   };
 };

@@ -9,11 +9,11 @@
   interface Props {
     /** Hostname of the app the CLI is being authorized for, or undefined for
      *  generic mode. */
-    appHost?: string;
+    domain?: string;
     onAuthorize: () => Promise<void>;
   }
 
-  const { appHost, onAuthorize }: Props = $props();
+  const { domain, onAuthorize }: Props = $props();
 
   let busy = $state(false);
 
@@ -28,17 +28,15 @@
 
   // Title is short and constant; the app hostname lives in the badge under
   // the connector visual (CliHeader handles it).
-  const isAppMode = $derived(appHost !== undefined);
+  const isAppMode = $derived(domain !== undefined);
   const command = $derived(
-    isAppMode
-      ? `icp identity link ii --app ${appHost}`
-      : "icp identity link ii",
+    isAppMode ? `icp identity link ii --app ${domain}` : "icp identity link ii",
   );
 </script>
 
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
-    <CliHeader appOrigin={isAppMode ? `https://${appHost}` : undefined} />
+    <CliHeader appOrigin={isAppMode ? `https://${domain}` : undefined} />
 
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
       {isAppMode ? $t`Allow CLI access` : $t`Sign in`}
