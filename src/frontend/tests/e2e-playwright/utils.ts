@@ -283,15 +283,18 @@ export const openIiTab = async (page: Page): Promise<Page> => {
   return await pagePromise;
 };
 
-// HoldToConfirm requires a real press-and-hold; the component's duration is
-// 1500ms, so we hold a bit longer to absorb scheduling jitter.
+// HoldToConfirm requires a sustained press; the component's duration is
+// 1500ms, so we hold a bit longer to absorb scheduling jitter. We dispatch
+// the events directly so the helper works the same on desktop and mobile —
+// Playwright's mobile contexts don't deliver keyboard events to focused
+// elements, and touchscreen.tap is too short for the 1500ms gate.
 export const holdToConfirm = async (page: Page): Promise<void> => {
-  await page
-    .getByRole("button", { name: "Hold to confirm you started this" })
-    .focus();
-  await page.keyboard.down("Space");
+  const button = page.getByRole("button", {
+    name: "Hold to confirm you started this",
+  });
+  await button.dispatchEvent("mousedown");
   await page.waitForTimeout(1700);
-  await page.keyboard.up("Space");
+  await button.dispatchEvent("mouseup");
 };
 
 /**
