@@ -42,7 +42,7 @@ export const idlFactory = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
-    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text))),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({
@@ -1196,7 +1196,7 @@ export const init = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
-    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text))),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({

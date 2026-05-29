@@ -237,12 +237,11 @@ impl Provider {
     }
 }
 
-/// Build a single [`Jwk`] from the `(field, value)` pairs supplied via
-/// [`OpenIdConfig::seed_jwks`]. Each pair is one field of the JWK's JSON object
-/// (e.g. `("kty","RSA")`, `("kid","...")`, `("n","...")`, `("e","AQAB")`). The
-/// pairs are assembled into a JSON object and parsed with the same `serde` path
-/// used for fetched certs, so a seeded key is byte-for-byte identical to a
-/// fetched one.
+/// Build a single [`Jwk`] from one entry of [`OpenIdConfig::seed_jwks`] — the
+/// `(field, value)` pairs of one JWK's JSON object (e.g. `("kty","RSA")`,
+/// `("kid","...")`, `("n","...")`, `("e","AQAB")`). The pairs are assembled into
+/// a JSON object and parsed with the same `serde` path used for fetched certs,
+/// so a seeded key is byte-for-byte identical to a fetched one.
 fn build_seed_jwk(pairs: &[(String, String)]) -> Result<Jwk, String> {
     let mut object = serde_json::Map::with_capacity(pairs.len());
     for (field, value) in pairs {
@@ -252,39 +251,49 @@ fn build_seed_jwk(pairs: &[(String, String)]) -> Result<Jwk, String> {
         .map_err(|err| format!("invalid seed JWK: {err}"))
 }
 
+/// Build every JWK supplied via [`OpenIdConfig::seed_jwks`]: one [`Jwk`] per
+/// entry (each entry is a single JWK's `(field, value)` pairs). Returns the
+/// successfully-parsed keys together with an error message for each entry that
+/// failed to parse, so the caller can log and skip invalid entries rather than
+/// failing the whole install.
+fn build_seed_jwks(entries: &[Vec<(String, String)>]) -> (Vec<Jwk>, Vec<String>) {
+    let mut keys = Vec::with_capacity(entries.len());
+    let mut errors = Vec::new();
+    for pairs in entries {
+        match build_seed_jwk(pairs) {
+            Ok(jwk) => keys.push(jwk),
+            Err(err) => errors.push(err),
+        }
+    }
+    (keys, errors)
+}
+
 /// Compute the initial contents of a provider's in-memory JWK cache.
 ///
-/// 1. Prefer the cache persisted in stable memory (keyed by `issuer`): this is
-///    populated by previous seeds / fetches and lets JWT verification work
-///    immediately after an upgrade, before the first post-upgrade fetch.
-/// 2. Otherwise, if `seed_jwks` is provided, bootstrap from it and persist the
-///    result so it too survives the next upgrade.
-///
-/// `seed_jwks` only takes effect when nothing is persisted yet; once the cache
-/// holds keys (seeded or fetched) they are never clobbered by a stale seed on
-/// a later upgrade. Use a reinstall to reset.
+/// - If `config.seed_jwks` supplies any valid JWKs, they are authoritative:
+///   persist them to stable memory (keyed by `issuer`, so they survive
+///   upgrades) and use them. Invalid entries are logged and skipped.
+/// - Otherwise, fall back to the JWKs already persisted for this `issuer` (from
+///   an earlier seed or a periodic fetch), so verification keeps working across
+///   upgrades before the first post-upgrade fetch completes.
 #[cfg(not(test))]
 fn initial_certs(config: &OpenIdConfig) -> Vec<Jwk> {
-    if let Some(persisted) = state::storage_borrow(|s| s.read_openid_jwks(&config.issuer)) {
-        return persisted;
-    }
-    let Some(pairs) = config.seed_jwks.as_ref() else {
-        return vec![];
-    };
-    match build_seed_jwk(pairs) {
-        Ok(jwk) => {
-            let keys = vec![jwk];
-            state::storage_borrow_mut(|s| s.write_openid_jwks(&config.issuer, keys.clone()));
-            keys
-        }
-        Err(err) => {
+    // Seed JWKs from the config win: persist and use them.
+    if let Some(entries) = config.seed_jwks.as_ref() {
+        let (keys, errors) = build_seed_jwks(entries);
+        for err in errors {
             ic_cdk::println!(
-                "Ignoring invalid seed_jwks for issuer {}: {err}",
+                "Ignoring invalid seed JWK for issuer {}: {err}",
                 config.issuer
             );
-            vec![]
+        }
+        if !keys.is_empty() {
+            state::storage_borrow_mut(|s| s.write_openid_jwks(&config.issuer, keys.clone()));
+            return keys;
         }
     }
+    // No (valid) seed JWKs in the config: fall back to the persisted cache.
+    state::storage_borrow(|s| s.read_openid_jwks(&config.issuer)).unwrap_or_default()
 }
 
 /// Allowlist of domains accepted as `discovery_domain` by
@@ -1529,4 +1538,35 @@ fn should_reject_seed_jwk_without_key_type() {
     // Missing the mandatory `kty` discriminator: not a valid JWK.
     let pairs = vec![("alg".to_string(), "RS256".to_string())];
     assert!(build_seed_jwk(&pairs).is_err());
+}
+
+#[test]
+fn should_build_multiple_seed_jwks_and_skip_invalid() {
+    let key = |kid: &str| {
+        vec![
+            ("kty".to_string(), "RSA".to_string()),
+            ("use".to_string(), "sig".to_string()),
+            ("alg".to_string(), "RS256".to_string()),
+            ("kid".to_string(), kid.to_string()),
+            ("n".to_string(), format!("modulus-{kid}")),
+            ("e".to_string(), "AQAB".to_string()),
+        ]
+    };
+    // Second entry is invalid (no `kty`) and must be skipped, not fatal.
+    let invalid = vec![("alg".to_string(), "RS256".to_string())];
+    let entries = vec![key("kid-a"), invalid, key("kid-b")];
+
+    let (keys, errors) = build_seed_jwks(&entries);
+
+    assert_eq!(keys.len(), 2);
+    assert_eq!(keys[0].kid(), Some("kid-a"));
+    assert_eq!(keys[1].kid(), Some("kid-b"));
+    assert_eq!(errors.len(), 1);
+}
+
+#[test]
+fn should_build_no_seed_jwks_from_empty_set() {
+    let (keys, errors) = build_seed_jwks(&[]);
+    assert!(keys.is_empty());
+    assert!(errors.is_empty());
 }

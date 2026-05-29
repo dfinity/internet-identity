@@ -648,24 +648,34 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
 }
 
 /// Installs II with a single Google provider whose JWK cache is seeded — via
-/// `OpenIdConfig.seed_jwks` — with the key that signed the JWT returned by
-/// [`openid_google_test_data`] (kid `763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b`,
-/// the same key served by [`mock_google_certs_response`]).
+/// `OpenIdConfig.seed_jwks` — with *two* keys served by
+/// [`mock_google_certs_response`]: a decoy (kid
+/// `25f8211713788b6145474b5029b0141bd5b3de9c`) and the key that signed the JWT
+/// returned by [`openid_google_test_data`] (kid
+/// `763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b`). Seeding more than one key
+/// exercises the multi-JWK seed path and the by-`kid` match during
+/// verification.
 ///
-/// The seed is expressed exactly as the API expects it: the list of the JWK's
+/// Each JWK is expressed exactly as the API expects it: the list of that JWK's
 /// JSON `(field, value)` pairs. Unlike [`setup_canister`], this does NOT mock
-/// the certs HTTP response.
+/// the certs HTTP response, so a successful link proves verification used the
+/// seeded cache.
 pub fn setup_canister_with_seeded_google_jwks(env: &PocketIc) -> Principal {
-    // The JWK (as JSON) that signs the test JWT, turned into the `(field, value)`
-    // pair list expected by `seed_jwks`.
-    let google_jwk_json = r#"{"kty":"RSA","use":"sig","alg":"RS256","kid":"763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b","n":"y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw","e":"AQAB"}"#;
-    let jwk_value: serde_json::Value = serde_json::from_str(google_jwk_json).unwrap();
-    let seed_jwks: Vec<(String, String)> = jwk_value
-        .as_object()
-        .unwrap()
-        .iter()
-        .map(|(field, value)| (field.clone(), value.as_str().unwrap().to_string()))
-        .collect();
+    // Turn a JWK JSON object into the `(field, value)` pair list `seed_jwks`
+    // expects for a single key.
+    let jwk_pairs = |jwk_json: &str| -> Vec<(String, String)> {
+        serde_json::from_str::<serde_json::Value>(jwk_json)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(field, value)| (field.clone(), value.as_str().unwrap().to_string()))
+            .collect()
+    };
+    // A decoy key (not used to sign the JWT) plus the actual signing key.
+    let decoy_jwk_json = r#"{"kty":"RSA","use":"sig","alg":"RS256","kid":"25f8211713788b6145474b5029b0141bd5b3de9c","n":"0qTcwnqUqJqsyu57JAC4IOAgTuMrccabAKKj5T93F68NoCk4kAax0oJhDArisYpiLrQ__YJJ9HFm3TKkuiPZeb1xqSSXAnIZVo8UigTLQDQLCTq3O-aD5EyQTOhOHWxJBZcpyLO-dZVuOIbv8fNMcXpNCioHVHO04gI_mvaw8ZzbU_j8ZeHSPk4wTBNfmH4l0mYRDhoQHLkZxxvc2V71ppBPYbnX-4t6h7XcuTkLJKBxfrR43G5nNzDuFsIbBnS2fjVLEv_1LYj9G5Q5XwiCFS0BON-oqQNzRWF53nkf91bMm2TaROg21KKJbZqfEjUhCVlMDFmBW-MNv69-C19PZQ","e":"AQAB"}"#;
+    let signing_jwk_json = r#"{"kty":"RSA","use":"sig","alg":"RS256","kid":"763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b","n":"y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw","e":"AQAB"}"#;
+    let seed_jwks = vec![jwk_pairs(decoy_jwk_json), jwk_pairs(signing_jwk_json)];
 
     let args = InternetIdentityInit {
         openid_configs: Some(vec![OpenIdConfig {

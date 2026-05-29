@@ -406,17 +406,18 @@ pub struct OpenIdConfig {
     pub email_verification: Option<OpenIdEmailVerificationScheme>,
     /// Optional initial set of JWKs used to seed this provider's JWK cache on
     /// install, so JWT verification works before the first `jwks_uri` fetch
-    /// completes (and across upgrades — see the persistent JWK cache in the
-    /// backend's storage layer).
+    /// completes (and across upgrades — the cache is persisted in stable memory
+    /// in the backend's storage layer).
     ///
-    /// Each entry is one JWK represented as the list of its JSON
-    /// `(field, value)` pairs, e.g.
-    /// `vec { record { "kty"; "RSA" }; record { "kid"; "..." };
-    ///        record { "n"; "..." }; record { "e"; "AQAB" } }`.
-    /// The pairs are assembled into a JSON object and parsed with the same
+    /// The outer vector is the set of JWKs; each inner vector is one JWK,
+    /// represented as the list of its JSON `(field, value)` pairs. For example a
+    /// single RSA key is
+    /// `vec { vec { record { "kty"; "RSA" }; record { "kid"; "..." };
+    ///              record { "n"; "..." }; record { "e"; "AQAB" } } }`.
+    /// Each inner list is assembled into a JSON object and parsed with the same
     /// path used for fetched certs, so all string-valued JWK fields are
-    /// supported.
-    pub seed_jwks: Option<Vec<(String, String)>>,
+    /// supported. Invalid entries are skipped.
+    pub seed_jwks: Option<Vec<Vec<(String, String)>>>,
 }
 
 /// SSO provider configuration that uses two-hop discovery.

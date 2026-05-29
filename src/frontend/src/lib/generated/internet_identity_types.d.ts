@@ -1088,12 +1088,13 @@ export interface OpenIdConfig {
   /**
    * Optional initial set of JWKs used to seed this provider's JWK cache on
    * install, so JWT verification works before the first jwks_uri fetch and
-   * across upgrades (the cache is persisted in stable memory). Each entry is
-   * one JWK represented as the list of its JSON (field, value) pairs, e.g.
-   * vec { record { "kty"; "RSA" }; record { "kid"; "..." };
-   * record { "n"; "..." }; record { "e"; "AQAB" } }.
+   * across upgrades (the cache is persisted in stable memory). The outer vec
+   * is the set of JWKs; each inner vec is one JWK, given as the list of its
+   * JSON (field, value) pairs, e.g. a single RSA key is
+   * vec { vec { record { "kty"; "RSA" }; record { "kid"; "..." };
+   * record { "n"; "..." }; record { "e"; "AQAB" } } }.
    */
-  'seed_jwks' : [] | [Array<[string, string]>],
+  'seed_jwks' : [] | [Array<Array<[string, string]>>],
   'client_id' : string,
 }
 export interface OpenIdCredential {
