@@ -899,6 +899,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         auth_scope: vec!["openid".to_string(), "email".to_string()],
         fedcm_uri: None,
         email_verification: None,
+        seed_jwks: None,
     }];
     let config = InternetIdentityInit {
         openid_configs: Some(openid_configs.clone()),

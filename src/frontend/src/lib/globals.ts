@@ -38,6 +38,7 @@ const backendCanisterConfigIDL = IDL.Record({
         email_verification: IDL.Opt(OpenIdEmailVerificationIDL),
         issuer: IDL.Text,
         auth_scope: IDL.Vec(IDL.Text),
+        seed_jwks: IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
         client_id: IDL.Text,
       }),
     ),
@@ -58,6 +59,7 @@ export interface OpenIdConfig {
   email_verification: [] | [OpenIdEmailVerification];
   issuer: string;
   auth_scope: Array<string>;
+  seed_jwks: [] | [Array<Array<[string, string]>>];
   client_id: string;
 }
 export type BackendCanisterConfig = {
