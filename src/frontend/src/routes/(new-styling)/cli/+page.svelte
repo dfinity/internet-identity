@@ -99,8 +99,14 @@
     // Continue screen and picks the right identity from the header switcher
     // (plus the onMount toast explaining the mismatch), rather than being
     // dropped back into the method wizard.
-    if (get(lastUsedIdentitiesStore).selected !== undefined) {
-      return { kind: "authorize" };
+    const selected = get(lastUsedIdentitiesStore).selected;
+    if (selected !== undefined) {
+      // CLI access is a device-local flag we can read up front, so when it's
+      // off for this identity (app mode) show the gated screen immediately
+      // rather than the Continue button followed by a gate after sign-in.
+      return isCliAccessGated(selected.identityNumber)
+        ? { kind: "cli-disabled" }
+        : { kind: "authorize" };
     }
     return { kind: "wizard" };
   };

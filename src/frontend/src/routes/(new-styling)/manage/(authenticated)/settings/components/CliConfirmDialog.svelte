@@ -17,7 +17,7 @@
   let acknowledged = $state(false);
 </script>
 
-<Dialog {onClose}>
+<Dialog {onClose} width="wider">
   <div class="flex flex-col gap-5 p-1">
     <FeaturedIcon size="lg" variant="warning" class="self-start">
       <TriangleAlertIcon class="size-6" />
@@ -52,6 +52,7 @@
     <Checkbox
       bind:checked={acknowledged}
       label={$t`I'm using the official ICP CLI and I trust this device.`}
+      labelClass="text-sm"
     />
 
     <button

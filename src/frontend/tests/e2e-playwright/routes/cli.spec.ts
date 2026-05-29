@@ -222,6 +222,28 @@ test("App mode without CLI access enabled shows the gated error screen", async (
   ).toBeVisible();
 });
 
+test("Returning user without CLI access lands on the gated screen immediately", async ({
+  page,
+  cli,
+}) => {
+  // Establish a last-used identity (CLI access left disabled), the way a
+  // returning user would have.
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+
+  // App-mode /cli for that identity: since CLI access isn't enabled on this
+  // device, the gated screen shows up front — no "Allow access" / sign-in step.
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),
+  );
+  await expect(
+    page.getByRole("heading", { name: "CLI access not enabled" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Allow access" })).toBeHidden();
+});
+
 test("Requested TTL within bounds is honoured", async ({ page, cli }) => {
   const ttlMinutes = 60; // 1 hour
   await addVirtualAuthenticator(page);
