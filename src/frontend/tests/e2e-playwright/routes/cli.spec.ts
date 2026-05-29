@@ -1,6 +1,16 @@
 import { expect, type Page } from "@playwright/test";
+import { Principal } from "@icp-sdk/core/principal";
 import { test } from "../fixtures";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import {
+  addVirtualAuthenticator,
+  authorizeWithUrl,
+  II_URL,
+  TEST_APP_URL,
+} from "../utils";
+
+/** Decodes a hex string (as delegation chains encode public keys) to bytes. */
+const hexToBytes = (hex: string): Uint8Array =>
+  Uint8Array.from(hex.match(/.{1,2}/g) ?? [], (byte) => parseInt(byte, 16));
 
 const cliFragment = (params: {
   publicKey: string;
@@ -381,4 +391,58 @@ test("`--app` derives a different identity than generic mode for the same identi
   expect(rootPublicKey(cli.receivedDelegations[1])).not.toBe(
     rootPublicKey(cli.receivedDelegations[0]),
   );
+});
+
+test("`--app` links the same principal that /authorize gives for that app", async ({
+  page,
+  cli,
+  identities,
+  signInWithIdentity,
+}) => {
+  const identityNumber = identities[0].identityNumber;
+
+  // Principal the app (nice-name.com) sees via the normal /authorize flow.
+  const authorizePrincipal = await authorizeWithUrl(
+    page,
+    TEST_APP_URL,
+    II_URL,
+    async (authPage) => {
+      await signInWithIdentity(authPage, identityNumber);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    },
+    true, // ICRC-25: account-based delegation, the same system the CLI uses
+  );
+
+  // Enable device CLI access for the same identity so app mode isn't gated.
+  await page.goto(II_URL);
+  await signInWithIdentity(page, identityNumber);
+  await page.waitForURL(II_URL + "/manage");
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.waitForURL(II_URL + "/manage/settings");
+  await page.getByRole("switch").click();
+  await page
+    .getByLabel("I'm using the official ICP CLI and I trust this device.")
+    .check();
+  await page.getByRole("button", { name: "Enable CLI access" }).click();
+  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+
+  // Principal the CLI links via `icp identity link ii --app nice-name.com`: the
+  // self-authenticating principal of the delegation chain's root public key.
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  const chain = await cli.receivedDelegation;
+  const cliPrincipal = Principal.selfAuthenticating(
+    hexToBytes(rootPublicKey(chain)),
+  ).toText();
+
+  // Same identity + same derivation origin (nice-name.com) ⇒ same principal.
+  expect(cliPrincipal).toBe(authorizePrincipal);
 });
