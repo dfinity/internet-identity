@@ -58,7 +58,11 @@ const parseLoopbackCallback = (raw: string | null): string | undefined => {
   } catch {
     return undefined;
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
+  // Loopback callbacks are http only: RFC 8252 expects http for loopback (the
+  // local listener can't realistically present a CA-trusted cert), and the
+  // frontend canister's `form-action` CSP only allows http loopback — so an
+  // https callback would pass here but silently die on the CSP at submit time.
+  if (url.protocol !== "http:") {
     return undefined;
   }
   if (url.hostname !== "127.0.0.1" && url.hostname !== "::1") {
