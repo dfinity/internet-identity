@@ -148,6 +148,38 @@ test("Identity switcher shows while signing in and hides on the success screen",
   await expect(switcher).toBeHidden();
 });
 
+test("Returning user opens on the Continue screen, not the method wizard", async ({
+  page,
+  cli,
+}) => {
+  // Establish a last-used identity (persisted in localStorage), the way a user
+  // who has signed in before would have.
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+
+  // Like /authorize, /cli should now open directly on the Continue screen for
+  // that identity rather than the sign-in method wizard.
+  await page.goto(await cli.resolveAuthorizeUrl(page));
+  await expect(
+    page.getByRole("button", { name: "Continue", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continue with passkey" }),
+  ).toBeHidden();
+
+  // Continue authenticates the last-used identity and posts the delegation.
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  expect(await cli.receivedDelegation).toMatchObject({
+    delegations: expect.any(Array),
+    publicKey: expect.any(String),
+  });
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+});
+
 test("Identity mismatch shows a toast and lets the user retry in place", async ({
   page,
   cli,
@@ -250,12 +282,13 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   await page.getByRole("button", { name: "Enable CLI access" }).click();
   await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
 
-  // Re-authenticate on /cli with the same discoverable passkey; the
-  // device-local CLI access flag persists in localStorage for this identity.
+  // Re-authenticate on /cli; the device-local CLI access flag persists in
+  // localStorage for this identity. With a last-used identity present, /cli
+  // opens directly on the Allow-access screen (like /authorize) — clicking it
+  // authenticates that identity and posts the delegation.
   await page.goto(
     await cli.resolveAuthorizeUrl(page, { appHost: "nice-name.com" }),
   );
-  await signInExisting(page);
   await page.getByRole("button", { name: "Allow access" }).click();
 
   expect(await cli.receivedDelegation).toMatchObject({

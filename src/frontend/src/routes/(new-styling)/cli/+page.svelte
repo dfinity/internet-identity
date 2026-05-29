@@ -88,6 +88,21 @@
     if (params.kind !== "valid") {
       return { kind: "invalid" };
     }
+    // Mirror /authorize: a returning user with a previously-used identity opens
+    // on the Continue/authorize screen for it, and only a user with no last-used
+    // identity starts in the sign-in method wizard. The Continue button
+    // (`handleAuthorize`) authenticates the selected identity if it isn't the
+    // active session yet, so opening here works even before authentication.
+    //
+    // An identity-mismatch redirect falls through to the wizard: the last-used
+    // identity is the one that just mismatched, so the user needs to pick a
+    // different one rather than be re-shown the same Continue screen.
+    if (
+      status === undefined &&
+      get(lastUsedIdentitiesStore).selected !== undefined
+    ) {
+      return { kind: "authorize" };
+    }
     return { kind: "wizard" };
   };
 
@@ -147,6 +162,7 @@
         appHost: params.appHost,
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
+        nonce: params.nonce,
       });
     } catch (error) {
       // Authentication and delegation errors are surfaced the same way as the
