@@ -52,7 +52,7 @@
     "@types/dompurify": "^3.0.5",
     "@types/node": "*",
     "@vitejs/plugin-basic-ssl": "^2.1.4",
-    "@vitest/browser": "^4.0.18",
+    "@vitest/browser": "^4.1.8",
     "@zag-js/svelte": "^1.12.0",
     "@zag-js/toast": "^1.12.0",
     "devtools-protocol": "^0.0.1596832",
@@ -78,7 +78,7 @@
     "typescript-eslint": "^8.57.0",
     "vite": "^7.3.2",
     "vite-plugin-node-polyfills": "^0.25.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@dfinity/internet-identity-vc-api": "*",
