@@ -21,6 +21,10 @@
   import CliErrorView from "./views/CliErrorView.svelte";
   import { cliAuthorize } from "./utils";
   import { showIdentitySwitcher } from "./cli-switcher.store";
+  import {
+    cliAuthorizeFunnel,
+    CliAuthorizeEvents,
+  } from "$lib/utils/analytics/cliAuthorizeFunnel";
 
   const { data }: PageProps = $props();
   const params = $derived(data.params);
@@ -41,6 +45,37 @@
   // After a mismatch the loopback server redirects back here so the user can
   // retry with the right identity; surface why before they try again.
   onMount(() => {
+    // A redirect back from the loopback server carries an outcome `status`; a
+    // fresh entry carries the request itself. The success/error/mismatch loads
+    // continue the funnel started on the original entry (correlated by visitor
+    // session), so they only emit the outcome event rather than re-`init`.
+    if (status === "success") {
+      cliAuthorizeFunnel.trigger(CliAuthorizeEvents.Success);
+    } else if (status === "error") {
+      cliAuthorizeFunnel.trigger(CliAuthorizeEvents.Error);
+    } else if (status === "identity-mismatch") {
+      cliAuthorizeFunnel.trigger(CliAuthorizeEvents.IdentityMismatch);
+    } else {
+      cliAuthorizeFunnel.init({
+        mode:
+          params.kind === "valid" && params.domain !== undefined
+            ? "app"
+            : "generic",
+      });
+      if (params.kind !== "valid") {
+        cliAuthorizeFunnel.trigger(CliAuthorizeEvents.RequestInvalid);
+        cliAuthorizeFunnel.close();
+      } else {
+        cliAuthorizeFunnel.trigger(CliAuthorizeEvents.RequestReceived);
+        // A returning user without device CLI access opens straight on the
+        // gated screen, so record that terminal outcome here.
+        if (phase.kind === "cli-disabled") {
+          cliAuthorizeFunnel.trigger(CliAuthorizeEvents.CliDisabled);
+          cliAuthorizeFunnel.close();
+        }
+      }
+    }
+
     if (status === "identity-mismatch") {
       toaster.error({
         title: $t`That identity doesn't match`,
@@ -140,6 +175,7 @@
     if (selected === undefined) {
       return;
     }
+    cliAuthorizeFunnel.trigger(CliAuthorizeEvents.Confirmed);
     try {
       // The Continue button is the single sign-in point: switching identity
       // only selects, so authenticate the selected identity now if it isn't
@@ -155,6 +191,8 @@
         return;
       }
       if (isCliAccessGated(authenticated.identityNumber)) {
+        cliAuthorizeFunnel.trigger(CliAuthorizeEvents.CliDisabled);
+        cliAuthorizeFunnel.close();
         phase = { kind: "cli-disabled" };
         return;
       }

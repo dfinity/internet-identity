@@ -50,9 +50,7 @@
     <div class="mt-6">
       <TerminalBlock
         {command}
-        progressLine={isAppMode
-          ? $t`Linking your identity`
-          : $t`Linking Internet Identity`}
+        progressLine={$t`Linking Internet Identity`}
         {busy}
       />
     </div>
