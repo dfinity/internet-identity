@@ -52,7 +52,7 @@
     "@types/dompurify": "^3.0.5",
     "@types/node": "*",
     "@vitejs/plugin-basic-ssl": "^2.1.4",
-    "@vitest/browser": "^4.0.18",
+    "@vitest/browser": "^4.1.6",
     "@zag-js/svelte": "^1.12.0",
     "@zag-js/toast": "^1.12.0",
     "devtools-protocol": "^0.0.1596832",
