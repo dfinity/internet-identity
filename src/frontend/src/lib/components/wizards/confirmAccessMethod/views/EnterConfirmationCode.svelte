@@ -3,9 +3,12 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import CodeInput from "$lib/components/ui/CodeInput.svelte";
   import HoldToConfirm from "$lib/components/ui/HoldToConfirm.svelte";
-  import { ChevronLeftIcon, RotateCcwIcon, SquareIcon } from "@lucide/svelte";
+  import {
+    ChevronLeftIcon,
+    CircleCheckIcon,
+    RotateCcwIcon,
+  } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
 
   const host = typeof window === "undefined" ? "" : window.location.host;
 
@@ -105,60 +108,60 @@
       <div class={["illustration self-center max-sm:hidden"]}>
         <ConfirmDeviceIllustration class="text-text-primary mt-4 mb-8 h-32" />
       </div>
-      <h1 class="text-text-primary mb-3 text-2xl font-medium">
+      <h1 class="text-text-primary mb-2 text-2xl font-medium">
         {$t`Authorize new device`}
       </h1>
-      <p class="text-text-tertiary mb-4 text-base font-medium">
-        <Trans>
-          You're about to authorize a <b class="text-text-primary">new device</b
-          >.
-        </Trans>
+      <p class="text-text-tertiary mb-5 text-base">
+        {$t`You're about to authorize a new device.`}
       </p>
-      <p class="text-text-primary mb-4 text-base font-medium">
-        {$t`Before continuing, please check:`}
+      <div class="border-border-secondary border-t"></div>
+      <p class="text-text-primary mt-5 mb-4 text-base font-semibold">
+        {$t`Please make sure:`}
       </p>
-      <ul class="mb-8 flex flex-col gap-3">
-        <li
-          class="text-text-tertiary flex items-start gap-3 text-base font-medium"
-        >
-          <SquareIcon
+      <ul class="mb-8 flex flex-col">
+        <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+          <CircleCheckIcon
             class="text-text-tertiary mt-0.5 size-5 shrink-0"
-            strokeWidth={2.5}
             aria-hidden="true"
           />
-          <span>
-            <Trans>
-              <b class="text-text-primary">You</b> started this from the new device
-            </Trans>
-          </span>
+          <div class="flex flex-col gap-1">
+            <p class="text-text-primary text-base font-semibold">
+              {$t`You started this request`}
+            </p>
+            <p class="text-text-tertiary text-sm">
+              {$t`from the device you're using now`}
+            </p>
+          </div>
         </li>
-        <li
-          class="text-text-tertiary flex items-start gap-3 text-base font-medium"
-        >
-          <SquareIcon
+        <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+          <CircleCheckIcon
             class="text-text-tertiary mt-0.5 size-5 shrink-0"
-            strokeWidth={2.5}
             aria-hidden="true"
           />
-          <span>
-            <Trans>
-              The new device is on <b class="text-text-primary">{host}</b>
-            </Trans>
-          </span>
+          <div class="flex flex-col items-start gap-1.5">
+            <p class="text-text-primary text-base font-semibold">
+              {$t`Device address`}
+            </p>
+            <code
+              class="bg-bg-tertiary text-text-primary rounded-md px-2 py-1 font-mono text-sm"
+            >
+              {host}
+            </code>
+          </div>
         </li>
-        <li
-          class="text-text-tertiary flex items-start gap-3 text-base font-medium"
-        >
-          <SquareIcon
+        <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+          <CircleCheckIcon
             class="text-text-tertiary mt-0.5 size-5 shrink-0"
-            strokeWidth={2.5}
             aria-hidden="true"
           />
-          <span>
-            <Trans>
-              You <b class="text-text-primary">control and trust</b> the new device
-            </Trans>
-          </span>
+          <div class="flex flex-col gap-1">
+            <p class="text-text-primary text-base font-semibold">
+              {$t`You trust this device`}
+            </p>
+            <p class="text-text-tertiary text-sm">
+              {$t`and want to grant access`}
+            </p>
+          </div>
         </li>
       </ul>
       <HoldToConfirm

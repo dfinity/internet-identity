@@ -71,7 +71,7 @@
     controller.cancel();
   }}
   class={[
-    "bg-bg-primary focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring relative box-border flex h-12 w-full touch-none items-center justify-center overflow-hidden rounded-xl border px-4.5 text-base font-semibold outline-none select-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2",
+    "bg-bg-primary focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring relative box-border flex h-12 w-full touch-none items-center justify-center overflow-hidden rounded-md border px-4.5 text-base font-semibold outline-none select-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2",
     completed
       ? "border-border-brand text-text-primary-inversed"
       : "border-border-secondary text-text-primary",
