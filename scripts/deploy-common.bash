@@ -166,6 +166,12 @@ Common options:
   --doh-domains <a,b,...>   Override the default DoH allowlist (only used
                             with --update-email-recovery-init). Empty
                             disables the DoH path (DNSSEC-only).
+  --openid-configs-file <path>
+                            Set the backend openid_configs init arg from a
+                            Candid-text file holding an opt vec OpenIdConfig
+                            value (e.g. opt vec { record { ... } }, or
+                            opt vec {} to clear all providers). Omit to leave
+                            the current on-chain value untouched.
   -h, --help                Show this help
 EOF
 }
@@ -191,6 +197,10 @@ parse_common_args() {
     # default) from "--doh-domains '' was passed" (operator wants the
     # empty list to disable the DoH path entirely).
     DOH_DOMAINS_ARG_SET=false
+    # Path to a Candid-text file holding the backend `openid_configs` value
+    # to set on this upgrade. Empty = not passed = leave the field at `null`
+    # (preserve the previously stored value).
+    OPENID_CONFIGS_FILE=""
     REMAINING_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -308,6 +318,23 @@ parse_common_args() {
                 fi
                 DOH_DOMAINS_ARG="$1"
                 DOH_DOMAINS_ARG_SET=true
+                shift
+                ;;
+            --openid-configs-file)
+                shift
+                if [ $# -eq 0 ]; then
+                    echo "Error: --openid-configs-file requires a path to a Candid-text file" >&2
+                    return 1
+                fi
+                if [ ! -f "$1" ]; then
+                    echo "Error: --openid-configs-file: no such file: $1" >&2
+                    return 1
+                fi
+                if [ ! -s "$1" ]; then
+                    echo "Error: --openid-configs-file: file is empty: $1" >&2
+                    return 1
+                fi
+                OPENID_CONFIGS_FILE="$1"
                 shift
                 ;;
             --)
@@ -643,9 +670,11 @@ EOF
 # Build the BE install arg. The BE init type is `opt InternetIdentityInit`
 # where every field is itself `opt` and "absent" = preserve previous value,
 # so we only set the fields that follow from the shared quad (BE_ID, BE_URL,
-# FE_URL) plus — when `UPDATE_EMAIL_RECOVERY_INIT` is true — the
-# `dnssec_config` and `doh_config` knobs the email-recovery flow needs.
-# Everything else stays untouched on upgrade.
+# FE_URL), the prompted backend_origin/related_origins, the
+# `--openid-configs-file` contents (when passed), and — when
+# `UPDATE_EMAIL_RECOVERY_INIT` is true — the `dnssec_config`/`doh_config`
+# knobs the email-recovery flow needs. Everything left unset stays untouched
+# on upgrade.
 #
 # Output: Candid text on stdout.
 build_be_install_arg() {
@@ -670,12 +699,21 @@ EXTRA
 )
     fi
 
+    # `openid_configs` stays `null` (= preserve the previous on-chain value)
+    # unless --openid-configs-file was passed; its Candid contents are then
+    # emitted verbatim. parse_common_args already validated the file.
+    local openid_configs_arg="null"
+    if [ -n "$OPENID_CONFIGS_FILE" ]; then
+        openid_configs_arg="$(cat "$OPENID_CONFIGS_FILE")"
+    fi
+
     cat <<EOF
 (
   opt record {
     backend_canister_id = opt principal "$BE_ID";
     backend_origin = $BE_BACKEND_ORIGIN_ARG;
     related_origins = $BE_RELATED_ORIGINS_ARG;
+    openid_configs = $openid_configs_arg;
 $extra
   }
 )
