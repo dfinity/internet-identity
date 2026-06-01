@@ -583,6 +583,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
@@ -630,6 +631,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
@@ -678,6 +680,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
@@ -724,6 +727,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {
@@ -770,6 +774,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         // now = 1_700_000_000, t = 1_700_001_000 → 1000 s in the future,
         // well beyond CLOCK_SKEW_SECS (60).
@@ -822,6 +827,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         // now = 1_700_000_000, t = 1_700_000_030 → 30 s in the future,
         // inside the 60 s skew window. The t= check must pass; we
@@ -883,6 +889,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
         match result {

@@ -167,6 +167,7 @@ mod tests {
                 body: ByteBuf::from(b"x".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         }
     }
 

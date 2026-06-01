@@ -698,6 +698,7 @@ export const idlFactory = ({ IDL }) => {
     'envelope' : IDL.Opt(SmtpEnvelope),
     'message' : IDL.Opt(SmtpMessage),
     'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'message_id' : IDL.Opt(IDL.Text),
   });
   const SmtpRequestError = IDL.Record({
     'code' : IDL.Nat64,
