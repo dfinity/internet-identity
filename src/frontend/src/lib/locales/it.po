@@ -1246,7 +1246,7 @@ msgid "The CLI gets its own account, separate from your other apps."
 msgstr "Il CLI ottiene il proprio account, separato dalle tue altre app."
 
 msgid "The CLI sign-in couldn't be completed. Check the CLI for details."
-msgstr "L'accesso CLI non è stato possibile completare. Controlla il CLI per i dettagli."
+msgstr "Non è stato possibile completare l'accesso tramite CLI. Controlla il CLI per i dettagli."
 
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
 msgstr "L'email deve provenire direttamente dall'indirizzo sopra indicato. Gli alias e gli inoltri non funzioneranno."

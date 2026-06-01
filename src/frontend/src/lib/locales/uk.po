@@ -975,7 +975,7 @@ msgid "Replace it anytime"
 msgstr "Замініть його будь-коли"
 
 msgid "Requested by"
-msgstr "Запитано від"
+msgstr "Запит від"
 
 msgid "Reset"
 msgstr "Скинути"
