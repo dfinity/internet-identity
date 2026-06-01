@@ -4,6 +4,14 @@ import { fromBase64URL } from "$lib/utils/utils";
 /** Default delegation lifetime in minutes. */
 const DEFAULT_TTL_MINUTES = 480;
 
+/**
+ * The `/cli` request, parsed from the URL fragment the CLI opens the page with.
+ * `valid` carries the validated request — the session public key to delegate
+ * to, the loopback callback to post the delegation back to, the single-use
+ * nonce, the delegation TTL, and the optional delegation domain. `invalid`
+ * means the fragment was missing or malformed, and the page shows the
+ * invalid-request screen.
+ */
 export type CliParams =
   | {
       kind: "valid";
@@ -25,6 +33,13 @@ export type CliParams =
  * delegation. `success` and `error` arrive on their own; `identity-mismatch`
  * arrives alongside `public_key`/`callback` so the authorize screen can be
  * re-shown for an in-place retry.
+ *
+ * `identity-mismatch` is the `icp identity login` re-auth case: that command
+ * re-authenticates an already-linked identity, which has a fixed principal. If
+ * the user signs in with a different II identity than the one originally
+ * linked, the resulting delegation resolves to a different principal, so the
+ * CLI rejects it and redirects back here — letting the user switch to the
+ * correct identity and try again without restarting the flow.
  */
 export type CliStatus = "success" | "identity-mismatch" | "error";
 
