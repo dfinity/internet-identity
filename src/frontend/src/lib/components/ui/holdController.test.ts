@@ -159,7 +159,7 @@ describe("HoldController", () => {
     expect(lastProgress).toBeLessThanOrEqual(1);
   });
 
-  it("ignores the Space key after completion", () => {
+  it("can be started again after a successful completion", () => {
     const onComplete = vi.fn();
     const controller = new HoldController({
       getDuration: () => 1500,

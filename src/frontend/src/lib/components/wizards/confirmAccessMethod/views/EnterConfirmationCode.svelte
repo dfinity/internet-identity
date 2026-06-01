@@ -16,7 +16,7 @@
   // Non-breaking space rendered through CodeInput's `hint` slot to reserve
   // the line's vertical space when no error is shown — keeping the slot
   // mounted prevents the layout from shifting when the error appears.
-  const HINT_PLACEHOLDER = " ";
+  const HINT_PLACEHOLDER = " ";
 
   const SLIDE_DURATION = 380;
   const HOLD_ADVANCE_DELAY = 250;
@@ -39,6 +39,7 @@
   let step0El = $state<HTMLDivElement>();
   let step1El = $state<HTMLDivElement>();
   let wrapperHeight = $state<number | undefined>(undefined);
+  let advanceTimer: ReturnType<typeof setTimeout> | undefined;
 
   const handleSubmit = async () => {
     isConfirming = true;
@@ -53,13 +54,32 @@
   };
 
   const goToStep1 = () => {
+    advanceTimer = undefined;
     step = 1;
   };
 
   const goToStep0 = () => {
+    if (advanceTimer !== undefined) {
+      clearTimeout(advanceTimer);
+      advanceTimer = undefined;
+    }
     step = 0;
     holdCompleted = false;
   };
+
+  const handleRestart = () => {
+    if (advanceTimer !== undefined) {
+      clearTimeout(advanceTimer);
+      advanceTimer = undefined;
+    }
+    restart();
+  };
+
+  $effect(() => () => {
+    if (advanceTimer !== undefined) {
+      clearTimeout(advanceTimer);
+    }
+  });
 
   $effect(() => {
     if (confirmationCode.length > 0) {
@@ -170,13 +190,17 @@
         class="mb-2"
         onComplete={() => {
           holdCompleted = true;
-          setTimeout(goToStep1, HOLD_ADVANCE_DELAY);
+          advanceTimer = setTimeout(goToStep1, HOLD_ADVANCE_DELAY);
         }}
       />
       <p class="text-text-tertiary mb-6 text-center text-xs">
         {$t`Hold for 1.5 seconds. Release to cancel.`}
       </p>
-      <button class="btn btn-secondary btn-xl" onclick={restart} type="button">
+      <button
+        class="btn btn-secondary btn-xl"
+        onclick={handleRestart}
+        type="button"
+      >
         <RotateCcwIcon class="size-5" />
         <span>{$t`Start over`}</span>
       </button>
@@ -229,7 +253,6 @@
         />
         <button
           class="btn btn-primary btn-xl mb-3"
-          onclick={handleSubmit}
           type="submit"
           disabled={confirmationCode.length < CODE_LENGTH || isConfirming}
         >
@@ -242,7 +265,7 @@
         </button>
         <button
           class="btn btn-secondary btn-xl"
-          onclick={restart}
+          onclick={handleRestart}
           type="button"
           disabled={isConfirming}
         >
