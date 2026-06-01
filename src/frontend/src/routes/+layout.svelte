@@ -29,9 +29,15 @@
       // TODO: Implement redirect with pending ICRC-29 state
       window.location.pathname !== "/authorize"
     ) {
+      // cli.id.ai serves only the CLI authorize entry point — every hit
+      // there lands on /cli on the primary origin, regardless of path.
+      const pathname =
+        window.location.host === "cli.id.ai"
+          ? "/cli"
+          : window.location.pathname;
       window.location.replace(
         primaryOrigin +
-          window.location.pathname +
+          pathname +
           window.location.search +
           window.location.hash,
       );
