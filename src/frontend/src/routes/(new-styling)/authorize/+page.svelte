@@ -162,6 +162,7 @@
       issuer: result.discovery.issuer,
       auth_scope: selectAuthScopes(result.discovery.scopes_supported),
       client_id: result.clientId,
+      seed_jwks: [],
     };
     initiateOpenId(syntheticConfig);
   };
@@ -214,6 +215,7 @@
         issuer: iss,
         auth_scope: [],
         client_id: aud ?? "",
+        seed_jwks: [],
       };
       authorizationStore.setFlow({ type: "1-click-sso", domain: ssoDomain });
     } else {
