@@ -607,6 +607,14 @@ pub fn email_recovery_status(
     query_candid(env, canister_id, "email_recovery_status", (nonce,)).map(|(x,)| x)
 }
 
+pub fn email_recovery_diagnostics(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    nonce: &str,
+) -> Result<Option<types::email_recovery::EmailRecoveryDiagnostics>, RejectResponse> {
+    query_candid(env, canister_id, "email_recovery_diagnostics", (nonce,)).map(|(x,)| x)
+}
+
 pub fn email_recovery_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,

@@ -1442,8 +1442,9 @@ mod email_recovery_api {
     use ic_canister_sig_creation::signature_map::CanisterSigInputs;
     use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
     use internet_identity_interface::internet_identity::types::email_recovery::{
-        EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
-        EmailRecoveryGetDelegationArgs, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
+        EmailRecoveryChallenge, EmailRecoveryDiagnostics, EmailRecoveryDnsInput,
+        EmailRecoveryError, EmailRecoveryGetDelegationArgs, EmailRecoveryStatus,
+        EmailRecoverySubmitDkimLeafArg,
     };
     use internet_identity_interface::internet_identity::types::SessionKey;
 
@@ -1559,6 +1560,28 @@ mod email_recovery_api {
     fn email_recovery_status(nonce: String) -> EmailRecoveryStatus {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
         email_recovery::pending_status(&nonce, now_secs)
+    }
+
+    /// Anonymous. Returns strictly-public, user-copyable diagnostics for
+    /// a pending challenge — the gateway `message_id`, a coarse reason
+    /// code, the verification path, and the challenge creation time — so
+    /// a user who hits a recovery-email failure can paste them into a
+    /// support ticket and let support line the case up across the SMTP
+    /// gateway and canister logs.
+    ///
+    /// Returns `None` for an unknown/expired nonce, the same observable
+    /// collapse `email_recovery_status` makes to `Expired`.
+    ///
+    /// **Security:** strictly non-sensitive — NO email address, anchor,
+    /// principal, delegation/seed, or inner error string (the
+    /// `reason_code` is the failing variant's name only). Readable only
+    /// by the holder of the 64-bit nonce, exactly like
+    /// `email_recovery_status`; it adds no pre-verification distinction a
+    /// prober could use as an existence/linkage oracle.
+    #[query]
+    fn email_recovery_diagnostics(nonce: String) -> Option<EmailRecoveryDiagnostics> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::pending_diagnostics(&nonce, now_secs)
     }
 
     /// Anonymous. Phase 2 of the DNSSEC path: once

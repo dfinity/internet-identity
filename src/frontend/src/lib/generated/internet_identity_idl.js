@@ -322,6 +322,16 @@ export const idlFactory = ({ IDL }) => {
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
   });
+  const VerificationPath = IDL.Variant({
+    'Doh' : IDL.Null,
+    'Dnssec' : IDL.Null,
+  });
+  const EmailRecoveryDiagnostics = IDL.Record({
+    'created_at' : Timestamp,
+    'verification_path' : VerificationPath,
+    'message_id' : IDL.Opt(IDL.Text),
+    'reason_code' : IDL.Text,
+  });
   const SessionKey = PublicKey;
   const EmailRecoveryGetDelegationArgs = IDL.Record({
     'session_key' : SessionKey,
@@ -867,6 +877,11 @@ export const idlFactory = ({ IDL }) => {
         [IdentityNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
+      ),
+    'email_recovery_diagnostics' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(EmailRecoveryDiagnostics)],
+        ['query'],
       ),
     'email_recovery_get_delegation' : IDL.Func(
         [EmailRecoveryGetDelegationArgs],
