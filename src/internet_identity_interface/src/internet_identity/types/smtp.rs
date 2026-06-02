@@ -31,6 +31,13 @@ pub const MAX_BODY_BYTES: usize = 5_000;
 pub const MAX_HEADERS: usize = 30;
 pub const MAX_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_HEADER_VALUE_BYTES: usize = 8_192;
+/// Cap on the optional gateway-supplied `message_id` correlation id.
+/// `smtp_request` and `smtp_request_validate` are both open (anyone can
+/// call them), so — like every other inbound string — it is length-bounded
+/// to keep worst-case allocation on an open endpoint in check. 256 bytes
+/// comfortably fits an RFC 5322 `Message-ID` or a gateway-assigned tracking
+/// id; oversize values are rejected with code 555.
+pub const MAX_MESSAGE_ID_BYTES: usize = 256;
 
 /// Headers that RFC 5322 §3.6 requires to appear exactly once in a
 /// message. Counted case-insensitively.
@@ -124,6 +131,13 @@ pub struct SmtpRequest {
     pub message: Option<SmtpMessage>,
     pub envelope: Option<SmtpEnvelope>,
     pub gateway_flags: Option<Vec<String>>,
+    /// Optional gateway-supplied correlation id for one inbound message
+    /// (e.g. the RFC 5322 `Message-ID` or a gateway-assigned tracking id).
+    /// The canister does not interpret it; it exists purely so a reported
+    /// case can be lined up across the SMTP gateway logs and the canister's
+    /// production logs during support investigations. Length-bounded by
+    /// [`MAX_MESSAGE_ID_BYTES`] since the entrypoints are open.
+    pub message_id: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -288,9 +302,10 @@ pub fn validate_header_occurrences(headers: &[SmtpHeader]) -> Result<(), SmtpRes
     Ok(())
 }
 
-/// Bounds-check both halves of an `SmtpRequest`: the envelope (always)
-/// and the message body if present. Per the PoC review, the validate
-/// path must accept envelope-only requests for `smtp_request_validate`.
+/// Bounds-check an `SmtpRequest`: the envelope (always), the message body
+/// if present, and the optional `message_id`. Per the PoC review, the
+/// validate path must accept envelope-only requests for
+/// `smtp_request_validate`.
 pub fn validate_smtp_request(request: &SmtpRequest) -> Result<(), SmtpResponse> {
     let envelope = request
         .envelope
@@ -299,6 +314,14 @@ pub fn validate_smtp_request(request: &SmtpRequest) -> Result<(), SmtpResponse> 
     validate_envelope(envelope)?;
     if let Some(message) = &request.message {
         validate_message(message)?;
+    }
+    if let Some(message_id) = &request.message_id {
+        if message_id.len() > MAX_MESSAGE_ID_BYTES {
+            return Err(smtp_err(
+                SMTP_ERR_SYNTAX_ERROR,
+                format!("message_id exceeds {MAX_MESSAGE_ID_BYTES} bytes"),
+            ));
+        }
     }
     Ok(())
 }
@@ -471,6 +494,7 @@ mod tests {
             envelope: None,
             message: None,
             gateway_flags: None,
+            message_id: None,
         };
         let resp = validate_smtp_request(&req).unwrap_err();
         assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
@@ -643,7 +667,46 @@ mod tests {
             }),
             message: None,
             gateway_flags: None,
+            message_id: None,
         };
         assert!(validate_smtp_request(&req).is_ok());
+    }
+
+    fn envelope_only_request(message_id: Option<String>) -> SmtpRequest {
+        SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: addr("alice", "gmail.com"),
+                to: vec![addr("recover", "id.ai")],
+            }),
+            message: None,
+            gateway_flags: None,
+            message_id,
+        }
+    }
+
+    #[test]
+    fn validate_smtp_request_accepts_within_bound_message_id() {
+        // A gateway-supplied correlation id within the cap is accepted; the
+        // canister doesn't interpret it, only bounds its length.
+        let req = envelope_only_request(Some("<abc123@gateway.example>".into()));
+        assert!(validate_smtp_request(&req).is_ok());
+    }
+
+    #[test]
+    fn validate_smtp_request_accepts_message_id_at_cap() {
+        // Exactly at the cap must still pass — defines the inclusive bound.
+        let req = envelope_only_request(Some("x".repeat(MAX_MESSAGE_ID_BYTES)));
+        assert!(validate_smtp_request(&req).is_ok());
+    }
+
+    #[test]
+    fn validate_smtp_request_rejects_oversize_message_id() {
+        // `smtp_request` is open, so an over-long correlation id is refused
+        // at the input-bounds layer with a syntax error (555), like every
+        // other oversize field.
+        let req = envelope_only_request(Some("x".repeat(MAX_MESSAGE_ID_BYTES + 1)));
+        let resp = validate_smtp_request(&req).unwrap_err();
+        assert_eq!(err_code(&resp), SMTP_ERR_SYNTAX_ERROR);
+        assert!(err_msg(&resp).contains("message_id"));
     }
 }

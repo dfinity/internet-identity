@@ -270,6 +270,7 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
+        message_id: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
     assert!(matches!(resp, SmtpResponse::Ok {}));
@@ -315,6 +316,7 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
+        message_id: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
     assert!(matches!(resp, SmtpResponse::Ok {}));
@@ -364,6 +366,7 @@ fn smtp_request_rejects_emails_addressed_to_unknown_recipients_with_550() {
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
+        message_id: None,
     };
     let resp = api::smtp_request(&env, canister_id, &request).expect("call failed");
     match resp {
@@ -1252,6 +1255,7 @@ mod dkim_signer {
                     body: ByteBuf::from(params.body.to_vec()),
                 }),
                 gateway_flags: None,
+                message_id: None,
             };
 
             super::SignedEmail { request }
