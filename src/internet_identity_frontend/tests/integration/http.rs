@@ -62,6 +62,7 @@ fn default_frontend_args() -> InternetIdentityFrontendArgs {
         dummy_auth: None,
         dev_csp: None,
         featured_dashboard_apps: None,
+        feature_flags: None,
     }
 }
 

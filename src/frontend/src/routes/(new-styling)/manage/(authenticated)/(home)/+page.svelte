@@ -17,7 +17,7 @@
     type KnownDapp,
   } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { deriveSmartActions, type SmartActionId } from "./smartActions";
-  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
+  import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
 
@@ -27,7 +27,7 @@
 
   const smartActions = $derived(
     deriveSmartActions(data.identityInfo, {
-      emailRecoveryEnabled: $EMAIL_RECOVERY,
+      emailRecoveryEnabled: $EMAIL_RECOVERY_SETUP,
     }),
   );
 

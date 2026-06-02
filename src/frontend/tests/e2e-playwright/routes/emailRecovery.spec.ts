@@ -60,7 +60,6 @@ test.describe("Email recovery — wizard surface", () => {
     signInWithIdentity,
     identities,
   }) => {
-    await emailRecovery.enableFlag();
     await manageRecoveryPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
     await emailRecovery.assertSetupCardVisible();
@@ -83,9 +82,7 @@ test.describe("Email recovery — wizard surface", () => {
 
   test("recover sign-in shows the email button and opens the wizard", async ({
     page,
-    emailRecovery,
   }) => {
-    await emailRecovery.enableFlag();
     await page.goto(II_URL + "/recovery");
     await expect(
       page.getByRole("button", { name: "Recover with email" }),
@@ -112,7 +109,6 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
   }) => {
     test.slow(); // RSA keygen + DNSSEC walk + status polling
 
-    await emailRecovery.enableFlag();
     await emailRecovery.installDohInterceptor();
 
     // ---------------------------------------------------------------
