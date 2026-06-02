@@ -10,13 +10,13 @@ export const idlFactory = ({ IDL }) => {
   const DummyAuthConfig = IDL.Record({ 'prompt_for_index' : IDL.Bool });
   const InternetIdentityFrontendInit = IDL.Record({
     'fetch_root_key' : IDL.Opt(IDL.Bool),
+    'featured_dashboard_apps' : IDL.Opt(IDL.Vec(IDL.Text)),
     'backend_canister_id' : IDL.Principal,
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'backend_origin' : IDL.Text,
     'dev_csp' : IDL.Opt(IDL.Bool),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
-    'featured_dashboard_apps' : IDL.Opt(IDL.Vec(IDL.Text)),
     'feature_flags' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))),
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
@@ -49,13 +49,13 @@ export const init = ({ IDL }) => {
   const DummyAuthConfig = IDL.Record({ 'prompt_for_index' : IDL.Bool });
   const InternetIdentityFrontendInit = IDL.Record({
     'fetch_root_key' : IDL.Opt(IDL.Bool),
+    'featured_dashboard_apps' : IDL.Opt(IDL.Vec(IDL.Text)),
     'backend_canister_id' : IDL.Principal,
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'backend_origin' : IDL.Text,
     'dev_csp' : IDL.Opt(IDL.Bool),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
-    'featured_dashboard_apps' : IDL.Opt(IDL.Vec(IDL.Text)),
     'feature_flags' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))),
   });
   return [InternetIdentityFrontendInit];
