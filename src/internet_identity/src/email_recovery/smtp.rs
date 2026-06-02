@@ -259,6 +259,21 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // and the global eviction sweep on the next `insert_with_eviction`
     // call cleans up any other expired entries.
     let snapshot = match pending::with_mut(&nonce, now_secs, |c| {
+        // Retain the gateway-supplied correlation id on the user's own
+        // (nonce-keyed) entry as early as possible — before the
+        // recipient/kind dispatch below — so `email_recovery_diagnostics`
+        // can surface it even in silent-drop cases where the entry exists
+        // but we don't process the email (e.g. a recipient/kind mismatch
+        // leaves `status` at `Pending`, still retryable). Guarded to
+        // non-terminal status so a stray gateway redelivery can't clobber
+        // the id of the decisive message. Length already bounded by
+        // `validate_smtp_request` at the top of this fn.
+        if matches!(
+            c.status,
+            PendingStatus::Pending | PendingStatus::NeedDkimLeaf { .. }
+        ) {
+            c.message_id = request.message_id.clone();
+        }
         let kind = match (&c.kind, recipient_flow) {
             (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
                 SnapshotKind::Setup { anchor: *anchor }
