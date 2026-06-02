@@ -23,8 +23,14 @@ const {
 } = await import("$lib/state/featureFlags");
 
 // `window.location` is read-only, so swap it for a writable stand-in we can
-// point at the host under test. Restored in `afterEach`.
+// point at the host under test. Capture the original property descriptor (not
+// just the value) so `afterEach` can restore `location` exactly as it was,
+// rather than leaving a plain data property behind for the rest of the worker.
 const originalLocation = window.location;
+const originalLocationDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  "location",
+);
 const setHostname = (hostname: string) => {
   Object.defineProperty(window, "location", {
     configurable: true,
@@ -44,10 +50,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  Object.defineProperty(window, "location", {
-    configurable: true,
-    value: originalLocation,
-  });
+  if (originalLocationDescriptor !== undefined) {
+    Object.defineProperty(window, "location", originalLocationDescriptor);
+  } else {
+    // `location` was inherited rather than an own property — drop our override
+    // so lookups fall back to the prototype again.
+    delete (window as { location?: unknown }).location;
+  }
 });
 
 test("keeps the compile-time default when nothing is configured", () => {
