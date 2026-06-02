@@ -194,17 +194,19 @@
   {/if}
   {#if authFlow.view !== "chooseMethod"}
     {#if !withinDialog}
-      <Dialog
-        onClose={() => {
-          if (isAuthenticating) {
-            return;
-          }
-          pendingSsoRegistration = false;
-          authFlow.chooseMethod();
-        }}
-      >
-        {@render dialogContent()}
-      </Dialog>
+      {#if !isContinueFromAnotherDeviceVisible && !isUpgrading}
+        <Dialog
+          onClose={() => {
+            if (isAuthenticating) {
+              return;
+            }
+            pendingSsoRegistration = false;
+            authFlow.chooseMethod();
+          }}
+        >
+          {@render dialogContent()}
+        </Dialog>
+      {/if}
     {:else}
       {@render dialogContent()}
     {/if}
