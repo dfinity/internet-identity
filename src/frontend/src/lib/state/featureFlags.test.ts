@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const { mockGetConfiguredFeatureFlag, mockGetPrimaryOrigin } = vi.hoisted(
   () => ({
@@ -15,8 +15,22 @@ vi.mock("$lib/globals", () => ({
 }));
 
 // Imported after the mock so the store factory picks up the mocked globals.
-const { DISCOVERABLE_PASSKEY_FLOW, MIN_GUIDED_UPGRADE } =
-  await import("$lib/state/featureFlags");
+const {
+  DISCOVERABLE_PASSKEY_FLOW,
+  MIN_GUIDED_UPGRADE,
+  EMAIL_RECOVERY,
+  EMAIL_RECOVERY_SETUP,
+} = await import("$lib/state/featureFlags");
+
+// `window.location` is read-only, so swap it for a writable stand-in we can
+// point at the host under test. Restored in `afterEach`.
+const originalLocation = window.location;
+const setHostname = (hostname: string) => {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: { ...originalLocation, hostname },
+  });
+};
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -25,6 +39,15 @@ beforeEach(() => {
   // Clear any value left on the stores by a previous test.
   MIN_GUIDED_UPGRADE.getFeatureFlag()?.reset();
   DISCOVERABLE_PASSKEY_FLOW.getFeatureFlag()?.reset();
+  EMAIL_RECOVERY.getFeatureFlag()?.reset();
+  EMAIL_RECOVERY_SETUP.getFeatureFlag()?.reset();
+});
+
+afterEach(() => {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: originalLocation,
+  });
 });
 
 test("keeps the compile-time default when nothing is configured", () => {
@@ -59,4 +82,65 @@ test("localStorage takes precedence over the canister deploy arg", () => {
   expect(get(MIN_GUIDED_UPGRADE)).toEqual(false);
   // The configured value isn't even consulted once a stored value exists.
   expect(mockGetConfiguredFeatureFlag).not.toHaveBeenCalled();
+});
+
+test("email-recovery flags default on for id.ai and beta.id.ai", () => {
+  for (const hostname of ["id.ai", "beta.id.ai"]) {
+    setHostname(hostname);
+    EMAIL_RECOVERY.getFeatureFlag()?.reset();
+    EMAIL_RECOVERY_SETUP.getFeatureFlag()?.reset();
+
+    EMAIL_RECOVERY.initialize();
+    EMAIL_RECOVERY_SETUP.initialize();
+
+    expect(get(EMAIL_RECOVERY), hostname).toEqual(true);
+    expect(get(EMAIL_RECOVERY_SETUP), hostname).toEqual(true);
+  }
+});
+
+test("email-recovery flags stay off on other domains when unconfigured", () => {
+  setHostname("example.com");
+
+  EMAIL_RECOVERY.initialize();
+  EMAIL_RECOVERY_SETUP.initialize();
+
+  expect(get(EMAIL_RECOVERY)).toEqual(false);
+  expect(get(EMAIL_RECOVERY_SETUP)).toEqual(false);
+});
+
+test("configured false keeps email-recovery flags off even on id.ai", () => {
+  setHostname("id.ai");
+  mockGetConfiguredFeatureFlag.mockReturnValue(false);
+
+  EMAIL_RECOVERY.initialize();
+  EMAIL_RECOVERY_SETUP.initialize();
+
+  expect(get(EMAIL_RECOVERY)).toEqual(false);
+  expect(get(EMAIL_RECOVERY_SETUP)).toEqual(false);
+});
+
+test("configured true turns email-recovery flags on off-domain", () => {
+  setHostname("example.com");
+  mockGetConfiguredFeatureFlag.mockReturnValue(true);
+
+  EMAIL_RECOVERY.initialize();
+  EMAIL_RECOVERY_SETUP.initialize();
+
+  expect(get(EMAIL_RECOVERY)).toEqual(true);
+  expect(get(EMAIL_RECOVERY_SETUP)).toEqual(true);
+});
+
+test("the two email-recovery flags resolve independently from config", () => {
+  setHostname("example.com");
+  mockGetConfiguredFeatureFlag.mockImplementation((name) =>
+    name === "EMAIL_RECOVERY_SETUP" ? true : undefined,
+  );
+
+  EMAIL_RECOVERY.initialize();
+  EMAIL_RECOVERY_SETUP.initialize();
+
+  // Only the set-up flag is configured on; the recovery flow flag stays at its
+  // off-domain default.
+  expect(get(EMAIL_RECOVERY)).toEqual(false);
+  expect(get(EMAIL_RECOVERY_SETUP)).toEqual(true);
 });

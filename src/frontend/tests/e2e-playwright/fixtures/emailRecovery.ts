@@ -58,13 +58,18 @@ function makeFromAddress(): string {
 
 /**
  * Inject `localStorage` overrides for the email-recovery feature
- * flag before the page's JS runs. The runtime flag store at
- * `lib/state/featureFlags.ts` reads from this key on init, so this
- * is enough to flip the flag without faking the page hostname.
+ * flags before the page's JS runs. The runtime flag stores at
+ * `lib/state/featureFlags.ts` read from these keys on init, so this
+ * is enough to flip the flags without faking the page hostname.
+ *
+ * The feature is gated by two flags: `EMAIL_RECOVERY` (the
+ * recover-with-email flow) and `EMAIL_RECOVERY_SETUP` (the set-up /
+ * management surface). The tests exercise both surfaces, so we drive
+ * both flags together here.
  *
  * The corresponding key shape is the runtime constant
  * `LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name` from `featureFlags.ts`.
- * We hardcode the literal here on purpose — if the runtime prefix
+ * We hardcode the literals here on purpose — if the runtime prefix
  * changes we want the test to fail loudly.
  */
 async function setEmailRecoveryFlag(page: Page, on: boolean) {
@@ -73,6 +78,10 @@ async function setEmailRecoveryFlag(page: Page, on: boolean) {
       try {
         window.localStorage.setItem(
           "ii-localstorage-feature-flags__EMAIL_RECOVERY",
+          JSON.stringify(value),
+        );
+        window.localStorage.setItem(
+          "ii-localstorage-feature-flags__EMAIL_RECOVERY_SETUP",
           JSON.stringify(value),
         );
       } catch {
