@@ -62,7 +62,7 @@ const enableCliAccessInSettings = async (
   }
   await page.getByRole("link", { name: "Settings" }).click();
   await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch").click();
+  await page.getByRole("switch", { name: "CLI access" }).check();
   await page
     .getByLabel("I'm using the official ICP CLI and I trust this device.")
     .check();
