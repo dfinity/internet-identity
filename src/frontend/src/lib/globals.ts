@@ -114,3 +114,8 @@ export const getPrimaryOrigin = () =>
   frontendCanisterConfig.related_origins[0]?.find((origin) =>
     origin.endsWith("id.ai"),
   );
+
+// Get the feature flag value configured via the canister deploy args, or
+// `undefined` when the operator didn't configure this flag.
+export const getConfiguredFeatureFlag = (name: string): boolean | undefined =>
+  frontendCanisterConfig.feature_flags[0]?.find(([key]) => key === name)?.[1];

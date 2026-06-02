@@ -40,6 +40,7 @@ export interface InternetIdentityFrontendInit {
   'dev_csp' : [] | [boolean],
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   'featured_dashboard_apps' : [] | [Array<string>],
+  'feature_flags' : [] | [Array<[string, boolean]>],
 }
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],

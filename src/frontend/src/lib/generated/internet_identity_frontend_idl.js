@@ -17,6 +17,7 @@ export const idlFactory = ({ IDL }) => {
     'dev_csp' : IDL.Opt(IDL.Bool),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'featured_dashboard_apps' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'feature_flags' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))),
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -55,6 +56,7 @@ export const init = ({ IDL }) => {
     'dev_csp' : IDL.Opt(IDL.Bool),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'featured_dashboard_apps' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'feature_flags' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))),
   });
   return [InternetIdentityFrontendInit];
 };

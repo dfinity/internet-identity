@@ -1,6 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
-import { getPrimaryOrigin } from "$lib/globals";
+import { getConfiguredFeatureFlag, getPrimaryOrigin } from "$lib/globals";
 
 declare global {
   interface Window {
@@ -52,10 +52,21 @@ const createFeatureFlagStore = (
     return initializedFeatureFlag;
   };
   const initialize = (): void => {
-    // Call init callback if not already set
-    if (initCallback !== undefined && !initializedFeatureFlag.isSet()) {
-      initCallback?.(initializedFeatureFlag);
+    // A value persisted in localStorage (from the browser console or a
+    // `?feature_flag_*` URL param) always wins — leave it untouched.
+    if (initializedFeatureFlag.isSet()) {
+      return;
     }
+    // Apply the deployment-level baseline from the canister deploy args, when
+    // the operator configured this flag. Uses `temporaryOverride` so the value
+    // is re-derived on every load and never persisted to localStorage.
+    const configuredValue = getConfiguredFeatureFlag(name);
+    if (configuredValue !== undefined) {
+      initializedFeatureFlag.temporaryOverride(configuredValue);
+    }
+    // Let the flag's init callback layer host-based logic on top of the
+    // resolved baseline (callbacks read the current value via `isEnabled()`).
+    initCallback?.(initializedFeatureFlag);
   };
 
   return {
