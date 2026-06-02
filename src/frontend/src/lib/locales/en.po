@@ -97,6 +97,18 @@ msgstr "<0>Seamless passkey integration:</0> We continue to embrace passkeys as 
 msgid "A 24-word phrase you write down and keep offline."
 msgstr "A 24-word phrase you write down and keep offline."
 
+msgid "A few things could be going on:"
+msgstr "A few things could be going on:"
+
+msgid "a pattern"
+msgstr "a pattern"
+
+msgid "a popular provider"
+msgstr "a popular provider"
+
+msgid "a security key"
+msgstr "a security key"
+
 msgid "About"
 msgstr "About"
 
@@ -154,6 +166,9 @@ msgstr "Add another passkey"
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Add another way to sign in with a passkey or third-party account for secure access."
 
+msgid "Add identity"
+msgstr "Add identity"
+
 msgid "Add new"
 msgstr "Add new"
 
@@ -165,6 +180,12 @@ msgstr "Advanced identity management"
 
 msgid "Allow to access this info"
 msgstr "Allow to access this info"
+
+msgid "Already connected"
+msgstr "Already connected"
+
+msgid "Already have an identity?"
+msgstr "Already have an identity?"
 
 msgid "Already signed-in"
 msgstr "Already signed-in"
@@ -268,6 +289,9 @@ msgstr "Code copied to clipboard"
 msgid "Company domain"
 msgstr "Company domain"
 
+msgid "company SSO"
+msgstr "company SSO"
+
 msgid "company.domain.com"
 msgstr "company.domain.com"
 
@@ -334,6 +358,12 @@ msgstr "Create new identity"
 msgid "Create passkey"
 msgstr "Create passkey"
 
+msgid "Create your Identity"
+msgstr "Create your Identity"
+
+msgid "Create your private, passwordless identity."
+msgstr "Create your private, passwordless identity."
+
 msgid "Created {0}"
 msgstr "Created {0}"
 
@@ -394,6 +424,9 @@ msgstr "Edit {name}"
 msgid "Edit account"
 msgstr "Edit account"
 
+msgid "Edit identities"
+msgstr "Edit identities"
+
 msgid "Email address"
 msgstr "Email address"
 
@@ -430,6 +463,9 @@ msgstr "Experience"
 
 msgid "Export JSON"
 msgstr "Export JSON"
+
+msgid "Face ID"
+msgstr "Face ID"
 
 msgid "FAQ & Support"
 msgstr "FAQ & Support"
@@ -638,6 +674,9 @@ msgstr "It won't be removed from your device or password manager."
 msgid "Keep it secret"
 msgstr "Keep it secret"
 
+msgid "Keep your access and recovery methods up to date."
+msgstr "Keep your access and recovery methods up to date."
+
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
 msgstr "Kept on a physical key. Authenticate on supported devices via tap/insert."
 
@@ -692,6 +731,9 @@ msgstr "Make sure to add a new access method so that you can sign in next time o
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 
+msgid "Manage your Identity"
+msgstr "Manage your Identity"
+
 msgid "Manage your Internet Identity"
 msgstr "Manage your Internet Identity"
 
@@ -727,6 +769,9 @@ msgstr "Name your identity"
 
 msgid "Name:"
 msgstr "Name:"
+
+msgid "New to Internet Identity?"
+msgstr "New to Internet Identity?"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
@@ -998,20 +1043,26 @@ msgstr "Sign in again to continue where you left off."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Sign in by sending a signed email from your inbox."
 
-msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr "Sign in or create an identity to access apps without passwords or sharing personal data."
-
 msgid "Sign in there."
 msgstr "Sign in there."
-
-msgid "Sign in to manage your identity"
-msgstr "Sign in to manage your identity"
 
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"
 
+msgid "Sign in with {name}"
+msgstr "Sign in with {name}"
+
+msgid "Sign in with a passkey or familiar provider."
+msgstr "Sign in with a passkey or familiar provider."
+
 msgid "Sign in with another identity"
 msgstr "Sign in with another identity"
+
+msgid "Sign in with passkey"
+msgstr "Sign in with passkey"
+
+msgid "Sign in with SSO"
+msgstr "Sign in with SSO"
 
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Sign in with your {displayName} account from any device."
@@ -1030,6 +1081,18 @@ msgstr "Sign out from this device"
 
 msgid "Sign out to remove"
 msgstr "Sign out to remove"
+
+msgid "Sign up"
+msgstr "Sign up"
+
+msgid "Sign up with {name}"
+msgstr "Sign up with {name}"
+
+msgid "Sign up with passkey"
+msgstr "Sign up with passkey"
+
+msgid "Sign up with SSO"
+msgstr "Sign up with SSO"
 
 msgid "Sign-in"
 msgstr "Sign-in"
@@ -1491,8 +1554,20 @@ msgstr "You're all set. Your passkey has been registered."
 msgid "You're signing in as <0>{name}</0>."
 msgstr "You're signing in as <0>{name}</0>."
 
+msgid "You've never used this {providerName} account with Internet Identity."
+msgstr "You've never used this {providerName} account with Internet Identity."
+
+msgid "Your Internet Identity, with"
+msgstr "Your Internet Identity, with"
+
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
+
+msgid "your phone"
+msgstr "your phone"
+
+msgid "Your progress on this step will be lost."
+msgstr "Your progress on this step will be lost."
 
 msgid "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."
 msgstr "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."
