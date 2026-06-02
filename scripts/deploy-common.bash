@@ -330,8 +330,15 @@ parse_common_args() {
                     echo "Error: --openid-configs-file: no such file: $1" >&2
                     return 1
                 fi
-                if [ ! -s "$1" ]; then
-                    echo "Error: --openid-configs-file: file is empty: $1" >&2
+                if [ ! -r "$1" ]; then
+                    echo "Error: --openid-configs-file: file is not readable: $1" >&2
+                    return 1
+                fi
+                # Reject empty / whitespace-only files now so the operator gets
+                # a clear message here rather than an opaque didc parse error at
+                # encode time.
+                if ! grep -q '[^[:space:]]' "$1"; then
+                    echo "Error: --openid-configs-file: file is empty or contains only whitespace: $1" >&2
                     return 1
                 fi
                 OPENID_CONFIGS_FILE="$1"
@@ -701,10 +708,17 @@ EXTRA
 
     # `openid_configs` stays `null` (= preserve the previous on-chain value)
     # unless --openid-configs-file was passed; its Candid contents are then
-    # emitted verbatim. parse_common_args already validated the file.
+    # emitted verbatim. parse_common_args already validated the path, but the
+    # read is re-checked here (separately from the `local` declaration, whose
+    # exit status would otherwise mask cat's) so a file that vanished or was
+    # emptied after parsing fails loudly instead of emitting `... = ;`.
     local openid_configs_arg="null"
     if [ -n "$OPENID_CONFIGS_FILE" ]; then
-        openid_configs_arg="$(cat "$OPENID_CONFIGS_FILE")"
+        if ! openid_configs_arg="$(cat "$OPENID_CONFIGS_FILE")" \
+                || [ -z "${openid_configs_arg//[[:space:]]/}" ]; then
+            echo "Error: failed to read --openid-configs-file (or it is now empty): $OPENID_CONFIGS_FILE" >&2
+            return 1
+        fi
     fi
 
     cat <<EOF
