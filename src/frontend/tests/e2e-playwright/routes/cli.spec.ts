@@ -44,6 +44,32 @@ const expirationMillis = (body: unknown): number => {
   return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
 };
 
+/**
+ * Enables device-local CLI access for the signed-in identity via Settings.
+ * Assumes the page is already on `/manage`.
+ *
+ * Branches on the `isMobile` fixture to open the hamburger nav (mobile only):
+ * the previous `if (await menuButton.isVisible())` guard was a non-waiting
+ * check that raced page hydration and intermittently left the menu closed, so
+ * the subsequent "Settings" click timed out on the mobile project.
+ */
+const enableCliAccessInSettings = async (
+  page: Page,
+  isMobile: boolean,
+): Promise<void> => {
+  if (isMobile) {
+    await page.getByRole("button", { name: "Open menu" }).click();
+  }
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.waitForURL(II_URL + "/manage/settings");
+  await page.getByRole("switch").click();
+  await page
+    .getByLabel("I'm using the official ICP CLI and I trust this device.")
+    .check();
+  await page.getByRole("button", { name: "Enable CLI access" }).click();
+  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+};
+
 test("cli.id.ai redirects to id.ai/cli, preserving the fragment", async ({
   page,
   cli,
@@ -285,6 +311,7 @@ test("Requested TTL beyond the backend max is clamped to 30 days", async ({
 test("App mode succeeds once CLI access is enabled in Settings", async ({
   page,
   cli,
+  isMobile,
 }) => {
   // Sign up a fresh identity on the landing page, then enable CLI access for
   // it via the Settings page (SPA navigation keeps the session).
@@ -293,19 +320,7 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
 
-  // On mobile the sidebar nav is behind a menu button; open it first.
-  const menuButton = page.getByRole("button", { name: "Open menu" });
-  if (await menuButton.isVisible()) {
-    await menuButton.click();
-  }
-  await page.getByRole("link", { name: "Settings" }).click();
-  await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch").click();
-  await page
-    .getByLabel("I'm using the official ICP CLI and I trust this device.")
-    .check();
-  await page.getByRole("button", { name: "Enable CLI access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  await enableCliAccessInSettings(page, isMobile);
 
   // Re-authenticate on /cli; the device-local CLI access flag persists in
   // localStorage for this identity. With a last-used identity present, /cli
@@ -341,24 +356,14 @@ const rootPublicKey = (body: unknown): string => {
 test("`--app` derives a different identity than generic mode for the same identity", async ({
   page,
   cli,
+  isMobile,
 }) => {
   // One identity, with device CLI access enabled so app mode isn't gated.
   await addVirtualAuthenticator(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  const menuButton = page.getByRole("button", { name: "Open menu" });
-  if (await menuButton.isVisible()) {
-    await menuButton.click();
-  }
-  await page.getByRole("link", { name: "Settings" }).click();
-  await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch").click();
-  await page
-    .getByLabel("I'm using the official ICP CLI and I trust this device.")
-    .check();
-  await page.getByRole("button", { name: "Enable CLI access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  await enableCliAccessInSettings(page, isMobile);
 
   // Generic sign-in (no `domain`) → delegation rooted at the auth page's
   // default origin (cli.id.ai).
@@ -393,6 +398,7 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   cli,
   identities,
   signInWithIdentity,
+  isMobile,
 }) => {
   const identityNumber = identities[0].identityNumber;
 
@@ -408,18 +414,7 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   await page.goto(II_URL);
   await signInWithIdentity(page, identityNumber);
   await page.waitForURL(II_URL + "/manage");
-  const menuButton = page.getByRole("button", { name: "Open menu" });
-  if (await menuButton.isVisible()) {
-    await menuButton.click();
-  }
-  await page.getByRole("link", { name: "Settings" }).click();
-  await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch").click();
-  await page
-    .getByLabel("I'm using the official ICP CLI and I trust this device.")
-    .check();
-  await page.getByRole("button", { name: "Enable CLI access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  await enableCliAccessInSettings(page, isMobile);
 
   // Principal the CLI links via `icp identity link ii --app nice-name.com`: the
   // self-authenticating principal of the delegation chain's root public key.
