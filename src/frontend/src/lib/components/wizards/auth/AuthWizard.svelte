@@ -7,10 +7,12 @@
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
-  import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
+  import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
+  import { toaster } from "$lib/components/utils/toaster";
+  import { t } from "$lib/stores/locale.store";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
@@ -97,6 +99,7 @@
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
+        toaster.info({ title: $t`Sign-in was canceled` });
         return "cancelled";
       }
       onError(error); // Propagate unhandled errors to parent component
@@ -123,6 +126,7 @@
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
+        toaster.info({ title: $t`Sign-in was canceled` });
         return "cancelled";
       }
       onError(error);
@@ -173,24 +177,12 @@
   {/if}
 {/snippet}
 
-{#if isContinueFromAnotherDeviceVisible}
-  {#if !withinDialog}
-    <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
-      <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
-    </Dialog>
-  {:else}
-    <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
-  {/if}
-{:else if isUpgrading}
-  {#if !withinDialog}
-    <Dialog onClose={() => (isUpgrading = false)}>
-      <MigrationWizard onSuccess={onUpgrade} {onError} />
-    </Dialog>
-  {:else}
-    <MigrationWizard onSuccess={onUpgrade} {onError} />
-  {/if}
-{:else if authFlow.captcha !== undefined}
+{#if authFlow.captcha !== undefined}
   <SolveCaptcha {...authFlow.captcha} />
+{:else if withinDialog && isContinueFromAnotherDeviceVisible}
+  <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
+{:else if withinDialog && isUpgrading}
+  <MigrationWizard onSuccess={onUpgrade} {onError} />
 {:else}
   {#if authFlow.view === "chooseMethod" || !withinDialog}
     {@render children?.()}
@@ -217,6 +209,17 @@
       {@render dialogContent()}
     {/if}
   {/if}
+{/if}
+
+{#if !withinDialog && isContinueFromAnotherDeviceVisible}
+  <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
+    <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
+  </Dialog>
+{/if}
+{#if !withinDialog && isUpgrading}
+  <Dialog onClose={() => (isUpgrading = false)}>
+    <MigrationWizard onSuccess={onUpgrade} {onError} />
+  </Dialog>
 {/if}
 
 {#if authFlow.systemOverlay}
