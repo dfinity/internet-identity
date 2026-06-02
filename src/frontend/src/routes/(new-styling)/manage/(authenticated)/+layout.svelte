@@ -201,8 +201,14 @@
     analytics.pageView();
   });
 
-  afterNavigate(() => {
-    isMobileSidebarOpen = false;
+  afterNavigate((nav) => {
+    // Only auto-close on actual route changes. A same-URL navigation (e.g.,
+    // clicking a nav link for the current page, or a `replaceState` to clear
+    // a query param after a flow completes) shouldn't yank the mobile menu
+    // shut while the user is interacting with it.
+    if (nav?.from?.url?.pathname !== nav?.to?.url?.pathname) {
+      isMobileSidebarOpen = false;
+    }
   });
 
   // Pre-fetch passkey credential ids
