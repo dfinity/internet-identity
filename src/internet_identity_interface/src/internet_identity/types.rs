@@ -237,6 +237,12 @@ pub struct InternetIdentityFrontendArgs {
     /// against the bundled dapps catalogue (`dapps.json`) at runtime to obtain
     /// the name, description and logo. Unknown origins are skipped.
     pub featured_dashboard_apps: Option<Vec<String>>,
+    /// Frontend feature flag overrides keyed by flag name (e.g.
+    /// `("EMAIL_RECOVERY", true)`). Each entry sets the deployment-level
+    /// baseline for that flag; the frontend still lets `localStorage`, a flag's
+    /// own init callback, and `?feature_flag_*` URL params take precedence.
+    /// Names that don't match a known frontend flag are ignored by the frontend.
+    pub feature_flags: Option<Vec<(String, bool)>>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.

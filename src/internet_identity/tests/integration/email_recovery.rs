@@ -31,7 +31,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus,
+    EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus, VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
@@ -955,6 +955,131 @@ fn doh_path_dns_record_umbrella_rejects_testing_mode_key() {
         }
         other => panic!("expected Failed(EmailVerificationFailed(TestingMode…)), got {other:?}"),
     }
+}
+
+// ===================================================================
+// email_recovery_diagnostics — the gateway message_id reaches the FE.
+// ===================================================================
+
+/// Happy path: the gateway sets `message_id` on the inbound
+/// `SmtpRequest`; the canister retains it on the pending challenge and
+/// surfaces it (verbatim) via `email_recovery_diagnostics`, alongside a
+/// public reason code + verification path. Confirms the new query + the
+/// `canister_tests` API wrapper end-to-end.
+#[test]
+fn diagnostics_surface_message_id_from_smtp_request() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let mut signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    // The gateway attaches a per-message correlation id.
+    const GW_ID: &str = "<gw-test-id@gateway.example>";
+    signed.request.message_id = Some(GW_ID.into());
+
+    let dkim_txt = signer.public_txt_record();
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+    fulfill_doh_outcalls(&env, &dkim_txt);
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let diag = api::email_recovery_diagnostics(&env, canister_id, &challenge.nonce)
+        .expect("diagnostics call failed")
+        .expect("diagnostics present for a live challenge");
+    assert_eq!(diag.message_id.as_deref(), Some(GW_ID));
+    assert_eq!(diag.reason_code, "Succeeded");
+    assert!(matches!(diag.verification_path, VerificationPath::Doh));
+}
+
+/// The core promise: a *verification failure* still retains the gateway
+/// `message_id` (the email reached the canister), so a user who reports
+/// "it didn't work" has a correlation id to hand to support. Uses the
+/// future-dated `t=` failure shape from the umbrella tests above.
+#[test]
+fn diagnostics_cover_the_failed_path_with_message_id() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let mut signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs + 10_000, // future-dated → verification fails
+    });
+    const GW_ID: &str = "<gw-failed-id@gateway.example>";
+    signed.request.message_id = Some(GW_ID.into());
+
+    let dkim_txt = signer.public_txt_record();
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+    fulfill_doh_outcalls(&env, &dkim_txt);
+    let _ = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+
+    let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
+        .expect("status call failed");
+    assert!(
+        matches!(status, EmailRecoveryStatus::Failed(_)),
+        "expected Failed, got {status:?}",
+    );
+
+    let diag = api::email_recovery_diagnostics(&env, canister_id, &challenge.nonce)
+        .expect("diagnostics call failed")
+        .expect("diagnostics present for a failed challenge");
+    assert_eq!(diag.message_id.as_deref(), Some(GW_ID));
+    assert_eq!(diag.reason_code, "Failed:EmailVerificationFailed");
+}
+
+/// An unknown/expired nonce yields `None`, mirroring how
+/// `email_recovery_status` collapses both to `Expired` — no oracle.
+#[test]
+fn diagnostics_returns_none_for_unknown_nonce() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let diag = api::email_recovery_diagnostics(&env, canister_id, "II-Recovery-deadbeefcafe1234")
+        .expect("diagnostics call failed");
+    assert!(diag.is_none());
 }
 
 /// Drive PocketIC forward until each of the 5 DoH provider outcalls
