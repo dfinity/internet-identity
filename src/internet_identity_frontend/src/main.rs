@@ -260,8 +260,14 @@ fn get_asset_headers(
 /// base-uri 'none':
 ///   Prevents injection of <base> tags that could redirect relative URLs
 ///
-/// form-action 'none':
-///   Prevents forms from being submitted anywhere (II doesn't use forms)
+/// form-action 'self' http://127.0.0.1:* http://[::1]:*:
+///   The CLI authorize flow (`/cli`) delivers the delegation to the CLI's
+///   loopback callback via a top-level form POST (a top-level navigation
+///   avoids Chrome's Local Network Access permission prompt that a `fetch`
+///   would trigger). Submissions are restricted to same origin and the http
+///   loopback literals the `/cli` callback parser accepts (127.0.0.1, ::1) —
+///   `localhost` is intentionally excluded there (it can resolve off-loopback)
+///   so it's omitted here too — so a form can never post to a remote origin.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -327,7 +333,7 @@ fn get_content_security_policy(
          img-src 'self' data: https://*.googleusercontent.com;\
          script-src {script_src};\
          base-uri 'none';\
-         form-action 'none';\
+         form-action 'self' http://127.0.0.1:* http://[::1]:*;\
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
@@ -394,6 +400,15 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
         content: config.backend_canister_id.to_text().into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::TXT,
+    });
+
+    // Advertise where the CLI authorize flow lives so the ICP CLI can
+    // discover it from a well-known path on the II domain.
+    assets.push(AssetUtilAsset {
+        url_path: "/.well-known/cli-auth-config".to_string(),
+        content: json!({ "path": "/cli" }).to_string().into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
     });
 
     // Add .well-known/webauthn for passkey sharing if related_origins is configured
