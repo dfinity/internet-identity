@@ -263,15 +263,15 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // (nonce-keyed) entry as early as possible — before the
         // recipient/kind dispatch below — so `email_recovery_diagnostics`
         // can surface it even in silent-drop cases where the entry exists
-        // but we don't process the email (e.g. a recipient/kind mismatch
-        // leaves `status` at `Pending`, still retryable). Guarded to
-        // non-terminal status so a stray gateway redelivery can't clobber
-        // the id of the decisive message. Length already bounded by
-        // `validate_smtp_request` at the top of this fn.
-        if matches!(
-            c.status,
-            PendingStatus::Pending | PendingStatus::NeedDkimLeaf { .. }
-        ) {
+        // but we don't process the email (e.g. a recipient/kind mismatch).
+        //
+        // First-writer-wins: only record an id if we haven't captured one
+        // yet, so a gateway redelivery — which can arrive after the DNSSEC
+        // path has flipped to `NeedDkimLeaf` — can't clobber the decisive
+        // email's id and surface a misleading one in diagnostics. A later
+        // delivery still fills it in when the first carried none. Length
+        // already bounded by `validate_smtp_request` at the top of this fn.
+        if c.message_id.is_none() {
             c.message_id = request.message_id.clone();
         }
         let kind = match (&c.kind, recipient_flow) {
