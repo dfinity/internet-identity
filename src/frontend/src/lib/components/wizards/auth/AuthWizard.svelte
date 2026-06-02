@@ -17,13 +17,50 @@
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+  import {
+    lastUsedIdentitiesStore,
+    type LastUsedIdentity,
+  } from "$lib/stores/last-used-identities.store";
+  import { get } from "svelte/store";
+
+  interface OpenIdNotConnectedArgs {
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    resume: () => Promise<void>;
+  }
+
+  interface OpenIdAlreadyLinkedArgs {
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    signIn: () => Promise<void>;
+  }
+
+  type NewProvider =
+    | { type: "passkey" }
+    | { type: "openid"; logo: string; name: string }
+    | { type: "sso"; name: string };
+
+  interface MethodSwitchArgs {
+    previous: LastUsedIdentity;
+    newProvider: NewProvider;
+    proceed: () => Promise<void>;
+  }
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
     onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
+    onOpenIdNotConnected?: (args: OpenIdNotConnectedArgs) => void;
+    onOpenIdAlreadyLinked?: (args: OpenIdAlreadyLinkedArgs) => void;
+    onMethodSwitch?: (args: MethodSwitchArgs) => void;
+    onSwitchMode?: () => void;
     withinDialog?: boolean;
+    mode?: "signin" | "signup" | "both";
     children?: Snippet;
   }
 
@@ -32,9 +69,38 @@
     onSignUp,
     onUpgrade,
     onError,
+    onOpenIdNotConnected,
+    onOpenIdAlreadyLinked,
+    onMethodSwitch,
+    onSwitchMode,
     withinDialog = false,
+    mode = "both",
     children,
   }: Props = $props();
+
+  const methodType = (
+    m: LastUsedIdentity["authMethod"],
+  ): NewProvider["type"] =>
+    "passkey" in m ? "passkey" : "openid" in m ? "openid" : "sso";
+
+  const maybeInterceptMethodSwitch = (
+    identityNumber: bigint,
+    newProvider: NewProvider,
+    previousSnapshot: LastUsedIdentity | undefined,
+  ): boolean => {
+    if (onMethodSwitch === undefined || previousSnapshot === undefined) {
+      return false;
+    }
+    if (methodType(previousSnapshot.authMethod) === newProvider.type) {
+      return false;
+    }
+    onMethodSwitch({
+      previous: previousSnapshot,
+      newProvider,
+      proceed: () => onSignIn(identityNumber),
+    });
+    return true;
+  };
 
   const authFlow = new AuthFlow();
 
@@ -53,7 +119,18 @@
   > => {
     try {
       isAuthenticating = true;
-      await onSignIn(await authFlow.continueWithExistingPasskey());
+      const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
+      const identityNumber = await authFlow.continueWithExistingPasskey();
+      if (
+        maybeInterceptMethodSwitch(
+          identityNumber,
+          { type: "passkey" },
+          preSnapshot[identityNumber.toString()],
+        )
+      ) {
+        return;
+      }
+      await onSignIn(identityNumber);
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         isContinueFromAnotherDeviceVisible = true;
@@ -87,15 +164,72 @@
   ): Promise<void | "cancelled"> => {
     try {
       isAuthenticating = true;
+      const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
       const result = await authFlow.continueWithOpenId(config);
       if (result.type === "signIn") {
+        if (mode === "signup" && onOpenIdAlreadyLinked !== undefined) {
+          const identityNumber = result.identityNumber;
+          onOpenIdAlreadyLinked({
+            providerName: config.name,
+            providerLogo: config.logo,
+            userName: result.name,
+            userEmail: result.email,
+            signIn: async () => {
+              try {
+                isAuthenticating = true;
+                await onSignIn(identityNumber);
+              } catch (error) {
+                onError(error);
+              } finally {
+                isAuthenticating = false;
+              }
+            },
+          });
+          return;
+        }
+        if (
+          maybeInterceptMethodSwitch(
+            result.identityNumber,
+            { type: "openid", logo: config.logo, name: config.name },
+            preSnapshot[result.identityNumber.toString()],
+          )
+        ) {
+          return;
+        }
         await onSignIn(result.identityNumber);
-      } else if (result.name !== undefined) {
+        return;
+      }
+      if (mode === "signin" && onOpenIdNotConnected !== undefined) {
+        pendingSsoRegistration = false;
+        onOpenIdNotConnected({
+          providerName: config.name,
+          providerLogo: config.logo,
+          userName: result.name,
+          userEmail: result.email,
+          resume: async () => {
+            try {
+              isAuthenticating = true;
+              if (result.name !== undefined) {
+                await onSignUp(
+                  await authFlow.completeOpenIdRegistration(result.name),
+                );
+              } else {
+                authFlow.setupNewIdentity();
+              }
+            } catch (error) {
+              onError(error);
+            } finally {
+              isAuthenticating = false;
+            }
+          },
+        });
+        return;
+      }
+      if (result.name !== undefined) {
         await onSignUp(await authFlow.completeOpenIdRegistration(result.name));
       } else {
-        // Deferred direct-OpenID sign-up: ensure the SSO flag is clear so
-        // the name-entry view dispatches to `completeOpenIdRegistration`.
         pendingSsoRegistration = false;
+        authFlow.setupNewIdentity();
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
@@ -113,16 +247,27 @@
   ): Promise<void | "cancelled"> => {
     try {
       isAuthenticating = true;
+      const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
       const authResult = await authFlow.continueWithSso(result);
       if (authResult.type === "signIn") {
+        if (
+          maybeInterceptMethodSwitch(
+            authResult.identityNumber,
+            { type: "sso", name: result.name ?? result.domain },
+            preSnapshot[authResult.identityNumber.toString()],
+          )
+        ) {
+          return;
+        }
         await onSignIn(authResult.identityNumber);
       } else if (authResult.name !== undefined) {
         await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
       } else {
-        // The SSO IdP didn't supply a name — the wizard now drives the
-        // user to `setupNewIdentity`. Mark the deferred completion as
-        // SSO so the name-entry callback dispatches to the SSO path.
+        // The SSO IdP didn't supply a name — drive the user to the
+        // name-entry view and mark the deferred completion as SSO so
+        // the callback dispatches to the SSO path.
         pendingSsoRegistration = true;
+        authFlow.setupNewIdentity();
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
@@ -187,9 +332,16 @@
   {#if authFlow.view === "chooseMethod" || !withinDialog}
     {@render children?.()}
     <PickAuthenticationMethod
-      setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
+      setupOrUseExistingPasskey={mode === "signin"
+        ? handleContinueWithExistingPasskey
+        : mode === "signup"
+          ? authFlow.setupNewPasskey
+          : authFlow.setupOrUseExistingPasskey}
       continueWithOpenId={handleContinueWithOpenId}
       signInWithSso={authFlow.signInWithSso}
+      {mode}
+      {onSwitchMode}
+      {withinDialog}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}
