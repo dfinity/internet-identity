@@ -142,9 +142,10 @@ ${record_fields};
     echo "  $FRONTEND_CANDID_ARG"
     echo ""
 
-    echo "Encoding argument with didc..."
+    echo "Encoding argument with pinned didc..."
+    ensure_pinned_didc || exit 1
     local encoded
-    encoded=$(didc encode \
+    encoded=$("$PINNED_DIDC" encode \
         -d ./src/internet_identity_frontend/internet_identity_frontend.did \
         -t '(InternetIdentityFrontendInit)' \
         "$FRONTEND_CANDID_ARG")

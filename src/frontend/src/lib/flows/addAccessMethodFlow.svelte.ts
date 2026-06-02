@@ -149,6 +149,7 @@ export class AddAccessMethodFlow {
       issuer: discovery.issuer,
       auth_scope: selectAuthScopes(discovery.scopes_supported),
       client_id: clientId,
+      seed_jwks: [],
     };
     return this.linkOpenIdAccount(syntheticConfig);
   };

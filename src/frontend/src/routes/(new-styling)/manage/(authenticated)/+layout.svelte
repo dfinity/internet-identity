@@ -8,6 +8,7 @@
     LifeBuoyIcon,
     CodeIcon,
     LanguagesIcon,
+    SettingsIcon,
     ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
@@ -112,10 +113,7 @@
   };
 
   const handleConfirmSignOutAndRemove = () => {
-    const identity = $lastUsedIdentitiesStore.selected;
-    if (identity !== undefined) {
-      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
-    }
+    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
     window.location.replace("/");
   };
 
@@ -318,6 +316,15 @@
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/settings"
+            current={page.url.pathname === "/manage/settings"}
+          >
+            <SettingsIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Settings`}</span>
+          </NavItem>
+        </li>
       </ul>
     </nav>
     <!-- Empty space between top and bottom content-->
@@ -478,14 +485,20 @@
   </Dialog>
 {/if}
 
-{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
-  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
-    <SignOutConfirmation
-      identity={$lastUsedIdentitiesStore.selected}
-      onSignOut={handleConfirmSignOut}
-      onSignOutAndRemove={handleConfirmSignOutAndRemove}
-    />
-  </Dialog>
+{#if isSignOutDialogOpen}
+  {@const currentIdentity =
+    $lastUsedIdentitiesStore.identities[
+      $authenticatedStore.identityNumber.toString()
+    ]}
+  {#if currentIdentity !== undefined}
+    <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+      <SignOutConfirmation
+        identity={currentIdentity}
+        onSignOut={handleConfirmSignOut}
+        onSignOutAndRemove={handleConfirmSignOutAndRemove}
+      />
+    </Dialog>
+  {/if}
 {/if}
 
 {#if isReauthDialogOpen}

@@ -1085,6 +1085,16 @@ export interface OpenIdConfig {
   'email_verification' : [] | [OpenIdEmailVerification],
   'issuer' : string,
   'auth_scope' : Array<string>,
+  /**
+   * Optional initial set of JWKs used to seed this provider's JWK cache on
+   * install, so JWT verification works before the first jwks_uri fetch and
+   * across upgrades (the cache is persisted in stable memory). The outer vec
+   * is the set of JWKs; each inner vec is one JWK, given as the list of its
+   * JSON (field, value) pairs, e.g. a single RSA key is
+   * vec { vec { record { "kty"; "RSA" }; record { "kid"; "..." };
+   * record { "n"; "..." }; record { "e"; "AQAB" } } }.
+   */
+  'seed_jwks' : [] | [Array<Array<[string, string]>>],
   'client_id' : string,
 }
 export interface OpenIdCredential {
@@ -1391,6 +1401,15 @@ export interface SmtpRequest {
   'envelope' : [] | [SmtpEnvelope],
   'message' : [] | [SmtpMessage],
   'gateway_flags' : [] | [Array<string>],
+  /**
+   * Optional gateway-supplied correlation id for one inbound message
+   * (e.g. the RFC 5322 Message-ID or a gateway-assigned tracking id).
+   * The canister does not interpret it; it lets a reported case be
+   * lined up across the SMTP gateway logs and the canister's production
+   * logs during support investigations. Capped at 256 bytes; oversize
+   * values are rejected with code 555.
+   */
+  'message_id' : [] | [string],
 }
 /**
  * Error returned by `smtp_request` / `smtp_request_validate`.

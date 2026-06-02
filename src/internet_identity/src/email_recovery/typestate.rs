@@ -387,6 +387,7 @@ impl TryFrom<WireSmtpRequest> for UnverifiedSmtpRequest {
             envelope,
             message,
             gateway_flags: _,
+            message_id: _,
         } = request;
 
         let envelope = envelope.ok_or(SmtpError::Envelope(EnvelopeError::Missing))?;
@@ -945,6 +946,7 @@ mod tests {
             }),
             message: None,
             gateway_flags: None,
+            message_id: None,
         }
     }
 
@@ -976,6 +978,7 @@ mod tests {
             }),
             message: Some(well_formed_message(&[])),
             gateway_flags: None,
+            message_id: None,
         }
     }
 
@@ -1147,6 +1150,7 @@ mod tests {
             envelope: None,
             message: None,
             gateway_flags: None,
+            message_id: None,
         };
         let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
         assert!(matches!(err, SmtpError::Envelope(EnvelopeError::Missing)));

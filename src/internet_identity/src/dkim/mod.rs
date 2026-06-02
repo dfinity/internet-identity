@@ -82,7 +82,9 @@ pub(crate) use dns_record::{parse_dkim_txt, DkimDnsRecord, KeyType};
 #[allow(unused_imports)]
 pub(crate) use parse::{parse_dkim_signature, DkimSignature};
 #[allow(unused_imports)]
-pub(crate) use signature::{body_hash_sha256, verify_signature, VerifyOutcome};
+pub(crate) use signature::{
+    body_hash_sha256, verify_signature, verify_signature_prehashed, VerifyOutcome, RSA_MIN_KEY_BITS,
+};
 #[allow(unused_imports)]
 pub(crate) use tag_checks::{
     // The two umbrellas (`enforce_*_tag_contract`) are the facade

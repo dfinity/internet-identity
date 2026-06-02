@@ -42,6 +42,7 @@ export const idlFactory = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({
@@ -697,6 +698,7 @@ export const idlFactory = ({ IDL }) => {
     'envelope' : IDL.Opt(SmtpEnvelope),
     'message' : IDL.Opt(SmtpMessage),
     'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'message_id' : IDL.Opt(IDL.Text),
   });
   const SmtpRequestError = IDL.Record({
     'code' : IDL.Nat64,
@@ -1195,6 +1197,7 @@ export const init = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({

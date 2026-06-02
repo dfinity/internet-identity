@@ -121,9 +121,6 @@ msgstr "Activate recovery phrase"
 msgid "Activate recovery to remove"
 msgstr "Activate recovery to remove"
 
-msgid "Activate your recovery phrase so that you can recover your identity at any point."
-msgstr "Activate your recovery phrase so that you can recover your identity at any point."
-
 msgid "Activated"
 msgstr "Activated"
 
@@ -274,9 +271,6 @@ msgstr "Company domain"
 msgid "company.domain.com"
 msgstr "company.domain.com"
 
-msgid "Complete set-up"
-msgstr "Complete set-up"
-
 msgid "Confirm sign-in"
 msgstr "Confirm sign-in"
 
@@ -379,9 +373,6 @@ msgstr "Deny all"
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
-msgid "Dismiss"
-msgstr "Dismiss"
-
 msgid "Do you want to continue?"
 msgstr "Do you want to continue?"
 
@@ -445,6 +436,9 @@ msgstr "FAQ & Support"
 
 msgid "FAQs"
 msgstr "FAQs"
+
+msgid "Featured apps"
+msgstr "Featured apps"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
@@ -593,9 +587,6 @@ msgstr "Internet Identity is an authentication system for applications running o
 msgid "Internet Identity is as secure as the authentication methods it uses (like Google, Apple, Microsoft, or Passkeys). That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 msgstr "Internet Identity is as secure as the authentication methods it uses (like Google, Apple, Microsoft, or Passkeys). That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 
-msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
-msgstr "Internet Identity is used to sign in securely and connect to apps with passkeys."
-
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 
@@ -725,9 +716,6 @@ msgstr "My {application} account"
 msgid "My account"
 msgstr "My account"
 
-msgid "My identity"
-msgstr "My identity"
-
 msgid "n/a"
 msgstr "n/a"
 
@@ -763,9 +751,6 @@ msgstr "Not upgraded"
 
 msgid "Not verified"
 msgstr "Not verified"
-
-msgid "Number of access methods"
-msgstr "Number of access methods"
 
 msgid "One or more words are wrong or out of order."
 msgstr "One or more words are wrong or out of order."
@@ -929,6 +914,9 @@ msgstr "Replace it anytime"
 msgid "Reset"
 msgstr "Reset"
 
+msgid "Reset recovery phrase"
+msgstr "Reset recovery phrase"
+
 msgid "Reset your recovery phrase?"
 msgstr "Reset your recovery phrase?"
 
@@ -971,9 +959,6 @@ msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manu
 msgid "Seamless access"
 msgstr "Seamless access"
 
-msgid "See how many access methods are within your identity and manage your recovery phrase."
-msgstr "See how many access methods are within your identity and manage your recovery phrase."
-
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 
@@ -991,6 +976,12 @@ msgstr "Session timed out"
 
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
+
+msgid "Set up recovery email"
+msgstr "Set up recovery email"
+
+msgid "Set up recovery phrase"
+msgstr "Set up recovery phrase"
 
 msgid "Share {label}"
 msgstr "Share {label}"
@@ -1308,6 +1299,9 @@ msgstr "Unsupported browser"
 msgid "Unverified origin"
 msgstr "Unverified origin"
 
+msgid "Update recovery email"
+msgstr "Update recovery email"
+
 msgid "Upgrade"
 msgstr "Upgrade"
 
@@ -1343,6 +1337,9 @@ msgstr "Verification failed"
 
 msgid "Verify"
 msgstr "Verify"
+
+msgid "Verify recovery phrase"
+msgstr "Verify recovery phrase"
 
 msgid "Verify recovery to remove"
 msgstr "Verify recovery to remove"
@@ -1380,8 +1377,8 @@ msgstr "We can't verify mail from <0>{domain}</0> yet. Try a different address. 
 msgid "We didn't recognize that activation code."
 msgstr "We didn't recognize that activation code."
 
-msgid "Welcome, {name}."
-msgstr "Welcome, {name}."
+msgid "Welcome, <0>{name}</0>."
+msgstr "Welcome, <0>{name}</0>."
 
 msgid "What are passkeys?"
 msgstr "What are passkeys?"
@@ -1494,12 +1491,6 @@ msgstr "You're all set. Your passkey has been registered."
 msgid "You're signing in as <0>{name}</0>."
 msgstr "You're signing in as <0>{name}</0>."
 
-msgid "Your identity and sign-in methods at a glance."
-msgstr "Your identity and sign-in methods at a glance."
-
-msgid "Your identity name is currently not editable. It is only ever visible to you."
-msgstr "Your identity name is currently not editable. It is only ever visible to you."
-
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 
@@ -1514,9 +1505,6 @@ msgstr "Your recovery email has been detached from this identity."
 
 msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
 msgstr "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
-
-msgid "Your recovery phrase is active, verify you saved it correctly."
-msgstr "Your recovery phrase is active, verify you saved it correctly."
 
 msgid "Your recovery phrase is now active and can be reset anytime."
 msgstr "Your recovery phrase is now active and can be reset anytime."

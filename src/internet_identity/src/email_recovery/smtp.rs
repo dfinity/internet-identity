@@ -1040,6 +1040,7 @@ mod tests {
             }),
             message: None,
             gateway_flags: None,
+            message_id: None,
         }
     }
 
@@ -1178,6 +1179,7 @@ mod tests {
             envelope: None,
             message: None,
             gateway_flags: None,
+            message_id: None,
         };
         assert_smtp_err_code(handle_smtp_request_validate(req), SMTP_ERR_SYNTAX_ERROR);
     }
@@ -1252,6 +1254,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         }
     }
 

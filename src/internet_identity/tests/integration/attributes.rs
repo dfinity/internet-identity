@@ -84,6 +84,7 @@ fn should_get_certified_attributes() {
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
         email_verification: None,
+        seed_jwks: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
@@ -277,6 +278,7 @@ fn legacy_prepare_attributes_rejects_sso_scope() {
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
         email_verification: None,
+        seed_jwks: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
@@ -379,6 +381,7 @@ fn should_get_certified_attributes_microsoft() {
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("".into()),
         email_verification: None,
+        seed_jwks: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
@@ -556,6 +559,7 @@ fn should_get_icrc3_certified_attributes() {
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
         email_verification: None,
+        seed_jwks: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
@@ -701,6 +705,7 @@ fn setup_icrc3_test_env() -> (
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
         email_verification: None,
+        seed_jwks: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
@@ -1364,6 +1369,7 @@ fn setup_icrc3_test_env_with_fake_openid() -> (
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
         email_verification: None,
+        seed_jwks: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(

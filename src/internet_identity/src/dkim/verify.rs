@@ -502,6 +502,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         }
     }
 
@@ -543,6 +544,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         };
         let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must accept");
         let err = SignedSmtpRequest::try_from(unverified).expect_err("stage 2 must reject");
