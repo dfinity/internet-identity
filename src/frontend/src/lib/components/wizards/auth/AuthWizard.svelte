@@ -29,6 +29,9 @@
     userName?: string;
     userEmail?: string;
     resume: () => Promise<void>;
+    // Signal the dispatcher that the user dismissed the disambiguation
+    // dialog without committing — releases the picker's in-flight loader.
+    cancel: () => void;
   }
 
   interface OpenIdAlreadyLinkedArgs {
@@ -37,6 +40,7 @@
     userName?: string;
     userEmail?: string;
     signIn: () => Promise<void>;
+    cancel: () => void;
   }
 
   type NewProvider =
@@ -169,23 +173,28 @@
       if (result.type === "signIn") {
         if (mode === "signup" && onOpenIdAlreadyLinked !== undefined) {
           const identityNumber = result.identityNumber;
-          onOpenIdAlreadyLinked({
-            providerName: config.name,
-            providerLogo: config.logo,
-            userName: result.name,
-            userEmail: result.email,
-            signIn: async () => {
-              try {
-                isAuthenticating = true;
-                await onSignIn(identityNumber);
-              } catch (error) {
-                onError(error);
-              } finally {
-                isAuthenticating = false;
-              }
-            },
+          // Stay in the in-flight state until the user commits (signIn) or
+          // dismisses (cancel); this keeps the picker's loader on the
+          // provider button instead of flashing back to the idle state
+          // while the disambiguation dialog is open.
+          return await new Promise<void | "cancelled">((resolve) => {
+            onOpenIdAlreadyLinked({
+              providerName: config.name,
+              providerLogo: config.logo,
+              userName: result.name,
+              userEmail: result.email,
+              signIn: async () => {
+                try {
+                  await onSignIn(identityNumber);
+                  resolve();
+                } catch (error) {
+                  onError(error);
+                  resolve();
+                }
+              },
+              cancel: () => resolve("cancelled"),
+            });
           });
-          return;
         }
         if (
           maybeInterceptMethodSwitch(
@@ -201,29 +210,30 @@
       }
       if (mode === "signin" && onOpenIdNotConnected !== undefined) {
         pendingSsoRegistration = false;
-        onOpenIdNotConnected({
-          providerName: config.name,
-          providerLogo: config.logo,
-          userName: result.name,
-          userEmail: result.email,
-          resume: async () => {
-            try {
-              isAuthenticating = true;
-              if (result.name !== undefined) {
-                await onSignUp(
-                  await authFlow.completeOpenIdRegistration(result.name),
-                );
-              } else {
-                authFlow.setupNewIdentity();
+        return await new Promise<void | "cancelled">((resolve) => {
+          onOpenIdNotConnected({
+            providerName: config.name,
+            providerLogo: config.logo,
+            userName: result.name,
+            userEmail: result.email,
+            resume: async () => {
+              try {
+                if (result.name !== undefined) {
+                  await onSignUp(
+                    await authFlow.completeOpenIdRegistration(result.name),
+                  );
+                } else {
+                  authFlow.setupNewIdentity();
+                }
+                resolve();
+              } catch (error) {
+                onError(error);
+                resolve();
               }
-            } catch (error) {
-              onError(error);
-            } finally {
-              isAuthenticating = false;
-            }
-          },
+            },
+            cancel: () => resolve("cancelled"),
+          });
         });
-        return;
       }
       if (result.name !== undefined) {
         await onSignUp(await authFlow.completeOpenIdRegistration(result.name));

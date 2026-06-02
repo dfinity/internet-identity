@@ -73,14 +73,14 @@
   const openIdProviders = backendCanisterConfig.openid_configs?.[0] ?? [];
 </script>
 
-<div class="flex flex-col items-stretch gap-4">
+<div class="flex flex-col items-stretch gap-5">
   {#if !supportsPasskeys}
     <Alert
       title={$t`Passkeys not available here`}
       description={$t`Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue.`}
     />
   {/if}
-  <div class="flex flex-col items-stretch gap-2">
+  <div class="flex flex-col items-stretch gap-3">
     <button
       class="btn btn-primary btn-xl h-14"
       onclick={setupOrUseExistingPasskey}
@@ -89,7 +89,7 @@
       <PasskeyIcon />
       {passkeyLabel}
     </button>
-    <div class="flex flex-row flex-nowrap justify-stretch gap-2">
+    <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
         <Tooltip
