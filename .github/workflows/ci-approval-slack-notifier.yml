@@ -1,0 +1,28 @@
+name: CI Approval Slack Notifier
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts/notify-ci-approval.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Notify Slack about action_required runs
+        env:
+          SLACK_CI_APPROVAL_WEBHOOK_URL: ${{ secrets.SLACK_CI_APPROVAL_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-ci-approval.sh
