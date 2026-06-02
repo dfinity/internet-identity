@@ -160,6 +160,7 @@ export class TestSigner {
         },
       ],
       gateway_flags: [],
+      message_id: [],
     };
     return { request };
   }

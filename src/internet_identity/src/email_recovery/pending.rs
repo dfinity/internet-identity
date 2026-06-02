@@ -12,7 +12,8 @@
 
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryError, EmailRecoveryStatus,
+    error_code_name, EmailRecoveryDiagnostics, EmailRecoveryError, EmailRecoveryStatus,
+    VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey, Timestamp};
 use std::cell::RefCell;
@@ -82,6 +83,14 @@ pub struct PendingChallenge {
     /// `email_recovery_get_delegation` can recover the seed without
     /// recomputing it. `None` on the setup path.
     pub recovery_outcome: Option<RecoveryOutcome>,
+    /// Gateway-supplied correlation id from the inbound `SmtpRequest`
+    /// (`SmtpRequest.message_id`), captured in `handle_smtp_request`
+    /// the first time an email bearing this nonce arrives. Surfaced
+    /// verbatim by `email_recovery_diagnostics` so a support ticket can
+    /// be lined up across the gateway and canister logs. Public,
+    /// non-sensitive; `None` until an email arrives (or if the gateway
+    /// omitted it).
+    pub message_id: Option<String>,
 }
 
 /// Cached output of a successful recovery flow. Used to answer
@@ -274,6 +283,55 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
     })
 }
 
+/// Read public diagnostics for a pending challenge. Mirrors
+/// [`status_of`]'s lazy-expire-on-read semantics: an entry past its TTL
+/// is evicted and reported as `None`, and an unknown nonce is likewise
+/// `None` — the same observable collapse `status_of` makes to
+/// `Expired`, so this query is no more of an existence oracle than that
+/// one.
+///
+/// The returned record is **strictly public** (see
+/// [`EmailRecoveryDiagnostics`]): the gateway `message_id`, a coarse
+/// reason code (variant name only), the verification path, and the
+/// challenge creation time. No address, anchor, principal, or inner
+/// error string is ever included.
+pub fn diagnostics_of(nonce: &str, now_secs: u64) -> Option<EmailRecoveryDiagnostics> {
+    PENDING.with(|cell| {
+        let mut map = cell.borrow_mut();
+
+        // Lazy-expire on read, exactly like `status_of`, so a polled
+        // diagnostics read sees a timely eviction rather than stale state.
+        if let Some(challenge) = map.get(nonce) {
+            if is_expired_at(challenge, now_secs) {
+                map.remove(nonce);
+                return None;
+            }
+        }
+
+        let c = map.get(nonce)?;
+        let reason_code = match &c.status {
+            PendingStatus::Pending => "Pending".to_string(),
+            PendingStatus::NeedDkimLeaf { .. } => "NeedDkimLeaf".to_string(),
+            PendingStatus::Succeeded => "Succeeded".to_string(),
+            PendingStatus::Expired => "Expired".to_string(),
+            // Variant NAME only — never the inner payload. See
+            // `error_code_name` for why this stays strictly public.
+            PendingStatus::Failed(e) => format!("Failed:{}", error_code_name(e)),
+        };
+        Some(EmailRecoveryDiagnostics {
+            message_id: c.message_id.clone(),
+            reason_code,
+            verification_path: if c.cached_root_dnskey.is_some() {
+                VerificationPath::Dnssec
+            } else {
+                VerificationPath::Doh
+            },
+            // `created_at_secs` is Unix-seconds; `Timestamp` is ns.
+            created_at: c.created_at_secs.saturating_mul(1_000_000_000),
+        })
+    })
+}
+
 /// Look up a pending challenge by nonce, applying the TTL check, and
 /// run a closure against its mutable state. Returns `None` if the
 /// nonce is unknown or has just expired.
@@ -353,6 +411,7 @@ mod tests {
             partial_verification: None,
             status: PendingStatus::Pending,
             recovery_outcome: None,
+            message_id: None,
         }
     }
 
@@ -471,6 +530,63 @@ mod tests {
         let outcome = with_mut("n1", t + super::super::CHALLENGE_TTL_SECS, |_| ());
         assert!(outcome.is_none());
         // And the entry was evicted in the process.
+        assert_eq!(len_for_tests(), 0);
+    }
+
+    #[test]
+    fn diagnostics_of_unknown_nonce_returns_none() {
+        // Unknown and expired collapse to `None`, mirroring how
+        // `status_of` collapses both to `Expired` — no existence oracle.
+        reset_for_tests();
+        assert!(diagnostics_of("never-issued", 0).is_none());
+    }
+
+    #[test]
+    fn diagnostics_of_surfaces_message_id_reason_and_path() {
+        reset_for_tests();
+        insert_with_eviction("n1".into(), challenge("a@x.com", 100), 100);
+        // Simulate `handle_smtp_request`: capture the gateway id, then a
+        // verification failure flips the status to `Failed`.
+        with_mut("n1", 200, |c| {
+            c.message_id = Some("<gw-123@gateway.example>".into());
+            c.status = PendingStatus::Failed(EmailRecoveryError::AddressMismatch);
+        });
+        let d = diagnostics_of("n1", 200).expect("diagnostics present");
+        assert_eq!(d.message_id.as_deref(), Some("<gw-123@gateway.example>"));
+        assert_eq!(d.reason_code, "Failed:AddressMismatch");
+        // The test `challenge()` helper has no cached root DNSKEY → DoH.
+        assert_eq!(d.verification_path, VerificationPath::Doh);
+        // `created_at` is the challenge creation time, in ns.
+        assert_eq!(d.created_at, 100u64.saturating_mul(1_000_000_000));
+    }
+
+    #[test]
+    fn diagnostics_of_reason_code_is_variant_name_only() {
+        // A still-`Pending` challenge reports "Pending"; the failure code
+        // is the variant NAME only — never the inner payload (here a
+        // domain) — keeping the copyable blob strictly public.
+        reset_for_tests();
+        insert_with_eviction("n1".into(), challenge("a@x.com", 100), 100);
+        assert_eq!(diagnostics_of("n1", 200).unwrap().reason_code, "Pending");
+        with_mut("n1", 200, |c| {
+            c.status = PendingStatus::Failed(EmailRecoveryError::DomainNotAllowlisted(
+                "secret-domain.example".into(),
+            ));
+        });
+        let code = diagnostics_of("n1", 200).unwrap().reason_code;
+        assert_eq!(code, "Failed:DomainNotAllowlisted");
+        assert!(!code.contains("secret-domain"));
+    }
+
+    #[test]
+    fn diagnostics_of_expires_on_ttl() {
+        reset_for_tests();
+        let created_at = 1_000;
+        insert_with_eviction("n1".into(), challenge("a@x.com", created_at), created_at);
+        // Just under the TTL → present.
+        assert!(diagnostics_of("n1", created_at + super::super::CHALLENGE_TTL_SECS - 1).is_some());
+        // Right at the TTL → None, and the entry is evicted on read.
+        assert!(diagnostics_of("n1", created_at + super::super::CHALLENGE_TTL_SECS).is_none());
         assert_eq!(len_for_tests(), 0);
     }
 }

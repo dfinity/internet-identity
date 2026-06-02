@@ -544,6 +544,20 @@ export interface EmailRecoveryCredential {
   'address' : string,
   'last_used' : [] | [Timestamp],
 }
+/**
+ * Strictly-public, user-copyable diagnostics for one pending challenge
+ * (see email_recovery_diagnostics). Intended for a support ticket so a
+ * case can be lined up across the SMTP gateway logs and the canister's
+ * production logs via message_id. NO email address, anchor, principal,
+ * delegation/seed, or inner error string — reason_code is the failing
+ * variant's name only.
+ */
+export interface EmailRecoveryDiagnostics {
+  'created_at' : Timestamp,
+  'verification_path' : VerificationPath,
+  'message_id' : [] | [string],
+  'reason_code' : string,
+}
 export interface EmailRecoveryDnsInput {
   'dns_proof' : [] | [DnsProofBundle],
   'address' : string,
@@ -1401,6 +1415,15 @@ export interface SmtpRequest {
   'envelope' : [] | [SmtpEnvelope],
   'message' : [] | [SmtpMessage],
   'gateway_flags' : [] | [Array<string>],
+  /**
+   * Optional gateway-supplied correlation id for one inbound message
+   * (e.g. the RFC 5322 Message-ID or a gateway-assigned tracking id).
+   * The canister does not interpret it; it lets a reported case be
+   * lined up across the SMTP gateway logs and the canister's production
+   * logs during support investigations. Capped at 256 bytes; oversize
+   * values are rejected with code 555.
+   */
+  'message_id' : [] | [string],
 }
 /**
  * Error returned by `smtp_request` / `smtp_request_validate`.
@@ -1440,6 +1463,13 @@ export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'NameTooLong' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
+/**
+ * Which trust path the canister used (or will use) to verify the
+ * challenge email. Public — already chosen by the FE and derivable
+ * from the public deploy config.
+ */
+export type VerificationPath = { 'Doh' : null } |
+  { 'Dnssec' : null };
 export type VerifyTentativeDeviceResponse = {
     /**
      * Device registration mode is off, either due to timeout or because it was never enabled.
@@ -1647,6 +1677,10 @@ export interface _SERVICE {
     [IdentityNumber, string],
     { 'Ok' : null } |
       { 'Err' : EmailRecoveryError }
+  >,
+  'email_recovery_diagnostics' : ActorMethod<
+    [string],
+    [] | [EmailRecoveryDiagnostics]
   >,
   'email_recovery_get_delegation' : ActorMethod<
     [EmailRecoveryGetDelegationArgs],

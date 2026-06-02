@@ -625,6 +625,24 @@ type EmailRecoveryStatus = variant {
     Expired;
 };
 
+// Which trust path the canister used (or will use) to verify the
+// challenge email. Public — already chosen by the FE and derivable
+// from the public deploy config.
+type VerificationPath = variant { Doh; Dnssec };
+
+// Strictly-public, user-copyable diagnostics for one pending challenge
+// (see email_recovery_diagnostics). Intended for a support ticket so a
+// case can be lined up across the SMTP gateway logs and the canister's
+// production logs via message_id. NO email address, anchor, principal,
+// delegation/seed, or inner error string — reason_code is the failing
+// variant's name only.
+type EmailRecoveryDiagnostics = record {
+    message_id : opt text;
+    reason_code : text;
+    verification_path : VerificationPath;
+    created_at : Timestamp;
+};
+
 type EmailRecoveryGetDelegationArgs = record {
     nonce       : text;
     session_key : SessionKey;
@@ -671,6 +689,13 @@ type SmtpRequest = record {
     message : opt SmtpMessage;
     envelope : opt SmtpEnvelope;
     gateway_flags : opt vec text;
+    // Optional gateway-supplied correlation id for one inbound message
+    // (e.g. the RFC 5322 Message-ID or a gateway-assigned tracking id).
+    // The canister does not interpret it; it lets a reported case be
+    // lined up across the SMTP gateway logs and the canister's production
+    // logs during support investigations. Capped at 256 bytes; oversize
+    // values are rejected with code 555.
+    message_id : opt text;
 };
 
 // Error returned by `smtp_request` / `smtp_request_validate`.
@@ -1489,6 +1514,7 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
+    email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
     email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });

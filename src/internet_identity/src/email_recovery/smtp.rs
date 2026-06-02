@@ -259,6 +259,21 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // and the global eviction sweep on the next `insert_with_eviction`
     // call cleans up any other expired entries.
     let snapshot = match pending::with_mut(&nonce, now_secs, |c| {
+        // Retain the gateway-supplied correlation id on the user's own
+        // (nonce-keyed) entry as early as possible — before the
+        // recipient/kind dispatch below — so `email_recovery_diagnostics`
+        // can surface it even in silent-drop cases where the entry exists
+        // but we don't process the email (e.g. a recipient/kind mismatch).
+        //
+        // First-writer-wins: only record an id if we haven't captured one
+        // yet, so a gateway redelivery — which can arrive after the DNSSEC
+        // path has flipped to `NeedDkimLeaf` — can't clobber the decisive
+        // email's id and surface a misleading one in diagnostics. A later
+        // delivery still fills it in when the first carried none. Length
+        // already bounded by `validate_smtp_request` at the top of this fn.
+        if c.message_id.is_none() {
+            c.message_id = request.message_id.clone();
+        }
         let kind = match (&c.kind, recipient_flow) {
             (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
                 SnapshotKind::Setup { anchor: *anchor }
@@ -1045,6 +1060,7 @@ mod tests {
             }),
             message: None,
             gateway_flags: None,
+            message_id: None,
         }
     }
 
@@ -1183,6 +1199,7 @@ mod tests {
             envelope: None,
             message: None,
             gateway_flags: None,
+            message_id: None,
         };
         assert_smtp_err_code(handle_smtp_request_validate(req), SMTP_ERR_SYNTAX_ERROR);
     }
@@ -1243,6 +1260,7 @@ mod tests {
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
+            message_id: None,
         }
     }
 
