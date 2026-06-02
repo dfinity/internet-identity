@@ -6,6 +6,7 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   addVirtualAuthenticator,
+  openManageMenuIfMobile,
 } from "../../utils";
 import { test } from "../../fixtures";
 import { SSO_OPENID_PORT } from "../../fixtures/sso";
@@ -49,6 +50,7 @@ test("Authorize by signing in with an existing passkey", async ({
 test("Authorize by signing in from another device", async ({
   browser,
   page,
+  isMobile,
   identities,
   addAuthenticatorForIdentity,
   signInWithIdentity,
@@ -141,12 +143,7 @@ test("Authorize by signing in from another device", async ({
         .waitFor({ state: "hidden" });
 
       // Navigate to access methods
-      const menuButton = otherDevicePage.getByRole("button", {
-        name: "Open menu",
-      });
-      if (await menuButton.isVisible()) {
-        await menuButton.click();
-      }
+      await openManageMenuIfMobile(otherDevicePage, isMobile);
       await otherDevicePage.getByRole("link", { name: "Access" }).click();
 
       // Verify we have two passkeys

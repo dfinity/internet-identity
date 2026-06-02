@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { II_URL } from "../../utils";
+import { II_URL, openManageMenuIfMobile } from "../../utils";
 
 test.describe("Session re-authentication", () => {
   test("Shows re-auth dialog after session timeout and re-authenticates", async ({
@@ -66,6 +66,7 @@ test.describe("Session re-authentication", () => {
 test.describe("Dashboard Navigation", () => {
   test("User can register, sign in, access the dashboard and navigate to security page", async ({
     page,
+    isMobile,
     identities,
     signInWithIdentity,
     managePage,
@@ -75,10 +76,7 @@ test.describe("Dashboard Navigation", () => {
     await managePage.assertVisible();
 
     // Navigate to access methods
-    const menuButton = page.getByRole("button", { name: "Open menu" });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
-    }
+    await openManageMenuIfMobile(page, isMobile);
     await page.getByRole("link", { name: "Access" }).click();
 
     // Check that we have one passkey listed
@@ -115,6 +113,7 @@ test.describe("Dashboard Navigation", () => {
 
     test("User can switch between identities", async ({
       page,
+      isMobile,
       managePage,
       identities,
       addAuthenticatorForIdentity,
@@ -134,10 +133,7 @@ test.describe("Dashboard Navigation", () => {
       ).toBeVisible();
 
       // Navigate to access methods
-      const menuButton = page.getByRole("button", { name: "Open menu" });
-      if (await menuButton.isVisible()) {
-        await menuButton.click();
-      }
+      await openManageMenuIfMobile(page, isMobile);
       await page.getByRole("link", { name: "Access" }).click();
 
       // Switch to second identity
