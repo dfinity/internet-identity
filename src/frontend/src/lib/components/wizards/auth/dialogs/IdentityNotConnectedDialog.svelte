@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
     providerName: string;
@@ -9,6 +10,7 @@
     userEmail?: string;
     onSignUp: () => void;
     onRecover: () => void;
+    loading?: boolean;
   }
 
   let {
@@ -18,6 +20,7 @@
     userEmail,
     onSignUp,
     onRecover,
+    loading = false,
   }: Props = $props();
 </script>
 
@@ -66,7 +69,14 @@
     </span>
   </div>
 
-  <button onclick={onSignUp} class="btn btn-primary btn-lg mt-3 w-full">
+  <button
+    onclick={onSignUp}
+    disabled={loading}
+    class="btn btn-primary btn-lg mt-3 w-full gap-2"
+  >
+    {#if loading}
+      <ProgressRing class="size-5" />
+    {/if}
     {$t`Sign up`}
   </button>
 
