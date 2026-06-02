@@ -28,7 +28,7 @@
   import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
   import type { EmailRecoveryDnsInput } from "$lib/generated/internet_identity_types";
-  import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
+  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
     fromMnemonicWithoutValidation,
@@ -355,13 +355,13 @@
 
   // Trigger email recovery wizard (set up or replace, depending on
   // whether an email is already bound). Used by the home dashboard's
-  // smart-action strip when EMAIL_RECOVERY_SETUP is enabled.
+  // smart-action strip when EMAIL_RECOVERY is enabled.
   afterNavigate(() => {
     if (!("email" in page.state)) {
       return;
     }
     replaceState("", {});
-    if ($EMAIL_RECOVERY_SETUP) {
+    if ($EMAIL_RECOVERY) {
       showEmailRecoverySetup = true;
     }
   });
@@ -403,10 +403,10 @@
     />
   {/if}
 
-  <!-- Recovery email card. Gated by the EMAIL_RECOVERY_SETUP feature
-       flag (default false; auto-enabled on id.ai and beta.id.ai by the
+  <!-- Recovery email card. Gated by the EMAIL_RECOVERY feature
+       flag (default false; auto-enabled on beta.id.ai by the
        flag's init callback). -->
-  {#if $EMAIL_RECOVERY_SETUP}
+  {#if $EMAIL_RECOVERY}
     {#if emailRecovery !== undefined}
       <ActiveEmailRecovery
         credential={emailRecovery}
@@ -421,7 +421,7 @@
   {/if}
 </div>
 
-{#if !$EMAIL_RECOVERY_SETUP}
+{#if !$EMAIL_RECOVERY}
   <section>
     <h2 class="text-text-primary mt-10 text-lg font-semibold">
       {$t`How to stay secure`}

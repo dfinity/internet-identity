@@ -161,12 +161,9 @@ class ManageRecoveryPage {
   async activate<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
-    // Target the phrase card's button by its full aria-label: the recovery
-    // email card (shown when EMAIL_RECOVERY_SETUP is on, e.g. on id.ai) renders
-    // its own "Activate" button, so a bare "Activate" match is ambiguous.
     await this.#page
       .getByRole("main")
-      .getByRole("button", { name: "Activate recovery phrase" })
+      .getByRole("button", { name: "Activate" })
       .click();
     return this.#withWizard(fn);
   }

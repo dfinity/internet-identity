@@ -118,38 +118,20 @@ export const MIN_GUIDED_UPGRADE = createFeatureFlagStore(
   false,
 );
 
-// Init callback shared by the email-recovery flags. Defaults the flag on for
-// the production and beta domains (`id.ai`, `beta.id.ai`) and leaves it off
-// everywhere else, but an explicit canister-config value always wins: when the
-// operator configured the flag, a `false` stays off on every domain and a
-// `true` stays on. We use `temporaryOverride` so the value is re-derived on
-// every load and a manual `set()` from the console still takes precedence.
-const enableOnIdAiDomains =
-  (name: string) =>
-  (featureFlag: FeatureFlag): void => {
-    if (getConfiguredFeatureFlag(name) !== undefined) {
-      return;
-    }
-    const { hostname } = window.location;
-    if (hostname === "id.ai" || hostname === "beta.id.ai") {
-      featureFlag.temporaryOverride(true);
-    }
-  };
-
-/// Recover an identity with a previously bound recovery email (the
-/// recover-with-email flow on the `/recovery` sign-in page).
+/// Email-based recovery method (design doc §8). Default `false`
+/// everywhere except `beta.id.ai`, where the init callback flips it
+/// on so internal beta testers can exercise the wizard without
+/// reaching for the browser console. Same override path as
+/// `GUIDED_UPGRADE` above — we use `temporaryOverride` so a manual
+/// `set()` from the console takes precedence on any host.
 export const EMAIL_RECOVERY = createFeatureFlagStore(
   "EMAIL_RECOVERY",
   false,
-  enableOnIdAiDomains("EMAIL_RECOVERY"),
-);
-
-/// Set up, replace or remove a recovery email on an identity (the recovery
-/// email card in the manage area and the dashboard's set-up smart-action).
-export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
-  "EMAIL_RECOVERY_SETUP",
-  false,
-  enableOnIdAiDomains("EMAIL_RECOVERY_SETUP"),
+  (featureFlag) => {
+    if (window.location.hostname === "beta.id.ai") {
+      featureFlag.temporaryOverride(true);
+    }
+  },
 );
 
 export default {
@@ -160,5 +142,4 @@ export default {
   GUIDED_UPGRADE,
   MIN_GUIDED_UPGRADE,
   EMAIL_RECOVERY,
-  EMAIL_RECOVERY_SETUP,
 } as Record<string, FeatureFlagStore>;

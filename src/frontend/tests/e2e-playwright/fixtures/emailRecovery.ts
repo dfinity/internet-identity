@@ -57,36 +57,30 @@ function makeFromAddress(): string {
 }
 
 /**
- * Force the email-recovery feature off via `localStorage` before the
- * page's JS runs.
- *
- * The feature is gated by two flags: `EMAIL_RECOVERY` (the
- * recover-with-email flow) and `EMAIL_RECOVERY_SETUP` (the set-up /
- * management surface). Both default *on* for `id.ai`, which the e2e
- * suite runs against (`II_URL`), so there's nothing to do to enable
- * them. To exercise the off-path we persist `false` for both keys,
- * which beats the domain default in `featureFlags.ts`.
+ * Inject `localStorage` overrides for the email-recovery feature
+ * flag before the page's JS runs. The runtime flag store at
+ * `lib/state/featureFlags.ts` reads from this key on init, so this
+ * is enough to flip the flag without faking the page hostname.
  *
  * The corresponding key shape is the runtime constant
  * `LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name` from `featureFlags.ts`.
- * We hardcode the literals here on purpose — if the runtime prefix
+ * We hardcode the literal here on purpose — if the runtime prefix
  * changes we want the test to fail loudly.
  */
-async function disableEmailRecoveryFlags(page: Page) {
-  await page.addInitScript(() => {
-    try {
-      window.localStorage.setItem(
-        "ii-localstorage-feature-flags__EMAIL_RECOVERY",
-        JSON.stringify(false),
-      );
-      window.localStorage.setItem(
-        "ii-localstorage-feature-flags__EMAIL_RECOVERY_SETUP",
-        JSON.stringify(false),
-      );
-    } catch {
-      // localStorage may be locked in some test contexts.
-    }
-  });
+async function setEmailRecoveryFlag(page: Page, on: boolean) {
+  await page.addInitScript(
+    ({ value }) => {
+      try {
+        window.localStorage.setItem(
+          "ii-localstorage-feature-flags__EMAIL_RECOVERY",
+          JSON.stringify(value),
+        );
+      } catch {
+        // localStorage may be locked in some test contexts.
+      }
+    },
+    { value: on },
+  );
 }
 
 class EmailRecoveryWizard {
@@ -197,10 +191,12 @@ class EmailRecoveryFixtures {
   // Flag + card surface — used by every email-recovery test
   // ---------------------------------------------------------------
 
-  // The flags default on for `id.ai` (the suite's `II_URL`), so the
-  // "on" tests need no setup. Only the off-path is forced explicitly.
+  async enableFlag(): Promise<void> {
+    await setEmailRecoveryFlag(this.#page, true);
+  }
+
   async disableFlag(): Promise<void> {
-    await disableEmailRecoveryFlags(this.#page);
+    await setEmailRecoveryFlag(this.#page, false);
   }
 
   async assertSetupCardVisible(): Promise<void> {
