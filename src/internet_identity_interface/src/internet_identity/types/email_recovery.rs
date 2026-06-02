@@ -260,6 +260,36 @@ pub enum EmailRecoveryError {
     InternalCanisterError(String),
 }
 
+/// Stable, public reason code for an `EmailRecoveryError`: the variant
+/// **name** only, dropping every inner payload (`String` / `Principal`).
+///
+/// Used to build [`EmailRecoveryDiagnostics::reason_code`] for the
+/// user-copyable support blob. Returning the bare discriminant is what
+/// keeps that blob strictly public — variants like
+/// `EmailVerificationFailed(String)`, `InternalCanisterError(String)`,
+/// `DomainNotAllowlisted(String)` and `Unauthorized(Principal)` carry
+/// payloads (domains, principals, free-form internal detail) that must
+/// never leak into it. Mirrors the FE's existing `failureReason()`,
+/// which already treats the variant name as the stable reason.
+pub fn error_code_name(error: &EmailRecoveryError) -> &'static str {
+    match error {
+        EmailRecoveryError::Unauthorized(_) => "Unauthorized",
+        EmailRecoveryError::NonceUnknown => "NonceUnknown",
+        EmailRecoveryError::NonceExpired => "NonceExpired",
+        EmailRecoveryError::DomainNotAllowlisted(_) => "DomainNotAllowlisted",
+        EmailRecoveryError::DohFetchFailed(_) => "DohFetchFailed",
+        EmailRecoveryError::DomainNotSupported(_) => "DomainNotSupported",
+        EmailRecoveryError::EmailVerificationFailed(_) => "EmailVerificationFailed",
+        EmailRecoveryError::DkimLeafMismatch => "DkimLeafMismatch",
+        EmailRecoveryError::NoDkimLeafExpected => "NoDkimLeafExpected",
+        EmailRecoveryError::AddressMismatch => "AddressMismatch",
+        EmailRecoveryError::SubjectNotSigned => "SubjectNotSigned",
+        EmailRecoveryError::AddressAlreadyRegistered => "AddressAlreadyRegistered",
+        EmailRecoveryError::AddressNotRegistered => "AddressNotRegistered",
+        EmailRecoveryError::InternalCanisterError(_) => "InternalCanisterError",
+    }
+}
+
 /// Polling result for a pending challenge. The FE polls
 /// `email_recovery_status(nonce)` at 1–5 s cadence until it sees a
 /// terminal variant — or sees `NeedDkimLeaf`, which is the trigger
@@ -299,6 +329,47 @@ pub enum EmailRecoveryStatus {
     Failed(EmailRecoveryError),
     /// 30-minute TTL elapsed without an email matching the nonce.
     Expired,
+}
+
+/// Which trust path the canister used (or will use) to verify the
+/// challenge email. Decided at prepare time: a supplied DNSSEC skeleton
+/// bundle → `Dnssec`; otherwise the DoH allowlist → `Doh`. Public — the
+/// FE already chose the branch and the deploy config is public, so
+/// surfacing it leaks nothing.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
+pub enum VerificationPath {
+    Doh,
+    Dnssec,
+}
+
+/// Strictly-public, user-copyable diagnostics for one pending
+/// challenge, returned by `email_recovery_diagnostics(nonce)`.
+///
+/// Intended to be pasted into a support ticket so the case can be lined
+/// up against the SMTP gateway logs and the canister's production logs
+/// via `message_id`. Every field here is deliberately
+/// **non-sensitive**: there is NO email address, NO anchor number, NO
+/// principal, NO delegation/seed material, and NO inner error string —
+/// `reason_code` is the failing variant's *name* only (see
+/// [`error_code_name`]). Readable only by whoever holds the 64-bit
+/// nonce, exactly like `EmailRecoveryStatus`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
+pub struct EmailRecoveryDiagnostics {
+    /// The gateway-supplied `SmtpRequest.message_id`, verbatim. `None`
+    /// until an email bearing this nonce reaches the canister (or if
+    /// the gateway omitted it). This is the cross-log correlation id.
+    pub message_id: Option<String>,
+    /// Coarse, stable status/failure code: the current lifecycle state
+    /// (`"Pending"`, `"NeedDkimLeaf"`, `"Succeeded"`, `"Expired"`), or
+    /// for a failed challenge `"Failed:<Variant>"` (variant name only,
+    /// never a payload).
+    pub reason_code: String,
+    /// The trust path this challenge is on.
+    pub verification_path: VerificationPath,
+    /// Challenge creation time, nanoseconds since the Unix epoch
+    /// (matches this crate's `Timestamp` encoding). Bounds the incident
+    /// to the ~30-minute challenge window for log lookup.
+    pub created_at: Timestamp,
 }
 
 /// Argument shape for `email_recovery_get_delegation` — mirrors the

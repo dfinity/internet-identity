@@ -28,8 +28,10 @@
   import SendConfirmationEmail from "./views/SendConfirmationEmail.svelte";
   import FailedView from "./views/FailedView.svelte";
   import UnsupportedDomain from "./views/UnsupportedDomain.svelte";
+  import { buildDiagnosticsBlob } from "./diagnostics";
   import type {
     EmailRecoveryChallenge,
+    EmailRecoveryDiagnostics,
     EmailRecoveryDnsInput,
     EmailRecoveryError,
     EmailRecoveryStatus,
@@ -53,6 +55,8 @@
     prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
     /** Anonymous wrapper around `email_recovery_status` (query). */
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
+    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
     /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
     submitDkimLeaf: (
       arg: EmailRecoverySubmitDkimLeafArg,
@@ -62,7 +66,8 @@
     onSuccess: (address: string) => void;
   }
 
-  const { prepare, status, submitDkimLeaf, onSuccess }: Props = $props();
+  const { prepare, status, diagnostics, submitDkimLeaf, onSuccess }: Props =
+    $props();
 
   type Stage =
     | { kind: "enter"; initialError?: string }
@@ -84,7 +89,7 @@
         path: Path;
       }
     | { kind: "unsupported"; domain: string }
-    | { kind: "failed"; reason: string };
+    | { kind: "failed"; reason: string; diagnostics?: string };
 
   let stage = $state<Stage>({ kind: "enter" });
 
@@ -177,6 +182,19 @@
     return "Unexpected status from the canister.";
   };
 
+  // Best-effort fetch of the canister's strictly-public diagnostics for
+  // this challenge, formatted into a copyable blob (incl. the gateway
+  // `message_id`). The pending entry is sticky on `Failed`, so this read
+  // lands while it's still present; on any hiccup we fall back to
+  // FE-only fields so the user always gets something to share.
+  const collectDiagnostics = async (nonce: string): Promise<string> => {
+    try {
+      return buildDiagnosticsBlob((await diagnostics(nonce))[0]);
+    } catch {
+      return buildDiagnosticsBlob(undefined);
+    }
+  };
+
   const handleAddressSubmitted = async (address: string) => {
     setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.AddressSubmitted);
     const domain = address.split("@")[1] ?? "";
@@ -257,7 +275,12 @@
             reason: failureReason(result),
           });
           setupEmailRecoveryFunnel.close();
-          stage = { kind: "failed", reason: friendlyError(result) };
+          const diagnosticsBlob = await collectDiagnostics(nonce);
+          stage = {
+            kind: "failed",
+            reason: friendlyError(result),
+            diagnostics: diagnosticsBlob,
+          };
           return;
         }
         if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
@@ -296,7 +319,12 @@
                   { reason: failureReason(submission) },
                 );
                 setupEmailRecoveryFunnel.close();
-                stage = { kind: "failed", reason: friendlyError(submission) };
+                const diagnosticsBlob = await collectDiagnostics(nonce);
+                stage = {
+                  kind: "failed",
+                  reason: friendlyError(submission),
+                  diagnostics: diagnosticsBlob,
+                };
                 return;
               }
             }
@@ -358,5 +386,9 @@
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
 {:else}
-  <FailedView reason={stage.reason} onRetry={handleRetry} />
+  <FailedView
+    reason={stage.reason}
+    diagnostics={stage.diagnostics}
+    onRetry={handleRetry}
+  />
 {/if}

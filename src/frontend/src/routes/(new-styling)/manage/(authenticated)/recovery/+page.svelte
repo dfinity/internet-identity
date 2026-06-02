@@ -271,6 +271,10 @@
   const statusEmailRecovery = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);
 
+  /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
+  const diagnosticsEmailRecovery = (nonce: string) =>
+    anonymousActor.email_recovery_diagnostics(nonce);
+
   /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
   const submitEmailDkimLeaf = (
     arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
@@ -493,6 +497,7 @@
     <SetupEmailRecoveryWizard
       prepare={prepareAddEmail}
       status={statusEmailRecovery}
+      diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
       onSuccess={handleEmailWizardSuccess}
     />
