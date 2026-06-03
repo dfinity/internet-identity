@@ -294,11 +294,17 @@ test("App mode succeeds once CLI access is enabled in Settings", async ({
   await page.waitForURL(II_URL + "/manage");
 
   // On mobile the sidebar nav is behind a menu button; open it first.
+  // Wait for the /manage sidebar to render — `waitForURL` resolves when
+  // the URL flips, but the layout's first paint can land a tick later
+  // and `isVisible()` does not auto-wait, so probing immediately can
+  // return a stale false on mobile and skip the menu open click.
+  const settingsLink = page.getByRole("link", { name: "Settings" });
+  await settingsLink.waitFor();
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Settings" }).click();
+  await settingsLink.click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch").click();
   await page
@@ -347,11 +353,17 @@ test("`--app` derives a different identity than generic mode for the same identi
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
+  // Wait for the /manage sidebar to render — `waitForURL` resolves when
+  // the URL flips, but the layout's first paint can land a tick later
+  // and `isVisible()` does not auto-wait, so probing immediately can
+  // return a stale false on mobile and skip the menu open click.
+  const settingsLink = page.getByRole("link", { name: "Settings" });
+  await settingsLink.waitFor();
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Settings" }).click();
+  await settingsLink.click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch").click();
   await page
@@ -408,11 +420,17 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   await page.goto(II_URL);
   await signInWithIdentity(page, identityNumber);
   await page.waitForURL(II_URL + "/manage");
+  // Wait for the /manage sidebar to render — `waitForURL` resolves when
+  // the URL flips, but the layout's first paint can land a tick later
+  // and `isVisible()` does not auto-wait, so probing immediately can
+  // return a stale false on mobile and skip the menu open click.
+  const settingsLink = page.getByRole("link", { name: "Settings" });
+  await settingsLink.waitFor();
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Settings" }).click();
+  await settingsLink.click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch").click();
   await page
