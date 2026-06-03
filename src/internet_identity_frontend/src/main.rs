@@ -260,14 +260,17 @@ fn get_asset_headers(
 /// base-uri 'none':
 ///   Prevents injection of <base> tags that could redirect relative URLs
 ///
-/// form-action 'self' http://127.0.0.1:* http://[::1]:*:
+/// form-action 'self' http://127.0.0.1:*:
 ///   The CLI authorize flow (`/cli`) delivers the delegation to the CLI's
 ///   loopback callback via a top-level form POST (a top-level navigation
 ///   avoids Chrome's Local Network Access permission prompt that a `fetch`
 ///   would trigger). Submissions are restricted to same origin and the http
-///   loopback literals the `/cli` callback parser accepts (127.0.0.1, ::1) —
-///   `localhost` is intentionally excluded there (it can resolve off-loopback)
-///   so it's omitted here too — so a form can never post to a remote origin.
+///   127.0.0.1 loopback the `/cli` callback parser accepts. CSP's host-source
+///   grammar can't express IPv6 literals — `http://[::1]:*` is rejected as an
+///   invalid source and silently ignored by the browser — so IPv6 loopback
+///   isn't allowlistable here; the `/cli` parser only accepts 127.0.0.1 to
+///   match. `localhost` is also excluded (it can resolve off-loopback) — so a
+///   form can never post to a remote origin.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -333,7 +336,7 @@ fn get_content_security_policy(
          img-src 'self' data: https://*.googleusercontent.com;\
          script-src {script_src};\
          base-uri 'none';\
-         form-action 'self' http://127.0.0.1:* http://[::1]:*;\
+         form-action 'self' http://127.0.0.1:*;\
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
