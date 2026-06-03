@@ -80,14 +80,14 @@
   const openIdProviders = backendCanisterConfig.openid_configs?.[0] ?? [];
 </script>
 
-<div class="flex flex-col items-stretch gap-5">
+<div class="flex flex-col items-stretch gap-7">
   {#if !supportsPasskeys}
     <Alert
       title={$t`Passkeys not available here`}
       description={$t`Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue.`}
     />
   {/if}
-  <div class="flex flex-col items-stretch gap-3">
+  <div class="flex flex-col items-stretch gap-2">
     <button
       class="btn btn-primary btn-xl h-14"
       onclick={setupOrUseExistingPasskey}

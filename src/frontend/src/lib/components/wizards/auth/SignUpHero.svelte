@@ -32,8 +32,7 @@
   });
 </script>
 
-<div class="relative -mt-2 mb-5 w-full overflow-hidden">
-  <div class="halftone absolute -inset-x-20 inset-y-0" aria-hidden="true"></div>
+<div class="relative -mt-2 mb-8 w-full overflow-hidden">
   <div class="relative flex justify-center py-4">
     <PasskeyIllustration class="text-text-primary h-32" />
   </div>
@@ -57,20 +56,3 @@
     {words[index]}
   </span>
 </p>
-
-<style>
-  .halftone {
-    background-image: radial-gradient(
-      circle,
-      color-mix(in oklab, var(--fg-primary) 36%, transparent) 1px,
-      transparent 1.4px
-    );
-    background-size: 22px 22px;
-    mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
-    -webkit-mask-image: radial-gradient(
-      ellipse at center,
-      black 0%,
-      transparent 70%
-    );
-  }
-</style>
