@@ -272,6 +272,11 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
       // Assert that dashboard is shown
       await page.waitForURL(II_URL + "/manage");
       await expect(
@@ -306,6 +311,11 @@ test.describe("First visit", () => {
       const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
+
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
 
       const name = "John Doe";
       await page.getByLabel("Identity name").fill(name);
