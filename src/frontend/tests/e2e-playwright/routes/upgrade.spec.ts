@@ -2,9 +2,9 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import {
   addVirtualAuthenticator,
+  authorize,
   fromBase64URL,
   getCredentialsFromVirtualAuthenticator,
-  II_URL,
   LEGACY_II_URL,
   removeVirtualAuthenticator,
   addCredentialToVirtualAuthenticator,
@@ -14,7 +14,7 @@ import {
 
 const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
 
-test("Can upgrade identity", async ({ page, managePage, identities }) => {
+test("Can upgrade identity", async ({ page, identities }) => {
   // Navigate to legacy page that doesn't redirect
   await page.goto(LEGACY_II_URL + "/self-service");
 
@@ -89,53 +89,73 @@ test("Can upgrade identity", async ({ page, managePage, identities }) => {
     nonLegacyIdentity.getPublicKey().toDer(),
   );
 
-  // Verify identity can be upgraded multiple times
+  // The dedicated upgrade panel on /authorize is gated by the
+  // GUIDED_UPGRADE feature flag, which only auto-enables when the page
+  // loads on a non-primary origin (legacy domain). Persisting the
+  // override in localStorage beats the domain-based default and gives
+  // every popup opened in this context a visible "Upgrade" entry.
+  await page.context().addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        "ii-localstorage-feature-flags__GUIDED_UPGRADE",
+        JSON.stringify(true),
+      );
+    } catch {
+      // localStorage may be locked in some test contexts.
+    }
+  });
+
+  // Verify identity can be upgraded multiple times via the dapp-driven
+  // /authorize flow — the new canonical entry point for legacy users.
   for (let attempt = 0; attempt < 3; attempt++) {
-    // Navigate to the new II_URL to trigger the upgrade flow
-    await page.goto(II_URL);
-    const authenticatorId = await addVirtualAuthenticator(page);
-    await addCredentialToVirtualAuthenticator(
-      page,
-      authenticatorId,
-      legacyCredential,
-    );
+    await authorize(page, async (authPage) => {
+      const authenticatorId = await addVirtualAuthenticator(authPage);
+      await addCredentialToVirtualAuthenticator(
+        authPage,
+        authenticatorId,
+        legacyCredential,
+      );
 
-    // On the first attempt the sign-in state's auth picker is rendered
-    // inline on the landing page; on later attempts a last-used identity
-    // exists, so we open the picker via "Add identity", which surfaces
-    // it inside a dialog.
-    if (attempt > 0) {
-      await page.getByRole("button", { name: "Add identity" }).click();
-    }
+      // First attempt: the panel renders expanded with a primary
+      // "Upgrade your identity" button. After the first success the
+      // panel collapses (state persisted to `ii-guided-upgrade-collapsed`
+      // in localStorage) and the entry becomes the secondary "Upgrade"
+      // link in the collapsed header.
+      const upgradeButton =
+        attempt === 0
+          ? authPage.getByRole("button", { name: "Upgrade your identity" })
+          : authPage.getByRole("button", { name: "Upgrade", exact: true });
+      await upgradeButton.click();
 
-    // Select the passkey authentication method (page-scoped works for
-    // both: inline on first attempt, inside the dialog on later ones).
-    await page.getByRole("button", { name: "Sign in with passkey" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Upgrade" }).click();
+      const dialog = authPage.getByRole("dialog");
+      await dialog
+        .getByPlaceholder("Internet Identity number")
+        .fill(identities[0].identityNumber.toString());
+      await dialog.getByRole("button", { name: "Continue" }).click();
 
-    // Enter the identity number
-    await dialog
-      .getByPlaceholder("Internet Identity number")
-      .fill(identities[0].identityNumber.toString());
-    await dialog.getByRole("button", { name: "Continue" }).click();
+      // On subsequent attempts the identity is already migrated; the
+      // wizard surfaces the "already upgraded" view with an explicit
+      // "Upgrade again" CTA.
+      if (attempt > 0) {
+        await expect(
+          dialog.getByRole("heading", { name: "Identity already upgraded" }),
+        ).toBeVisible();
+        await dialog.getByRole("button", { name: "Upgrade again" }).click();
+      }
 
-    // On subsequent attempts, we expect a message that the identity is already upgraded
-    if (attempt > 0) {
-      await expect(
-        dialog.getByRole("heading", { name: "Identity already upgraded" }),
-      ).toBeVisible();
-      await dialog.getByRole("button", { name: "Upgrade again" }).click();
-    }
+      // Complete the upgrade. The wizard creates a fresh passkey in the
+      // authenticator and routes to the success view.
+      await dialog.getByLabel("Identity name").fill(identities[0].name);
+      await dialog.getByRole("button", { name: "Upgrade identity" }).click();
 
-    // Complete the upgrade process
-    await dialog.getByLabel("Identity name").fill(identities[0].name);
-    await dialog.getByRole("button", { name: "Upgrade identity" }).click();
-    await expect(dialog).toBeHidden();
-    await managePage.assertVisible();
+      // Cleanup the popup's authenticator before driving the success
+      // view forward — the next iteration spins up a fresh authenticator
+      // and re-attaches the legacy credential alone.
+      await removeVirtualAuthenticator(authPage, authenticatorId);
 
-    // Cleanup by removing the newly added authenticator and signing out
-    await managePage.signOut();
-    await removeVirtualAuthenticator(page, authenticatorId);
+      // The success view auto-redirects to the dapp after a 5s
+      // countdown; clicking is faster and matches a real user.
+      await authPage.getByRole("button", { name: /Go to the app/ }).click();
+    });
   }
 });
