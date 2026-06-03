@@ -318,7 +318,7 @@ test.describe("First visit", () => {
         .click();
 
       const name = "John Doe";
-      await page.getByLabel("Identity name").fill(name);
+      await page.getByLabel("Identity name").pressSequentially(name);
       await page.getByRole("button", { name: "Create identity" }).click();
 
       await page.waitForURL(II_URL + "/manage");
