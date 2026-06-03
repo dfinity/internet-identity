@@ -2,9 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 
 // IdentityAlreadyLinkedDialog is a pure-presentational Svelte component.
 // @testing-library/svelte is not installed; rendering and click behaviour
-// are covered by the Playwright E2E spec (authorize/auth-disambiguation.spec.ts).
-// This file covers the prop contract logic shared by every page that renders
-// the dialog.
+// are covered by the Playwright E2E spec
+// `routes/authorize/auth-disambiguation.spec.ts`, which is introduced in
+// the routes PR stacked on top of this one (the dialog primitive lands
+// here ahead of being wired into any user-facing flow).
+// This file covers the prop contract logic shared by every page that
+// renders the dialog.
 
 describe("IdentityAlreadyLinkedDialog prop contract", () => {
   it("userName falls back to userEmail when name is absent", () => {

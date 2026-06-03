@@ -37,7 +37,7 @@
 
   <div class="mt-4 flex flex-col items-center py-5">
     <div class="flex items-center gap-3">
-      {#each [fromMethod, toMethod] as method (method)}
+      {#each [fromMethod, toMethod] as method, i (i)}
         <span class="relative inline-block size-14 shrink-0">
           <span
             class="bg-bg-primary border-border-secondary text-fg-disabled flex size-14 items-center justify-center rounded-full border"

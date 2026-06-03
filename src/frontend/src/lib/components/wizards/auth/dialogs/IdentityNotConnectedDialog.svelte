@@ -82,7 +82,7 @@
 
   <details class="group border-border-secondary mt-4 border-t pt-4">
     <summary
-      class="text-text-tertiary flex cursor-pointer list-none items-center justify-between text-sm font-semibold outline-none"
+      class="text-text-tertiary focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex cursor-pointer list-none items-center justify-between rounded-sm text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     >
       <span>{$t`Why am I seeing this?`}</span>
       <ChevronDownIcon

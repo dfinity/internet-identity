@@ -7,7 +7,10 @@ type AccessMethod =
 
 // SwitchAccessMethodDialog is a pure-presentational Svelte component.
 // @testing-library/svelte is not installed; rendering is covered by
-// the Playwright E2E spec (authorize/auth-disambiguation.spec.ts).
+// the Playwright E2E spec `routes/authorize/auth-disambiguation.spec.ts`,
+// which is introduced in the routes PR stacked on top of this one (the
+// dialog primitive lands here ahead of being wired into any user-facing
+// flow).
 // This file covers the extractable pure `methodLabel` logic and the
 // cross-variant combinations the brief calls out.
 

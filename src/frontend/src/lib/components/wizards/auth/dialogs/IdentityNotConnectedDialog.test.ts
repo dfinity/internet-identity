@@ -3,9 +3,11 @@ import { describe, it, expect, vi } from "vitest";
 // IdentityNotConnectedDialog is a pure-presentational Svelte component.
 // @testing-library/svelte is not installed in this project, so component
 // rendering is covered by the Playwright E2E spec
-// (authorize/auth-disambiguation.spec.ts). This file covers the one
-// extractable pure-logic piece: the prop contract used by the parent
-// pages to decide what to pass.
+// `routes/authorize/auth-disambiguation.spec.ts`, which is introduced in
+// the routes PR stacked on top of this one (the dialog primitive lands
+// here ahead of being wired into any user-facing flow).
+// This file covers the one extractable pure-logic piece: the prop
+// contract used by the parent pages to decide what to pass.
 
 describe("IdentityNotConnectedDialog prop contract", () => {
   it("userName falls back to userEmail when name is absent", () => {
