@@ -238,9 +238,7 @@ export class IdentityWizard {
       await continueWithPasskey.click();
       const dialog = this.#page.getByRole("dialog");
       await expect(dialog).toBeVisible();
-      await dialog
-        .getByRole("button", { name: "Create new identity" })
-        .click();
+      await dialog.getByRole("button", { name: "Create new identity" }).click();
     } else {
       // The picker is in sign-in mode by default on the new homepage.
       // Switch to sign-up via the picker's toggle CTA, which surfaces
