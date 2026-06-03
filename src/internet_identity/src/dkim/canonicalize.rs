@@ -141,13 +141,17 @@ pub fn relaxed_body(body: &[u8]) -> Vec<u8> {
     }
 
     if lines.is_empty() {
-        // RFC 6376 §3.4.3 (cited by §3.4.4): "a completely empty or
-        // missing body is canonicalized as a single 'CRLF'; that is,
-        // the canonicalized length will be 2 octets". Same rule for
-        // both simple and relaxed body canonicalization. Returning
-        // Vec::new() here would make `bh=` checks fail for valid
-        // signatures over empty-body messages.
-        return b"\r\n".to_vec();
+        // RFC 6376 §3.4.4: relaxed canonicalisation of a completely
+        // empty or missing body is the zero-length ("null") input — its
+        // body hash is SHA-256("") = 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=.
+        // This DIFFERS from §3.4.3 simple, which canonicalises an empty
+        // body to a single CRLF (SHA-256("\r\n") =
+        // frcCV1k9oG9oKj3dpUqdJg1PxRT2RSN/XKdLCPjaYaY=). Returning
+        // b"\r\n" here would compute the *simple* hash and make `bh=`
+        // fail for every relaxed-signed empty-body message — the common
+        // case for minimal MTAs and mail clients that send a literally
+        // empty body (e.g. Apple Mail). `simple_body` keeps the CRLF.
+        return Vec::new();
     }
 
     // Join with CRLF terminators; the algorithm guarantees a single
@@ -295,12 +299,14 @@ mod tests {
     // --- Body tests ---
 
     #[test]
-    fn relaxed_body_empty_canonicalizes_to_crlf() {
-        // RFC 6376 §3.4.3: a completely empty body is canonicalized
-        // as a single CRLF (2 octets). This rule applies to both
-        // simple and relaxed canonicalization; without it, valid
-        // DKIM signatures over empty bodies would fail bh= checks.
-        assert_eq!(relaxed_body(b""), b"\r\n");
+    fn relaxed_body_empty_canonicalizes_to_null_input() {
+        // RFC 6376 §3.4.4: a completely empty or missing body is
+        // canonicalized to the zero-length ("null") input under the
+        // *relaxed* algorithm — NOT a single CRLF. (The CRLF rule is
+        // §3.4.3 simple, handled by `simple_body`.) Returning b"\r\n"
+        // here computes the simple body hash and breaks bh= for every
+        // relaxed-signed empty-body message.
+        assert_eq!(relaxed_body(b""), b"");
     }
 
     #[test]
@@ -351,13 +357,33 @@ mod tests {
     }
 
     #[test]
-    fn relaxed_body_only_whitespace_canonicalizes_to_crlf() {
+    fn relaxed_body_only_whitespace_canonicalizes_to_null_input() {
         // The whole body is one WSP-only line. After per-line WSP
         // stripping it's the empty line, which then gets dropped by
         // the trailing-empty-lines clause. Result: the body is
-        // effectively empty, which RFC 6376 §3.4.3 canonicalises to
-        // a single CRLF.
+        // effectively empty, which RFC 6376 §3.4.4 (relaxed)
+        // canonicalises to the zero-length input.
         let body = b"   \r\n";
-        assert_eq!(relaxed_body(body), b"\r\n");
+        assert_eq!(relaxed_body(body), b"");
+    }
+
+    #[test]
+    fn relaxed_body_empty_matches_rfc_6376_bh_constant() {
+        // End-to-end anchor: the SHA-256 of the relaxed-canonicalised
+        // empty body, base64-encoded, must equal the constant RFC 6376
+        // §3.4.4 publishes for an empty body. A regression here means a
+        // relaxed-signed empty-body message would fail the bh= check —
+        // exactly the Apple Mail / minimal-MTA report this test guards.
+        use base64::engine::general_purpose::STANDARD as BASE64;
+        use base64::Engine;
+        use sha2::{Digest, Sha256};
+
+        let canonical = relaxed_body(b"");
+        let bh = BASE64.encode(Sha256::digest(&canonical));
+        assert_eq!(bh, "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=");
+
+        // And it must NOT collide with the §3.4.3 simple constant, which
+        // is what the old (buggy) b"\r\n" canonical form produced.
+        assert_ne!(bh, "frcCV1k9oG9oKj3dpUqdJg1PxRT2RSN/XKdLCPjaYaY=");
     }
 }
