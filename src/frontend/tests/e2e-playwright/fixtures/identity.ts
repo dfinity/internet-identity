@@ -254,10 +254,13 @@ export class IdentityWizard {
         .getByRole("button", { name: "Sign up with passkey" })
         .click();
     }
-    // Capture the surface before submitting — only the homepage path
-    // navigates to /manage after registration; the /authorize and /cli
-    // popups stay on their own URL and would otherwise time out below.
-    const settlesOnManage = new URL(this.#page.url()).pathname === "/";
+    // Only the homepage flow navigates to /manage after registration.
+    // The /authorize popup also loads at `/` (the root handles authorize
+    // via postMessage) so pathname alone can't distinguish it — check
+    // `opener()` to single out the top-level homepage page.
+    const settlesOnManage =
+      new URL(this.#page.url()).pathname === "/" &&
+      (await this.#page.opener()) === null;
     await this.#page.getByLabel("Identity name").fill(name);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
     if (settlesOnManage) {
