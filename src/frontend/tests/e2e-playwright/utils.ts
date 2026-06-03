@@ -267,6 +267,26 @@ export const signOut = async (page: Page): Promise<void> => {
 };
 
 /**
+ * Opens the manage hamburger menu on the mobile project so a following
+ * section-link click (Access, Settings, …) can't race a not-yet-hydrated
+ * menu. On desktop the links are always visible, so this is a no-op.
+ *
+ * Branch on the `isMobile` fixture rather than a non-waiting
+ * `menuButton.isVisible()` probe: that probe returns `false` while the page
+ * is still hydrating, silently skips opening the menu, and leaves the next
+ * link click waiting on a hidden element until the test times out. Same
+ * fix as cli.spec.ts's Settings navigation.
+ */
+export const openManageMenuIfMobile = async (
+  page: Page,
+  isMobile: boolean,
+): Promise<void> => {
+  if (isMobile) {
+    await page.getByRole("button", { name: "Open menu" }).click();
+  }
+};
+
+/**
  * Opens test app and configures II URL
  */
 export const openTestAppWithII = async (page: Page): Promise<void> => {

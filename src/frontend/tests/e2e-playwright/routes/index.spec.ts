@@ -1,5 +1,9 @@
 import { expect } from "@playwright/test";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import {
+  addVirtualAuthenticator,
+  II_URL,
+  openManageMenuIfMobile,
+} from "../utils";
 import { test } from "../fixtures";
 import { SSO_OPENID_PORT } from "../fixtures/sso";
 
@@ -38,6 +42,7 @@ test.describe("First visit", () => {
   test("Sign in from another device", async ({
     browser,
     page,
+    isMobile,
     identities,
     addAuthenticatorForIdentity,
   }) => {
@@ -120,12 +125,7 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
-      const existingMenuButton = existingDevicePage.getByRole("button", {
-        name: "Open menu",
-      });
-      if (await existingMenuButton.isVisible()) {
-        await existingMenuButton.click();
-      }
+      await openManageMenuIfMobile(existingDevicePage, isMobile);
       await existingDevicePage.getByRole("link", { name: "Access" }).click();
       await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
