@@ -129,7 +129,8 @@ test.describe("Sign out confirmation", () => {
       await confirmation.removeFromDevice();
     });
 
-    // No identities left — should see the inline sign-in auth picker
+    // No identities left — should see the inline auth picker (the
+    // homepage's empty state renders it in sign-in mode).
     await expect(
       page.getByRole("button", { name: "Sign in with passkey" }),
     ).toBeVisible();
