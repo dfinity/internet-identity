@@ -207,7 +207,14 @@
     // a query param after a flow completes) shouldn't yank the mobile menu
     // shut while the user is interacting with it.
     if (nav?.from?.url?.pathname !== nav?.to?.url?.pathname) {
-      isMobileSidebarOpen = false;
+      // Defer the close past the current task so the click that triggered
+      // the navigation finishes propagating before the sidebar slides out;
+      // otherwise on mobile Playwright's auto-wait observes the link
+      // moving off-screen between its actionability check and the click
+      // dispatch, and times out.
+      setTimeout(() => {
+        isMobileSidebarOpen = false;
+      }, 0);
     }
   });
 
