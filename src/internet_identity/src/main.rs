@@ -686,7 +686,7 @@ fn config() -> InternetIdentityInit {
         is_production: persistent_state.is_production,
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
-        backend_origin: None,
+        backend_origin: persistent_state.backend_origin.clone(),
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
     })
@@ -783,6 +783,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(related_origins) = arg.related_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.related_origins = Some(related_origins);
+            })
+        }
+        if let Some(backend_origin) = arg.backend_origin {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.backend_origin = Some(backend_origin);
             })
         }
         if let Some(openid_configs) = arg.openid_configs {
