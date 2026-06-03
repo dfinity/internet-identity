@@ -284,12 +284,42 @@
           return;
         }
         await onSignIn(authResult.identityNumber);
-      } else if (authResult.name !== undefined) {
+        return;
+      }
+      const dispatchNotConnected = resolveOpenIdNotConnectedDispatcher(
+        authResult.type,
+        mode,
+        onOpenIdNotConnected,
+      );
+      if (dispatchNotConnected !== undefined) {
+        return await new Promise<void | "cancelled">((resolve) => {
+          dispatchNotConnected({
+            providerName: result.name ?? result.domain,
+            userName: authResult.name,
+            userEmail: authResult.email,
+            resume: async () => {
+              try {
+                if (authResult.name !== undefined) {
+                  await onSignUp(
+                    await authFlow.completeSsoRegistration(authResult.name),
+                  );
+                } else {
+                  pendingSsoRegistration = true;
+                  authFlow.setupNewIdentity();
+                }
+                resolve();
+              } catch (error) {
+                onError(error);
+                resolve();
+              }
+            },
+            cancel: () => resolve("cancelled"),
+          });
+        });
+      }
+      if (authResult.name !== undefined) {
         await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
       } else {
-        // The SSO IdP didn't supply a name — drive the user to the
-        // name-entry view and mark the deferred completion as SSO so
-        // the callback dispatches to the SSO path.
         pendingSsoRegistration = true;
         authFlow.setupNewIdentity();
       }
