@@ -258,6 +258,7 @@ export class IdentityWizard {
     }
     await this.#page.getByLabel("Identity name").fill(name);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
+    await this.#page.waitForURL(`${II_URL}/manage`);
   }
 
   /**
