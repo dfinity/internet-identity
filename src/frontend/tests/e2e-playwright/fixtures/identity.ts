@@ -254,9 +254,18 @@ export class IdentityWizard {
         .getByRole("button", { name: "Sign up with passkey" })
         .click();
     }
+    // Capture the surface before submitting — only the homepage path
+    // navigates to /manage after registration; the /authorize and /cli
+    // popups stay on their own URL and would otherwise time out below.
+    const settlesOnManage = new URL(this.#page.url()).pathname === "/";
     await this.#page.getByLabel("Identity name").fill(name);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
-    await this.#page.waitForURL(`${II_URL}/manage`);
+    if (settlesOnManage) {
+      // Wait for the registration to actually settle on the canister
+      // before callers inspect the new identity — otherwise the fixture
+      // can race ahead and `lookup_device_key` returns empty.
+      await this.#page.waitForURL(`${II_URL}/manage`);
+    }
   }
 
   /**

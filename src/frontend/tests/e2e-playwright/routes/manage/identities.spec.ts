@@ -129,9 +129,9 @@ test.describe("Sign out confirmation", () => {
       await confirmation.removeFromDevice();
     });
 
-    // No identities left — should see the inline sign-up auth picker
+    // No identities left — should see the inline sign-in auth picker
     await expect(
-      page.getByRole("button", { name: "Continue with passkey" }),
+      page.getByRole("button", { name: "Sign in with passkey" }),
     ).toBeVisible();
   });
 });

@@ -19,8 +19,25 @@ const cliFragment = (params: {
 
 /** Signs up a fresh identity from the inline auth wizard on the current page. */
 const signUp = async (page: Page): Promise<void> => {
-  await page.getByRole("button", { name: "Continue with passkey" }).click();
-  await page.getByRole("button", { name: "Create new identity" }).click();
+  // /cli renders the picker with mode="both" (the original
+  // "Continue with passkey" entry); the homepage now renders mode="signin",
+  // so we toggle to sign-up first and click "Sign up with passkey" instead.
+  const continueWithPasskey = page.getByRole("button", {
+    name: "Continue with passkey",
+  });
+  if (await continueWithPasskey.isVisible()) {
+    await continueWithPasskey.click();
+    await page.getByRole("button", { name: "Create new identity" }).click();
+  } else {
+    const signUpToggle = page.getByRole("button", {
+      name: "Sign up",
+      exact: true,
+    });
+    if (await signUpToggle.isVisible()) {
+      await signUpToggle.click();
+    }
+    await page.getByRole("button", { name: "Sign up with passkey" }).click();
+  }
   await page.getByLabel("Identity name").fill("Test User");
   await page.getByRole("button", { name: "Create identity" }).click();
 };

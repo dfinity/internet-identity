@@ -172,6 +172,14 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      // The inline picker is in sign-in mode on the homepage, so a fresh
+      // OpenID user surfaces the "not connected yet" dialog — confirm
+      // sign-up to proceed to /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
       // Assert that dashboard is shown
       await page.waitForURL(II_URL + "/manage");
       await expect(
@@ -211,6 +219,14 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      // The inline picker is in sign-in mode on the homepage, so a fresh
+      // OpenID user surfaces the "not connected yet" dialog — confirm
+      // sign-up to proceed to the name-entry view.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
       // Enter identity name
       const name = "John Doe";
       await page.getByLabel("Identity name").fill(name);
@@ -246,9 +262,10 @@ test.describe("First visit", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
-      // Pick SSO to continue
+      // Pick SSO to continue — the homepage renders the inline picker in
+      // sign-in mode, so the entry button is "Sign in with SSO".
       await page.goto(II_URL);
-      const popup = await openSsoPopup(page);
+      const popup = await openSsoPopup(page, undefined, "signin");
 
       // Sign in on the IdP page (same flow as direct OpenID)
       const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
@@ -284,7 +301,7 @@ test.describe("First visit", () => {
       openIdUsers,
     }) => {
       await page.goto(II_URL);
-      const popup = await openSsoPopup(page);
+      const popup = await openSsoPopup(page, undefined, "signin");
 
       const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(popup, openIdUsers[0].id);
@@ -339,6 +356,13 @@ test.describe("First visit", () => {
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new OpenID user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Wipe localStorage AND IdP cookies so the second flow is fully
@@ -394,12 +418,19 @@ test.describe("First visit", () => {
     }) => {
       // Sign up first so the user exists in II.
       await page.goto(II_URL);
-      const signUpPopup = await openSsoPopup(page);
+      const signUpPopup = await openSsoPopup(page, undefined, "signin");
       const signUpClosePromise = signUpPopup.waitForEvent("close", {
         timeout: 15_000,
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new SSO user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Wipe localStorage AND IdP cookies so the second flow is fully
@@ -412,7 +443,7 @@ test.describe("First visit", () => {
 
       // Sign in via SSO — the user already exists in II so we should
       // jump straight to /manage without a name prompt.
-      const signInPopup = await openSsoPopup(page);
+      const signInPopup = await openSsoPopup(page, undefined, "signin");
       const signInClosePromise = signInPopup.waitForEvent("close", {
         timeout: 15_000,
       });
@@ -527,6 +558,13 @@ test.describe("Last used identities listed", () => {
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new OpenID user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Sign out (keeps the last-used entry) and clear IdP cookies so the
@@ -575,12 +613,19 @@ test.describe("Last used identities listed", () => {
     }) => {
       // Sign up first to populate the last-used SSO entry.
       await page.goto(II_URL);
-      const signUpPopup = await openSsoPopup(page);
+      const signUpPopup = await openSsoPopup(page, undefined, "signin");
       const signUpClosePromise = signUpPopup.waitForEvent("close", {
         timeout: 15_000,
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new SSO user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Sign out and clear IdP cookies so the re-auth popup actually
