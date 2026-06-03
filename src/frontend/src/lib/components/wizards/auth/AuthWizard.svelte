@@ -22,6 +22,10 @@
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { get } from "svelte/store";
+  import {
+    resolveOpenIdAlreadyLinkedDispatcher,
+    resolveOpenIdNotConnectedDispatcher,
+  } from "./AuthWizard.gating";
 
   interface OpenIdNotConnectedArgs {
     providerName: string;
@@ -171,14 +175,19 @@
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
       const result = await authFlow.continueWithOpenId(config);
       if (result.type === "signIn") {
-        if (mode === "signup" && onOpenIdAlreadyLinked !== undefined) {
+        const dispatchAlreadyLinked = resolveOpenIdAlreadyLinkedDispatcher(
+          result.type,
+          mode,
+          onOpenIdAlreadyLinked,
+        );
+        if (dispatchAlreadyLinked !== undefined) {
           const identityNumber = result.identityNumber;
           // Stay in the in-flight state until the user commits (signIn) or
           // dismisses (cancel); this keeps the picker's loader on the
           // provider button instead of flashing back to the idle state
           // while the disambiguation dialog is open.
           return await new Promise<void | "cancelled">((resolve) => {
-            onOpenIdAlreadyLinked({
+            dispatchAlreadyLinked({
               providerName: config.name,
               providerLogo: config.logo,
               userName: result.name,
@@ -208,10 +217,15 @@
         await onSignIn(result.identityNumber);
         return;
       }
-      if (mode === "signin" && onOpenIdNotConnected !== undefined) {
+      const dispatchNotConnected = resolveOpenIdNotConnectedDispatcher(
+        result.type,
+        mode,
+        onOpenIdNotConnected,
+      );
+      if (dispatchNotConnected !== undefined) {
         pendingSsoRegistration = false;
         return await new Promise<void | "cancelled">((resolve) => {
-          onOpenIdNotConnected({
+          dispatchNotConnected({
             providerName: config.name,
             providerLogo: config.logo,
             userName: result.name,

@@ -60,6 +60,7 @@
     userName?: string;
     userEmail?: string;
     resume: () => Promise<void>;
+    cancel: () => void;
   }>();
 
   let alreadyLinkedPayload = $state<{
@@ -68,6 +69,7 @@
     userName?: string;
     userEmail?: string;
     signIn: () => Promise<void>;
+    cancel: () => void;
   }>();
 
   let methodSwitchPayload = $state<{
@@ -535,7 +537,9 @@
       if (isAuthenticating) {
         return;
       }
+      const cancel = payload.cancel;
       notConnectedPayload = undefined;
+      cancel();
     }}
   >
     <IdentityNotConnectedDialog
@@ -549,7 +553,9 @@
         void resume();
       }}
       onRecover={() => {
+        const cancel = payload.cancel;
         notConnectedPayload = undefined;
+        cancel();
         void goto("/recovery");
       }}
     />
@@ -563,7 +569,9 @@
       if (isAuthenticating) {
         return;
       }
+      const cancel = payload.cancel;
       alreadyLinkedPayload = undefined;
+      cancel();
     }}
   >
     <IdentityAlreadyLinkedDialog
@@ -590,13 +598,7 @@
       : "sso" in previous.authMethod
         ? previous.authMethod.sso.email
         : undefined}
-  <Dialog
-    onClose={() => {
-      const proceed = payload.proceed;
-      methodSwitchPayload = undefined;
-      void proceed();
-    }}
-  >
+  <Dialog onClose={() => (methodSwitchPayload = undefined)}>
     <SwitchAccessMethodDialog
       userName={previous.name ?? previousEmail ?? `${previous.identityNumber}`}
       userEmail={previous.name !== undefined ? previousEmail : undefined}

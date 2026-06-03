@@ -54,16 +54,23 @@
         : $t`Continue with SSO`,
   );
 
+  // Keyed by `${issuer}:${client_id}` — two configs can share an issuer with
+  // different client_ids (e.g. client_id rotation, distinct audiences); using
+  // the composite avoids conflating the loader/tooltip across them.
+  const providerKey = (config: OpenIdConfig) =>
+    `${config.issuer}:${config.client_id}`;
+
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();
 
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
-    authenticatingProviderId = config.issuer;
+    const key = providerKey(config);
+    authenticatingProviderId = key;
     const result = await continueWithOpenId(config);
     authenticatingProviderId = undefined;
 
     if (result === "cancelled") {
-      cancelledProviderId = config.issuer;
+      cancelledProviderId = key;
       await waitFor(4000);
       cancelledProviderId = undefined;
     }
@@ -90,11 +97,12 @@
       {passkeyLabel}
     </button>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
-      {#each openIdProviders as provider (provider.issuer)}
+      {#each openIdProviders as provider (providerKey(provider))}
         {@const name = provider.name}
+        {@const key = providerKey(provider)}
         <Tooltip
           label={$t`Interaction canceled. Please try again.`}
-          hidden={cancelledProviderId !== provider.issuer}
+          hidden={cancelledProviderId !== key}
           manual
         >
           <button
@@ -103,7 +111,7 @@
             disabled={authenticatingProviderId !== undefined}
             aria-label={providerLabel(name)}
           >
-            {#if authenticatingProviderId === provider.issuer}
+            {#if authenticatingProviderId === key}
               <ProgressRing />
             {:else}
               <div class="size-5">

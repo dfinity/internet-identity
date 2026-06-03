@@ -1,8 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // openID imports transitively load featureFlags (localStorage) and globals
 // (canister config). Mock the canister-config globals before the import.
-import { vi } from "vitest";
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: { openid_configs: [] },
   canisterId: "rdmx6-jaaaa-aaaaa-aaadq-cai",
@@ -17,71 +16,76 @@ vi.mock("$lib/state/featureFlags", () => ({
 
 import { isOpenIdCancelError } from "$lib/utils/openID";
 import { CallbackPopupClosedError } from "../../../../routes/(new-styling)/callback/utils";
+import {
+  resolveOpenIdAlreadyLinkedDispatcher,
+  resolveOpenIdNotConnectedDispatcher,
+} from "./AuthWizard.gating";
 
-describe("AuthWizard mode-gating — signIn vs signUp result discrimination", () => {
-  // The mode check in handleContinueWithOpenId reads:
-  //   if (result.type === "signIn") { ... onOpenIdAlreadyLinked gated to signup/both }
-  //   if (result.type === "signUp") { ... onOpenIdNotConnected gated to signin/both }
-  // These tests verify the boolean shape of those checks.
+describe("AuthWizard gating — OpenID disambiguation dispatcher resolution", () => {
+  const handler = () => undefined;
 
-  type Result = { type: "signIn" } | { type: "signUp" };
+  describe("alreadyLinked", () => {
+    it("dispatches in signup mode when result is signIn", () => {
+      expect(
+        resolveOpenIdAlreadyLinkedDispatcher("signIn", "signup", handler),
+      ).toBe(handler);
+    });
 
-  const alreadyLinkedFires = (
-    result: Result,
-    mode: "signin" | "signup" | "both",
-    handlerPresent: boolean,
-  ) =>
-    result.type === "signIn" &&
-    (mode === "signup" || mode === "both") &&
-    handlerPresent;
+    it("does NOT dispatch in both mode (only signup gates the dialog)", () => {
+      expect(
+        resolveOpenIdAlreadyLinkedDispatcher("signIn", "both", handler),
+      ).toBeUndefined();
+    });
 
-  const notConnectedFires = (
-    result: Result,
-    mode: "signin" | "signup" | "both",
-    handlerPresent: boolean,
-  ) =>
-    result.type === "signUp" &&
-    (mode === "signin" || mode === "both") &&
-    handlerPresent;
+    it("does NOT dispatch in signin mode", () => {
+      expect(
+        resolveOpenIdAlreadyLinkedDispatcher("signIn", "signin", handler),
+      ).toBeUndefined();
+    });
 
-  it("alreadyLinked fires in signup mode when result is signIn", () => {
-    expect(alreadyLinkedFires({ type: "signIn" }, "signup", true)).toBe(true);
+    it("does NOT dispatch when the handler is absent", () => {
+      expect(
+        resolveOpenIdAlreadyLinkedDispatcher("signIn", "signup", undefined),
+      ).toBeUndefined();
+    });
+
+    it("does NOT dispatch when result is signUp", () => {
+      expect(
+        resolveOpenIdAlreadyLinkedDispatcher("signUp", "signup", handler),
+      ).toBeUndefined();
+    });
   });
 
-  it("alreadyLinked fires in both mode when result is signIn", () => {
-    expect(alreadyLinkedFires({ type: "signIn" }, "both", true)).toBe(true);
-  });
+  describe("notConnected", () => {
+    it("dispatches in signin mode when result is signUp", () => {
+      expect(
+        resolveOpenIdNotConnectedDispatcher("signUp", "signin", handler),
+      ).toBe(handler);
+    });
 
-  it("alreadyLinked does NOT fire in signin mode even when result is signIn", () => {
-    expect(alreadyLinkedFires({ type: "signIn" }, "signin", true)).toBe(false);
-  });
+    it("does NOT dispatch in both mode (only signin gates the dialog)", () => {
+      expect(
+        resolveOpenIdNotConnectedDispatcher("signUp", "both", handler),
+      ).toBeUndefined();
+    });
 
-  it("alreadyLinked does NOT fire when handler is absent", () => {
-    expect(alreadyLinkedFires({ type: "signIn" }, "both", false)).toBe(false);
-  });
+    it("does NOT dispatch in signup mode", () => {
+      expect(
+        resolveOpenIdNotConnectedDispatcher("signUp", "signup", handler),
+      ).toBeUndefined();
+    });
 
-  it("alreadyLinked does NOT fire when result is signUp", () => {
-    expect(alreadyLinkedFires({ type: "signUp" }, "both", true)).toBe(false);
-  });
+    it("does NOT dispatch when the handler is absent", () => {
+      expect(
+        resolveOpenIdNotConnectedDispatcher("signUp", "signin", undefined),
+      ).toBeUndefined();
+    });
 
-  it("notConnected fires in signin mode when result is signUp", () => {
-    expect(notConnectedFires({ type: "signUp" }, "signin", true)).toBe(true);
-  });
-
-  it("notConnected fires in both mode when result is signUp", () => {
-    expect(notConnectedFires({ type: "signUp" }, "both", true)).toBe(true);
-  });
-
-  it("notConnected does NOT fire in signup mode even when result is signUp", () => {
-    expect(notConnectedFires({ type: "signUp" }, "signup", true)).toBe(false);
-  });
-
-  it("notConnected does NOT fire when handler is absent", () => {
-    expect(notConnectedFires({ type: "signUp" }, "both", false)).toBe(false);
-  });
-
-  it("notConnected does NOT fire when result is signIn", () => {
-    expect(notConnectedFires({ type: "signIn" }, "both", true)).toBe(false);
+    it("does NOT dispatch when result is signIn", () => {
+      expect(
+        resolveOpenIdNotConnectedDispatcher("signIn", "signin", handler),
+      ).toBeUndefined();
+    });
   });
 });
 

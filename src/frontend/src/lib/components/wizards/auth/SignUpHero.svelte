@@ -2,14 +2,14 @@
   import { t } from "$lib/stores/locale.store";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
 
-  const words: string[] = [
+  const words = $derived<string[]>([
     $t`Face ID`,
     $t`a security key`,
     $t`your phone`,
     $t`a pattern`,
     $t`a popular provider`,
     $t`company SSO`,
-  ];
+  ]);
 
   let index = $state(0);
   let shown = $state(true);
