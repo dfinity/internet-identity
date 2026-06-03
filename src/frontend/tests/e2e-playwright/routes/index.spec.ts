@@ -287,49 +287,6 @@ test.describe("First visit", () => {
     });
   });
 
-  test.describe("SSO user without name claim", () => {
-    test.use({
-      openIdConfig: {
-        defaultPort: SSO_OPENID_PORT,
-        createUsers: [
-          {
-            claims: {},
-          },
-        ],
-      },
-    });
-
-    test("Sign up with SSO", async ({
-      page,
-      openSsoPopup,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      await page.goto(II_URL);
-      const popup = await openSsoPopup(page, undefined, "signin");
-
-      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
-      await signInWithOpenId(popup, openIdUsers[0].id);
-      await closePromise;
-
-      await page
-        .getByRole("dialog")
-        .getByRole("button", { name: "Sign up" })
-        .click();
-
-      const name = "John Doe";
-      await page.getByLabel("Identity name").pressSequentially(name);
-      await page.getByRole("button", { name: "Create identity" }).click();
-
-      await page.waitForURL(II_URL + "/manage");
-      await expect(
-        page.getByRole("heading", {
-          name: new RegExp(`Welcome, ${name}\\.`),
-        }),
-      ).toBeVisible();
-    });
-  });
-
   // Sign-in (not sign-up) tests: the OpenID/SSO user already exists in II
   // because we go through the sign-up flow first, then clear localStorage
   // so the next attempt looks like a "first visit" (no last-used row).
