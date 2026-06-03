@@ -408,11 +408,16 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   await page.goto(II_URL);
   await signInWithIdentity(page, identityNumber);
   await page.waitForURL(II_URL + "/manage");
+  // The manage layout's sidebar can finish first paint a tick after the
+  // URL flips, so probing `isVisible()` immediately can return a stale
+  // false on mobile — wait for a stable sidebar element first.
+  const settingsLink = page.getByRole("link", { name: "Settings" });
+  await settingsLink.waitFor();
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Settings" }).click();
+  await settingsLink.click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch").click();
   await page
