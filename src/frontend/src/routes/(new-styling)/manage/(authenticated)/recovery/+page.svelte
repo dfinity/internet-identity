@@ -82,6 +82,9 @@
   const isCurrentAccessMethod = $derived(
     "recoveryPhrase" in $authenticatedStore.authMethod,
   );
+  const isCurrentEmailRecovery = $derived(
+    "emailRecovery" in $authenticatedStore.authMethod,
+  );
   const isUnverified = $derived(
     recoveryPhraseData !== undefined &&
       recoveryPhraseData.last_authentication[0] === undefined &&
@@ -410,6 +413,7 @@
     {#if emailRecovery !== undefined}
       <ActiveEmailRecovery
         credential={emailRecovery}
+        isCurrentAccessMethod={isCurrentEmailRecovery}
         onReplace={() => (showEmailRecoverySetup = true)}
         onRemove={() => (removingEmailRecovery = true)}
       />
