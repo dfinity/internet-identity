@@ -272,12 +272,45 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
-      await page
-        .getByRole("dialog")
-        .getByRole("button", { name: "Sign up" })
-        .click();
-
       // Assert that dashboard is shown
+      await page.waitForURL(II_URL + "/manage");
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${name}\\.`),
+        }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("SSO user without name claim", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: {},
+          },
+        ],
+      },
+    });
+
+    test("Sign up with SSO", async ({
+      page,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await page.goto(II_URL);
+      const popup = await openSsoPopup(page, undefined, "signin");
+
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
+
+      const name = "John Doe";
+      await page.getByLabel("Identity name").fill(name);
+      await page.getByRole("button", { name: "Create identity" }).click();
+
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {
