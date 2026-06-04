@@ -211,9 +211,9 @@ test.describe("AuthWizard passkey picker — no in-dialog upgrade link", () => {
     await page.goto(II_URL);
     await signInWithIdentity(page, identities[0].identityNumber);
 
-    // Now on welcome-back state: open "Add another identity" to reach picker.
+    // Now on welcome-back state: open "Add identity" to reach picker.
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Add another identity" }).click();
+    await page.getByRole("button", { name: "Add identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
 
     const dialog = page.getByRole("dialog");
