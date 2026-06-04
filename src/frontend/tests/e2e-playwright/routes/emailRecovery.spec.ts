@@ -200,7 +200,15 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     // ADP — signed in via email recovery, the recovery-email card
     // disables both Replace and Remove and shows an Active badge.
     // ---------------------------------------------------------------
-    await page.goto(II_URL + "/manage/recovery");
+    // Use the sidebar link, not page.goto: a full reload wipes the
+    // in-memory authentication store and the card would render in
+    // its non-active state.
+    const openMenu = page.getByRole("button", { name: "Open menu" });
+    if (await openMenu.isVisible()) {
+      await openMenu.click();
+    }
+    await page.getByRole("link", { name: "Recovery" }).click();
+    await page.waitForURL(/\/manage\/recovery/);
     const emailCard = page.locator("section").filter({
       has: page.getByRole("heading", { name: "Recovery email" }),
     });
