@@ -5,10 +5,12 @@ import {
   extractIssuerTemplateClaims,
   selectAuthScopes,
   extractIdTokenFromCallback,
+  isOpenIdCancelError,
   OAuthProviderError,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
+import { CallbackPopupClosedError } from "../../routes/(new-styling)/callback/utils";
 
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
@@ -427,5 +429,34 @@ describe("OAuthProviderError", () => {
   it("is an Error instance (so existing `instanceof Error` branches still catch it)", () => {
     const err = new OAuthProviderError("server_error");
     expect(err).toBeInstanceOf(Error);
+  });
+});
+
+describe("isOpenIdCancelError", () => {
+  it("returns true for CallbackPopupClosedError (popup closed by user)", () => {
+    expect(isOpenIdCancelError(new CallbackPopupClosedError())).toBe(true);
+  });
+
+  it("returns true for a NetworkError (FedCM cancel)", () => {
+    const networkError = Object.assign(new Error("failed"), {
+      name: "NetworkError",
+    });
+    expect(isOpenIdCancelError(networkError)).toBe(true);
+  });
+
+  it("returns false for a generic Error", () => {
+    expect(isOpenIdCancelError(new Error("something bad"))).toBe(false);
+  });
+
+  it("returns false for a TypeError", () => {
+    expect(isOpenIdCancelError(new TypeError("bad type"))).toBe(false);
+  });
+
+  it("returns false for a plain string", () => {
+    expect(isOpenIdCancelError("cancel")).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(isOpenIdCancelError(null)).toBe(false);
   });
 });

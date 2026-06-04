@@ -7,10 +7,10 @@
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
-  import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
+  import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
@@ -173,24 +173,12 @@
   {/if}
 {/snippet}
 
-{#if isContinueFromAnotherDeviceVisible}
-  {#if !withinDialog}
-    <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
-      <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
-    </Dialog>
-  {:else}
-    <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
-  {/if}
-{:else if isUpgrading}
-  {#if !withinDialog}
-    <Dialog onClose={() => (isUpgrading = false)}>
-      <MigrationWizard onSuccess={onUpgrade} {onError} />
-    </Dialog>
-  {:else}
-    <MigrationWizard onSuccess={onUpgrade} {onError} />
-  {/if}
-{:else if authFlow.captcha !== undefined}
+{#if authFlow.captcha !== undefined}
   <SolveCaptcha {...authFlow.captcha} />
+{:else if withinDialog && isContinueFromAnotherDeviceVisible}
+  <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
+{:else if withinDialog && isUpgrading}
+  <MigrationWizard onSuccess={onUpgrade} {onError} />
 {:else}
   {#if authFlow.view === "chooseMethod" || !withinDialog}
     {@render children?.()}
@@ -202,21 +190,34 @@
   {/if}
   {#if authFlow.view !== "chooseMethod"}
     {#if !withinDialog}
-      <Dialog
-        onClose={() => {
-          if (isAuthenticating) {
-            return;
-          }
-          pendingSsoRegistration = false;
-          authFlow.chooseMethod();
-        }}
-      >
-        {@render dialogContent()}
-      </Dialog>
+      {#if !isContinueFromAnotherDeviceVisible && !isUpgrading}
+        <Dialog
+          onClose={() => {
+            if (isAuthenticating) {
+              return;
+            }
+            pendingSsoRegistration = false;
+            authFlow.chooseMethod();
+          }}
+        >
+          {@render dialogContent()}
+        </Dialog>
+      {/if}
     {:else}
       {@render dialogContent()}
     {/if}
   {/if}
+{/if}
+
+{#if !withinDialog && isContinueFromAnotherDeviceVisible}
+  <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
+    <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
+  </Dialog>
+{/if}
+{#if !withinDialog && isUpgrading}
+  <Dialog onClose={() => (isUpgrading = false)}>
+    <MigrationWizard onSuccess={onUpgrade} {onError} />
+  </Dialog>
 {/if}
 
 {#if authFlow.systemOverlay}
