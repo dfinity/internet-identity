@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Create the canister pair (backend + frontend) for a new II staging
+# environment, mirroring Staging A/B/C.
+#
+# A staging environment is nothing more than two empty canisters on the IC
+# mainnet — a backend and a frontend — created on, and controlled by, the
+# legacy staging wallet, now reinstalled as the icp-cli *proxy* canister
+# (cvthj-wyaaa-aaaad-aaaaq-cai). `icp canister create --proxy` routes the
+# create_canister call through the proxy, so the new canisters land on the
+# proxy's subnet and inherit it as controller — which is exactly what lets
+# the deploy-*-to-beta scripts install into them later via `--proxy`.
+#
+# This script performs only the one-time *creation* step. Wiring the two
+# printed ids into scripts/deploy-common.bash (the staging_be_id /
+# staging_fe_id case tables + a -sd/--staging-d flag) is what makes the new
+# environment selectable, exactly like -sa/-sb/-sc. The script prints the
+# precise edits to make at the end.
+#
+# Usage:
+#   ./scripts/create-staging [NAME]     # NAME defaults to "d" (Staging-D)
+#   ./scripts/create-staging --dry-run  # print the icp commands, create nothing
+#
+# Requires: `icp` (icp-cli) on PATH, with the identity that controls the
+# proxy canister selected (the same identity used to deploy to staging).
+# Creating canisters spends cycles held by the proxy.
+
+readonly PROXY_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
+readonly IC_NETWORK="ic"
+# Cycles to fund each new canister with. icp-cli's own default is 2T; II
+# staging canisters are data-heavy, so fund a little more headroom. Override
+# with CREATE_CYCLES=... in the environment. Accepts k/m/b/t suffixes.
+CREATE_CYCLES="${CREATE_CYCLES:-5t}"
+
+NAME="d"
+DRY_RUN=false
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+        -h|--help) sed -n '4,28p' "$0"; exit 0 ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *)  NAME="$arg" ;;
+    esac
+done
+
+if [ "$DRY_RUN" = false ] && ! command -v icp >/dev/null 2>&1; then
+    echo "Error: \`icp\` (icp-cli) not on PATH." >&2
+    echo "       Install it and select an identity that controls $PROXY_CANISTER_ID." >&2
+    exit 1
+fi
+
+# Create one detached canister via the proxy and echo its id on stdout
+# (-q makes icp print only the id). All chatter goes to stderr so the id
+# is cleanly capturable with $(...).
+create_one() {
+    local label="$1"
+    local cmd=(
+        icp canister create --detached
+            -n "$IC_NETWORK"
+            --proxy "$PROXY_CANISTER_ID"
+            --cycles "$CREATE_CYCLES"
+            -q
+    )
+    if [ "$DRY_RUN" = true ]; then
+        printf '[dry-run] %s →\n  ' "$label" >&2
+        printf '%q ' "${cmd[@]}" >&2; echo >&2
+        return 0
+    fi
+    echo "Creating $label on $IC_NETWORK via proxy $PROXY_CANISTER_ID (${CREATE_CYCLES} cycles) ..." >&2
+    "${cmd[@]}"
+}
+
+UPPER="$(echo "$NAME" | tr '[:lower:]' '[:upper:]')"
+
+BE_ID="$(create_one "Staging-$UPPER backend")"
+FE_ID="$(create_one "Staging-$UPPER frontend")"
+
+if [ "$DRY_RUN" = true ]; then
+    exit 0
+fi
+
+cat >&2 <<EOF
+
+Created Staging-$UPPER:
+  backend : $BE_ID
+  frontend: $FE_ID
+
+To rely on it like -sa/-sb/-sc, wire these into scripts/deploy-common.bash:
+
+  staging_be_id()  →  $NAME) echo "$BE_ID" ;;
+  staging_fe_id()  →  $NAME) echo "$FE_ID" ;;
+
+and add the flag to parse_common_args (-s$NAME / --staging-$NAME, plus "$NAME"
+in the --staging value validation) and the "$NAME" case in resolve_staging_config.
+
+Then deploy as usual, e.g.:
+  ./scripts/deploy-pr-to-beta -s$NAME -fe -be <PR_NUMBER>
+EOF
