@@ -272,6 +272,13 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      // Fresh SSO user on the homepage surfaces IdentityNotConnectedDialog
+      // — confirm sign-up to land on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
       // Assert that dashboard is shown
       await page.waitForURL(II_URL + "/manage");
       await expect(
@@ -306,6 +313,13 @@ test.describe("First visit", () => {
       const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
+
+      // Fresh SSO user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up so the name-entry view appears.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
 
       const name = "John Doe";
       await page.getByLabel("Identity name").fill(name);

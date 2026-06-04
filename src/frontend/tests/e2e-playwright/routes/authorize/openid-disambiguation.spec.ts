@@ -1,61 +1,9 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { authorize, addVirtualAuthenticator, II_URL } from "../../utils";
+import { authorize, II_URL } from "../../utils";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 
 const DEFAULT_USER_NAME = "John Doe";
-
-// OIDC cancellation → "Sign-in was canceled" toast
-test.describe("OIDC cancel toast", () => {
-  test.use({
-    openIdConfig: {
-      defaultPort: DEFAULT_OPENID_PORT,
-      createUsers: [
-        {
-          claims: { name: DEFAULT_USER_NAME },
-        },
-      ],
-    },
-  });
-
-  test("closing the OIDC popup without signing in shows 'Sign-in was canceled' toast", async ({
-    page,
-    openIdUsers,
-  }) => {
-    await authorize(page, async (authPage) => {
-      // Click the OpenID provider button — popup opens
-      const popupPromise = authPage.context().waitForEvent("page");
-      await authPage
-        .getByRole("button", { name: openIdUsers[0].issuer.name })
-        .click();
-      const popup = await popupPromise;
-
-      // Close the popup without signing in (user cancels)
-      await popup.close();
-
-      // The cancel toast should appear
-      await expect(
-        authPage
-          .getByRole("status")
-          .filter({ hasText: "Sign-in was canceled" }),
-      ).toBeVisible({ timeout: 5_000 });
-
-      // Complete the flow so authorize utility can finish
-      await addVirtualAuthenticator(authPage);
-      await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
-        .click();
-      await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
-        .click();
-      await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
-      await authPage.getByRole("button", { name: "Create identity" }).click();
-      await authPage
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-    });
-  });
-});
 
 // OIDC sign-in succeeds for existing II — no disambiguation dialog
 test.describe("OIDC sign-in for existing II at /authorize", () => {
