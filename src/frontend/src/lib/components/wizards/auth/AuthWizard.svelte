@@ -11,7 +11,6 @@
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
-  import { t } from "$lib/stores/locale.store";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
