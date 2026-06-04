@@ -28,7 +28,16 @@ pub const MAX_EMAIL_USER_BYTES: usize = 64;
 pub const MAX_EMAIL_DOMAIN_BYTES: usize = 255;
 pub const MAX_SUBJECT_BYTES: usize = 256;
 pub const MAX_BODY_BYTES: usize = 5_000;
-pub const MAX_HEADERS: usize = 30;
+/// Cap on the number of headers in one inbound message. Real-world mail
+/// that has traversed several hops accumulates a long run of trace and
+/// authentication headers (`Received`, `Authentication-Results`, `ARC-*`,
+/// and provider-specific `X-MS-Exchange-*` / `X-Microsoft-*` fields), so a
+/// legitimate message routed through Outlook/Exchange routinely carries far
+/// more than a hand-authored one. The original bound of 30 was too tight —
+/// it rejected genuine recovery emails (e.g. 39 headers from Outlook) — so
+/// it is raised to 100 to leave comfortable headroom while still keeping
+/// worst-case allocation on the open `smtp_request` endpoint bounded.
+pub const MAX_HEADERS: usize = 100;
 pub const MAX_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_HEADER_VALUE_BYTES: usize = 8_192;
 /// Cap on the optional gateway-supplied `message_id` correlation id.
@@ -476,6 +485,22 @@ mod tests {
         };
         let resp = validate_message(&msg).unwrap_err();
         assert!(err_msg(&resp).contains("Too many headers"));
+    }
+
+    #[test]
+    fn validate_message_accepts_max_headers() {
+        // Exactly at the cap must still pass — defines the inclusive upper
+        // bound, and guards the motivating case: a message that has picked
+        // up a long run of trace/authentication headers en route (e.g.
+        // through Outlook/Exchange) must not be rejected. From and Date
+        // appear exactly once; the remainder are repeatable trace headers so
+        // the occurrence rules in `validate_header_occurrences` are satisfied.
+        let mut headers = minimal_headers();
+        headers.extend(
+            (0..(MAX_HEADERS - headers.len())).map(|i| header("Received", &format!("hop {i}"))),
+        );
+        assert_eq!(headers.len(), MAX_HEADERS);
+        assert!(validate_message(&message_with(headers)).is_ok());
     }
 
     #[test]

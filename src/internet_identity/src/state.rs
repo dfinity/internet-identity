@@ -111,6 +111,11 @@ pub struct PersistentState {
     pub captcha_config: CaptchaConfig,
     // Configuration for Related Origins Requests
     pub related_origins: Option<Vec<String>>,
+    // Origin of the II backend canister (e.g. "https://backend.id.ai", no
+    // trailing slash). Served — alongside the related origins — in the
+    // `.well-known/ic-domains` asset so the backend is reachable on its
+    // custom domain.
+    pub backend_origin: Option<String>,
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
@@ -155,6 +160,7 @@ impl Default for PersistentState {
             active_authn_method_stats: ActivityStats::new(time),
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
+            backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,
             sso_discoverable_domains: None,
