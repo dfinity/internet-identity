@@ -118,13 +118,20 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
+      // Wait for the /manage sidebar to render before probing the mobile
+      // menu — `isVisible()` doesn't auto-wait, so probing too early
+      // leaves the menu closed and the Access link click times out.
+      const accessLink = existingDevicePage.getByRole("link", {
+        name: "Access",
+      });
+      await accessLink.waitFor();
       const existingMenuButton = existingDevicePage.getByRole("button", {
         name: "Open menu",
       });
       if (await existingMenuButton.isVisible()) {
         await existingMenuButton.click();
       }
-      await existingDevicePage.getByRole("link", { name: "Access" }).click();
+      await accessLink.click();
       await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
       // Switch to new device and verify we are signed in
@@ -227,6 +234,12 @@ test.describe("First visit", () => {
         .getByRole("button", { name: "Sign up" })
         .click();
 
+      // Wait for the CreateIdentity view before filling so the dismissed
+      // disambiguation dialog's backdrop can't intercept the next click.
+      await expect(
+        page.getByRole("heading", { name: "What's your name?" }),
+      ).toBeVisible();
+
       // Enter identity name
       const name = "John Doe";
       await page.getByLabel("Identity name").fill(name);
@@ -320,6 +333,13 @@ test.describe("First visit", () => {
         .getByRole("dialog")
         .getByRole("button", { name: "Sign up" })
         .click();
+
+      // Wait for the CreateIdentity view to fully render before filling
+      // the name — the IdentityNotConnectedDialog backdrop animating out
+      // can otherwise intercept the subsequent Create-identity click.
+      await expect(
+        page.getByRole("heading", { name: "What's your name?" }),
+      ).toBeVisible();
 
       const name = "John Doe";
       await page.getByLabel("Identity name").fill(name);
