@@ -1566,9 +1566,6 @@ msgstr "Your passkeys and recovery phrase are unaffected. You can add a recovery
 msgid "your phone"
 msgstr "your phone"
 
-msgid "Your progress on this step will be lost."
-msgstr "Your progress on this step will be lost."
-
 msgid "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."
 msgstr "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."
 

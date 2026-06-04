@@ -11,10 +11,10 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import {
     AuthWizard,
-    IdentityAlreadyLinkedDialog,
-    IdentityNotConnectedDialog,
+    IdentityAlreadyLinked,
+    IdentityNotConnected,
     SignUpHero,
-    SwitchAccessMethodDialog,
+    SwitchAccessMethod,
   } from "$lib/components/wizards/auth";
   import {
     afterNavigate,
@@ -27,7 +27,7 @@
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { backendCanisterConfig } from "$lib/globals";
-  import type { AccessMethod } from "$lib/components/wizards/auth/dialogs/SwitchAccessMethodDialog.svelte";
+  import type { AccessMethod } from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import {
     AuthenticationV2Events,
@@ -542,7 +542,7 @@
       cancel();
     }}
   >
-    <IdentityNotConnectedDialog
+    <IdentityNotConnected
       providerName={payload.providerName}
       providerLogo={payload.providerLogo}
       userName={payload.userName ?? payload.userEmail ?? payload.providerName}
@@ -574,7 +574,7 @@
       cancel();
     }}
   >
-    <IdentityAlreadyLinkedDialog
+    <IdentityAlreadyLinked
       providerName={payload.providerName}
       providerLogo={payload.providerLogo}
       userName={payload.userName ?? payload.userEmail ?? payload.providerName}
@@ -599,7 +599,7 @@
         ? previous.authMethod.sso.email
         : undefined}
   <Dialog onClose={() => (methodSwitchPayload = undefined)}>
-    <SwitchAccessMethodDialog
+    <SwitchAccessMethod
       userName={previous.name ?? previousEmail ?? `${previous.identityNumber}`}
       userEmail={previous.name !== undefined ? previousEmail : undefined}
       fromMethod={authMethodToAccessMethod(previous.authMethod)}
