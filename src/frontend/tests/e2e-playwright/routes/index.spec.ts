@@ -239,11 +239,15 @@ test.describe("First visit", () => {
         page.getByRole("heading", { name: "What's your name?" }),
       ).toBeVisible();
 
-      // pressSequentially fires input events per keystroke so Svelte's
-      // bind:value commits the value before Create-identity's disabled
-      // prop is re-evaluated (see SSO no-name twin below).
+      // On mobile the HTML <dialog>'s native focus trap lands on the
+      // Close button before CreateIdentity's onMount can focus the
+      // input, so we click the input first to take focus before fill —
+      // otherwise the typed value never reaches the bound `name` state
+      // and the Create-identity button stays disabled.
       const name = "John Doe";
-      await page.getByLabel("Identity name").pressSequentially(name);
+      const input = page.getByLabel("Identity name");
+      await input.click();
+      await input.fill(name);
       await page.getByRole("button", { name: "Create identity" }).click();
 
       // Assert that dashboard is shown
@@ -340,13 +344,15 @@ test.describe("First visit", () => {
         page.getByRole("heading", { name: "What's your name?" }),
       ).toBeVisible();
 
-      // pressSequentially fires input events per keystroke so Svelte's
-      // bind:value commits the value before Create-identity's disabled
-      // prop is re-evaluated. .fill() can race the binding on mobile
-      // after the IdentityNotConnectedDialog → CreateIdentity transition,
-      // leaving the button stuck in its disabled state.
+      // On mobile the HTML <dialog>'s native focus trap lands on the
+      // Close button before CreateIdentity's onMount can focus the
+      // input, so we click the input first to take focus before fill —
+      // otherwise the typed value never reaches the bound `name` state
+      // and the Create-identity button stays disabled.
       const name = "John Doe";
-      await page.getByLabel("Identity name").pressSequentially(name);
+      const input = page.getByLabel("Identity name");
+      await input.click();
+      await input.fill(name);
       await page.getByRole("button", { name: "Create identity" }).click();
 
       await page.waitForURL(II_URL + "/manage");
