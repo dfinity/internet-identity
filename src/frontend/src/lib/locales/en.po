@@ -97,9 +97,6 @@ msgstr "<0>Seamless passkey integration:</0> We continue to embrace passkeys as 
 msgid "A 24-word phrase you write down and keep offline."
 msgstr "A 24-word phrase you write down and keep offline."
 
-msgid "A few things could be going on:"
-msgstr "A few things could be going on:"
-
 msgid "About"
 msgstr "About"
 
@@ -168,9 +165,6 @@ msgstr "Advanced identity management"
 
 msgid "Allow to access this info"
 msgstr "Allow to access this info"
-
-msgid "Already connected"
-msgstr "Already connected"
 
 msgid "Already signed-in"
 msgstr "Already signed-in"
@@ -292,9 +286,6 @@ msgstr "Confirmation code"
 msgid "Confirming..."
 msgstr "Confirming..."
 
-msgid "Connected"
-msgstr "Connected"
-
 msgid "Connection closed"
 msgstr "Connection closed"
 
@@ -343,9 +334,6 @@ msgstr "Create new identity"
 msgid "Create passkey"
 msgstr "Create passkey"
 
-msgid "Create your Identity"
-msgstr "Create your Identity"
-
 msgid "Created {0}"
 msgstr "Created {0}"
 
@@ -381,12 +369,6 @@ msgstr "Default"
 
 msgid "Deny all"
 msgstr "Deny all"
-
-msgid "Discard"
-msgstr "Discard"
-
-msgid "Discard changes?"
-msgstr "Discard changes?"
 
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
@@ -653,9 +635,6 @@ msgstr "It seems like the request could not be processed."
 msgid "It won't be removed from your device or password manager."
 msgstr "It won't be removed from your device or password manager."
 
-msgid "Keep editing"
-msgstr "Keep editing"
-
 msgid "Keep it secret"
 msgstr "Keep it secret"
 
@@ -766,9 +745,6 @@ msgstr "No. Your face ID or fingerprint is only used to create or unlock your pa
 
 msgid "Not activated"
 msgstr "Not activated"
-
-msgid "Not connected yet"
-msgstr "Not connected yet"
 
 msgid "Not upgraded"
 msgstr "Not upgraded"
@@ -1055,14 +1031,8 @@ msgstr "Sign out from this device"
 msgid "Sign out to remove"
 msgstr "Sign out to remove"
 
-msgid "Sign up"
-msgstr "Sign up"
-
 msgid "Sign-in"
 msgstr "Sign-in"
-
-msgid "Sign-in was canceled"
-msgstr "Sign-in was canceled"
 
 msgid "Sign-up"
 msgstr "Sign-up"
@@ -1161,9 +1131,6 @@ msgstr "Switch access method"
 msgid "Switch identity"
 msgstr "Switch identity"
 
-msgid "Switch method"
-msgstr "Switch method"
-
 msgid "Switch to another method before removing"
 msgstr "Switch to another method before removing"
 
@@ -1208,15 +1175,6 @@ msgstr "The phrase was entered correctly but belongs to a product other than Int
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
-
-msgid "This {providerName} account is already connected to an Internet Identity."
-msgstr "This {providerName} account is already connected to an Internet Identity."
-
-msgid "This {providerName} account isn't connected to an Internet Identity yet."
-msgstr "This {providerName} account isn't connected to an Internet Identity yet."
-
-msgid "This account is already attached to your identity. Your active access method will be switched to it."
-msgstr "This account is already attached to your identity. Your active access method will be switched to it."
 
 msgid "This app has moved to the new Internet Identity"
 msgstr "This app has moved to the new Internet Identity"
@@ -1443,9 +1401,6 @@ msgstr "What's your name?"
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you (without ever sharing your personal info or a password)."
 msgstr "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you (without ever sharing your personal info or a password)."
 
-msgid "Why am I seeing this?"
-msgstr "Why am I seeing this?"
-
 msgid "Why isn't this supported?"
 msgstr "Why isn't this supported?"
 
@@ -1515,12 +1470,6 @@ msgstr "You may close this page."
 msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
 msgstr "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
 
-msgid "You signed up before with a different access method."
-msgstr "You signed up before with a different access method."
-
-msgid "You unlinked this {providerName} account from your identity."
-msgstr "You unlinked this {providerName} account from your identity."
-
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 
@@ -1542,14 +1491,8 @@ msgstr "You're all set. Your passkey has been registered."
 msgid "You're signing in as <0>{name}</0>."
 msgstr "You're signing in as <0>{name}</0>."
 
-msgid "You've never used this {providerName} account with Internet Identity."
-msgstr "You've never used this {providerName} account with Internet Identity."
-
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
-
-msgid "Your progress on this step will be lost."
-msgstr "Your progress on this step will be lost."
 
 msgid "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."
 msgstr "Your provider's DKIM key is verified by quorum consensus across independent DNS resolvers."

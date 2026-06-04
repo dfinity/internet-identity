@@ -57,15 +57,10 @@ const enableCliAccessInSettings = async (
   page: Page,
   isMobile: boolean,
 ): Promise<void> => {
-  // `waitForURL` resolves when the URL flips, but the /manage layout's
-  // first paint can land a tick later. Wait for the Settings link so the
-  // menu-button probe below doesn't return a stale false on mobile.
-  const settingsLink = page.getByRole("link", { name: "Settings" });
-  await settingsLink.waitFor();
   if (isMobile) {
     await page.getByRole("button", { name: "Open menu" }).click();
   }
-  await settingsLink.click();
+  await page.getByRole("link", { name: "Settings" }).click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch", { name: "CLI access" }).check();
   await page
