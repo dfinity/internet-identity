@@ -893,14 +893,8 @@ msgstr "Real privacy"
 msgid "Recover"
 msgstr "Recover"
 
-msgid "Recover a legacy identity with its number."
-msgstr "Recover a legacy identity with its number."
-
 msgid "Recover with email"
 msgstr "Recover with email"
-
-msgid "Recover with identity number"
-msgstr "Recover with identity number"
 
 msgid "Recover with phrase"
 msgstr "Recover with phrase"
@@ -1157,6 +1151,9 @@ msgstr "SSO sign-in for {domainInput} failed. Please try again."
 
 msgid "Start over"
 msgstr "Start over"
+
+msgid "Still have an identity number?"
+msgstr "Still have an identity number?"
 
 msgid "Still using an identity number?"
 msgstr "Still using an identity number?"

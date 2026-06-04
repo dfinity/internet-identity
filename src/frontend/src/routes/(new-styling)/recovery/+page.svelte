@@ -270,7 +270,6 @@
           <ButtonCard
             onclick={() => (showIdentityNumberDialog = true)}
             class="group !flex-col !items-stretch !gap-1 py-4 text-start"
-            aria-label={$t`Recover with identity number`}
           >
             <span class="flex w-full items-center gap-3">
               <KeyIcon class="text-fg-tertiary size-5 shrink-0" />
@@ -286,9 +285,6 @@
                   "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
                 ]}
               />
-            </span>
-            <span class="text-text-tertiary ps-8 text-sm font-normal">
-              {$t`Recover a legacy identity with its number.`}
             </span>
           </ButtonCard>
         </div>
