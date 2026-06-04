@@ -207,12 +207,9 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     await expect(emailCard.getByText("Active", { exact: true })).toBeVisible();
 
     await emailCard.getByRole("button", { name: "More options" }).click();
-    const replaceItem = page
-      .getByRole("menu")
-      .getByRole("menuitem", { name: "Replace" });
-    const removeItem = page
-      .getByRole("menu")
-      .getByRole("menuitem", { name: "Remove" });
+    const menu = emailCard.getByRole("menu");
+    const replaceItem = menu.getByRole("menuitem", { name: "Replace" });
+    const removeItem = menu.getByRole("menuitem", { name: "Remove" });
     await expect(replaceItem).toBeDisabled();
     await expect(removeItem).toBeDisabled();
 
@@ -221,6 +218,13 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
       page
         .getByRole("tooltip")
         .filter({ hasText: "Sign in with another method before changing" }),
+    ).toBeVisible();
+
+    await removeItem.hover({ force: true });
+    await expect(
+      page
+        .getByRole("tooltip")
+        .filter({ hasText: "Sign in with another method before removing" }),
     ).toBeVisible();
   });
 });

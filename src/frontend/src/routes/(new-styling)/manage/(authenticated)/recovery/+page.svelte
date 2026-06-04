@@ -413,7 +413,7 @@
     {#if emailRecovery !== undefined}
       <ActiveEmailRecovery
         credential={emailRecovery}
-        isCurrentRecoveryMethod={isCurrentEmailRecovery}
+        isCurrentAccessMethod={isCurrentEmailRecovery}
         onReplace={() => (showEmailRecoverySetup = true)}
         onRemove={() => (removingEmailRecovery = true)}
       />

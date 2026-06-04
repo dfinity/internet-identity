@@ -18,14 +18,14 @@
     credential: EmailRecoveryCredential;
     onReplace: () => void;
     onRemove: () => void;
-    isCurrentRecoveryMethod?: boolean;
+    isCurrentAccessMethod?: boolean;
   } & SvelteHTMLElements["section"];
 
   const {
     credential,
     onReplace,
     onRemove,
-    isCurrentRecoveryMethod = false,
+    isCurrentAccessMethod = false,
     class: className,
     ...props
   }: Props = $props();
@@ -40,7 +40,7 @@
 >
   <div class="mb-3 flex h-9 flex-row items-center">
     <MailCheckIcon class="text-fg-success-primary size-6" />
-    {#if isCurrentRecoveryMethod}
+    {#if isCurrentAccessMethod}
       <Tooltip
         label={$t`Currently active`}
         description={$t`This is the recovery method you're currently signed in with.`}
@@ -60,8 +60,8 @@
         {
           label: $t`Replace`,
           icon: PencilIcon,
-          disabled: isCurrentRecoveryMethod,
-          tooltip: isCurrentRecoveryMethod
+          disabled: isCurrentAccessMethod,
+          tooltip: isCurrentAccessMethod
             ? $t`Sign in with another method before changing this email`
             : undefined,
           onClick: onReplace,
@@ -69,8 +69,8 @@
         {
           label: $t`Remove`,
           icon: Trash2Icon,
-          disabled: isCurrentRecoveryMethod,
-          tooltip: isCurrentRecoveryMethod
+          disabled: isCurrentAccessMethod,
+          tooltip: isCurrentAccessMethod
             ? $t`Sign in with another method before removing this email`
             : undefined,
           onClick: onRemove,
@@ -97,7 +97,7 @@
         {$t`Last used`}
       </div>
       <div class="text-text-primary cursor-default text-xs">
-        {#if isCurrentRecoveryMethod}
+        {#if isCurrentAccessMethod}
           <Tooltip
             label={$t`Currently signed in with this recovery email`}
             direction="up"
