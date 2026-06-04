@@ -11,7 +11,6 @@
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
-  import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
@@ -99,7 +98,6 @@
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
-        toaster.info({ title: $t`Sign-in was canceled` });
         return "cancelled";
       }
       onError(error); // Propagate unhandled errors to parent component
@@ -126,7 +124,6 @@
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
-        toaster.info({ title: $t`Sign-in was canceled` });
         return "cancelled";
       }
       onError(error);
