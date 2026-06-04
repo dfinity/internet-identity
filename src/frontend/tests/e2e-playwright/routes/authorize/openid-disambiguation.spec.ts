@@ -48,11 +48,24 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
     await managePage.signOut((c) => c.keepIdentity());
     await page.context().clearCookies();
 
-    // Now sign in via /authorize — known (iss, sub) should go straight to ContinueView
+    // Now sign in via /authorize — known (iss, sub) goes straight to ContinueView.
+    // keepIdentity() left the last-used entry in localStorage, so the picker is
+    // skipped. ContinueView still calls AuthLastUsedFlow.authenticate on Continue
+    // click, which opens an OIDC popup (mediation: "optional").
     await authorize(page, async (authPage) => {
+      await expect(
+        authPage.getByRole("heading", { name: /^Continue to/ }),
+      ).toBeVisible();
+      await expect(
+        authPage.getByRole("heading", { name: "Create your Identity" }),
+      ).toBeHidden();
+      await expect(
+        authPage.getByRole("heading", { name: "Already connected" }),
+      ).toBeHidden();
+
       const signInPopupPromise = authPage.context().waitForEvent("page");
       await authPage
-        .getByRole("button", { name: openIdUsers[0].issuer.name })
+        .getByRole("button", { name: "Continue", exact: true })
         .click();
       const signInPopup = await signInPopupPromise;
       const signInClosePromise = signInPopup.waitForEvent("close", {
@@ -60,17 +73,6 @@ test.describe("OIDC sign-in for existing II at /authorize", () => {
       });
       await signInWithOpenId(signInPopup, openIdUsers[0].id);
       await signInClosePromise;
-
-      // No disambiguation dialog — ContinueView should be visible immediately
-      await expect(
-        authPage.getByRole("heading", { name: "Create your Identity" }),
-      ).toBeHidden();
-      await expect(
-        authPage.getByRole("heading", { name: "Already connected" }),
-      ).toBeHidden();
-      await authPage
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
     });
   });
 });
