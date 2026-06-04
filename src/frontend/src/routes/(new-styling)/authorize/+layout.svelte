@@ -202,9 +202,6 @@
       duration: 4000,
     });
   };
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-  };
   const handleRemoveIdentity = (identityNumber: bigint) => {
     const isCurrent = selectedIdentity?.identityNumber === identityNumber;
     if (isCurrent) {
@@ -346,7 +343,6 @@
               <AuthWizard
                 onSignIn={handleSignIn}
                 onSignUp={handleSignUp}
-                onUpgrade={handleUpgrade}
                 onError={(error) => {
                   isAuthDialogOpen = false;
                   isAuthenticating = false;
@@ -386,7 +382,6 @@
               <AuthWizard
                 onSignIn={handleSignIn}
                 onSignUp={handleSignUp}
-                onUpgrade={handleUpgrade}
                 onError={(error) => {
                   isCreateIdentityDialogOpen = false;
                   isAuthenticating = false;

@@ -7,7 +7,6 @@
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
-  import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
@@ -59,7 +58,6 @@
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     onOpenIdNotConnected?: (args: OpenIdNotConnectedArgs) => void;
     onOpenIdAlreadyLinked?: (args: OpenIdAlreadyLinkedArgs) => void;
@@ -78,7 +76,6 @@
   let {
     onSignIn,
     onSignUp,
-    onUpgrade,
     onError,
     onOpenIdNotConnected,
     onOpenIdAlreadyLinked,
@@ -118,7 +115,6 @@
 
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
-  let isUpgrading = $state(false);
   // True while a deferred SSO registration is awaiting the name-entry view
   // (`setupNewIdentity`). Used by `handleCompleteOpenIdRegistration` to
   // dispatch to `completeSsoRegistration` instead of the direct-provider
@@ -364,7 +360,6 @@
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
-      upgrade={() => (isUpgrading = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
@@ -382,8 +377,6 @@
   <SolveCaptcha {...authFlow.captcha} />
 {:else if withinDialog && isContinueFromAnotherDeviceVisible}
   <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
-{:else if withinDialog && isUpgrading}
-  <MigrationWizard onSuccess={onUpgrade} {onError} />
 {:else}
   {#if authFlow.view === "chooseMethod" || !withinDialog}
     {@render children?.()}
@@ -403,7 +396,7 @@
   {/if}
   {#if authFlow.view !== "chooseMethod"}
     {#if !withinDialog}
-      {#if !isContinueFromAnotherDeviceVisible && !isUpgrading}
+      {#if !isContinueFromAnotherDeviceVisible}
         <Dialog
           onClose={() => {
             if (isAuthenticating) {
@@ -425,11 +418,6 @@
 {#if !withinDialog && isContinueFromAnotherDeviceVisible}
   <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
     <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
-  </Dialog>
-{/if}
-{#if !withinDialog && isUpgrading}
-  <Dialog onClose={() => (isUpgrading = false)}>
-    <MigrationWizard onSuccess={onUpgrade} {onError} />
   </Dialog>
 {/if}
 

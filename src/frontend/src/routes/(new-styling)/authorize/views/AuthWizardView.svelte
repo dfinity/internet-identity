@@ -38,7 +38,6 @@
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     onOpenIdNotConnected?: (args: OpenIdNotConnectedArgs) => void;
     onOpenIdAlreadyLinked?: (args: OpenIdAlreadyLinkedArgs) => void;
@@ -50,7 +49,6 @@
   const {
     onSignIn,
     onSignUp,
-    onUpgrade,
     onError,
     onOpenIdNotConnected,
     onOpenIdAlreadyLinked,
@@ -71,7 +69,6 @@
 <AuthWizard
   {onSignIn}
   {onSignUp}
-  {onUpgrade}
   {onError}
   {onOpenIdNotConnected}
   {onOpenIdAlreadyLinked}
