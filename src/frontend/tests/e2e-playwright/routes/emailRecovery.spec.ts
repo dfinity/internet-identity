@@ -195,5 +195,32 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     await expect(
       page.getByRole("heading", { name: /access methods/i }).first(),
     ).toBeVisible();
+
+    // ---------------------------------------------------------------
+    // ADP — signed in via email recovery, the recovery-email card
+    // disables both Replace and Remove and shows an Active badge.
+    // ---------------------------------------------------------------
+    await page.goto(II_URL + "/manage/recovery");
+    const emailCard = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "Recovery email" }),
+    });
+    await expect(emailCard.getByText("Active", { exact: true })).toBeVisible();
+
+    await emailCard.getByRole("button", { name: "More options" }).click();
+    const replaceItem = page
+      .getByRole("menu")
+      .getByRole("menuitem", { name: "Replace" });
+    const removeItem = page
+      .getByRole("menu")
+      .getByRole("menuitem", { name: "Remove" });
+    await expect(replaceItem).toBeDisabled();
+    await expect(removeItem).toBeDisabled();
+
+    await replaceItem.hover({ force: true });
+    await expect(
+      page
+        .getByRole("tooltip")
+        .filter({ hasText: "Sign in with another method before changing" }),
+    ).toBeVisible();
   });
 });

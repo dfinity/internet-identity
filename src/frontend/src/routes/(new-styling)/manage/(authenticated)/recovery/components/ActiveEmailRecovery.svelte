@@ -11,18 +11,21 @@
   import { nanosToMillis } from "$lib/utils/time";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Select from "$lib/components/ui/Select.svelte";
+  import Badge from "$lib/components/ui/Badge.svelte";
   import type { EmailRecoveryCredential } from "$lib/generated/internet_identity_types";
 
   type Props = {
     credential: EmailRecoveryCredential;
     onReplace: () => void;
     onRemove: () => void;
+    isCurrentRecoveryMethod?: boolean;
   } & SvelteHTMLElements["section"];
 
   const {
     credential,
     onReplace,
     onRemove,
+    isCurrentRecoveryMethod = false,
     class: className,
     ...props
   }: Props = $props();
@@ -37,16 +40,39 @@
 >
   <div class="mb-3 flex h-9 flex-row items-center">
     <MailCheckIcon class="text-fg-success-primary size-6" />
+    {#if isCurrentRecoveryMethod}
+      <Tooltip
+        label={$t`Currently active`}
+        description={$t`This is the recovery method you're currently signed in with.`}
+        direction="up"
+      >
+        <Badge
+          color="success"
+          size="sm"
+          dot
+          class="ms-2 flex-none cursor-default select-none"
+          tabindex={0}>{$t`Active`}</Badge
+        >
+      </Tooltip>
+    {/if}
     <Select
       options={[
         {
           label: $t`Replace`,
           icon: PencilIcon,
+          disabled: isCurrentRecoveryMethod,
+          tooltip: isCurrentRecoveryMethod
+            ? $t`Sign in with another method before changing this email`
+            : undefined,
           onClick: onReplace,
         },
         {
           label: $t`Remove`,
           icon: Trash2Icon,
+          disabled: isCurrentRecoveryMethod,
+          tooltip: isCurrentRecoveryMethod
+            ? $t`Sign in with another method before removing this email`
+            : undefined,
           onClick: onRemove,
         },
       ]}
@@ -71,7 +97,15 @@
         {$t`Last used`}
       </div>
       <div class="text-text-primary cursor-default text-xs">
-        {#if credential.last_used[0] !== undefined}
+        {#if isCurrentRecoveryMethod}
+          <Tooltip
+            label={$t`Currently signed in with this recovery email`}
+            direction="up"
+            align="start"
+          >
+            <span>{$t`Right now`}</span>
+          </Tooltip>
+        {:else if credential.last_used[0] !== undefined}
           {@const date = new Date(nanosToMillis(credential.last_used[0]))}
           <Tooltip
             label={$formatDate(date, {
