@@ -67,6 +67,11 @@
     onSwitchMode?: () => void;
     withinDialog?: boolean;
     mode?: "signin" | "signup" | "both";
+    // Optional override for the picker's switch-mode CTA title — useful
+    // when the wizard is hosted inside a surface (e.g. /manage's Add
+    // identity dialog) where the default "New to Internet Identity?"
+    // copy is misleading.
+    switchModeTitle?: string;
     children?: Snippet;
   }
 
@@ -81,6 +86,7 @@
     onSwitchMode,
     withinDialog = false,
     mode = "both",
+    switchModeTitle,
     children,
   }: Props = $props();
 
@@ -392,6 +398,7 @@
       {mode}
       {onSwitchMode}
       {withinDialog}
+      {switchModeTitle}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}

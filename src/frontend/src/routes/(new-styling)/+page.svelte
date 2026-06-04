@@ -62,6 +62,7 @@
     resume: () => Promise<void>;
     cancel: () => void;
   }>();
+  let isResumingRegistration = $state(false);
 
   let alreadyLinkedPayload = $state<{
     providerName: string;
@@ -71,6 +72,7 @@
     signIn: () => Promise<void>;
     cancel: () => void;
   }>();
+  let isSigningInAlreadyLinked = $state(false);
 
   let methodSwitchPayload = $state<{
     previous: LastUsedIdentity;
@@ -534,7 +536,7 @@
   {@const payload = notConnectedPayload}
   <Dialog
     onClose={() => {
-      if (isAuthenticating) {
+      if (isAuthenticating || isResumingRegistration) {
         return;
       }
       const cancel = payload.cancel;
@@ -547,10 +549,15 @@
       providerLogo={payload.providerLogo}
       userName={payload.userName ?? payload.userEmail ?? payload.providerName}
       userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
-      onSignUp={() => {
-        const resume = payload.resume;
-        notConnectedPayload = undefined;
-        void resume();
+      loading={isResumingRegistration}
+      onSignUp={async () => {
+        isResumingRegistration = true;
+        try {
+          await payload.resume();
+        } finally {
+          isResumingRegistration = false;
+          notConnectedPayload = undefined;
+        }
       }}
       onRecover={() => {
         const cancel = payload.cancel;
@@ -566,7 +573,7 @@
   {@const payload = alreadyLinkedPayload}
   <Dialog
     onClose={() => {
-      if (isAuthenticating) {
+      if (isAuthenticating || isSigningInAlreadyLinked) {
         return;
       }
       const cancel = payload.cancel;
@@ -579,10 +586,15 @@
       providerLogo={payload.providerLogo}
       userName={payload.userName ?? payload.userEmail ?? payload.providerName}
       userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
-      onSignIn={() => {
-        const signIn = payload.signIn;
-        alreadyLinkedPayload = undefined;
-        void signIn();
+      loading={isSigningInAlreadyLinked}
+      onSignIn={async () => {
+        isSigningInAlreadyLinked = true;
+        try {
+          await payload.signIn();
+        } finally {
+          isSigningInAlreadyLinked = false;
+          alreadyLinkedPayload = undefined;
+        }
       }}
     />
   </Dialog>

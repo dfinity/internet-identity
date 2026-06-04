@@ -275,13 +275,12 @@ export class IdentityWizard {
    * Bring the page to a state where the auth picker is on screen.
    *
    * The picker is rendered inline on the homepage's empty state but
-   * sits behind an "Add identity" / "Add another identity" / "Switch
-   * identity" CTA on the welcome-back state and on `/authorize` /
-   * `/manage`. The picker may be in mode="both" ("Continue with
-   * passkey") or in a mode-specific variant ("Sign in with passkey" /
-   * "Sign up with passkey") depending on which surface rendered it.
-   * Callers handle the variants themselves; this method just makes sure
-   * a picker is on screen.
+   * sits behind an "Add identity" / "Switch identity" CTA on the
+   * welcome-back state and on `/authorize` / `/manage`. The picker may
+   * be in mode="both" ("Continue with passkey") or in a mode-specific
+   * variant ("Sign in with passkey" / "Sign up with passkey") depending
+   * on which surface rendered it. Callers handle the variants
+   * themselves; this method just makes sure a picker is on screen.
    */
   async #openPicker(): Promise<void> {
     const switchIdentity = this.#page.getByRole("button", {
@@ -289,9 +288,6 @@ export class IdentityWizard {
     });
     const addIdentity = this.#page.getByRole("button", {
       name: "Add identity",
-    });
-    const addAnotherIdentity = this.#page.getByRole("button", {
-      name: "Add another identity",
     });
     const continueWithPasskey = this.#page.getByRole("button", {
       name: "Continue with passkey",
@@ -304,7 +300,6 @@ export class IdentityWizard {
     });
     await switchIdentity
       .or(addIdentity)
-      .or(addAnotherIdentity)
       .or(continueWithPasskey)
       .or(signInWithPasskey)
       .or(signUpWithPasskey)
@@ -322,11 +317,7 @@ export class IdentityWizard {
     if (await switchIdentity.isVisible()) {
       await switchIdentity.click();
     }
-    if (await addIdentity.isVisible()) {
-      await addIdentity.click();
-    } else {
-      await addAnotherIdentity.click();
-    }
+    await addIdentity.click();
     await continueWithPasskey
       .or(signInWithPasskey)
       .or(signUpWithPasskey)

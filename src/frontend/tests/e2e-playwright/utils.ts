@@ -140,7 +140,7 @@ export const createNewIdentityInII = async (
   if (onContinueScreen) {
     // If we're on the continue screen, go through the identity switcher
     await page.getByRole("button", { name: "Switch identity" }).click();
-    await page.getByRole("button", { name: "Add another identity" }).click();
+    await page.getByRole("button", { name: "Add identity" }).click();
   }
 
   // Create passkey identity
