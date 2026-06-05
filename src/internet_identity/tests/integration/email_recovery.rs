@@ -1274,11 +1274,6 @@ fn diagnostics_returns_none_for_unknown_nonce() {
     assert!(diag.is_none());
 }
 
-/// Drive PocketIC forward until each of the 5 DoH provider outcalls
-/// has been seen, fulfilling them with the supplied DKIM TXT bytes.
-/// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
-/// DMARC record" path requires DKIM `d=` to equal From: domain — true
-/// in this test).
 /// The 5 provider URLs the DoH module fans out to. Order doesn't matter
 /// because the quorum just needs 3 of them to agree on the same body
 /// bytes. Shared by the outcall-fulfilling and outcall-counting helpers
@@ -1320,6 +1315,11 @@ fn tick_until_doh_outcalls(env: &PocketIc, want: usize, max_ticks: u32) {
     );
 }
 
+/// Drive PocketIC forward until each of the 5 DoH provider outcalls
+/// has been seen, fulfilling them with the supplied DKIM TXT bytes.
+/// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
+/// DMARC record" path requires DKIM `d=` to equal From: domain — true
+/// in this test).
 fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
     let providers = DOH_PROVIDER_URLS;
     // We wait for at most this many ticks before assuming the
