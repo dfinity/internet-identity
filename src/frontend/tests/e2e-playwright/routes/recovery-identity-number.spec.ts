@@ -258,6 +258,7 @@ test.describe("/authorize — standalone upgrade panel sanity check", () => {
         await authPage
           .getByRole("button", { name: "Sign in with passkey" })
           .click();
+        await authPage.getByLabel("Identity name").click();
         await authPage.getByLabel("Identity name").fill("Test");
         await authPage.getByRole("button", { name: "Create identity" }).click();
         await authPage
