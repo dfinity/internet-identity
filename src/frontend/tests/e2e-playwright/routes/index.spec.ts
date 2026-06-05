@@ -118,20 +118,13 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
-      // Wait for the /manage sidebar to render before probing the mobile
-      // menu — `isVisible()` doesn't auto-wait, so probing too early
-      // leaves the menu closed and the Access link click times out.
-      const accessLink = existingDevicePage.getByRole("link", {
-        name: "Access",
-      });
-      await accessLink.waitFor();
       const existingMenuButton = existingDevicePage.getByRole("button", {
         name: "Open menu",
       });
       if (await existingMenuButton.isVisible()) {
         await existingMenuButton.click();
       }
-      await accessLink.click();
+      await existingDevicePage.getByRole("link", { name: "Access" }).click();
       await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
       // Switch to new device and verify we are signed in
