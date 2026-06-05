@@ -75,9 +75,9 @@ use std::rc::Rc;
 use crate::dkim::{parse_dkim_signature, DkimCheck, DkimSignature, VerificationFailReason};
 use crate::dmarc::DmarcOutcome;
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_envelope, validate_message, SmtpHeader as WireSmtpHeader,
-    SmtpMessage as WireSmtpMessage, SmtpRequest as WireSmtpRequest, SmtpResponse,
-    SMTP_ERR_SYNTAX_ERROR,
+    smtp_err, validate_envelope, validate_message, validate_message_id,
+    SmtpEnvelope as WireSmtpEnvelope, SmtpHeader as WireSmtpHeader, SmtpMessage as WireSmtpMessage,
+    SmtpRequest as WireSmtpRequest, SmtpResponse, SMTP_ERR_SYNTAX_ERROR,
 };
 
 pub use signed::SignedSmtpRequestProjection;
@@ -98,6 +98,9 @@ pub use verified::SmtpRequest as VerifiedSmtpRequest;
 pub enum SmtpError {
     Envelope(EnvelopeError),
     Message(MessageError),
+    /// The optional `message_id` correlation id exceeded its length
+    /// bound. Pass-through of the wire-types crate's bounds response.
+    MessageId(SmtpResponse),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -147,6 +150,7 @@ impl From<SmtpError> for SmtpResponse {
                 SMTP_ERR_SYNTAX_ERROR,
                 format!("RFC 5322 §3.6: header '{name}' must appear exactly once"),
             ),
+            SmtpError::MessageId(resp) => resp,
         }
     }
 }
@@ -156,6 +160,7 @@ impl From<SmtpError> for SmtpResponse {
 // =========================================================================
 
 pub mod unverified {
+    use super::WireSmtpEnvelope;
     use serde_bytes::ByteBuf;
 
     /// A header that wasn't routed into one of the §3.6 typed slots.
@@ -358,19 +363,30 @@ pub mod unverified {
         }
     }
 
-    /// Stage-1 wrapper — `message` is `None` for envelope-only
-    /// requests (`smtp_request_validate` at RCPT TO time) and
-    /// `Some(SmtpMessage)` for full requests. The wire-type envelope
-    /// is consumed by the canister boundary's recipient dispatch
-    /// *before* this value is built, so it doesn't appear here.
+    /// Stage-1 wrapper — the bounds-checked form of the whole inbound
+    /// request. `message` is `None` for envelope-only requests
+    /// (`smtp_request_validate` at RCPT TO time) and `Some` for full
+    /// requests. The envelope is retained (still the wire shape, only
+    /// bounds-validated) because recipient dispatch reads it *after*
+    /// stage 1 runs; `message_id` rides along for diagnostics.
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct SmtpRequest {
+        pub(super) envelope: WireSmtpEnvelope,
         pub(super) message: Option<SmtpMessage>,
+        pub(super) message_id: Option<String>,
     }
 
     impl SmtpRequest {
+        pub fn envelope(&self) -> &WireSmtpEnvelope {
+            &self.envelope
+        }
+
         pub fn message(&self) -> Option<&SmtpMessage> {
             self.message.as_ref()
+        }
+
+        pub fn message_id(&self) -> Option<&str> {
+            self.message_id.as_deref()
         }
 
         pub(super) fn take_message(self) -> Option<SmtpMessage> {
@@ -387,18 +403,23 @@ impl TryFrom<WireSmtpRequest> for UnverifiedSmtpRequest {
             envelope,
             message,
             gateway_flags: _,
-            message_id: _,
+            message_id,
         } = request;
 
         let envelope = envelope.ok_or(SmtpError::Envelope(EnvelopeError::Missing))?;
         validate_envelope(&envelope).map_err(|e| SmtpError::Envelope(EnvelopeError::Bounds(e)))?;
+        validate_message_id(message_id.as_deref()).map_err(SmtpError::MessageId)?;
 
         let message = match message {
             None => None,
             Some(m) => Some(build_typed_message(m)?),
         };
 
-        Ok(UnverifiedSmtpRequest { message })
+        Ok(UnverifiedSmtpRequest {
+            envelope,
+            message,
+            message_id,
+        })
     }
 }
 
@@ -989,6 +1010,24 @@ mod tests {
         let unverified = UnverifiedSmtpRequest::try_from(envelope_only_request())
             .expect("envelope-only must pass stage 1");
         assert!(unverified.message().is_none());
+    }
+
+    #[test]
+    fn stage1_carries_envelope_and_message_id() {
+        let mut req = well_formed_request();
+        req.message_id = Some("<id@gateway.example>".into());
+        let unverified = UnverifiedSmtpRequest::try_from(req).expect("well-formed must pass");
+        assert_eq!(unverified.envelope().to.len(), 1);
+        assert_eq!(unverified.message_id(), Some("<id@gateway.example>"));
+    }
+
+    #[test]
+    fn stage1_rejects_oversize_message_id() {
+        use internet_identity_interface::internet_identity::types::smtp::MAX_MESSAGE_ID_BYTES;
+        let mut req = well_formed_request();
+        req.message_id = Some("x".repeat(MAX_MESSAGE_ID_BYTES + 1));
+        let err = UnverifiedSmtpRequest::try_from(req).unwrap_err();
+        assert!(matches!(err, SmtpError::MessageId(_)));
     }
 
     #[test]

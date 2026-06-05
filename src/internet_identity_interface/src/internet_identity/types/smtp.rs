@@ -271,8 +271,16 @@ pub fn validate_smtp_request(request: &SmtpRequest) -> Result<(), SmtpResponse> 
     if let Some(message) = &request.message {
         validate_message(message)?;
     }
-    if let Some(message_id) = &request.message_id {
-        if message_id.len() > MAX_MESSAGE_ID_BYTES {
+    validate_message_id(request.message_id.as_deref())?;
+    Ok(())
+}
+
+/// Length-bound the optional gateway-supplied `message_id`. Both
+/// `smtp_request` entrypoints are open, so this caps worst-case
+/// allocation; oversize values are rejected with code 555.
+pub fn validate_message_id(message_id: Option<&str>) -> Result<(), SmtpResponse> {
+    if let Some(id) = message_id {
+        if id.len() > MAX_MESSAGE_ID_BYTES {
             return Err(smtp_err(
                 SMTP_ERR_SYNTAX_ERROR,
                 format!("message_id exceeds {MAX_MESSAGE_ID_BYTES} bytes"),

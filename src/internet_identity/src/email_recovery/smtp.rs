@@ -67,8 +67,7 @@ use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryCredential, EmailRecoveryError,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
-    smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
-    SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,
+    smtp_err, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE, SMTP_ERR_USER_NOT_LOCAL,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
@@ -129,35 +128,35 @@ fn recipient_matches(
 /// effects and leaks nothing beyond the deploy arg, which is already
 /// public.
 pub fn handle_smtp_request_validate(request: SmtpRequest) -> SmtpResponse {
-    // Bounds first — cheap memory-abuse defence. RCPT TO arrives
-    // before any message body, so stage 1's RFC §3.6 header-
-    // uniqueness checks are vacuous here; skipping them keeps
-    // unknown-mailbox (550) and bad-envelope (551) rejections ahead
-    // of any syntax-error (555) noise in the failure-code lattice.
-    if let Err(e) = validate_smtp_request(&request) {
-        return e;
-    }
-    let envelope = request
-        .envelope
-        .as_ref()
-        .expect("validate_smtp_request guarantees envelope is present");
-    let to = match single_recipient(envelope) {
-        Some(to) => to,
-        None => {
-            return smtp_err(
-                SMTP_ERR_USER_NOT_LOCAL,
-                "Recovery emails must have exactly one recipient",
-            );
-        }
+    handle_smtp_request_validate_inner(request).unwrap_or_else(|resp| resp)
+}
+
+/// `Ok(SmtpResponse::Ok {})` for an accepted envelope; `Err(resp)` for a
+/// rejection that the wrapper unwraps into the same `SmtpResponse` slot
+/// — `Result<SmtpResponse, SmtpResponse>` is a control-flow trick that
+/// lets every reject site use `?` or `return Err(...)` instead of a
+/// `match` over `try_from`.
+fn handle_smtp_request_validate_inner(request: SmtpRequest) -> Result<SmtpResponse, SmtpResponse> {
+    // Same stage-1 validation the update path runs; the resulting value
+    // is discarded — at RCPT TO time (no message body yet) we only need
+    // to know the request is well-formed and pick the recipient.
+    let unverified = UnverifiedSmtpRequest::try_from(request).map_err(SmtpResponse::from)?;
+
+    let Some(to) = single_recipient(unverified.envelope()) else {
+        return Err(smtp_err(
+            SMTP_ERR_USER_NOT_LOCAL,
+            "Recovery emails must have exactly one recipient",
+        ));
     };
+
     if recipient_matches(to, SETUP_RECIPIENT_USER) || recipient_matches(to, RECOVERY_RECIPIENT_USER)
     {
-        return SmtpResponse::Ok {};
+        return Ok(SmtpResponse::Ok {});
     }
-    smtp_err(
+    Err(smtp_err(
         SMTP_ERR_MAILBOX_UNAVAILABLE,
         "Recipient is not a known mailbox on this canister",
-    )
+    ))
 }
 
 /// Return the sole recipient of `envelope` if there is exactly one,
@@ -181,81 +180,64 @@ fn single_recipient(
 /// see the module-level note on why we don't surface per-message
 /// verification failures.
 pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
-    // Recipient dispatch runs ahead of the typestate conversion so
-    // misdirected mail (550 "No such user here") and bad-envelope
-    // shapes (551 "User not local") get a specific SMTP-level signal
-    // regardless of how well-formed the message body is. We read the
-    // envelope from the wire `SmtpRequest` directly since the
-    // typestate (`UnverifiedSmtpRequest`) doesn't carry it — only the
-    // typed message ends up there.
-    //
-    // We accept either of the two reserved recipients
-    // (`register@id.ai` for setup, `recover@id.ai` for recovery);
-    // after the pending lookup we cross-check that the recipient
-    // matches the `PendingKind` of the entry, so a direct caller
-    // can't trick us into running a recovery flow against a setup
-    // challenge or vice versa. We match on the *full* recipient
-    // address (user + domain), case-insensitively, so a direct caller
-    // can't bypass dispatch by spoofing just the user-part with a
-    // different domain — `smtp_request` is an open update.
-    //
-    // We require *exactly one* recipient on the envelope. Multi-
-    // recipient envelopes addressed (in part) to a recovery mailbox
-    // can only come from a phishy forwarder — a legitimate recovery
-    // email never targets a CC/BCC alongside `register@…` /
-    // `recover@…`, so accepting one would let an attacker exfiltrate
-    // the user's canister-signed challenge nonce. Reject with 551
-    // ("User not local") to mirror what `smtp_request_validate`
-    // says at RCPT TO time; 550 is reserved for the single-recipient
-    // "unknown mailbox" case so the gateway can tell the two apart.
+    handle_smtp_request_inner(request)
+        .await
+        .unwrap_or_else(|resp| resp)
+}
+
+/// `Ok(SmtpResponse::Ok {})` for every flow outcome the gateway should
+/// see as success (real verification success, silent drop, redelivery
+/// idempotency); `Err(resp)` for envelope/syntax rejections that the
+/// wrapper unwraps into the same `SmtpResponse` slot. The Result here
+/// is purely a control-flow trick so every reject site can use `?` or
+/// `return Err(...)` instead of a `match` over `try_from`.
+async fn handle_smtp_request_inner(request: SmtpRequest) -> Result<SmtpResponse, SmtpResponse> {
+    // Stage 1 runs first: a malformed request shape (missing envelope,
+    // bounds, RFC 5322 §3.6) is rejected with 555 before any dispatch
+    // or business logic. The unverified value retains the (bounds-
+    // validated) envelope so recipient dispatch reads it below.
+    let unverified = UnverifiedSmtpRequest::try_from(request).map_err(SmtpResponse::from)?;
+
+    // Recipient dispatch. We match the *full* address (user + domain),
+    // case-insensitively, so a direct caller can't bypass it by
+    // spoofing just the user-part on an unauthorised domain. Exactly
+    // one recipient is required — a multi-recipient envelope can only
+    // come from a forwarder trying to exfiltrate the user's canister-
+    // signed nonce via a CC/BCC, so it gets 551 (distinct from the
+    // 550 single-unknown-mailbox case). The recipient↔`PendingKind`
+    // cross-check happens after the pending lookup below.
     let recipient_flow = {
-        let envelope = match request.envelope.as_ref() {
-            Some(e) => e,
-            None => return smtp_err(SMTP_ERR_SYNTAX_ERROR, "Missing envelope"),
-        };
-        let to = match single_recipient(envelope) {
-            Some(to) => to,
-            None => {
-                return smtp_err(
-                    SMTP_ERR_USER_NOT_LOCAL,
-                    "Recovery emails must have exactly one recipient",
-                );
-            }
+        let Some(to) = single_recipient(unverified.envelope()) else {
+            return Err(smtp_err(
+                SMTP_ERR_USER_NOT_LOCAL,
+                "Recovery emails must have exactly one recipient",
+            ));
         };
         if recipient_matches(to, SETUP_RECIPIENT_USER) {
             RecipientFlow::Setup
         } else if recipient_matches(to, RECOVERY_RECIPIENT_USER) {
             RecipientFlow::Recovery
         } else {
-            return smtp_err(
+            return Err(smtp_err(
                 SMTP_ERR_MAILBOX_UNAVAILABLE,
                 "Recipient is not a known mailbox on this canister",
-            );
+            ));
         }
     };
 
-    // Stage 1: bounds + RFC 5322 §3.6 well-formedness via the
-    // typestate's builder. Failures map to SMTP 555. The typestate
-    // doesn't carry `message_id`, so we lift it out before the move
-    // for the pending-challenge snapshot below.
-    let message_id = request.message_id.clone();
-    let unverified = match UnverifiedSmtpRequest::try_from(request) {
-        Ok(u) => u,
-        Err(err) => return err.into(),
-    };
+    let message_id = unverified.message_id().map(String::from);
 
     // Extract the canister-issued nonce from the Subject field. If
     // there's no message body (envelope-only), no Subject header, no
     // `II-Recovery-` prefix, or no pending challenge for the
     // discovered nonce, treat the message as not for us and silently
     // drop.
-    let nonce = match unverified
+    let Some(nonce) = unverified
         .message()
         .and_then(|m| m.subject())
         .and_then(find_nonce_in)
-    {
-        Some(n) => n,
-        None => return SmtpResponse::Ok {},
+    else {
+        return Ok(SmtpResponse::Ok {});
     };
 
     let now_secs = now_secs();
@@ -272,7 +254,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // status `Expired` without consuming further canister cycles,
     // and the global eviction sweep on the next `insert_with_eviction`
     // call cleans up any other expired entries.
-    let snapshot = match pending::with_mut(&nonce, now_secs, |c| {
+    let pending_snapshot = pending::with_mut(&nonce, now_secs, |c| {
         // Retain the gateway-supplied correlation id on the user's own
         // (nonce-keyed) entry as early as possible — before the
         // recipient/kind dispatch below — so `email_recovery_diagnostics`
@@ -283,8 +265,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
         // yet, so a gateway redelivery — which can arrive after the DNSSEC
         // path has flipped to `NeedDkimLeaf` — can't clobber the decisive
         // email's id and surface a misleading one in diagnostics. A later
-        // delivery still fills it in when the first carried none. Length
-        // already bounded by `validate_smtp_request` at the top of this fn.
+        // delivery still fills it in when the first carried none.
         if c.message_id.is_none() {
             c.message_id = message_id.clone();
         }
@@ -302,7 +283,9 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             // (the user copy-pasted the recovery-flow nonce into
             // an email addressed to `register@id.ai`). Either way:
             // drop silently.
-            _ => return None,
+            _ => {
+                return None;
+            }
         };
         Some(PendingSnapshot {
             kind,
@@ -319,12 +302,13 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
                     | PendingStatus::NeedDkimLeaf { .. }
             ),
         })
-    }) {
-        Some(Some(s)) => s,
+    });
+
+    let Some(Some(snapshot)) = pending_snapshot else {
         // Either nonce is unknown / expired (None), or the pending
         // entry's kind didn't match the recipient (Some(None)).
         // Drop silently — see module note.
-        _ => return SmtpResponse::Ok {},
+        return Ok(SmtpResponse::Ok {});
     };
 
     // Idempotency: if the pending entry already moved past
@@ -333,70 +317,94 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // gateway sometimes redelivers; we silently treat the second
     // call as a no-op rather than risk overwriting state.
     if snapshot.already_terminal || snapshot.partial_set {
-        return SmtpResponse::Ok {};
-    }
-    if snapshot.is_dnssec_path {
-        // DNSSEC path — pre-DKIM-key verification only. Body is
-        // dropped after `bh=` validates; status flips to
-        // `NeedDkimLeaf { selector }` so the FE submits the leaf.
-        // `unverified` is consumed here; the DoH branch below is
-        // the alternative, so exactly one of the two ever sees it.
-        match prepare_partial_verification(unverified, &snapshot, now_secs) {
-            Ok(partial) => {
-                let selector = partial.selector.clone();
-                pending::with_mut(&nonce, now_secs, |c| {
-                    c.partial_verification = Some(partial);
-                    c.status = PendingStatus::NeedDkimLeaf { selector };
-                });
-            }
-            Err(e) => {
-                pending::with_mut(&nonce, now_secs, |c| {
-                    c.status = PendingStatus::Failed(e);
-                });
-            }
-        }
-    } else {
-        // DoH path — the canister can fetch the DKIM TXT itself, so
-        // verification finishes synchronously inside this one call.
-        let outcome = verify_setup_email_doh(unverified, &snapshot, now_secs).await;
-        match outcome {
-            Ok(()) => match &snapshot.kind {
-                SnapshotKind::Setup { anchor } => {
-                    if let Err(e) = bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
-                        pending::with_mut(&nonce, now_secs, |c| {
-                            c.status = PendingStatus::Failed(e);
-                        });
-                    } else {
-                        pending::with_mut(&nonce, now_secs, |c| {
-                            c.status = PendingStatus::Succeeded;
-                        });
-                    }
-                }
-                SnapshotKind::Recovery { session_pk } => {
-                    match stamp_recovery_delegation(&snapshot, session_pk).await {
-                        Ok(outcome) => {
-                            pending::with_mut(&nonce, now_secs, |c| {
-                                c.recovery_outcome = Some(outcome);
-                                c.status = PendingStatus::Succeeded;
-                            });
-                        }
-                        Err(e) => {
-                            pending::with_mut(&nonce, now_secs, |c| {
-                                c.status = PendingStatus::Failed(e);
-                            });
-                        }
-                    }
-                }
-            },
-            Err(reason) => {
-                pending::with_mut(&nonce, now_secs, |c| {
-                    c.status = PendingStatus::Failed(reason);
-                });
-            }
-        }
+        return Ok(SmtpResponse::Ok {});
     }
 
-    SmtpResponse::Ok {}
+    // `unverified` is consumed by exactly one of the two paths — the
+    // DNSSEC/DoH fork is decided once at prepare time and cached on the
+    // challenge.
+    if snapshot.is_dnssec_path {
+        complete_dnssec_path(unverified, &snapshot, &nonce, now_secs);
+    } else {
+        complete_doh_path(unverified, &snapshot, &nonce, now_secs).await;
+    }
+
+    Ok(SmtpResponse::Ok {})
+}
+
+/// DNSSEC path — pre-DKIM-key verification only. Parses the signature,
+/// validates `bh=`, and stashes a partial-verification record, flipping
+/// the challenge to `NeedDkimLeaf { selector }` so the FE walks DNSSEC
+/// for that one leaf and finishes via `email_recovery_submit_dkim_leaf`.
+/// The body is dropped — once `bh=` validates, its bytes can't change
+/// without breaking the hash.
+fn complete_dnssec_path(
+    unverified: UnverifiedSmtpRequest,
+    snapshot: &PendingSnapshot,
+    nonce: &str,
+    now_secs: u64,
+) {
+    let partial = match prepare_partial_verification(unverified, snapshot, now_secs) {
+        Ok(partial) => partial,
+        Err(e) => {
+            pending::with_mut(nonce, now_secs, |c| {
+                c.status = PendingStatus::Failed(e);
+            });
+            return;
+        }
+    };
+    let selector = partial.selector.clone();
+    pending::with_mut(nonce, now_secs, |c| {
+        c.partial_verification = Some(partial);
+        c.status = PendingStatus::NeedDkimLeaf { selector };
+    });
+}
+
+/// DoH path — the canister fetches the DKIM TXT itself, so verification
+/// finishes synchronously inside the one `smtp_request` call. On
+/// success, finalize the bound flow.
+async fn complete_doh_path(
+    unverified: UnverifiedSmtpRequest,
+    snapshot: &PendingSnapshot,
+    nonce: &str,
+    now_secs: u64,
+) {
+    if let Err(reason) = verify_setup_email_doh(unverified, snapshot, now_secs).await {
+        pending::with_mut(nonce, now_secs, |c| {
+            c.status = PendingStatus::Failed(reason);
+        });
+        return;
+    }
+    finalize_doh_success(snapshot, nonce, now_secs).await;
+}
+
+/// Finalize a DoH-verified email: bind the credential (setup flow) or
+/// stamp the recovery delegation (recovery flow), flipping the
+/// challenge to `Succeeded` or `Failed`.
+async fn finalize_doh_success(snapshot: &PendingSnapshot, nonce: &str, now_secs: u64) {
+    match &snapshot.kind {
+        SnapshotKind::Setup { anchor } => {
+            let status = match bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
+                Ok(()) => PendingStatus::Succeeded,
+                Err(e) => PendingStatus::Failed(e),
+            };
+            pending::with_mut(nonce, now_secs, |c| {
+                c.status = status;
+            });
+        }
+        SnapshotKind::Recovery { session_pk } => {
+            let result = stamp_recovery_delegation(snapshot, session_pk).await;
+            pending::with_mut(nonce, now_secs, |c| match result {
+                Ok(outcome) => {
+                    c.recovery_outcome = Some(outcome);
+                    c.status = PendingStatus::Succeeded;
+                }
+                Err(e) => {
+                    c.status = PendingStatus::Failed(e);
+                }
+            });
+        }
+    }
 }
 
 /// Snapshot of the pending challenge taken under the brief `RefCell`
@@ -683,7 +691,9 @@ async fn verify_setup_email_doh(
     let dmarc_bytes_opt = match crate::doh::fetch_txt(&dmarc_fqdn, &domain).await {
         Ok(bytes) => Some(bytes),
         Err(crate::doh::DohError::NoAnswer) => None,
-        Err(e) => return Err(map_doh_error(e, &domain)),
+        Err(e) => {
+            return Err(map_doh_error(e, &domain));
+        }
     };
 
     let dkim_txt = std::str::from_utf8(&dkim_bytes)
@@ -991,6 +1001,7 @@ fn now_secs() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use internet_identity_interface::internet_identity::types::smtp::SMTP_ERR_SYNTAX_ERROR;
 
     #[test]
     fn extract_nonce_finds_canister_format() {
