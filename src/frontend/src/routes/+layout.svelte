@@ -7,14 +7,11 @@
   const { children } = $props();
 
   onMount(() => {
-    // Always redirect to primary origin
-    const primaryOrigin = getPrimaryOrigin();
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-    if (
-      !isLocalhost &&
-      primaryOrigin !== undefined &&
-      window.location.origin !== primaryOrigin &&
+   // Always redirect to primary origin
+   const primaryOrigin = getPrimaryOrigin();
+   if (
+     primaryOrigin !== undefined &&
+     window.location.origin !== primaryOrigin &&
       // Don't redirect if we're coming from legacy AuthClient
       !(
         window.location.pathname === "/" &&
