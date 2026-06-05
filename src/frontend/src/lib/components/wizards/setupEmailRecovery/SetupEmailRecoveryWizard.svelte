@@ -141,6 +141,42 @@
     return "unknown";
   };
 
+  /**
+   * Granular machine sub-reason for a DoH transport failure, or
+   * `undefined` for any non-DoH failure. The `DohFetchFailed` variant
+   * collapses several distinct DoH causes (quorum miss, all providers
+   * down, dedup-wait timeout, malformed response) into one variant name,
+   * so on its own it can't tell us *why* DoH failed — which matters most
+   * for Gmail and other DoH-path providers. The canister encodes the
+   * cause as the leading `snake_case` token of the `DohFetchFailed`
+   * payload (see `map_doh_error` in the backend); we lift that token out
+   * here and report it as the `doh_reason` property on the
+   * `email-recovery-setup-failed` event so the funnel is segmentable.
+   */
+  const dohSubReason = (variant: EmailRecoveryStatus): string | undefined => {
+    if (!("Failed" in variant)) return undefined;
+    const reason = variant.Failed as Record<string, unknown>;
+    const detail = reason["DohFetchFailed"];
+    if (typeof detail !== "string") return undefined;
+    const token = detail.split(":")[0]?.trim();
+    return token !== undefined && /^[a-z_]+$/.test(token) ? token : undefined;
+  };
+
+  /**
+   * Property bag for a `email-recovery-setup-failed` event: the coarse
+   * variant `reason`, plus the granular `doh_reason` when the failure
+   * came from the DoH path.
+   */
+  const failedEventProps = (
+    variant: EmailRecoveryStatus,
+  ): Record<string, string> => {
+    const reason = failureReason(variant);
+    const dohReason = dohSubReason(variant);
+    return dohReason !== undefined
+      ? { reason, doh_reason: dohReason }
+      : { reason };
+  };
+
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
       const reason = variant.Failed;
@@ -271,9 +307,10 @@
           return;
         }
         if ("Failed" in result || "Expired" in result) {
-          setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Failed, {
-            reason: failureReason(result),
-          });
+          setupEmailRecoveryFunnel.trigger(
+            SetupEmailRecoveryEvents.Failed,
+            failedEventProps(result),
+          );
           setupEmailRecoveryFunnel.close();
           const diagnosticsBlob = await collectDiagnostics(nonce);
           stage = {
@@ -316,7 +353,7 @@
               if ("Failed" in submission || "Expired" in submission) {
                 setupEmailRecoveryFunnel.trigger(
                   SetupEmailRecoveryEvents.Failed,
-                  { reason: failureReason(submission) },
+                  failedEventProps(submission),
                 );
                 setupEmailRecoveryFunnel.close();
                 const diagnosticsBlob = await collectDiagnostics(nonce);

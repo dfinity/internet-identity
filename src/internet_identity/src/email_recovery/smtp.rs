@@ -766,22 +766,36 @@ pub(super) fn extract_from_address(
 /// FE poll. Configuration-level failures (allowlist miss, missing
 /// `DohConfig`) become `DomainNotAllowlisted` so the FE shows
 /// "operator hasn't enabled this domain"; transport-level failures
-/// (quorum miss, all providers down, malformed responses) become
-/// `DohFetchFailed` so the FE shows "transient error, try again";
-/// caller-bug variants (`InvalidName`, `NameOutsideRegisteredDomain`)
-/// surface as `InternalCanisterError` because they shouldn't reach
-/// here in practice (`prepare_add` already validates the inputs).
+/// (quorum miss, all providers down, dedup wait timeout, malformed
+/// responses) become `DohFetchFailed` so the FE shows "transient error,
+/// try again"; caller-bug variants (`InvalidName`,
+/// `NameOutsideRegisteredDomain`) surface as `InternalCanisterError`
+/// because they shouldn't reach here in practice (`prepare_add` already
+/// validates the inputs).
+///
+/// **Analytics contract:** every `DohFetchFailed` payload begins with a
+/// stable `snake_case` machine token up to the first `:` (e.g.
+/// `quorum_failed`, `all_providers_failed`, `dedup_wait_timeout`,
+/// `response_malformed`). The FE lifts that token into the
+/// `doh_reason` property on the Plausible `email-recovery-setup-failed`
+/// event (see `dohSubReason` in `SetupEmailRecoveryWizard.svelte`), so
+/// the DoH failure mix is segmentable. Keep these tokens stable and in
+/// sync with the FE; the human-readable tail after the token is free to
+/// change.
 fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
     use crate::doh::DohError;
     match err {
         DohError::DomainNotAllowed | DohError::NotConfigured => {
             EmailRecoveryError::DomainNotAllowlisted(domain.to_string())
         }
-        DohError::AllProvidersFailed => {
-            EmailRecoveryError::DohFetchFailed("all DoH providers failed".into())
-        }
+        DohError::AllProvidersFailed => EmailRecoveryError::DohFetchFailed(
+            "all_providers_failed: all DoH providers failed".into(),
+        ),
+        DohError::DedupWaitTimedOut => EmailRecoveryError::DohFetchFailed(
+            "dedup_wait_timeout: timed out waiting on an in-flight fetch".into(),
+        ),
         DohError::QuorumFailed { agreeing, total } => EmailRecoveryError::DohFetchFailed(format!(
-            "DoH quorum failed: {agreeing} of {total} providers agreed",
+            "quorum_failed: {agreeing} of {total} providers agreed",
         )),
         // `NoAnswer` from the DMARC fetch is handled inline at the
         // call site (it switches the verifier to the strict-alignment
@@ -794,7 +808,7 @@ fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError 
             "DKIM record not found at signed selector".into(),
         ),
         DohError::ResponseMalformed(msg) => {
-            EmailRecoveryError::DohFetchFailed(format!("DoH response malformed: {msg}"))
+            EmailRecoveryError::DohFetchFailed(format!("response_malformed: {msg}"))
         }
         DohError::InvalidName(msg) => {
             EmailRecoveryError::InternalCanisterError(format!("DoH rejected query name: {msg}"))
@@ -983,6 +997,47 @@ mod tests {
         let nonce = format!("{}{}", super::super::NONCE_PREFIX, "0123456789abcdef");
         let subject = format!("Hello world {nonce} please verify");
         assert_eq!(find_nonce_in(&subject), Some(nonce));
+    }
+
+    #[test]
+    fn map_doh_error_emits_stable_analytics_tokens() {
+        use crate::doh::DohError;
+
+        // The leading snake_case token (up to the first ':') of each
+        // `DohFetchFailed` payload is a contract consumed by the FE's
+        // `doh_reason` analytics property — keep these stable and in
+        // sync with `dohSubReason` in SetupEmailRecoveryWizard.svelte.
+        let token = |e: DohError| -> String {
+            match map_doh_error(e, "example.com") {
+                EmailRecoveryError::DohFetchFailed(s) => s.split(':').next().unwrap().to_string(),
+                other => panic!("expected DohFetchFailed, got {other:?}"),
+            }
+        };
+        assert_eq!(token(DohError::AllProvidersFailed), "all_providers_failed");
+        assert_eq!(token(DohError::DedupWaitTimedOut), "dedup_wait_timeout");
+        assert_eq!(
+            token(DohError::QuorumFailed {
+                agreeing: 2,
+                total: 5
+            }),
+            "quorum_failed"
+        );
+        assert_eq!(
+            token(DohError::ResponseMalformed("bad".into())),
+            "response_malformed"
+        );
+
+        // The non-`DohFetchFailed` causes keep their own distinct
+        // variants — already segmentable by variant name, no token
+        // needed.
+        assert!(matches!(
+            map_doh_error(DohError::NoAnswer, "example.com"),
+            EmailRecoveryError::EmailVerificationFailed(_)
+        ));
+        assert!(matches!(
+            map_doh_error(DohError::DomainNotAllowed, "example.com"),
+            EmailRecoveryError::DomainNotAllowlisted(_)
+        ));
     }
 
     #[test]

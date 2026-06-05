@@ -208,8 +208,11 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
                     // its owner trapped before the staleness window let
                     // someone take over). Fail transiently rather than
                     // poll forever; a retry — or the post-staleness
-                    // takeover — resolves it.
-                    return Err(DohError::AllProvidersFailed);
+                    // takeover — resolves it. Report it as its own
+                    // variant (not `AllProvidersFailed`) so "the dedup
+                    // wait was too short" is distinguishable from "our
+                    // own fan-out failed" in diagnostics.
+                    return Err(DohError::DedupWaitTimedOut);
                 }
                 waits += 1;
                 yield_round().await;
