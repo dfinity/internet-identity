@@ -816,42 +816,37 @@ fn full_setup_flow_binds_credential_to_anchor() {
 }
 
 // ===================================================================
-// DoH path: concurrent in-flight dedup — production-panic reproduction
+// DoH path: concurrent in-flight dedup — regression coverage
 // ===================================================================
 //
-// Reproduces the prod trap:
+// Guards the concurrency bug fixed in #3987. When two `smtp_request`
+// calls for addresses in the *same* domain arrive while the DoH cache
+// is cold, they dedup onto a single DKIM outcall fan-out (`doh::cache`):
+// the first becomes the fetcher, the rest must reuse its result rather
+// than each firing their own five-provider fan-out.
 //
-//     Panicked at 'RefCell already borrowed',
-//     src/internet_identity/src/doh/cache.rs:256
+// The original dedup parked waiters on a shared future that the fetcher
+// woke when it published. On the single-threaded canister executor that
+// ran the waiter to completion *inside the fetcher's call context* —
+// first tripping `RefCell already borrowed` at doh/cache.rs:256, and
+// (once that borrow was addressed) mis-routing the waiter's reply to the
+// wrong call (`ic0.msg_reply ... already replied` on one request, "did
+// not reply" on the other). The fix makes waiters poll the cache from
+// their OWN call context instead of being woken cross-call.
 //
-// When two `smtp_request` calls for addresses in the *same* domain
-// arrive while the DoH cache is cold, they dedup onto a single DKIM
-// outcall fan-out (`doh::cache`): the first becomes the fetcher, the
-// second parks as a waiter on the shared `PendingState`. When the
-// fetcher's outcalls resolve it publishes the result and wakes the
-// waiter — and on the single-threaded canister executor that wake
-// re-polls the waiter *synchronously*, re-entering a `RefCell` the
-// publisher is still holding (the waiter's `WaitForPending::poll`, then
-// `DOH_CACHE` itself as the resumed task races on to its DMARC fetch).
-// The canister traps: the publisher's `smtp_request` is rejected and
-// the waiter never completes.
+// This test pins the public-API behaviour the fix guarantees, with the
+// dedup interleaving made explicit (and asserted) rather than left to a
+// fixed tick count:
+//   1. Submit request A and drive rounds — *without answering any
+//      outcall* — until its provider outcalls are pending; A now owns
+//      the fetch.
+//   2. Submit request B and confirm it dedups: no new outcalls appear,
+//      and it stays in-flight (no terminal status) until A publishes.
+//   3. Answer the single, deduped DKIM (+ DMARC) outcall set.
+//   4. Both requests reply Ok and their credentials are bound.
 //
-// The test drives exactly that interleaving through the public API:
-//   1. Two identities prepare recovery for alice@ and bob@ the same
-//      allow-listed domain.
-//   2. Both DKIM-signed emails are submitted as concurrent in-flight
-//      update calls.
-//   3. We tick *without* answering any outcall, so the second request
-//      is guaranteed to park as a dedup waiter before the fetcher
-//      publishes. (If we answered early, the fetcher would publish and
-//      evict the pending entry, the second request would hit a warm
-//      cache, and the dedup path — hence the bug — would never run.)
-//   4. We fan out the single, deduped DKIM (+ DMARC) outcall set.
-//
-// On the unfixed canister, step 4 traps the publisher with
-// "RefCell already borrowed" and BOTH requests fail to complete. The
-// fix (cache hands wakers back to be fired outside every borrow) lets
-// both requests complete and bind their credentials.
+// Against the pre-fix cache, step 3 made the publisher trap / mis-reply
+// and the waiter never completed; with the fix both succeed.
 #[test]
 fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
     let env = env();
@@ -914,7 +909,12 @@ fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
         timestamp: now_secs,
     });
 
-    // Submit both as concurrent in-flight update calls (no await yet).
+    // 1. Submit request A and drive rounds — *without answering any
+    //    outcall* — until its provider outcalls are pending. A now owns
+    //    the DKIM fetch. Establishing the fetcher first (rather than
+    //    submitting both and relying on a fixed tick count) makes the
+    //    dedup interleaving explicit: B is guaranteed to find A's
+    //    in-flight entry and dedup onto it.
     let msg_a = env
         .submit_call_with_effective_principal(
             canister_id,
@@ -924,6 +924,14 @@ fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
             candid::encode_one(&signed_a.request).expect("encode SmtpRequest A"),
         )
         .expect("submit_call A");
+    tick_until_doh_outcalls(&env, DOH_PROVIDER_URLS.len(), 60);
+
+    // 2. Submit request B and give it a few rounds to run its lookup. It
+    //    must dedup onto A's in-flight fetch: no *new* DoH outcalls
+    //    appear (still just A's fan-out), and B stays in-flight — no
+    //    terminal status — until A publishes. We must not answer an
+    //    outcall yet: that would let A publish and warm the cache, and B
+    //    would hit it instead of deduping, leaving the path untested.
     let msg_b = env
         .submit_call_with_effective_principal(
             canister_id,
@@ -933,32 +941,35 @@ fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
             candid::encode_one(&signed_b.request).expect("encode SmtpRequest B"),
         )
         .expect("submit_call B");
-
-    // Let both requests reach their cache-dedup suspend points *before*
-    // any outcall is answered: the fetcher parks on its 5 provider
-    // outcalls and the second request dedups onto it and parks as a
-    // waiter. We must not answer an outcall yet — see the module note
-    // above on why early answers would warm the cache and skip dedup.
     for _ in 0..5 {
         env.tick();
     }
+    assert_eq!(
+        pending_doh_outcalls(&env),
+        DOH_PROVIDER_URLS.len(),
+        "second request must dedup onto the in-flight fetch, not issue its own DoH fan-out",
+    );
+    assert!(
+        env.ingress_status(msg_b.clone()).is_none(),
+        "the dedup waiter must still be in-flight (no terminal status) before the fetcher publishes",
+    );
 
-    // Fan out the single (deduped) DKIM + DMARC outcall set. On the
-    // unfixed canister the publish-time wake traps right here.
+    // 3. Answer the single, deduped DKIM + DMARC outcall set.
     fulfill_doh_outcalls(&env, &signer.public_txt_record());
-    // A few more rounds so both update calls reach a terminal state on
-    // the happy (fixed) path. Harmless on the unfixed path — the dedup
-    // waiter never completes there no matter how long we tick.
-    for _ in 0..10 {
+
+    // 4. Drive both calls to a terminal status — capped, so a
+    //    regression that wedges one of them fails the test instead of
+    //    hanging it. Read statuses without blocking: we must never
+    //    `await` a dedup waiter, which on the pre-fix cache never
+    //    completed. `ingress_status` is `None` until a call is terminal.
+    for _ in 0..60 {
+        if env.ingress_status(msg_a.clone()).is_some()
+            && env.ingress_status(msg_b.clone()).is_some()
+        {
+            break;
+        }
         env.tick();
     }
-
-    // Read both terminal statuses *without* blocking. We must never
-    // `await` the dedup waiter: on unfixed code it never completes (the
-    // publisher trapped and rolled back, leaving the pending entry
-    // `InFlight` forever), so a blocking await would hang the test
-    // instead of failing. `ingress_status` is `None` for a call with no
-    // terminal status yet and `Some(Err(reject))` for a trap.
     let status_a = env.ingress_status(msg_a);
     let status_b = env.ingress_status(msg_b);
     let a_ok = matches!(
@@ -970,16 +981,15 @@ fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
         Some(Ok(raw)) if matches!(candid::decode_one::<SmtpResponse>(raw), Ok(SmtpResponse::Ok {}))
     );
 
-    // Symptom gate: on the unfixed canister the publisher's status is a
-    // reject carrying "RefCell already borrowed …/doh/cache.rs:256" and
-    // the waiter's is `None` (it never completes). Both must be Ok
-    // replies.
+    // Both concurrent verifications must reply Ok. The DoH dedup bug
+    // (#3987) made the publisher trap or mis-route its reply
+    // ("RefCell already borrowed" / "already replied" / "did not
+    // reply"); a regression would resurface as a non-Ok status here.
     assert!(
         a_ok && b_ok,
         "concurrent DoH dedup for the same domain did not complete both \
-         requests — reproduction of the prod panic 'RefCell already \
-         borrowed' at src/internet_identity/src/doh/cache.rs.\n  \
-         request A => {status_a:?}\n  request B => {status_b:?}",
+         requests (regression of #3987).\n  request A => {status_a:?}\n  \
+         request B => {status_b:?}",
     );
 
     // End-to-end: both bindings landed on their anchors.
@@ -1264,22 +1274,54 @@ fn diagnostics_returns_none_for_unknown_nonce() {
     assert!(diag.is_none());
 }
 
+/// The 5 provider URLs the DoH module fans out to. Order doesn't matter
+/// because the quorum just needs 3 of them to agree on the same body
+/// bytes. Shared by the outcall-fulfilling and outcall-counting helpers
+/// so they agree on what counts as a DoH outcall.
+const DOH_PROVIDER_URLS: [&str; 5] = [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+    "https://dns.quad9.net/dns-query",
+    "https://private.canadianshield.cira.ca/dns-query",
+    "https://public.dns.iij.jp/dns-query",
+];
+
+/// Count the DoH provider outcalls currently pending (unanswered). A
+/// dedup waiter's `yield_round` round-trips the management canister
+/// (`raw_rand`), which is not an HTTP outcall, so it never inflates this
+/// count — letting a test assert "the second request issued no fan-out
+/// of its own".
+fn pending_doh_outcalls(env: &PocketIc) -> usize {
+    env.get_canister_http()
+        .iter()
+        .filter(|r| DOH_PROVIDER_URLS.iter().any(|p| r.url.starts_with(p)))
+        .count()
+}
+
+/// Drive rounds — *without answering anything* — until at least `want`
+/// DoH outcalls are pending, or panic after `max_ticks`. Lets a test
+/// wait for a fetcher to fan out before acting, instead of guessing a
+/// fixed tick count.
+fn tick_until_doh_outcalls(env: &PocketIc, want: usize, max_ticks: u32) {
+    for _ in 0..max_ticks {
+        if pending_doh_outcalls(env) >= want {
+            return;
+        }
+        env.tick();
+    }
+    panic!(
+        "expected >= {want} pending DoH outcalls within {max_ticks} ticks, saw {}",
+        pending_doh_outcalls(env)
+    );
+}
+
 /// Drive PocketIC forward until each of the 5 DoH provider outcalls
 /// has been seen, fulfilling them with the supplied DKIM TXT bytes.
 /// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
 /// DMARC record" path requires DKIM `d=` to equal From: domain — true
 /// in this test).
 fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
-    // The 5 provider URLs the DoH module fans out to. Order doesn't
-    // matter because the quorum just needs 3 of them to agree on the
-    // same body bytes.
-    let providers = [
-        "https://cloudflare-dns.com/dns-query",
-        "https://dns.google/dns-query",
-        "https://dns.quad9.net/dns-query",
-        "https://private.canadianshield.cira.ca/dns-query",
-        "https://public.dns.iij.jp/dns-query",
-    ];
+    let providers = DOH_PROVIDER_URLS;
     // We wait for at most this many ticks before assuming the
     // canister isn't going to issue any more outcalls. Each tick is
     // a heartbeat; outcalls land within a few of them.
