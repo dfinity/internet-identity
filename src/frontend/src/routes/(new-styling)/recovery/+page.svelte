@@ -87,6 +87,9 @@
   const emailRecoveryStatus = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);
 
+  const emailRecoveryDiagnostics = (nonce: string) =>
+    anonymousActor.email_recovery_diagnostics(nonce);
+
   const submitEmailDkimLeaf = (
     arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
   ) =>
@@ -274,6 +277,7 @@
     <RecoverWithEmailWizard
       prepareDelegation={prepareEmailDelegation}
       status={emailRecoveryStatus}
+      diagnostics={emailRecoveryDiagnostics}
       submitDkimLeaf={submitEmailDkimLeaf}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}

@@ -28,7 +28,16 @@ pub const MAX_EMAIL_USER_BYTES: usize = 64;
 pub const MAX_EMAIL_DOMAIN_BYTES: usize = 255;
 pub const MAX_SUBJECT_BYTES: usize = 256;
 pub const MAX_BODY_BYTES: usize = 5_000;
-pub const MAX_HEADERS: usize = 30;
+/// Cap on the number of headers in one inbound message. Real-world mail
+/// that has traversed several hops accumulates a long run of trace and
+/// authentication headers (`Received`, `Authentication-Results`, `ARC-*`,
+/// and provider-specific `X-MS-Exchange-*` / `X-Microsoft-*` fields), so a
+/// legitimate message routed through Outlook/Exchange routinely carries far
+/// more than a hand-authored one. The original bound of 30 was too tight —
+/// it rejected genuine recovery emails (e.g. 39 headers from Outlook) — so
+/// it is raised to 100 to leave comfortable headroom while still keeping
+/// worst-case allocation on the open `smtp_request` endpoint bounded.
+pub const MAX_HEADERS: usize = 100;
 pub const MAX_HEADER_NAME_BYTES: usize = 256;
 pub const MAX_HEADER_VALUE_BYTES: usize = 8_192;
 /// Cap on the optional gateway-supplied `message_id` correlation id.
@@ -423,6 +432,24 @@ mod tests {
         };
         let resp = validate_message(&msg).unwrap_err();
         assert!(err_msg(&resp).contains("Too many headers"));
+    }
+
+    #[test]
+    fn validate_message_accepts_max_headers() {
+        // Guards the motivating case for raising the cap: a message that
+        // picked up a long run of trace/authentication headers en route
+        // (e.g. through Outlook/Exchange) must not be rejected.
+        let headers: Vec<SmtpHeader> = (0..MAX_HEADERS)
+            .map(|i| SmtpHeader {
+                name: "Received".into(),
+                value: format!("hop {i}"),
+            })
+            .collect();
+        let msg = SmtpMessage {
+            headers,
+            body: ByteBuf::new(),
+        };
+        assert!(validate_message(&msg).is_ok());
     }
 
     #[test]

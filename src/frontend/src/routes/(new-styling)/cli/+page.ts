@@ -83,7 +83,11 @@ const parseLoopbackCallback = (raw: string | null): string | undefined => {
   if (url.protocol !== "http:") {
     return undefined;
   }
-  if (url.hostname !== "127.0.0.1" && url.hostname !== "::1") {
+  // Only the IPv4 loopback literal. CSP's host-source grammar can't express
+  // IPv6 literals, so `http://[::1]:*` is an invalid `form-action` source the
+  // browser ignores — a `::1` callback would pass here but die on the CSP at
+  // submit time, the same trap as https above. The CLI must bind 127.0.0.1.
+  if (url.hostname !== "127.0.0.1") {
     return undefined;
   }
   return raw;

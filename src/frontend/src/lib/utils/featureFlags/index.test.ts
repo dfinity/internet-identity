@@ -78,3 +78,31 @@ test("feature flag to be reset", () => {
   expect(storage.getItem("a")).toEqual(null);
   expect(storage.getItem("b")).toEqual(null);
 });
+
+test("temporary override changes value without persisting", () => {
+  const storage = new MockStorage();
+  const aStore = writable(false);
+
+  const flag = new FeatureFlag(storage, "a", false, aStore);
+
+  flag.temporaryOverride(true);
+
+  expect(flag.isEnabled()).toEqual(true);
+  // Not persisted, so storage stays empty and `isSet` keeps reporting false.
+  expect(flag.isSet()).toEqual(false);
+  expect(storage.getItem("a")).toEqual(null);
+});
+
+test("set persists over a previous temporary override", () => {
+  const storage = new MockStorage();
+  const aStore = writable(false);
+
+  const flag = new FeatureFlag(storage, "a", false, aStore);
+
+  flag.temporaryOverride(true);
+  flag.set(false);
+
+  expect(flag.isEnabled()).toEqual(false);
+  expect(flag.isSet()).toEqual(true);
+  expect(storage.getItem("a")).toEqual("false");
+});

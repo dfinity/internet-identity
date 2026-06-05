@@ -176,6 +176,9 @@ async fn prepare_common(
         partial_verification: None,
         status: PendingStatus::Pending,
         recovery_outcome: None,
+        // Populated later, in `handle_smtp_request`, once an email
+        // bearing this nonce arrives carrying a gateway correlation id.
+        message_id: None,
     };
     insert_with_eviction(nonce.clone(), challenge, now_secs);
 

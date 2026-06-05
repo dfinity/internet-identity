@@ -21,13 +21,16 @@
 //!   ECDSA-P256-SHA256 leaf (TXT).
 //! - `ed25519.nl` — RSA-SHA256 root → ECDSA-P256-SHA256 nl →
 //!   Ed25519 leaf (A).
+//! - `mailbox.org` — RSA-SHA256 root → RSA-SHA256 org → RSA-SHA512
+//!   leaf (DKIM TXT). The leaf zone double-signs with RSA/SHA-1 too;
+//!   the captured bundle uses the RSA-SHA512 RRSIGs the FE selects.
 //!
-//! Together they exercise every algorithm in our RFC 8624 MUST set
-//! `{RSA-SHA256, ECDSA-P256-SHA256, Ed25519}` with real captured
-//! data, plus the four production email zones the recovery feature
-//! targets (proton.me, protonmail.com, tutanota.com — gmail.com /
-//! icloud.com / outlook.com / fastmail.com are unsigned and rely on
-//! the DoH-fallback path landing in PR 4).
+//! Together they exercise every algorithm we support
+//! `{RSA-SHA256, RSA-SHA512, ECDSA-P256-SHA256, Ed25519}` with real
+//! captured data, plus the production email zones the recovery
+//! feature targets (proton.me, protonmail.com, tutanota.com,
+//! mailbox.org — gmail.com / icloud.com / outlook.com / fastmail.com
+//! are unsigned and rely on the DoH-fallback path).
 //!
 //! This module is gated `#[cfg(test)]` at its declaration in
 //! `dnssec/mod.rs`, so no inner gate is needed here.
@@ -199,6 +202,16 @@ pub const TUTANOTA_COM_CHAIN_JSON: &str =
 /// same path.
 pub const ED25519_NL_CHAIN_JSON: &str =
     include_str!("../../../../test_vectors/dnssec/ed25519-nl-2026-05.json");
+
+/// Captured chain for `mbo0001._domainkey.mailbox.org TXT` — the
+/// DKIM leaf of an email-recovery target whose `mailbox.org` zone is
+/// signed with **RSA/SHA-512 (algorithm 10)** at the leaf zone and
+/// leaf RRsets (the zone also double-signs with deprecated RSA/SHA-1,
+/// which the FE skips). Provides real-data RSA-SHA512 coverage: the
+/// chain is RSA-SHA256 root → RSA-SHA256 `org` → RSA-SHA512
+/// `mailbox.org` DNSKEY self-sig → RSA-SHA512 leaf TXT.
+pub const MAILBOX_ORG_CHAIN_JSON: &str =
+    include_str!("../../../../test_vectors/dnssec/mailbox.org-2026-06.json");
 
 pub const IANA_ROOT_ANCHORS_JSON: &str =
     include_str!("../../../../test_vectors/dnssec/iana-root-anchors-2026-05.json");

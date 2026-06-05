@@ -64,6 +64,20 @@ pub fn pending_status(
     pending::status_of(nonce, now_secs)
 }
 
+/// Wrapper around `pending::diagnostics_of` (see
+/// `EmailRecoveryDiagnostics`) so the canister method in `main.rs`
+/// doesn't reach into the submodule. Returns `None` for an
+/// unknown/expired nonce; the record carries strictly-public fields
+/// only.
+pub fn pending_diagnostics(
+    nonce: &str,
+    now_secs: u64,
+) -> Option<
+    internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryDiagnostics,
+> {
+    pending::diagnostics_of(nonce, now_secs)
+}
+
 /// Look up the cached `RecoveryOutcome.seed` for a recovery-flow
 /// pending challenge. Used by `email_recovery_get_delegation` to
 /// find the canister-signature without having to recompute the
