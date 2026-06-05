@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
-  import { InfoIcon, UserIcon } from "@lucide/svelte";
+  import { UserIcon } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
@@ -61,9 +61,8 @@
       {/if}
     </div>
     <span
-      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold"
+      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold"
     >
-      <InfoIcon class="size-3.5" aria-hidden="true" />
       {$t`Connected`}
     </span>
   </div>
@@ -74,9 +73,7 @@
     class="btn btn-primary btn-lg mt-3 w-full gap-2"
   >
     {#if loading}
-      <ProgressRing class="size-4" />
-    {:else}
-      <UserIcon class="size-4" aria-hidden="true" />
+      <ProgressRing class="size-5" />
     {/if}
     {$t`Sign in`}
   </button>

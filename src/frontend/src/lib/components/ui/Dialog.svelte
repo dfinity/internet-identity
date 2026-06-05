@@ -1,10 +1,18 @@
+<script lang="ts" context="module">
+  import { getContext } from "svelte";
+  export const isInsideDialog = (): boolean => getContext("inDialog") === true;
+</script>
+
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, setContext } from "svelte";
   import { scale, fly } from "svelte/transition";
   import type { ClassValue, HTMLAttributes } from "svelte/elements";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { onNavigate } from "$app/navigation";
+
+  const nested = isInsideDialog();
+  setContext("inDialog", true);
 
   type DialogWidth = "normal" | "wider" | "extra";
 
@@ -132,7 +140,9 @@
   On both layouts, spacer elements push the content above the software
   keyboard and safe-area insets.
 -->
-{#if isOpen}
+{#if nested}
+  {@render children?.()}
+{:else if isOpen}
   <dialog
     bind:this={dialogRef}
     oncancel={onCancel}

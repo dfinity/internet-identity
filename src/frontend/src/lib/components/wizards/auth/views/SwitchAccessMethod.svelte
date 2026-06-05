@@ -2,7 +2,7 @@
   import { t } from "$lib/stores/locale.store";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
-  import { ArrowRightIcon, RepeatIcon, UserIcon } from "@lucide/svelte";
+  import { UserIcon } from "@lucide/svelte";
 
   export type AccessMethod =
     | { type: "passkey" }
@@ -38,12 +38,6 @@
   <div class="mt-4 flex flex-col items-center py-5">
     <div class="flex items-center gap-3">
       {#each [fromMethod, toMethod] as method, i (i)}
-        {#if i > 0}
-          <ArrowRightIcon
-            class="text-fg-tertiary size-5 rtl:-scale-x-100"
-            aria-hidden="true"
-          />
-        {/if}
         <span class="relative inline-block size-14 shrink-0">
           <span
             class="bg-bg-primary border-border-secondary text-fg-disabled flex size-14 items-center justify-center rounded-full border"
@@ -82,8 +76,7 @@
     </span>
   </div>
 
-  <button onclick={onSwitch} class="btn btn-primary btn-lg mt-3 w-full gap-2">
-    <RepeatIcon class="size-4" aria-hidden="true" />
+  <button onclick={onSwitch} class="btn btn-primary btn-lg mt-3 w-full">
     {$t`Switch method`}
   </button>
 </div>

@@ -115,7 +115,6 @@ export class AuthFlow {
       }
     | {
         name?: string;
-        email?: string;
         type: "signUp";
       }
   > => {
@@ -151,11 +150,7 @@ export class AuthFlow {
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
     this.#ssoName = ssoName;
-    return {
-      name: result.suggestedName,
-      email: result.email,
-      type: "signUp",
-    };
+    return { name: result.suggestedName, type: "signUp" };
   };
 
   completeSsoRegistration = async (name: string): Promise<bigint> => {
@@ -199,10 +194,6 @@ export class AuthFlow {
     this.#view = "setupNewPasskey";
   };
 
-  setupNewIdentity = (): void => {
-    this.#view = "setupNewIdentity";
-  };
-
   submitNameAndContinue = async (
     name: string,
   ): Promise<{ type: "created"; identityNumber: bigint }> => {
@@ -232,13 +223,10 @@ export class AuthFlow {
   ): Promise<
     | {
         identityNumber: bigint;
-        name?: string;
-        email?: string;
         type: "signIn";
       }
     | {
         name?: string;
-        email?: string;
         type: "signUp";
       }
   > => {
@@ -271,21 +259,11 @@ export class AuthFlow {
           createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
         });
       }
-      const { name: jwtName, email } = decodeJWT(result.jwt);
-      return {
-        identityNumber: result.identityNumber,
-        name: result.info.name[0] ?? jwtName,
-        email,
-        type: "signIn",
-      };
+      return { identityNumber: result.identityNumber, type: "signIn" };
     }
     this.#jwt = result.jwt;
     this.#configIssuer = config.issuer;
-    return {
-      name: result.suggestedName,
-      email: result.email,
-      type: "signUp",
-    };
+    return { name: result.suggestedName, type: "signUp" };
   };
 
   // Shared core for `continueWithOpenId` / `continueWithSso`. Acquires the
@@ -311,7 +289,6 @@ export class AuthFlow {
         type: "signUp";
         jwt: string;
         suggestedName?: string;
-        email?: string;
       }
   > => {
     let jwt: string | undefined = existingJwt;
@@ -363,11 +340,14 @@ export class AuthFlow {
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor"
       ) {
-        const { name, email } = decodeJWT(jwt);
+        const { name } = decodeJWT(jwt);
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.RegisterWithOpenID,
         );
-        return { type: "signUp", jwt, suggestedName: name, email };
+        if (name === undefined) {
+          this.#view = "setupNewIdentity";
+        }
+        return { type: "signUp", jwt, suggestedName: name };
       }
       throw error;
     }

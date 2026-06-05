@@ -296,7 +296,6 @@
                   isAuthDialogOpen = false;
                   handleError(error);
                 }}
-                withinDialog
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
