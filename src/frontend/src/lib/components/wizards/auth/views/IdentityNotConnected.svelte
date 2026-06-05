@@ -1,6 +1,11 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
-  import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
+  import {
+    ChevronDownIcon,
+    CircleAlertIcon,
+    UserIcon,
+    UserPlusIcon,
+  } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
@@ -63,8 +68,12 @@
       {/if}
     </div>
     <span
-      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold"
+      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold"
     >
+      <CircleAlertIcon
+        class="text-fg-warning-primary size-3.5"
+        aria-hidden="true"
+      />
       {$t`Not connected yet`}
     </span>
   </div>
@@ -75,12 +84,16 @@
     class="btn btn-primary btn-lg mt-3 w-full gap-2"
   >
     {#if loading}
-      <ProgressRing class="size-5" />
+      <ProgressRing class="size-4" />
+    {:else}
+      <UserPlusIcon class="size-4" aria-hidden="true" />
     {/if}
     {$t`Sign up`}
   </button>
 
-  <details class="group border-border-secondary mt-4 border-t pt-4">
+  <details
+    class="group bg-bg-secondary dark:bg-bg-primary border-border-secondary -mx-4 mt-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:-mb-8 sm:px-6"
+  >
     <summary
       class="text-text-tertiary focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex cursor-pointer list-none items-center justify-between rounded-sm text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
     >
