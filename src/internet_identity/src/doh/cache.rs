@@ -136,6 +136,7 @@ impl DohCache {
     /// Also opportunistically evicts the looked-up entry if we find
     /// it expired — keeps the cache from accumulating dead entries
     /// for FQDNs that get queried once and then go silent.
+    #[must_use = "the returned orphan wakers must be woken after the DOH_CACHE borrow is released"]
     pub fn lookup(&mut self, name: &str, now_secs: u64) -> (CacheLookup, Vec<Waker>) {
         if let Some(entry) = self.entries.get(name) {
             if entry.expires_at_secs > now_secs {
@@ -254,12 +255,19 @@ impl DohCache {
 /// `RefCell already borrowed` — the regression this indirection exists
 /// to prevent.
 ///
-/// Idempotent: if the state is already `Done`, its wakers were taken on
-/// the first transition, so this returns an empty list.
+/// Idempotent: only the first `InFlight -> Done` transition takes
+/// effect. If the state is already `Done`, the stored result and the
+/// (already taken) wakers are left untouched and this returns an empty
+/// list — so a late publish from an evicted/stale fetch can't overwrite
+/// the outcome a stale-eviction already settled.
 fn take_wakers(state: &SharedPending, result: Result<Vec<u8>, DohError>) -> Vec<Waker> {
     let mut s = state.borrow_mut();
+    if matches!(*s, PendingState::Done(_)) {
+        return Vec::new();
+    }
     match std::mem::replace(&mut *s, PendingState::Done(result)) {
         PendingState::InFlight { wakers } => wakers,
+        // Unreachable: the `Done` case returned above.
         PendingState::Done(_) => Vec::new(),
     }
 }
@@ -497,6 +505,29 @@ mod tests {
         }
         assert_eq!(w.count.load(Ordering::SeqCst), 1);
         assert!(cache.get_fresh("a.com", 0).is_none());
+    }
+
+    #[test]
+    fn take_wakers_is_idempotent_on_already_done() {
+        // A second resolution must be a no-op: once a stale-eviction has
+        // flipped an entry to `Done(Err)`, a late publish from the
+        // evicted fetch must not overwrite the result — a waiter not yet
+        // re-polled would otherwise observe late, stale data.
+        let state: SharedPending =
+            Rc::new(RefCell::new(PendingState::InFlight { wakers: Vec::new() }));
+
+        let first = take_wakers(&state, Err(DohError::AllProvidersFailed));
+        assert!(first.is_empty());
+
+        // Different result against the now-`Done` state — must not take.
+        let second = take_wakers(&state, Ok(b"late stale data".to_vec()));
+        assert!(second.is_empty());
+
+        let settled = state.borrow();
+        match &*settled {
+            PendingState::Done(Err(DohError::AllProvidersFailed)) => {}
+            other => panic!("first result must stick, got {other:?}"),
+        }
     }
 
     // ---- Stale-pending eviction ----
