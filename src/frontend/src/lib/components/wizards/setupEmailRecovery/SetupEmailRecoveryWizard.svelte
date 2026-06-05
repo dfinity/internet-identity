@@ -159,7 +159,9 @@
     const detail = reason["DohFetchFailed"];
     if (typeof detail !== "string") return undefined;
     const token = detail.split(":")[0]?.trim();
-    return token !== undefined && /^[a-z_]+$/.test(token) ? token : undefined;
+    return token !== undefined && /^[a-z0-9_]+$/.test(token)
+      ? token
+      : undefined;
   };
 
   /**
