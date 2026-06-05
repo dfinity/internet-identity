@@ -318,11 +318,8 @@ fn verify_root_dnskey(
                 continue;
             }
             had_digest_match = true;
-            match verify_rrsig_under_dnskey(
-                root_dnskey,
-                dnskey_rdata,
-                root_dnskey.rrsig.algorithm,
-            ) {
+            match verify_rrsig_under_dnskey(root_dnskey, dnskey_rdata, root_dnskey.rrsig.algorithm)
+            {
                 Ok(()) => return Ok(()),
                 Err(e) => last_signature_err = Some(e),
             }
@@ -594,8 +591,8 @@ fn name_is_subdomain_of(owner: &[u8], zone: &[u8]) -> bool {
 mod tests {
     use super::super::test_vectors::{
         load_anchors, load_bundle, CLOUDFLARE_COM_CHAIN_JSON, ED25519_NL_CHAIN_JSON,
-        IANA_ROOT_ANCHORS_JSON, PROTONMAIL_COM_CHAIN_JSON, PROTON_ME_CHAIN_JSON,
-        TUTANOTA_COM_CHAIN_JSON,
+        IANA_ROOT_ANCHORS_JSON, MAILBOX_ORG_CHAIN_JSON, PROTONMAIL_COM_CHAIN_JSON,
+        PROTON_ME_CHAIN_JSON, TUTANOTA_COM_CHAIN_JSON,
     };
     use super::super::types::{TYPE_DNSKEY, TYPE_TXT};
     use super::*;
@@ -687,6 +684,16 @@ mod tests {
         // MUST algorithm. Chain: RSA-SHA256 root → ECDSA-P256-SHA256
         // nl → Ed25519 leaf.
         assert_verifies(ED25519_NL_CHAIN_JSON, TYPE_A);
+    }
+
+    #[test]
+    fn verifies_mailbox_org_chain() {
+        // RSA-SHA512 (algorithm 10) leaf + leaf-zone DNSKEY self-sig —
+        // real-data coverage for the mailbox.org case. The zone also
+        // publishes RSA/SHA-1 signatures, which the FE skips; the
+        // captured bundle carries the alg-10 RRSIGs. Chain:
+        // RSA-SHA256 root → RSA-SHA256 org → RSA-SHA512 mailbox.org.
+        assert_verifies(MAILBOX_ORG_CHAIN_JSON, TYPE_TXT);
     }
 
     #[test]
