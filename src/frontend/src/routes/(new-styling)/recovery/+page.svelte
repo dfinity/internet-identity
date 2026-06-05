@@ -286,6 +286,9 @@
                 ]}
               />
             </span>
+            <span class="text-text-tertiary ps-8 text-sm font-normal">
+              Recover a legacy identity by its number.
+            </span>
           </ButtonCard>
         </div>
         <a href="/" class="btn btn-secondary btn-xl">

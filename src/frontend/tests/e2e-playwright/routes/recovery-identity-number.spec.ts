@@ -58,7 +58,7 @@ test.describe("/recovery — identity number entry point", () => {
   }) => {
     await page.goto(II_URL + "/recovery");
     await expect(
-      page.getByRole("button", { name: "Identity number", exact: true }),
+      page.getByRole("button", { name: /^Identity number/ }),
     ).toBeVisible();
   });
 
@@ -67,7 +67,7 @@ test.describe("/recovery — identity number entry point", () => {
   }) => {
     await page.goto(II_URL + "/recovery");
     await page
-      .getByRole("button", { name: "Identity number", exact: true })
+      .getByRole("button", { name: /^Identity number/ })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -79,14 +79,14 @@ test.describe("/recovery — identity number entry point", () => {
   test("MigrationWizard dialog can be dismissed", async ({ page }) => {
     await page.goto(II_URL + "/recovery");
     await page
-      .getByRole("button", { name: "Identity number", exact: true })
+      .getByRole("button", { name: /^Identity number/ })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
     await expect(
-      page.getByRole("button", { name: "Identity number", exact: true }),
+      page.getByRole("button", { name: /^Identity number/ }),
     ).toBeVisible();
   });
 
@@ -138,7 +138,7 @@ test.describe("/recovery — identity number entry point", () => {
     // Navigate to /recovery and open the identity-number wizard.
     await page.goto(II_URL + "/recovery");
     await page
-      .getByRole("button", { name: "Identity number", exact: true })
+      .getByRole("button", { name: /^Identity number/ })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
