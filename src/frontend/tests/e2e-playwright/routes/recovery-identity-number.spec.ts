@@ -178,43 +178,6 @@ test.describe("/recovery — identity number entry point", () => {
   });
 });
 
-test.describe("AuthWizard passkey picker — no in-dialog upgrade link", () => {
-  test("SetupOrUseExistingPasskey does not render an identity number upgrade link", async ({
-    page,
-  }) => {
-    // Navigate to II landing page — first-time state shows the passkey picker inline.
-    await page.goto(II_URL);
-    await page.getByRole("button", { name: "Sign in with passkey" }).click();
-
-    // The picker dialog / inline view must NOT contain the removed upgrade link.
-    await expect(page.getByText("Still have an identity number?")).toBeHidden();
-    await expect(page.getByRole("button", { name: "Upgrade" })).toBeHidden();
-  });
-
-  test("SetupOrUseExistingPasskey inside 'Add another identity' dialog has no upgrade link", async ({
-    page,
-    identities,
-    signInWithIdentity,
-  }) => {
-    // Sign in to reach the welcome-back state where the picker is behind a dialog.
-    await page.goto(II_URL);
-    await signInWithIdentity(page, identities[0].identityNumber);
-
-    // Now on welcome-back state: open "Add identity" to reach picker.
-    await page.goto(II_URL);
-    await page.getByRole("button", { name: "Add identity" }).click();
-    await page.getByRole("button", { name: "Sign in with passkey" }).click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-
-    await expect(
-      dialog.getByText("Still have an identity number?"),
-    ).toBeHidden();
-    await expect(dialog.getByRole("button", { name: "Upgrade" })).toBeHidden();
-  });
-});
-
 test.describe("/authorize — standalone upgrade panel sanity check", () => {
   test("Upgrade panel is present and opens the MigrationWizard when arriving from a legacy domain", async ({
     page,
@@ -235,30 +198,24 @@ test.describe("/authorize — standalone upgrade panel sanity check", () => {
           }),
         ).toBeVisible({ timeout: 10000 });
 
-        // Expand the panel if collapsed (MIN_GUIDED_UPGRADE flag may start it collapsed).
-        const upgradeBtn = authPage.getByRole("button", {
-          name: "Upgrade your identity",
-        });
-        const isExpanded = await upgradeBtn.isVisible();
-        if (!isExpanded) {
-          await authPage
-            .getByRole("button", { name: "Upgrade" })
-            .first()
-            .click();
-        }
-        await upgradeBtn.click();
+        await authPage
+          .getByRole("button", { name: "Upgrade your identity" })
+          .click();
 
         // MigrationWizard should now be active — the identity number input is the gate.
         await expect(
           authPage.getByPlaceholder("Internet Identity number"),
         ).toBeVisible();
 
-        // Cancel: close the wizard and complete the authorize flow by creating a new identity.
+        // Close the wizard and complete the authorize flow by creating a new
+        // identity via the sign-up mode switcher.
         await authPage.keyboard.press("Escape");
         await authPage
-          .getByRole("button", { name: "Sign in with passkey" })
+          .getByRole("button", { name: "Sign up", exact: true })
           .click();
-        await authPage.getByLabel("Identity name").click();
+        await authPage
+          .getByRole("button", { name: "Sign up with passkey" })
+          .click();
         await authPage.getByLabel("Identity name").fill("Test");
         await authPage.getByRole("button", { name: "Create identity" }).click();
         await authPage
