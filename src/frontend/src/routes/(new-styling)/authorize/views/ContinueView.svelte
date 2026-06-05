@@ -71,6 +71,9 @@
   const application = $derived(
     dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin))?.name,
   );
+  const dappName = $derived(
+    application ?? new URL($establishedChannelStore.origin).hostname,
+  );
   const primaryAccountName = $derived(
     application !== undefined ? $t`My ${application} account` : $t`My account`,
   );
@@ -347,7 +350,7 @@
 <div class="flex flex-1 flex-col">
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-    {$t`Sign in`}
+    {$t`Continue to ${dappName}`}
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
     {$t`with your Internet Identity`}

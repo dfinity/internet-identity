@@ -112,14 +112,11 @@ test.describe("multiple identities", () => {
     const principal = await authorize(page, async (authPage) => {
       await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
       await authPage.getByRole("button", { name: "Switch identity" }).click();
+      await authPage.getByRole("button", { name: "Add identity" }).click();
+      // Sign-in dialog renders the mode="signin" picker; clicking it
+      // goes straight to existing-passkey WebAuthn.
       await authPage
-        .getByRole("button", { name: "Add another identity" })
-        .click();
-      await authPage
-        .getByRole("button", { name: "Continue with passkey" })
-        .click();
-      await authPage
-        .getByRole("button", { name: "Use existing identity" })
+        .getByRole("button", { name: "Sign in with passkey" })
         .click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })

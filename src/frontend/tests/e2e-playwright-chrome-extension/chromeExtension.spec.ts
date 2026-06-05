@@ -17,11 +17,12 @@ authorizeTest.describe("Authorize from chrome extension", () => {
 
   authorizeTest("should authenticate", async ({ authorizePage }) => {
     await addVirtualAuthenticator(authorizePage.page);
+    // /authorize renders the picker in mode="signin"; switch to sign-up.
     await authorizePage.page
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Sign up", exact: true })
       .click();
     await authorizePage.page
-      .getByRole("button", { name: "Create new identity" })
+      .getByRole("button", { name: "Sign up with passkey" })
       .click();
     await authorizePage.page.getByLabel("Identity name").fill("Extension User");
     await authorizePage.page
