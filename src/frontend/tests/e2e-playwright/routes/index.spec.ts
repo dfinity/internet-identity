@@ -227,9 +227,20 @@ test.describe("First visit", () => {
         .getByRole("button", { name: "Sign up" })
         .click();
 
-      // Enter identity name
+      // Wait for the CreateIdentity view before typing.
+      await expect(
+        page.getByRole("heading", { name: "What's your name?" }),
+      ).toBeVisible();
+
+      // On mobile the HTML <dialog>'s native focus trap lands on the
+      // Close button before CreateIdentity's onMount can focus the
+      // input, so we click the input first to take focus before fill —
+      // otherwise the typed value never reaches the bound `name` state
+      // and the Create-identity button stays disabled.
       const name = "John Doe";
-      await page.getByLabel("Identity name").fill(name);
+      const input = page.getByLabel("Identity name");
+      await input.click();
+      await input.fill(name);
       await page.getByRole("button", { name: "Create identity" }).click();
 
       // Assert that dashboard is shown
@@ -272,12 +283,71 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      // Fresh SSO user on the homepage surfaces IdentityNotConnectedDialog
+      // — confirm sign-up to land on /manage.
       await page
         .getByRole("dialog")
         .getByRole("button", { name: "Sign up" })
         .click();
 
       // Assert that dashboard is shown
+      await page.waitForURL(II_URL + "/manage");
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${name}\\.`),
+        }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("SSO user without name claim", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [
+          {
+            claims: {},
+          },
+        ],
+      },
+    });
+
+    test("Sign up with SSO", async ({
+      page,
+      openSsoPopup,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await page.goto(II_URL);
+      const popup = await openSsoPopup(page, undefined, "signin");
+
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
+
+      // Fresh SSO user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up so the name-entry view appears.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
+      // Wait for the CreateIdentity view to fully render before typing.
+      await expect(
+        page.getByRole("heading", { name: "What's your name?" }),
+      ).toBeVisible();
+
+      // On mobile the HTML <dialog>'s native focus trap lands on the
+      // Close button before CreateIdentity's onMount can focus the
+      // input, so we click the input first to take focus before fill —
+      // otherwise the typed value never reaches the bound `name` state
+      // and the Create-identity button stays disabled.
+      const name = "John Doe";
+      const input = page.getByLabel("Identity name");
+      await input.click();
+      await input.fill(name);
+      await page.getByRole("button", { name: "Create identity" }).click();
+
       await page.waitForURL(II_URL + "/manage");
       await expect(
         page.getByRole("heading", {

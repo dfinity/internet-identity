@@ -17,6 +17,11 @@
     mode?: "signin" | "signup" | "both";
     onSwitchMode?: () => void;
     withinDialog?: boolean;
+    // Override the switch-mode CTA title (used when the picker lives
+    // inside a logged-in surface where the default "New to Internet
+    // Identity?" copy is misleading). When set, the description line is
+    // suppressed and the title carries the full prompt on its own.
+    switchModeTitle?: string;
   }
 
   const {
@@ -26,6 +31,7 @@
     mode = "both",
     onSwitchMode,
     withinDialog = false,
+    switchModeTitle,
   }: Props = $props();
 
   const showLostAccess = $derived(mode !== "signup");
@@ -174,15 +180,18 @@
     >
       <div class="min-w-0 flex-1">
         <div class="text-text-primary text-sm font-semibold">
-          {mode === "signin"
-            ? $t`New to Internet Identity?`
-            : $t`Already have an identity?`}
+          {switchModeTitle ??
+            (mode === "signin"
+              ? $t`New to Internet Identity?`
+              : $t`Already have an identity?`)}
         </div>
-        <div class="text-text-tertiary mt-0.5 text-xs">
-          {mode === "signin"
-            ? $t`Create your private, passwordless identity.`
-            : $t`Sign in with a passkey or familiar provider.`}
-        </div>
+        {#if switchModeTitle === undefined}
+          <div class="text-text-tertiary mt-0.5 text-xs">
+            {mode === "signin"
+              ? $t`Create your private, passwordless identity.`
+              : $t`Sign in with a passkey or familiar provider.`}
+          </div>
+        {/if}
       </div>
       <button
         onclick={onSwitchMode}
