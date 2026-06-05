@@ -9,14 +9,25 @@
   import Logo from "$lib/components/ui/Logo.svelte";
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { AuthWizard } from "$lib/components/wizards/auth";
+  import {
+    AuthWizard,
+    IdentityAlreadyLinked,
+    IdentityNotConnected,
+    SignUpHero,
+    SwitchAccessMethod,
+  } from "$lib/components/wizards/auth";
   import {
     afterNavigate,
     beforeNavigate,
     goto,
     preloadData,
   } from "$app/navigation";
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import {
+    lastUsedIdentitiesStore,
+    type LastUsedIdentity,
+  } from "$lib/stores/last-used-identities.store";
+  import { backendCanisterConfig } from "$lib/globals";
+  import type { AccessMethod } from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import {
     AuthenticationV2Events,
@@ -38,9 +49,56 @@
 
   let next = $state("/manage");
   let isAuthDialogOpen = $state(false);
+  let isCreateIdentityDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let switchingToIdentity = $state<bigint>();
+
+  let notConnectedPayload = $state<{
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    resume: () => Promise<void>;
+    cancel: () => void;
+  }>();
+
+  let alreadyLinkedPayload = $state<{
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    signIn: () => Promise<void>;
+    cancel: () => void;
+  }>();
+
+  let methodSwitchPayload = $state<{
+    previous: LastUsedIdentity;
+    newProvider: AccessMethod;
+    proceed: () => Promise<void>;
+  }>();
+
+  // True when the sign-up dialog was opened by toggling from the sign-in
+  // modal — in that case "Sign in" inside the sign-up dialog should return
+  // to the sign-in modal, not just close down to the landing page.
+  let signUpOpenedFromSignInModal = $state(false);
+
+  const authMethodToAccessMethod = (
+    m: LastUsedIdentity["authMethod"],
+  ): AccessMethod => {
+    if ("passkey" in m) return { type: "passkey" };
+    if ("openid" in m) {
+      const config = backendCanisterConfig.openid_configs[0]?.find(
+        (c) => c.issuer === m.openid.iss,
+      );
+      return {
+        type: "openid",
+        logo: config?.logo ?? "",
+        name: config?.name ?? m.openid.iss,
+      };
+    }
+    return { type: "sso", name: m.sso.name ?? m.sso.domain };
+  };
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities).sort(
@@ -71,6 +129,8 @@
       await goto(next, { replaceState: true });
     } finally {
       isAuthDialogOpen = false;
+      isCreateIdentityDialogOpen = false;
+      signUpOpenedFromSignInModal = false;
       isAuthenticating = false;
       switchingToIdentity = undefined;
     }
@@ -235,12 +295,14 @@
             <!-- Welcome-back state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
               <h1
-                class="text-text-primary mb-4 text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
+                class="text-text-primary mb-4 text-4xl font-medium tracking-tight text-balance md:text-[40px] md:leading-[1.1]"
               >
-                {$t`Internet Identity`}
+                {$t`Manage your Identity`}
               </h1>
-              <p class="text-text-tertiary mb-10 max-w-md text-base md:text-lg">
-                <Trans>Sign in to manage your identity</Trans>
+              <p
+                class="text-text-tertiary mb-8 max-w-md text-base text-balance md:text-lg"
+              >
+                <Trans>Keep your access and recovery methods up to date.</Trans>
               </p>
 
               <div
@@ -297,7 +359,7 @@
                     class="btn btn-tertiary btn-icon btn-sm ms-auto rounded-full"
                   >
                     <PencilIcon class="size-4" />
-                    <span>{$t`Edit`}</span>
+                    <span>{$t`Edit identities`}</span>
                   </button>
                 </div>
                 <ul class="flex flex-col gap-2">
@@ -341,23 +403,20 @@
               class="btn btn-tertiary mt-6 gap-2"
             >
               <PlusIcon class="size-4" />
-              {$t`Add another identity`}
+              {$t`Add identity`}
             </button>
           {:else}
             <!-- Sign-up state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
               <h1
-                class="text-text-primary mb-4 text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
+                class="text-text-primary mb-4 text-4xl font-medium tracking-tight text-balance md:text-[40px] md:leading-[1.1]"
               >
-                {$t`Internet Identity`}
+                {$t`Manage your Identity`}
               </h1>
               <p
-                class="text-text-tertiary mb-10 max-w-md text-base text-balance md:text-lg"
+                class="text-text-tertiary mb-8 max-w-md text-base text-balance md:text-lg"
               >
-                <Trans>
-                  Sign in or create an identity to access apps without passwords
-                  or sharing personal data.
-                </Trans>
+                <Trans>Keep your access and recovery methods up to date.</Trans>
               </p>
               <AuthWizard
                 onSignIn={handleSignIn}
@@ -367,7 +426,14 @@
                   isAuthenticating = false;
                   handleError(error);
                 }}
+                onOpenIdNotConnected={(args) => (notConnectedPayload = args)}
+                onMethodSwitch={(args) => (methodSwitchPayload = args)}
+                onSwitchMode={() => {
+                  signUpOpenedFromSignInModal = false;
+                  isCreateIdentityDialogOpen = true;
+                }}
                 withinDialog={false}
+                mode="signin"
               />
             </div>
           {/if}
@@ -397,7 +463,15 @@
         isAuthenticating = false;
         handleError(error);
       }}
+      onOpenIdNotConnected={(args) => (notConnectedPayload = args)}
+      onMethodSwitch={(args) => (methodSwitchPayload = args)}
+      onSwitchMode={() => {
+        signUpOpenedFromSignInModal = true;
+        isAuthDialogOpen = false;
+        isCreateIdentityDialogOpen = true;
+      }}
       withinDialog={true}
+      mode="signin"
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
         {$t`Sign in`}
@@ -409,11 +483,132 @@
   </Dialog>
 {/if}
 
+{#if isCreateIdentityDialogOpen}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      isCreateIdentityDialogOpen = false;
+      signUpOpenedFromSignInModal = false;
+    }}
+  >
+    <AuthWizard
+      onSignIn={handleSignIn}
+      onSignUp={handleSignUp}
+      onUpgrade={handleUpgrade}
+      onError={(error) => {
+        isCreateIdentityDialogOpen = false;
+        isAuthenticating = false;
+        handleError(error);
+      }}
+      onMethodSwitch={(args) => (methodSwitchPayload = args)}
+      onOpenIdAlreadyLinked={(args) => (alreadyLinkedPayload = args)}
+      onSwitchMode={lastUsedIdentities.length > 0
+        ? () => {
+            isCreateIdentityDialogOpen = false;
+            if (signUpOpenedFromSignInModal) {
+              signUpOpenedFromSignInModal = false;
+              isAuthDialogOpen = true;
+            }
+          }
+        : undefined}
+      withinDialog={true}
+      mode="signup"
+    >
+      <SignUpHero />
+    </AuthWizard>
+  </Dialog>
+{/if}
+
 {#if isManageIdentitiesDialogOpen}
   <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
     <ManageIdentities
       identities={lastUsedIdentities}
       onRemoveIdentity={handleRemoveIdentity}
+    />
+  </Dialog>
+{/if}
+
+{#if notConnectedPayload !== undefined}
+  {@const payload = notConnectedPayload}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      const cancel = payload.cancel;
+      notConnectedPayload = undefined;
+      cancel();
+    }}
+  >
+    <IdentityNotConnected
+      providerName={payload.providerName}
+      providerLogo={payload.providerLogo}
+      userName={payload.userName ?? payload.userEmail ?? payload.providerName}
+      userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
+      onSignUp={() => {
+        const resume = payload.resume;
+        notConnectedPayload = undefined;
+        void resume();
+      }}
+      onRecover={() => {
+        const cancel = payload.cancel;
+        notConnectedPayload = undefined;
+        cancel();
+        void goto("/recovery");
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if alreadyLinkedPayload !== undefined}
+  {@const payload = alreadyLinkedPayload}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      const cancel = payload.cancel;
+      alreadyLinkedPayload = undefined;
+      cancel();
+    }}
+  >
+    <IdentityAlreadyLinked
+      providerName={payload.providerName}
+      providerLogo={payload.providerLogo}
+      userName={payload.userName ?? payload.userEmail ?? payload.providerName}
+      userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
+      onSignIn={() => {
+        const signIn = payload.signIn;
+        alreadyLinkedPayload = undefined;
+        void signIn();
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if methodSwitchPayload !== undefined}
+  {@const payload = methodSwitchPayload}
+  {@const previous = payload.previous}
+  {@const previousEmail =
+    "openid" in previous.authMethod &&
+    previous.authMethod.openid.metadata !== undefined
+      ? getMetadataString(previous.authMethod.openid.metadata, "email")
+      : "sso" in previous.authMethod
+        ? previous.authMethod.sso.email
+        : undefined}
+  <Dialog onClose={() => (methodSwitchPayload = undefined)}>
+    <SwitchAccessMethod
+      userName={previous.name ?? previousEmail ?? `${previous.identityNumber}`}
+      userEmail={previous.name !== undefined ? previousEmail : undefined}
+      fromMethod={authMethodToAccessMethod(previous.authMethod)}
+      toMethod={payload.newProvider}
+      onSwitch={() => {
+        const proceed = payload.proceed;
+        methodSwitchPayload = undefined;
+        void proceed();
+      }}
     />
   </Dialog>
 {/if}
