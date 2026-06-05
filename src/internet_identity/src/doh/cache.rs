@@ -125,35 +125,48 @@ impl DohCache {
     ///
     /// If we find a `Pending` entry that's older than
     /// [`PENDING_STALE_AFTER_SECS`], we treat it as abandoned (the
-    /// continuation that should have published it likely trapped),
-    /// wake any orphan waiters with [`DohError::AllProvidersFailed`]
-    /// so they don't hang, and start a fresh fetch.
+    /// continuation that should have published it likely trapped) and
+    /// start a fresh fetch. The abandoned entry's orphan waiters are
+    /// flipped to [`DohError::AllProvidersFailed`] so they don't hang;
+    /// their wakers are returned in the second tuple element for the
+    /// caller to fire *after* releasing the `DOH_CACHE` borrow (waking
+    /// re-enters the cache — see [`take_wakers`]). The list is empty on
+    /// every non-eviction path.
     ///
     /// Also opportunistically evicts the looked-up entry if we find
     /// it expired — keeps the cache from accumulating dead entries
     /// for FQDNs that get queried once and then go silent.
-    pub fn lookup(&mut self, name: &str, now_secs: u64) -> CacheLookup {
+    pub fn lookup(&mut self, name: &str, now_secs: u64) -> (CacheLookup, Vec<Waker>) {
         if let Some(entry) = self.entries.get(name) {
             if entry.expires_at_secs > now_secs {
-                return CacheLookup::Hit(entry.bytes.clone());
+                return (CacheLookup::Hit(entry.bytes.clone()), Vec::new());
             }
             // Expired: drop it now rather than waiting for a publish
             // to overwrite — most expired entries never see a republish.
             self.entries.remove(name);
         }
+        // Wakers of an abandoned in-flight fetch we evict below, if any.
+        // Returned to the caller to fire once the `DOH_CACHE` borrow is
+        // released — never woken inline (see `take_wakers`).
+        let mut orphan_wakers = Vec::new();
         if let Some(existing) = self.pending.get(name) {
             let age = now_secs.saturating_sub(existing.started_at_secs);
             if age < PENDING_STALE_AFTER_SECS {
-                return CacheLookup::Wait(WaitForPending {
-                    state: existing.state.clone(),
-                });
+                return (
+                    CacheLookup::Wait(WaitForPending {
+                        state: existing.state.clone(),
+                    }),
+                    Vec::new(),
+                );
             }
-            // Abandoned: evict and wake any orphan waiters. The
-            // SharedPending may still be held by `WaitForPending`
-            // futures that registered before eviction; flipping it to
-            // `Done(Err)` resolves their `await` instead of hanging.
+            // Abandoned: evict it. The SharedPending may still be held
+            // by `WaitForPending` futures that registered before
+            // eviction; flipping it to `Done(Err)` resolves their
+            // `await` instead of hanging. We hand their wakers back
+            // rather than firing them here — `lookup` runs inside
+            // `DOH_CACHE.borrow_mut()`.
             let stale = self.pending.remove(name).expect("just checked");
-            wake_with(&stale.state, Err(DohError::AllProvidersFailed));
+            orphan_wakers = take_wakers(&stale.state, Err(DohError::AllProvidersFailed));
         }
         let state = Rc::new(RefCell::new(PendingState::InFlight { wakers: Vec::new() }));
         self.pending.insert(
@@ -163,17 +176,26 @@ impl DohCache {
                 started_at_secs: now_secs,
             },
         );
-        CacheLookup::Fetch(FetchToken { state })
+        (CacheLookup::Fetch(FetchToken { state }), orphan_wakers)
     }
 
-    /// Publish the result of the in-flight fetch for `name`.
+    /// Publish the result of the in-flight fetch for `name`, returning
+    /// the wakers of any dedup subscribers.
+    ///
+    /// **The caller must wake the returned wakers, and only after the
+    /// `DOH_CACHE` borrow is released.** `publish` runs inside
+    /// `DOH_CACHE.borrow_mut()`; a woken `WaitForPending` is polled
+    /// synchronously and re-entrantly by the single-threaded canister
+    /// executor, and that poll borrows both this `PendingState` and —
+    /// as the resumed task races on to its next `fetch_txt` — `DOH_CACHE`
+    /// itself. Waking inline would trip `RefCell already borrowed`.
     ///
     /// The `token` is whatever [`Self::lookup`] handed back when this
     /// caller got the `Fetch` arm — passing it back lets us detect
     /// the case where this fetch was evicted by a stale-takeover
     /// (another caller saw the pending entry as abandoned and started
     /// over). In that case we don't touch the cache map but we still
-    /// wake any subscribers tied to *our* `PendingState`, so even
+    /// return the wakers tied to *our* `PendingState`, so even
     /// orphaned waiters resolve cleanly.
     ///
     /// Also opportunistically sweeps any value entries that are
@@ -181,6 +203,7 @@ impl DohCache {
     /// write path) rather than on every `lookup` keeps reads cheap
     /// while still bounding cache size — every successful fetch
     /// drops the dead weight that accumulated since the last write.
+    #[must_use = "the returned wakers must be woken after the DOH_CACHE borrow is released"]
     pub fn publish(
         &mut self,
         name: &str,
@@ -188,7 +211,7 @@ impl DohCache {
         result: Result<Vec<u8>, DohError>,
         expires_at_secs: u64,
         now_secs: u64,
-    ) {
+    ) -> Vec<Waker> {
         self.sweep_expired(now_secs);
 
         let still_ours = self
@@ -201,7 +224,10 @@ impl DohCache {
             }
             self.pending.remove(name);
         }
-        wake_with(&token.state, result);
+        // Flip our `PendingState` to `Done` and hand the registered
+        // wakers back — we must not wake here. See the method doc and
+        // `take_wakers`.
+        take_wakers(&token.state, result)
     }
 
     /// Drop every value entry whose `expires_at_secs` is at or before
@@ -214,16 +240,27 @@ impl DohCache {
     }
 }
 
-/// Flip a `PendingState` to `Done(result)` and wake every registered
-/// waker. Idempotent: if the state is already `Done`, this is a no-op
-/// for the wakers (they were woken on the first transition).
-fn wake_with(state: &SharedPending, result: Result<Vec<u8>, DohError>) {
+/// Flip a `PendingState` to `Done(result)` and return its registered
+/// wakers **without waking them**.
+///
+/// The wake is the caller's responsibility, and it must happen only
+/// after every relevant `RefCell` borrow is released — both this
+/// `PendingState`'s cell and the surrounding `DOH_CACHE`. The canister
+/// runs a single wasm thread and its executor polls a woken task
+/// *synchronously and re-entrantly* from inside `Waker::wake`: that
+/// poll borrows this same cell in [`WaitForPending::poll`], and the
+/// resumed task may run straight into another `fetch_txt` that borrows
+/// `DOH_CACHE`. Waking while either borrow is held panics with
+/// `RefCell already borrowed` — the regression this indirection exists
+/// to prevent.
+///
+/// Idempotent: if the state is already `Done`, its wakers were taken on
+/// the first transition, so this returns an empty list.
+fn take_wakers(state: &SharedPending, result: Result<Vec<u8>, DohError>) -> Vec<Waker> {
     let mut s = state.borrow_mut();
-    let prev = std::mem::replace(&mut *s, PendingState::Done(result));
-    if let PendingState::InFlight { wakers } = prev {
-        for w in wakers {
-            w.wake();
-        }
+    match std::mem::replace(&mut *s, PendingState::Done(result)) {
+        PendingState::InFlight { wakers } => wakers,
+        PendingState::Done(_) => Vec::new(),
     }
 }
 
@@ -312,17 +349,33 @@ mod tests {
     fn lookup_returns_hit_on_fresh_entry() {
         let mut cache = DohCache::default();
         cache.insert("a.com", b"hello".to_vec(), 1000);
-        match cache.lookup("a.com", 999) {
+        match cache.lookup("a.com", 999).0 {
             CacheLookup::Hit(b) => assert_eq!(b, b"hello"),
             _ => panic!("expected Hit"),
         }
     }
 
-    /// Helper: take the `Fetch` arm or fail the test.
-    fn expect_fetch(lookup: CacheLookup) -> FetchToken {
-        match lookup {
+    /// Helper: take the `Fetch` arm or fail the test. Ignores the
+    /// orphan-waker list (empty on the paths these callers exercise).
+    fn expect_fetch(lookup: (CacheLookup, Vec<Waker>)) -> FetchToken {
+        match lookup.0 {
             CacheLookup::Fetch(t) => t,
             _ => panic!("expected Fetch"),
+        }
+    }
+
+    /// Helper: register a waiter on `name` so its waker is stored in the
+    /// shared `PendingState`. The `WaitForPending` future is dropped
+    /// after the single poll, but the waker persists in the map entry —
+    /// exactly what a real `Wait` caller leaves behind before it parks
+    /// on the outcall.
+    fn register_waiter(cache: &mut DohCache, name: &str, now: u64, waker: &Waker) {
+        match cache.lookup(name, now).0 {
+            CacheLookup::Wait(mut fut) => {
+                let mut cx = Context::from_waker(waker);
+                assert!(matches!(Pin::new(&mut fut).poll(&mut cx), Poll::Pending));
+            }
+            _ => panic!("expected Wait"),
         }
     }
 
@@ -338,7 +391,7 @@ mod tests {
     fn second_lookup_returns_wait() {
         let mut cache = DohCache::default();
         let _token = expect_fetch(cache.lookup("a.com", 0));
-        match cache.lookup("a.com", 0) {
+        match cache.lookup("a.com", 0).0 {
             CacheLookup::Wait(_) => {}
             _ => panic!("expected Wait"),
         }
@@ -356,25 +409,12 @@ mod tests {
         let w2 = Arc::new(CountingWaker {
             count: AtomicUsize::new(0),
         });
+        register_waiter(&mut cache, "a.com", 0, &make_waker(&w1));
+        register_waiter(&mut cache, "a.com", 0, &make_waker(&w2));
 
-        let waker_1 = make_waker(&w1);
-        match cache.lookup("a.com", 0) {
-            CacheLookup::Wait(mut fut) => {
-                let mut cx = Context::from_waker(&waker_1);
-                assert!(matches!(Pin::new(&mut fut).poll(&mut cx), Poll::Pending));
-            }
-            _ => panic!("expected Wait"),
+        for w in cache.publish("a.com", token, Ok(b"hello".to_vec()), 1000, 0) {
+            w.wake();
         }
-        let waker_2 = make_waker(&w2);
-        match cache.lookup("a.com", 0) {
-            CacheLookup::Wait(mut fut) => {
-                let mut cx = Context::from_waker(&waker_2);
-                assert!(matches!(Pin::new(&mut fut).poll(&mut cx), Poll::Pending));
-            }
-            _ => panic!("expected Wait"),
-        }
-
-        cache.publish("a.com", token, Ok(b"hello".to_vec()), 1000, 0);
         assert_eq!(w1.count.load(Ordering::SeqCst), 1);
         assert_eq!(w2.count.load(Ordering::SeqCst), 1);
 
@@ -383,15 +423,49 @@ mod tests {
     }
 
     #[test]
+    fn publish_returns_wakers_without_waking_them() {
+        // Regression for the `RefCell already borrowed` panic at
+        // WaitForPending::poll (cache.rs:256): `publish` runs inside
+        // `DOH_CACHE.borrow_mut()` and must hand its subscribers' wakers
+        // back to the caller rather than waking them itself. In the
+        // single-threaded canister executor a woken waiter is polled
+        // synchronously and re-entrantly, re-borrowing the PendingState
+        // (and racing on to another `fetch_txt` that re-borrows the
+        // cache) — so waking while those borrows are held traps. Here we
+        // assert the subscriber is NOT woken by `publish`, only once the
+        // caller drains the returned wakers.
+        let mut cache = DohCache::default();
+        let token = expect_fetch(cache.lookup("a.com", 0));
+
+        let w = Arc::new(CountingWaker {
+            count: AtomicUsize::new(0),
+        });
+        register_waiter(&mut cache, "a.com", 0, &make_waker(&w));
+
+        let wakers = cache.publish("a.com", token, Ok(b"hi".to_vec()), 1000, 0);
+        assert_eq!(
+            w.count.load(Ordering::SeqCst),
+            0,
+            "publish must not wake subscribers while the cache is borrowed"
+        );
+        assert_eq!(wakers.len(), 1, "the registered waker should be handed back");
+
+        for waker in wakers {
+            waker.wake();
+        }
+        assert_eq!(w.count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
     fn published_subscriber_resolves_to_result() {
         let mut cache = DohCache::default();
         let token = expect_fetch(cache.lookup("a.com", 0));
-        let mut wait = match cache.lookup("a.com", 0) {
+        let mut wait = match cache.lookup("a.com", 0).0 {
             CacheLookup::Wait(f) => f,
             _ => panic!(),
         };
 
-        cache.publish("a.com", token, Ok(b"hello".to_vec()), 1000, 0);
+        let _ = cache.publish("a.com", token, Ok(b"hello".to_vec()), 1000, 0);
 
         let w = Arc::new(CountingWaker {
             count: AtomicUsize::new(0),
@@ -412,15 +486,11 @@ mod tests {
         let w = Arc::new(CountingWaker {
             count: AtomicUsize::new(0),
         });
-        let waker = make_waker(&w);
-        match cache.lookup("a.com", 0) {
-            CacheLookup::Wait(mut fut) => {
-                let mut cx = Context::from_waker(&waker);
-                let _ = Pin::new(&mut fut).poll(&mut cx);
-            }
-            _ => panic!(),
+        register_waiter(&mut cache, "a.com", 0, &make_waker(&w));
+
+        for waker in cache.publish("a.com", token, Err(DohError::AllProvidersFailed), 1000, 0) {
+            waker.wake();
         }
-        cache.publish("a.com", token, Err(DohError::AllProvidersFailed), 1000, 0);
         assert_eq!(w.count.load(Ordering::SeqCst), 1);
         assert!(cache.get_fresh("a.com", 0).is_none());
     }
@@ -432,7 +502,7 @@ mod tests {
         let mut cache = DohCache::default();
         let _orig = expect_fetch(cache.lookup("a.com", 100));
         // Just under the threshold: still fresh.
-        match cache.lookup("a.com", 100 + PENDING_STALE_AFTER_SECS - 1) {
+        match cache.lookup("a.com", 100 + PENDING_STALE_AFTER_SECS - 1).0 {
             CacheLookup::Wait(_) => {}
             _ => panic!("expected Wait while pending is still fresh"),
         }
@@ -452,12 +522,14 @@ mod tests {
         // Setup: A starts a fetch, B registers as a waiter while A is
         // still in flight, then A's continuation never runs (simulated
         // here by just letting time pass without calling publish). C
-        // arrives after the staleness threshold. B should get woken
-        // with an error rather than hanging on a pending state forever.
+        // arrives after the staleness threshold. B should be woken with
+        // an error rather than hanging on a pending state forever — but
+        // the cache hands B's waker back to the caller rather than
+        // firing it inline (waking re-enters a held borrow in prod).
         let mut cache = DohCache::default();
         let _a_token = expect_fetch(cache.lookup("a.com", 100));
 
-        let mut b_wait = match cache.lookup("a.com", 110) {
+        let mut b_wait = match cache.lookup("a.com", 110).0 {
             CacheLookup::Wait(f) => f,
             _ => panic!("B should have got Wait"),
         };
@@ -468,14 +540,27 @@ mod tests {
         let mut cx = Context::from_waker(&waker);
         assert!(matches!(Pin::new(&mut b_wait).poll(&mut cx), Poll::Pending));
 
-        // C arrives way past the threshold.
-        let _c_token = expect_fetch(cache.lookup("a.com", 100 + PENDING_STALE_AFTER_SECS + 1));
+        // C arrives way past the threshold and evicts A's pending entry.
+        let (c_lookup, orphans) = cache.lookup("a.com", 100 + PENDING_STALE_AFTER_SECS + 1);
+        let _c_token = match c_lookup {
+            CacheLookup::Fetch(t) => t,
+            _ => panic!("expected Fetch"),
+        };
 
-        // B's waker should have fired during eviction.
+        // The cache must NOT have woken B itself — that would re-enter a
+        // held borrow in production. It returns B's waker instead.
+        assert_eq!(
+            waker_b.count.load(Ordering::SeqCst),
+            0,
+            "eviction must not wake orphan waiters inline"
+        );
+        for w in orphans {
+            w.wake();
+        }
         assert_eq!(
             waker_b.count.load(Ordering::SeqCst),
             1,
-            "orphan waiter must be woken on stale eviction"
+            "orphan waiter must be woken once the caller drains the wakers"
         );
 
         // And the next poll resolves to an error rather than Pending.
@@ -510,7 +595,7 @@ mod tests {
         // Publishing for a fourth name at now=100 should drop both
         // expired entries while leaving the fresh one alone.
         let token = expect_fetch(cache.lookup("new.com", 100));
-        cache.publish("new.com", token, Ok(b"v".to_vec()), 2_000, 100);
+        let _ = cache.publish("new.com", token, Ok(b"v".to_vec()), 2_000, 100);
 
         assert!(!cache.entries.contains_key("expired1.com"));
         assert!(!cache.entries.contains_key("expired2.com"));
@@ -528,7 +613,7 @@ mod tests {
         let c_token = expect_fetch(cache.lookup("a.com", 100 + PENDING_STALE_AFTER_SECS + 1));
 
         // A's late publish: no-op on cache state.
-        cache.publish("a.com", a_token, Ok(b"A's stale data".to_vec()), 9999, 0);
+        let _ = cache.publish("a.com", a_token, Ok(b"A's stale data".to_vec()), 9999, 0);
         assert!(
             cache.get_fresh("a.com", 0).is_none(),
             "A's publish must not write to the cache after eviction"
@@ -539,7 +624,7 @@ mod tests {
         );
 
         // Now C publishes its real result and that DOES land.
-        cache.publish("a.com", c_token, Ok(b"C's fresh data".to_vec()), 9999, 0);
+        let _ = cache.publish("a.com", c_token, Ok(b"C's fresh data".to_vec()), 9999, 0);
         assert_eq!(
             cache.get_fresh("a.com", 0),
             Some(b"C's fresh data".to_vec())

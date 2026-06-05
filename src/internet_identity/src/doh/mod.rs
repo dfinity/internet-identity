@@ -190,7 +190,15 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     // canister is single-threaded but futures across yields can re-
     // enter the same `RefCell`, which would trap.
     let now = now_secs();
-    let lookup = DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now));
+    let (lookup, orphan_wakers) = DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now));
+    // Wake any orphaned waiters from a stale fetch we just evicted —
+    // *after* the borrow above is released. A woken waiter is polled
+    // synchronously and may call straight back into the cache, so waking
+    // while `DOH_CACHE` is borrowed would trap (`RefCell already
+    // borrowed`). `orphan_wakers` is empty on the common paths.
+    for w in orphan_wakers {
+        w.wake();
+    }
     let token = match lookup {
         CacheLookup::Hit(bytes) => {
             return Ok(bytes);
@@ -198,23 +206,28 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
         CacheLookup::Wait(fut) => {
             return fut.await;
         }
-        CacheLookup::Fetch(token) => {
-            token
-        }
+        CacheLookup::Fetch(token) => token,
     };
 
     // Fan out to every provider in parallel, then decide.
     let outcomes = fetch_all(&query).await;
     let result = decide_quorum(&outcomes);
 
-    // Publish: stores on success, removes the pending entry, wakes any
-    // dedup subscribers. The expires-at uses the timestamp we captured
-    // before the await so multiple subscribers see consistent freshness.
+    // Publish: stores on success, removes the pending entry, and hands
+    // back the dedup subscribers' wakers. The expires-at uses the
+    // timestamp we captured before the await so multiple subscribers see
+    // consistent freshness.
     let expires_at = now.saturating_add(max_age);
-    DOH_CACHE.with(|c| {
+    let wakers = DOH_CACHE.with(|c| {
         c.borrow_mut()
             .publish(name, token, result.clone(), expires_at, now)
     });
+    // Wake subscribers outside the cache borrow: each woken waiter is
+    // polled synchronously and races on to its own `fetch_txt`
+    // (e.g. DKIM → DMARC), which re-borrows `DOH_CACHE`.
+    for w in wakers {
+        w.wake();
+    }
     result
 }
 
