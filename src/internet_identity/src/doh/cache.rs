@@ -448,7 +448,11 @@ mod tests {
             0,
             "publish must not wake subscribers while the cache is borrowed"
         );
-        assert_eq!(wakers.len(), 1, "the registered waker should be handed back");
+        assert_eq!(
+            wakers.len(),
+            1,
+            "the registered waker should be handed back"
+        );
 
         for waker in wakers {
             waker.wake();
