@@ -27,7 +27,7 @@
 //! `crate::email_recovery` for the design.
 
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_recovery::{
@@ -50,6 +50,10 @@ use std::time::Duration;
 
 const TEST_DOMAIN: &str = "test.example.com";
 const TEST_ADDRESS: &str = "alice@test.example.com";
+// A second address in the *same* domain as `TEST_ADDRESS`, so two
+// concurrent verifications resolve the same DKIM FQDN and exercise the
+// in-flight cache dedup path. Used by the concurrency reproduction test.
+const TEST_ADDRESS_2: &str = "bob@test.example.com";
 const TEST_SELECTOR: &str = "test1";
 const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
 
@@ -812,6 +816,194 @@ fn full_setup_flow_binds_credential_to_anchor() {
 }
 
 // ===================================================================
+// DoH path: concurrent in-flight dedup — regression coverage
+// ===================================================================
+//
+// Guards the concurrency bug fixed in #3987. When two `smtp_request`
+// calls for addresses in the *same* domain arrive while the DoH cache
+// is cold, they dedup onto a single DKIM outcall fan-out (`doh::cache`):
+// the first becomes the fetcher, the rest must reuse its result rather
+// than each firing their own five-provider fan-out.
+//
+// The original dedup parked waiters on a shared future that the fetcher
+// woke when it published. On the single-threaded canister executor that
+// ran the waiter to completion *inside the fetcher's call context* —
+// first tripping `RefCell already borrowed` at doh/cache.rs:256, and
+// (once that borrow was addressed) mis-routing the waiter's reply to the
+// wrong call (`ic0.msg_reply ... already replied` on one request, "did
+// not reply" on the other). The fix makes waiters poll the cache from
+// their OWN call context instead of being woken cross-call.
+//
+// This test pins the public-API behaviour the fix guarantees, with the
+// dedup interleaving made explicit (and asserted) rather than left to a
+// fixed tick count:
+//   1. Submit request A and drive rounds — *without answering any
+//      outcall* — until its provider outcalls are pending; A now owns
+//      the fetch.
+//   2. Submit request B and confirm it dedups: no new outcalls appear,
+//      and it stays in-flight (no terminal status) until A publishes.
+//   3. Answer the single, deduped DKIM (+ DMARC) outcall set.
+//   4. Both requests reply Ok and their credentials are bound.
+//
+// Against the pre-fix cache, step 3 made the publisher trap / mis-reply
+// and the waiter never completed; with the fix both succeed.
+#[test]
+fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    // Two identities with *distinct* passkeys. We can't call the shared
+    // `fresh_identity` helper twice here: it registers a fixed public
+    // key (`sample_webauthn_authn_method(0)`), and II rejects a second
+    // registration that reuses a public key.
+    let authn_a = sample_webauthn_authn_method(1);
+    let authn_b = sample_webauthn_authn_method(2);
+    let id_a = create_identity_with_authn_method(&env, canister_id, &authn_a);
+    let id_b = create_identity_with_authn_method(&env, canister_id, &authn_b);
+    let p_a = authn_a.principal();
+    let p_b = authn_b.principal();
+
+    // Two pending challenges, one per identity, both in TEST_DOMAIN.
+    let challenge_a = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p_a,
+        id_a,
+        EmailRecoveryDnsInput {
+            address: TEST_ADDRESS.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add A call failed")
+    .expect("prepare_add A failed");
+    let challenge_b = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p_b,
+        id_b,
+        EmailRecoveryDnsInput {
+            address: TEST_ADDRESS_2.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add B call failed")
+    .expect("prepare_add B failed");
+
+    // One signer (one selector + domain) → both emails resolve the
+    // *same* DKIM FQDN `test1._domainkey.test.example.com`, which is
+    // exactly what makes the two verifications dedup in the cache.
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed_a = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge_a.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let signed_b = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS_2,
+        to: "register@id.ai",
+        subject: &challenge_b.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+
+    // 1. Submit request A and drive rounds — *without answering any
+    //    outcall* — until its provider outcalls are pending. A now owns
+    //    the DKIM fetch. Establishing the fetcher first (rather than
+    //    submitting both and relying on a fixed tick count) makes the
+    //    dedup interleaving explicit: B is guaranteed to find A's
+    //    in-flight entry and dedup onto it.
+    let msg_a = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed_a.request).expect("encode SmtpRequest A"),
+        )
+        .expect("submit_call A");
+    tick_until_doh_outcalls(&env, DOH_PROVIDER_URLS.len(), 60);
+
+    // 2. Submit request B and give it a few rounds to run its lookup. It
+    //    must dedup onto A's in-flight fetch: no *new* DoH outcalls
+    //    appear (still just A's fan-out), and B stays in-flight — no
+    //    terminal status — until A publishes. We must not answer an
+    //    outcall yet: that would let A publish and warm the cache, and B
+    //    would hit it instead of deduping, leaving the path untested.
+    let msg_b = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed_b.request).expect("encode SmtpRequest B"),
+        )
+        .expect("submit_call B");
+    for _ in 0..5 {
+        env.tick();
+    }
+    assert_eq!(
+        pending_doh_outcalls(&env),
+        DOH_PROVIDER_URLS.len(),
+        "second request must dedup onto the in-flight fetch, not issue its own DoH fan-out",
+    );
+    assert!(
+        env.ingress_status(msg_b.clone()).is_none(),
+        "the dedup waiter must still be in-flight (no terminal status) before the fetcher publishes",
+    );
+
+    // 3. Answer the single, deduped DKIM + DMARC outcall set.
+    fulfill_doh_outcalls(&env, &signer.public_txt_record());
+
+    // 4. Drive both calls to a terminal status — capped, so a
+    //    regression that wedges one of them fails the test instead of
+    //    hanging it. Read statuses without blocking: we must never
+    //    `await` a dedup waiter, which on the pre-fix cache never
+    //    completed. `ingress_status` is `None` until a call is terminal.
+    for _ in 0..60 {
+        if env.ingress_status(msg_a.clone()).is_some()
+            && env.ingress_status(msg_b.clone()).is_some()
+        {
+            break;
+        }
+        env.tick();
+    }
+    let status_a = env.ingress_status(msg_a);
+    let status_b = env.ingress_status(msg_b);
+    let a_ok = matches!(
+        &status_a,
+        Some(Ok(raw)) if matches!(candid::decode_one::<SmtpResponse>(raw), Ok(SmtpResponse::Ok {}))
+    );
+    let b_ok = matches!(
+        &status_b,
+        Some(Ok(raw)) if matches!(candid::decode_one::<SmtpResponse>(raw), Ok(SmtpResponse::Ok {}))
+    );
+
+    // Both concurrent verifications must reply Ok. The DoH dedup bug
+    // (#3987) made the publisher trap or mis-route its reply
+    // ("RefCell already borrowed" / "already replied" / "did not
+    // reply"); a regression would resurface as a non-Ok status here.
+    assert!(
+        a_ok && b_ok,
+        "concurrent DoH dedup for the same domain did not complete both \
+         requests (regression of #3987).\n  request A => {status_a:?}\n  \
+         request B => {status_b:?}",
+    );
+
+    // End-to-end: both bindings landed on their anchors.
+    for (label, nonce) in [("A", &challenge_a.nonce), ("B", &challenge_b.nonce)] {
+        let status =
+            api::email_recovery_status(&env, canister_id, nonce).expect("status call failed");
+        assert!(
+            matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+            "expected RegistrationSucceeded for request {label}, got {status:?}",
+        );
+    }
+}
+
+// ===================================================================
 // Tag-contract umbrella smoke tests.
 //
 // `dkim::tag_checks` exposes two umbrella functions
@@ -1082,22 +1274,54 @@ fn diagnostics_returns_none_for_unknown_nonce() {
     assert!(diag.is_none());
 }
 
+/// The 5 provider URLs the DoH module fans out to. Order doesn't matter
+/// because the quorum just needs 3 of them to agree on the same body
+/// bytes. Shared by the outcall-fulfilling and outcall-counting helpers
+/// so they agree on what counts as a DoH outcall.
+const DOH_PROVIDER_URLS: [&str; 5] = [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+    "https://dns.quad9.net/dns-query",
+    "https://private.canadianshield.cira.ca/dns-query",
+    "https://public.dns.iij.jp/dns-query",
+];
+
+/// Count the DoH provider outcalls currently pending (unanswered). A
+/// dedup waiter's `yield_round` round-trips the management canister
+/// (`raw_rand`), which is not an HTTP outcall, so it never inflates this
+/// count — letting a test assert "the second request issued no fan-out
+/// of its own".
+fn pending_doh_outcalls(env: &PocketIc) -> usize {
+    env.get_canister_http()
+        .iter()
+        .filter(|r| DOH_PROVIDER_URLS.iter().any(|p| r.url.starts_with(p)))
+        .count()
+}
+
+/// Drive rounds — *without answering anything* — until at least `want`
+/// DoH outcalls are pending, or panic after `max_ticks`. Lets a test
+/// wait for a fetcher to fan out before acting, instead of guessing a
+/// fixed tick count.
+fn tick_until_doh_outcalls(env: &PocketIc, want: usize, max_ticks: u32) {
+    for _ in 0..max_ticks {
+        if pending_doh_outcalls(env) >= want {
+            return;
+        }
+        env.tick();
+    }
+    panic!(
+        "expected >= {want} pending DoH outcalls within {max_ticks} ticks, saw {}",
+        pending_doh_outcalls(env)
+    );
+}
+
 /// Drive PocketIC forward until each of the 5 DoH provider outcalls
 /// has been seen, fulfilling them with the supplied DKIM TXT bytes.
 /// DMARC outcalls are answered with NXDOMAIN (the verifier's "no
 /// DMARC record" path requires DKIM `d=` to equal From: domain — true
 /// in this test).
 fn fulfill_doh_outcalls(env: &PocketIc, dkim_txt: &[u8]) {
-    // The 5 provider URLs the DoH module fans out to. Order doesn't
-    // matter because the quorum just needs 3 of them to agree on the
-    // same body bytes.
-    let providers = [
-        "https://cloudflare-dns.com/dns-query",
-        "https://dns.google/dns-query",
-        "https://dns.quad9.net/dns-query",
-        "https://private.canadianshield.cira.ca/dns-query",
-        "https://public.dns.iij.jp/dns-query",
-    ];
+    let providers = DOH_PROVIDER_URLS;
     // We wait for at most this many ticks before assuming the
     // canister isn't going to issue any more outcalls. Each tick is
     // a heartbeat; outcalls land within a few of them.
