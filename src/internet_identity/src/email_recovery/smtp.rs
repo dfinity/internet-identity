@@ -762,26 +762,19 @@ pub(super) fn extract_from_address(
     ))
 }
 
-/// Map a `DohError` to the appropriate `EmailRecoveryError` for the
-/// FE poll. Configuration-level failures (allowlist miss, missing
-/// `DohConfig`) become `DomainNotAllowlisted` so the FE shows
-/// "operator hasn't enabled this domain"; transport-level failures
-/// (quorum miss, all providers down, dedup wait timeout, malformed
-/// responses) become `DohFetchFailed` so the FE shows "transient error,
-/// try again"; caller-bug variants (`InvalidName`,
-/// `NameOutsideRegisteredDomain`) surface as `InternalCanisterError`
-/// because they shouldn't reach here in practice (`prepare_add` already
-/// validates the inputs).
+/// Translate an internal `DohError` into the `EmailRecoveryError` the FE
+/// polls, grouped into the buckets the FE acts on: config misses
+/// (`DomainNotAllowed` / `NotConfigured`) → `DomainNotAllowlisted`; a
+/// quorum "no record" (`NoAnswer`) → `EmailVerificationFailed` (signed
+/// selector gone); caller bugs (`InvalidName` /
+/// `NameOutsideRegisteredDomain`) → `InternalCanisterError`; everything
+/// else transient → `DohFetchFailed` ("try again").
 ///
-/// **Analytics contract:** every `DohFetchFailed` payload begins with a
-/// stable `snake_case` machine token up to the first `:` (e.g.
-/// `quorum_failed`, `all_providers_failed`, `dedup_wait_timeout`,
-/// `response_malformed`). The FE lifts that token into the
-/// `doh_reason` property on the Plausible `email-recovery-setup-failed`
-/// event (see `dohSubReason` in `SetupEmailRecoveryWizard.svelte`), so
-/// the DoH failure mix is segmentable. Keep these tokens stable and in
-/// sync with the FE; the human-readable tail after the token is free to
-/// change.
+/// **Analytics contract:** each `DohFetchFailed` payload starts with a
+/// stable `snake_case` token before the first `:` (`all_providers_failed`,
+/// `dedup_wait_timeout`, `quorum_failed`, `response_malformed`), which the
+/// FE surfaces as the `doh_reason` funnel property (`dohSubReason` in
+/// `SetupEmailRecoveryWizard.svelte`). Keep the tokens stable.
 fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
     use crate::doh::DohError;
     match err {
