@@ -23,48 +23,52 @@ if [[ -z "$runs" || "$runs" == "null" || "$runs" == "[]" ]]; then
   exit 0
 fi
 
-# Group runs by the originating PR's head SHA (source branch HEAD, not
-# the merge commit). We key on (pr_number, head_sha) to avoid spurious
-# re-notifications when the base branch advances.
-#
-# Each run has .pull_requests[] — we take the first one. Runs without a
-# PR association (e.g. branch pushes) are skipped.
-#
-# Output: one JSON object per unique (pr_number, head_sha) with fields:
-#   pr_number, head_sha, head_short, run_count, pr_url, author, title, approve_url
-grouped=$(echo "$runs" | jq -r '
-  [ .[]
-    | select(.pull_requests | length > 0)
-    | {
-        pr_number: .pull_requests[0].number,
-        head_sha:  .head_sha,
-        head_short: (.head_sha[:7]),
-        repo_url:  (.repository.html_url // ""),
-        run_html:  .html_url,
-        actor:     (.actor.login // "unknown"),
-        pr_url:    (.pull_requests[0].url // "")
-      }
+# Fork-PR runs in action_required commonly have pull_requests:[].
+# Fetch open PRs to resolve head_sha → PR when the run itself lacks the link.
+open_prs=$(gh api --paginate "repos/${REPO}/pulls?state=open&per_page=100" \
+  --jq '.[] | {number, head_sha: .head.sha, title, html_url, author: .user.login}' \
+  | jq -s '.')
+
+# Group runs by (pr_number, head_sha). For runs with empty pull_requests[],
+# fall back to matching head_sha against the open-PR list.
+grouped=$(jq -n \
+  --argjson runs "$runs" \
+  --argjson prs "$open_prs" \
+  '
+  ($prs | map({key: .head_sha, value: .}) | from_entries) as $sha_map |
+  [
+    $runs[] |
+    .head_sha as $sha |
+    (if (.pull_requests | length) > 0 then
+       .pull_requests[0].number
+     elif $sha_map[$sha] then
+       $sha_map[$sha].number
+     else null end) as $pr_num |
+    select($pr_num != null) |
+    {
+      pr_number:  $pr_num,
+      head_sha:   $sha,
+      head_short: ($sha[:7]),
+      actor:      (.actor.login // "unknown"),
+      run_html:   .html_url
+    }
   ]
-  | group_by(.pr_number + ":" + .head_sha)
-  | [ .[] | {
-        pr_number:  .[0].pr_number,
-        head_sha:   .[0].head_sha,
-        head_short: .[0].head_short,
-        run_count:  length,
-        actor:      .[0].actor,
-        repo_url:   .[0].repo_url,
-        run_html:   .[0].run_html,
-        pr_url:     .[0].pr_url
-      }
-    ]
-')
+  | group_by("\(.pr_number):\(.head_sha)")
+  | [.[] | {
+      pr_number:  .[0].pr_number,
+      head_sha:   .[0].head_sha,
+      head_short: .[0].head_short,
+      run_count:  length,
+      actor:      .[0].actor,
+      run_html:   .[0].run_html
+    }]
+  ')
 
 if [[ -z "$grouped" || "$grouped" == "null" || "$grouped" == "[]" ]]; then
   echo "No action_required runs linked to open PRs."
   exit 0
 fi
 
-# For each unique (PR, head SHA), check dedup marker and notify if new.
 notified=0
 echo "$grouped" | jq -c '.[]' | while IFS= read -r entry; do
   pr_number=$(echo "$entry" | jq -r '.pr_number')
@@ -72,35 +76,30 @@ echo "$grouped" | jq -c '.[]' | while IFS= read -r entry; do
   head_short=$(echo "$entry" | jq -r '.head_short')
   run_count=$(echo "$entry"  | jq -r '.run_count')
   actor=$(echo "$entry"      | jq -r '.actor')
-  run_html=$(echo "$entry"   | jq -r '.run_html')
-  pr_rest_url=$(echo "$entry" | jq -r '.pr_url')
 
-  # Fetch PR details (title, html_url) from the REST API.
-  pr_data=$(gh api "repos/${REPO}/pulls/${pr_number}" --jq '{title: .title, html_url: .html_url, state: .state}' 2>/dev/null || echo '{}')
-  pr_title=$(echo "$pr_data" | jq -r '.title // "PR #'"${pr_number}"'"')
-  pr_html=$(echo "$pr_data"  | jq -r '.html_url // "https://github.com/'"${REPO}"'/pull/'"${pr_number}"'"')
-  pr_state=$(echo "$pr_data" | jq -r '.state // "unknown"')
-
-  # Skip closed PRs — their runs are stale.
-  if [[ "$pr_state" != "open" ]]; then
-    echo "PR #${pr_number} is ${pr_state}, skipping."
+  # Resolve PR metadata from the preloaded open-PR list.
+  pr_info=$(echo "$open_prs" | jq --argjson n "$pr_number" \
+    'map(select(.number == $n)) | first // null')
+  if [[ -z "$pr_info" || "$pr_info" == "null" ]]; then
+    echo "PR #${pr_number}: not in open-PR list, skipping."
     continue
   fi
+  pr_title=$(echo "$pr_info" | jq -r '.title')
+  pr_html=$(echo "$pr_info"  | jq -r '.html_url')
 
-  # Check dedup: look for our marker comment on this PR with this head SHA.
+  # Dedup: look for our marker comment with this head SHA.
   marker="${MARKER_PREFIX} head=${head_sha} -->"
-  existing=$(gh api "repos/${REPO}/issues/${pr_number}/comments?per_page=100" \
-    --jq '[.[] | select(.body | contains("'"${MARKER_PREFIX}"'")) | .body] | last // ""' 2>/dev/null || echo "")
+  existing=$(gh api --paginate "repos/${REPO}/issues/${pr_number}/comments" \
+    --jq '.[] | select(.body | contains("'"${MARKER_PREFIX}"'")) | .body' \
+    | tail -1)
 
-  if echo "$existing" | grep -qF "head=${head_sha}"; then
+  if echo "${existing:-}" | grep -qF "head=${head_sha}"; then
     echo "PR #${pr_number} head=${head_short}: already notified, skipping."
     continue
   fi
 
-  # Build the approval-UI link (Actions tab filtered to the PR).
   approve_url="https://github.com/${REPO}/actions?query=event%3Apull_request_target+is%3Aaction_required"
 
-  # Post Slack notification.
   slack_text=":warning: *CI approval needed* for <${pr_html}|${pr_title}> by \`${actor}\`\n:point_right: Head: \`${head_short}\` · ${run_count} pending run(s)\n<${approve_url}|Approve workflow runs>"
 
   response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
@@ -114,14 +113,14 @@ echo "$grouped" | jq -c '.[]' | while IFS= read -r entry; do
     echo "PR #${pr_number} head=${head_short}: Slack returned HTTP ${response}."
   fi
 
-  # Post dedup marker on the PR as an HTML comment (invisible in rendered markdown).
+  # Post dedup marker on the PR.
   marker_body="${marker}
 :robot_face: Slack notification sent for CI approval on head \`${head_short}\` (${run_count} pending run(s)).
 
 _Automated by [ci-approval-slack-notifier](https://github.com/${REPO}/actions/workflows/ci-approval-slack-notifier.yml)._"
 
   gh api "repos/${REPO}/issues/${pr_number}/comments" \
-    -f body="$marker_body" --silent 2>/dev/null || \
+    -f body="$marker_body" --silent || \
     echo "PR #${pr_number}: failed to post dedup marker (non-fatal)."
 
   notified=$((notified + 1))
