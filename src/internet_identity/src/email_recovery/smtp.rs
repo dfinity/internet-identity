@@ -771,7 +771,10 @@ pub(super) fn extract_from_address(
 /// caller-bug variants (`InvalidName`, `NameOutsideRegisteredDomain`)
 /// surface as `InternalCanisterError` because they shouldn't reach
 /// here in practice (`prepare_add` already validates the inputs).
-fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
+///
+/// `pub(super)` so the DNSSEC-path DoH fallback in `submit_leaf.rs`
+/// (empty `hops`) maps its own `fetch_txt` errors identically.
+pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
     use crate::doh::DohError;
     match err {
         DohError::DomainNotAllowed | DohError::NotConfigured => {
