@@ -775,7 +775,10 @@ pub(super) fn extract_from_address(
 /// `dedup_wait_timeout`, `quorum_failed`, `response_malformed`), which the
 /// FE surfaces as the `doh_reason` funnel property (`dohSubReason` in
 /// `SetupEmailRecoveryWizard.svelte`). Keep the tokens stable.
-fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
+///
+/// `pub(super)` so the DNSSEC-path DoH fallback in `submit_leaf.rs`
+/// (empty `hops`) maps its own `fetch_txt` errors identically.
+pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
     use crate::doh::DohError;
     match err {
         DohError::DomainNotAllowed | DohError::NotConfigured => {

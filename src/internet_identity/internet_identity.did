@@ -540,10 +540,24 @@ type EmailRecoveryDnsInput = record {
 
 type EmailRecoverySubmitDkimLeafArg = record {
     nonce : text;
-    // The DKIM resolution chain in CNAME order, ending in a TXT. At
-    // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
-    // canister side. For the Gmail-style direct-TXT case this is a
-    // single-element vec.
+    // The DKIM resolution chain in CNAME order, ending in a TXT,
+    // bounded by `MAX_CNAME_HOPS = 4` at the canister side. For the
+    // Gmail-style direct-TXT case this is a single-element vec.
+    //
+    // An EMPTY vec is a distinct signal: the FE could not walk a
+    // fully-signed DNSSEC resolution for this leaf, because the DKIM
+    // record CNAMEs into an unsigned zone (e.g.
+    // `selector1._domainkey.outlook.com` is a signed CNAME into the
+    // unsigned `outbound.protection.outlook.com`). The DNSSEC walk has
+    // to verify every hop and so fails on the unsigned one. The
+    // canister then resolves the key over its own DoH path: it issues
+    // ONE outcall for the in-zone name
+    // `<selector>._domainkey.<signing_domain>` and lets the recursive
+    // resolver chase the CNAME, so the unsigned target zone is never
+    // queried (or allowlist-checked) directly. The fetch is
+    // allowlist-gated on the registered domain; a non-allowlisted
+    // domain comes back as `DomainNotAllowlisted` rather than leaving
+    // the entry pending until it expires.
     hops : vec SignedRRset;
     // Delegation chains for signed zones touched by `hops` that
     // weren't already covered by the skeleton chain anchored at

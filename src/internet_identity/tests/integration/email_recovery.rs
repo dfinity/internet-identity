@@ -31,7 +31,8 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus, VerificationPath,
+    EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
+    VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest, SmtpResponse,
@@ -715,6 +716,211 @@ fn full_setup_flow_via_dnssec_path() {
     api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
         .expect("remove call failed")
         .expect("remove should succeed");
+}
+
+// ===================================================================
+// DNSSEC path: DoH fallback for an unsigned DKIM leaf
+// ===================================================================
+//
+// The DNSSEC path commits at prepare time based on the *apex* being
+// signed. But some providers publish the DKIM record as a CNAME into
+// an unsigned zone — `selector1._domainkey.outlook.com` is a signed
+// CNAME into the unsigned `outbound.protection.outlook.com`,
+// `live.com` likewise. The FE's DNSSEC hop-walk can't authenticate
+// that hop, so it submits an EMPTY `hops` set, asking the canister to
+// resolve the DKIM key over its own (allowlist-gated) DoH path using
+// the cached `partial_verification` crypto material instead of leaving
+// the entry stuck in `NeedDkimLeaf` until it expires.
+//
+// These tests reuse the same DNSSEC-signed `TEST_DOMAIN` fixture to
+// reach `NeedDkimLeaf`, then exercise the empty-hops fallback with the
+// domain on / off the DoH allowlist.
+
+/// Drive a DNSSEC-path setup flow up to the `NeedDkimLeaf` state.
+/// `allowed_domains` sets the DoH allowlist the subsequent empty-hops
+/// fallback will be gated on. Returns the canister + identity handles,
+/// the issued nonce, and the DKIM TXT the fallback's outcall expects
+/// to fetch (so the caller can fulfil the DoH fan-out).
+fn dnssec_flow_until_need_dkim_leaf(
+    env: &PocketIc,
+    allowed_domains: Vec<String>,
+) -> (candid::Principal, u64, candid::Principal, String, Vec<u8>) {
+    use internet_identity_interface::internet_identity::types::DnssecConfig;
+
+    let dkim = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let dkim_txt = dkim.public_txt_record();
+    let now_secs: u32 = (time(env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC initial time fits in u32");
+    // Skeleton bundle = chain + DMARC leaf (no DKIM leaf; its selector
+    // is unknown at prepare). `p=none` keeps DMARC alignment permissive.
+    let dmarc_txt = b"v=DMARC1; p=none;";
+    let chain = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        &dkim_txt,
+        Some(dmarc_txt),
+        now_secs,
+    );
+
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains,
+            max_cache_age_secs: Some(3600),
+        })),
+        dnssec_config: Some(Some(DnssecConfig {
+            root_anchors: vec![chain.anchor],
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        env,
+        II_WASM.clone(),
+        Some(args),
+        10_000_000_000_000,
+    );
+    let (id, p) = fresh_identity(env, canister_id);
+
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(DnsProofBundle {
+            hops: chain.dmarc_leaf.clone().map_or(vec![], |l| vec![l]),
+            ..chain.skeleton.clone()
+        }),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(env, canister_id, p, id, input)
+        .expect("prepare_add call failed")
+        .expect("DNSSEC prepare_add should succeed");
+
+    let signed = dkim.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: time(env) / 1_000_000_000,
+    });
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed.request).expect("encode SmtpRequest"),
+        )
+        .expect("submit_call");
+    // The DNSSEC path issues no outcalls at email-arrival time (chain +
+    // DMARC were anchored at prepare); a handful of ticks executes the
+    // message before we collect the response.
+    for _ in 0..30 {
+        env.tick();
+    }
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let resp: SmtpResponse = candid::decode_one(&raw).expect("decode SmtpResponse");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status =
+        api::email_recovery_status(env, canister_id, &challenge.nonce).expect("status call failed");
+    match status {
+        EmailRecoveryStatus::NeedDkimLeaf { ref selector } => {
+            assert_eq!(selector, TEST_SELECTOR)
+        }
+        other => panic!("expected NeedDkimLeaf, got {other:?}"),
+    };
+
+    (canister_id, id, p, challenge.nonce, dkim_txt)
+}
+
+#[test]
+fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
+    let env = env();
+    // Domain IS on the DoH allowlist, so the fallback can complete.
+    let (canister_id, id, p, nonce, dkim_txt) =
+        dnssec_flow_until_need_dkim_leaf(&env, vec![TEST_DOMAIN.into()]);
+
+    // The FE could not DNSSEC-resolve the leaf, so it submits an EMPTY
+    // hop set. The canister resolves the DKIM key over DoH instead;
+    // submit now issues outcalls, so drive it asynchronously and fulfil
+    // the provider fan-out with the test signer's DKIM TXT.
+    let raw_msg_id = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "email_recovery_submit_dkim_leaf",
+            candid::encode_one(&EmailRecoverySubmitDkimLeafArg {
+                nonce: nonce.clone(),
+                hops: vec![],
+                extra_chains: vec![],
+            })
+            .expect("encode submit arg"),
+        )
+        .expect("submit_call");
+
+    fulfill_doh_outcalls(&env, &dkim_txt);
+
+    let raw = env
+        .await_call_no_ticks(raw_msg_id)
+        .expect("await_call_no_ticks");
+    let result: Result<EmailRecoveryStatus, EmailRecoveryError> =
+        candid::decode_one(&raw).expect("decode submit_dkim_leaf result");
+    let submit_status = result.expect("DoH fallback should succeed for an allowlisted domain");
+    assert!(
+        matches!(submit_status, EmailRecoveryStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded from the DoH fallback, got {submit_status:?}",
+    );
+
+    // Polled status agrees, and the credential actually persisted to
+    // the anchor (otherwise remove would return AddressNotRegistered).
+    let status = api::email_recovery_status(&env, canister_id, &nonce).expect("status call failed");
+    assert!(
+        matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded, got {status:?}",
+    );
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+}
+
+#[test]
+fn dnssec_path_doh_fallback_rejects_non_allowlisted_domain() {
+    let env = env();
+    // TEST_DOMAIN is DNSSEC-signed (so the DNSSEC path + NeedDkimLeaf
+    // are reached) but is NOT on the DoH allowlist.
+    let (canister_id, _id, _p, nonce, _dkim_txt) =
+        dnssec_flow_until_need_dkim_leaf(&env, vec![]);
+
+    // Empty hops -> DoH fallback. The allowlist gate rejects before any
+    // outcall, so this resolves synchronously with DomainNotAllowlisted
+    // — no DoH fan-out to fulfil.
+    let result = api::email_recovery_submit_dkim_leaf(
+        &env,
+        canister_id,
+        EmailRecoverySubmitDkimLeafArg {
+            nonce: nonce.clone(),
+            hops: vec![],
+            extra_chains: vec![],
+        },
+    )
+    .expect("submit_dkim_leaf call failed");
+    assert!(
+        matches!(result, Err(EmailRecoveryError::DomainNotAllowlisted(ref d)) if d == TEST_DOMAIN),
+        "expected Err(DomainNotAllowlisted({TEST_DOMAIN})), got {result:?}",
+    );
+
+    // The pending entry is now terminally Failed — the user sees the
+    // unsupported-domain view instead of polling until Expired.
+    let status = api::email_recovery_status(&env, canister_id, &nonce).expect("status call failed");
+    assert!(
+        matches!(
+            status,
+            EmailRecoveryStatus::Failed(EmailRecoveryError::DomainNotAllowlisted(_))
+        ),
+        "expected Failed(DomainNotAllowlisted), got {status:?}",
+    );
 }
 
 /// Drive PocketIC forward and panic if any DoH outcall is observed.
