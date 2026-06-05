@@ -27,7 +27,7 @@
 //! `crate::email_recovery` for the design.
 
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_recovery::{
@@ -50,6 +50,10 @@ use std::time::Duration;
 
 const TEST_DOMAIN: &str = "test.example.com";
 const TEST_ADDRESS: &str = "alice@test.example.com";
+// A second address in the *same* domain as `TEST_ADDRESS`, so two
+// concurrent verifications resolve the same DKIM FQDN and exercise the
+// in-flight cache dedup path. Used by the concurrency reproduction test.
+const TEST_ADDRESS_2: &str = "bob@test.example.com";
 const TEST_SELECTOR: &str = "test1";
 const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
 
@@ -809,6 +813,184 @@ fn full_setup_flow_binds_credential_to_anchor() {
     api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
         .expect("remove call failed")
         .expect("remove should succeed");
+}
+
+// ===================================================================
+// DoH path: concurrent in-flight dedup — production-panic reproduction
+// ===================================================================
+//
+// Reproduces the prod trap:
+//
+//     Panicked at 'RefCell already borrowed',
+//     src/internet_identity/src/doh/cache.rs:256
+//
+// When two `smtp_request` calls for addresses in the *same* domain
+// arrive while the DoH cache is cold, they dedup onto a single DKIM
+// outcall fan-out (`doh::cache`): the first becomes the fetcher, the
+// second parks as a waiter on the shared `PendingState`. When the
+// fetcher's outcalls resolve it publishes the result and wakes the
+// waiter — and on the single-threaded canister executor that wake
+// re-polls the waiter *synchronously*, re-entering a `RefCell` the
+// publisher is still holding (the waiter's `WaitForPending::poll`, then
+// `DOH_CACHE` itself as the resumed task races on to its DMARC fetch).
+// The canister traps: the publisher's `smtp_request` is rejected and
+// the waiter never completes.
+//
+// The test drives exactly that interleaving through the public API:
+//   1. Two identities prepare recovery for alice@ and bob@ the same
+//      allow-listed domain.
+//   2. Both DKIM-signed emails are submitted as concurrent in-flight
+//      update calls.
+//   3. We tick *without* answering any outcall, so the second request
+//      is guaranteed to park as a dedup waiter before the fetcher
+//      publishes. (If we answered early, the fetcher would publish and
+//      evict the pending entry, the second request would hit a warm
+//      cache, and the dedup path — hence the bug — would never run.)
+//   4. We fan out the single, deduped DKIM (+ DMARC) outcall set.
+//
+// On the unfixed canister, step 4 traps the publisher with
+// "RefCell already borrowed" and BOTH requests fail to complete. The
+// fix (cache hands wakers back to be fired outside every borrow) lets
+// both requests complete and bind their credentials.
+#[test]
+fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
+    let env = env();
+    let canister_id = setup_canister(&env);
+
+    // Two identities with *distinct* passkeys. We can't call the shared
+    // `fresh_identity` helper twice here: it registers a fixed public
+    // key (`sample_webauthn_authn_method(0)`), and II rejects a second
+    // registration that reuses a public key.
+    let authn_a = sample_webauthn_authn_method(1);
+    let authn_b = sample_webauthn_authn_method(2);
+    let id_a = create_identity_with_authn_method(&env, canister_id, &authn_a);
+    let id_b = create_identity_with_authn_method(&env, canister_id, &authn_b);
+    let p_a = authn_a.principal();
+    let p_b = authn_b.principal();
+
+    // Two pending challenges, one per identity, both in TEST_DOMAIN.
+    let challenge_a = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p_a,
+        id_a,
+        EmailRecoveryDnsInput {
+            address: TEST_ADDRESS.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add A call failed")
+    .expect("prepare_add A failed");
+    let challenge_b = api::email_recovery_credential_prepare_add(
+        &env,
+        canister_id,
+        p_b,
+        id_b,
+        EmailRecoveryDnsInput {
+            address: TEST_ADDRESS_2.into(),
+            dns_proof: None,
+        },
+    )
+    .expect("prepare_add B call failed")
+    .expect("prepare_add B failed");
+
+    // One signer (one selector + domain) → both emails resolve the
+    // *same* DKIM FQDN `test1._domainkey.test.example.com`, which is
+    // exactly what makes the two verifications dedup in the cache.
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed_a = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge_a.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let signed_b = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS_2,
+        to: "register@id.ai",
+        subject: &challenge_b.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+
+    // Submit both as concurrent in-flight update calls (no await yet).
+    let msg_a = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed_a.request).expect("encode SmtpRequest A"),
+        )
+        .expect("submit_call A");
+    let msg_b = env
+        .submit_call_with_effective_principal(
+            canister_id,
+            pocket_ic::common::rest::RawEffectivePrincipal::None,
+            candid::Principal::anonymous(),
+            "smtp_request",
+            candid::encode_one(&signed_b.request).expect("encode SmtpRequest B"),
+        )
+        .expect("submit_call B");
+
+    // Let both requests reach their cache-dedup suspend points *before*
+    // any outcall is answered: the fetcher parks on its 5 provider
+    // outcalls and the second request dedups onto it and parks as a
+    // waiter. We must not answer an outcall yet — see the module note
+    // above on why early answers would warm the cache and skip dedup.
+    for _ in 0..5 {
+        env.tick();
+    }
+
+    // Fan out the single (deduped) DKIM + DMARC outcall set. On the
+    // unfixed canister the publish-time wake traps right here.
+    fulfill_doh_outcalls(&env, &signer.public_txt_record());
+    // A few more rounds so both update calls reach a terminal state on
+    // the happy (fixed) path. Harmless on the unfixed path — the dedup
+    // waiter never completes there no matter how long we tick.
+    for _ in 0..10 {
+        env.tick();
+    }
+
+    // Read both terminal statuses *without* blocking. We must never
+    // `await` the dedup waiter: on unfixed code it never completes (the
+    // publisher trapped and rolled back, leaving the pending entry
+    // `InFlight` forever), so a blocking await would hang the test
+    // instead of failing. `ingress_status` is `None` for a call with no
+    // terminal status yet and `Some(Err(reject))` for a trap.
+    let status_a = env.ingress_status(msg_a);
+    let status_b = env.ingress_status(msg_b);
+    let a_ok = matches!(
+        &status_a,
+        Some(Ok(raw)) if matches!(candid::decode_one::<SmtpResponse>(raw), Ok(SmtpResponse::Ok {}))
+    );
+    let b_ok = matches!(
+        &status_b,
+        Some(Ok(raw)) if matches!(candid::decode_one::<SmtpResponse>(raw), Ok(SmtpResponse::Ok {}))
+    );
+
+    // Symptom gate: on the unfixed canister the publisher's status is a
+    // reject carrying "RefCell already borrowed …/doh/cache.rs:256" and
+    // the waiter's is `None` (it never completes). Both must be Ok
+    // replies.
+    assert!(
+        a_ok && b_ok,
+        "concurrent DoH dedup for the same domain did not complete both \
+         requests — reproduction of the prod panic 'RefCell already \
+         borrowed' at src/internet_identity/src/doh/cache.rs.\n  \
+         request A => {status_a:?}\n  request B => {status_b:?}",
+    );
+
+    // End-to-end: both bindings landed on their anchors.
+    for (label, nonce) in [("A", &challenge_a.nonce), ("B", &challenge_b.nonce)] {
+        let status =
+            api::email_recovery_status(&env, canister_id, nonce).expect("status call failed");
+        assert!(
+            matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+            "expected RegistrationSucceeded for request {label}, got {status:?}",
+        );
+    }
 }
 
 // ===================================================================
