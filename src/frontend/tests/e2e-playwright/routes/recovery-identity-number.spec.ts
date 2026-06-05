@@ -184,19 +184,11 @@ test.describe("AuthWizard passkey picker — no in-dialog upgrade link", () => {
   }) => {
     // Navigate to II landing page — first-time state shows the passkey picker inline.
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
+    await page.getByRole("button", { name: "Sign in with passkey" }).click();
 
     // The picker dialog / inline view must NOT contain the removed upgrade link.
     await expect(page.getByText("Still have an identity number?")).toBeHidden();
     await expect(page.getByRole("button", { name: "Upgrade" })).toBeHidden();
-
-    // Verify the two core actions are still present.
-    await expect(
-      page.getByRole("button", { name: "Create new identity" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Use existing identity" }),
-    ).toBeVisible();
   });
 
   test("SetupOrUseExistingPasskey inside 'Add another identity' dialog has no upgrade link", async ({
@@ -211,7 +203,7 @@ test.describe("AuthWizard passkey picker — no in-dialog upgrade link", () => {
     // Now on welcome-back state: open "Add identity" to reach picker.
     await page.goto(II_URL);
     await page.getByRole("button", { name: "Add identity" }).click();
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
+    await page.getByRole("button", { name: "Sign in with passkey" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -220,13 +212,6 @@ test.describe("AuthWizard passkey picker — no in-dialog upgrade link", () => {
       dialog.getByText("Still have an identity number?"),
     ).toBeHidden();
     await expect(dialog.getByRole("button", { name: "Upgrade" })).toBeHidden();
-
-    await expect(
-      dialog.getByRole("button", { name: "Create new identity" }),
-    ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: "Use existing identity" }),
-    ).toBeVisible();
   });
 });
 
@@ -271,10 +256,7 @@ test.describe("/authorize — standalone upgrade panel sanity check", () => {
         // Cancel: close the wizard and complete the authorize flow by creating a new identity.
         await authPage.keyboard.press("Escape");
         await authPage
-          .getByRole("button", { name: "Continue with passkey" })
-          .click();
-        await authPage
-          .getByRole("button", { name: "Create new identity" })
+          .getByRole("button", { name: "Sign in with passkey" })
           .click();
         await authPage.getByLabel("Identity name").fill("Test");
         await authPage.getByRole("button", { name: "Create identity" }).click();
