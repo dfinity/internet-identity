@@ -372,26 +372,38 @@
             // Pending / NeedDkimLeaf from a submit: non-terminal, fall
             // through and let the polling loop carry the flow forward.
           } catch (e) {
-            // The submit wrapper throws on a canister `Err`. A
-            // DomainNotAllowlisted / DomainNotSupported verdict means
-            // even the DoH fallback can't verify this domain — show
-            // the unsupported-domain view instead of hanging. Any
-            // other error falls through to keep polling so a
-            // transient failure still resolves cleanly.
-            if (
-              isCanisterError<EmailRecoveryError>(e) &&
-              (e.type === "DomainNotAllowlisted" ||
-                e.type === "DomainNotSupported")
-            ) {
+            // A non-canister error (transport failure, dropped
+            // response, an unexpected throw in the leaf walk) leaves
+            // the canister state unknown, and our single submit attempt
+            // is already spent (`dkimLeafSubmitted`), so the poll loop
+            // would never re-submit and the entry would hang at
+            // NeedDkimLeaf until the 30-minute Expired. Surface a
+            // retryable failure instead of staying silent.
+            if (!isCanisterError<EmailRecoveryError>(e)) {
               setupEmailRecoveryFunnel.trigger(
-                SetupEmailRecoveryEvents.UnsupportedDomain,
-                { reason: e.type },
+                SetupEmailRecoveryEvents.Failed,
+                {
+                  reason: "SubmitFailed",
+                },
               );
               setupEmailRecoveryFunnel.close();
+              const diagnosticsBlob = await collectDiagnostics(nonce);
               polling = false;
-              stage = { kind: "unsupported", domain };
+              stage = {
+                kind: "failed",
+                reason:
+                  "We couldn't reach Internet Identity to verify your email. Please try again.",
+                diagnostics: diagnosticsBlob,
+              };
               return;
             }
+            // A canister `Err` means the canister has already moved the
+            // pending entry to a terminal state, so we let the polling
+            // loop's Failed/Expired branch surface the authoritative
+            // reason on its next tick — it routes
+            // DomainNotAllowlisted/DomainNotSupported to the
+            // unsupported-domain view and every other reason to the
+            // failed view (with diagnostics). Nothing is swallowed.
           }
         }
         // Pending or NeedDkimLeaf-but-already-submitted: back off
