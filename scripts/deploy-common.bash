@@ -1020,7 +1020,7 @@ encode_install_arg_bin() {
 # -------------------------
 # Proxy-routed install runner (honours DRY_RUN)
 # -------------------------
-# Routes the upgrade through the proxy canister at PROXY_CANISTER_ID,
+# Routes the install/upgrade through the proxy canister at PROXY_CANISTER_ID,
 # which is the legacy staging wallet reinstalled with the icp-cli proxy
 # WASM (see
 # https://cli.internetcomputer.org/0.2/migration/from-dfx/#replacing-the-dfx-wallet-canister).
@@ -1048,11 +1048,31 @@ run_icp_install() {
         return 1
     fi
 
+    # Choose install vs upgrade based on whether the canister already holds a
+    # Wasm module on chain. A freshly created staging canister (e.g. a new
+    # Staging-D, or any canister whose code was uninstalled) has none, so
+    # `--mode upgrade` fails with "canister contains no Wasm module"; it needs
+    # `--mode install`. We deliberately only ever pick install/upgrade — never
+    # `reinstall`, which would wipe the canister's state.
+    #
+    # Detection reuses the public ic-api module_hash (same source --reconfigure
+    # relies on, and which reliably reports a hash for the live staging
+    # canisters). A present hash ⇒ upgrade; absent ⇒ install. The only
+    # ambiguous case is "installed canister but ic-api momentarily
+    # unreachable", which would mis-pick install — but `--mode install` on an
+    # already-installed canister is rejected by the IC (non-destructive), so
+    # the operator just sees an error and re-runs, rather than losing state.
+    local mode="upgrade"
+    if [ -z "$(fetch_onchain_module_hash "$canister_id")" ]; then
+        mode="install"
+        echo "  $canister_id has no Wasm module on chain (per ic-api) — using --mode install (fresh canister)." >&2
+    fi
+
     local cmd=(
         icp canister install "$canister_id"
             -e "$IC_NETWORK"
             --proxy "$PROXY_CANISTER_ID"
-            --mode upgrade
+            --mode "$mode"
             --wasm "$wasm_path"
             --args-file "$install_arg_bin"
             --args-format bin
@@ -1073,9 +1093,9 @@ run_icp_install() {
     # less obvious place.
     bootstrap_init_args || return 1
 
-    echo "Upgrading canister $canister_id ..."
+    echo "Running icp canister install (--mode $mode) on $canister_id ..."
     "${cmd[@]}"
-    echo "Upgrade of $canister_id complete."
+    echo "Done (--mode $mode) on $canister_id."
 }
 
 # -------------------------
