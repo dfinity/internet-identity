@@ -61,6 +61,7 @@ mod http;
 mod ii_domain;
 
 mod openid;
+mod single_flight_cache;
 mod state;
 mod stats;
 mod storage;

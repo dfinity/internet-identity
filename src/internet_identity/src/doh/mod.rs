@@ -40,7 +40,7 @@ mod types;
 
 use std::cell::RefCell;
 
-use cache::{CacheLookup, DohCache};
+use cache::{CacheState, DohCache};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
@@ -200,9 +200,9 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     let token = loop {
         let now = now_secs();
         match DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now)) {
-            CacheLookup::Hit(bytes) => return Ok(bytes),
-            CacheLookup::Fetch(token) => break token,
-            CacheLookup::Wait => {
+            CacheState::Warm(bytes) => return Ok(bytes),
+            CacheState::Cold(token) => break token,
+            CacheState::Pending => {
                 if waits >= MAX_DEDUP_WAIT_POLLS {
                     // The in-flight fetch is taking implausibly long (or
                     // its owner trapped before the staleness window let
@@ -229,7 +229,7 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     let expires_at = now.saturating_add(max_age);
     DOH_CACHE.with(|c| {
         c.borrow_mut()
-            .publish(name, token, result.clone(), expires_at, now)
+            .publish(name, token, result.as_ref().ok().cloned(), expires_at, now)
     });
     result
 }
@@ -276,8 +276,9 @@ fn now_secs() -> u64 {
 /// so this is ~100 rounds of patience — far more than a healthy fan-out
 /// needs — and bounds the wait so a wedged fetch can't pin a waiter
 /// indefinitely. The post-staleness takeover (see
-/// [`cache::PENDING_STALE_AFTER_SECS`]) is the real recovery path; this
-/// is just a backstop against an unbounded poll loop.
+/// [`crate::single_flight_cache::DEFAULT_PENDING_STALE_AFTER_SECS`]) is
+/// the real recovery path; this is just a backstop against an unbounded
+/// poll loop.
 const MAX_DEDUP_WAIT_POLLS: u32 = 100;
 
 /// Yield one consensus round, resuming in the caller's OWN call context.
