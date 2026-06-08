@@ -27,7 +27,10 @@
   import ActiveEmailRecovery from "./components/ActiveEmailRecovery.svelte";
   import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
-  import type { EmailRecoveryDnsInput } from "$lib/generated/internet_identity_types";
+  import type {
+    EmailRecoveryDnsInput,
+    EmailRecoverySubmitDkimLeafArg,
+  } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
@@ -279,11 +282,15 @@
     anonymousActor.email_recovery_diagnostics(nonce);
 
   /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
-  const submitEmailDkimLeaf = (
-    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
-  ) =>
+  const submitEmailDkimLeaf = (arg: EmailRecoverySubmitDkimLeafArg) =>
     anonymousActor
       .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
+  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf_via_doh`. */
+  const submitEmailDkimLeafViaDoh = (nonce: string) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf_via_doh(nonce)
       .then(throwCanisterError);
 
   const handleRemoveEmail = async () => {
@@ -503,6 +510,7 @@
       status={statusEmailRecovery}
       diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
+      submitDkimLeafViaDoh={submitEmailDkimLeafViaDoh}
       onSuccess={handleEmailWizardSuccess}
     />
   </Dialog>

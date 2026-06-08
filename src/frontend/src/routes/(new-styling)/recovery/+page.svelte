@@ -23,6 +23,7 @@
   import type {
     EmailRecoveryDnsInput,
     EmailRecoveryGetDelegationArgs,
+    EmailRecoverySubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -90,11 +91,14 @@
   const emailRecoveryDiagnostics = (nonce: string) =>
     anonymousActor.email_recovery_diagnostics(nonce);
 
-  const submitEmailDkimLeaf = (
-    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
-  ) =>
+  const submitEmailDkimLeaf = (arg: EmailRecoverySubmitDkimLeafArg) =>
     anonymousActor
       .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
+  const submitEmailDkimLeafViaDoh = (nonce: string) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf_via_doh(nonce)
       .then(throwCanisterError);
 
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
@@ -279,6 +283,7 @@
       status={emailRecoveryStatus}
       diagnostics={emailRecoveryDiagnostics}
       submitDkimLeaf={submitEmailDkimLeaf}
+      submitDkimLeafViaDoh={submitEmailDkimLeafViaDoh}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
     />

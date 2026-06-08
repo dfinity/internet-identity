@@ -655,6 +655,24 @@ pub fn email_recovery_submit_dkim_leaf(
     .map(|(x,)| x)
 }
 
+pub fn email_recovery_submit_dkim_leaf_via_doh(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    nonce: &str,
+) -> Result<
+    Result<types::email_recovery::EmailRecoveryStatus, types::email_recovery::EmailRecoveryError>,
+    RejectResponse,
+> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "email_recovery_submit_dkim_leaf_via_doh",
+        (nonce,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn email_recovery_get_delegation(
     env: &PocketIc,
     canister_id: CanisterId,

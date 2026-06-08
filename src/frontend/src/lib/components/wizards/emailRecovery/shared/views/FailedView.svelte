@@ -12,8 +12,7 @@
     /** Strictly-public, copyable diagnostics blob (includes the
      *  gateway `message_id`) the user can hand to support. Absent when
      *  there's nothing useful to share (e.g. a purely FE-side failure
-     *  with no canister challenge to read). See
-     *  `setupEmailRecovery/diagnostics.ts`. */
+     *  with no canister challenge to read). See `../diagnostics.ts`. */
     diagnostics?: string;
     onRetry: () => void;
   }

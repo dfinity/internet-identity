@@ -605,6 +605,13 @@ export interface EmailRecoverySubmitDkimLeafArg {
    * least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
    * canister side. For the Gmail-style direct-TXT case this is a
    * single-element vec.
+   * 
+   * When the FE cannot walk a fully-signed DNSSEC resolution for the
+   * leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
+   * `selector1._domainkey.outlook.com` is a signed CNAME into the
+   * unsigned `outbound.protection.outlook.com`) — it must NOT submit
+   * an empty vec here; it calls `email_recovery_submit_dkim_leaf_via_doh`
+   * instead, which resolves the key over the canister's DoH path.
    */
   'hops' : Array<SignedRRset>,
   'nonce' : string,
@@ -1695,6 +1702,18 @@ export interface _SERVICE {
   'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
   'email_recovery_submit_dkim_leaf' : ActorMethod<
     [EmailRecoverySubmitDkimLeafArg],
+    { 'Ok' : EmailRecoveryStatus } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  /**
+   * DoH-fallback sibling of email_recovery_submit_dkim_leaf, called
+   * with just the nonce when the FE can't walk a fully-signed DNSSEC
+   * resolution for the leaf (the DKIM record CNAMEs into an unsigned
+   * zone). The canister resolves the DKIM key over its own
+   * allowlist-gated DoH path.
+   */
+  'email_recovery_submit_dkim_leaf_via_doh' : ActorMethod<
+    [string],
     { 'Ok' : EmailRecoveryStatus } |
       { 'Err' : EmailRecoveryError }
   >,

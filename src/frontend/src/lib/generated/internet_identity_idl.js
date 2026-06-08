@@ -913,6 +913,16 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'email_recovery_submit_dkim_leaf_via_doh' : IDL.Func(
+        [IDL.Text],
+        [
+          IDL.Variant({
+            'Ok' : EmailRecoveryStatus,
+            'Err' : EmailRecoveryError,
+          }),
+        ],
+        [],
+      ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
