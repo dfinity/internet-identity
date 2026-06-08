@@ -2,7 +2,7 @@
 # Shared helpers for deploy-pr-to-beta and deploy-local-to-beta.
 #
 # Responsibilities:
-# - CLI arg parsing for staging selection (-sa/-sb/-sc/--staging custom),
+# - CLI arg parsing for staging selection (-sa/-sb/-sc/-sd/--staging custom),
 #   end selection (-fe/-be/--end), dry-run, no-checks, and (for the local
 #   script) the rebuild flags.
 # - Reachability + consistency checks against the selected staging canisters.
@@ -23,7 +23,7 @@
 # - An icp install runner that honours --dry-run.
 #
 # Globals set by parse_common_args (and expected by later helpers):
-#   STAGING_NAME       : "a" | "b" | "c" | "custom"
+#   STAGING_NAME       : "a" | "b" | "c" | "d" | "custom"
 #   BE_ID, FE_ID       : principals (text form)
 #   BE_URL, FE_URL     : https://... URLs
 #   DEPLOY_FE          : true | false
@@ -64,6 +64,7 @@ staging_be_id() {
         a) echo "fgte5-ciaaa-aaaad-aaatq-cai" ;;
         b) echo "jqajs-xiaaa-aaaad-aab5q-cai" ;;
         c) echo "y2aaj-miaaa-aaaad-aacxq-cai" ;;
+        d) echo "u6uxm-3qaaa-aaaad-ags6a-cai" ;;
         *) return 1 ;;
     esac
 }
@@ -72,6 +73,7 @@ staging_fe_id() {
         a) echo "gjxif-ryaaa-aaaad-ae4ka-cai" ;;
         b) echo "uhh2r-oyaaa-aaaad-agbva-cai" ;;
         c) echo "uag4f-daaaa-aaaad-agbvq-cai" ;;
+        d) echo "uzvry-wiaaa-aaaad-ags6q-cai" ;;
         *) return 1 ;;
     esac
 }
@@ -147,6 +149,7 @@ Common options:
   --staging-a, -sa          Use Staging A
   --staging-b, -sb          Use Staging B
   --staging-c, -sc          Use Staging C
+  --staging-d, -sd          Use Staging D
   --staging custom          Prompt for a custom (BE_ID, FE_ID, BE_URL, FE_URL) quad
   --end <front|back>        Which end(s) to deploy (can be repeated)
   -fe                       Shortcut for --end front
@@ -221,17 +224,21 @@ parse_common_args() {
                 STAGING_NAME="c"
                 shift
                 ;;
+            -sd|--staging-d)
+                STAGING_NAME="d"
+                shift
+                ;;
             --staging)
                 shift
                 if [ $# -eq 0 ]; then
-                    echo "Error: --staging requires an argument (a|b|c|custom)" >&2
+                    echo "Error: --staging requires an argument (a|b|c|d|custom)" >&2
                     return 1
                 fi
                 case "$1" in
-                    a|b|c)   STAGING_NAME="$1" ;;
+                    a|b|c|d) STAGING_NAME="$1" ;;
                     custom)  STAGING_NAME="custom" ;;
                     *)
-                        echo "Error: --staging value must be a|b|c|custom, got '$1'" >&2
+                        echo "Error: --staging value must be a|b|c|d|custom, got '$1'" >&2
                         return 1
                         ;;
                 esac
@@ -361,7 +368,7 @@ parse_common_args() {
     done
 
     if [ -z "$STAGING_NAME" ]; then
-        echo "Error: staging must be specified (use -sa/-sb/-sc or --staging custom)" >&2
+        echo "Error: staging must be specified (use -sa/-sb/-sc/-sd or --staging custom)" >&2
         return 1
     fi
     if [ "$DEPLOY_FE" = false ] && [ "$DEPLOY_BE" = false ]; then
@@ -375,7 +382,7 @@ parse_common_args() {
 # fill the canonical ids/URLs directly; for `custom` we prompt.
 resolve_staging_config() {
     case "$STAGING_NAME" in
-        a|b|c)
+        a|b|c|d)
             BE_ID="$(staging_be_id "$STAGING_NAME")"
             FE_ID="$(staging_fe_id "$STAGING_NAME")"
             BE_URL="$(canister_default_url "$BE_ID")"

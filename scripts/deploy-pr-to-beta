@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Usage:
-#   ./deploy-pr-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) [options] <PR_NUMBER>
-#   ./deploy-pr-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) --reconfigure [options]
+#   ./deploy-pr-to-beta [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) [options] <PR_NUMBER>
+#   ./deploy-pr-to-beta [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) --reconfigure [options]
 #
 # Default flow deploys CI-built artifacts from a pull request's
 # canister-tests.yml run. `--reconfigure` drops the PR # and instead
@@ -13,8 +13,8 @@ set -euo pipefail
 print_usage() {
     cat <<EOF
 Usage:
-  $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) [--dry-run] [--no-checks] <PR_NUMBER>
-  $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) --reconfigure [--dry-run] [--no-checks]
+  $0 [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) [--dry-run] [--no-checks] <PR_NUMBER>
+  $0 [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) --reconfigure [--dry-run] [--no-checks]
 
 Default mode downloads CI-built wasm.gz files from the most recent
 canister-tests.yml run for <PR_NUMBER> and upgrades the selected staging
