@@ -163,8 +163,17 @@ msgstr "Tambahkan atau hapus cara Anda dapat masuk dengan identitas Anda."
 msgid "Advanced identity management"
 msgstr "Manajemen identitas tingkat lanjut"
 
+msgid "Allow access"
+msgstr "Izinkan akses"
+
+msgid "Allow CLI access"
+msgstr "Izinkan akses CLI"
+
 msgid "Allow to access this info"
 msgstr "Izinkan untuk mengakses info ini"
+
+msgid "Allowing access"
+msgstr "Mengizinkan akses"
 
 msgid "Already signed-in"
 msgstr "Sudah masuk"
@@ -201,6 +210,9 @@ msgstr "Sebelum Anda melanjutkan"
 
 msgid "Body"
 msgstr "Isi"
+
+msgid "Browser opened"
+msgstr "Browser dibuka"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Dengan mengaktifkan fitur ini, Anda dapat membuat lebih dari satu akun untuk satu aplikasi. Beralih antar akun dengan mudah (misalnya, kantor, pribadi, atau demo)."
@@ -247,11 +259,20 @@ msgstr "Pilih metode"
 msgid "Choose method to continue"
 msgstr "Pilih metode untuk melanjutkan"
 
+msgid "Choose the identity you originally linked, then try again."
+msgstr "Pilih identitas yang awalnya Anda tautkan, lalu coba lagi."
+
 msgid "Choose which details you'd like to share"
 msgstr "Pilih detail yang ingin Anda bagikan"
 
 msgid "Clear all"
 msgstr "Hapus semua"
+
+msgid "CLI access"
+msgstr "Akses CLI"
+
+msgid "CLI access not enabled"
+msgstr "Akses CLI tidak diaktifkan"
 
 msgid "Click to reveal"
 msgstr "Klik untuk menampilkan"
@@ -264,6 +285,9 @@ msgstr "Tutup menu"
 
 msgid "Code copied to clipboard"
 msgstr "Kode disalin ke papan klip"
+
+msgid "Command-line tools on this device can ask to sign you in to apps."
+msgstr "Alat baris perintah di perangkat ini dapat meminta Anda untuk masuk ke aplikasi."
 
 msgid "Company domain"
 msgstr "Domain perusahaan"
@@ -309,6 +333,9 @@ msgstr "Lanjutkan dengan SSO"
 
 msgid "Copied to clipboard"
 msgstr "Disalin ke papan klip"
+
+msgid "Copy install command: {command}"
+msgstr "Salin perintah instal: {command}"
 
 msgid "Copy recipient address"
 msgstr "Salin alamat penerima"
@@ -400,8 +427,17 @@ msgstr "Alamat email"
 msgid "Email:"
 msgstr "Email:"
 
+msgid "Enable CLI access"
+msgstr "Aktifkan akses CLI"
+
+msgid "Enable CLI access for this device, then try again."
+msgstr "Aktifkan akses CLI untuk perangkat ini, lalu coba lagi."
+
 msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
+
+msgid "Enabled"
+msgstr "Diaktifkan"
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Masukkan nama untuk identitas Anda untuk menyelesaikan peningkatan. Setelah diatur, nama tidak dapat diubah nanti."
@@ -442,6 +478,9 @@ msgstr "Aplikasi unggulan"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Misalnya, pengguna A masuk ke Internet Identity dengan akun Google mereka “A@gmail.com” dan kemudian menggunakan Internet Identity untuk autentikasi di aplikasi Z. Google tidak akan pernah tahu bahwa pengguna tersebut terautentikasi di aplikasi Z, hanya Internet Identity yang mengetahuinya. Selain itu, aplikasi Z juga tidak akan pernah tahu bahwa pengguna A menggunakan Google untuk mengautentikasi pengguna Internet Identity mereka."
+
+msgid "For security, Internet Identity blocks command-line tools from signing in to apps using your identity."
+msgstr "Untuk keamanan, Internet Identity memblokir alat baris perintah agar tidak dapat masuk ke aplikasi menggunakan identitas Anda."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in. Quick, safe, and hassle-free."
 msgstr "Lupakan mengingat nama pengguna dan kata sandi yang rumit. Dengan passkey, Anda cukup memilih nama Anda untuk masuk. Cepat, aman, dan tanpa kerumitan."
@@ -517,6 +556,9 @@ msgstr "Saya bertanggung jawab atas frasa pemulihan saya dan frasa tersebut tida
 
 msgid "I have written it down"
 msgstr "Saya sudah mencatatnya"
+
+msgid "I'm using the official ICP CLI and I trust this device."
+msgstr "Saya menggunakan ICP CLI resmi dan saya mempercayai perangkat ini."
 
 msgid "I've sent the email"
 msgstr "Saya sudah mengirim email"
@@ -626,6 +668,9 @@ msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, a
 msgid "It seems like an invalid authentication request was received."
 msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 
+msgid "It seems like an invalid CLI authentication request was received."
+msgstr "Tampaknya permintaan autentikasi CLI yang tidak valid telah diterima."
+
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
 
@@ -656,6 +701,9 @@ msgstr "Pelajari cara membuka tautan di peramban Anda"
 msgid "Legacy"
 msgstr "Legacy"
 
+msgid "Let command-line tools on this device sign in to apps using your identity."
+msgstr "Izinkan alat baris perintah di perangkat ini masuk ke aplikasi menggunakan identitas Anda."
+
 msgid "Let's get started"
 msgstr "Mari mulai"
 
@@ -664,6 +712,9 @@ msgstr "Batas tercapai"
 
 msgid "Link copied to clipboard"
 msgstr "Tautan disalin ke papan klip"
+
+msgid "Linking Internet Identity"
+msgstr "Menautkan Internet Identity"
 
 msgid "Loading permissions"
 msgstr "Memuat izin"
@@ -689,8 +740,14 @@ msgstr "Pastikan tidak ada yang bisa melihat apa yang ada di layar Anda atau apa
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Pastikan untuk menambahkan metode akses baru agar Anda dapat masuk lain kali atau mengatur ulang frasa pemulihan Anda."
 
+msgid "Manage how other tools connect to your identity."
+msgstr "Kelola cara alat lain terhubung ke identitas Anda."
+
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Kelola identitas Anda dan tetap kendalikan aplikasi serta situs web Anda melalui dashboard. Jelajahi Fitur Pro untuk menyesuaikan dan mengamankan pengalaman Anda lebih lanjut."
+
+msgid "Manage your identity"
+msgstr "Kelola identitas Anda"
 
 msgid "Manage your Internet Identity"
 msgstr "Kelola Internet Identity Anda"
@@ -752,8 +809,14 @@ msgstr "Belum ditingkatkan"
 msgid "Not verified"
 msgstr "Belum diverifikasi"
 
+msgid "Once enabled, any command-line tool on this device can use your identity to sign in to apps."
+msgstr "Setelah diaktifkan, alat baris perintah apa pun di perangkat ini dapat menggunakan identitas Anda untuk masuk ke aplikasi."
+
 msgid "One or more words are wrong or out of order."
 msgstr "Satu atau lebih kata salah atau urutannya tidak tepat."
+
+msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
+msgstr "Aktifkan ini hanya untuk <0>ICP CLI</0> resmi. Jika Anda tidak yakin, instal ulang dari <1>sumber resmi</1>."
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
@@ -911,6 +974,9 @@ msgstr "Ganti"
 msgid "Replace it anytime"
 msgstr "Ganti kapan saja"
 
+msgid "Requested by"
+msgstr "Diminta oleh"
+
 msgid "Reset"
 msgstr "Setel ulang"
 
@@ -983,6 +1049,9 @@ msgstr "Siapkan email pemulihan"
 msgid "Set up recovery phrase"
 msgstr "Siapkan frasa pemulihan"
 
+msgid "Settings"
+msgstr "Pengaturan"
+
 msgid "Share {label}"
 msgstr "Bagikan {label}"
 
@@ -1040,6 +1109,9 @@ msgstr "Pendaftaran"
 msgid "Signed in"
 msgstr "Sudah masuk"
 
+msgid "Signing in"
+msgstr "Sedang masuk"
+
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
 
@@ -1055,6 +1127,9 @@ msgstr "Beberapa penyedia email mengantrekan email keluar. Periksa folder terkir
 msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong."
 msgstr "Ada yang tidak sesuai."
+
+msgid "Something went wrong"
+msgstr "Terjadi kesalahan"
 
 msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 msgstr "Terjadi kesalahan saat membuat delegasi Anda. Silakan coba lagi; jika masalah berlanjut, hubungi dukungan."
@@ -1155,11 +1230,23 @@ msgstr "Uji dukungan passkey dan lihat detail autentikator"
 msgid "Test sign-in"
 msgstr "Uji masuk"
 
+msgid "That identity doesn't match"
+msgstr "Identitas itu tidak cocok"
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "<0>Perangkat yang ada</0> sedang bersiap untuk melanjutkan."
 
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "<0>Perangkat baru</0> sedang bersiap untuk melanjutkan."
+
+msgid "The CLI gets full access to your account in this app."
+msgstr "CLI mendapatkan akses penuh ke akun Anda di aplikasi ini."
+
+msgid "The CLI gets its own account, separate from your other apps."
+msgstr "CLI mendapatkan akun sendiri, terpisah dari aplikasi Anda lainnya."
+
+msgid "The CLI sign-in couldn't be completed. Check the CLI for details."
+msgstr "Masuk CLI tidak dapat diselesaikan. Periksa CLI untuk detailnya."
 
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
 msgstr "Email harus berasal langsung dari alamat di atas. Alias dan penerus tidak akan berfungsi."
@@ -1407,6 +1494,9 @@ msgstr "Mengapa ini tidak didukung?"
 msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
 msgstr "Dengan passkey, Anda sekarang dapat menggunakan sidik jari, wajah, atau kunci layar Anda untuk mengonfirmasi bahwa itu benar-benar Anda dengan cepat dan aman."
 
+msgid "with your identity in this app"
+msgstr "dengan identitas Anda di aplikasi ini"
+
 msgid "with your Internet Identity"
 msgstr "dengan Internet Identity Anda"
 
@@ -1445,6 +1535,9 @@ msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan ak
 
 msgid "You can add it back anytime by signing in with the same passkey."
 msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan passkey yang sama."
+
+msgid "You can close this window."
+msgstr "Anda dapat menutup jendela ini."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
@@ -1487,6 +1580,9 @@ msgstr "Semua siap. Identitas Anda telah dibuat."
 
 msgid "You're all set. Your passkey has been registered."
 msgstr "Semua siap. Passkey Anda telah terdaftar."
+
+msgid "You're signed in"
+msgstr "Anda sudah masuk"
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Anda masuk sebagai <0>{name}</0>."
