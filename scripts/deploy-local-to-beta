@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./deploy-local-to-beta [-sa|-sb|-sc|--staging custom] (-fe|-be) [options]
+# Usage: ./deploy-local-to-beta [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) [options]
 #
 # Deploy LOCALLY-BUILT artifacts to a staging canister. Builds the wasm.gz
 # files with `scripts/build` (on-demand, per `-rfe`/`-rbe`) and runs the
@@ -9,12 +9,12 @@ set -euo pipefail
 
 print_usage() {
     cat <<EOF
-Usage: $0 [-sa|-sb|-sc|--staging custom] (-fe|-be) [-rfe] [-rbe] [--dry-run] [--no-checks]
+Usage: $0 [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) [-rfe] [-rbe] [--dry-run] [--no-checks]
 
 Deploys wasm.gz files built from your local working tree. Prompts for the
 small set of install-arg fields that can vary (dev_csp, dummy_auth,
 analytics_config) and derives the rest from the (BE_ID, FE_ID, BE_URL,
-FE_URL) quad — known for -sa/-sb/-sc, prompted for --staging custom.
+FE_URL) quad — known for -sa/-sb/-sc/-sd, prompted for --staging custom.
 
 Rebuild flags (default: reuse existing wasm.gz at repo root):
   --rebuild fe [be]       Rebuild the listed ends before deploying
