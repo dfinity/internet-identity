@@ -22,7 +22,7 @@ jobs:
 
       - name: Notify Slack about action_required runs
         env:
-          SLACK_CI_APPROVAL_WEBHOOK_URL: ${{ secrets.SLACK_CI_APPROVAL_WEBHOOK_URL }}
+          SLACK_PRIVATE_IDENTITY_WEBHOOK_URL: ${{ secrets.SLACK_PRIVATE_IDENTITY_WEBHOOK_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-ci-approval.sh

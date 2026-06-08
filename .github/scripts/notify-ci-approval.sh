@@ -2,15 +2,15 @@
 # Notify Slack when fork-PR workflow runs are stuck in action_required.
 #
 # Requires: gh (authenticated), curl, jq
-# Env:      SLACK_CI_APPROVAL_WEBHOOK_URL (optional — exits cleanly if unset)
+# Env:      SLACK_PRIVATE_IDENTITY_WEBHOOK_URL (optional — exits cleanly if unset)
 #           GITHUB_REPOSITORY (e.g. dfinity/internet-identity)
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}"
 MARKER_PREFIX="<!-- ci-approval-slack:"
 
-if [[ -z "${SLACK_CI_APPROVAL_WEBHOOK_URL:-}" ]]; then
-  echo "SLACK_CI_APPROVAL_WEBHOOK_URL is not set — skipping notification."
+if [[ -z "${SLACK_PRIVATE_IDENTITY_WEBHOOK_URL:-}" ]]; then
+  echo "SLACK_PRIVATE_IDENTITY_WEBHOOK_URL is not set — skipping notification."
   exit 0
 fi
 
@@ -70,7 +70,7 @@ if [[ -z "$grouped" || "$grouped" == "null" || "$grouped" == "[]" ]]; then
 fi
 
 notified=0
-echo "$grouped" | jq -c '.[]' | while IFS= read -r entry; do
+while IFS= read -r entry; do
   pr_number=$(echo "$entry" | jq -r '.pr_number')
   head_sha=$(echo "$entry"  | jq -r '.head_sha')
   head_short=$(echo "$entry" | jq -r '.head_short')
@@ -105,7 +105,7 @@ echo "$grouped" | jq -c '.[]' | while IFS= read -r entry; do
   response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H 'Content-Type: application/json' \
     --data "$(jq -n --arg text "$slack_text" '{text: $text}')" \
-    "$SLACK_CI_APPROVAL_WEBHOOK_URL")
+    "$SLACK_PRIVATE_IDENTITY_WEBHOOK_URL")
 
   if [[ "$response" == "200" ]]; then
     echo "PR #${pr_number} head=${head_short}: Slack notification sent."
@@ -124,6 +124,6 @@ _Automated by [ci-approval-slack-notifier](https://github.com/${REPO}/actions/wo
     echo "PR #${pr_number}: failed to post dedup marker (non-fatal)."
 
   notified=$((notified + 1))
-done
+done < <(echo "$grouped" | jq -c '.[]')
 
-echo "Done. Notifications sent this run: ${notified:-0}."
+echo "Done. Notifications sent this run: ${notified}."
