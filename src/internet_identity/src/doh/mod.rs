@@ -17,6 +17,12 @@
 //!   or returning forged bytes never breaks the verifier.
 //! - **In-flight dedup.** Multiple concurrent verification requests
 //!   for the same domain share one outcall fan-out, not five each.
+//! - **Resilient.** A fetched record is served for a short window past
+//!   its TTL while a refresh is attempted, and a failed refresh keeps
+//!   serving the last-good record (stale-while-revalidate /
+//!   stale-if-error), so a transient outage doesn't fail an in-progress
+//!   recovery. A failed fetch is debounced, not retried on every message.
+//!   See [`cache`] for the exact knobs.
 //! - **Heap cache.** Fast and cheap. Keys are re-fetchable, so an
 //!   upgrade rebuilding the cache from scratch is fine.
 //!
@@ -189,26 +195,32 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
 
     // Dedup-aware fetch via the single-flight cache. The first arrival for
-    // a cold name owns the five-provider fan-out; concurrent arrivals wait
-    // for it to publish. `get_or_fill` owns the whole lookup/wait/publish
-    // dance — including the IC-specific reason a waiter polls from its own
-    // call context instead of being woken (see `crate::single_flight_cache`).
+    // a cold or stale name owns the five-provider fan-out; concurrent
+    // arrivals wait for it and all get the same result. `get_or_fill` owns
+    // the whole lookup/wait/publish dance — it serves the last-good record
+    // while a refresh runs and on a transient refresh failure
+    // (stale-while-revalidate / stale-if-error), debounces a failed fetch
+    // (see `cache`), and polls from each waiter's own call context instead
+    // of being woken (the IC reply-routing constraint — see
+    // `crate::single_flight_cache`).
     get_or_fill(&DOH_CACHE, name, now_secs, max_age, || async move {
         let outcomes = fetch_all(&query).await;
         decide_quorum(&outcomes)
     })
     .await
     .map_err(|e| match e {
-        // The dedup wait was too long (or the owner trapped before the
-        // staleness window let someone take over). Surface its own variant
-        // — not `AllProvidersFailed` — so "the dedup wait timed out" is
-        // distinguishable from "our own fan-out failed" in diagnostics.
+        // A foreign in-flight fetch didn't publish within the poll cap and
+        // there was no cached record to serve stale (e.g. an owner trapped
+        // before the staleness window let someone take over). Its own
+        // variant — not `AllProvidersFailed` — so "the dedup wait timed
+        // out" is distinguishable from "our own fan-out failed".
         CacheFillError::WaitTimedOut => DohError::DedupWaitTimedOut,
         CacheFillError::Fill(e) => e,
-        // Defensive: the DoH cache configures no retry backoff (failures
-        // are immediately retryable, bounded by the domain allowlist), so
-        // this is unreachable. Fold it into the transient variant if it
-        // ever surfaces.
+        // A recent fetch for this name failed and is still within its retry
+        // backoff, so the cache short-circuited without a new fan-out and
+        // had no record to serve stale. Transient — a retry past the
+        // backoff, or a later refresh succeeding, resolves it; mapped to the
+        // same transient variant as a dedup-wait timeout (see `types`).
         CacheFillError::CoolingDown => DohError::DedupWaitTimedOut,
     })
 }
@@ -664,9 +676,11 @@ mod tests {
 
     #[test]
     fn no_answer_result_is_not_cached() {
-        // Surfacing NoAnswer must NOT poison the cache: a follow-up
-        // call with a different mock (record was just published) re-
-        // fetches and now gets the real bytes.
+        // A cold NoAnswer creates no positive cache entry, so it can't
+        // poison verification: it is debounced (an immediate retry is
+        // throttled), but past the retry backoff a follow-up with a
+        // different mock (record was just published) re-fetches and gets
+        // the real bytes.
         install_config(&["example.com"], Some(3600));
         reset_cache();
         set_mock(&[
