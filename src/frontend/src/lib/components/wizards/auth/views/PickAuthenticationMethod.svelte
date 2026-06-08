@@ -93,7 +93,7 @@
       description={$t`Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue.`}
     />
   {/if}
-  <div class="flex flex-col items-stretch gap-2">
+  <div class="flex flex-col items-stretch gap-3">
     <button
       class="btn btn-primary btn-xl h-14"
       onclick={setupOrUseExistingPasskey}
@@ -153,8 +153,8 @@
   {#if showLostAccess}
     <div
       class={[
-        "flex flex-row items-center justify-between gap-4",
-        !withinDialog && "border-border-secondary border-b pb-3",
+        "flex flex-row items-center justify-between gap-4 py-3",
+        !withinDialog && "border-border-secondary border-b",
       ]}
     >
       <p class="text-text-tertiary text-sm">
@@ -174,7 +174,7 @@
       class={[
         "flex flex-row items-center gap-3",
         withinDialog
-          ? "bg-bg-secondary dark:bg-bg-primary border-border-secondary -mx-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:-mb-8 sm:px-6"
+          ? "bg-bg-secondary dark:bg-bg-primary border-border-secondary -mx-4 -mb-4 border-t p-4 sm:-mx-6 sm:-mb-8 sm:rounded-b-2xl sm:p-6"
           : "py-2",
       ]}
     >
@@ -186,10 +186,10 @@
               : $t`Already have an identity?`)}
         </div>
         {#if switchModeTitle === undefined}
-          <div class="text-text-tertiary mt-0.5 text-xs">
+          <div class="text-text-tertiary mt-1.5 text-xs">
             {mode === "signin"
-              ? $t`Create your private, passwordless identity.`
-              : $t`Sign in with a passkey or familiar provider.`}
+              ? $t`Create one in seconds.`
+              : $t`Use a passkey or familiar provider.`}
           </div>
         {/if}
       </div>

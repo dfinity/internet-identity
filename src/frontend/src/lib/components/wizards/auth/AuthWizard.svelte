@@ -1,9 +1,14 @@
 <script lang="ts">
-  import { AuthFlow } from "$lib/flows/authFlow.svelte";
-  import type { Snippet } from "svelte";
+  import {
+    AuthFlow,
+    type AuthMode,
+    type MethodTag,
+  } from "$lib/flows/authFlow.svelte";
+  import { type Snippet, untrack } from "svelte";
+  import { fade } from "svelte/transition";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import Dialog, { isInsideDialog } from "$lib/components/ui/Dialog.svelte";
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
@@ -20,59 +25,18 @@
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { get } from "svelte/store";
-  import {
-    resolveOpenIdAlreadyLinkedDispatcher,
-    resolveOpenIdNotConnectedDispatcher,
-  } from "./AuthWizard.gating";
-
-  interface OpenIdNotConnectedArgs {
-    providerName: string;
-    providerLogo?: string;
-    userName?: string;
-    userEmail?: string;
-    resume: () => Promise<void>;
-    // Signal the dispatcher that the user dismissed the disambiguation
-    // dialog without committing — releases the picker's in-flight loader.
-    cancel: () => void;
-  }
-
-  interface OpenIdAlreadyLinkedArgs {
-    providerName: string;
-    providerLogo?: string;
-    userName?: string;
-    userEmail?: string;
-    signIn: () => Promise<void>;
-    cancel: () => void;
-  }
-
-  type NewProvider =
-    | { type: "passkey" }
-    | { type: "openid"; logo: string; name: string }
-    | { type: "sso"; name: string };
-
-  interface MethodSwitchArgs {
-    previous: LastUsedIdentity;
-    newProvider: NewProvider;
-    proceed: () => Promise<void>;
-  }
+  import IdentityNotConnected from "$lib/components/wizards/auth/views/IdentityNotConnected.svelte";
+  import IdentityAlreadyLinked from "$lib/components/wizards/auth/views/IdentityAlreadyLinked.svelte";
+  import SwitchAccessMethod from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
+  import { goto } from "$app/navigation";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
     onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
-    onOpenIdNotConnected?: (args: OpenIdNotConnectedArgs) => void;
-    onOpenIdAlreadyLinked?: (args: OpenIdAlreadyLinkedArgs) => void;
-    onMethodSwitch?: (args: MethodSwitchArgs) => void;
-    onSwitchMode?: () => void;
-    withinDialog?: boolean;
-    mode?: "signin" | "signup" | "both";
-    // Optional override for the picker's switch-mode CTA title — useful
-    // when the wizard is hosted inside a surface (e.g. /manage's Add
-    // identity dialog) where the default "New to Internet Identity?"
-    // copy is misleading.
-    switchModeTitle?: string;
-    children?: Snippet;
+    mode?: AuthMode;
+    children?: Snippet<[boolean?]>;
   }
 
   let {
@@ -80,51 +44,95 @@
     onSignUp,
     onUpgrade,
     onError,
-    onOpenIdNotConnected,
-    onOpenIdAlreadyLinked,
-    onMethodSwitch,
-    onSwitchMode,
-    withinDialog = false,
-    mode = "both",
-    switchModeTitle,
+    mode = $bindable("both"),
     children,
   }: Props = $props();
 
-  const methodType = (
-    m: LastUsedIdentity["authMethod"],
-  ): NewProvider["type"] =>
+  // Initial mode snapshot — restored when the wizard's own dialog closes
+  // so the parent's inline-mount state doesn't drift into a mode it never
+  // intended after a user self-elevated and toggled.
+  const initialMode = untrack(() => mode);
+
+  const authFlow = new AuthFlow();
+  $effect(() => {
+    authFlow.setMode(mode);
+  });
+
+  const inDialog: boolean = isInsideDialog();
+  let isElevated = $state(false);
+  let isContinueFromAnotherDeviceVisible = $state(false);
+  let isAuthenticating = $state(false);
+  let isUpgrading = $state(false);
+  let pendingSsoRegistration = false;
+
+  const methodType = (m: LastUsedIdentity["authMethod"]): MethodTag =>
     "passkey" in m ? "passkey" : "openid" in m ? "openid" : "sso";
 
-  const maybeInterceptMethodSwitch = (
-    identityNumber: bigint,
-    newProvider: NewProvider,
+  const maybeRequestMethodSwitch = (
+    signedInIdentityNumber: bigint,
+    newMethod: MethodTag,
     previousSnapshot: LastUsedIdentity | undefined,
+    providerInfo?: {
+      providerIssuer?: string;
+      providerDomain?: string;
+      providerName?: string;
+    },
   ): boolean => {
-    if (onMethodSwitch === undefined || previousSnapshot === undefined) {
-      return false;
-    }
-    if (methodType(previousSnapshot.authMethod) === newProvider.type) {
-      return false;
-    }
-    onMethodSwitch({
-      previous: previousSnapshot,
-      newProvider,
-      proceed: () => onSignIn(identityNumber),
+    if (previousSnapshot === undefined) return false;
+    if (methodType(previousSnapshot.authMethod) === newMethod) return false;
+    authFlow.requestMethodSwitch({
+      previousIdentityNumber: previousSnapshot.identityNumber,
+      newMethod,
+      signedInIdentityNumber,
+      ...providerInfo,
     });
     return true;
   };
 
-  const authFlow = new AuthFlow();
+  // In signup mode the toggle's "Already have an identity? Sign in" CTA
+  // is misleading when the user has none — hide it in that case. Signin
+  // mode's "New to Internet Identity? Sign up" is always useful.
+  const switchModeAvailable = $derived(
+    mode === "signin" ||
+      Object.keys($lastUsedIdentitiesStore.identities).length > 0,
+  );
 
-  let isContinueFromAnotherDeviceVisible = $state(false);
-  let isAuthenticating = $state(false);
-  let isUpgrading = $state(false);
-  // True while a deferred SSO registration is awaiting the name-entry view
-  // (`setupNewIdentity`). Used by `handleCompleteOpenIdRegistration` to
-  // dispatch to `completeSsoRegistration` instead of the direct-provider
-  // counterpart. Plain `let` (no `$state`) — only read inside async event
-  // handlers, never in the template, so reactivity isn't needed.
-  let pendingSsoRegistration = false;
+  const toggleMode = () => {
+    mode = mode === "signin" ? "signup" : "signin";
+    if (!inDialog) isElevated = true;
+  };
+
+  // Full reset — restores the wizard to its initial state. Fires when the
+  // user closes the wizard's outermost dialog (either standalone or
+  // self-elevated from an inline picker).
+  const reset = () => {
+    if (isAuthenticating) return;
+    isElevated = false;
+    pendingSsoRegistration = false;
+    mode = initialMode;
+    authFlow.chooseMethod();
+  };
+
+  // Sub-view cancel — clears the active sub-view but preserves mode and
+  // elevation. Fires when the user closes a sub-view dialog (e.g. OIDC
+  // disambiguation, method-switch confirmation) while the wizard sits
+  // inside a parent dialog and the user wants to keep the picker open.
+  const cancelSubView = () => {
+    if (isAuthenticating) return;
+    if (
+      authFlow.view === "openIdNotConnected" ||
+      authFlow.view === "openIdAlreadyLinked"
+    ) {
+      authFlow.cancelOpenIdDisambiguation();
+      pendingSsoRegistration = false;
+      return;
+    }
+    if (authFlow.view === "confirmMethodSwitch") {
+      authFlow.cancelMethodSwitch();
+      return;
+    }
+    authFlow.chooseMethod();
+  };
 
   const handleContinueWithExistingPasskey = async (): Promise<
     void | "cancelled"
@@ -134,9 +142,9 @@
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
       const identityNumber = await authFlow.continueWithExistingPasskey();
       if (
-        maybeInterceptMethodSwitch(
+        maybeRequestMethodSwitch(
           identityNumber,
-          { type: "passkey" },
+          "passkey",
           preSnapshot[identityNumber.toString()],
         )
       ) {
@@ -148,7 +156,7 @@
         isContinueFromAnotherDeviceVisible = true;
         return;
       }
-      onError(error); // Propagate unhandled errors to parent component
+      onError(error);
     } finally {
       isAuthenticating = false;
     }
@@ -165,7 +173,7 @@
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
       }
-      onError(error); // Propagate unhandled errors to parent component
+      onError(error);
     } finally {
       isAuthenticating = false;
     }
@@ -177,81 +185,25 @@
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
-      const result = await authFlow.continueWithOpenId(config);
+      const result = await authFlow.continueWithOpenId(config, undefined, mode);
+      if (result === undefined) {
+        // Disambiguation took over — AuthFlow set the view, dialog
+        // will render. Wizard exits the in-flight state.
+        return;
+      }
       if (result.type === "signIn") {
-        const dispatchAlreadyLinked = resolveOpenIdAlreadyLinkedDispatcher(
-          result.type,
-          mode,
-          onOpenIdAlreadyLinked,
-        );
-        if (dispatchAlreadyLinked !== undefined) {
-          const identityNumber = result.identityNumber;
-          // Stay in the in-flight state until the user commits (signIn) or
-          // dismisses (cancel); this keeps the picker's loader on the
-          // provider button instead of flashing back to the idle state
-          // while the disambiguation dialog is open.
-          return await new Promise<void | "cancelled">((resolve) => {
-            dispatchAlreadyLinked({
-              providerName: config.name,
-              providerLogo: config.logo,
-              userName: result.name,
-              userEmail: result.email,
-              signIn: async () => {
-                try {
-                  await onSignIn(identityNumber);
-                  resolve();
-                } catch (error) {
-                  onError(error);
-                  resolve();
-                }
-              },
-              cancel: () => resolve("cancelled"),
-            });
-          });
-        }
         if (
-          maybeInterceptMethodSwitch(
+          maybeRequestMethodSwitch(
             result.identityNumber,
-            { type: "openid", logo: config.logo, name: config.name },
+            "openid",
             preSnapshot[result.identityNumber.toString()],
+            { providerIssuer: config.issuer, providerName: config.name },
           )
         ) {
           return;
         }
         await onSignIn(result.identityNumber);
         return;
-      }
-      const dispatchNotConnected = resolveOpenIdNotConnectedDispatcher(
-        result.type,
-        mode,
-        onOpenIdNotConnected,
-      );
-      if (dispatchNotConnected !== undefined) {
-        pendingSsoRegistration = false;
-        return await new Promise<void | "cancelled">((resolve) => {
-          dispatchNotConnected({
-            providerName: config.name,
-            providerLogo: config.logo,
-            userName: result.name,
-            userEmail: result.email,
-            resume: async () => {
-              try {
-                if (result.name !== undefined) {
-                  await onSignUp(
-                    await authFlow.completeOpenIdRegistration(result.name),
-                  );
-                } else {
-                  authFlow.setupNewIdentity();
-                }
-                resolve();
-              } catch (error) {
-                onError(error);
-                resolve();
-              }
-            },
-            cancel: () => resolve("cancelled"),
-          });
-        });
       }
       if (result.name !== undefined) {
         await onSignUp(await authFlow.completeOpenIdRegistration(result.name));
@@ -263,62 +215,41 @@
       if (isOpenIdCancelError(error)) {
         return "cancelled";
       }
-      onError(error); // Propagate unhandled errors to parent component
+      onError(error);
     } finally {
       isAuthenticating = false;
     }
   };
 
   const handleContinueWithSso = async (
-    result: SsoDiscoveryResult,
+    ssoResult: SsoDiscoveryResult,
   ): Promise<void | "cancelled"> => {
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
-      const authResult = await authFlow.continueWithSso(result);
+      const authResult = await authFlow.continueWithSso(ssoResult, mode);
+      if (authResult === undefined) {
+        if (authFlow.view === "openIdNotConnected") {
+          pendingSsoRegistration = true;
+        }
+        return;
+      }
       if (authResult.type === "signIn") {
         if (
-          maybeInterceptMethodSwitch(
+          maybeRequestMethodSwitch(
             authResult.identityNumber,
-            { type: "sso", name: result.name ?? result.domain },
+            "sso",
             preSnapshot[authResult.identityNumber.toString()],
+            {
+              providerDomain: ssoResult.domain,
+              providerName: ssoResult.name ?? ssoResult.domain,
+            },
           )
         ) {
           return;
         }
         await onSignIn(authResult.identityNumber);
         return;
-      }
-      const dispatchNotConnected = resolveOpenIdNotConnectedDispatcher(
-        authResult.type,
-        mode,
-        onOpenIdNotConnected,
-      );
-      if (dispatchNotConnected !== undefined) {
-        return await new Promise<void | "cancelled">((resolve) => {
-          dispatchNotConnected({
-            providerName: result.name ?? result.domain,
-            userName: authResult.name,
-            userEmail: authResult.email,
-            resume: async () => {
-              try {
-                if (authResult.name !== undefined) {
-                  await onSignUp(
-                    await authFlow.completeSsoRegistration(authResult.name),
-                  );
-                } else {
-                  pendingSsoRegistration = true;
-                  authFlow.setupNewIdentity();
-                }
-                resolve();
-              } catch (error) {
-                onError(error);
-                resolve();
-              }
-            },
-            cancel: () => resolve("cancelled"),
-          });
-        });
       }
       if (authResult.name !== undefined) {
         await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
@@ -348,7 +279,50 @@
         await onSignUp(await authFlow.completeOpenIdRegistration(name));
       }
     } catch (error) {
-      onError(error); // Propagate unhandled errors to parent component
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
+  const handleConfirmOpenIdSignUp = async (): Promise<void> => {
+    try {
+      isAuthenticating = true;
+      const result = await authFlow.confirmOpenIdSignUp();
+      if (result !== "needs-name") {
+        await onSignUp(result);
+      }
+    } catch (error) {
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
+  const handleConfirmOpenIdSignIn = async (): Promise<void> => {
+    try {
+      isAuthenticating = true;
+      const identityNumber = authFlow.confirmOpenIdSignIn();
+      await onSignIn(identityNumber);
+    } catch (error) {
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
+  const handleRecoverFromNotConnected = (): void => {
+    authFlow.cancelOpenIdDisambiguation();
+    void goto("/recovery");
+  };
+
+  const handleConfirmMethodSwitch = async (): Promise<void> => {
+    try {
+      isAuthenticating = true;
+      const identityNumber = authFlow.confirmMethodSwitch();
+      await onSignIn(identityNumber);
+    } catch (error) {
+      onError(error);
     } finally {
       isAuthenticating = false;
     }
@@ -359,7 +333,7 @@
   };
 </script>
 
-{#snippet dialogContent()}
+{#snippet activeView()}
   {#if authFlow.view === "setupOrUseExistingPasskey"}
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
@@ -375,61 +349,104 @@
       continueWithSso={handleContinueWithSso}
       goBack={authFlow.chooseMethod}
     />
+  {:else if authFlow.view === "openIdNotConnected"}
+    <IdentityNotConnected
+      issuer={authFlow.configIssuer}
+      providerName={authFlow.providerName}
+      providerLogo={authFlow.providerLogo}
+      userName={authFlow.userName}
+      userEmail={authFlow.userEmail}
+      onSignUp={handleConfirmOpenIdSignUp}
+      onRecover={handleRecoverFromNotConnected}
+      loading={isAuthenticating}
+    />
+  {:else if authFlow.view === "openIdAlreadyLinked"}
+    <IdentityAlreadyLinked
+      issuer={authFlow.configIssuer}
+      providerName={authFlow.providerName}
+      providerLogo={authFlow.providerLogo}
+      userName={authFlow.userName}
+      userEmail={authFlow.userEmail}
+      onSignIn={handleConfirmOpenIdSignIn}
+      loading={isAuthenticating}
+    />
+  {:else if authFlow.view === "confirmMethodSwitch" && authFlow.pendingMethodSwitch !== undefined}
+    <SwitchAccessMethod
+      previousIdentityNumber={authFlow.pendingMethodSwitch
+        .previousIdentityNumber}
+      newMethod={authFlow.pendingMethodSwitch.newMethod}
+      providerIssuer={authFlow.pendingMethodSwitch.providerIssuer}
+      providerName={authFlow.pendingMethodSwitch.providerName}
+      onSwitch={handleConfirmMethodSwitch}
+    />
   {/if}
 {/snippet}
 
-{#if authFlow.captcha !== undefined}
-  <SolveCaptcha {...authFlow.captcha} />
-{:else if withinDialog && isContinueFromAnotherDeviceVisible}
-  <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
-{:else if withinDialog && isUpgrading}
-  <MigrationWizard onSuccess={onUpgrade} {onError} />
-{:else}
-  {#if authFlow.view === "chooseMethod" || !withinDialog}
-    {@render children?.()}
-    <PickAuthenticationMethod
-      setupOrUseExistingPasskey={mode === "signin"
-        ? handleContinueWithExistingPasskey
-        : mode === "signup"
-          ? authFlow.setupNewPasskey
-          : authFlow.setupOrUseExistingPasskey}
-      continueWithOpenId={handleContinueWithOpenId}
-      signInWithSso={authFlow.signInWithSso}
-      {mode}
-      {onSwitchMode}
-      {withinDialog}
-      {switchModeTitle}
-    />
-  {/if}
-  {#if authFlow.view !== "chooseMethod"}
-    {#if !withinDialog}
-      {#if !isContinueFromAnotherDeviceVisible && !isUpgrading}
-        <Dialog
-          onClose={() => {
-            if (isAuthenticating) {
-              return;
-            }
-            pendingSsoRegistration = false;
-            authFlow.chooseMethod();
-          }}
-        >
-          {@render dialogContent()}
-        </Dialog>
-      {/if}
-    {:else}
-      {@render dialogContent()}
-    {/if}
-  {/if}
-{/if}
+{#snippet pickerBlock()}
+  {#key mode}
+    <div in:fade={{ duration: 150 }}>
+      {@render children?.(inDialog || isElevated)}
+    </div>
+  {/key}
+  <PickAuthenticationMethod
+    setupOrUseExistingPasskey={mode === "signin"
+      ? handleContinueWithExistingPasskey
+      : mode === "signup"
+        ? authFlow.setupNewPasskey
+        : authFlow.setupOrUseExistingPasskey}
+    continueWithOpenId={handleContinueWithOpenId}
+    signInWithSso={authFlow.signInWithSso}
+    {mode}
+    onSwitchMode={switchModeAvailable ? toggleMode : undefined}
+    withinDialog={inDialog || isElevated}
+  />
+{/snippet}
 
-{#if !withinDialog && isContinueFromAnotherDeviceVisible}
-  <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
-    <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
-  </Dialog>
-{/if}
-{#if !withinDialog && isUpgrading}
-  <Dialog onClose={() => (isUpgrading = false)}>
-    <MigrationWizard onSuccess={onUpgrade} {onError} />
+<!-- Single persistent Dialog instance — content swaps reactively as the
+     wizard's view changes. Prevents remount races between captcha and
+     post-captcha views when SvelteKit navigation interleaves with the
+     Dialog's onNavigate outro-pause. -->
+{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined && !isContinueFromAnotherDeviceVisible && !isUpgrading}
+  {@render pickerBlock()}
+{:else}
+  {@const dialogOnClose =
+    authFlow.captcha !== undefined
+      ? undefined
+      : isContinueFromAnotherDeviceVisible
+        ? () => (isContinueFromAnotherDeviceVisible = false)
+        : isUpgrading
+          ? () => (isUpgrading = false)
+          : authFlow.view !== "chooseMethod"
+            ? cancelSubView
+            : reset}
+  <!-- Passthrough only when the wizard is showing the picker inside a
+       parent Dialog — we don't want a redundant inner <dialog> wrapping
+       the picker in that case. For sub-views (captcha, disambiguation,
+       upgrade, continue-on-another-device) the wizard stacks its own
+       Dialog on top, so its Close button cancels just the sub-view
+       instead of the entire parent modal. -->
+  {@const passthrough =
+    inDialog &&
+    authFlow.view === "chooseMethod" &&
+    authFlow.captcha === undefined &&
+    !isContinueFromAnotherDeviceVisible &&
+    !isUpgrading}
+  <Dialog
+    onClose={dialogOnClose}
+    {passthrough}
+    data-testid="auth-wizard-dialog"
+  >
+    {#if authFlow.captcha !== undefined}
+      <SolveCaptcha {...authFlow.captcha} />
+    {:else if isContinueFromAnotherDeviceVisible}
+      <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
+    {:else if isUpgrading}
+      <MigrationWizard onSuccess={onUpgrade} {onError} />
+    {:else if authFlow.view === "chooseMethod"}
+      {@render pickerBlock()}
+    {:else}
+      {@render activeView()}
+    {/if}
   </Dialog>
 {/if}
 

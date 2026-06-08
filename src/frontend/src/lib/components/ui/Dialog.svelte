@@ -1,10 +1,19 @@
+<script lang="ts" module>
+  import { getContext } from "svelte";
+
+  export const isInsideDialog = (): boolean => getContext("inDialog") === true;
+</script>
+
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, setContext } from "svelte";
   import { scale, fly } from "svelte/transition";
   import type { ClassValue, HTMLAttributes } from "svelte/elements";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { onNavigate } from "$app/navigation";
+
+  const nested = getContext("inDialog") === true;
+  setContext("inDialog", true);
 
   type DialogWidth = "normal" | "wider" | "extra";
 
@@ -17,6 +26,11 @@
     /** Desktop (sm+) width preset. Applied to both the positioning `<dialog>`
      *  and the inner card so they stay in sync. */
     width?: DialogWidth;
+    /** Render children inline instead of inside a `<dialog>` — used by
+     *  consumers that need to opt out of dialog chrome when nested inside
+     *  another `<Dialog>`. Default false: nested dialogs still stack
+     *  natively, which is what most callers want. */
+    passthrough?: boolean;
   };
 
   const {
@@ -28,6 +42,7 @@
     backdrop = true,
     contentClass,
     width = "normal",
+    passthrough = false,
     ...props
   }: Props = $props();
 
@@ -61,6 +76,11 @@
 
   onNavigate((navigation) => {
     if (navigation.to?.url.pathname === navigation.from?.url.pathname) return;
+    // Nested Dialogs render as a passthrough with no <dialog> element, so
+    // the outro that resolves `resolveNavigation` never fires — leaving
+    // SvelteKit waiting forever. Only the outermost Dialog should pause
+    // navigation; the ancestor handles the outro for the whole stack.
+    if (nested) return;
     isOpen = false;
     return new Promise<void>((resolve) => {
       resolveNavigation = resolve;
@@ -132,7 +152,9 @@
   On both layouts, spacer elements push the content above the software
   keyboard and safe-area insets.
 -->
-{#if isOpen}
+{#if passthrough}
+  {@render children?.()}
+{:else if isOpen}
   <dialog
     bind:this={dialogRef}
     oncancel={onCancel}

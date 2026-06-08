@@ -2,24 +2,39 @@
   import { t } from "$lib/stores/locale.store";
   import { InfoIcon, UserIcon } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { findConfig } from "$lib/utils/openID";
 
   interface Props {
-    providerName: string;
+    issuer?: string;
+    providerName?: string;
     providerLogo?: string;
-    userName: string;
+    userName?: string;
     userEmail?: string;
     onSignIn: () => void;
     loading?: boolean;
   }
 
   let {
-    providerName,
-    providerLogo,
+    issuer,
+    providerName: providerNameProp,
+    providerLogo: providerLogoProp,
     userName,
     userEmail,
     onSignIn,
     loading = false,
   }: Props = $props();
+
+  const config = $derived(
+    issuer === undefined ? undefined : findConfig(issuer, undefined, []),
+  );
+  const resolvedProviderName = $derived(config?.name ?? providerNameProp ?? "");
+  const resolvedProviderLogo = $derived(config?.logo ?? providerLogoProp);
+  const resolvedUserName = $derived(
+    userName ?? userEmail ?? resolvedProviderName,
+  );
+  const resolvedUserEmail = $derived(
+    userName !== undefined ? userEmail : undefined,
+  );
 </script>
 
 <div class="flex flex-col">
@@ -30,7 +45,7 @@
       {$t`Already connected`}
     </h2>
     <p class="text-text-tertiary mt-2 max-w-80 text-sm leading-5">
-      {$t`This ${providerName} account is already connected to an Internet Identity.`}
+      {$t`This ${resolvedProviderName} account is already connected to an Internet Identity.`}
     </p>
   </div>
 
@@ -41,23 +56,25 @@
       >
         <UserIcon class="size-7" aria-hidden="true" />
       </span>
-      {#if providerLogo !== undefined}
+      {#if resolvedProviderLogo !== undefined}
         <span
           class="bg-bg-primary_alt border-border-secondary absolute -inset-e-1 -bottom-1 flex size-8 items-center justify-center rounded-full border"
         >
           <span class="size-5">
-            <!-- eslint-disable-next-line svelte/no-at-html-tags -- providerLogo is a trusted SVG string from openid_configs -->
-            {@html providerLogo}
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -- logo is a trusted SVG string from openid_configs -->
+            {@html resolvedProviderLogo}
           </span>
         </span>
       {/if}
     </span>
     <div class="mt-2 text-center">
       <div class="text-text-primary text-base leading-tight font-semibold">
-        {userName}
+        {resolvedUserName}
       </div>
-      {#if userEmail !== undefined}
-        <div class="text-text-tertiary mt-0.5 text-[13px]">{userEmail}</div>
+      {#if resolvedUserEmail !== undefined}
+        <div class="text-text-tertiary mt-0.5 text-[13px]">
+          {resolvedUserEmail}
+        </div>
       {/if}
     </div>
     <span

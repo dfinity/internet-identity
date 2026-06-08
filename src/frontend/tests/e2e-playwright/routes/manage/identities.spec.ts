@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
+import { IdentityWizard } from "../../fixtures/identity";
 import { II_URL } from "../../utils";
 
 test.describe("Manage identities", () => {
@@ -93,6 +94,32 @@ test.describe("Manage identities", () => {
         await dialog.close();
       });
     });
+  });
+});
+
+test.describe("Add identity from /manage", () => {
+  test.use({
+    identityConfig: {
+      createIdentities: [{ name: "Alice" }],
+    },
+  });
+
+  test("Add identity button opens the wizard and completes a passkey sign-up", async ({
+    page,
+    identities,
+    signInWithIdentity,
+  }) => {
+    await page.goto(II_URL);
+    await signInWithIdentity(page, identities[0].identityNumber);
+
+    // `IdentityWizard.signUp` handles opening the picker (popover → Add
+    // identity → modal) and the full sign-up flow on any surface.
+    const wizard = new IdentityWizard(page);
+    await wizard.signUp("Bob");
+
+    // After registration the new identity becomes the active one — the
+    // /manage layout's `identityInfo.name` flows into the page header.
+    await expect(page.getByText("Bob", { exact: true })).toBeVisible();
   });
 });
 

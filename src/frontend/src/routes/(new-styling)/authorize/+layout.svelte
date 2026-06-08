@@ -17,17 +17,8 @@
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import {
-    AuthWizard,
-    SignUpHero,
-    IdentityNotConnected,
-    IdentityAlreadyLinked,
-    SwitchAccessMethod,
-  } from "$lib/components/wizards/auth";
-  import type { AccessMethod } from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
-  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import { backendCanisterConfig } from "$lib/globals";
-  import { getMetadataString } from "$lib/utils/openID";
+  import { AuthWizard } from "$lib/components/wizards/auth";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -131,51 +122,9 @@
   let identityButtonRef = $state<HTMLElement>();
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
-  let isCreateIdentityDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
-  let signUpOpenedFromSignInModal = $state(false);
-
-  let notConnectedPayload = $state<{
-    providerName: string;
-    providerLogo?: string;
-    userName?: string;
-    userEmail?: string;
-    resume: () => Promise<void>;
-    cancel: () => void;
-  }>();
-  let isResumingRegistration = $state(false);
-  let alreadyLinkedPayload = $state<{
-    providerName: string;
-    providerLogo?: string;
-    userName?: string;
-    userEmail?: string;
-    signIn: () => Promise<void>;
-    cancel: () => void;
-  }>();
-  let isSigningInAlreadyLinked = $state(false);
-  let methodSwitchPayload = $state<{
-    previous: LastUsedIdentity;
-    newProvider: AccessMethod;
-    proceed: () => Promise<void>;
-  }>();
-
-  const authMethodToAccessMethod = (
-    m: LastUsedIdentity["authMethod"],
-  ): AccessMethod => {
-    if ("passkey" in m) return { type: "passkey" };
-    if ("openid" in m) {
-      const config = backendCanisterConfig.openid_configs[0]?.find(
-        (c) => c.issuer === m.openid.iss,
-      );
-      return {
-        type: "openid",
-        logo: config?.logo ?? "",
-        name: config?.name ?? m.openid.iss,
-      };
-    }
-    return { type: "sso", name: m.sso.name ?? m.sso.domain };
-  };
+  let authDialogMode = $state<AuthMode>("signin");
 
   const handleSignIn = async (identityNumber: bigint) => {
     try {
@@ -190,8 +139,6 @@
     } finally {
       isIdentityPopoverOpen = false;
       isAuthDialogOpen = false;
-      isCreateIdentityDialogOpen = false;
-      signUpOpenedFromSignInModal = false;
       isAuthenticating = false;
     }
   };
@@ -341,6 +288,7 @@
                   return;
                 }
                 isAuthDialogOpen = false;
+                authDialogMode = "signin";
               }}
             >
               <AuthWizard
@@ -352,59 +300,16 @@
                   isAuthenticating = false;
                   handleError(error);
                 }}
-                onOpenIdNotConnected={(args) => (notConnectedPayload = args)}
-                onMethodSwitch={(args) => (methodSwitchPayload = args)}
-                onSwitchMode={() => {
-                  signUpOpenedFromSignInModal = true;
-                  isAuthDialogOpen = false;
-                  isCreateIdentityDialogOpen = true;
-                }}
-                withinDialog
-                mode="signin"
+                bind:mode={authDialogMode}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
                 >
-                  {$t`Sign in`}
+                  {authDialogMode === "signup" ? $t`Sign up` : $t`Sign in`}
                 </h1>
                 <p class="text-text-secondary mb-6 self-start text-sm">
                   {$t`Choose method to continue`}
                 </p>
-              </AuthWizard>
-            </Dialog>
-          {/if}
-          {#if isCreateIdentityDialogOpen}
-            <Dialog
-              onClose={() => {
-                if (isAuthenticating) {
-                  return;
-                }
-                isCreateIdentityDialogOpen = false;
-                signUpOpenedFromSignInModal = false;
-              }}
-            >
-              <AuthWizard
-                onSignIn={handleSignIn}
-                onSignUp={handleSignUp}
-                onUpgrade={handleUpgrade}
-                onError={(error) => {
-                  isCreateIdentityDialogOpen = false;
-                  isAuthenticating = false;
-                  handleError(error);
-                }}
-                onMethodSwitch={(args) => (methodSwitchPayload = args)}
-                onOpenIdAlreadyLinked={(args) => (alreadyLinkedPayload = args)}
-                onSwitchMode={() => {
-                  isCreateIdentityDialogOpen = false;
-                  if (signUpOpenedFromSignInModal) {
-                    signUpOpenedFromSignInModal = false;
-                    isAuthDialogOpen = true;
-                  }
-                }}
-                withinDialog
-                mode="signup"
-              >
-                <SignUpHero />
               </AuthWizard>
             </Dialog>
           {/if}
@@ -425,108 +330,6 @@
       <ManageIdentities
         identities={lastUsedIdentities}
         onRemoveIdentity={handleRemoveIdentity}
-      />
-    </Dialog>
-  {/if}
-
-  {#if notConnectedPayload !== undefined}
-    {@const payload = notConnectedPayload}
-    <Dialog
-      onClose={() => {
-        if (isAuthenticating || isResumingRegistration) {
-          return;
-        }
-        payload.cancel();
-        notConnectedPayload = undefined;
-      }}
-    >
-      <IdentityNotConnected
-        providerName={payload.providerName}
-        providerLogo={payload.providerLogo}
-        userName={payload.userName ?? payload.userEmail ?? payload.providerName}
-        userEmail={payload.userName !== undefined
-          ? payload.userEmail
-          : undefined}
-        loading={isResumingRegistration}
-        onSignUp={async () => {
-          isResumingRegistration = true;
-          try {
-            await payload.resume();
-          } finally {
-            isResumingRegistration = false;
-            notConnectedPayload = undefined;
-          }
-        }}
-        onRecover={() => {
-          payload.cancel();
-          notConnectedPayload = undefined;
-          void goto("/recovery");
-        }}
-      />
-    </Dialog>
-  {/if}
-
-  {#if alreadyLinkedPayload !== undefined}
-    {@const payload = alreadyLinkedPayload}
-    <Dialog
-      onClose={() => {
-        if (isAuthenticating || isSigningInAlreadyLinked) {
-          return;
-        }
-        payload.cancel();
-        alreadyLinkedPayload = undefined;
-      }}
-    >
-      <IdentityAlreadyLinked
-        providerName={payload.providerName}
-        providerLogo={payload.providerLogo}
-        userName={payload.userName ?? payload.userEmail ?? payload.providerName}
-        userEmail={payload.userName !== undefined
-          ? payload.userEmail
-          : undefined}
-        loading={isSigningInAlreadyLinked}
-        onSignIn={async () => {
-          isSigningInAlreadyLinked = true;
-          try {
-            await payload.signIn();
-          } finally {
-            isSigningInAlreadyLinked = false;
-            alreadyLinkedPayload = undefined;
-          }
-        }}
-      />
-    </Dialog>
-  {/if}
-
-  {#if methodSwitchPayload !== undefined}
-    {@const payload = methodSwitchPayload}
-    {@const previous = payload.previous}
-    {@const previousEmail =
-      "openid" in previous.authMethod &&
-      previous.authMethod.openid.metadata !== undefined
-        ? getMetadataString(previous.authMethod.openid.metadata, "email")
-        : "sso" in previous.authMethod
-          ? previous.authMethod.sso.email
-          : undefined}
-    <Dialog
-      onClose={() => {
-        const proceed = payload.proceed;
-        methodSwitchPayload = undefined;
-        void proceed();
-      }}
-    >
-      <SwitchAccessMethod
-        userName={previous.name ??
-          previousEmail ??
-          `${previous.identityNumber}`}
-        userEmail={previous.name !== undefined ? previousEmail : undefined}
-        fromMethod={authMethodToAccessMethod(previous.authMethod)}
-        toMethod={payload.newProvider}
-        onSwitch={() => {
-          const proceed = payload.proceed;
-          methodSwitchPayload = undefined;
-          void proceed();
-        }}
       />
     </Dialog>
   {/if}
