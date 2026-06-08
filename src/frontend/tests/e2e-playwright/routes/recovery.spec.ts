@@ -1,7 +1,15 @@
 import { test as base } from "../fixtures";
 import { expect } from "@playwright/test";
 import { generateMnemonic } from "$lib/utils/recoveryPhrase";
-import { createActorForCredential, II_URL } from "../utils";
+import {
+  addVirtualAuthenticator,
+  addCredentialToVirtualAuthenticator,
+  createActorForCredential,
+  createLegacyCredential,
+  II_URL,
+  removeVirtualAuthenticator,
+  swapToLegacyOnlyIdentity,
+} from "../utils";
 
 /**
  * Replace the last word with the first different word found,
@@ -220,5 +228,44 @@ test.describe("Recovery flow", () => {
         name: [identities[0].name],
       });
     });
+  });
+});
+
+test.describe("Identity number recovery (MigrationWizard)", () => {
+  test("Completes the identity-number upgrade path and lands on /manage/access", async ({
+    page,
+    recoveryPage,
+    identities,
+  }) => {
+    const legacyCredential = await createLegacyCredential(page);
+
+    const actor = await createActorForCredential(
+      identities[0].host,
+      identities[0].canisterId,
+      identities[0].credentials[0],
+    );
+    await swapToLegacyOnlyIdentity(actor, identities[0], legacyCredential);
+
+    await recoveryPage.goto();
+
+    const authenticatorId = await addVirtualAuthenticator(page);
+    await addCredentialToVirtualAuthenticator(
+      page,
+      authenticatorId,
+      legacyCredential,
+    );
+
+    const upgradedName = identities[0].name + " (upgraded)";
+    await recoveryPage.startIdentityNumberUpgrade(async (wizard) => {
+      await wizard.enterIdentityNumber(identities[0].identityNumber);
+      await wizard.nameAndUpgrade(upgradedName);
+    });
+
+    await page.waitForURL(II_URL + "/manage/access");
+    await expect(
+      page.getByRole("heading", { name: "Access methods" }),
+    ).toBeVisible();
+
+    await removeVirtualAuthenticator(page, authenticatorId);
   });
 });
