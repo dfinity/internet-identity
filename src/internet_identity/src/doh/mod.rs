@@ -40,7 +40,7 @@ mod types;
 
 use std::cell::RefCell;
 
-use cache::DohCache;
+use cache::{new_doh_cache, DohCache};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
@@ -57,7 +57,7 @@ thread_local! {
     /// Per-canister DoH cache. Heap-only — losing it on upgrade is
     /// fine, the next `smtp_request` for an affected domain just
     /// re-fetches.
-    static DOH_CACHE: RefCell<DohCache> = RefCell::new(DohCache::default());
+    static DOH_CACHE: RefCell<DohCache> = RefCell::new(new_doh_cache());
 }
 
 // =====================================================================
@@ -399,7 +399,7 @@ pub(super) mod test_support {
     /// state. Call this at the top of every test that asserts on
     /// `call_count`.
     pub(super) fn reset_cache() {
-        DOH_CACHE.with(|c| *c.borrow_mut() = DohCache::default());
+        DOH_CACHE.with(|c| *c.borrow_mut() = new_doh_cache());
         MOCK_CALL_COUNT.with(|c| *c.borrow_mut() = 0);
     }
 
@@ -568,10 +568,16 @@ mod tests {
         let r1 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
         assert!(matches!(r1, Err(DohError::QuorumFailed { .. })));
 
-        // Failure must NOT poison the cache: a follow-up call (with
-        // different mock) should re-fetch and now succeed.
-        set_mock(&agreeing_dkim());
+        // A cold failure debounces: an immediate retry does NOT re-fan-out
+        // to the providers (it's within the retry backoff window).
         set_now(1_001);
+        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(call_count(), 1, "cold-failure refetch is debounced");
+
+        // But the failure is NOT permanently poisoned: past the backoff a
+        // follow-up call (with a different mock) re-fetches and succeeds.
+        set_mock(&agreeing_dkim());
+        set_now(1_000 + 61); // past DOH_RETRY_BASE_SECS (60 s)
         let r2 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
         assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
         assert_eq!(call_count(), 2);
@@ -674,8 +680,14 @@ mod tests {
         let r1 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
         assert_eq!(r1, Err(DohError::NoAnswer));
 
-        set_mock(&agreeing_dkim());
+        // A cold failure debounces: an immediate retry is throttled.
         set_now(1_001);
+        let _ = block_on(fetch_txt("_dmarc.example.com", "example.com"));
+        assert_eq!(call_count(), 1, "cold-failure refetch is debounced");
+
+        // Past the backoff, the failure isn't poisoned: re-fetch succeeds.
+        set_mock(&agreeing_dkim());
+        set_now(1_000 + 61); // past DOH_RETRY_BASE_SECS (60 s)
         let r2 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
         assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
         assert_eq!(call_count(), 2);

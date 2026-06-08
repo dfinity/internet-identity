@@ -1,57 +1,51 @@
-//! Single-flight TTL cache for IC canister code: a value map plus an
-//! in-flight marker set that deduplicates concurrent fills of the same
-//! key, and drives the waiting itself.
+//! Single-flight cache for IC canister code: stale-while-revalidate +
+//! stale-if-error, with concurrent-fill dedup, exponential-backoff retry,
+//! and an LRU size bound.
 //!
-//! Two responsibilities:
+//! [`get_or_fill`] is the entry point. Each key moves through these
+//! "temperatures" (see the SSO readiness doc §5.2.2 for the full picture):
 //!
-//! 1. **Cache** — keep a filled value around until it expires, so a
-//!    flurry of requests for the same key doesn't re-run the expensive
-//!    fill on every one. Entries carry an absolute `expires_at_secs`
-//!    wall-clock deadline; the caller chooses the TTL.
+//! - **Fresh** — a value cached within its `ttl`; returned with no fill.
+//! - **Stale** — past `ttl` but still within the stale window; the old
+//!   value is served while a refresh is attempted on demand (throttled by
+//!   the retry backoff).
+//! - **Cold** — nothing servable; the caller owns a (blocking) fill.
+//! - A fill/refresh **in flight** makes every concurrent caller wait and
+//!   converge on the same result.
 //!
-//! 2. **Single-flight dedup** — when several concurrent callers ask for
-//!    the same cold key, only the first runs the fill. The rest observe
-//!    an in-flight marker and wait for it to publish, rather than each
-//!    launching its own expensive fill.
+//! Two properties matter most:
 //!
-//! [`get_or_fill`] is the entry point: hand it the cache, a key, a clock,
-//! a TTL, and a fill future, and it returns the cached or freshly-filled
-//! value. Internally each lookup resolves to one of four "temperatures":
+//! 1. **Single-flight, uniform value.** Once a fill or refresh is in
+//!    flight, concurrent callers wait on it (polling from their own call
+//!    context — see "Why the waiter polls" below) and all receive the same
+//!    outcome: the fresh value on success, or the *same* stale value on
+//!    failure. An error only surfaces for a key with no servable value.
+//! 2. **Stale-while-revalidate / stale-if-error.** An expired value is not
+//!    evicted at `ttl`; it lingers through the stale window as a fallback,
+//!    replaced only by a successful refresh. A failed refresh keeps serving
+//!    it. The value is hard-evicted at `evict_at = last_success + ttl +
+//!    stale`, or earlier under LRU pressure.
 //!
-//! - **Warm** — a fresh value is cached; return it.
-//! - **Pending** — another caller is filling this key; yield a round and
-//!   re-check, bounded by [`MAX_WAIT_POLLS`].
-//! - **CoolingDown** — a recent fill *failed* and the configured retry
-//!   backoff hasn't elapsed; short-circuit without running the fill.
-//! - **Cold** — nothing fresh, no live fill, no active cooldown; run the
-//!   fill and publish.
+//! ## Failure backoff (debounce)
 //!
-//! ## Failure backoff (opt-in)
-//!
-//! By default a failed fill caches nothing and the key is immediately
-//! retryable — fine when the set of keys is bounded (e.g. an allowlist).
-//! For lazy fetches against an unbounded or attacker-influenced key space,
-//! that lets a steady stream of requests for a failing key spam one
-//! expensive fill (outcall) each. Construct the cache with
-//! [`SingleFlightCache::with_retry_backoff`] and a failed fill instead
-//! parks the key in a cooldown that grows on consecutive failures (capped),
-//! during which lookups short-circuit to [`CacheFillError::CoolingDown`]
-//! without running the fill. A success clears the cooldown.
+//! A failed fill does not retry on the next call; the key parks until
+//! `next_attempt = now + base * multiplier^(failures-1)` (reset on
+//! success). The entry lifetime is the bound and the reset: once the delay
+//! would push `next_attempt` past `evict_at`, the entry is evicted and the
+//! next call is a fresh cold fill. Cold-failure markers (no value) carry an
+//! `evict_at` too, so a never-succeeding key's backoff is bounded the same
+//! way and can't leak. With no backoff configured (the default) a failed
+//! fill is immediately retryable.
 //!
 //! ## Why the waiter polls instead of being woken
 //!
-//! A `Pending` waiter does **not** block on a shared future that the
-//! filler wakes. The canister runs a single wasm thread, and waking
-//! another call's task runs that task to completion *inside the filler's
-//! call context* — so the woken waiter's reply is routed to the wrong
-//! call (`ic0.msg_reply ... already replied`) and the real owner is left
-//! unreplied. Instead each waiter polls the cache from its OWN call
-//! context, yielding a round via a cheap management-canister round-trip
-//! ([`yield_round`]) between checks. The cache holds no `Waker`s and no
-//! shared futures precisely so that nothing drives one call's task from
-//! another's, and the [`get_or_fill`] loop releases the cache borrow
-//! before every `.await` (a borrow held across a yield would trap on the
-//! single-threaded executor).
+//! A waiter does not block on a shared future the filler wakes. The
+//! canister runs a single wasm thread, and waking another call's task runs
+//! it to completion *inside the filler's* call context — mis-routing the
+//! reply (`ic0.msg_reply ... already replied`). Instead each waiter polls
+//! from its OWN call context, yielding a cheap management-canister round
+//! ([`yield_round`]) between checks. The cache holds no `Waker`s and
+//! [`get_or_fill`] releases the cache borrow before every `.await`.
 
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -65,237 +59,211 @@ use std::thread::LocalKey;
 ///
 /// The IC commits state changes made *before* an `.await`, so if a
 /// filler's post-yield continuation traps its in-flight marker survives,
-/// and later arrivals would otherwise wait on it forever; the staleness
-/// window lets one take the fill over. Pick a value comfortably longer
-/// than a healthy fill takes but short enough that a genuinely wedged
-/// fill clears within a few retries. 120 s suits a fill bounded by a
-/// handful of HTTP outcalls; tune it per use case with
-/// [`SingleFlightCache::new`].
+/// and later arrivals would otherwise wait on it forever; this window lets
+/// one take the fill over. 120 s is comfortably longer than any plausible
+/// HTTP-outcall round trip yet quick enough that a genuinely stuck entry
+/// clears within a couple of retries.
 pub const DEFAULT_PENDING_STALE_AFTER_SECS: u64 = 120;
 
-/// Upper bound on how many times a waiter polls before giving up with
-/// [`CacheFillError::WaitTimedOut`]. Each poll yields one round via
-/// [`yield_round`], so this is ~100 rounds of patience — far more than a
-/// healthy fill needs — and bounds the wait so a wedged fill can't pin a
-/// waiter indefinitely. The post-staleness takeover (see
-/// [`DEFAULT_PENDING_STALE_AFTER_SECS`]) is the real recovery path; this
-/// is just a backstop against an unbounded poll loop.
+/// Upper bound on how many times a waiter polls before giving up. Each poll
+/// yields one round via [`yield_round`]; on giving up the waiter falls back
+/// to a stale value if one exists, else [`CacheFillError::WaitTimedOut`].
 const MAX_WAIT_POLLS: u32 = 100;
 
-/// One cache entry — the value and the wall-clock time at which it goes
-/// stale.
-struct Entry<V> {
-    value: V,
-    expires_at_secs: u64,
-}
-
-/// Marker for an in-flight fill. `fill_id` identifies *this* attempt so
-/// [`SingleFlightCache::publish`] can tell whether a stale-takeover has
-/// since replaced it; `started_at_secs` drives the staleness check.
-struct InFlight {
-    fill_id: u64,
-    started_at_secs: u64,
-}
-
-/// Exponential backoff schedule for the failure path. With it configured,
-/// a failed fill parks its key in a cooldown of
-/// `min(base_secs * multiplier^(attempts - 1), max_secs)` seconds, growing
-/// each consecutive failure and capped at `max_secs`. A success resets the
-/// count.
+/// Exponential backoff for the failure path: `delay = base_secs *
+/// multiplier^(consecutive_failures - 1)`, reset on success. No explicit
+/// cap — the entry lifetime (`evict_at`) bounds and resets it.
 #[derive(Clone, Copy)]
 pub struct RetryBackoff {
     base_secs: u64,
     multiplier: u64,
-    max_secs: u64,
 }
 
 impl RetryBackoff {
     /// Build a backoff schedule. The first failure waits `base_secs`; each
-    /// further consecutive failure multiplies the wait by `multiplier`,
-    /// capped at `max_secs`.
-    ///
-    /// Part of the opt-in backoff API; no non-test caller yet (DoH, the
-    /// first consumer, uses the default no-backoff cache).
-    #[allow(dead_code)]
-    pub fn new(base_secs: u64, multiplier: u64, max_secs: u64) -> Self {
+    /// further consecutive failure multiplies the wait by `multiplier`.
+    pub fn new(base_secs: u64, multiplier: u64) -> Self {
         Self {
             base_secs,
             multiplier,
-            max_secs,
         }
     }
 
-    /// Cooldown length for the `attempts`-th consecutive failure
-    /// (`attempts` is 1-based). Saturating throughout — a large attempt
-    /// count clamps to `max_secs` rather than overflowing.
-    fn cooldown_secs(&self, attempts: u32) -> u64 {
+    /// Debounce delay for the `failures`-th consecutive failure (1-based).
+    /// Saturating throughout — a large failure count clamps rather than
+    /// overflowing; the entry's `evict_at` caps the effective wait anyway.
+    fn delay_secs(&self, failures: u32) -> u64 {
         let factor = self
             .multiplier
-            .checked_pow(attempts.saturating_sub(1))
+            .checked_pow(failures.saturating_sub(1))
             .unwrap_or(u64::MAX);
-        self.base_secs.saturating_mul(factor).min(self.max_secs)
+        self.base_secs.saturating_mul(factor)
     }
 }
 
-/// A parked failure: how many consecutive fills have failed and the
-/// wall-clock time before which the key must not be retried.
-struct Cooldown {
-    attempts: u32,
-    retry_not_before_secs: u64,
+/// One cache record. `value` is `Some` after a success (fresh or stale) and
+/// `None` for a cold-failure marker. Timing is absolute wall-clock seconds.
+struct Entry<V> {
+    value: Option<V>,
+    /// Fresh while `now < fresh_until_secs` (only meaningful with a value).
+    fresh_until_secs: u64,
+    /// Hard-evict at/after this (`last_success + ttl + stale`, or for a
+    /// cold-failure marker `failure_time + ttl + stale`).
+    evict_at_secs: u64,
+    /// Earliest a (re)fill may run — the failure-backoff throttle.
+    next_attempt_secs: u64,
+    /// Consecutive failures, for the backoff. Reset to 0 on success.
+    failures: u32,
+    /// Monotonic access stamp for LRU eviction.
+    last_access: u64,
+}
+
+/// Marker for an in-flight fill. `fill_id` identifies *this* attempt so
+/// [`SingleFlightCache::publish`] can tell whether a stale-takeover
+/// replaced it; `started_at_secs` drives the staleness check.
+struct InFlight {
+    fill_id: u64,
+    started_at_secs: u64,
 }
 
 /// In-memory single-flight cache keyed by `K`, holding values of type `V`.
 pub struct SingleFlightCache<K, V> {
     entries: HashMap<K, Entry<V>>,
     in_flight: HashMap<K, InFlight>,
-    cooldowns: HashMap<K, Cooldown>,
     next_fill_id: u64,
-    /// How long an in-flight marker may sit before a new arrival presumes
-    /// it abandoned and takes the fill over. See
-    /// [`DEFAULT_PENDING_STALE_AFTER_SECS`].
+    /// Monotonic counter stamped onto entries on access, for LRU.
+    access_clock: u64,
+    /// Extra time a value is served past `ttl` (stale-while-revalidate).
+    stale_secs: u64,
+    /// Hard cap on entries; over it, the least-recently-used is evicted.
+    max_entries: usize,
+    /// Failure backoff; `None` means immediately retryable.
+    backoff: Option<RetryBackoff>,
+    /// See [`DEFAULT_PENDING_STALE_AFTER_SECS`].
     pending_stale_after_secs: u64,
-    /// Failure backoff. `None` (the default) means a failed fill caches
-    /// nothing and is immediately retryable.
-    retry_backoff: Option<RetryBackoff>,
 }
 
 impl<K, V> SingleFlightCache<K, V> {
-    /// Create a cache whose in-flight markers are presumed abandoned after
-    /// `pending_stale_after_secs` (see [`DEFAULT_PENDING_STALE_AFTER_SECS`]
-    /// for guidance on the value). No failure backoff: a failed fill is
-    /// immediately retryable — add one with [`Self::with_retry_backoff`].
-    pub fn new(pending_stale_after_secs: u64) -> Self {
+    /// A cache with no stale window, no size bound, and no failure backoff
+    /// — a failed fill caches nothing and is immediately retryable. Use the
+    /// `with_*` builders to opt into stale-serving, an LRU cap, and backoff.
+    pub fn new() -> Self {
         Self {
             entries: HashMap::new(),
             in_flight: HashMap::new(),
-            cooldowns: HashMap::new(),
             next_fill_id: 0,
-            pending_stale_after_secs,
-            retry_backoff: None,
+            access_clock: 0,
+            stale_secs: 0,
+            max_entries: usize::MAX,
+            backoff: None,
+            pending_stale_after_secs: DEFAULT_PENDING_STALE_AFTER_SECS,
         }
     }
 
-    /// Park a failed fill's key in a growing, capped cooldown (see
-    /// [`RetryBackoff`]) instead of allowing an immediate retry. Use this
-    /// for lazy fetches against an unbounded key space, where immediate
-    /// retry of a persistently failing key would spam the fill.
-    ///
-    /// Part of the opt-in backoff API; no non-test caller yet (DoH, the
-    /// first consumer, uses the default no-backoff cache).
-    #[allow(dead_code)]
+    /// Serve an expired value for `stale_secs` past its `ttl` while a
+    /// refresh is attempted (stale-while-revalidate / stale-if-error).
+    pub fn with_stale_secs(mut self, stale_secs: u64) -> Self {
+        self.stale_secs = stale_secs;
+        self
+    }
+
+    /// Cap the cache at `max_entries`; over it, evict the least-recently-
+    /// used entry. Protects a hot key from a churn of one-off keys.
+    pub fn with_max_entries(mut self, max_entries: usize) -> Self {
+        self.max_entries = max_entries.max(1);
+        self
+    }
+
+    /// Debounce a failed fill with exponential backoff (see [`RetryBackoff`])
+    /// instead of allowing an immediate retry.
     pub fn with_retry_backoff(mut self, backoff: RetryBackoff) -> Self {
-        self.retry_backoff = Some(backoff);
+        self.backoff = Some(backoff);
+        self
+    }
+
+    /// Override the in-flight staleness window
+    /// ([`DEFAULT_PENDING_STALE_AFTER_SECS`]).
+    #[allow(dead_code)]
+    pub fn with_pending_stale_after_secs(mut self, secs: u64) -> Self {
+        self.pending_stale_after_secs = secs;
         self
     }
 }
 
 impl<K, V> Default for SingleFlightCache<K, V> {
-    /// A cache with the default staleness window
-    /// ([`DEFAULT_PENDING_STALE_AFTER_SECS`]) and no failure backoff.
     fn default() -> Self {
-        Self::new(DEFAULT_PENDING_STALE_AFTER_SECS)
+        Self::new()
     }
 }
 
-impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
-    /// Insert a value that expires at the given wall-clock time.
-    fn insert(&mut self, key: K, value: V, expires_at_secs: u64) {
-        self.entries.insert(
-            key,
-            Entry {
-                value,
-                expires_at_secs,
-            },
-        );
-    }
-
-    /// Decide what an incoming request for `key` should do:
-    ///
-    /// - [`CacheState::Warm`]`(value)` — cache fresh, use immediately.
-    /// - [`CacheState::Pending`] — another caller is filling this key.
-    ///   Returned only for a *fresh* in-flight marker.
-    /// - [`CacheState::CoolingDown`] — a recent fill failed and the
-    ///   [`RetryBackoff`] cooldown for this key hasn't elapsed; the caller
-    ///   must not run the fill yet. Only possible when a backoff is
-    ///   configured.
-    /// - [`CacheState::Cold`]`(token)` — you own the fill; do the work,
-    ///   then call [`Self::publish`] with the token. Returned when there's
-    ///   no in-flight marker, or the existing one is older than the
-    ///   configured staleness window (presumed abandoned — you take it
-    ///   over). Marks a fresh in-flight entry for you.
-    ///
-    /// Also opportunistically evicts the looked-up value entry if it's
-    /// expired — keeps the cache from accumulating dead entries for keys
-    /// queried once and then gone silent.
+impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
+    /// Decide what an incoming request for `key` should do. See the module
+    /// docs for the state semantics. Drops a fully-dead entry, honours the
+    /// in-flight dedup (uniform wait), and otherwise classifies the entry
+    /// as fresh / stale-serve / stale-refresh-due / cooling-down / cold.
     fn lookup<Q>(&mut self, key: &Q, now_secs: u64) -> CacheState<V>
     where
         K: Borrow<Q>,
         Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
         V: Clone,
     {
-        if let Some(entry) = self.entries.get(key) {
-            if entry.expires_at_secs > now_secs {
-                return CacheState::Warm(entry.value.clone());
-            }
-            // Expired: drop it now rather than waiting for a publish to
-            // overwrite — most expired entries never see a republish.
+        // Drop a fully-dead entry so the rest reasons over a live one.
+        if self
+            .entries
+            .get(key)
+            .is_some_and(|e| now_secs >= e.evict_at_secs)
+        {
             self.entries.remove(key);
         }
-        if let Some(inflight) = self.in_flight.get(key) {
-            let age = now_secs.saturating_sub(inflight.started_at_secs);
-            if age < self.pending_stale_after_secs {
-                return CacheState::Pending;
+
+        let inflight_fresh = self.in_flight.get(key).is_some_and(|f| {
+            now_secs.saturating_sub(f.started_at_secs) < self.pending_stale_after_secs
+        });
+
+        // Classify from an immutable borrow, then act (touch/claim need
+        // `&mut self`, so the borrow must end first).
+        let decision = if let Some(e) = self.entries.get(key) {
+            let fresh = now_secs < e.fresh_until_secs;
+            let throttled = now_secs < e.next_attempt_secs;
+            match e.value.as_ref() {
+                Some(v) if fresh => Decision::Warm(v.clone()),
+                _ if inflight_fresh => Decision::Pending,
+                Some(v) if throttled => Decision::Stale(v.clone()),
+                None if throttled => Decision::Cooling,
+                _ => Decision::Claim,
             }
-            // Stale: the owner likely died before publishing. Fall through
-            // and take the fill over — the insert below overwrites the
-            // abandoned marker with a fresh `fill_id`, so the old owner's
-            // late `publish` can't clobber the new owner's marker or value
-            // (its only remaining effect is the harmless expired-entry
-            // sweep).
-        }
-        if let Some(cooldown) = self.cooldowns.get(key) {
-            if now_secs < cooldown.retry_not_before_secs {
-                return CacheState::CoolingDown;
+        } else if inflight_fresh {
+            Decision::Pending
+        } else {
+            Decision::Claim
+        };
+
+        match decision {
+            Decision::Warm(v) => {
+                self.touch(key);
+                CacheState::Warm(v)
             }
-            // Cooldown elapsed: drop the marker and fall through to take a
-            // fresh fill over. The `attempts` count is preserved across the
-            // takeover (re-read in `publish` on a fresh failure) so backoff
-            // keeps growing until a success resets it.
+            Decision::Stale(v) => {
+                self.touch(key);
+                CacheState::Stale(v)
+            }
+            Decision::Pending => CacheState::Pending,
+            Decision::Cooling => CacheState::CoolingDown,
+            Decision::Claim => CacheState::Cold(self.claim(key, now_secs)),
         }
-        let fill_id = self.next_fill_id;
-        self.next_fill_id = self.next_fill_id.wrapping_add(1);
-        self.in_flight.insert(
-            key.to_owned(),
-            InFlight {
-                fill_id,
-                started_at_secs: now_secs,
-            },
-        );
-        CacheState::Cold(FillToken { fill_id })
     }
 
-    /// Publish the outcome of the fill you owned. `value` is `Some` on
-    /// success (the value entry is written and any failure cooldown for the
-    /// key is cleared) and `None` on failure (nothing is cached; if a
-    /// [`RetryBackoff`] is configured the key is parked in a growing,
-    /// capped cooldown). Either way your in-flight marker is cleared — but
-    /// only if it's still *yours* (`token.fill_id` matches the current
-    /// marker). If a stale-takeover replaced you, the new owner's marker,
-    /// value entry and cooldown are left untouched, so a late publish from
-    /// a superseded fill can't clobber fresher state.
-    ///
-    /// Also opportunistically sweeps expired value entries and elapsed
-    /// cooldowns (publish is the rare write path, so this keeps reads cheap
-    /// while bounding map size — every completed fill drops the dead weight
-    /// accumulated since the last write). The sweep runs *after* the
-    /// cooldown bookkeeping so the just-parked cooldown isn't immediately
-    /// reaped.
+    /// Publish the outcome of the fill you owned. `Some` on success (stored
+    /// fresh for `ttl_secs`, backoff reset), `None` on failure (any prior
+    /// value is kept for stale-serving; a backoff cooldown is parked).
+    /// Cleared/written only if the in-flight marker is still *yours*, so a
+    /// superseded fill can't clobber fresher state. Sweeps expired entries.
     fn publish<Q>(
         &mut self,
         key: &Q,
         token: FillToken,
         value: Option<V>,
-        expires_at_secs: u64,
+        ttl_secs: u64,
         now_secs: u64,
     ) where
         K: Borrow<Q>,
@@ -305,35 +273,68 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
             .in_flight
             .get(key)
             .is_some_and(|f| f.fill_id == token.fill_id);
-        if still_ours {
-            self.in_flight.remove(key);
-            match value {
-                Some(value) => {
-                    self.insert(key.to_owned(), value, expires_at_secs);
-                    // Success resets the failure backoff for this key.
-                    self.cooldowns.remove(key);
-                }
-                None => {
-                    if let Some(backoff) = self.retry_backoff {
-                        // Grow the cooldown: read this key's prior attempt
-                        // count (preserved across takeover; reset only by a
-                        // success above) and extend it by one.
-                        let attempts = self
-                            .cooldowns
-                            .get(key)
-                            .map_or(0, |c| c.attempts)
-                            .saturating_add(1);
-                        let delay = backoff.cooldown_secs(attempts);
-                        self.cooldowns.insert(
-                            key.to_owned(),
-                            Cooldown {
-                                attempts,
-                                retry_not_before_secs: now_secs.saturating_add(delay),
-                            },
-                        );
+        if !still_ours {
+            self.sweep_expired(now_secs);
+            return;
+        }
+        self.in_flight.remove(key);
+
+        match value {
+            Some(v) => {
+                let fresh_until = now_secs.saturating_add(ttl_secs);
+                let evict_at = fresh_until.saturating_add(self.stale_secs);
+                // Success: store fresh, reset the backoff. `next_attempt`
+                // points at stale onset so the first stale lookup refreshes.
+                self.upsert(
+                    key,
+                    Entry {
+                        value: Some(v),
+                        fresh_until_secs: fresh_until,
+                        evict_at_secs: evict_at,
+                        next_attempt_secs: fresh_until,
+                        failures: 0,
+                        last_access: 0,
+                    },
+                );
+            }
+            None => {
+                let failures = self
+                    .entries
+                    .get(key)
+                    .map_or(0, |e| e.failures)
+                    .saturating_add(1);
+                let delay = self.backoff.as_ref().map_or(0, |b| b.delay_secs(failures));
+                let next_attempt = now_secs.saturating_add(delay);
+
+                if let Some(e) = self.entries.get_mut(key) {
+                    // Stale-if-error: keep the existing value and its
+                    // `evict_at` (the value still dies relative to the last
+                    // success); just bump the throttle and failure count.
+                    // For a cold-failure marker, also refresh its lifetime.
+                    e.next_attempt_secs = next_attempt;
+                    e.failures = failures;
+                    if e.value.is_none() {
+                        e.evict_at_secs = now_secs
+                            .saturating_add(ttl_secs)
+                            .saturating_add(self.stale_secs);
                     }
-                    // Without a backoff configured: nothing cached, no
-                    // cooldown — the key is immediately retryable.
+                } else {
+                    // New cold-failure marker: no value to serve, but bounded
+                    // by its own `evict_at` so the backoff can't grow forever.
+                    let evict_at = now_secs
+                        .saturating_add(ttl_secs)
+                        .saturating_add(self.stale_secs);
+                    self.upsert(
+                        key,
+                        Entry {
+                            value: None,
+                            fresh_until_secs: now_secs,
+                            evict_at_secs: evict_at,
+                            next_attempt_secs: next_attempt,
+                            failures,
+                            last_access: 0,
+                        },
+                    );
                 }
             }
         }
@@ -341,76 +342,137 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
         self.sweep_expired(now_secs);
     }
 
-    /// Drop every value entry whose `expires_at_secs` is at or before
-    /// `now_secs`, and every cooldown whose `retry_not_before_secs` is at
-    /// or before it (an elapsed cooldown no longer suppresses anything).
-    /// Linear in the map sizes, each bounded by the number of distinct keys
-    /// touched within the TTL / cooldown window — small in practice, and
-    /// this is what keeps an unbounded key space from leaking markers.
+    /// The currently servable value for `key` (fresh or stale), if any —
+    /// used for stale-if-error and the poll-timeout fallback.
+    fn servable_value<Q>(&self, key: &Q, now_secs: u64) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+        V: Clone,
+    {
+        self.entries.get(key).and_then(|e| {
+            if now_secs < e.evict_at_secs {
+                e.value.clone()
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Mark a fresh in-flight attempt for `key`, returning its token.
+    fn claim<Q>(&mut self, key: &Q, now_secs: u64) -> FillToken
+    where
+        K: Borrow<Q>,
+        Q: ToOwned<Owned = K> + ?Sized,
+    {
+        let fill_id = self.next_fill_id;
+        self.next_fill_id = self.next_fill_id.wrapping_add(1);
+        self.in_flight.insert(
+            key.to_owned(),
+            InFlight {
+                fill_id,
+                started_at_secs: now_secs,
+            },
+        );
+        FillToken { fill_id }
+    }
+
+    /// Bump the access stamp on an existing entry (LRU recency).
+    fn touch<Q>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
+        self.access_clock = self.access_clock.wrapping_add(1);
+        let stamp = self.access_clock;
+        if let Some(e) = self.entries.get_mut(key) {
+            e.last_access = stamp;
+        }
+    }
+
+    /// Insert/overwrite an entry, stamping it most-recently-used and
+    /// evicting the least-recently-used entry first if a *new* key would
+    /// exceed `max_entries`.
+    fn upsert<Q>(&mut self, key: &Q, mut entry: Entry<V>)
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
+    {
+        self.access_clock = self.access_clock.wrapping_add(1);
+        entry.last_access = self.access_clock;
+        if !self.entries.contains_key(key) && self.entries.len() >= self.max_entries {
+            self.evict_lru();
+        }
+        self.entries.insert(key.to_owned(), entry);
+    }
+
+    /// Evict the least-recently-used entry (smallest `last_access`).
+    fn evict_lru(&mut self) {
+        if let Some(victim) = self
+            .entries
+            .iter()
+            .min_by_key(|(_, e)| e.last_access)
+            .map(|(k, _)| k.clone())
+        {
+            self.entries.remove(&victim);
+        }
+    }
+
+    /// Drop every entry at/past its `evict_at` — bounds memory for an
+    /// unbounded key space and clears dead cold-failure markers.
     fn sweep_expired(&mut self, now_secs: u64) {
-        self.entries.retain(|_, e| e.expires_at_secs > now_secs);
-        self.cooldowns
-            .retain(|_, c| c.retry_not_before_secs > now_secs);
+        self.entries.retain(|_, e| now_secs < e.evict_at_secs);
     }
 }
 
-/// What [`SingleFlightCache::lookup`] returned — the temperature of the
-/// key.
+/// What [`SingleFlightCache::lookup`] resolved to.
 enum CacheState<V> {
-    /// A fresh value is cached.
+    /// A fresh value — return it, no fill.
     Warm(V),
-    /// Another caller is filling this key.
+    /// A stale value served while the refresh is throttled — return it.
+    Stale(V),
+    /// A fill/refresh is in flight; wait and re-check.
     Pending,
-    /// A recent fill failed and its backoff cooldown hasn't elapsed.
+    /// A recent fill failed and its backoff hasn't elapsed; no value.
     CoolingDown,
-    /// Nothing fresh and no live fill; the holder owns the fill.
+    /// Nothing servable and no live fill; the holder owns the fill.
     Cold(FillToken),
 }
 
+/// Internal lookup decision, computed before mutating the cache.
+enum Decision<V> {
+    Warm(V),
+    Stale(V),
+    Pending,
+    Cooling,
+    Claim,
+}
+
 /// Opaque handle a [`CacheState::Cold`] caller passes back to
-/// [`SingleFlightCache::publish`]. Identifies this particular in-flight
-/// attempt, so `publish` can tell whether the caller is still the owner or
-/// was superseded by a stale-takeover.
+/// [`SingleFlightCache::publish`].
 struct FillToken {
     fill_id: u64,
 }
 
 /// Why [`get_or_fill`] returned without a value.
 pub enum CacheFillError<E> {
-    /// The fill we owned failed; nothing was cached. Carries the fill's
-    /// own error so the caller can react to it.
+    /// The fill we owned failed and there was no value to fall back on.
     Fill(E),
-    /// Another caller's in-flight fill didn't publish within
-    /// [`MAX_WAIT_POLLS`] yields. Transient — a retry, or the
-    /// post-staleness takeover, resolves it.
+    /// A foreign in-flight fill didn't publish within [`MAX_WAIT_POLLS`]
+    /// and there was no stale value to serve. Transient.
     WaitTimedOut,
-    /// A recent fill for this key failed and the configured
-    /// [`RetryBackoff`] cooldown hasn't elapsed; the fill was not run.
-    /// Only returned by caches built with
-    /// [`SingleFlightCache::with_retry_backoff`].
+    /// A recent fill failed and the backoff cooldown hasn't elapsed; the
+    /// fill was not run and there is no servable value.
     CoolingDown,
 }
 
-/// Get `key` from `cache`, or fill it once under single-flight dedup.
+/// Get `key` from `cache`, or fill it once under single-flight dedup, with
+/// stale-while-revalidate + stale-if-error and exponential-backoff retry.
+/// See the module docs for the full semantics.
 ///
-/// - **Warm:** returns the cached value without calling `fill`.
-/// - **Cold:** runs `fill`, caches the value on success (TTL `ttl_secs`
-///   from the post-fill clock reading), and returns it. On a `fill`
-///   error nothing is cached and the error is returned as
-///   [`CacheFillError::Fill`].
-/// - **Pending:** another call owns the fill; yields a round and
-///   re-checks, up to [`MAX_WAIT_POLLS`] times, then returns
-///   [`CacheFillError::WaitTimedOut`].
-/// - **CoolingDown:** a recent fill failed and the cache's
-///   [`RetryBackoff`] cooldown hasn't elapsed; returns
-///   [`CacheFillError::CoolingDown`] *without* running `fill`. Only
-///   possible when the cache was built with
-///   [`SingleFlightCache::with_retry_backoff`].
-///
-/// `now` is read fresh on each loop turn (so the staleness check sees real
-/// time advance across yields) and again after the fill to set the expiry.
-/// The cache borrow is released before every `.await`, as the
-/// single-threaded executor requires.
+/// `now` is read fresh on each loop turn and again after the fill. The
+/// cache borrow is released before every `.await`, as the single-threaded
+/// executor requires.
 pub async fn get_or_fill<K, V, Q, E, Fut>(
     cache: &'static LocalKey<RefCell<SingleFlightCache<K, V>>>,
     key: &Q,
@@ -419,7 +481,7 @@ pub async fn get_or_fill<K, V, Q, E, Fut>(
     fill: impl FnOnce() -> Fut,
 ) -> Result<V, CacheFillError<E>>
 where
-    K: Eq + Hash + Borrow<Q>,
+    K: Eq + Hash + Clone + Borrow<Q>,
     Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
     V: Clone,
     Fut: Future<Output = Result<V, E>>,
@@ -429,10 +491,16 @@ where
         let now_secs = now();
         match cache.with(|c| c.borrow_mut().lookup(key, now_secs)) {
             CacheState::Warm(value) => return Ok(value),
+            CacheState::Stale(value) => return Ok(value),
             CacheState::Cold(token) => break token,
             CacheState::CoolingDown => return Err(CacheFillError::CoolingDown),
             CacheState::Pending => {
                 if waits >= MAX_WAIT_POLLS {
+                    // A wedged owner: serve a stale value if one exists,
+                    // else report the transient timeout.
+                    if let Some(v) = cache.with(|c| c.borrow().servable_value(key, now())) {
+                        return Ok(v);
+                    }
                     return Err(CacheFillError::WaitTimedOut);
                 }
                 waits += 1;
@@ -441,26 +509,28 @@ where
         }
     };
 
-    // We own the fill. Run it, then publish (writes the value on success,
-    // clears our in-flight marker either way).
+    // We own the fill.
     let result = fill().await;
     let now_secs = now();
-    let expires_at = now_secs.saturating_add(ttl_secs);
     let to_cache = result.as_ref().ok().cloned();
     cache.with(|c| {
         c.borrow_mut()
-            .publish(key, token, to_cache, expires_at, now_secs)
+            .publish(key, token, to_cache, ttl_secs, now_secs)
     });
-    result.map_err(CacheFillError::Fill)
+    match result {
+        Ok(value) => Ok(value),
+        // Stale-if-error: a kept value beats surfacing the failure.
+        Err(e) => match cache.with(|c| c.borrow().servable_value(key, now_secs)) {
+            Some(value) => Ok(value),
+            None => Err(CacheFillError::Fill(e)),
+        },
+    }
 }
 
-/// Yield one round, resuming in the caller's OWN call context.
-///
-/// A waiter uses this to let the in-flight fill make progress and then
-/// re-check the cache, *without* being driven by the filler's wake (see
-/// the module docs for why that would mis-route the reply). Awaiting a
-/// cheap management-canister round-trip is the idiomatic way to give up a
-/// round and come back in our own context; the random bytes are unused.
+/// Yield one round, resuming in the caller's OWN call context (see the
+/// module docs for why a waiter must not be woken cross-call). Awaiting a
+/// cheap management-canister round-trip gives up a round and comes back in
+/// our own context; the random bytes are unused.
 #[cfg(not(test))]
 async fn yield_round() {
     let _ =
@@ -469,8 +539,7 @@ async fn yield_round() {
 }
 
 /// Host-test stand-in: there is no executor to yield to, so a poll is a
-/// no-op. The [`MAX_WAIT_POLLS`] counter still bounds the loop, so the
-/// `Pending` timeout path is exercisable without an IC.
+/// no-op. The [`MAX_WAIT_POLLS`] counter still bounds the loop.
 #[cfg(test)]
 async fn yield_round() {}
 
@@ -499,20 +568,6 @@ mod tests {
         }
     }
 
-    /// Read a fresh value out of the cache (test-only assertion helper).
-    fn get_fresh<'a, K: Eq + Hash + Borrow<str>, V>(
-        cache: &'a SingleFlightCache<K, V>,
-        key: &str,
-        now_secs: u64,
-    ) -> Option<&'a V> {
-        cache
-            .entries
-            .get(key)
-            .filter(|e| e.expires_at_secs > now_secs)
-            .map(|e| &e.value)
-    }
-
-    /// Helper: take the `Cold` arm or fail the test.
     fn expect_cold<V>(state: CacheState<V>) -> FillToken {
         match state {
             CacheState::Cold(t) => t,
@@ -520,393 +575,223 @@ mod tests {
         }
     }
 
-    // ---- Low-level lookup/publish state machine ----
+    // ---- lookup / publish state machine ----
 
     #[test]
-    fn lookup_returns_warm_on_fresh_entry() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        cache.insert("a.com".to_string(), "hello", 1000);
-        match cache.lookup("a.com", 999) {
-            CacheState::Warm(v) => assert_eq!(v, "hello"),
-            _ => panic!("expected Warm"),
+    fn fresh_then_stale_then_dead() {
+        // ttl 100, stale 50 → fresh [0,100), stale [100,150), dead ≥150.
+        let mut c = SingleFlightCache::<String, &str>::new().with_stale_secs(50);
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, Some("v"), 100, 0);
+        assert!(matches!(c.lookup("k", 50), CacheState::Warm("v")));
+
+        let mut c = SingleFlightCache::<String, &str>::new().with_stale_secs(50);
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, Some("v"), 100, 0);
+        // Stale: refresh due → Cold, value retained.
+        assert!(matches!(c.lookup("k", 120), CacheState::Cold(_)));
+        assert!(c.entries.get("k").and_then(|e| e.value).is_some());
+
+        let mut c = SingleFlightCache::<String, &str>::new().with_stale_secs(50);
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, Some("v"), 100, 0);
+        // Dead: evicted, cold path.
+        assert!(matches!(c.lookup("k", 150), CacheState::Cold(_)));
+    }
+
+    #[test]
+    fn concurrent_lookup_waits_when_fill_in_flight() {
+        let mut c = SingleFlightCache::<String, &str>::new();
+        let _t = expect_cold(c.lookup("k", 0));
+        assert!(matches!(c.lookup("k", 0), CacheState::Pending));
+    }
+
+    #[test]
+    fn failed_refresh_keeps_serving_stale() {
+        let mut c = SingleFlightCache::<String, &str>::new()
+            .with_stale_secs(1000)
+            .with_retry_backoff(RetryBackoff::new(60, 2));
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, Some("good"), 100, 0);
+        let t2 = expect_cold(c.lookup("k", 100)); // refresh due, owns refill
+        c.publish("k", t2, None, 100, 100); // refresh fails
+                                            // Within the backoff window: serve the OLD value, no fill.
+        assert!(matches!(c.lookup("k", 130), CacheState::Stale("good")));
+        // After the backoff (base 60s): refresh due again.
+        assert!(matches!(c.lookup("k", 160), CacheState::Cold(_)));
+    }
+
+    #[test]
+    fn cold_failure_cools_down_then_retries() {
+        let mut c = SingleFlightCache::<String, &str>::new()
+            .with_stale_secs(1000)
+            .with_retry_backoff(RetryBackoff::new(60, 2));
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, None, 100, 0); // cold fill fails → marker, no value
+        assert!(matches!(c.lookup("k", 30), CacheState::CoolingDown));
+        // After base 60s the cold key may be refilled.
+        assert!(matches!(c.lookup("k", 61), CacheState::Cold(_)));
+    }
+
+    #[test]
+    fn backoff_grows_then_resets_on_success() {
+        let mut c = SingleFlightCache::<String, &str>::new()
+            .with_stale_secs(100_000)
+            .with_retry_backoff(RetryBackoff::new(60, 2));
+        // fail 1 @0 → next at 60.
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, None, 1000, 0);
+        assert_eq!(c.entries.get("k").map(|e| e.next_attempt_secs), Some(60));
+        // fail 2 @60 → next at 60 + 120 = 180.
+        let t = expect_cold(c.lookup("k", 60));
+        c.publish("k", t, None, 1000, 60);
+        assert_eq!(c.entries.get("k").map(|e| e.next_attempt_secs), Some(180));
+        // success resets the failure count.
+        let t = expect_cold(c.lookup("k", 180));
+        c.publish("k", t, Some("v"), 1000, 180);
+        assert_eq!(c.entries.get("k").map(|e| e.failures), Some(0));
+    }
+
+    #[test]
+    fn no_backoff_is_immediately_retryable() {
+        let mut c = SingleFlightCache::<String, &str>::new();
+        let t = expect_cold(c.lookup("k", 0));
+        c.publish("k", t, None, 100, 0);
+        // No value cached, no cooldown: next lookup is a fresh Cold.
+        assert!(matches!(c.lookup("k", 0), CacheState::Cold(_)));
+    }
+
+    #[test]
+    fn superseded_owner_publish_does_not_overwrite() {
+        let mut c = SingleFlightCache::<String, &str>::new().with_pending_stale_after_secs(100);
+        let a = expect_cold(c.lookup("k", 0));
+        let cc = expect_cold(c.lookup("k", 101)); // A presumed abandoned, C takes over
+        c.publish("k", a, Some("A"), 1000, 0); // A's late publish
+        assert!(
+            c.servable_value("k", 0).is_none(),
+            "A's stale publish must not land after takeover"
+        );
+        c.publish("k", cc, Some("C"), 1000, 101);
+        assert_eq!(c.servable_value("k", 200), Some("C"));
+    }
+
+    #[test]
+    fn lru_evicts_least_recently_used_when_full() {
+        let mut c = SingleFlightCache::<String, &str>::new().with_max_entries(2);
+        for (k, t) in [("a", 0u64), ("b", 1)] {
+            let tok = expect_cold(c.lookup(k, t));
+            c.publish(k, tok, Some("v"), 10_000, t);
         }
+        // Touch "a" so "b" is the LRU.
+        assert!(matches!(c.lookup("a", 2), CacheState::Warm(_)));
+        // Insert "c": over capacity → evict the LRU ("b").
+        let tok = expect_cold(c.lookup("c", 3));
+        c.publish("c", tok, Some("v"), 10_000, 3);
+        assert!(c.entries.contains_key("a"));
+        assert!(c.entries.contains_key("c"));
+        assert!(!c.entries.contains_key("b"), "b was least-recently-used");
+        assert_eq!(c.entries.len(), 2);
     }
 
     #[test]
-    fn lookup_misses_when_expired() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        cache.insert("a.com".to_string(), "hello", 1000);
-        assert!(matches!(cache.lookup("a.com", 1001), CacheState::Cold(_)));
-    }
-
-    #[test]
-    fn first_lookup_returns_cold_and_marks_in_flight() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let _token = expect_cold(cache.lookup("a.com", 0));
-        assert!(cache.in_flight.contains_key("a.com"));
-    }
-
-    #[test]
-    fn second_concurrent_lookup_returns_pending() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let _token = expect_cold(cache.lookup("a.com", 0));
-        assert!(matches!(cache.lookup("a.com", 0), CacheState::Pending));
-    }
-
-    #[test]
-    fn publish_success_writes_entry_and_clears_in_flight() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let token = expect_cold(cache.lookup("a.com", 0));
-        cache.publish("a.com", token, Some("hello"), 1000, 0);
-
-        assert!(!cache.in_flight.contains_key("a.com"));
-        assert_eq!(get_fresh(&cache, "a.com", 999), Some(&"hello"));
-        // A later arrival is a straight hit — no second fill.
-        assert!(matches!(cache.lookup("a.com", 999), CacheState::Warm(_)));
-    }
-
-    #[test]
-    fn publish_failure_does_not_cache_but_clears_in_flight() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let token = expect_cold(cache.lookup("a.com", 0));
-        cache.publish("a.com", token, None, 1000, 0);
-
-        assert!(get_fresh(&cache, "a.com", 0).is_none());
-        assert!(!cache.in_flight.contains_key("a.com"));
-        // The next arrival starts a fresh fill rather than waiting.
-        assert!(matches!(cache.lookup("a.com", 0), CacheState::Cold(_)));
-    }
-
-    // ---- Stale in-flight takeover ----
-
-    #[test]
-    fn fresh_in_flight_within_threshold_returns_pending() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let _orig = expect_cold(cache.lookup("a.com", 100));
-        // Just under the threshold: still fresh.
-        assert!(matches!(
-            cache.lookup("a.com", 100 + DEFAULT_PENDING_STALE_AFTER_SECS - 1),
-            CacheState::Pending
-        ));
-    }
-
-    #[test]
-    fn stale_in_flight_is_taken_over_with_cold() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let _abandoned = expect_cold(cache.lookup("a.com", 100));
-        // Past the staleness threshold — the prior fill is presumed dead,
-        // so the new arrival takes over with a fresh Cold.
-        let _new = expect_cold(cache.lookup("a.com", 100 + DEFAULT_PENDING_STALE_AFTER_SECS));
-    }
-
-    #[test]
-    fn configured_staleness_window_is_respected() {
-        // A short window means a fill is presumed abandoned sooner.
-        let mut cache = SingleFlightCache::<String, &str>::new(10);
-        let _abandoned = expect_cold(cache.lookup("a.com", 100));
-        assert!(matches!(cache.lookup("a.com", 109), CacheState::Pending));
-        let _new = expect_cold(cache.lookup("a.com", 110));
-    }
-
-    #[test]
-    fn superseded_owner_publish_does_not_overwrite_new_fill() {
-        // A starts a fill; it's presumed abandoned and C takes over. A then
-        // returns late and publishes. The cache must NOT write A's value or
-        // clear C's in-flight marker.
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        let a_token = expect_cold(cache.lookup("a.com", 100));
-        let c_token =
-            expect_cold(cache.lookup("a.com", 100 + DEFAULT_PENDING_STALE_AFTER_SECS + 1));
-
-        cache.publish("a.com", a_token, Some("A's stale data"), 9999, 0);
-        assert!(
-            get_fresh(&cache, "a.com", 0).is_none(),
-            "A's late publish must not write to the cache after takeover"
+    fn sweep_drops_dead_entries() {
+        let mut c = SingleFlightCache::<String, &str>::new();
+        c.entries.insert(
+            "old".into(),
+            Entry {
+                value: Some("x"),
+                fresh_until_secs: 10,
+                evict_at_secs: 10,
+                next_attempt_secs: 10,
+                failures: 0,
+                last_access: 0,
+            },
         );
-        assert!(
-            cache.in_flight.contains_key("a.com"),
-            "C's in-flight marker must still be in place"
-        );
-
-        // C publishes its real result and that DOES land.
-        cache.publish("a.com", c_token, Some("C's fresh data"), 9999, 0);
-        assert_eq!(get_fresh(&cache, "a.com", 0), Some(&"C's fresh data"));
-        assert!(!cache.in_flight.contains_key("a.com"));
+        // A publish at t=100 sweeps the dead "old" entry.
+        let t = expect_cold(c.lookup("new", 100));
+        c.publish("new", t, Some("v"), 1000, 100);
+        assert!(!c.entries.contains_key("old"));
+        assert!(c.entries.contains_key("new"));
     }
 
-    // ---- Eviction / sweeping of expired value entries ----
-
-    #[test]
-    fn lookup_evicts_expired_entry() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        cache.insert("a.com".to_string(), "x", 100);
-        // Lookup at a time past the expiry — entry should be removed.
-        let _ = cache.lookup("a.com", 200);
-        assert!(
-            !cache.entries.contains_key("a.com"),
-            "expired entry should be evicted on lookup"
-        );
-    }
-
-    #[test]
-    fn publish_sweeps_other_expired_entries() {
-        let mut cache = SingleFlightCache::<String, &str>::default();
-        // Three pre-existing entries, two expired and one fresh.
-        cache.insert("expired1.com".to_string(), "x", 50);
-        cache.insert("expired2.com".to_string(), "y", 60);
-        cache.insert("fresh.com".to_string(), "z", 1_000);
-
-        // Publishing for a fourth key at now=100 should drop both expired
-        // entries while leaving the fresh one alone.
-        let token = expect_cold(cache.lookup("new.com", 100));
-        cache.publish("new.com", token, Some("v"), 2_000, 100);
-
-        assert!(!cache.entries.contains_key("expired1.com"));
-        assert!(!cache.entries.contains_key("expired2.com"));
-        assert!(cache.entries.contains_key("fresh.com"));
-        assert!(cache.entries.contains_key("new.com"));
-    }
-
-    // ---- get_or_fill: the full lookup/wait/publish flow ----
+    // ---- get_or_fill end to end ----
 
     thread_local! {
-        static TEST_CACHE: RefCell<SingleFlightCache<String, i32>> =
-            RefCell::new(SingleFlightCache::default());
+        static TEST_CACHE: RefCell<SingleFlightCache<String, i32>> = RefCell::new(
+            SingleFlightCache::new()
+                .with_stale_secs(50)
+                .with_retry_backoff(RetryBackoff::new(60, 2)),
+        );
     }
-
-    fn reset_test_cache() {
-        TEST_CACHE.with(|c| *c.borrow_mut() = SingleFlightCache::default());
+    fn reset() {
+        TEST_CACHE.with(|c| {
+            *c.borrow_mut() = SingleFlightCache::new()
+                .with_stale_secs(50)
+                .with_retry_backoff(RetryBackoff::new(60, 2))
+        });
     }
 
     #[test]
-    fn get_or_fill_warm_returns_cached_without_filling() {
-        reset_test_cache();
-        TEST_CACHE.with(|c| c.borrow_mut().insert("k".to_string(), 7, 1000));
-
-        let r: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
-            &TEST_CACHE,
-            "k",
-            || 999,
-            100,
-            || async { panic!("fill must not run on a warm hit") },
-        ));
+    fn get_or_fill_warm_skips_fill() {
+        reset();
+        let r: Result<i32, CacheFillError<()>> =
+            block_on(get_or_fill(&TEST_CACHE, "k", || 0, 100, || async { Ok(7) }));
         assert!(matches!(r, Ok(7)));
+        let r2: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
+            &TEST_CACHE,
+            "k",
+            || 50,
+            100,
+            || async { panic!("must not fill on warm hit") },
+        ));
+        assert!(matches!(r2, Ok(7)));
     }
 
     #[test]
-    fn get_or_fill_cold_runs_fill_and_caches() {
-        reset_test_cache();
-
-        let r: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
+    fn get_or_fill_serves_stale_on_failed_refresh() {
+        reset();
+        let _: Result<i32, CacheFillError<()>> =
+            block_on(get_or_fill(&TEST_CACHE, "k", || 0, 100, || async { Ok(7) }));
+        // now=110 → stale, refresh due; this caller owns it and it fails,
+        // so stale-if-error returns the old value.
+        let r: Result<i32, CacheFillError<&str>> = block_on(get_or_fill(
             &TEST_CACHE,
             "k",
-            || 100,
-            50,
-            || async { Ok(42) },
+            || 110,
+            100,
+            || async { Err("boom") },
         ));
-        assert!(matches!(r, Ok(42)));
-
-        // Second call is a warm hit — fill must not run again.
+        assert!(matches!(r, Ok(7)), "stale value should be served on error");
+        // Within backoff: still stale, fill not even called.
         let r2: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
             &TEST_CACHE,
             "k",
             || 120,
-            50,
-            || async { panic!("fill must not run on a warm hit") },
+            100,
+            || async { panic!("must not fill during backoff") },
         ));
-        assert!(matches!(r2, Ok(42)));
+        assert!(matches!(r2, Ok(7)));
     }
 
     #[test]
-    fn get_or_fill_propagates_fill_error_and_caches_nothing() {
-        reset_test_cache();
-
+    fn get_or_fill_cold_failure_errors_then_cools_down() {
+        reset();
         let r: Result<i32, CacheFillError<&str>> = block_on(get_or_fill(
             &TEST_CACHE,
             "k",
-            || 100,
-            50,
+            || 0,
+            100,
             || async { Err("boom") },
         ));
         assert!(matches!(r, Err(CacheFillError::Fill("boom"))));
-        // Nothing cached and no marker left behind: a retry fills afresh.
+        // Within backoff a cold key short-circuits without filling.
         let r2: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
             &TEST_CACHE,
             "k",
-            || 100,
-            50,
-            || async { Ok(1) },
-        ));
-        assert!(matches!(r2, Ok(1)));
-    }
-
-    #[test]
-    fn get_or_fill_times_out_waiting_on_a_foreign_in_flight() {
-        reset_test_cache();
-        // Claim an in-flight marker we never publish, so every lookup for
-        // "k" sees a fresh Pending (the clock is constant, so the marker
-        // never goes stale and is never taken over).
-        let _foreign = TEST_CACHE.with(|c| match c.borrow_mut().lookup("k", 100) {
-            CacheState::Cold(t) => t,
-            _ => panic!("expected Cold"),
-        });
-
-        let r: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
-            &TEST_CACHE,
-            "k",
-            || 100,
-            50,
-            || async { panic!("fill must not run while another fill is in flight") },
-        ));
-        assert!(matches!(r, Err(CacheFillError::WaitTimedOut)));
-    }
-
-    // ---- Failure backoff (opt-in) ----
-
-    thread_local! {
-        static BACKOFF_CACHE: RefCell<SingleFlightCache<String, i32>> = RefCell::new(
-            SingleFlightCache::default().with_retry_backoff(RetryBackoff::new(10, 2, 80)),
-        );
-    }
-
-    fn reset_backoff_cache() {
-        BACKOFF_CACHE.with(|c| {
-            *c.borrow_mut() =
-                SingleFlightCache::default().with_retry_backoff(RetryBackoff::new(10, 2, 80));
-        });
-    }
-
-    #[test]
-    fn cooldown_secs_grows_and_caps() {
-        // base 10, x2, cap 80: 10, 20, 40, 80, 80, ...
-        let b = RetryBackoff::new(10, 2, 80);
-        assert_eq!(b.cooldown_secs(1), 10);
-        assert_eq!(b.cooldown_secs(2), 20);
-        assert_eq!(b.cooldown_secs(3), 40);
-        assert_eq!(b.cooldown_secs(4), 80);
-        assert_eq!(b.cooldown_secs(5), 80);
-        // Large attempt counts saturate rather than overflow.
-        assert_eq!(b.cooldown_secs(u32::MAX), 80);
-    }
-
-    #[test]
-    fn failed_fill_parks_key_in_cooldown_and_skips_fill() {
-        reset_backoff_cache();
-        // First attempt fails at t=100 -> cooldown of base (10s).
-        let r1: Result<i32, CacheFillError<&str>> = block_on(get_or_fill(
-            &BACKOFF_CACHE,
-            "k",
-            || 100,
-            50,
-            || async { Err("boom") },
-        ));
-        assert!(matches!(r1, Err(CacheFillError::Fill("boom"))));
-
-        // Within the cooldown window the fill is NOT run.
-        let r2: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
-            &BACKOFF_CACHE,
-            "k",
-            || 105,
-            50,
-            || async { panic!("fill must not run during cooldown") },
+            || 30,
+            100,
+            || async { panic!("must not fill during cooldown") },
         ));
         assert!(matches!(r2, Err(CacheFillError::CoolingDown)));
-    }
-
-    #[test]
-    fn cooldown_grows_on_consecutive_failures_then_succeeds_and_resets() {
-        reset_backoff_cache();
-        let fail = |t: u64| -> Result<i32, CacheFillError<&'static str>> {
-            block_on(get_or_fill(
-                &BACKOFF_CACHE,
-                "k",
-                move || t,
-                50,
-                || async { Err("boom") },
-            ))
-        };
-
-        // Attempt 1 at t=0 -> cooldown 10 (retry_not_before = 10).
-        assert!(matches!(fail(0), Err(CacheFillError::Fill(_))));
-        // Still cooling at t=9.
-        let cd: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
-            &BACKOFF_CACHE,
-            "k",
-            || 9,
-            50,
-            || async { panic!("cooling") },
-        ));
-        assert!(matches!(cd, Err(CacheFillError::CoolingDown)));
-
-        // Attempt 2 at t=10 -> cooldown 20 (retry_not_before = 30).
-        assert!(matches!(fail(10), Err(CacheFillError::Fill(_))));
-        let cd: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
-            &BACKOFF_CACHE,
-            "k",
-            || 29,
-            50,
-            || async { panic!("cooling") },
-        ));
-        assert!(matches!(cd, Err(CacheFillError::CoolingDown)));
-
-        // Attempt 3 at t=30 -> cooldown 40 (retry_not_before = 70).
-        assert!(matches!(fail(30), Err(CacheFillError::Fill(_))));
-
-        // At t=70 the cooldown has elapsed; a success now clears the
-        // backoff entirely.
-        let ok: Result<i32, CacheFillError<&str>> = block_on(get_or_fill(
-            &BACKOFF_CACHE,
-            "k",
-            || 70,
-            50,
-            || async { Ok(7) },
-        ));
-        assert!(matches!(ok, Ok(7)));
-        // Value is cached (TTL 50 from t=70) and no cooldown remains.
-        BACKOFF_CACHE.with(|c| {
-            let c = c.borrow();
-            assert!(c.cooldowns.is_empty(), "success must clear the cooldown");
-            assert_eq!(get_fresh(&c, "k", 100), Some(&7));
-        });
-
-        // After expiry (t=130) a fresh failure starts the backoff back at
-        // base (10), proving the count reset on success.
-        let _ = fail(130);
-        BACKOFF_CACHE.with(|c| {
-            let c = c.borrow();
-            let cd = c.cooldowns.get("k").expect("cooldown recorded");
-            assert_eq!(cd.attempts, 1);
-            assert_eq!(cd.retry_not_before_secs, 140); // 130 + base 10
-        });
-    }
-
-    #[test]
-    fn sweep_drops_elapsed_cooldowns() {
-        let mut cache = SingleFlightCache::<String, i32>::default()
-            .with_retry_backoff(RetryBackoff::new(10, 2, 80));
-        // Two failures park two cooldowns (retry_not_before = 10).
-        let t1 = expect_cold(cache.lookup("a", 0));
-        cache.publish("a", t1, None, 0, 0);
-        let t2 = expect_cold(cache.lookup("b", 0));
-        cache.publish("b", t2, None, 0, 0);
-        assert_eq!(cache.cooldowns.len(), 2);
-
-        // A later publish (for a third key) at t=100 sweeps both elapsed
-        // cooldowns; only the freshly-parked one for "c" remains.
-        let t3 = expect_cold(cache.lookup("c", 100));
-        cache.publish("c", t3, None, 0, 100);
-        assert_eq!(cache.cooldowns.len(), 1);
-        assert!(cache.cooldowns.contains_key("c"));
-    }
-
-    #[test]
-    fn default_cache_has_no_backoff_and_retries_immediately() {
-        let mut cache = SingleFlightCache::<String, i32>::default();
-        let t = expect_cold(cache.lookup("k", 0));
-        cache.publish("k", t, None, 0, 0);
-        // No cooldown recorded, and the next lookup is a fresh Cold (not
-        // CoolingDown): the failure is immediately retryable.
-        assert!(cache.cooldowns.is_empty());
-        assert!(matches!(cache.lookup("k", 0), CacheState::Cold(_)));
     }
 }
