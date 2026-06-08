@@ -33,16 +33,33 @@ readonly IC_NETWORK="ic"
 # with CREATE_CYCLES=... in the environment. Accepts k/m/b/t suffixes.
 CREATE_CYCLES="${CREATE_CYCLES:-5t}"
 
-NAME="d"
+NAME=""
 DRY_RUN=false
+positional_count=0
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY_RUN=true ;;
         -h|--help) sed -n '4,28p' "$0"; exit 0 ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
-        *)  NAME="$arg" ;;
+        *)  NAME="$arg"; positional_count=$((positional_count + 1)) ;;
     esac
 done
+
+if [ "$positional_count" -gt 1 ]; then
+    echo "Error: expected at most one NAME argument, got $positional_count." >&2
+    exit 1
+fi
+
+# Default to Staging-D, and normalize to the lowercase single-letter
+# convention deploy-common.bash uses (a/b/c → -sa/-sb/-sc). Rejecting
+# anything else keeps the printed wiring instructions (-s$NAME, "$NAME) ..."
+# case arms) consistent with what those scripts actually match.
+NAME="$(printf '%s' "${NAME:-d}" | tr '[:upper:]' '[:lower:]')"
+if ! [[ "$NAME" =~ ^[a-z]$ ]]; then
+    echo "Error: NAME must be a single letter a-z (got '$NAME')." >&2
+    echo "       Staging environments are selected as -sa/-sb/-sc/-sd, etc." >&2
+    exit 1
+fi
 
 if [ "$DRY_RUN" = false ] && ! command -v icp >/dev/null 2>&1; then
     echo "Error: \`icp\` (icp-cli) not on PATH." >&2
@@ -94,6 +111,24 @@ FE_ID="$(create_one "Staging-$UPPER frontend")"
 if [ "$DRY_RUN" = true ]; then
     exit 0
 fi
+
+# `icp ... -q` is expected to print exactly the new canister id. Guard against
+# it returning empty / a non-id (e.g. a future output-format change) despite a
+# zero exit — otherwise we'd happily print wiring instructions with blank ids
+# that are trivial to paste into deploy-common.bash by mistake. Canister ids
+# are dash-separated base32 groups ending in a 3-char check group, e.g.
+# fgte5-ciaaa-aaaad-aaatq-cai.
+for pair in "backend:$BE_ID" "frontend:$FE_ID"; do
+    role="${pair%%:*}"
+    id="${pair#*:}"
+    if ! [[ "$id" =~ ^([a-z0-9]{5}-)+[a-z0-9]{3}$ ]]; then
+        echo "Error: \`icp canister create\` did not return a valid canister id for the $role" >&2
+        echo "       (got: '$id'). A canister may have been created without its id being" >&2
+        echo "       captured — check the proxy's controlled canisters before re-running." >&2
+        echo "       Refusing to print wiring instructions with a bad id." >&2
+        exit 1
+    fi
+done
 
 cat >&2 <<EOF
 
