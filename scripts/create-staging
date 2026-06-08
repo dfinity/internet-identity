@@ -19,7 +19,7 @@ set -euo pipefail
 # precise edits to make at the end.
 #
 # Usage:
-#   ./scripts/create-staging [NAME]     # NAME defaults to "d" (Staging-D)
+#   ./scripts/create-staging [NAME]     # NAME defaults to the next unused staging letter
 #   ./scripts/create-staging --dry-run  # print the icp commands, create nothing
 #
 # Requires: `icp` (icp-cli) on PATH, with the identity that controls the
@@ -50,11 +50,48 @@ if [ "$positional_count" -gt 1 ]; then
     exit 1
 fi
 
-# Default to Staging-D, and normalize to the lowercase single-letter
-# convention deploy-common.bash uses (a/b/c → -sa/-sb/-sc). Rejecting
-# anything else keeps the printed wiring instructions (-s$NAME, "$NAME) ..."
-# case arms) consistent with what those scripts actually match.
-NAME="$(printf '%s' "${NAME:-d}" | tr '[:upper:]' '[:lower:]')"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_COMMON="$SCRIPT_DIR/deploy-common.bash"
+
+# Single-letter labels already present as `x) echo "..." ;;` arms in
+# deploy-common.bash's staging_be_id() table — i.e. the staging environments
+# that already exist. Printed one per line.
+taken_staging_letters() {
+    [ -f "$DEPLOY_COMMON" ] || return 0
+    sed -n '/^staging_be_id()/,/^}/p' "$DEPLOY_COMMON" \
+        | sed -nE 's/^[[:space:]]*([a-z])\).*/\1/p'
+}
+
+# The next unused staging letter: one past the highest letter currently wired
+# into staging_be_id() (a→b→…). This is the default when no NAME is given, so
+# repeated runs propose d, e, f, … instead of always the same letter.
+next_staging_name() {
+    if [ ! -f "$DEPLOY_COMMON" ]; then
+        echo "Error: cannot find $DEPLOY_COMMON to determine the next staging letter." >&2
+        echo "       Pass an explicit NAME, e.g. \`$0 e\`." >&2
+        return 1
+    fi
+    local last
+    last="$(taken_staging_letters | sort | tail -n1)"
+    if [ -z "$last" ]; then echo "a"; return 0; fi
+    # Advance one letter (a→b … y→z; z maps to itself, signalling exhaustion).
+    local next
+    next="$(printf '%s' "$last" | tr 'a-y' 'b-z')"
+    if [ "$next" = "$last" ]; then
+        echo "Error: staging letters a-z all appear taken in staging_be_id()." >&2
+        return 1
+    fi
+    echo "$next"
+}
+
+# Default to the next unused staging letter; normalize to the lowercase
+# single-letter convention deploy-common.bash uses (a/b/c → -sa/-sb/-sc).
+# Rejecting anything else keeps the printed wiring instructions (-s$NAME,
+# "$NAME) ..." case arms) consistent with what those scripts actually match.
+if [ -z "$NAME" ]; then
+    NAME="$(next_staging_name)" || exit 1
+fi
+NAME="$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]')"
 if ! [[ "$NAME" =~ ^[a-z]$ ]]; then
     echo "Error: NAME must be a single letter a-z (got '$NAME')." >&2
     echo "       Staging environments are selected as -sa/-sb/-sc/-sd, etc." >&2
