@@ -18,7 +18,11 @@ import { Funnel } from "./Funnel";
  *     email-recovery-recover-recovery-ready
  *       email-recovery-recover-delegation-retrieved
  *         email-recovery-recover-signed-in
- *     | email-recovery-recover-failed   (with `reason = <variant>`)
+ *     | email-recovery-recover-failed   (with `reason = <variant>`, plus
+ *       `doh_reason = quorum_failed | all_providers_failed |
+ *       dedup_wait_timeout | response_malformed` when a DoH-path
+ *       `DohFetchFailed` was the cause — mirrors the setup funnel so the
+ *       DoH failure mix is segmentable for non-DNSSEC providers like Gmail)
  * end-email-recovery-recover       (CLOSE — terminal state, carries `duration-…`)
  *
  * Two stages distinguish the recovery flow from setup:

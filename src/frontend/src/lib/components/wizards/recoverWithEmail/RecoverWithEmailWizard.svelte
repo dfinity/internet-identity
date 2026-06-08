@@ -149,6 +149,45 @@
     return "unknown";
   };
 
+  /**
+   * Granular machine sub-reason for a DoH transport failure, or
+   * `undefined` for any non-DoH failure. Mirrors the setup wizard:
+   * `DohFetchFailed` collapses several distinct DoH causes (quorum
+   * miss, all providers down, dedup-wait timeout, malformed response)
+   * into one variant name. The canister encodes the cause as the
+   * leading `snake_case` token of the `DohFetchFailed` payload (see
+   * `map_doh_error` in the backend); we lift it out and report it as
+   * the `doh_reason` property on the `email-recovery-recover-failed`
+   * event so the funnel is segmentable by *why* DoH failed — which
+   * bites Gmail and other DoH-path providers on recovery just as it
+   * does on setup.
+   */
+  const dohSubReason = (variant: EmailRecoveryStatus): string | undefined => {
+    if (!("Failed" in variant)) return undefined;
+    const reason = variant.Failed as Record<string, unknown>;
+    const detail = reason["DohFetchFailed"];
+    if (typeof detail !== "string") return undefined;
+    const token = detail.split(":")[0]?.trim();
+    return token !== undefined && /^[a-z0-9_]+$/.test(token)
+      ? token
+      : undefined;
+  };
+
+  /**
+   * Property bag for a `email-recovery-recover-failed` event: the
+   * coarse variant `reason`, plus the granular `doh_reason` when the
+   * failure came from the DoH path.
+   */
+  const failedEventProps = (
+    variant: EmailRecoveryStatus,
+  ): Record<string, string> => {
+    const reason = failureReason(variant);
+    const dohReason = dohSubReason(variant);
+    return dohReason !== undefined
+      ? { reason, doh_reason: dohReason }
+      : { reason };
+  };
+
   const friendlyError = (variant: EmailRecoveryStatus): string => {
     if ("Failed" in variant) {
       const reason = variant.Failed;
@@ -295,9 +334,10 @@
             stage = { kind: "unsupported", domain };
             return;
           }
-          recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.Failed, {
-            reason: failureReason(result),
-          });
+          recoverWithEmailFunnel.trigger(
+            RecoverWithEmailEvents.Failed,
+            failedEventProps(result),
+          );
           recoverWithEmailFunnel.close();
           const diagnosticsBlob = await collectDiagnostics(nonce);
           stage = {
@@ -359,9 +399,10 @@
                 stage = { kind: "unsupported", domain };
                 return;
               }
-              recoverWithEmailFunnel.trigger(RecoverWithEmailEvents.Failed, {
-                reason: failureReason(submission),
-              });
+              recoverWithEmailFunnel.trigger(
+                RecoverWithEmailEvents.Failed,
+                failedEventProps(submission),
+              );
               recoverWithEmailFunnel.close();
               const diagnosticsBlob = await collectDiagnostics(nonce);
               polling = false;
