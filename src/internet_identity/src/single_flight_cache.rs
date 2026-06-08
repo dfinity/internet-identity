@@ -16,12 +16,27 @@
 //!
 //! [`get_or_fill`] is the entry point: hand it the cache, a key, a clock,
 //! a TTL, and a fill future, and it returns the cached or freshly-filled
-//! value. Internally each lookup resolves to one of three "temperatures":
+//! value. Internally each lookup resolves to one of four "temperatures":
 //!
 //! - **Warm** — a fresh value is cached; return it.
 //! - **Pending** — another caller is filling this key; yield a round and
 //!   re-check, bounded by [`MAX_WAIT_POLLS`].
-//! - **Cold** — nothing fresh and no live fill; run the fill and publish.
+//! - **CoolingDown** — a recent fill *failed* and the configured retry
+//!   backoff hasn't elapsed; short-circuit without running the fill.
+//! - **Cold** — nothing fresh, no live fill, no active cooldown; run the
+//!   fill and publish.
+//!
+//! ## Failure backoff (opt-in)
+//!
+//! By default a failed fill caches nothing and the key is immediately
+//! retryable — fine when the set of keys is bounded (e.g. an allowlist).
+//! For lazy fetches against an unbounded or attacker-influenced key space,
+//! that lets a steady stream of requests for a failing key spam one
+//! expensive fill (outcall) each. Construct the cache with
+//! [`SingleFlightCache::with_retry_backoff`] and a failed fill instead
+//! parks the key in a cooldown that grows on consecutive failures (capped),
+//! during which lookups short-circuit to [`CacheFillError::CoolingDown`]
+//! without running the fill. A success clears the cooldown.
 //!
 //! ## Why the waiter polls instead of being woken
 //!
@@ -82,34 +97,101 @@ struct InFlight {
     started_at_secs: u64,
 }
 
+/// Exponential backoff schedule for the failure path. With it configured,
+/// a failed fill parks its key in a cooldown of
+/// `min(base_secs * multiplier^(attempts - 1), max_secs)` seconds, growing
+/// each consecutive failure and capped at `max_secs`. A success resets the
+/// count.
+#[derive(Clone, Copy)]
+pub struct RetryBackoff {
+    base_secs: u64,
+    multiplier: u64,
+    max_secs: u64,
+}
+
+impl RetryBackoff {
+    /// Build a backoff schedule. The first failure waits `base_secs`; each
+    /// further consecutive failure multiplies the wait by `multiplier`,
+    /// capped at `max_secs`.
+    ///
+    /// Part of the opt-in backoff API; no non-test caller yet (DoH, the
+    /// first consumer, uses the default no-backoff cache).
+    #[allow(dead_code)]
+    pub fn new(base_secs: u64, multiplier: u64, max_secs: u64) -> Self {
+        Self {
+            base_secs,
+            multiplier,
+            max_secs,
+        }
+    }
+
+    /// Cooldown length for the `attempts`-th consecutive failure
+    /// (`attempts` is 1-based). Saturating throughout — a large attempt
+    /// count clamps to `max_secs` rather than overflowing.
+    fn cooldown_secs(&self, attempts: u32) -> u64 {
+        let factor = self
+            .multiplier
+            .checked_pow(attempts.saturating_sub(1))
+            .unwrap_or(u64::MAX);
+        self.base_secs.saturating_mul(factor).min(self.max_secs)
+    }
+}
+
+/// A parked failure: how many consecutive fills have failed and the
+/// wall-clock time before which the key must not be retried.
+struct Cooldown {
+    attempts: u32,
+    retry_not_before_secs: u64,
+}
+
 /// In-memory single-flight cache keyed by `K`, holding values of type `V`.
 pub struct SingleFlightCache<K, V> {
     entries: HashMap<K, Entry<V>>,
     in_flight: HashMap<K, InFlight>,
+    cooldowns: HashMap<K, Cooldown>,
     next_fill_id: u64,
     /// How long an in-flight marker may sit before a new arrival presumes
     /// it abandoned and takes the fill over. See
     /// [`DEFAULT_PENDING_STALE_AFTER_SECS`].
     pending_stale_after_secs: u64,
+    /// Failure backoff. `None` (the default) means a failed fill caches
+    /// nothing and is immediately retryable.
+    retry_backoff: Option<RetryBackoff>,
 }
 
 impl<K, V> SingleFlightCache<K, V> {
     /// Create a cache whose in-flight markers are presumed abandoned after
     /// `pending_stale_after_secs` (see [`DEFAULT_PENDING_STALE_AFTER_SECS`]
-    /// for guidance on the value).
+    /// for guidance on the value). No failure backoff: a failed fill is
+    /// immediately retryable — add one with [`Self::with_retry_backoff`].
     pub fn new(pending_stale_after_secs: u64) -> Self {
         Self {
             entries: HashMap::new(),
             in_flight: HashMap::new(),
+            cooldowns: HashMap::new(),
             next_fill_id: 0,
             pending_stale_after_secs,
+            retry_backoff: None,
         }
+    }
+
+    /// Park a failed fill's key in a growing, capped cooldown (see
+    /// [`RetryBackoff`]) instead of allowing an immediate retry. Use this
+    /// for lazy fetches against an unbounded key space, where immediate
+    /// retry of a persistently failing key would spam the fill.
+    ///
+    /// Part of the opt-in backoff API; no non-test caller yet (DoH, the
+    /// first consumer, uses the default no-backoff cache).
+    #[allow(dead_code)]
+    pub fn with_retry_backoff(mut self, backoff: RetryBackoff) -> Self {
+        self.retry_backoff = Some(backoff);
+        self
     }
 }
 
 impl<K, V> Default for SingleFlightCache<K, V> {
     /// A cache with the default staleness window
-    /// ([`DEFAULT_PENDING_STALE_AFTER_SECS`]).
+    /// ([`DEFAULT_PENDING_STALE_AFTER_SECS`]) and no failure backoff.
     fn default() -> Self {
         Self::new(DEFAULT_PENDING_STALE_AFTER_SECS)
     }
@@ -132,6 +214,10 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
     /// - [`CacheState::Warm`]`(value)` — cache fresh, use immediately.
     /// - [`CacheState::Pending`] — another caller is filling this key.
     ///   Returned only for a *fresh* in-flight marker.
+    /// - [`CacheState::CoolingDown`] — a recent fill failed and the
+    ///   [`RetryBackoff`] cooldown for this key hasn't elapsed; the caller
+    ///   must not run the fill yet. Only possible when a backoff is
+    ///   configured.
     /// - [`CacheState::Cold`]`(token)` — you own the fill; do the work,
     ///   then call [`Self::publish`] with the token. Returned when there's
     ///   no in-flight marker, or the existing one is older than the
@@ -167,6 +253,15 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
             // (its only remaining effect is the harmless expired-entry
             // sweep).
         }
+        if let Some(cooldown) = self.cooldowns.get(key) {
+            if now_secs < cooldown.retry_not_before_secs {
+                return CacheState::CoolingDown;
+            }
+            // Cooldown elapsed: drop the marker and fall through to take a
+            // fresh fill over. The `attempts` count is preserved across the
+            // takeover (re-read in `publish` on a fresh failure) so backoff
+            // keeps growing until a success resets it.
+        }
         let fill_id = self.next_fill_id;
         self.next_fill_id = self.next_fill_id.wrapping_add(1);
         self.in_flight.insert(
@@ -180,17 +275,21 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
     }
 
     /// Publish the outcome of the fill you owned. `value` is `Some` on
-    /// success (the value entry is written) and `None` on failure (nothing
-    /// is cached). Either way your in-flight marker is cleared — but only
-    /// if it's still *yours* (`token.fill_id` matches the current marker).
-    /// If a stale-takeover replaced you, the new owner's marker and any
-    /// value entry are left untouched, so a late publish from a superseded
-    /// fill can't clobber fresher state.
+    /// success (the value entry is written and any failure cooldown for the
+    /// key is cleared) and `None` on failure (nothing is cached; if a
+    /// [`RetryBackoff`] is configured the key is parked in a growing,
+    /// capped cooldown). Either way your in-flight marker is cleared — but
+    /// only if it's still *yours* (`token.fill_id` matches the current
+    /// marker). If a stale-takeover replaced you, the new owner's marker,
+    /// value entry and cooldown are left untouched, so a late publish from
+    /// a superseded fill can't clobber fresher state.
     ///
-    /// Also opportunistically sweeps expired value entries (publish is the
-    /// rare write path, so this keeps reads cheap while bounding cache
-    /// size — every successful fill drops the dead weight accumulated
-    /// since the last write).
+    /// Also opportunistically sweeps expired value entries and elapsed
+    /// cooldowns (publish is the rare write path, so this keeps reads cheap
+    /// while bounding map size — every completed fill drops the dead weight
+    /// accumulated since the last write). The sweep runs *after* the
+    /// cooldown bookkeeping so the just-parked cooldown isn't immediately
+    /// reaped.
     fn publish<Q>(
         &mut self,
         key: &Q,
@@ -202,26 +301,56 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
         K: Borrow<Q>,
         Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
     {
-        self.sweep_expired(now_secs);
-
         let still_ours = self
             .in_flight
             .get(key)
             .is_some_and(|f| f.fill_id == token.fill_id);
         if still_ours {
-            if let Some(value) = value {
-                self.insert(key.to_owned(), value, expires_at_secs);
-            }
             self.in_flight.remove(key);
+            match value {
+                Some(value) => {
+                    self.insert(key.to_owned(), value, expires_at_secs);
+                    // Success resets the failure backoff for this key.
+                    self.cooldowns.remove(key);
+                }
+                None => {
+                    if let Some(backoff) = self.retry_backoff {
+                        // Grow the cooldown: read this key's prior attempt
+                        // count (preserved across takeover; reset only by a
+                        // success above) and extend it by one.
+                        let attempts = self
+                            .cooldowns
+                            .get(key)
+                            .map_or(0, |c| c.attempts)
+                            .saturating_add(1);
+                        let delay = backoff.cooldown_secs(attempts);
+                        self.cooldowns.insert(
+                            key.to_owned(),
+                            Cooldown {
+                                attempts,
+                                retry_not_before_secs: now_secs.saturating_add(delay),
+                            },
+                        );
+                    }
+                    // Without a backoff configured: nothing cached, no
+                    // cooldown — the key is immediately retryable.
+                }
+            }
         }
+
+        self.sweep_expired(now_secs);
     }
 
     /// Drop every value entry whose `expires_at_secs` is at or before
-    /// `now_secs`. Linear in `entries.len()`, which is bounded by the
-    /// number of distinct keys filled within the TTL window — small in
-    /// practice.
+    /// `now_secs`, and every cooldown whose `retry_not_before_secs` is at
+    /// or before it (an elapsed cooldown no longer suppresses anything).
+    /// Linear in the map sizes, each bounded by the number of distinct keys
+    /// touched within the TTL / cooldown window — small in practice, and
+    /// this is what keeps an unbounded key space from leaking markers.
     fn sweep_expired(&mut self, now_secs: u64) {
         self.entries.retain(|_, e| e.expires_at_secs > now_secs);
+        self.cooldowns
+            .retain(|_, c| c.retry_not_before_secs > now_secs);
     }
 }
 
@@ -232,6 +361,8 @@ enum CacheState<V> {
     Warm(V),
     /// Another caller is filling this key.
     Pending,
+    /// A recent fill failed and its backoff cooldown hasn't elapsed.
+    CoolingDown,
     /// Nothing fresh and no live fill; the holder owns the fill.
     Cold(FillToken),
 }
@@ -253,6 +384,11 @@ pub enum CacheFillError<E> {
     /// [`MAX_WAIT_POLLS`] yields. Transient — a retry, or the
     /// post-staleness takeover, resolves it.
     WaitTimedOut,
+    /// A recent fill for this key failed and the configured
+    /// [`RetryBackoff`] cooldown hasn't elapsed; the fill was not run.
+    /// Only returned by caches built with
+    /// [`SingleFlightCache::with_retry_backoff`].
+    CoolingDown,
 }
 
 /// Get `key` from `cache`, or fill it once under single-flight dedup.
@@ -265,6 +401,11 @@ pub enum CacheFillError<E> {
 /// - **Pending:** another call owns the fill; yields a round and
 ///   re-checks, up to [`MAX_WAIT_POLLS`] times, then returns
 ///   [`CacheFillError::WaitTimedOut`].
+/// - **CoolingDown:** a recent fill failed and the cache's
+///   [`RetryBackoff`] cooldown hasn't elapsed; returns
+///   [`CacheFillError::CoolingDown`] *without* running `fill`. Only
+///   possible when the cache was built with
+///   [`SingleFlightCache::with_retry_backoff`].
 ///
 /// `now` is read fresh on each loop turn (so the staleness check sees real
 /// time advance across yields) and again after the fill to set the expiry.
@@ -289,6 +430,7 @@ where
         match cache.with(|c| c.borrow_mut().lookup(key, now_secs)) {
             CacheState::Warm(value) => return Ok(value),
             CacheState::Cold(token) => break token,
+            CacheState::CoolingDown => return Err(CacheFillError::CoolingDown),
             CacheState::Pending => {
                 if waits >= MAX_WAIT_POLLS {
                     return Err(CacheFillError::WaitTimedOut);
@@ -617,5 +759,154 @@ mod tests {
             || async { panic!("fill must not run while another fill is in flight") },
         ));
         assert!(matches!(r, Err(CacheFillError::WaitTimedOut)));
+    }
+
+    // ---- Failure backoff (opt-in) ----
+
+    thread_local! {
+        static BACKOFF_CACHE: RefCell<SingleFlightCache<String, i32>> = RefCell::new(
+            SingleFlightCache::default().with_retry_backoff(RetryBackoff::new(10, 2, 80)),
+        );
+    }
+
+    fn reset_backoff_cache() {
+        BACKOFF_CACHE.with(|c| {
+            *c.borrow_mut() =
+                SingleFlightCache::default().with_retry_backoff(RetryBackoff::new(10, 2, 80));
+        });
+    }
+
+    #[test]
+    fn cooldown_secs_grows_and_caps() {
+        // base 10, x2, cap 80: 10, 20, 40, 80, 80, ...
+        let b = RetryBackoff::new(10, 2, 80);
+        assert_eq!(b.cooldown_secs(1), 10);
+        assert_eq!(b.cooldown_secs(2), 20);
+        assert_eq!(b.cooldown_secs(3), 40);
+        assert_eq!(b.cooldown_secs(4), 80);
+        assert_eq!(b.cooldown_secs(5), 80);
+        // Large attempt counts saturate rather than overflow.
+        assert_eq!(b.cooldown_secs(u32::MAX), 80);
+    }
+
+    #[test]
+    fn failed_fill_parks_key_in_cooldown_and_skips_fill() {
+        reset_backoff_cache();
+        // First attempt fails at t=100 -> cooldown of base (10s).
+        let r1: Result<i32, CacheFillError<&str>> = block_on(get_or_fill(
+            &BACKOFF_CACHE,
+            "k",
+            || 100,
+            50,
+            || async { Err("boom") },
+        ));
+        assert!(matches!(r1, Err(CacheFillError::Fill("boom"))));
+
+        // Within the cooldown window the fill is NOT run.
+        let r2: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
+            &BACKOFF_CACHE,
+            "k",
+            || 105,
+            50,
+            || async { panic!("fill must not run during cooldown") },
+        ));
+        assert!(matches!(r2, Err(CacheFillError::CoolingDown)));
+    }
+
+    #[test]
+    fn cooldown_grows_on_consecutive_failures_then_succeeds_and_resets() {
+        reset_backoff_cache();
+        let fail = |t: u64| -> Result<i32, CacheFillError<&'static str>> {
+            block_on(get_or_fill(
+                &BACKOFF_CACHE,
+                "k",
+                move || t,
+                50,
+                || async { Err("boom") },
+            ))
+        };
+
+        // Attempt 1 at t=0 -> cooldown 10 (retry_not_before = 10).
+        assert!(matches!(fail(0), Err(CacheFillError::Fill(_))));
+        // Still cooling at t=9.
+        let cd: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
+            &BACKOFF_CACHE,
+            "k",
+            || 9,
+            50,
+            || async { panic!("cooling") },
+        ));
+        assert!(matches!(cd, Err(CacheFillError::CoolingDown)));
+
+        // Attempt 2 at t=10 -> cooldown 20 (retry_not_before = 30).
+        assert!(matches!(fail(10), Err(CacheFillError::Fill(_))));
+        let cd: Result<i32, CacheFillError<()>> = block_on(get_or_fill(
+            &BACKOFF_CACHE,
+            "k",
+            || 29,
+            50,
+            || async { panic!("cooling") },
+        ));
+        assert!(matches!(cd, Err(CacheFillError::CoolingDown)));
+
+        // Attempt 3 at t=30 -> cooldown 40 (retry_not_before = 70).
+        assert!(matches!(fail(30), Err(CacheFillError::Fill(_))));
+
+        // At t=70 the cooldown has elapsed; a success now clears the
+        // backoff entirely.
+        let ok: Result<i32, CacheFillError<&str>> = block_on(get_or_fill(
+            &BACKOFF_CACHE,
+            "k",
+            || 70,
+            50,
+            || async { Ok(7) },
+        ));
+        assert!(matches!(ok, Ok(7)));
+        // Value is cached (TTL 50 from t=70) and no cooldown remains.
+        BACKOFF_CACHE.with(|c| {
+            let c = c.borrow();
+            assert!(c.cooldowns.is_empty(), "success must clear the cooldown");
+            assert_eq!(get_fresh(&c, "k", 100), Some(&7));
+        });
+
+        // After expiry (t=130) a fresh failure starts the backoff back at
+        // base (10), proving the count reset on success.
+        let _ = fail(130);
+        BACKOFF_CACHE.with(|c| {
+            let c = c.borrow();
+            let cd = c.cooldowns.get("k").expect("cooldown recorded");
+            assert_eq!(cd.attempts, 1);
+            assert_eq!(cd.retry_not_before_secs, 140); // 130 + base 10
+        });
+    }
+
+    #[test]
+    fn sweep_drops_elapsed_cooldowns() {
+        let mut cache = SingleFlightCache::<String, i32>::default()
+            .with_retry_backoff(RetryBackoff::new(10, 2, 80));
+        // Two failures park two cooldowns (retry_not_before = 10).
+        let t1 = expect_cold(cache.lookup("a", 0));
+        cache.publish("a", t1, None, 0, 0);
+        let t2 = expect_cold(cache.lookup("b", 0));
+        cache.publish("b", t2, None, 0, 0);
+        assert_eq!(cache.cooldowns.len(), 2);
+
+        // A later publish (for a third key) at t=100 sweeps both elapsed
+        // cooldowns; only the freshly-parked one for "c" remains.
+        let t3 = expect_cold(cache.lookup("c", 100));
+        cache.publish("c", t3, None, 0, 100);
+        assert_eq!(cache.cooldowns.len(), 1);
+        assert!(cache.cooldowns.contains_key("c"));
+    }
+
+    #[test]
+    fn default_cache_has_no_backoff_and_retries_immediately() {
+        let mut cache = SingleFlightCache::<String, i32>::default();
+        let t = expect_cold(cache.lookup("k", 0));
+        cache.publish("k", t, None, 0, 0);
+        // No cooldown recorded, and the next lookup is a fresh Cold (not
+        // CoolingDown): the failure is immediately retryable.
+        assert!(cache.cooldowns.is_empty());
+        assert!(matches!(cache.lookup("k", 0), CacheState::Cold(_)));
     }
 }

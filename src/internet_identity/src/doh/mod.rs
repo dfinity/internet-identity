@@ -205,6 +205,11 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
         // distinguishable from "our own fan-out failed" in diagnostics.
         CacheFillError::WaitTimedOut => DohError::DedupWaitTimedOut,
         CacheFillError::Fill(e) => e,
+        // Defensive: the DoH cache configures no retry backoff (failures
+        // are immediately retryable, bounded by the domain allowlist), so
+        // this is unreachable. Fold it into the transient variant if it
+        // ever surfaces.
+        CacheFillError::CoolingDown => DohError::DedupWaitTimedOut,
     })
 }
 
