@@ -201,6 +201,16 @@ a:not(:disabled) {
   /* Focus ring colors */
   --focus-ring: var(--color-surface-light-300);
   --focus-ring-error: var(--color-error-500);
+
+  /* CLI terminal block — intentionally dark in both themes so it reads as a
+     real terminal. Light mode uses a softer near-black so it doesn't slam
+     against a white page. */
+  --cli-terminal-bg: #232325;
+  --cli-terminal-border: #3a3a3a;
+  --cli-terminal-body: #d1d1d4;
+  --cli-terminal-prompt: #a1a1a5;
+  --cli-terminal-em: #ffffff;
+  --cli-terminal-ok: #47cd89;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -295,6 +305,14 @@ a:not(:disabled) {
     /* Focus ring colors */
     --focus-ring: var(--color-surface-dark-600);
     --focus-ring-error: var(--color-error-500);
+
+    /* CLI terminal block — dark mode uses the deeper near-black. */
+    --cli-terminal-bg: #0d0d0e;
+    --cli-terminal-border: #2a2a2a;
+    --cli-terminal-body: #b3b3b7;
+    --cli-terminal-prompt: #69696c;
+    --cli-terminal-em: #fafafa;
+    --cli-terminal-ok: #47cd89;
   }
 }
 

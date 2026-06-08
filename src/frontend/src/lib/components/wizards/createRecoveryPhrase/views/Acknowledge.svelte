@@ -36,7 +36,7 @@
 </p>
 <Checkbox
   bind:checked={isAcknowledged}
-  label={$t`I Acknowledge`}
+  label={$t`I acknowledge`}
   hint={$t`I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost.`}
   size="sm"
   class="mb-8"

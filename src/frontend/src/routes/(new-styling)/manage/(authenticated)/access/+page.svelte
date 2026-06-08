@@ -15,7 +15,12 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { authnMethodToPublicKey } from "$lib/utils/webAuthn";
   import { nanosToMillis } from "$lib/utils/time";
-  import { goto, invalidateAll } from "$app/navigation";
+  import {
+    afterNavigate,
+    goto,
+    invalidateAll,
+    replaceState,
+  } from "$app/navigation";
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
@@ -59,6 +64,7 @@
   let switchingAccessMethodKey = $state<string>();
   let accessMethods = $derived(toAccessMethods(data.identityInfo));
   let pendingRegistrationId = $state(data.pendingRegistrationId);
+  let showRegistrationDialog = $state(data.pendingRegistrationId !== null);
 
   // Derived
   const renamingAccessMethod = $derived(
@@ -155,9 +161,23 @@
     toaster.success({
       title: $t`Passkey has been registered from another device.`,
     });
+    showRegistrationDialog = false;
     pendingRegistrationId = null;
     // Remove searchParam and update state
     void goto(page.url.pathname, { replaceState: true, invalidateAll: true });
+  };
+  // Called when the user clicks "Start over" inside the wizard. The wizard
+  // generates a fresh registrationId internally; here we just drop the URL
+  // ?activate=<id> so a refresh doesn't reopen the old pending session.
+  const handleConfirmRestart = () => {
+    pendingRegistrationId = null;
+    if (page.url.searchParams.has("activate")) {
+      void goto(page.url.pathname, { replaceState: true });
+    }
+  };
+  const closeConfirmDialog = () => {
+    showRegistrationDialog = false;
+    pendingRegistrationId = null;
   };
 
   const handleNameChanged = async (name: string) => {
@@ -360,6 +380,15 @@
       handleError(error);
     }
   };
+
+  // Deep-link entry: open the Add Access Method wizard when navigated
+  // to with page state `{ add: true }` (set by the home dashboard's
+  // smart-action strip).
+  afterNavigate(() => {
+    if (!("add" in page.state)) return;
+    replaceState("", {});
+    isAddingAccessMethod = true;
+  });
 </script>
 
 <header class="flex flex-col gap-3">
@@ -500,13 +529,14 @@
   </Dialog>
 {/if}
 
-{#if pendingRegistrationId !== null}
-  <Dialog onClose={() => (pendingRegistrationId = null)}>
+{#if showRegistrationDialog}
+  <Dialog onClose={closeConfirmDialog}>
     <ConfirmAccessMethodWizard
-      registrationId={pendingRegistrationId}
+      registrationId={pendingRegistrationId ?? undefined}
       onConfirm={handleOtherDeviceConfirmed}
+      onRestart={handleConfirmRestart}
       onError={(error) => {
-        pendingRegistrationId = null;
+        closeConfirmDialog();
         handleError(error);
         void goto(page.url.pathname, { replaceState: true });
       }}

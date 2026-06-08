@@ -55,6 +55,14 @@ type InternetIdentityFrontendInit = record {
     analytics_config : opt opt AnalyticsConfig;
     dummy_auth : opt opt DummyAuthConfig;
     dev_csp : opt bool;
+    // Origins of apps to feature on the dashboard home. Each origin is resolved
+    // against the bundled dapps catalogue to render name, description and logo.
+    featured_dashboard_apps : opt vec text;
+    // Frontend feature flag overrides keyed by flag name, e.g.
+    // record { "EMAIL_RECOVERY"; true }. Sets the deployment-level baseline for
+    // each flag; localStorage, the flag's init callback and ?feature_flag_* URL
+    // params still take precedence. Unknown flag names are ignored.
+    feature_flags : opt vec record { text; bool };
 };
 
 service : (InternetIdentityFrontendInit) -> {

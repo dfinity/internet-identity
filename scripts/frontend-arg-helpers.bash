@@ -72,7 +72,7 @@ build_frontend_install_arg() {
     }
 
     # All known fields with their defaults (null for missing/new canisters)
-    local -a field_names=(backend_canister_id backend_origin related_origins fetch_root_key analytics_config dummy_auth dev_csp)
+    local -a field_names=(backend_canister_id backend_origin related_origins fetch_root_key analytics_config dummy_auth dev_csp featured_dashboard_apps)
     local -A current_values=(
         [backend_canister_id]="null"
         [backend_origin]="null"
@@ -81,6 +81,7 @@ build_frontend_install_arg() {
         [analytics_config]="null"
         [dummy_auth]="null"
         [dev_csp]="null"
+        [featured_dashboard_apps]="null"
     )
 
     if [ -z "$raw_config" ]; then
@@ -141,9 +142,10 @@ ${record_fields};
     echo "  $FRONTEND_CANDID_ARG"
     echo ""
 
-    echo "Encoding argument with didc..."
+    echo "Encoding argument with pinned didc..."
+    ensure_pinned_didc || exit 1
     local encoded
-    encoded=$(didc encode \
+    encoded=$("$PINNED_DIDC" encode \
         -d ./src/internet_identity_frontend/internet_identity_frontend.did \
         -t '(InternetIdentityFrontendInit)' \
         "$FRONTEND_CANDID_ARG")

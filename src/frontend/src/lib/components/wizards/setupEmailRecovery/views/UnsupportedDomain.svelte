@@ -52,6 +52,13 @@
       </p>
       <p>
         <Trans>
+          The DNSSEC zone must use a current algorithm — RSA/SHA-256,
+          RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms
+          aren't supported.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
           If you administer
           <strong class="break-all">{domain}</strong>, enabling DNSSEC at your
           domain registrar usually takes a few clicks. Once it propagates, this

@@ -75,6 +75,7 @@ fn should_coexist_with_openid_configs() {
                 auth_scope: vec!["openid".into()],
                 fedcm_uri: None,
                 email_verification: None,
+                seed_jwks: None,
             },
         ]),
         ..Default::default()

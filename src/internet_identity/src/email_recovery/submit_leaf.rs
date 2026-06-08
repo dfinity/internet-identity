@@ -62,7 +62,22 @@ pub async fn submit_dkim_leaf(
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
-    if let Err(e) = run_submit(&hops, &extra_chains, &snapshot, now_secs) {
+    // An empty `hops` set is the FE's signal that it could not walk a
+    // DNSSEC resolution for this leaf — the DKIM record CNAMEs into an
+    // unsigned zone (the `outlook.com` -> `outbound.protection.outlook.com`
+    // case, or `live.com`). A genuine DNSSEC submission always carries at
+    // least the final TXT hop. In that case we resolve the DKIM key over
+    // DoH instead, reusing the cached `partial_verification` crypto
+    // material; this is allowlist-gated, so a domain the operator hasn't
+    // enabled comes back as `DomainNotAllowlisted` rather than hanging the
+    // pending entry until it expires.
+    let verification = if hops.is_empty() {
+        run_doh_fallback(&snapshot).await
+    } else {
+        run_submit(&hops, &extra_chains, &snapshot, now_secs)
+    };
+
+    if let Err(e) = verification {
         let cloned = e.clone();
         pending::with_mut(&nonce, now_secs, |c| {
             c.status = PendingStatus::Failed(cloned);
@@ -275,17 +290,95 @@ fn run_submit(
 
     let leaf_name = crate::dnssec::wire::decode_dns_name_lowercase(&verified.name.0);
 
-    // Step 4: parse the DKIM TXT, get the public key + key type.
+    // Steps 4–6 (parse TXT → tag contract → signature → DMARC
+    // alignment → From-match) are shared with the DoH fallback. The
+    // DNSSEC path feeds the TXT it just authenticated through the hop
+    // walk and the DMARC record cached at prepare time.
     let txt = crate::dnssec::wire::parse_txt_rdata(&verified.rdata).map_err(|_| {
         EmailRecoveryError::EmailVerificationFailed("DNSSEC TXT RDATA truncated".into())
     })?;
-    if txt.len() > super::MAX_DKIM_TXT_BYTES {
+    verify_dkim_key_against_partial(
+        &txt,
+        snapshot.cached_dmarc_txt.as_deref(),
+        snapshot,
+        &leaf_name,
+    )
+}
+
+/// DoH fallback for the DNSSEC path: invoked from `submit_dkim_leaf`
+/// when the FE submits an empty `hops` set, signalling it could not
+/// walk a fully-signed DNSSEC resolution for the leaf (the DKIM record
+/// CNAMEs into an unsigned zone — `outlook.com` ->
+/// `outbound.protection.outlook.com`, `live.com`, …).
+///
+/// Rather than leave the pending entry stuck in `NeedDkimLeaf` until it
+/// expires, we resolve the DKIM public key over the canister's own DoH
+/// path and verify the signature the same way the synchronous DoH path
+/// (`smtp::verify_setup_email_doh`) does — except the email body is long
+/// gone (dropped after `bh=` validated at `smtp_request` time), so we
+/// reuse the cached `partial_verification` crypto material instead of
+/// re-parsing the message.
+///
+/// All DNS names handed to `fetch_txt` come from canister-pinned state
+/// (`expected_selector` from the email's `s=` tag, `signing_domain` from
+/// its `d=`, `registered_domain` from the claimed address), never the FE.
+/// The fetch is allowlist-gated on `registered_domain`: a domain the
+/// operator hasn't enabled returns `DomainNotAllowed`/`NotConfigured`,
+/// which [`super::smtp::map_doh_error`] folds into
+/// `DomainNotAllowlisted` — the FE turns that into the unsupported-domain
+/// view.
+async fn run_doh_fallback(snapshot: &Snapshot) -> Result<(), EmailRecoveryError> {
+    // DKIM key lives at `<selector>._domainkey.<d>`; the allowlist gate
+    // and the in-domain check both key off the registered domain.
+    let dkim_fqdn = format!(
+        "{}._domainkey.{}",
+        snapshot.expected_selector, snapshot.signing_domain
+    );
+    let dmarc_fqdn = format!("_dmarc.{}", snapshot.registered_domain);
+
+    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &snapshot.registered_domain)
+        .await
+        .map_err(|e| super::smtp::map_doh_error(e, &snapshot.registered_domain))?;
+
+    // DMARC: a quorum reporting "no record" is a valid DNS state and
+    // drops us to strict `d=` alignment; any other failure must
+    // propagate rather than quietly tighten the check. Mirrors the
+    // handling in `smtp::verify_setup_email_doh`.
+    let dmarc_bytes = match crate::doh::fetch_txt(&dmarc_fqdn, &snapshot.registered_domain).await {
+        Ok(bytes) => Some(bytes),
+        Err(crate::doh::DohError::NoAnswer) => None,
+        Err(e) => return Err(super::smtp::map_doh_error(e, &snapshot.registered_domain)),
+    };
+
+    verify_dkim_key_against_partial(
+        &dkim_bytes,
+        dmarc_bytes.as_deref(),
+        snapshot,
+        &dkim_fqdn,
+    )
+}
+
+/// Steps 4–6 of leaf verification, shared by the DNSSEC hop-walk path
+/// and the DoH fallback: parse the DKIM TXT, enforce the DNS-record tag
+/// contract, run the cached-digest signature check, then DMARC
+/// alignment and the final From-match. `dkim_txt` is the decoded TXT
+/// (record value) bytes; `dmarc_txt` is the decoded DMARC TXT or `None`
+/// when no record is published (strict `d=`/From equality applies).
+/// `context` names the leaf for diagnostics only.
+fn verify_dkim_key_against_partial(
+    dkim_txt: &[u8],
+    dmarc_txt: Option<&[u8]>,
+    snapshot: &Snapshot,
+    context: &str,
+) -> Result<(), EmailRecoveryError> {
+    // Step 4: parse the DKIM TXT, get the public key + key type.
+    if dkim_txt.len() > super::MAX_DKIM_TXT_BYTES {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
-            "DKIM TXT record at {leaf_name:?} is {} bytes; refusing to admit",
-            txt.len()
+            "DKIM TXT record at {context:?} is {} bytes; refusing to admit",
+            dkim_txt.len()
         )));
     }
-    let txt_str = std::str::from_utf8(&txt).map_err(|_| {
+    let txt_str = std::str::from_utf8(dkim_txt).map_err(|_| {
         EmailRecoveryError::EmailVerificationFailed("DKIM TXT is not valid UTF-8".into())
     })?;
     let dns_record = crate::dkim::parse_dkim_txt(txt_str).map_err(|e| {
@@ -296,8 +389,8 @@ fn run_submit(
     // through the same shared umbrella the DoH path calls so the
     // `t=y` and AUID-alignment policies stay in lock-step across
     // pipelines. The trail the umbrella builds is the DoH-side
-    // diagnostic; we discard it here because the DNSSEC path
-    // collapses every failure into a single `EmailRecoveryError`.
+    // diagnostic; we discard it here because this path collapses
+    // every failure into a single `EmailRecoveryError`.
     if let Err((reason, _trail)) = crate::dkim::enforce_dns_record_tag_contract(
         &snapshot.signing_auid,
         &snapshot.signing_domain,
@@ -319,7 +412,7 @@ fn run_submit(
     // is over `SHA256(signed_data)` (RFC 8463), so the cached
     // digest IS the correct input — we can call it directly.
     use crate::dkim::VerifyOutcome;
-    let outcome = verify_with_prehash(
+    let outcome = crate::dkim::verify_signature_prehashed(
         snapshot.algorithm,
         dns_record.key_type,
         &dns_record.public_key,
@@ -358,16 +451,17 @@ fn run_submit(
     // Step 6: DMARC alignment. The smtp.rs path enforced that the
     // signing domain (`d=`) is within the registered zone, so any
     // strict-or-relaxed alignment under DMARC is trivially
-    // satisfied. We re-check explicitly here against the cached
-    // DMARC record (when one was supplied at prepare time).
+    // satisfied. We re-check explicitly here against the DMARC
+    // record (cached at prepare time on the DNSSEC path, or
+    // freshly DoH-fetched on the fallback path).
     let from_domain = snapshot
         .from_address_lc
         .rsplit_once('@')
         .map(|(_, d)| d.to_string())
         .ok_or(EmailRecoveryError::AddressMismatch)?;
-    if let Some(dmarc_bytes) = &snapshot.cached_dmarc_txt {
+    if let Some(dmarc_bytes) = dmarc_txt {
         let dmarc_str = std::str::from_utf8(dmarc_bytes).map_err(|_| {
-            EmailRecoveryError::EmailVerificationFailed("cached DMARC is not valid UTF-8".into())
+            EmailRecoveryError::EmailVerificationFailed("DMARC TXT is not valid UTF-8".into())
         })?;
         let dmarc = crate::dmarc::parse_dmarc_txt(dmarc_str).map_err(|e| {
             EmailRecoveryError::EmailVerificationFailed(format!("DMARC parse: {e}"))
@@ -388,9 +482,9 @@ fn run_submit(
         }
     }
 
-    // Step 6: From: matches the claimed address. smtp.rs already
-    // confirmed this when caching `from_address_lc` on the partial
-    // verification record, but pin again as defense-in-depth.
+    // From: matches the claimed address. smtp.rs already confirmed
+    // this when caching `from_address_lc` on the partial verification
+    // record, but pin again as defense-in-depth.
     if !snapshot
         .from_address_lc
         .eq_ignore_ascii_case(&snapshot.claimed_address)
@@ -399,107 +493,6 @@ fn run_submit(
     }
 
     Ok(())
-}
-
-/// Verify a DKIM signature against a SHA-256-prehashed signed-data
-/// digest. This is the second-phase verification entry point we
-/// need on the recovery surface — `crate::dkim::verify_signature`
-/// takes the raw `signed_data` and hashes it internally, so it
-/// can't consume the cached 32-byte digest directly.
-fn verify_with_prehash(
-    algorithm: crate::dkim::Algorithm,
-    key_type: crate::dkim::KeyType,
-    key_bytes: &[u8],
-    digest: &[u8; 32],
-    signature: &[u8],
-) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::{Algorithm, VerifyOutcome};
-    if !key_type.matches_signature_alg(algorithm) {
-        return VerifyOutcome::AlgorithmMismatch;
-    }
-    match algorithm {
-        Algorithm::RsaSha256 => verify_rsa_sha256_prehashed(key_bytes, digest, signature),
-        Algorithm::Ed25519Sha256 => verify_ed25519_prehashed(key_bytes, digest, signature),
-    }
-}
-
-fn verify_rsa_sha256_prehashed(
-    key_bytes: &[u8],
-    digest: &[u8; 32],
-    signature: &[u8],
-) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::VerifyOutcome;
-    use rsa::pkcs1v15::{Signature as RsaSignature, VerifyingKey as RsaVerifyingKey};
-    use rsa::pkcs8::DecodePublicKey;
-    use rsa::traits::PublicKeyParts;
-    use rsa::RsaPublicKey;
-    use sha2::Sha256;
-    /// Minimum RSA key size in bits (matches `crate::dkim::signature::RSA_MIN_KEY_BITS`).
-    const RSA_MIN_KEY_BITS: usize = 1024;
-
-    let key = match RsaPublicKey::from_public_key_der(key_bytes) {
-        Ok(k) => k,
-        Err(e) => return VerifyOutcome::MalformedKey(format!("RSA SPKI decode: {e}")),
-    };
-    let bits = key.n().bits();
-    if bits < RSA_MIN_KEY_BITS {
-        return VerifyOutcome::RsaKeyTooSmall(bits);
-    }
-    if signature.len() != key.size() {
-        return VerifyOutcome::MalformedSignature(format!(
-            "RSA signature length {} != modulus length {}",
-            signature.len(),
-            key.size()
-        ));
-    }
-    let verifying_key = RsaVerifyingKey::<Sha256>::new(key);
-    let sig = match RsaSignature::try_from(signature) {
-        Ok(s) => s,
-        Err(e) => return VerifyOutcome::MalformedSignature(format!("RSA sig decode: {e}")),
-    };
-    use rsa::signature::hazmat::PrehashVerifier;
-    match verifying_key.verify_prehash(digest, &sig) {
-        Ok(()) => VerifyOutcome::Valid,
-        Err(_) => VerifyOutcome::BadSignature,
-    }
-}
-
-fn verify_ed25519_prehashed(
-    key_bytes: &[u8],
-    digest: &[u8; 32],
-    signature: &[u8],
-) -> crate::dkim::VerifyOutcome {
-    use crate::dkim::VerifyOutcome;
-    use ed25519_dalek::{Signature as Ed25519Signature, Verifier as _, VerifyingKey};
-    let key_array: [u8; 32] = match key_bytes.try_into() {
-        Ok(arr) => arr,
-        Err(_) => {
-            return VerifyOutcome::MalformedKey(format!(
-                "Ed25519 key length {} != 32",
-                key_bytes.len()
-            ));
-        }
-    };
-    let sig_array: [u8; 64] = match signature.try_into() {
-        Ok(arr) => arr,
-        Err(_) => {
-            return VerifyOutcome::MalformedSignature(format!(
-                "Ed25519 signature length {} != 64",
-                signature.len()
-            ));
-        }
-    };
-    let verifying_key = match VerifyingKey::from_bytes(&key_array) {
-        Ok(k) => k,
-        Err(e) => return VerifyOutcome::MalformedKey(format!("Ed25519 key: {e}")),
-    };
-    let sig = Ed25519Signature::from_bytes(&sig_array);
-    // RFC 8463: Ed25519 over `SHA256(signed_data)`. The cached
-    // digest IS the correct verify input.
-    match verifying_key.verify(digest, &sig) {
-        Ok(()) => VerifyOutcome::Valid,
-        Err(_) => VerifyOutcome::BadSignature,
-    }
 }
 
 // Tests for the DNS-record tag contract live alongside the umbrella

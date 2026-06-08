@@ -42,6 +42,7 @@ export const idlFactory = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({
@@ -321,6 +322,16 @@ export const idlFactory = ({ IDL }) => {
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
   });
+  const VerificationPath = IDL.Variant({
+    'Doh' : IDL.Null,
+    'Dnssec' : IDL.Null,
+  });
+  const EmailRecoveryDiagnostics = IDL.Record({
+    'created_at' : Timestamp,
+    'verification_path' : VerificationPath,
+    'message_id' : IDL.Opt(IDL.Text),
+    'reason_code' : IDL.Text,
+  });
   const SessionKey = PublicKey;
   const EmailRecoveryGetDelegationArgs = IDL.Record({
     'session_key' : SessionKey,
@@ -520,7 +531,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
     'name' : IDL.Opt(IDL.Text),
-    'email_recovery' : IDL.Vec(EmailRecoveryCredential),
+    'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
     'created_at' : IDL.Opt(Timestamp),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
@@ -697,6 +708,7 @@ export const idlFactory = ({ IDL }) => {
     'envelope' : IDL.Opt(SmtpEnvelope),
     'message' : IDL.Opt(SmtpMessage),
     'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'message_id' : IDL.Opt(IDL.Text),
   });
   const SmtpRequestError = IDL.Record({
     'code' : IDL.Nat64,
@@ -865,6 +877,11 @@ export const idlFactory = ({ IDL }) => {
         [IdentityNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
+      ),
+    'email_recovery_diagnostics' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(EmailRecoveryDiagnostics)],
+        ['query'],
       ),
     'email_recovery_get_delegation' : IDL.Func(
         [EmailRecoveryGetDelegationArgs],
@@ -1195,6 +1212,7 @@ export const init = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({

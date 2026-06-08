@@ -557,10 +557,20 @@ test.describe("Authorize — explicit consent UI", () => {
       openIdUsers,
     }) => {
       const consent = attributeConsentView(authorizePage.page);
-      const ssoPage = await openSsoPopup(authorizePage.page);
+      const ssoPage = await openSsoPopup(
+        authorizePage.page,
+        undefined,
+        "signin",
+      );
       const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(ssoPage, openIdUsers[0].id);
       await closePromise;
+      // Fresh SSO user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up before the authorize "Continue" is available.
+      await authorizePage.page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();

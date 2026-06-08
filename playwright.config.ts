@@ -42,7 +42,10 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--ignore-certificate-errors",
-            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
+            // Exclude loopback so tests can reach a real local server (e.g. the
+            // CLI flow's loopback callback); MAP otherwise remaps every host,
+            // including 127.0.0.1, to the dev server.
+            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1]",
           ],
         },
       },
@@ -54,7 +57,10 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--ignore-certificate-errors",
-            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
+            // Exclude loopback so tests can reach a real local server (e.g. the
+            // CLI flow's loopback callback); MAP otherwise remaps every host,
+            // including 127.0.0.1, to the dev server.
+            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1]",
           ],
         },
       },

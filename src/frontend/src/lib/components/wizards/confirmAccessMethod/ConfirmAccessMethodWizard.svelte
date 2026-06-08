@@ -11,16 +11,29 @@
   interface Props {
     registrationId?: string;
     onConfirm: () => void;
+    onRestart?: () => void;
     onError: (error: unknown) => void;
   }
 
-  const { registrationId, onConfirm, onError }: Props = $props();
+  const { registrationId, onConfirm, onRestart, onError }: Props = $props();
 
   const confirmAccessMethodFlow = new ConfirmAccessMethodFlow();
 
   const handleEnterRegistrationMode = async () => {
     try {
       await confirmAccessMethodFlow.enterRegistrationMode(registrationId);
+    } catch (error) {
+      onError(error);
+    }
+  };
+  // Always generate a fresh registrationId on user-initiated restart,
+  // even if the wizard was mounted with one (e.g. via /activate#<id>).
+  // Reusing the same id leaves #newDeviceLink unset and traps the dialog
+  // in the WaitingForNewDevice view.
+  const handleRestart = async () => {
+    onRestart?.();
+    try {
+      await confirmAccessMethodFlow.enterRegistrationMode();
     } catch (error) {
       onError(error);
     }
@@ -56,7 +69,7 @@
 {:else if confirmAccessMethodFlow.view === "enterConfirmationCode"}
   <EnterConfirmationCode
     confirm={handleConfirmDevice}
-    restart={handleEnterRegistrationMode}
+    restart={handleRestart}
   />
 {:else if confirmAccessMethodFlow.view === "finishOnNewDevice"}
   <FinishOnNewDevice />

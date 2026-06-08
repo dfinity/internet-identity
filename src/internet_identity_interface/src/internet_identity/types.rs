@@ -233,6 +233,16 @@ pub struct InternetIdentityFrontendArgs {
     /// * allows accessing II using http instead of https
     /// * allows II to connect to localhost on both http and https
     pub dev_csp: Option<bool>,
+    /// Origins of apps to feature on the dashboard home. Each origin is resolved
+    /// against the bundled dapps catalogue (`dapps.json`) at runtime to obtain
+    /// the name, description and logo. Unknown origins are skipped.
+    pub featured_dashboard_apps: Option<Vec<String>>,
+    /// Frontend feature flag overrides keyed by flag name (e.g.
+    /// `("EMAIL_RECOVERY", true)`). Each entry sets the deployment-level
+    /// baseline for that flag; the frontend still lets `localStorage`, a flag's
+    /// own init callback, and `?feature_flag_*` URL params take precedence.
+    /// Names that don't match a known frontend flag are ignored by the frontend.
+    pub feature_flags: Option<Vec<(String, bool)>>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -400,6 +410,20 @@ pub struct OpenIdConfig {
     pub auth_scope: Vec<String>,
     pub fedcm_uri: Option<String>,
     pub email_verification: Option<OpenIdEmailVerificationScheme>,
+    /// Optional initial set of JWKs used to seed this provider's JWK cache on
+    /// install, so JWT verification works before the first `jwks_uri` fetch
+    /// completes (and across upgrades — the cache is persisted in stable memory
+    /// in the backend's storage layer).
+    ///
+    /// The outer vector is the set of JWKs; each inner vector is one JWK,
+    /// represented as the list of its JSON `(field, value)` pairs. For example a
+    /// single RSA key is
+    /// `vec { vec { record { "kty"; "RSA" }; record { "kid"; "..." };
+    ///              record { "n"; "..." }; record { "e"; "AQAB" } } }`.
+    /// Each inner list is assembled into a JSON object and parsed with the same
+    /// path used for fetched certs, so all string-valued JWK fields are
+    /// supported. Invalid entries are skipped.
+    pub seed_jwks: Option<Vec<Vec<(String, String)>>>,
 }
 
 /// SSO provider configuration that uses two-hop discovery.

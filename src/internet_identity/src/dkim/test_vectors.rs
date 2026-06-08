@@ -82,6 +82,7 @@ fn parse_eml(raw: &[u8]) -> SmtpRequest {
             body: ByteBuf::from(body),
         }),
         gateway_flags: None,
+        message_id: None,
     }
 }
 

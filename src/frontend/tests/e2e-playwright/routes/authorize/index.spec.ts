@@ -16,9 +16,11 @@ test("Authorize by registering a new passkey", async ({ page }) => {
   await authorize(page, async (authPage) => {
     await addVirtualAuthenticator(authPage);
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Sign up", exact: true })
       .click();
-    await authPage.getByRole("button", { name: "Create new identity" }).click();
+    await authPage
+      .getByRole("button", { name: "Sign up with passkey" })
+      .click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
@@ -35,10 +37,7 @@ test("Authorize by signing in with an existing passkey", async ({
   await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .click();
-    await authPage
-      .getByRole("button", { name: "Use existing identity" })
+      .getByRole("button", { name: "Sign in with passkey" })
       .click();
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -77,12 +76,7 @@ test("Authorize by signing in from another device", async ({
       // Switch to current device and start "Continue from another device" flow to get link
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
-        .click();
-      await authPage
-        .getByRole("button", {
-          name: "Use existing identity",
-        })
+        .getByRole("button", { name: "Sign in with passkey" })
         .click();
       await authPage
         .getByRole("heading", {
@@ -196,7 +190,18 @@ test.describe("Sign up with OpenID", () => {
       await signInWithOpenId(openIdPage, openIdUsers[0].id);
       await closePromise;
 
-      // Continue to dapp
+      // Fresh OIDC user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up to land on ContinueView.
+      await authPage
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
+      // Continue to dapp — wait for the confirmation heading first so any
+      // dialog transition has fully resolved before clicking.
+      await expect(
+        authPage.getByRole("heading", { name: /^Continue to / }),
+      ).toBeVisible();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
@@ -225,10 +230,19 @@ test.describe("Sign up with SSO", () => {
     await authorize(page, async (authPage) => {
       // Pick SSO entry, type the discovery domain, wait for two-hop
       // discovery, then drive the IdP popup the same way as direct OpenID.
-      const ssoPage = await openSsoPopup(authPage);
+      // The /authorize picker renders with mode="signin", so the SSO
+      // button label is "Sign in with SSO" not the mode="both" default.
+      const ssoPage = await openSsoPopup(authPage, undefined, "signin");
       const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(ssoPage, openIdUsers[0].id);
       await closePromise;
+
+      // Fresh SSO user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up to land on ContinueView.
+      await authPage
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
 
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
@@ -245,10 +259,10 @@ test("Authorize with ICRC-29", async ({ page }) => {
     async (authPage) => {
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
+        .getByRole("button", { name: "Sign up", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Create new identity" })
+        .getByRole("button", { name: "Sign up with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -270,10 +284,10 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
+        .getByRole("button", { name: "Sign up", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Create new identity" })
+        .getByRole("button", { name: "Sign up with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       await authPage.getByRole("button", { name: "Create identity" }).click();

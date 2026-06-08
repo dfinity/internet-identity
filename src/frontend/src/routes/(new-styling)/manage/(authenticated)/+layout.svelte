@@ -8,7 +8,7 @@
     LifeBuoyIcon,
     CodeIcon,
     LanguagesIcon,
-    InfoIcon,
+    SettingsIcon,
     ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
@@ -28,21 +28,27 @@
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { getMetadataString } from "$lib/utils/openID";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import { Trans } from "$lib/components/locale";
   import type { LayoutProps } from "./$types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
   import ReauthPrompt from "$lib/components/ui/ReauthPrompt.svelte";
-  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
+  import {
+    AuthWizard,
+    IdentityNotConnected,
+    IdentityAlreadyLinked,
+    SwitchAccessMethod,
+  } from "$lib/components/wizards/auth";
+  import type { AccessMethod } from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
+  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import { backendCanisterConfig } from "$lib/globals";
+  import { getMetadataString } from "$lib/utils/openID";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
 
   // --- Props & state ---
@@ -54,12 +60,54 @@
   let isMobileSidebarOpen = $state(false);
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
+  let isCreateIdentityDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
   let isSignOutDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
-  let isRecoveryPhraseSetUpDismissed = $state(false);
   let isReauthDialogOpen = $state(false);
+  let signUpOpenedFromSignInModal = $state(false);
+
+  let notConnectedPayload = $state<{
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    resume: () => Promise<void>;
+    cancel: () => void;
+  }>();
+  let isResumingRegistration = $state(false);
+  let alreadyLinkedPayload = $state<{
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    signIn: () => Promise<void>;
+    cancel: () => void;
+  }>();
+  let isSigningInAlreadyLinked = $state(false);
+  let methodSwitchPayload = $state<{
+    previous: LastUsedIdentity;
+    newProvider: AccessMethod;
+    proceed: () => Promise<void>;
+  }>();
+
+  const authMethodToAccessMethod = (
+    m: LastUsedIdentity["authMethod"],
+  ): AccessMethod => {
+    if ("passkey" in m) return { type: "passkey" };
+    if ("openid" in m) {
+      const config = backendCanisterConfig.openid_configs[0]?.find(
+        (c) => c.issuer === m.openid.iss,
+      );
+      return {
+        type: "openid",
+        logo: config?.logo ?? "",
+        name: config?.name ?? m.openid.iss,
+      };
+    }
+    return { type: "sso", name: m.sso.name ?? m.sso.domain };
+  };
 
   // --- Derived ---
 
@@ -67,21 +115,6 @@
     Object.values($lastUsedIdentitiesStore.identities).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
     ),
-  );
-
-  let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
-    () => {
-      const value = data.identityInfo.authn_methods.find(
-        (m) =>
-          "Recovery" in m.security_settings.purpose &&
-          getMetadataString(m.metadata, "usage") === "recovery_phrase",
-      );
-      return value === undefined
-        ? "missing"
-        : value.last_authentication[0] === undefined
-          ? "unverified"
-          : "verified";
-    },
   );
 
   // --- Sign in / sign up / upgrade ---
@@ -101,6 +134,8 @@
     } finally {
       isIdentityPopoverOpen = false;
       isAuthDialogOpen = false;
+      isCreateIdentityDialogOpen = false;
+      signUpOpenedFromSignInModal = false;
       isAuthenticating = false;
     }
   };
@@ -134,10 +169,7 @@
   };
 
   const handleConfirmSignOutAndRemove = () => {
-    const identity = $lastUsedIdentitiesStore.selected;
-    if (identity !== undefined) {
-      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
-    }
+    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
     window.location.replace("/");
   };
 
@@ -272,72 +304,6 @@
   });
 </script>
 
-{#snippet recoveryPhraseSetUp()}
-  {#if recoveryPhraseStatus === "missing"}
-    <div class="mb-4 grid size-16">
-      <!-- Progress ring is actually only 85% of the way to
-           make it more clear there's set-up work remaining -->
-      <ProgressRing
-        value={85}
-        strokeWidth={5}
-        class="col-start-1 row-start-1 size-16 text-blue-700 dark:text-blue-300"
-      />
-      <span
-        class="text-text-primary col-start-1 row-start-1 m-auto text-sm font-semibold"
-      >
-        90%
-      </span>
-    </div>
-    <h3 class="text-text-primary mb-1 text-sm font-semibold">
-      {$t`Complete set-up`}
-    </h3>
-    <p class="text-text-secondary mb-4 text-sm">
-      <Trans>
-        Activate your recovery phrase so that you can recover your identity at
-        any point.
-      </Trans>
-    </p>
-    <div class="flex flex-row gap-3">
-      <button
-        onclick={() => (isRecoveryPhraseSetUpDismissed = true)}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Dismiss`}
-      </button>
-      <button
-        onclick={() => goto("/manage/recovery", { state: { activate: true } })}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Activate`}
-      </button>
-    </div>
-  {:else if recoveryPhraseStatus === "unverified"}
-    <InfoIcon class="text-fg-secondary mb-3 size-5" />
-    <h3 class="text-text-primary mb-1 text-sm font-semibold">
-      {$t`Verify your recovery phrase`}
-    </h3>
-    <p class="text-text-secondary mb-4 text-sm">
-      <Trans>
-        Your recovery phrase is active, verify you saved it correctly.
-      </Trans>
-    </p>
-    <div class="flex flex-row gap-3">
-      <button
-        onclick={() => (isRecoveryPhraseSetUpDismissed = true)}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Dismiss`}
-      </button>
-      <button
-        onclick={() => goto("/manage/recovery", { state: { verify: true } })}
-        class="text-text-primary border-none text-sm font-semibold outline-none hover:underline focus-visible:underline"
-      >
-        {$t`Verify`}
-      </button>
-    </div>
-  {/if}
-{/snippet}
-
 <!-- Layout -->
 <div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
   <!-- Sidebar and backdrop on mobile -->
@@ -418,24 +384,19 @@
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/settings"
+            current={page.url.pathname === "/manage/settings"}
+          >
+            <SettingsIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Settings`}</span>
+          </NavItem>
+        </li>
       </ul>
     </nav>
     <!-- Empty space between top and bottom content-->
     <div class="flex-1"></div>
-    <!-- Recovery phrase set-up guidance -->
-    <div
-      class={[
-        "mx-4 mt-24 mb-6",
-        "bg-bg-secondary rounded-xl p-4",
-        "sm:transition-all sm:transition-discrete sm:starting:scale-95 sm:starting:opacity-0",
-        "sm:max-md:hidden",
-        (recoveryPhraseStatus === "verified" ||
-          isRecoveryPhraseSetUpDismissed) &&
-          "hidden scale-90 opacity-0",
-      ]}
-    >
-      {@render recoveryPhraseSetUp()}
-    </div>
     <!-- Footer navigation -->
     <div class="mb-5 flex flex-col gap-0.5 px-4">
       <ul class="contents">
@@ -475,16 +436,6 @@
         >
           <MenuIcon class="size-5" />
         </button>
-        <!-- Indicator that there's a message in the mobile menu
-             e.g. recovery phrase has not been set-up yet. -->
-        <div
-          class={[
-            "border-bg-primary_alt absolute end-2 top-2 size-2 rounded-full border-2 bg-blue-700 dark:bg-blue-300",
-            (recoveryPhraseStatus === "verified" ||
-              isRecoveryPhraseSetUpDismissed) &&
-              "hidden",
-          ]}
-        ></div>
       </div>
       <!-- Empty space between left and right content -->
       <div class="flex-1"></div>
@@ -567,7 +518,16 @@
         isAuthenticating = false;
         handleError(error);
       }}
+      onOpenIdNotConnected={(args) => (notConnectedPayload = args)}
+      onMethodSwitch={(args) => (methodSwitchPayload = args)}
+      onSwitchMode={() => {
+        signUpOpenedFromSignInModal = true;
+        isAuthDialogOpen = false;
+        isCreateIdentityDialogOpen = true;
+      }}
       withinDialog
+      mode="signin"
+      switchModeTitle={$t`Want to create a new identity?`}
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
         {$t`Sign in`}
@@ -576,6 +536,143 @@
         {$t`Choose method to continue`}
       </p>
     </AuthWizard>
+  </Dialog>
+{/if}
+
+{#if isCreateIdentityDialogOpen}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      isCreateIdentityDialogOpen = false;
+      signUpOpenedFromSignInModal = false;
+    }}
+  >
+    <AuthWizard
+      onSignIn={handleSignIn}
+      onSignUp={handleSignUp}
+      onUpgrade={handleUpgrade}
+      onError={(error) => {
+        isCreateIdentityDialogOpen = false;
+        isAuthenticating = false;
+        handleError(error);
+      }}
+      onMethodSwitch={(args) => (methodSwitchPayload = args)}
+      onOpenIdAlreadyLinked={(args) => (alreadyLinkedPayload = args)}
+      onSwitchMode={() => {
+        isCreateIdentityDialogOpen = false;
+        if (signUpOpenedFromSignInModal) {
+          signUpOpenedFromSignInModal = false;
+          isAuthDialogOpen = true;
+        }
+      }}
+      withinDialog
+      mode="signup"
+    >
+      <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+        {$t`Create another identity`}
+      </h1>
+      <p class="text-text-secondary mb-6 self-start text-sm">
+        {$t`Set up a new identity.`}
+      </p>
+    </AuthWizard>
+  </Dialog>
+{/if}
+
+{#if notConnectedPayload !== undefined}
+  {@const payload = notConnectedPayload}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating || isResumingRegistration) {
+        return;
+      }
+      payload.cancel();
+      notConnectedPayload = undefined;
+    }}
+  >
+    <IdentityNotConnected
+      providerName={payload.providerName}
+      providerLogo={payload.providerLogo}
+      userName={payload.userName ?? payload.userEmail ?? payload.providerName}
+      userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
+      loading={isResumingRegistration}
+      onSignUp={async () => {
+        isResumingRegistration = true;
+        try {
+          await payload.resume();
+        } finally {
+          isResumingRegistration = false;
+          notConnectedPayload = undefined;
+        }
+      }}
+      onRecover={() => {
+        payload.cancel();
+        notConnectedPayload = undefined;
+        void goto("/recovery");
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if alreadyLinkedPayload !== undefined}
+  {@const payload = alreadyLinkedPayload}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating || isSigningInAlreadyLinked) {
+        return;
+      }
+      payload.cancel();
+      alreadyLinkedPayload = undefined;
+    }}
+  >
+    <IdentityAlreadyLinked
+      providerName={payload.providerName}
+      providerLogo={payload.providerLogo}
+      userName={payload.userName ?? payload.userEmail ?? payload.providerName}
+      userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
+      loading={isSigningInAlreadyLinked}
+      onSignIn={async () => {
+        isSigningInAlreadyLinked = true;
+        try {
+          await payload.signIn();
+        } finally {
+          isSigningInAlreadyLinked = false;
+          alreadyLinkedPayload = undefined;
+        }
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if methodSwitchPayload !== undefined}
+  {@const payload = methodSwitchPayload}
+  {@const previous = payload.previous}
+  {@const previousEmail =
+    "openid" in previous.authMethod &&
+    previous.authMethod.openid.metadata !== undefined
+      ? getMetadataString(previous.authMethod.openid.metadata, "email")
+      : "sso" in previous.authMethod
+        ? previous.authMethod.sso.email
+        : undefined}
+  <Dialog
+    onClose={() => {
+      const proceed = payload.proceed;
+      methodSwitchPayload = undefined;
+      void proceed();
+    }}
+  >
+    <SwitchAccessMethod
+      userName={previous.name ?? previousEmail ?? `${previous.identityNumber}`}
+      userEmail={previous.name !== undefined ? previousEmail : undefined}
+      fromMethod={authMethodToAccessMethod(previous.authMethod)}
+      toMethod={payload.newProvider}
+      onSwitch={() => {
+        const proceed = payload.proceed;
+        methodSwitchPayload = undefined;
+        void proceed();
+      }}
+    />
   </Dialog>
 {/if}
 
@@ -602,14 +699,20 @@
   </Dialog>
 {/if}
 
-{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
-  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
-    <SignOutConfirmation
-      identity={$lastUsedIdentitiesStore.selected}
-      onSignOut={handleConfirmSignOut}
-      onSignOutAndRemove={handleConfirmSignOutAndRemove}
-    />
-  </Dialog>
+{#if isSignOutDialogOpen}
+  {@const currentIdentity =
+    $lastUsedIdentitiesStore.identities[
+      $authenticatedStore.identityNumber.toString()
+    ]}
+  {#if currentIdentity !== undefined}
+    <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+      <SignOutConfirmation
+        identity={currentIdentity}
+        onSignOut={handleConfirmSignOut}
+        onSignOutAndRemove={handleConfirmSignOutAndRemove}
+      />
+    </Dialog>
+  {/if}
 {/if}
 
 {#if isReauthDialogOpen}
