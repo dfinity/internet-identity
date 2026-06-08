@@ -1276,7 +1276,7 @@ msgid "Support"
 msgstr "مدد"
 
 msgid "support request"
-msgstr "سپورٹ درخواست"
+msgstr "سپورٹ درخواست میں شامل کریں"
 
 msgid "Switch"
 msgstr "سوئچ کریں"

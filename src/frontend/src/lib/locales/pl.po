@@ -1276,7 +1276,7 @@ msgid "Support"
 msgstr "Pomoc"
 
 msgid "support request"
-msgstr "zgłoszeniu do pomocy technicznej"
+msgstr "zgłoszenia do pomocy technicznej"
 
 msgid "Switch"
 msgstr "Przełącz"
