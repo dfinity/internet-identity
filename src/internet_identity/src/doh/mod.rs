@@ -40,9 +40,11 @@ mod types;
 
 use std::cell::RefCell;
 
-use cache::{CacheState, DohCache};
+use cache::DohCache;
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
+
+use crate::single_flight_cache::{get_or_fill, CacheFillError};
 
 #[allow(unused_imports)]
 pub use parser::{parse_txt_response, ParseError};
@@ -183,55 +185,27 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
         .min(MAX_CACHE_AGE_SECS);
 
     // Build the query early so an InvalidName failure short-circuits
-    // before we touch the cache or claim a Fetch token.
+    // before we touch the cache or claim a fill token.
     let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
 
-    // Dedup-aware fetch. The first arrival for a cold name owns the
-    // five-provider fan-out; concurrent arrivals observe the in-flight
-    // marker and poll the cache until it publishes. Each waiter yields a
-    // round from its OWN call context (`yield_round`) and re-checks — it
-    // must NOT block on a future the fetcher wakes, because waking
-    // another call's task runs it to completion in the fetcher's call
-    // context and mis-routes its reply (`ic0.msg_reply ... already
-    // replied`). The cache borrow is released before each await: the
-    // canister is single-threaded and a borrow held across a yield would
-    // trap.
-    let mut waits = 0u32;
-    let token = loop {
-        let now = now_secs();
-        match DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now)) {
-            CacheState::Warm(bytes) => return Ok(bytes),
-            CacheState::Cold(token) => break token,
-            CacheState::Pending => {
-                if waits >= MAX_DEDUP_WAIT_POLLS {
-                    // The in-flight fetch is taking implausibly long (or
-                    // its owner trapped before the staleness window let
-                    // someone take over). Fail transiently rather than
-                    // poll forever; a retry — or the post-staleness
-                    // takeover — resolves it. Report it as its own
-                    // variant (not `AllProvidersFailed`) so "the dedup
-                    // wait was too short" is distinguishable from "our
-                    // own fan-out failed" in diagnostics.
-                    return Err(DohError::DedupWaitTimedOut);
-                }
-                waits += 1;
-                yield_round().await;
-            }
-        }
-    };
-
-    // We own the fetch: fan out to every provider in parallel, decide,
-    // then publish (writes the value entry on success, clears our
-    // in-flight marker either way).
-    let outcomes = fetch_all(&query).await;
-    let result = decide_quorum(&outcomes);
-    let now = now_secs();
-    let expires_at = now.saturating_add(max_age);
-    DOH_CACHE.with(|c| {
-        c.borrow_mut()
-            .publish(name, token, result.as_ref().ok().cloned(), expires_at, now)
-    });
-    result
+    // Dedup-aware fetch via the single-flight cache. The first arrival for
+    // a cold name owns the five-provider fan-out; concurrent arrivals wait
+    // for it to publish. `get_or_fill` owns the whole lookup/wait/publish
+    // dance — including the IC-specific reason a waiter polls from its own
+    // call context instead of being woken (see `crate::single_flight_cache`).
+    get_or_fill(&DOH_CACHE, name, now_secs, max_age, || async move {
+        let outcomes = fetch_all(&query).await;
+        decide_quorum(&outcomes)
+    })
+    .await
+    .map_err(|e| match e {
+        // The dedup wait was too long (or the owner trapped before the
+        // staleness window let someone take over). Surface its own variant
+        // — not `AllProvidersFailed` — so "the dedup wait timed out" is
+        // distinguishable from "our own fan-out failed" in diagnostics.
+        CacheFillError::WaitTimedOut => DohError::DedupWaitTimedOut,
+        CacheFillError::Fill(e) => e,
+    })
 }
 
 /// Whether a queried FQDN sits inside `registered_domain` (case-
@@ -270,39 +244,6 @@ fn now_secs() -> u64 {
 fn now_secs() -> u64 {
     test_support::TEST_NOW_SECS.with(|t| *t.borrow())
 }
-
-/// Upper bound on how many times a dedup waiter polls the cache before
-/// giving up. Each poll yields one consensus round via [`yield_round`],
-/// so this is ~100 rounds of patience — far more than a healthy fan-out
-/// needs — and bounds the wait so a wedged fetch can't pin a waiter
-/// indefinitely. The post-staleness takeover (see
-/// [`crate::single_flight_cache::DEFAULT_PENDING_STALE_AFTER_SECS`]) is
-/// the real recovery path; this is just a backstop against an unbounded
-/// poll loop.
-const MAX_DEDUP_WAIT_POLLS: u32 = 100;
-
-/// Yield one consensus round, resuming in the caller's OWN call context.
-///
-/// A dedup waiter uses this to let the in-flight fetch make progress and
-/// then re-check the cache, *without* being driven by the fetcher's
-/// wake. A timer is no good — its callback can't reply to the waiter's
-/// ingress call — and completing inside another call's context
-/// mis-routes the reply. Awaiting a cheap management-canister round-trip
-/// is the idiomatic way (already used elsewhere in this canister) to
-/// give up a round and come back in our own context; the random bytes
-/// are unused.
-#[cfg(not(test))]
-async fn yield_round() {
-    let _ =
-        ic_cdk::call::<(), (Vec<u8>,)>(candid::Principal::management_canister(), "raw_rand", ())
-            .await;
-}
-
-/// Host-test stand-in: unit tests drive `fetch_txt` sequentially with a
-/// mocked fan-out, so the dedup `Wait` path is never exercised and there
-/// is nothing to yield to.
-#[cfg(test)]
-async fn yield_round() {}
 
 // =====================================================================
 // Production outcall path (cfg(not(test)) only).
