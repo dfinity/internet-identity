@@ -163,7 +163,9 @@ impl<K: Eq + Hash, V> SingleFlightCache<K, V> {
             // Stale: the owner likely died before publishing. Fall through
             // and take the fill over — the insert below overwrites the
             // abandoned marker with a fresh `fill_id`, so the old owner's
-            // late `publish` becomes a no-op.
+            // late `publish` can't clobber the new owner's marker or value
+            // (its only remaining effect is the harmless expired-entry
+            // sweep).
         }
         let fill_id = self.next_fill_id;
         self.next_fill_id = self.next_fill_id.wrapping_add(1);
