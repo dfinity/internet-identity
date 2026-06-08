@@ -28,7 +28,7 @@
   import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
   import type { EmailRecoveryDnsInput } from "$lib/generated/internet_identity_types";
-  import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
+  import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
     fromMnemonicWithoutValidation,
@@ -81,6 +81,9 @@
   );
   const isCurrentAccessMethod = $derived(
     "recoveryPhrase" in $authenticatedStore.authMethod,
+  );
+  const isCurrentEmailRecovery = $derived(
+    "emailRecovery" in $authenticatedStore.authMethod,
   );
   const isUnverified = $derived(
     recoveryPhraseData !== undefined &&
@@ -271,6 +274,10 @@
   const statusEmailRecovery = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);
 
+  /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
+  const diagnosticsEmailRecovery = (nonce: string) =>
+    anonymousActor.email_recovery_diagnostics(nonce);
+
   /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
   const submitEmailDkimLeaf = (
     arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
@@ -351,13 +358,13 @@
 
   // Trigger email recovery wizard (set up or replace, depending on
   // whether an email is already bound). Used by the home dashboard's
-  // smart-action strip when EMAIL_RECOVERY is enabled.
+  // smart-action strip when EMAIL_RECOVERY_SETUP is enabled.
   afterNavigate(() => {
     if (!("email" in page.state)) {
       return;
     }
     replaceState("", {});
-    if ($EMAIL_RECOVERY) {
+    if ($EMAIL_RECOVERY_SETUP) {
       showEmailRecoverySetup = true;
     }
   });
@@ -399,13 +406,14 @@
     />
   {/if}
 
-  <!-- Recovery email card. Gated by the EMAIL_RECOVERY feature
-       flag (default false; auto-enabled on beta.id.ai by the
+  <!-- Recovery email card. Gated by the EMAIL_RECOVERY_SETUP feature
+       flag (default false; auto-enabled on id.ai and beta.id.ai by the
        flag's init callback). -->
-  {#if $EMAIL_RECOVERY}
+  {#if $EMAIL_RECOVERY_SETUP}
     {#if emailRecovery !== undefined}
       <ActiveEmailRecovery
         credential={emailRecovery}
+        isCurrentAccessMethod={isCurrentEmailRecovery}
         onReplace={() => (showEmailRecoverySetup = true)}
         onRemove={() => (removingEmailRecovery = true)}
       />
@@ -417,7 +425,7 @@
   {/if}
 </div>
 
-{#if !$EMAIL_RECOVERY}
+{#if !$EMAIL_RECOVERY_SETUP}
   <section>
     <h2 class="text-text-primary mt-10 text-lg font-semibold">
       {$t`How to stay secure`}
@@ -493,6 +501,7 @@
     <SetupEmailRecoveryWizard
       prepare={prepareAddEmail}
       status={statusEmailRecovery}
+      diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
       onSuccess={handleEmailWizardSuccess}
     />

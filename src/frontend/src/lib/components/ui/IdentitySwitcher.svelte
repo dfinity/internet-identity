@@ -235,7 +235,7 @@
     {/if}
     <button onclick={onUseAnotherIdentity} class="btn btn-tertiary m-4">
       <PlusIcon class="size-4" />
-      {$t`Add another identity`}
+      {$t`Add identity`}
     </button>
   </div>
 </fieldset>

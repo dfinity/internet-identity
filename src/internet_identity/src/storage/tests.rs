@@ -137,6 +137,35 @@ fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
 }
 
 #[test]
+fn should_persist_openid_jwks_across_reload() {
+    use identity_jose::jwk::Jwk;
+
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
+    storage.flush();
+
+    let issuer = "https://accounts.google.com";
+    let jwk: Jwk = serde_json::from_str(
+        r#"{"kty":"RSA","use":"sig","alg":"RS256","kid":"kid-1","n":"modulus","e":"AQAB"}"#,
+    )
+    .unwrap();
+
+    assert!(storage.read_openid_jwks(issuer).is_none());
+    storage.write_openid_jwks(issuer, vec![jwk]);
+
+    // Re-read from the same backing memory to simulate a canister upgrade.
+    let reloaded = Storage::from_memory(memory);
+    let restored = reloaded
+        .read_openid_jwks(issuer)
+        .expect("JWKs should persist across reload");
+    assert_eq!(restored.len(), 1);
+    assert_eq!(restored[0].kid(), Some("kid-1"));
+
+    // Unknown issuers have no cached keys.
+    assert!(reloaded.read_openid_jwks("https://other.example").is_none());
+}
+
+#[test]
 fn should_write_and_update_openid_credential_lookup() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);

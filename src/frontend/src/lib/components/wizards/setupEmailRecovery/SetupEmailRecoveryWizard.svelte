@@ -28,8 +28,10 @@
   import SendConfirmationEmail from "./views/SendConfirmationEmail.svelte";
   import FailedView from "./views/FailedView.svelte";
   import UnsupportedDomain from "./views/UnsupportedDomain.svelte";
+  import { buildDiagnosticsBlob } from "./diagnostics";
   import type {
     EmailRecoveryChallenge,
+    EmailRecoveryDiagnostics,
     EmailRecoveryDnsInput,
     EmailRecoveryError,
     EmailRecoveryStatus,
@@ -53,6 +55,8 @@
     prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
     /** Anonymous wrapper around `email_recovery_status` (query). */
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
+    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
     /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
     submitDkimLeaf: (
       arg: EmailRecoverySubmitDkimLeafArg,
@@ -62,7 +66,8 @@
     onSuccess: (address: string) => void;
   }
 
-  const { prepare, status, submitDkimLeaf, onSuccess }: Props = $props();
+  const { prepare, status, diagnostics, submitDkimLeaf, onSuccess }: Props =
+    $props();
 
   type Stage =
     | { kind: "enter"; initialError?: string }
@@ -84,7 +89,7 @@
         path: Path;
       }
     | { kind: "unsupported"; domain: string }
-    | { kind: "failed"; reason: string };
+    | { kind: "failed"; reason: string; diagnostics?: string };
 
   let stage = $state<Stage>({ kind: "enter" });
 
@@ -177,6 +182,19 @@
     return "Unexpected status from the canister.";
   };
 
+  // Best-effort fetch of the canister's strictly-public diagnostics for
+  // this challenge, formatted into a copyable blob (incl. the gateway
+  // `message_id`). The pending entry is sticky on `Failed`, so this read
+  // lands while it's still present; on any hiccup we fall back to
+  // FE-only fields so the user always gets something to share.
+  const collectDiagnostics = async (nonce: string): Promise<string> => {
+    try {
+      return buildDiagnosticsBlob((await diagnostics(nonce))[0]);
+    } catch {
+      return buildDiagnosticsBlob(undefined);
+    }
+  };
+
   const handleAddressSubmitted = async (address: string) => {
     setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.AddressSubmitted);
     const domain = address.split("@")[1] ?? "";
@@ -253,11 +271,34 @@
           return;
         }
         if ("Failed" in result || "Expired" in result) {
+          // A DomainNotAllowlisted / DomainNotSupported verdict (e.g.
+          // a DoH-fallback leaf submission for a domain the operator
+          // hasn't enabled) gets the dedicated unsupported-domain
+          // view, matching the prepare-time routing — not the generic
+          // failure screen.
+          if (
+            "Failed" in result &&
+            ("DomainNotAllowlisted" in result.Failed ||
+              "DomainNotSupported" in result.Failed)
+          ) {
+            setupEmailRecoveryFunnel.trigger(
+              SetupEmailRecoveryEvents.UnsupportedDomain,
+              { reason: failureReason(result) },
+            );
+            setupEmailRecoveryFunnel.close();
+            stage = { kind: "unsupported", domain };
+            return;
+          }
           setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Failed, {
             reason: failureReason(result),
           });
           setupEmailRecoveryFunnel.close();
-          stage = { kind: "failed", reason: friendlyError(result) };
+          const diagnosticsBlob = await collectDiagnostics(nonce);
+          stage = {
+            kind: "failed",
+            reason: friendlyError(result),
+            diagnostics: diagnosticsBlob,
+          };
           return;
         }
         if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
@@ -265,44 +306,104 @@
           setupEmailRecoveryFunnel.trigger(
             SetupEmailRecoveryEvents.NeedDkimLeaf,
           );
-          // Email arrived; the canister has the selector. Walk the
-          // single missing DKIM leaf and submit it. If the leaf
-          // walk fails we keep the loop alive — the canister-side
-          // entry will time out and the user will see Expired.
+          // Email arrived; the canister has the selector. Try to walk
+          // the missing DKIM leaf via DNSSEC. When the record CNAMEs
+          // into an unsigned zone (outlook.com ->
+          // outbound.protection.outlook.com) the walk yields
+          // `undefined`; we then submit an empty hop set, which asks
+          // the canister to resolve the key over its own DoH path
+          // instead. That either completes the flow (allowlisted
+          // domain) or throws DomainNotAllowlisted, which we route to
+          // the unsupported-domain view rather than poll to Expired.
           const selector = result.NeedDkimLeaf.selector;
           try {
             const walked = await assembleDkimResolution(domain, selector);
-            if (walked !== undefined) {
-              const submission = await submitDkimLeaf({
-                nonce,
-                hops: walked.hops,
-                extra_chains: walked.extraChains,
-              });
+            const submission = await submitDkimLeaf(
+              walked !== undefined
+                ? { nonce, hops: walked.hops, extra_chains: walked.extraChains }
+                : { nonce, hops: [], extra_chains: [] },
+            );
+            setupEmailRecoveryFunnel.trigger(
+              SetupEmailRecoveryEvents.DkimLeafSubmitted,
+            );
+            // Handle every terminal variant the status type can carry,
+            // not just the one the canister returns today — the FE must
+            // stay correct if the backend's `Ok` arm changes.
+            if ("RegistrationSucceeded" in submission) {
               setupEmailRecoveryFunnel.trigger(
-                SetupEmailRecoveryEvents.DkimLeafSubmitted,
+                SetupEmailRecoveryEvents.Succeeded,
               );
-              if ("RegistrationSucceeded" in submission) {
+              setupEmailRecoveryFunnel.close();
+              polling = false;
+              onSuccess(address);
+              return;
+            }
+            if ("Failed" in submission || "Expired" in submission) {
+              if (
+                "Failed" in submission &&
+                ("DomainNotAllowlisted" in submission.Failed ||
+                  "DomainNotSupported" in submission.Failed)
+              ) {
                 setupEmailRecoveryFunnel.trigger(
-                  SetupEmailRecoveryEvents.Succeeded,
-                );
-                setupEmailRecoveryFunnel.close();
-                polling = false;
-                onSuccess(address);
-                return;
-              }
-              if ("Failed" in submission || "Expired" in submission) {
-                setupEmailRecoveryFunnel.trigger(
-                  SetupEmailRecoveryEvents.Failed,
+                  SetupEmailRecoveryEvents.UnsupportedDomain,
                   { reason: failureReason(submission) },
                 );
                 setupEmailRecoveryFunnel.close();
-                stage = { kind: "failed", reason: friendlyError(submission) };
+                polling = false;
+                stage = { kind: "unsupported", domain };
                 return;
               }
+              setupEmailRecoveryFunnel.trigger(
+                SetupEmailRecoveryEvents.Failed,
+                {
+                  reason: failureReason(submission),
+                },
+              );
+              setupEmailRecoveryFunnel.close();
+              const diagnosticsBlob = await collectDiagnostics(nonce);
+              polling = false;
+              stage = {
+                kind: "failed",
+                reason: friendlyError(submission),
+                diagnostics: diagnosticsBlob,
+              };
+              return;
             }
-          } catch {
-            // Submit failed; fall through to keep polling so the
-            // user sees a clean Expired if the canister times out.
+            // Pending / NeedDkimLeaf from a submit: non-terminal, fall
+            // through and let the polling loop carry the flow forward.
+          } catch (e) {
+            // A non-canister error (transport failure, dropped
+            // response, an unexpected throw in the leaf walk) leaves
+            // the canister state unknown, and our single submit attempt
+            // is already spent (`dkimLeafSubmitted`), so the poll loop
+            // would never re-submit and the entry would hang at
+            // NeedDkimLeaf until the 30-minute Expired. Surface a
+            // retryable failure instead of staying silent.
+            if (!isCanisterError<EmailRecoveryError>(e)) {
+              setupEmailRecoveryFunnel.trigger(
+                SetupEmailRecoveryEvents.Failed,
+                {
+                  reason: "SubmitFailed",
+                },
+              );
+              setupEmailRecoveryFunnel.close();
+              const diagnosticsBlob = await collectDiagnostics(nonce);
+              polling = false;
+              stage = {
+                kind: "failed",
+                reason:
+                  "We couldn't reach Internet Identity to verify your email. Please try again.",
+                diagnostics: diagnosticsBlob,
+              };
+              return;
+            }
+            // A canister `Err` means the canister has already moved the
+            // pending entry to a terminal state, so we let the polling
+            // loop's Failed/Expired branch surface the authoritative
+            // reason on its next tick — it routes
+            // DomainNotAllowlisted/DomainNotSupported to the
+            // unsupported-domain view and every other reason to the
+            // failed view (with diagnostics). Nothing is swallowed.
           }
         }
         // Pending or NeedDkimLeaf-but-already-submitted: back off
@@ -358,5 +459,9 @@
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
 {:else}
-  <FailedView reason={stage.reason} onRetry={handleRetry} />
+  <FailedView
+    reason={stage.reason}
+    diagnostics={stage.diagnostics}
+    onRetry={handleRetry}
+  />
 {/if}

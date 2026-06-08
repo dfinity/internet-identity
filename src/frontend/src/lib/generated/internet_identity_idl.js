@@ -42,6 +42,7 @@ export const idlFactory = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({
@@ -320,6 +321,16 @@ export const idlFactory = ({ IDL }) => {
     'DomainNotAllowlisted' : IDL.Text,
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
+  });
+  const VerificationPath = IDL.Variant({
+    'Doh' : IDL.Null,
+    'Dnssec' : IDL.Null,
+  });
+  const EmailRecoveryDiagnostics = IDL.Record({
+    'created_at' : Timestamp,
+    'verification_path' : VerificationPath,
+    'message_id' : IDL.Opt(IDL.Text),
+    'reason_code' : IDL.Text,
   });
   const SessionKey = PublicKey;
   const EmailRecoveryGetDelegationArgs = IDL.Record({
@@ -697,6 +708,7 @@ export const idlFactory = ({ IDL }) => {
     'envelope' : IDL.Opt(SmtpEnvelope),
     'message' : IDL.Opt(SmtpMessage),
     'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'message_id' : IDL.Opt(IDL.Text),
   });
   const SmtpRequestError = IDL.Record({
     'code' : IDL.Nat64,
@@ -865,6 +877,11 @@ export const idlFactory = ({ IDL }) => {
         [IdentityNumber, IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
+      ),
+    'email_recovery_diagnostics' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(EmailRecoveryDiagnostics)],
+        ['query'],
       ),
     'email_recovery_get_delegation' : IDL.Func(
         [EmailRecoveryGetDelegationArgs],
@@ -1195,6 +1212,7 @@ export const init = ({ IDL }) => {
     'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
+    'seed_jwks' : IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({

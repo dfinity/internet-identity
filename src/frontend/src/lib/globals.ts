@@ -38,6 +38,7 @@ const backendCanisterConfigIDL = IDL.Record({
         email_verification: IDL.Opt(OpenIdEmailVerificationIDL),
         issuer: IDL.Text,
         auth_scope: IDL.Vec(IDL.Text),
+        seed_jwks: IDL.Opt(IDL.Vec(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)))),
         client_id: IDL.Text,
       }),
     ),
@@ -58,6 +59,7 @@ export interface OpenIdConfig {
   email_verification: [] | [OpenIdEmailVerification];
   issuer: string;
   auth_scope: Array<string>;
+  seed_jwks: [] | [Array<Array<[string, string]>>];
   client_id: string;
 }
 export type BackendCanisterConfig = {
@@ -112,3 +114,8 @@ export const getPrimaryOrigin = () =>
   frontendCanisterConfig.related_origins[0]?.find((origin) =>
     origin.endsWith("id.ai"),
   );
+
+// Get the feature flag value configured via the canister deploy args, or
+// `undefined` when the operator didn't configure this flag.
+export const getConfiguredFeatureFlag = (name: string): boolean | undefined =>
+  frontendCanisterConfig.feature_flags[0]?.find(([key]) => key === name)?.[1];

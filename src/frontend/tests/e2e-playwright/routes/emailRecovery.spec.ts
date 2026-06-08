@@ -60,7 +60,6 @@ test.describe("Email recovery — wizard surface", () => {
     signInWithIdentity,
     identities,
   }) => {
-    await emailRecovery.enableFlag();
     await manageRecoveryPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
     await emailRecovery.assertSetupCardVisible();
@@ -83,9 +82,7 @@ test.describe("Email recovery — wizard surface", () => {
 
   test("recover sign-in shows the email button and opens the wizard", async ({
     page,
-    emailRecovery,
   }) => {
-    await emailRecovery.enableFlag();
     await page.goto(II_URL + "/recovery");
     await expect(
       page.getByRole("button", { name: "Recover with email" }),
@@ -112,7 +109,6 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
   }) => {
     test.slow(); // RSA keygen + DNSSEC walk + status polling
 
-    await emailRecovery.enableFlag();
     await emailRecovery.installDohInterceptor();
 
     // ---------------------------------------------------------------
@@ -198,6 +194,45 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     });
     await expect(
       page.getByRole("heading", { name: /access methods/i }).first(),
+    ).toBeVisible();
+
+    // ---------------------------------------------------------------
+    // ADP — signed in via email recovery, the recovery-email card
+    // disables both Replace and Remove and shows an Active badge.
+    // ---------------------------------------------------------------
+    // Use the sidebar link, not page.goto: a full reload wipes the
+    // in-memory authentication store and the card would render in
+    // its non-active state.
+    const openMenu = page.getByRole("button", { name: "Open menu" });
+    if (await openMenu.isVisible()) {
+      await openMenu.click();
+    }
+    await page.getByRole("link", { name: "Recovery" }).click();
+    await page.waitForURL(/\/manage\/recovery/);
+    const emailCard = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "Recovery email" }),
+    });
+    await expect(emailCard.getByText("Active", { exact: true })).toBeVisible();
+
+    await emailCard.getByRole("button", { name: "More options" }).click();
+    const menu = emailCard.getByRole("menu");
+    const replaceItem = menu.getByRole("menuitem", { name: "Replace" });
+    const removeItem = menu.getByRole("menuitem", { name: "Remove" });
+    await expect(replaceItem).toBeDisabled();
+    await expect(removeItem).toBeDisabled();
+
+    await replaceItem.hover({ force: true });
+    await expect(
+      page
+        .getByRole("tooltip")
+        .filter({ hasText: "Sign in with another method before changing" }),
+    ).toBeVisible();
+
+    await removeItem.hover({ force: true });
+    await expect(
+      page
+        .getByRole("tooltip")
+        .filter({ hasText: "Sign in with another method before removing" }),
     ).toBeVisible();
   });
 });

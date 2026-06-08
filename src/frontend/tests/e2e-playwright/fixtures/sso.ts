@@ -15,40 +15,62 @@ export const SSO_OPENID_PORT = 11107;
  */
 export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 
+type SsoEntryMode = "signin" | "signup" | "both";
+
+const ssoEntryLabel = (mode: SsoEntryMode): string =>
+  mode === "signin"
+    ? "Sign in with SSO"
+    : mode === "signup"
+      ? "Sign up with SSO"
+      : "Continue with SSO";
+
 export const test = base.extend<{
   /**
-   * Drives only the II-side of the SSO entry: clicks "Continue with
-   * SSO", types the discovery domain, waits for hop-1 + hop-2 to
-   * resolve, then clicks Continue and returns the IdP popup. The popup
-   * itself is just `test_openid_provider`, so callers follow up with
+   * Drives only the II-side of the SSO entry: clicks the SSO entry
+   * button (label varies with the picker's mode), types the discovery
+   * domain, waits for hop-1 + hop-2 to resolve, then clicks Continue
+   * and returns the IdP popup. The popup itself is just
+   * `test_openid_provider`, so callers follow up with
    * `signInWithOpenId` from the OpenID fixture the same way
    * direct-OpenID tests do — there's nothing SSO-specific about the
    * IdP page.
    */
-  openSsoPopup: (authPage: Page, domain?: string) => Promise<Page>;
+  openSsoPopup: (
+    authPage: Page,
+    domain?: string,
+    mode?: SsoEntryMode,
+  ) => Promise<Page>;
 }>({
   // Playwright requires fixture functions to start with an object
   // destructuring pattern even when nothing is consumed; the empty
   // pattern would normally trip the no-empty-pattern lint rule.
   // eslint-disable-next-line no-empty-pattern
   openSsoPopup: async ({}, use) => {
-    await use(async (authPage: Page, domain: string = SSO_DISCOVERY_DOMAIN) => {
-      await authPage.getByRole("button", { name: "Continue with SSO" }).click();
-      await authPage
-        .getByRole("textbox", { name: "Company domain" })
-        .fill(domain);
-      // Continue is disabled until both `add_discoverable_oidc_config`
-      // and the two-hop discovery resolve and stash a `preparedResult`.
-      // The button label flips between "Checking..." and "Continue" —
-      // wait on the latter to know discovery's done.
-      const continueButton = authPage.getByRole("button", {
-        name: "Continue",
-        exact: true,
-      });
-      await expect(continueButton).toBeEnabled({ timeout: 30_000 });
-      const popupPromise = authPage.context().waitForEvent("page");
-      await continueButton.click();
-      return await popupPromise;
-    });
+    await use(
+      async (
+        authPage: Page,
+        domain: string = SSO_DISCOVERY_DOMAIN,
+        mode: SsoEntryMode = "both",
+      ) => {
+        await authPage
+          .getByRole("button", { name: ssoEntryLabel(mode) })
+          .click();
+        await authPage
+          .getByRole("textbox", { name: "Company domain" })
+          .fill(domain);
+        // Continue is disabled until both `add_discoverable_oidc_config`
+        // and the two-hop discovery resolve and stash a `preparedResult`.
+        // The button label flips between "Checking..." and "Continue" —
+        // wait on the latter to know discovery's done.
+        const continueButton = authPage.getByRole("button", {
+          name: "Continue",
+          exact: true,
+        });
+        await expect(continueButton).toBeEnabled({ timeout: 30_000 });
+        const popupPromise = authPage.context().waitForEvent("page");
+        await continueButton.click();
+        return await popupPromise;
+      },
+    );
   },
 });

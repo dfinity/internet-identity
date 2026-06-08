@@ -73,6 +73,47 @@ fn ii_canister_serves_http_assets() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Verifies that the `.well-known/ic-domains` asset lists the related origins
+/// together with the backend origin, each with its URL scheme stripped.
+#[test]
+fn ii_canister_serves_ic_domains_with_backend_origin() -> Result<(), RejectResponse> {
+    let env = env();
+    let config = InternetIdentityInit {
+        related_origins: Some(vec![
+            "https://beta.id.ai".to_string(),
+            "https://beta.identity.internetcomputer.org".to_string(),
+            "https://beta.identity.ic0.app".to_string(),
+            "https://beta.identity.icp0.io".to_string(),
+        ]),
+        backend_origin: Some("https://backend.beta.id.ai".to_string()),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/ic-domains".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(2),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+    assert_eq!(http_response.status_code, 200);
+
+    let body = String::from_utf8(http_response.body.to_vec())
+        .expect("/.well-known/ic-domains body is not valid UTF-8");
+    assert_eq!(
+        body,
+        "beta.id.ai\n\
+         beta.identity.internetcomputer.org\n\
+         beta.identity.ic0.app\n\
+         beta.identity.icp0.io\n\
+         backend.beta.id.ai"
+    );
+
+    Ok(())
+}
+
 /// Verifies that expected metrics are available via the HTTP endpoint.
 #[test]
 fn ii_canister_serves_http_metrics() -> Result<(), RejectResponse> {
@@ -899,6 +940,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         auth_scope: vec!["openid".to_string(), "email".to_string()],
         fedcm_uri: None,
         email_verification: None,
+        seed_jwks: None,
     }];
     let config = InternetIdentityInit {
         openid_configs: Some(openid_configs.clone()),
