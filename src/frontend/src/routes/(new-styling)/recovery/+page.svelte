@@ -3,7 +3,7 @@
   import { t } from "$lib/stores/locale.store";
   import {
     ArrowRightIcon,
-    KeyIcon,
+    HashIcon,
     MailIcon,
     RefreshCcw,
     ShieldIcon,
@@ -272,11 +272,11 @@
             class="group !flex-col !items-stretch !gap-1 py-4 text-start"
           >
             <span class="flex w-full items-center gap-3">
-              <KeyIcon class="text-fg-tertiary size-5 shrink-0" />
+              <HashIcon class="text-fg-tertiary size-5 shrink-0" />
               <span
                 class="text-text-primary grow text-start text-base font-semibold"
               >
-                {$t`Identity number`}
+                {$t`Legacy identity`}
               </span>
               <ArrowRightIcon
                 class={[
@@ -287,7 +287,7 @@
               />
             </span>
             <span class="text-text-tertiary ps-8 text-sm font-normal">
-              Recover a legacy identity by its number.
+              {$t`Enter your identity number.`}
             </span>
           </ButtonCard>
         </div>

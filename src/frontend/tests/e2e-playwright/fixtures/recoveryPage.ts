@@ -161,7 +161,7 @@ class RecoveryPage {
   async startIdentityNumberUpgrade<T>(
     fn: (wizard: MigrationWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page.getByRole("button", { name: /^Identity number/ }).click();
+    await this.#page.getByRole("button", { name: /^Legacy identity/ }).click();
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     const wizard = new MigrationWizard(dialog);
