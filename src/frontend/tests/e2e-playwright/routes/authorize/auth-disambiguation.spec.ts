@@ -380,12 +380,12 @@ test.describe("IdentityAlreadyLinkedDialog at /authorize (sign-up path)", () => 
         authPage.getByRole("heading", { name: "Already connected" }),
       ).toBeVisible();
 
-      // Dismiss the AlreadyLinked dialog via the wizard's Close button —
-      // the stacked dialog gets `data-testid="auth-wizard-dialog"` so the
-      // locator targets the inner dialog unambiguously.
+      // Dismiss the AlreadyLinked dialog via the in-content "Use a
+      // different method" link — clicking the parent dialog's X would
+      // close the whole sign-up modal, but the test wants the picker to
+      // remain accessible so the user can pick passkey instead.
       await authPage
-        .getByTestId("auth-wizard-dialog")
-        .getByRole("button", { name: "Close" })
+        .getByRole("button", { name: "Use a different method" })
         .click();
       await expect(
         authPage.getByRole("heading", { name: "Already connected" }),

@@ -5,7 +5,6 @@
     type MethodTag,
   } from "$lib/flows/authFlow.svelte";
   import { type Snippet, untrack } from "svelte";
-  import { fade } from "svelte/transition";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
   import Dialog, { isInsideDialog } from "$lib/components/ui/Dialog.svelte";
@@ -358,6 +357,7 @@
       userEmail={authFlow.userEmail}
       onSignUp={handleConfirmOpenIdSignUp}
       onRecover={handleRecoverFromNotConnected}
+      onCancel={cancelSubView}
       loading={isAuthenticating}
     />
   {:else if authFlow.view === "openIdAlreadyLinked"}
@@ -368,6 +368,7 @@
       userName={authFlow.userName}
       userEmail={authFlow.userEmail}
       onSignIn={handleConfirmOpenIdSignIn}
+      onCancel={cancelSubView}
       loading={isAuthenticating}
     />
   {:else if authFlow.view === "confirmMethodSwitch" && authFlow.pendingMethodSwitch !== undefined}
@@ -378,16 +379,13 @@
       providerIssuer={authFlow.pendingMethodSwitch.providerIssuer}
       providerName={authFlow.pendingMethodSwitch.providerName}
       onSwitch={handleConfirmMethodSwitch}
+      onCancel={cancelSubView}
     />
   {/if}
 {/snippet}
 
 {#snippet pickerBlock()}
-  {#key mode}
-    <div in:fade={{ duration: 150 }}>
-      {@render children?.(inDialog || isElevated)}
-    </div>
-  {/key}
+  {@render children?.(inDialog || isElevated)}
   <PickAuthenticationMethod
     setupOrUseExistingPasskey={mode === "signin"
       ? handleContinueWithExistingPasskey
@@ -416,26 +414,14 @@
         ? () => (isContinueFromAnotherDeviceVisible = false)
         : isUpgrading
           ? () => (isUpgrading = false)
-          : authFlow.view !== "chooseMethod"
-            ? cancelSubView
-            : reset}
-  <!-- Passthrough only when the wizard is showing the picker inside a
-       parent Dialog — we don't want a redundant inner <dialog> wrapping
-       the picker in that case. For sub-views (captcha, disambiguation,
-       upgrade, continue-on-another-device) the wizard stacks its own
-       Dialog on top, so its Close button cancels just the sub-view
-       instead of the entire parent modal. -->
-  {@const passthrough =
-    inDialog &&
-    authFlow.view === "chooseMethod" &&
-    authFlow.captcha === undefined &&
-    !isContinueFromAnotherDeviceVisible &&
-    !isUpgrading}
-  <Dialog
-    onClose={dialogOnClose}
-    {passthrough}
-    data-testid="auth-wizard-dialog"
-  >
+          : reset}
+  <!-- When the wizard is nested inside a parent Dialog, pass through
+       and render content directly into the parent — avoids stacking
+       two <dialog> elements (Safari renders both visibly, focus and
+       top-layer cleanup race in CI). Sub-views that need a "go back
+       to picker" affordance render their own in-content button which
+       calls cancelSubView. -->
+  <Dialog onClose={dialogOnClose} passthrough={inDialog}>
     {#if authFlow.captcha !== undefined}
       <SolveCaptcha {...authFlow.captcha} />
     {:else if isContinueFromAnotherDeviceVisible}

@@ -21,6 +21,7 @@
     providerIssuer?: string;
     providerName?: string;
     onSwitch: () => void;
+    onCancel?: () => void;
   }
 
   let {
@@ -29,6 +30,7 @@
     providerIssuer,
     providerName,
     onSwitch,
+    onCancel,
   }: Props = $props();
 
   const previous: LastUsedIdentity | undefined = $derived(
@@ -166,5 +168,14 @@
       <RepeatIcon class="size-4" aria-hidden="true" />
       {$t`Switch method`}
     </button>
+
+    {#if onCancel !== undefined}
+      <button
+        onclick={onCancel}
+        class="text-text-tertiary hover:text-text-primary mt-3 self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+      >
+        {$t`Use a different method`}
+      </button>
+    {/if}
   </div>
 {/if}

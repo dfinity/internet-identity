@@ -11,6 +11,7 @@
     userName?: string;
     userEmail?: string;
     onSignIn: () => void;
+    onCancel?: () => void;
     loading?: boolean;
   }
 
@@ -21,6 +22,7 @@
     userName,
     userEmail,
     onSignIn,
+    onCancel,
     loading = false,
   }: Props = $props();
 
@@ -97,4 +99,14 @@
     {/if}
     {$t`Sign in`}
   </button>
+
+  {#if onCancel !== undefined}
+    <button
+      onclick={onCancel}
+      disabled={loading}
+      class="text-text-tertiary hover:text-text-primary mt-3 self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`Use a different method`}
+    </button>
+  {/if}
 </div>
