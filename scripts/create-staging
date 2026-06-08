@@ -50,6 +50,20 @@ if [ "$DRY_RUN" = false ] && ! command -v icp >/dev/null 2>&1; then
     exit 1
 fi
 
+# A projectless working directory for the icp invocations. icp-cli loads the
+# whole `icp.yaml` project whenever it runs inside one — and that load fails
+# here because II's frontend canister declares an `init_args.path`
+# (.icp/cache/init-args/...) that only exists after a build/render. Creating
+# two empty canisters has nothing to do with the II project, so we run from a
+# scratch dir with no `icp.yaml` in any ancestor: the documented "outside of a
+# project context" form (`icp canister create -n ic --detached`).
+WORKDIR=""
+cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; return 0; }
+trap cleanup EXIT
+if [ "$DRY_RUN" = false ]; then
+    WORKDIR="$(mktemp -d -t ii-create-staging.XXXXXX)"
+fi
+
 # Create one detached canister via the proxy and echo its id on stdout
 # (-q makes icp print only the id). All chatter goes to stderr so the id
 # is cleanly capturable with $(...).
@@ -68,7 +82,8 @@ create_one() {
         return 0
     fi
     echo "Creating $label on $IC_NETWORK via proxy $PROXY_CANISTER_ID (${CREATE_CYCLES} cycles) ..." >&2
-    "${cmd[@]}"
+    # Run from the projectless scratch dir so no `icp.yaml` is loaded.
+    ( cd "$WORKDIR" && "${cmd[@]}" )
 }
 
 UPPER="$(echo "$NAME" | tr '[:lower:]' '[:upper:]')"
