@@ -345,6 +345,19 @@
                       await goto("/manage");
                       return;
                     }
+                    // Safari (and Firefox in strict mode) consumes the
+                    // click's transient activation when WebAuthn prompts —
+                    // so window.open after the passkey await silently fails
+                    // and the browser logs a "popup blocked" warning. Skip
+                    // the attempt when activation is gone and fall back to
+                    // same-tab navigation; the in-memory authenticationStore
+                    // survives goto() so /manage loads signed in.
+                    const canOpenPopup =
+                      navigator.userActivation?.isActive ?? true;
+                    if (!canOpenPopup) {
+                      await goto("/manage");
+                      return;
+                    }
                     const nonce = generateHandoffNonce();
                     const w = window.open(
                       `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
