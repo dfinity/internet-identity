@@ -6,22 +6,8 @@ import {
 } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import {
-  generateHandoffNonce,
-  receiveAuthFromOpener,
-  sendAuthToOpenedTab,
-} from "./auth-handoff";
+import { receiveAuthFromOpener, sendAuthToOpenedTab } from "./auth-handoff";
 import { toBase64 } from "./utils";
-
-const TEST_NONCE = "test-nonce-123";
-const TEST_CANISTER_ID = "rdmx6-jaaaa-aaaaa-aaadq-cai";
-
-vi.mock("$lib/globals", () => {
-  // vi.mock is hoisted — use require() to avoid TDZ issues with top-level consts.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Principal } = require("@icp-sdk/core/principal");
-  return { canisterId: Principal.fromText("rdmx6-jaaaa-aaaaa-aaadq-cai") };
-});
 
 const stubReceiveWindow = (params: {
   opener: { closed: boolean; postMessage: ReturnType<typeof vi.fn> } | null;
@@ -29,12 +15,7 @@ const stubReceiveWindow = (params: {
   messageListeners?: ((e: MessageEvent) => void)[];
   replaceState?: ReturnType<typeof vi.fn>;
 }) => {
-  const {
-    opener,
-    hash = `#h=${TEST_NONCE}`,
-    messageListeners,
-    replaceState,
-  } = params;
+  const { opener, hash = "#handoff", messageListeners, replaceState } = params;
   const locationStub = {
     origin: "https://id.ai",
     hash,
@@ -118,10 +99,9 @@ async function fireReadyAndWait(
   messageListeners: ((e: MessageEvent) => void)[],
   targetWindow: { postMessage: ReturnType<typeof vi.fn> },
   publicKeyDer: string,
-  nonce = TEST_NONCE,
 ): Promise<void> {
   const readyEvent = new MessageEvent("message", {
-    data: { type: "ii-handoff:ready", nonce, publicKeyDer },
+    data: { type: "ii-handoff:ready", publicKeyDer },
     origin: "https://id.ai",
     source: targetWindow as unknown as Window,
   });
@@ -147,7 +127,7 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth);
     await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
     const [payload] = targetWindow.postMessage.mock.calls[0];
@@ -180,7 +160,7 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth);
     await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
     const [payload] = targetWindow.postMessage.mock.calls[0];
@@ -209,7 +189,7 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth);
     await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
     const [payload] = targetWindow.postMessage.mock.calls[0];
@@ -229,7 +209,7 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth);
     await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
     const [payload] = targetWindow.postMessage.mock.calls[0];
@@ -237,28 +217,6 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
       kind: "emailRecovery",
       principal: "2vxsx-fae",
     });
-  }, 2000);
-
-  it("new chain has targets set to the II canister principal", async () => {
-    const auth = await makeOpenerAuth();
-    const { publicKeyDer } = await makeReceiverKey();
-
-    const messageListeners: ((e: MessageEvent) => void)[] = [];
-    const targetWindow = { postMessage: vi.fn(), closed: false };
-    stubSenderWindow(messageListeners);
-
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
-    await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
-
-    const [payload] = targetWindow.postMessage.mock.calls[0];
-    const newChain = DelegationChain.fromJSON(JSON.parse(payload.chainJson));
-
-    const lastDelegation =
-      newChain.delegations[newChain.delegations.length - 1];
-    expect(lastDelegation.delegation.targets).toBeDefined();
-    const targets = lastDelegation.delegation.targets!;
-    expect(targets.length).toBe(1);
-    expect(targets[0].toText()).toBe(TEST_CANISTER_ID);
   }, 2000);
 
   it("new chain expiration is within 30 minutes from now", async () => {
@@ -270,7 +228,7 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth);
     await fireReadyAndWait(messageListeners, targetWindow, publicKeyDer);
 
     const [payload] = targetWindow.postMessage.mock.calls[0];
@@ -307,10 +265,10 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, TEST_NONCE);
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth);
 
     const readyEvent = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      data: { type: "ii-handoff:ready", publicKeyDer },
       origin: "https://id.ai",
       source: targetWindow as unknown as Window,
     });
@@ -318,9 +276,6 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
       listener(readyEvent);
     }
 
-    // Wait for chain creation; may or may not call postMessage depending on
-    // whether DelegationChain.create propagates expiry. Either way the
-    // resulting chain must fail isDelegationValid on the receiver side.
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     if (targetWindow.postMessage.mock.calls.length > 0) {
@@ -340,14 +295,13 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const { cancel } = sendAuthToOpenedTab(
       targetWindow as unknown as Window,
       auth,
-      TEST_NONCE,
     );
 
     cancel();
 
     const { publicKeyDer } = await makeReceiverKey();
     const readyEvent = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      data: { type: "ii-handoff:ready", publicKeyDer },
       origin: "https://id.ai",
       source: targetWindow as unknown as Window,
     });
@@ -356,39 +310,6 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     }
 
     await new Promise((resolve) => setTimeout(resolve, 200));
-
-    expect(targetWindow.postMessage).not.toHaveBeenCalled();
-  }, 2000);
-
-  it("ignores ready messages whose nonce does not match expectedNonce", async () => {
-    const auth = await makeOpenerAuth();
-    const { publicKeyDer } = await makeReceiverKey();
-
-    const messageListeners: ((e: MessageEvent) => void)[] = [];
-    const targetWindow = { postMessage: vi.fn(), closed: false };
-    stubSenderWindow(messageListeners);
-
-    sendAuthToOpenedTab(
-      targetWindow as unknown as Window,
-      auth,
-      TEST_NONCE,
-      100,
-    );
-
-    const spoofedReady = new MessageEvent("message", {
-      data: {
-        type: "ii-handoff:ready",
-        nonce: "wrong-nonce",
-        publicKeyDer,
-      },
-      origin: "https://id.ai",
-      source: targetWindow as unknown as Window,
-    });
-    for (const listener of messageListeners) {
-      listener(spoofedReady);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(targetWindow.postMessage).not.toHaveBeenCalled();
   }, 2000);
@@ -402,15 +323,10 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const wrongSource = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(
-      targetWindow as unknown as Window,
-      auth,
-      TEST_NONCE,
-      100,
-    );
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, 100);
 
     const wrongSourceReady = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      data: { type: "ii-handoff:ready", publicKeyDer },
       origin: "https://id.ai",
       source: wrongSource as unknown as Window,
     });
@@ -431,15 +347,10 @@ describe("sendAuthToOpenedTab / receiveAuthFromOpener — delegation protocol", 
     const targetWindow = { postMessage: vi.fn(), closed: false };
     stubSenderWindow(messageListeners);
 
-    sendAuthToOpenedTab(
-      targetWindow as unknown as Window,
-      auth,
-      TEST_NONCE,
-      100,
-    );
+    sendAuthToOpenedTab(targetWindow as unknown as Window, auth, 100);
 
     const wrongOriginReady = new MessageEvent("message", {
-      data: { type: "ii-handoff:ready", nonce: TEST_NONCE, publicKeyDer },
+      data: { type: "ii-handoff:ready", publicKeyDer },
       origin: "https://evil.example.com",
       source: targetWindow as unknown as Window,
     });
@@ -479,7 +390,7 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null immediately when URL hash has no h= param", async () => {
+  it("returns null immediately when URL hash has no handoff marker", async () => {
     stubReceiveWindow({
       opener: { closed: false, postMessage: vi.fn() },
       hash: "",
@@ -489,11 +400,11 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   });
 
-  it("eagerly strips the h= nonce from the URL fragment", () => {
+  it("eagerly strips the handoff marker from the URL fragment", () => {
     const replaceState = vi.fn();
     stubReceiveWindow({
       opener: { closed: false, postMessage: vi.fn() },
-      hash: `#h=${TEST_NONCE}`,
+      hash: "#handoff",
       replaceState,
     });
 
@@ -502,11 +413,11 @@ describe("receiveAuthFromOpener", () => {
     expect(replaceState).toHaveBeenCalledWith(null, "", "/manage");
   });
 
-  it("preserves other hash params when stripping the h= nonce", () => {
+  it("preserves other hash params when stripping the handoff marker", () => {
     const replaceState = vi.fn();
     stubReceiveWindow({
       opener: { closed: false, postMessage: vi.fn() },
-      hash: `#h=${TEST_NONCE}&other=keep`,
+      hash: "#handoff&other=keep",
       replaceState,
     });
 
@@ -576,7 +487,7 @@ describe("receiveAuthFromOpener", () => {
     expect(result).toBeNull();
   }, 1000);
 
-  it("includes nonce and publicKeyDer in the ready message it posts to opener", async () => {
+  it("posts a ready message with publicKeyDer to opener", async () => {
     const mockOpener = { closed: false, postMessage: vi.fn() };
     stubReceiveWindow({ opener: mockOpener });
 
@@ -589,7 +500,6 @@ describe("receiveAuthFromOpener", () => {
     expect(mockOpener.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "ii-handoff:ready",
-        nonce: TEST_NONCE,
         publicKeyDer: expect.any(String),
       }),
       expect.any(String),
@@ -682,14 +592,4 @@ describe("receiveAuthFromOpener", () => {
     const cleanupKey = await ECDSAKeyIdentity.generate({ extractable: false });
     resolveKeyGeneration(cleanupKey);
   }, 3000);
-});
-
-describe("generateHandoffNonce", () => {
-  it("returns a non-empty string with sufficient entropy", () => {
-    const a = generateHandoffNonce();
-    const b = generateHandoffNonce();
-    expect(typeof a).toBe("string");
-    expect(a.length).toBeGreaterThanOrEqual(16);
-    expect(a).not.toBe(b);
-  });
 });

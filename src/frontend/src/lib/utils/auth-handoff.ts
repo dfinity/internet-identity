@@ -8,7 +8,6 @@ import type { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
 import type { Authenticated } from "$lib/stores/authentication.store";
-import { canisterId } from "$lib/globals";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
 
 const MSG_READY = "ii-handoff:ready";
@@ -16,7 +15,6 @@ const MSG_AUTH = "ii-handoff:auth";
 
 const AuthHandoffReadySchema = z.object({
   type: z.literal(MSG_READY),
-  nonce: z.string(),
   publicKeyDer: z.string(),
 });
 type AuthHandoffReady = z.infer<typeof AuthHandoffReadySchema>;
@@ -37,12 +35,7 @@ const AuthHandoffPayloadSchema = z.object({
 });
 type AuthHandoffPayload = z.infer<typeof AuthHandoffPayloadSchema>;
 
-// Nonce in the new tab's URL fragment; opener requires a match before sending auth.
-export const HANDOFF_HASH_KEY = "h";
-
-export function generateHandoffNonce(): string {
-  return crypto.randomUUID();
-}
+export const HANDOFF_HASH_KEY = "handoff";
 
 function serializeAuthMethod(
   method: Authenticated["authMethod"],
@@ -87,7 +80,7 @@ function deserializeAuthMethod(
   };
 }
 
-function stripHandoffNonceFromUrl(): void {
+function stripHandoffMarkerFromUrl(): void {
   const params = new URLSearchParams(globalThis.location.hash.slice(1));
   if (!params.has(HANDOFF_HASH_KEY)) return;
   params.delete(HANDOFF_HASH_KEY);
@@ -102,7 +95,6 @@ function stripHandoffNonceFromUrl(): void {
 export function sendAuthToOpenedTab(
   target: Window,
   auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
-  expectedNonce: string,
   timeoutMs = 2000,
 ): { cancel: () => void } {
   const controller = new AbortController();
@@ -116,7 +108,7 @@ export function sendAuthToOpenedTab(
       return;
     }
     const parsed = AuthHandoffReadySchema.safeParse(event.data);
-    if (!parsed.success || parsed.data.nonce !== expectedNonce) {
+    if (!parsed.success) {
       return;
     }
     clearTimeout(timer);
@@ -133,7 +125,6 @@ export function sendAuthToOpenedTab(
         new Date(Date.now() + 30 * 60 * 1000),
         {
           previous: auth.identity.getDelegation(),
-          targets: [canisterId],
         },
       );
 
@@ -177,13 +168,11 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
-  const nonce = new URLSearchParams(globalThis.location.hash.slice(1)).get(
-    HANDOFF_HASH_KEY,
-  );
-  if (nonce === null) {
+  const params = new URLSearchParams(globalThis.location.hash.slice(1));
+  if (!params.has(HANDOFF_HASH_KEY)) {
     return Promise.resolve(null);
   }
-  stripHandoffNonceFromUrl();
+  stripHandoffMarkerFromUrl();
 
   return new Promise((resolve) => {
     const controller = new AbortController();
@@ -262,7 +251,6 @@ export function receiveAuthFromOpener({
 
         const ready: AuthHandoffReady = {
           type: MSG_READY,
-          nonce,
           publicKeyDer: toBase64(derKey),
         };
         opener.postMessage(ready, globalThis.location.origin);

@@ -34,7 +34,6 @@
   import { getMetadataString } from "$lib/utils/openID";
   import {
     HANDOFF_HASH_KEY,
-    generateHandoffNonce,
     sendAuthToOpenedTab,
   } from "$lib/utils/auth-handoff";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
@@ -150,7 +149,6 @@
   // blocked. The confirmation dialog's own button click provides fresh
   // activation and drives window.open from there.
   let pendingManageOpen = $state<{
-    nonce: string;
     auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
   }>();
   let signUpOpenedFromSignInModal = $state(false);
@@ -285,7 +283,6 @@
         await goto("/manage");
         return;
       }
-      const nonce = generateHandoffNonce();
       if (needsAuth) {
         // The just-completed passkey/IdP prompt consumed the click's
         // transient activation on Safari/strict Firefox, so window.open()
@@ -293,18 +290,15 @@
         // and let its own button click drive window.open with fresh
         // activation. When the user was already signed in we never awaited
         // anything, so the popup goes straight through.
-        pendingManageOpen = { nonce, auth };
+        pendingManageOpen = { auth };
         return;
       }
-      const w = window.open(
-        `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
-        "_blank",
-      );
+      const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
       if (w === null) {
         await goto("/manage");
         return;
       }
-      pendingHandoff = sendAuthToOpenedTab(w, auth, nonce);
+      pendingHandoff = sendAuthToOpenedTab(w, auth);
     } catch (error) {
       handleError(error);
     } finally {
@@ -312,19 +306,15 @@
     }
   };
   const handleOpenManageTab = (pending: {
-    nonce: string;
     auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
   }) => {
-    const w = window.open(
-      `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(pending.nonce)}`,
-      "_blank",
-    );
+    const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
     if (w === null) {
       pendingManageOpen = undefined;
       void goto("/manage");
       return;
     }
-    pendingHandoff = sendAuthToOpenedTab(w, pending.auth, pending.nonce);
+    pendingHandoff = sendAuthToOpenedTab(w, pending.auth);
     pendingManageOpen = undefined;
   };
   const dismissPendingManageOpen = () => {
