@@ -148,11 +148,11 @@
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
   let pendingHandoff: { cancel: () => void } | undefined;
-  // Safari/strict-Firefox consume the click's transient activation during the
-  // passkey prompt, so window.open() after the await silently fails. On those
-  // browsers we stash the resolved auth + nonce here and surface a small
-  // dialog with an "Open Manage" button — that button's own click provides
-  // fresh activation so window.open() succeeds, preserving the new-tab UX.
+  // Set when the user clicked manage but had to authenticate first — the
+  // passkey/IdP prompt consumes the click's transient activation on Safari
+  // (and strict Firefox), so a follow-up window.open() would be silently
+  // blocked. The confirmation dialog's own button click provides fresh
+  // activation and drives window.open from there.
   let pendingManageOpen = $state<{
     nonce: string;
     auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
@@ -345,10 +345,10 @@
                   if (selectedIdentity === undefined) return;
                   try {
                     isAuthenticating = true;
-                    if (
+                    const needsAuth =
                       $authenticationStore?.identityNumber !==
-                      selectedIdentity.identityNumber
-                    ) {
+                      selectedIdentity.identityNumber;
+                    if (needsAuth) {
                       sessionStore.reset();
                       await authLastUsedFlow.authenticate(
                         $lastUsedIdentitiesStore.identities[
@@ -362,14 +362,15 @@
                       return;
                     }
                     const nonce = generateHandoffNonce();
-                    // Safari (and Firefox in strict mode) consume the click's
-                    // transient activation during the passkey prompt, so
-                    // window.open after the await silently fails. Stash the
-                    // resolved auth + nonce and let the confirmation dialog's
-                    // own click drive window.open with fresh activation.
-                    const canOpenPopup =
-                      navigator.userActivation?.isActive ?? true;
-                    if (!canOpenPopup) {
+                    if (needsAuth) {
+                      // The just-completed passkey/IdP prompt consumed the
+                      // click's transient activation on Safari/strict
+                      // Firefox, so window.open() here would be silently
+                      // blocked. Surface the confirmation dialog and let
+                      // its own button click drive window.open with fresh
+                      // activation. When the user was already signed in we
+                      // never awaited anything, so the popup goes straight
+                      // through.
                       pendingManageOpen = { nonce, auth };
                       return;
                     }
@@ -532,7 +533,7 @@
           }}
         >
           <ExternalLinkIcon class="size-4" aria-hidden="true" />
-          {$t`Open Manage`}
+          {$t`Open manage`}
         </button>
       </div>
     </Dialog>
