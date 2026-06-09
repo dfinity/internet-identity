@@ -136,7 +136,7 @@
       </p>
       <div class="border-border-secondary border-t"></div>
       <p class="text-text-primary mt-5 mb-4 text-base font-semibold">
-        {$t`Please make sure:`}
+        {$t`Please confirm`}
       </p>
       <ul class="mb-8 flex flex-col">
         <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
@@ -144,14 +144,9 @@
             class="text-text-tertiary mt-0.5 size-5 shrink-0"
             aria-hidden="true"
           />
-          <div class="flex flex-col gap-1">
-            <p class="text-text-primary text-base font-semibold">
-              {$t`You started this request`}
-            </p>
-            <p class="text-text-tertiary text-sm">
-              {$t`from the device you're using now`}
-            </p>
-          </div>
+          <p class="text-text-primary text-base font-semibold">
+            {$t`You started this process yourself.`}
+          </p>
         </li>
         <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
           <CircleCheckIcon
@@ -160,7 +155,7 @@
           />
           <div class="flex flex-col items-start gap-1.5">
             <p class="text-text-primary text-base font-semibold">
-              {$t`Device address`}
+              {$t`Both devices are on the same domain:`}
             </p>
             <code
               class="bg-bg-tertiary text-text-primary rounded-md px-2 py-1 font-mono text-sm"
@@ -169,26 +164,12 @@
             </code>
           </div>
         </li>
-        <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
-          <CircleCheckIcon
-            class="text-text-tertiary mt-0.5 size-5 shrink-0"
-            aria-hidden="true"
-          />
-          <div class="flex flex-col gap-1">
-            <p class="text-text-primary text-base font-semibold">
-              {$t`You trust this device`}
-            </p>
-            <p class="text-text-tertiary text-sm">
-              {$t`and want to grant access`}
-            </p>
-          </div>
-        </li>
       </ul>
       <p class="text-text-tertiary mb-2 text-center text-xs">
-        {$t`Hold for 2.5 seconds. Release to cancel.`}
+        {$t`Hold for a few seconds. Release to cancel.`}
       </p>
       <HoldToConfirm
-        label={$t`Hold to confirm you started this`}
+        label={$t`Hold to confirm`}
         completed={holdCompleted}
         class="mb-2"
         onComplete={() => {

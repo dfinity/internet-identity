@@ -294,7 +294,7 @@ export const openIiTab = async (page: Page): Promise<Page> => {
 export const holdToConfirm = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
     const button = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Hold to confirm you started this"]',
+      'button[aria-label="Hold to confirm"]',
     );
     if (button === null) {
       throw new Error("hold-to-confirm button not in DOM");
