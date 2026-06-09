@@ -22,10 +22,14 @@ echo "latest didc release '$latest_didc_release'"
 
 if [ "$current_didc_release" != "$latest_didc_release" ]; then
   echo "didc needs an update"
-  sed -i -e "s/$current_didc_release/$latest_didc_release/g" ".didc-release"
 
+  release_tmp=$(mktemp)
   checksums_tmp=$(mktemp)
-  trap 'rm -f "$checksums_tmp"' EXIT
+  trap 'rm -f "$release_tmp" "$checksums_tmp"' EXIT
+
+  sed -e "s/$current_didc_release/$latest_didc_release/g" ./.didc-release \
+    > "$release_tmp"
+
   grep -vE '^(linux64|macos|arm32)[[:space:]]' ./.didc-checksums \
     > "$checksums_tmp"
   sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}' -i "$checksums_tmp"
@@ -36,6 +40,8 @@ if [ "$current_didc_release" != "$latest_didc_release" ]; then
       | shasum -a 256 | awk '{print $1}')
     printf '%-7s %s\n' "$plat" "$sha" >> "$checksums_tmp"
   done
+
+  mv "$release_tmp" ./.didc-release
   mv "$checksums_tmp" ./.didc-checksums
 
   cat ./.didc-release ./.didc-checksums
