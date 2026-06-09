@@ -96,3 +96,12 @@
     {/if}
   </span>
 </button>
+
+<style>
+  button,
+  button * {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+</style>
