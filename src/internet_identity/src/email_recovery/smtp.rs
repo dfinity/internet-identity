@@ -790,6 +790,9 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
         DohError::DedupWaitTimedOut => EmailRecoveryError::DohFetchFailed(
             "dedup_wait_timeout: timed out waiting on an in-flight fetch".into(),
         ),
+        DohError::RetryBackoffActive => EmailRecoveryError::DohFetchFailed(
+            "retry_backoff_active: a recent fetch failed and is backing off".into(),
+        ),
         DohError::QuorumFailed { agreeing, total } => EmailRecoveryError::DohFetchFailed(format!(
             "quorum_failed: {agreeing} of {total} providers agreed",
         )),
@@ -1011,6 +1014,7 @@ mod tests {
         };
         assert_eq!(token(DohError::AllProvidersFailed), "all_providers_failed");
         assert_eq!(token(DohError::DedupWaitTimedOut), "dedup_wait_timeout");
+        assert_eq!(token(DohError::RetryBackoffActive), "retry_backoff_active");
         assert_eq!(
             token(DohError::QuorumFailed {
                 agreeing: 2,

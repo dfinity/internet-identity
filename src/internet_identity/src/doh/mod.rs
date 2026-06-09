@@ -21,8 +21,7 @@
 //!   its TTL while a refresh is attempted, and a failed refresh keeps
 //!   serving the last-good record (stale-while-revalidate /
 //!   stale-if-error), so a transient outage doesn't fail an in-progress
-//!   recovery. A failed fetch is debounced, not retried on every message.
-//!   See [`cache`] for the exact knobs.
+//!   recovery. See [`cache`] for the exact knobs.
 //! - **Heap cache.** Fast and cheap. Keys are re-fetchable, so an
 //!   upgrade rebuilding the cache from scratch is fine.
 //!
@@ -46,7 +45,7 @@ mod types;
 
 use std::cell::RefCell;
 
-use cache::{new_doh_cache, DohCache};
+use cache::{new_doh_cache, DohCache, DohRecord};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
@@ -197,32 +196,42 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     // Dedup-aware fetch via the single-flight cache. The first arrival for
     // a cold or stale name owns the five-provider fan-out; concurrent
     // arrivals wait for it and all get the same result. `get_or_fill` owns
-    // the whole lookup/wait/publish dance — it serves the last-good record
-    // while a refresh runs and on a transient refresh failure
-    // (stale-while-revalidate / stale-if-error), debounces a failed fetch
-    // (see `cache`), and polls from each waiter's own call context instead
-    // of being woken (the IC reply-routing constraint — see
-    // `crate::single_flight_cache`).
-    get_or_fill(&DOH_CACHE, name, now_secs, max_age, || async move {
+    // the whole lookup/wait/publish dance — serving the last-good answer
+    // while a refresh runs (stale-while-revalidate / stale-if-error),
+    // debouncing a *transient* failed fetch (see `cache`), and polling from
+    // each waiter's own call context instead of being woken (the IC
+    // reply-routing constraint — see `crate::single_flight_cache`).
+    //
+    // The fill maps the quorum verdict to what the cache should hold: a TXT
+    // record and a definitive `NoAnswer` are both cacheable *answers* (so
+    // they're shared and served for the TTL); only transient failures stay
+    // `Err`, which is what the cache debounces.
+    let outcome = get_or_fill(&DOH_CACHE, name, now_secs, max_age, || async move {
         let outcomes = fetch_all(&query).await;
-        decide_quorum(&outcomes)
+        match decide_quorum(&outcomes) {
+            Ok(bytes) => Ok(DohRecord::Txt(bytes)),
+            Err(DohError::NoAnswer) => Ok(DohRecord::NoAnswer),
+            Err(transient) => Err(transient),
+        }
     })
-    .await
-    .map_err(|e| match e {
+    .await;
+
+    match outcome {
+        Ok(DohRecord::Txt(bytes)) => Ok(bytes),
+        Ok(DohRecord::NoAnswer) => Err(DohError::NoAnswer),
+        Err(CacheFillError::Fill(e)) => Err(e),
         // A foreign in-flight fetch didn't publish within the poll cap and
-        // there was no cached record to serve stale (e.g. an owner trapped
+        // there was no cached answer to serve stale (e.g. an owner trapped
         // before the staleness window let someone take over). Its own
         // variant — not `AllProvidersFailed` — so "the dedup wait timed
         // out" is distinguishable from "our own fan-out failed".
-        CacheFillError::WaitTimedOut => DohError::DedupWaitTimedOut,
-        CacheFillError::Fill(e) => e,
-        // A recent fetch for this name failed and is still within its retry
-        // backoff, so the cache short-circuited without a new fan-out and
-        // had no record to serve stale. Transient — a retry past the
-        // backoff, or a later refresh succeeding, resolves it; mapped to the
-        // same transient variant as a dedup-wait timeout (see `types`).
-        CacheFillError::CoolingDown => DohError::DedupWaitTimedOut,
-    })
+        Err(CacheFillError::WaitTimedOut) => Err(DohError::DedupWaitTimedOut),
+        // A recent transient fetch for this name failed and is still within
+        // its retry backoff, so the cache short-circuited without a new
+        // fan-out and had no answer to serve stale. Transient — a retry
+        // past the backoff, or a later success, resolves it.
+        Err(CacheFillError::CoolingDown) => Err(DohError::RetryBackoffActive),
+    }
 }
 
 /// Whether a queried FQDN sits inside `registered_domain` (case-
@@ -563,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn quorum_failure_is_not_cached() {
+    fn quorum_failure_is_debounced_then_retryable() {
         install_config(&["example.com"], Some(3600));
         reset_cache();
         // Five distinct answers — biggest bucket is 1, well short of
@@ -580,18 +589,19 @@ mod tests {
         let r1 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
         assert!(matches!(r1, Err(DohError::QuorumFailed { .. })));
 
-        // A cold failure debounces: an immediate retry does NOT re-fan-out
-        // to the providers (it's within the retry backoff window).
-        set_now(1_001);
-        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(call_count(), 1, "cold-failure refetch is debounced");
-
-        // But the failure is NOT permanently poisoned: past the backoff a
-        // follow-up call (with a different mock) re-fetches and succeeds.
+        // A transient failure (cold, no record to serve) is debounced: an
+        // immediate retry does NOT re-fan-out — it backs off.
         set_mock(&agreeing_dkim());
-        set_now(1_000 + 61); // past DOH_RETRY_BASE_SECS (60 s)
+        set_now(1_001);
         let r2 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        assert!(matches!(r2, Err(DohError::RetryBackoffActive)));
+        assert_eq!(call_count(), 1, "transient failure is debounced");
+
+        // But it's not poisoned: past the backoff a follow-up re-fetches
+        // and now succeeds.
+        set_now(1_000 + cache::DOH_RETRY_BASE_SECS + 1);
+        let r3 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        assert_eq!(r3, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
         assert_eq!(call_count(), 2);
     }
 
@@ -675,12 +685,12 @@ mod tests {
     }
 
     #[test]
-    fn no_answer_result_is_not_cached() {
-        // A cold NoAnswer creates no positive cache entry, so it can't
-        // poison verification: it is debounced (an immediate retry is
-        // throttled), but past the retry backoff a follow-up with a
-        // different mock (record was just published) re-fetches and gets
-        // the real bytes.
+    fn no_answer_is_cached_as_definitive_negative() {
+        // A quorum `NoAnswer` is a definitive verdict, cached like any
+        // answer (not debounced, not re-fetched per call): a follow-up
+        // within the TTL is served from cache even though a record was
+        // since published, and only after the TTL do we re-fetch and
+        // pick it up. (`fetch_txt` still surfaces it as `Err(NoAnswer)`.)
         install_config(&["example.com"], Some(3600));
         reset_cache();
         set_mock(&[
@@ -693,17 +703,19 @@ mod tests {
         set_now(1_000);
         let r1 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
         assert_eq!(r1, Err(DohError::NoAnswer));
+        assert_eq!(call_count(), 1);
 
-        // A cold failure debounces: an immediate retry is throttled.
-        set_now(1_001);
-        let _ = block_on(fetch_txt("_dmarc.example.com", "example.com"));
-        assert_eq!(call_count(), 1, "cold-failure refetch is debounced");
-
-        // Past the backoff, the failure isn't poisoned: re-fetch succeeds.
+        // Within the TTL: cache-served, no second fan-out.
         set_mock(&agreeing_dkim());
-        set_now(1_000 + 61); // past DOH_RETRY_BASE_SECS (60 s)
+        set_now(1_001);
         let r2 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
-        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        assert_eq!(r2, Err(DohError::NoAnswer));
+        assert_eq!(call_count(), 1, "NoAnswer is cached, not re-fetched");
+
+        // Past the TTL: the entry refreshes and picks up the new record.
+        set_now(1_000 + 3600 + 1);
+        let r3 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
+        assert_eq!(r3, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
         assert_eq!(call_count(), 2);
     }
 

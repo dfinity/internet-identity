@@ -298,43 +298,50 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
                 );
             }
             None => {
-                let failures = self
-                    .entries
-                    .get(key)
-                    .map_or(0, |e| e.failures)
-                    .saturating_add(1);
-                let delay = self.backoff.as_ref().map_or(0, |b| b.delay_secs(failures));
-                let next_attempt = now_secs.saturating_add(delay);
-
-                if let Some(e) = self.entries.get_mut(key) {
-                    // Stale-if-error: keep the existing value and its
-                    // `evict_at` (the value still dies relative to the last
-                    // success); just bump the throttle and failure count.
-                    // For a cold-failure marker, also refresh its lifetime.
-                    e.next_attempt_secs = next_attempt;
-                    e.failures = failures;
-                    if e.value.is_none() {
-                        e.evict_at_secs = now_secs
+                // Without a backoff configured there is no negative caching:
+                // keep any existing value for stale-if-error serving, but
+                // record nothing for a value-less failure, so the key stays
+                // immediately re-fetchable (a concurrent waiter re-attempts
+                // rather than being blocked). The in-flight marker was
+                // already cleared above.
+                if let Some(backoff) = self.backoff {
+                    let failures = self
+                        .entries
+                        .get(key)
+                        .map_or(0, |e| e.failures)
+                        .saturating_add(1);
+                    let next_attempt = now_secs.saturating_add(backoff.delay_secs(failures));
+                    if let Some(e) = self.entries.get_mut(key) {
+                        // Stale-if-error: keep the existing value and its
+                        // `evict_at` (the value still dies relative to the
+                        // last success); just bump the throttle and count.
+                        // For a cold-failure marker, also refresh its life.
+                        e.next_attempt_secs = next_attempt;
+                        e.failures = failures;
+                        if e.value.is_none() {
+                            e.evict_at_secs = now_secs
+                                .saturating_add(ttl_secs)
+                                .saturating_add(self.stale_secs);
+                        }
+                    } else {
+                        // New cold-failure marker: no value to serve, but
+                        // bounded by its own `evict_at` so the backoff can't
+                        // grow forever.
+                        let evict_at = now_secs
                             .saturating_add(ttl_secs)
                             .saturating_add(self.stale_secs);
+                        self.upsert(
+                            key,
+                            Entry {
+                                value: None,
+                                fresh_until_secs: now_secs,
+                                evict_at_secs: evict_at,
+                                next_attempt_secs: next_attempt,
+                                failures,
+                                last_access: 0,
+                            },
+                        );
                     }
-                } else {
-                    // New cold-failure marker: no value to serve, but bounded
-                    // by its own `evict_at` so the backoff can't grow forever.
-                    let evict_at = now_secs
-                        .saturating_add(ttl_secs)
-                        .saturating_add(self.stale_secs);
-                    self.upsert(
-                        key,
-                        Entry {
-                            value: None,
-                            fresh_until_secs: now_secs,
-                            evict_at_secs: evict_at,
-                            next_attempt_secs: next_attempt,
-                            failures,
-                            last_access: 0,
-                        },
-                    );
                 }
             }
         }
