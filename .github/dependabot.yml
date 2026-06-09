@@ -6,6 +6,7 @@ updates:
       - "/"
       - "/demos/test-app"
       - "/demos/vc_issuer"
+      - "/src/try-ii"
     schedule:
       interval: weekly
       day: monday
