@@ -84,7 +84,7 @@ pub async fn submit_dkim_leaf(
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_submit(&hops, &extra_chains, &snapshot, now_secs);
-    finalize(&nonce, &snapshot, verification).await
+    finalize(&nonce, &snapshot, verification, now_secs).await
 }
 
 /// Body of `email_recovery_submit_dkim_leaf_via_doh(nonce)` — the DoH
@@ -106,7 +106,7 @@ pub async fn submit_dkim_leaf_via_doh(
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_doh_fallback(&snapshot).await;
-    finalize(&nonce, &snapshot, verification).await
+    finalize(&nonce, &snapshot, verification, now_secs).await
 }
 
 /// Shared tail of both submit methods: on a failed `verification`,
@@ -117,6 +117,7 @@ async fn finalize(
     nonce: &str,
     snapshot: &Snapshot,
     verification: Result<(), EmailRecoveryError>,
+    now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
     if let Err(e) = verification {
         let cloned = e.clone();
