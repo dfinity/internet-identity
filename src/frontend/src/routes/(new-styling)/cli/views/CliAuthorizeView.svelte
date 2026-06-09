@@ -30,7 +30,9 @@
   // the connector visual (CliHeader handles it).
   const isAppMode = $derived(domain !== undefined);
   const command = $derived(
-    isAppMode ? `icp identity link ii --app ${domain}` : "icp identity link ii",
+    isAppMode
+      ? `icp identity link web --app ${domain}`
+      : "icp identity link web",
   );
 </script>
 

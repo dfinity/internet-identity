@@ -144,11 +144,6 @@
     isCreateIdentityDialogOpen = false;
     return Promise.resolve();
   };
-  const handleAuthWizardUpgrade = (): Promise<void> => {
-    upgradeSuccess = true;
-    return Promise.resolve();
-  };
-
   const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
     authorizationStore.authorize(accountNumber);
   };
@@ -479,7 +474,6 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
-    onUpgrade={handleAuthWizardUpgrade}
     onError={handleError}
     onOpenIdNotConnected={(args) => (notConnectedPayload = args)}
     onMethodSwitch={(args) => (methodSwitchPayload = args)}
@@ -499,7 +493,6 @@
     <AuthWizard
       onSignIn={handleAuthWizardSignIn}
       onSignUp={handleAuthWizardSignUp}
-      onUpgrade={handleAuthWizardUpgrade}
       onError={(error) => {
         isCreateIdentityDialogOpen = false;
         handleError(error);
