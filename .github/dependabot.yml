@@ -46,6 +46,7 @@ updates:
       - "/src/test_openid_provider"
       - "/src/vite-plugins"
       - "/src/vc-api"
+      - "/src/try-ii"
       - "/src/try-ii/src/try-ii-frontend"
     schedule:
       interval: weekly
