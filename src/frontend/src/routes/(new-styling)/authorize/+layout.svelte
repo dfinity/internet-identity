@@ -511,17 +511,24 @@
         <button
           class="btn btn-primary btn-lg w-full gap-2"
           onclick={() => {
+            // {@const pending = pendingManageOpen} is reactive — once we
+            // assign pendingManageOpen = undefined, `pending.auth` would
+            // resolve through the live state proxy and throw. Snapshot
+            // to locals before mutating.
+            const nonce = pending.nonce;
+            const auth = pending.auth;
             const w = window.open(
-              `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(pending.nonce)}`,
+              `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
               "_blank",
             );
-            pendingManageOpen = undefined;
             if (w === null) {
+              pendingManageOpen = undefined;
               void goto("/manage");
               return;
             }
             pendingHandoff?.cancel();
-            pendingHandoff = sendAuthToOpenedTab(w, pending.auth, pending.nonce);
+            pendingHandoff = sendAuthToOpenedTab(w, auth, nonce);
+            pendingManageOpen = undefined;
           }}
         >
           <ExternalLinkIcon class="size-4" aria-hidden="true" />
