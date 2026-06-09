@@ -7,7 +7,10 @@
     authorizedStore,
   } from "$lib/stores/authorization.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { authenticationStore } from "$lib/stores/authentication.store";
+  import {
+    authenticationStore,
+    type Authenticated,
+  } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import { handleError } from "$lib/components/utils/error";
@@ -42,7 +45,11 @@
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
+  import {
+    ChevronDownIcon,
+    ExternalLinkIcon,
+    UserIcon,
+  } from "@lucide/svelte";
 
   const { children }: LayoutProps = $props();
 
@@ -141,6 +148,15 @@
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
   let pendingHandoff: { cancel: () => void } | undefined;
+  // Safari/strict-Firefox consume the click's transient activation during the
+  // passkey prompt, so window.open() after the await silently fails. On those
+  // browsers we stash the resolved auth + nonce here and surface a small
+  // dialog with an "Open Manage" button — that button's own click provides
+  // fresh activation so window.open() succeeds, preserving the new-tab UX.
+  let pendingManageOpen = $state<{
+    nonce: string;
+    auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
+  }>();
   let signUpOpenedFromSignInModal = $state(false);
 
   let notConnectedPayload = $state<{
@@ -345,20 +361,18 @@
                       await goto("/manage");
                       return;
                     }
-                    // Safari (and Firefox in strict mode) consumes the
-                    // click's transient activation when WebAuthn prompts —
-                    // so window.open after the passkey await silently fails
-                    // and the browser logs a "popup blocked" warning. Skip
-                    // the attempt when activation is gone and fall back to
-                    // same-tab navigation; the in-memory authenticationStore
-                    // survives goto() so /manage loads signed in.
+                    const nonce = generateHandoffNonce();
+                    // Safari (and Firefox in strict mode) consume the click's
+                    // transient activation during the passkey prompt, so
+                    // window.open after the await silently fails. Stash the
+                    // resolved auth + nonce and let the confirmation dialog's
+                    // own click drive window.open with fresh activation.
                     const canOpenPopup =
                       navigator.userActivation?.isActive ?? true;
                     if (!canOpenPopup) {
-                      await goto("/manage");
+                      pendingManageOpen = { nonce, auth };
                       return;
                     }
-                    const nonce = generateHandoffNonce();
                     const w = window.open(
                       `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
                       "_blank",
@@ -479,6 +493,41 @@
         identities={lastUsedIdentities}
         onRemoveIdentity={handleRemoveIdentity}
       />
+    </Dialog>
+  {/if}
+
+  {#if pendingManageOpen !== undefined}
+    {@const pending = pendingManageOpen}
+    <Dialog onClose={() => (pendingManageOpen = undefined)}>
+      <div class="flex flex-col">
+        <h2
+          class="text-text-primary my-2 self-start text-2xl font-medium"
+        >
+          {$t`You're signed in`}
+        </h2>
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`Open Internet Identity in a new tab to manage your access methods and recovery options.`}
+        </p>
+        <button
+          class="btn btn-primary btn-lg w-full gap-2"
+          onclick={() => {
+            const w = window.open(
+              `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(pending.nonce)}`,
+              "_blank",
+            );
+            pendingManageOpen = undefined;
+            if (w === null) {
+              void goto("/manage");
+              return;
+            }
+            pendingHandoff?.cancel();
+            pendingHandoff = sendAuthToOpenedTab(w, pending.auth, pending.nonce);
+          }}
+        >
+          <ExternalLinkIcon class="size-4" aria-hidden="true" />
+          {$t`Open Manage`}
+        </button>
+      </div>
     </Dialog>
   {/if}
 
