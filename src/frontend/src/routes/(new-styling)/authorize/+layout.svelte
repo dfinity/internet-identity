@@ -262,6 +262,76 @@
       });
     }
   };
+  const handleManageIdentity = async (): Promise<void> => {
+    pendingHandoff?.cancel();
+    pendingHandoff = undefined;
+    isIdentityPopoverOpen = false;
+    if (selectedIdentity === undefined) return;
+    try {
+      isAuthenticating = true;
+      const needsAuth =
+        $authenticationStore?.identityNumber !==
+        selectedIdentity.identityNumber;
+      if (needsAuth) {
+        sessionStore.reset();
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.identities[
+            `${selectedIdentity.identityNumber}`
+          ],
+        );
+      }
+      const auth = get(authenticationStore);
+      if (auth === undefined) {
+        await goto("/manage");
+        return;
+      }
+      const nonce = generateHandoffNonce();
+      if (needsAuth) {
+        // The just-completed passkey/IdP prompt consumed the click's
+        // transient activation on Safari/strict Firefox, so window.open()
+        // here would be silently blocked. Surface the confirmation dialog
+        // and let its own button click drive window.open with fresh
+        // activation. When the user was already signed in we never awaited
+        // anything, so the popup goes straight through.
+        pendingManageOpen = { nonce, auth };
+        return;
+      }
+      const w = window.open(
+        `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
+        "_blank",
+      );
+      if (w === null) {
+        await goto("/manage");
+        return;
+      }
+      pendingHandoff = sendAuthToOpenedTab(w, auth, nonce);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+  const handleOpenManageTab = (pending: {
+    nonce: string;
+    auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
+  }) => {
+    const w = window.open(
+      `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(pending.nonce)}`,
+      "_blank",
+    );
+    if (w === null) {
+      pendingManageOpen = undefined;
+      void goto("/manage");
+      return;
+    }
+    pendingHandoff = sendAuthToOpenedTab(w, pending.auth, pending.nonce);
+    pendingManageOpen = undefined;
+  };
+  const dismissPendingManageOpen = () => {
+    pendingHandoff?.cancel();
+    pendingHandoff = undefined;
+    pendingManageOpen = undefined;
+  };
   const authorizeDefault = async () => {
     try {
       const { identityNumber, actor } = $authenticationStore!;
@@ -336,56 +406,7 @@
                   isIdentityPopoverOpen = false;
                   isAuthDialogOpen = true;
                 }}
-                onManageIdentity={async (): Promise<void> => {
-                  isIdentityPopoverOpen = false;
-                  if (selectedIdentity === undefined) return;
-                  try {
-                    isAuthenticating = true;
-                    const needsAuth =
-                      $authenticationStore?.identityNumber !==
-                      selectedIdentity.identityNumber;
-                    if (needsAuth) {
-                      sessionStore.reset();
-                      await authLastUsedFlow.authenticate(
-                        $lastUsedIdentitiesStore.identities[
-                          `${selectedIdentity.identityNumber}`
-                        ],
-                      );
-                    }
-                    const auth = get(authenticationStore);
-                    if (auth === undefined) {
-                      await goto("/manage");
-                      return;
-                    }
-                    const nonce = generateHandoffNonce();
-                    if (needsAuth) {
-                      // The just-completed passkey/IdP prompt consumed the
-                      // click's transient activation on Safari/strict
-                      // Firefox, so window.open() here would be silently
-                      // blocked. Surface the confirmation dialog and let
-                      // its own button click drive window.open with fresh
-                      // activation. When the user was already signed in we
-                      // never awaited anything, so the popup goes straight
-                      // through.
-                      pendingManageOpen = { nonce, auth };
-                      return;
-                    }
-                    const w = window.open(
-                      `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
-                      "_blank",
-                    );
-                    if (w === null) {
-                      await goto("/manage");
-                      return;
-                    }
-                    pendingHandoff?.cancel();
-                    pendingHandoff = sendAuthToOpenedTab(w, auth, nonce);
-                  } catch (error) {
-                    handleError(error);
-                  } finally {
-                    isAuthenticating = false;
-                  }
-                }}
+                onManageIdentity={handleManageIdentity}
                 onManageIdentities={() => {
                   isIdentityPopoverOpen = false;
                   isManageIdentitiesDialogOpen = true;
@@ -495,7 +516,7 @@
 
   {#if pendingManageOpen !== undefined}
     {@const pending = pendingManageOpen}
-    <Dialog onClose={() => (pendingManageOpen = undefined)}>
+    <Dialog onClose={dismissPendingManageOpen}>
       <div class="flex flex-col">
         <h2 class="text-text-primary my-2 self-start text-2xl font-medium">
           {$t`You're signed in`}
@@ -505,26 +526,7 @@
         </p>
         <button
           class="btn btn-primary btn-lg w-full gap-2"
-          onclick={() => {
-            // {@const pending = pendingManageOpen} is reactive — once we
-            // assign pendingManageOpen = undefined, `pending.auth` would
-            // resolve through the live state proxy and throw. Snapshot
-            // to locals before mutating.
-            const nonce = pending.nonce;
-            const auth = pending.auth;
-            const w = window.open(
-              `/manage#${HANDOFF_HASH_KEY}=${encodeURIComponent(nonce)}`,
-              "_blank",
-            );
-            if (w === null) {
-              pendingManageOpen = undefined;
-              void goto("/manage");
-              return;
-            }
-            pendingHandoff?.cancel();
-            pendingHandoff = sendAuthToOpenedTab(w, auth, nonce);
-            pendingManageOpen = undefined;
-          }}
+          onclick={() => handleOpenManageTab(pending)}
         >
           <ExternalLinkIcon class="size-4" aria-hidden="true" />
           {$t`Open manage`}
