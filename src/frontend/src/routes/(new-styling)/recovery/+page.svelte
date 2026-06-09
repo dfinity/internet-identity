@@ -4,8 +4,8 @@
   import {
     ArrowRightIcon,
     BookOpenIcon,
+    BriefcaseMedicalIcon,
     HashIcon,
-    HeartPulseIcon,
     MailIcon,
   } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
@@ -208,7 +208,7 @@
     <AuthPanel class="sm:max-w-100">
       <div class="mt-auto flex flex-col sm:my-auto">
         <FeaturedIcon size="lg" class="mb-4">
-          <HeartPulseIcon class="size-5" />
+          <BriefcaseMedicalIcon class="size-5" />
         </FeaturedIcon>
         <h1 class="text-text-primary mb-3 text-2xl font-medium">
           {$t`Recover your identity`}
