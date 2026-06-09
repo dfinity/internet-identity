@@ -1,6 +1,8 @@
 name: Dependency Updates
 
 on:
+  push:
+    branches: [chore/ci-consolidate-update-deps]
   schedule:
     - cron: "30 7 * * MON"
   workflow_dispatch:
