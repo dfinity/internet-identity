@@ -5,6 +5,9 @@ on:
     - cron: "30 7 * * MON"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   update-deps:
     runs-on: ubuntu-latest
