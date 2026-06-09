@@ -238,17 +238,12 @@ struct State {
 }
 
 // Checks if salt is empty and calls `init_salt` to set it.
-pub async fn ensure_salt_set() {
+pub fn assert_salt_set() {
     let salt = storage_borrow(|storage| storage.salt().cloned());
-    if salt.is_none() {
-        init_salt().await;
-    }
-
-    storage_borrow(|storage| {
-        if storage.salt().is_none() {
-            trap("Salt is not set. Try calling init_salt() to set it");
-        }
-    });
+    assert!(
+        salt.is_some(),
+        "This code path cannot be executed until the salt has been initialized."
+    );
 }
 
 pub async fn init_salt() {

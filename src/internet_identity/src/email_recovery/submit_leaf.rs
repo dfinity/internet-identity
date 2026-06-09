@@ -84,7 +84,8 @@ pub async fn submit_dkim_leaf(
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_submit(&hops, &extra_chains, &snapshot, now_secs);
-    finalize(&nonce, &snapshot, verification).await
+
+    finalize(&nonce, &snapshot, verification)
 }
 
 /// Body of `email_recovery_submit_dkim_leaf_via_doh(nonce)` — the DoH
@@ -98,44 +99,35 @@ pub async fn submit_dkim_leaf(
 /// enabled comes back as `DomainNotAllowlisted` rather than leaving the
 /// pending entry stuck in `NeedDkimLeaf` until it expires. Returns the
 /// same post-call polling status as `submit_dkim_leaf`.
-pub async fn submit_dkim_leaf_via_doh(
+pub async fn submit_dkim_leaf_fallback(
     nonce: String,
     now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
-    let verification = run_doh_fallback(&snapshot).await;
-    finalize(&nonce, &snapshot, verification).await
+    let fallback_result = run_doh_fallback(&snapshot).await;
+
+    if let Err(err) = fallback_result {
+        pending::with_mut(&nonce, now_secs, |challenge| {
+            challenge.status = PendingStatus::Failed(err.clone());
+            challenge.partial_verification = None;
+        });
+        return Err(err);
+    }
+
+    finalize(&nonce, &snapshot)
 }
 
 /// Shared tail of both submit methods: on a failed `verification`,
 /// stamp the pending entry `Failed` and surface the error; on success,
 /// finalize per kind — setup binds the credential, recovery stamps a
 /// delegation seed.
-async fn finalize(
+fn finalize(
     nonce: &str,
+    now_secs: u64,
     snapshot: &Snapshot,
-    verification: Result<(), EmailRecoveryError>,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
-    // The verification that produced `verification` may have awaited DoH
-    // outcalls for several seconds (the `via_doh` path), and the recovery
-    // delegation stamp below awaits as well. Wall-clock has moved on, so
-    // decide the entry's liveness on a FRESH timestamp rather than the
-    // value captured before the await — otherwise an entry whose 30-min
-    // TTL lapsed mid-outcall (or that a concurrent poll already evicted)
-    // would still be treated as live.
-    let now_secs = ic_cdk::api::time() / 1_000_000_000;
-
-    if let Err(e) = verification {
-        let cloned = e.clone();
-        pending::with_mut(nonce, now_secs, |c| {
-            c.status = PendingStatus::Failed(cloned);
-            c.partial_verification = None;
-        });
-        return Err(e);
-    }
-
     // Re-grab the entry on the fresh clock before committing anything
     // irreversible (binding a credential / stamping a delegation):
     // `with_mut` lazily expires and removes a stale entry, and a racing
@@ -180,7 +172,7 @@ async fn finalize(
                 snapshot.registered_domain.clone(),
                 session_pk.clone(),
             );
-            match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk).await {
+            match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk) {
                 Ok(outcome) => {
                     let user_key = serde_bytes::ByteBuf::from(outcome.user_key.clone());
                     let expiration = outcome.expiration;
@@ -209,6 +201,7 @@ async fn finalize(
     }
 }
 
+/// TODO: explain this type
 #[derive(Clone, Debug)]
 struct Snapshot {
     kind: SnapshotKind,
@@ -231,12 +224,8 @@ struct Snapshot {
 
 #[derive(Clone, Debug)]
 enum SnapshotKind {
-    Register {
-        anchor: AnchorNumber,
-    },
-    Recovery {
-        session_pk: SessionKey,
-    },
+    Register { anchor: AnchorNumber },
+    Recovery { session_pk: SessionKey },
 }
 
 impl Snapshot {

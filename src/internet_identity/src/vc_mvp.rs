@@ -40,7 +40,7 @@ pub async fn prepare_id_alias(
     identity_number: IdentityNumber,
     dapps: InvolvedDapps,
 ) -> PreparedIdAlias {
-    state::ensure_salt_set().await;
+    state::assert_salt_set();
     check_frontend_length(&dapps.relying_party);
     check_frontend_length(&dapps.issuer);
 

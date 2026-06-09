@@ -1634,7 +1634,7 @@ mod email_recovery_api {
         arg: EmailRecoverySubmitDkimLeafViaDohArg,
     ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs).await
+        email_recovery::submit_dkim_leaf_fallback(arg.nonce, now_secs).await
     }
 
     /// **Anonymous query.** Final step of the recovery flow: after
@@ -1714,7 +1714,6 @@ mod email_recovery_api {
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
         Ok(())
     }
-
 }
 
 mod attribute_sharing {
@@ -1751,7 +1750,7 @@ mod attribute_sharing {
 
         // This is the only async operation, so we do it first, call operations that depend on
         // the time. TODO: refactor to avoid asynchronicity here.
-        state::ensure_salt_set().await;
+        state::assert_salt_set();
         let issued_at_timestamp_ns = ic_cdk::api::time();
 
         let attributes = anchor.prepare_attributes(attribute_keys, account, issued_at_timestamp_ns);
@@ -1822,7 +1821,7 @@ mod attribute_sharing {
             get_account_for_origin(anchor.anchor_number(), origin.clone(), account_number)
                 .map_err(PrepareIcrc3AttributeError::GetAccountError)?;
 
-        state::ensure_salt_set().await;
+        state::assert_salt_set();
 
         let issued_at_timestamp_ns = ic_cdk::api::time();
         let message = anchor.prepare_icrc3_attributes(

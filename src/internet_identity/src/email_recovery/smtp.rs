@@ -357,7 +357,7 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
                     }
                 }
                 SnapshotKind::Recovery { session_pk } => {
-                    match stamp_recovery_delegation(&snapshot, session_pk).await {
+                    match stamp_recovery_delegation(&snapshot, session_pk) {
                         Ok(outcome) => {
                             pending::with_mut(&nonce, now_secs, |c| {
                                 c.recovery_outcome = Some(outcome);
@@ -897,7 +897,7 @@ pub(super) fn recovery_snapshot(
 /// `RecoveryReady { user_key, expiration, anchor_number }`, and
 /// `email_recovery_get_delegation` reads the cached `seed` to look
 /// up the signature without re-deriving from the anchor.
-pub(super) async fn stamp_recovery_delegation(
+pub(super) fn stamp_recovery_delegation(
     snapshot: &PendingSnapshot,
     session_pk: &SessionKey,
 ) -> Result<super::pending::RecoveryOutcome, EmailRecoveryError> {
@@ -913,14 +913,9 @@ pub(super) async fn stamp_recovery_delegation(
     })
     .ok_or(EmailRecoveryError::AddressNotRegistered)?;
 
-    // The signature-map operations need the canister salt. In
-    // production it's already initialised (every prior delegation
-    // call paid that cost); we await defensively in case this is
-    // the very first delegation since deploy.
-    state::ensure_salt_set().await;
-
     let expiration =
         ic_cdk::api::time().saturating_add(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS);
+
     let seed: Hash = calculate_email_recovery_seed(&snapshot.claimed_address, anchor_number);
 
     state::signature_map_mut(|sigs| {
