@@ -121,7 +121,11 @@ test.describe("First visit", () => {
       const existingMenuButton = existingDevicePage.getByRole("button", {
         name: "Open menu",
       });
-      if (await existingMenuButton.isVisible()) {
+      const menuVisible = await existingMenuButton
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (menuVisible) {
         await existingMenuButton.click();
       }
       await existingDevicePage.getByRole("link", { name: "Access" }).click();
