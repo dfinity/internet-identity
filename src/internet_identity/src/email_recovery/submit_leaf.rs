@@ -49,7 +49,9 @@ use crate::email_recovery::pending;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryError, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
 };
-use internet_identity_interface::internet_identity::types::SessionKey;
+use internet_identity_interface::internet_identity::types::{
+    AnchorNumber, DelegationChain, SessionKey, SignedRRset,
+};
 
 /// Body of `email_recovery_submit_dkim_leaf(arg)` — the DNSSEC path.
 /// The FE walked a fully-signed DNSSEC resolution for the leaf and
@@ -82,7 +84,7 @@ pub async fn submit_dkim_leaf(
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_submit(&hops, &extra_chains, &snapshot, now_secs);
-    finalize(&nonce, &snapshot, verification, now_secs).await
+    finalize(&nonce, &snapshot, verification).await
 }
 
 /// Body of `email_recovery_submit_dkim_leaf_via_doh(nonce)` — the DoH
@@ -104,7 +106,7 @@ pub async fn submit_dkim_leaf_via_doh(
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_doh_fallback(&snapshot).await;
-    finalize(&nonce, &snapshot, verification, now_secs).await
+    finalize(&nonce, &snapshot, verification).await
 }
 
 /// Shared tail of both submit methods: on a failed `verification`,
@@ -115,8 +117,16 @@ async fn finalize(
     nonce: &str,
     snapshot: &Snapshot,
     verification: Result<(), EmailRecoveryError>,
-    now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+    // The verification that produced `verification` may have awaited DoH
+    // outcalls for several seconds (the `via_doh` path), and the recovery
+    // delegation stamp below awaits as well. Wall-clock has moved on, so
+    // decide the entry's liveness on a FRESH timestamp rather than the
+    // value captured before the await — otherwise an entry whose 30-min
+    // TTL lapsed mid-outcall (or that a concurrent poll already evicted)
+    // would still be treated as live.
+    let now_secs = ic_cdk::api::time() / 1_000_000_000;
+
     if let Err(e) = verification {
         let cloned = e.clone();
         pending::with_mut(nonce, now_secs, |c| {
@@ -124,6 +134,19 @@ async fn finalize(
             c.partial_verification = None;
         });
         return Err(e);
+    }
+
+    // Re-grab the entry on the fresh clock before committing anything
+    // irreversible (binding a credential / stamping a delegation):
+    // `with_mut` lazily expires and removes a stale entry, and a racing
+    // submit/poll may have advanced it past `NeedDkimLeaf` already. If
+    // it's no longer awaiting its leaf, treat the challenge as expired
+    // rather than finalizing against state that moved underneath us.
+    let still_awaiting = pending::with_mut(nonce, now_secs, |c| {
+        matches!(c.status, PendingStatus::NeedDkimLeaf { .. })
+    });
+    if still_awaiting != Some(true) {
+        return Err(EmailRecoveryError::NonceExpired);
     }
 
     match &snapshot.kind {
@@ -209,7 +232,7 @@ struct Snapshot {
 #[derive(Clone, Debug)]
 enum SnapshotKind {
     Register {
-        anchor: internet_identity_interface::internet_identity::types::AnchorNumber,
+        anchor: AnchorNumber,
     },
     Recovery {
         session_pk: SessionKey,
@@ -266,18 +289,20 @@ impl Snapshot {
 /// The leaf-validation + signature-verification + alignment-check
 /// pipeline. Returns `Ok(())` on full success.
 fn run_submit(
-    hops: &[internet_identity_interface::internet_identity::types::SignedRRset],
-    extra_chains: &[internet_identity_interface::internet_identity::types::DelegationChain],
+    hops: &[SignedRRset],
+    extra_chains: &[DelegationChain],
     snapshot: &Snapshot,
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
     // A genuine DNSSEC submission always carries at least the final
     // TXT hop. An empty `hops` set is malformed input on this path —
     // the FE that can't walk DNSSEC must call
-    // `submit_dkim_leaf_via_doh` instead. Reject it explicitly rather
-    // than relying on the hop walk below to fail.
+    // `submit_dkim_leaf_via_doh` instead. Reject it with the dedicated
+    // `EmptyDkimLeafHops` so the malformed-request case is unambiguous
+    // (distinct from a non-empty chain that failed to validate, which
+    // is `DkimLeafMismatch`), rather than relying on the hop walk below.
     if hops.is_empty() {
-        return Err(EmailRecoveryError::DkimLeafMismatch);
+        return Err(EmailRecoveryError::EmptyDkimLeafHops);
     }
 
     // Step 1: re-validate the cached root DNSKEY against the trust

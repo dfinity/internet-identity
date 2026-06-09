@@ -45,6 +45,9 @@ export const friendlyFailedReason = (reason: FailedReason): string => {
   if ("DkimLeafMismatch" in reason) {
     return "Your email provider rotated its DKIM keys mid-flow. Please retry.";
   }
+  if ("EmptyDkimLeafHops" in reason) {
+    return "Internal error: the DKIM leaf request was malformed. Please retry.";
+  }
   if ("NoDkimLeafExpected" in reason) {
     return "Internal error: the DKIM leaf was submitted at the wrong moment. Please retry.";
   }
@@ -52,7 +55,7 @@ export const friendlyFailedReason = (reason: FailedReason): string => {
     return `Your email didn't verify (${reason.EmailVerificationFailed}). Make sure you sent it from the address you typed, no forwarding, no aliases.`;
   }
   if ("DohFetchFailed" in reason) {
-    return `Something went wrong on our end: ${reason.DohFetchFailed}`;
+    return "Something went wrong on our end. Please try again.";
   }
   if ("InternalCanisterError" in reason) {
     return `Something went wrong on our end: ${reason.InternalCanisterError}`;
@@ -93,15 +96,17 @@ export const plausibleFailureReason = (status: EmailRecoveryStatus): string => {
 
 /**
  * Granular machine sub-reason for a DoH transport failure, or
- * `undefined` for any non-DoH failure. The `DohFetchFailed` variant
- * collapses several distinct DoH causes (quorum miss, all providers
- * down, dedup-wait timeout, malformed response) into one variant name,
- * so on its own it can't tell us *why* DoH failed — which matters most
- * for Gmail and other DoH-path providers. The canister encodes the
- * cause as the leading `snake_case` token of the `DohFetchFailed`
- * payload (see `map_doh_error` in the backend); we lift that token out
- * here and report it as the `doh_reason` property on the
- * `*-failed` funnel event so the funnel is segmentable.
+ * `undefined` for any non-DoH failure. The `DohFetchFailed` variant on
+ * its own only says *that* DoH failed, not *why* — which matters most
+ * for Gmail and other DoH-path providers. The canister now carries the
+ * cause as a typed `DohFailureReason` discriminant (see `map_doh_error`
+ * in the backend), so we read it directly and report it as the stable
+ * `snake_case` `doh_reason` property on the `*-failed` funnel event,
+ * keeping the funnel segmentable.
+ *
+ * Exhaustive over `DohFailureReason`: the trailing `satisfies never`
+ * makes the build fail if the backend adds a DoH cause until it's given
+ * a token here.
  */
 export const dohSubReason = (
   status: EmailRecoveryStatus,
@@ -109,6 +114,10 @@ export const dohSubReason = (
   if (!("Failed" in status)) return undefined;
   const reason = status.Failed;
   if (!("DohFetchFailed" in reason)) return undefined;
-  const token = reason.DohFetchFailed.split(":")[0]?.trim();
-  return token !== undefined && /^[a-z0-9_]+$/.test(token) ? token : undefined;
+  const cause = reason.DohFetchFailed;
+  if ("AllProvidersFailed" in cause) return "all_providers_failed";
+  if ("DedupWaitTimeout" in cause) return "dedup_wait_timeout";
+  if ("QuorumFailed" in cause) return "quorum_failed";
+  if ("ResponseMalformed" in cause) return "response_malformed";
+  return cause satisfies never;
 };

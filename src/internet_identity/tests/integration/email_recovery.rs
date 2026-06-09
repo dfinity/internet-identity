@@ -851,7 +851,12 @@ fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
             pocket_ic::common::rest::RawEffectivePrincipal::None,
             candid::Principal::anonymous(),
             "email_recovery_submit_dkim_leaf_via_doh",
-            candid::encode_one(&nonce).expect("encode nonce"),
+            candid::encode_one(
+                &internet_identity_interface::internet_identity::types::email_recovery::EmailRecoverySubmitDkimLeafViaDohArg {
+                    nonce: nonce.clone(),
+                },
+            )
+            .expect("encode via_doh arg"),
         )
         .expect("submit_call");
 

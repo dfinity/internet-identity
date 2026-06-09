@@ -1449,7 +1449,7 @@ mod email_recovery_api {
     use internet_identity_interface::internet_identity::types::email_recovery::{
         EmailRecoveryChallenge, EmailRecoveryDiagnostics, EmailRecoveryDnsInput,
         EmailRecoveryError, EmailRecoveryGetDelegationArgs, EmailRecoveryStatus,
-        EmailRecoverySubmitDkimLeafArg,
+        EmailRecoverySubmitDkimLeafArg, EmailRecoverySubmitDkimLeafViaDohArg,
     };
     use internet_identity_interface::internet_identity::types::SessionKey;
 
@@ -1631,10 +1631,10 @@ mod email_recovery_api {
     /// authentication, and the call is a no-op against any other entry.
     #[update]
     async fn email_recovery_submit_dkim_leaf_via_doh(
-        nonce: String,
+        arg: EmailRecoverySubmitDkimLeafViaDohArg,
     ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::submit_dkim_leaf_via_doh(nonce, now_secs).await
+        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs).await
     }
 
     /// **Anonymous query.** Final step of the recovery flow: after

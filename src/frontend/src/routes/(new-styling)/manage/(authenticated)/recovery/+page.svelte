@@ -290,7 +290,7 @@
   /** Anonymous wrapper around `email_recovery_submit_dkim_leaf_via_doh`. */
   const submitEmailDkimLeafViaDoh = (nonce: string) =>
     anonymousActor
-      .email_recovery_submit_dkim_leaf_via_doh(nonce)
+      .email_recovery_submit_dkim_leaf_via_doh({ nonce })
       .then(throwCanisterError);
 
   const handleRemoveEmail = async () => {

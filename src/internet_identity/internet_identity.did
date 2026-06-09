@@ -558,6 +558,14 @@ type EmailRecoverySubmitDkimLeafArg = record {
     extra_chains : vec DelegationChain;
 };
 
+// Argument to email_recovery_submit_dkim_leaf_via_doh. Wrapped in a
+// record (like EmailRecoverySubmitDkimLeafArg) so the method can grow
+// fields without a breaking interface change; nonce is the lookup key
+// and is always required.
+type EmailRecoverySubmitDkimLeafViaDohArg = record {
+    nonce : text;
+};
+
 // DNSSEC proof bundle and supporting types — see
 // `internet_identity_interface::types::dnssec`.
 type Rrsig = record {
@@ -602,15 +610,29 @@ type DnsProofBundle = record {
     hops : vec SignedRRset;
 };
 
+// Why a DoH resolution failed, as a typed discriminant rather than a
+// free-form string. The FE reads this directly to segment the
+// `doh_reason` analytics property — no string parsing.
+type DohFailureReason = variant {
+    AllProvidersFailed;
+    DedupWaitTimeout;
+    QuorumFailed : record { agreeing : nat32; total : nat32 };
+    ResponseMalformed : text;
+};
+
 type EmailRecoveryError = variant {
     Unauthorized : principal;
     NonceUnknown;
     NonceExpired;
     DomainNotAllowlisted : text;
-    DohFetchFailed : text;
+    DohFetchFailed : DohFailureReason;
     DomainNotSupported : text;
     EmailVerificationFailed : text;
     DkimLeafMismatch;
+    // email_recovery_submit_dkim_leaf was called with an empty `hops`
+    // vector; an FE that can't walk DNSSEC must call
+    // email_recovery_submit_dkim_leaf_via_doh instead.
+    EmptyDkimLeafHops;
     NoDkimLeafExpected;
     AddressMismatch;
     SubjectNotSigned;
@@ -1528,7 +1550,7 @@ service : (opt InternetIdentityInit) -> {
     // resolution for the leaf (the DKIM record CNAMEs into an unsigned
     // zone). The canister resolves the DKIM key over its own
     // allowlist-gated DoH path.
-    email_recovery_submit_dkim_leaf_via_doh : (text) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_submit_dkim_leaf_via_doh : (EmailRecoverySubmitDkimLeafViaDohArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 

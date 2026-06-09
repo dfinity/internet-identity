@@ -663,12 +663,15 @@ pub fn email_recovery_submit_dkim_leaf_via_doh(
     Result<types::email_recovery::EmailRecoveryStatus, types::email_recovery::EmailRecoveryError>,
     RejectResponse,
 > {
+    let arg = types::email_recovery::EmailRecoverySubmitDkimLeafViaDohArg {
+        nonce: nonce.to_string(),
+    };
     call_candid(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         "email_recovery_submit_dkim_leaf_via_doh",
-        (nonce,),
+        (arg,),
     )
     .map(|(x,)| x)
 }

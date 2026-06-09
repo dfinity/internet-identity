@@ -306,15 +306,25 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
+  const DohFailureReason = IDL.Variant({
+    'DedupWaitTimeout' : IDL.Null,
+    'AllProvidersFailed' : IDL.Null,
+    'ResponseMalformed' : IDL.Text,
+    'QuorumFailed' : IDL.Record({
+      'total' : IDL.Nat32,
+      'agreeing' : IDL.Nat32,
+    }),
+  });
   const EmailRecoveryError = IDL.Variant({
     'EmailVerificationFailed' : IDL.Text,
     'DkimLeafMismatch' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NonceUnknown' : IDL.Null,
-    'DohFetchFailed' : IDL.Text,
+    'DohFetchFailed' : DohFailureReason,
     'NoDkimLeafExpected' : IDL.Null,
     'DomainNotSupported' : IDL.Text,
     'AddressNotRegistered' : IDL.Null,
+    'EmptyDkimLeafHops' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'NonceExpired' : IDL.Null,
     'AddressMismatch' : IDL.Null,
@@ -363,6 +373,9 @@ export const idlFactory = ({ IDL }) => {
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({
     'extra_chains' : IDL.Vec(DelegationChain),
     'hops' : IDL.Vec(SignedRRset),
+    'nonce' : IDL.Text,
+  });
+  const EmailRecoverySubmitDkimLeafViaDohArg = IDL.Record({
     'nonce' : IDL.Text,
   });
   const BufferedArchiveEntry = IDL.Record({
@@ -914,7 +927,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'email_recovery_submit_dkim_leaf_via_doh' : IDL.Func(
-        [IDL.Text],
+        [EmailRecoverySubmitDkimLeafViaDohArg],
         [
           IDL.Variant({
             'Ok' : EmailRecoveryStatus,
