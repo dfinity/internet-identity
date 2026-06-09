@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/../.."
+
+current_didc_release=$(sed <.didc-release 's/#.*$//' | sed '/^$/d')
+echo "current didc release '$current_didc_release'"
+
+auth_header=()
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  auth_header=(-H "Authorization: Bearer $GITHUB_TOKEN")
+fi
+latest_didc_release=$(curl -sSL "${auth_header[@]}" https://api.github.com/repos/dfinity/candid/releases/latest | jq .tag_name -r)
+
+if [ -z "$latest_didc_release" ] || [ "$latest_didc_release" = "null" ]; then
+  echo "expected a didc release, got '$latest_didc_release'" >&2
+  exit 1
+fi
+
+echo "latest didc release '$latest_didc_release'"
+
+if [ "$current_didc_release" != "$latest_didc_release" ]; then
+  echo "didc needs an update"
+  sed -i -e "s/$current_didc_release/$latest_didc_release/g" ".didc-release"
+
+  checksums_tmp=$(mktemp)
+  trap 'rm -f "$checksums_tmp"' EXIT
+  grep -vE '^(linux64|macos|arm32)[[:space:]]' ./.didc-checksums \
+    > "$checksums_tmp"
+  sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}' -i "$checksums_tmp"
+  printf '\n' >> "$checksums_tmp"
+  for plat in linux64 macos arm32; do
+    sha=$(curl --location --fail --silent --show-error \
+      "https://github.com/dfinity/candid/releases/download/$latest_didc_release/didc-$plat" \
+      | shasum -a 256 | awk '{print $1}')
+    printf '%-7s %s\n' "$plat" "$sha" >> "$checksums_tmp"
+  done
+  mv "$checksums_tmp" ./.didc-checksums
+
+  cat ./.didc-release ./.didc-checksums
+else
+  echo "already up to date"
+fi
