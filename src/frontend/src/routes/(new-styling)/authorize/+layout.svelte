@@ -45,11 +45,7 @@
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import {
-    ChevronDownIcon,
-    ExternalLinkIcon,
-    UserIcon,
-  } from "@lucide/svelte";
+  import { ChevronDownIcon, ExternalLinkIcon, UserIcon } from "@lucide/svelte";
 
   const { children }: LayoutProps = $props();
 
@@ -501,9 +497,7 @@
     {@const pending = pendingManageOpen}
     <Dialog onClose={() => (pendingManageOpen = undefined)}>
       <div class="flex flex-col">
-        <h2
-          class="text-text-primary my-2 self-start text-2xl font-medium"
-        >
+        <h2 class="text-text-primary my-2 self-start text-2xl font-medium">
           {$t`You're signed in`}
         </h2>
         <p class="text-text-secondary mb-6 self-start text-sm">

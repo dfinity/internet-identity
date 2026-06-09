@@ -9,7 +9,7 @@ export const load: LayoutLoad = async ({ url }) => {
   let authentication = get(authenticationStore);
 
   if (authentication === undefined) {
-    const handoff = await receiveAuthFromOpener({ timeoutMs: 5000 });
+    const handoff = await receiveAuthFromOpener({ timeoutMs: 2000 });
     if (handoff !== null) {
       await authenticationStore.set(handoff);
       authentication = get(authenticationStore);
