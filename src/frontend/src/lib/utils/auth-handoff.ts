@@ -131,10 +131,7 @@ export function sendAuthToOpenedTab(
       const receiverDer = fromBase64(
         event.data.publicKeyDer,
       ) as DerEncodedPublicKey;
-
-      console.log(receiverDer);
       const receiverPublicKey = { toDer: () => receiverDer };
-      console.log(receiverPublicKey);
 
       const newChain = await DelegationChain.create(
         auth.identity,
@@ -145,10 +142,8 @@ export function sendAuthToOpenedTab(
           targets: [canisterId],
         },
       );
-      console.log("New delegation chain created:", newChain);
 
       if (!cancelled) {
-        console.log("Sending auth payload to opened tab...", auth);
         const payload: AuthHandoffPayload = {
           type: MSG_AUTH,
           identityNumber: auth.identityNumber.toString(),
@@ -157,8 +152,11 @@ export function sendAuthToOpenedTab(
         };
         target.postMessage(payload, location.origin);
       }
-    } catch {
-      // Chain creation failed — receiver will time out and fall back to login.
+    } catch (error) {
+      // Chain creation failed — receiver will time out and fall back to
+      // login. Surface the underlying error so we can debug the rare cases
+      // where this happens.
+      console.error("ii-handoff: failed to build delegation chain", error);
     }
   };
 
@@ -237,6 +235,7 @@ export function receiveAuthFromOpener({
         );
 
         if (!isDelegationValid(chain)) {
+          console.warn("ii-handoff: delegation chain from opener is invalid");
           settle(null);
           return;
         }
@@ -248,14 +247,20 @@ export function receiveAuthFromOpener({
           identity,
           authMethod: deserializeAuthMethod(event.data.authMethod),
         });
-      } catch {
+      } catch (error) {
+        console.warn("ii-handoff: could not consume auth payload", error);
         settle(null);
       }
     };
 
     window.addEventListener("message", listener);
 
-    const timer = setTimeout(() => settle(null), timeoutMs);
+    const timer = setTimeout(() => {
+      if (!settled) {
+        console.warn("ii-handoff: timed out waiting for auth from opener");
+      }
+      settle(null);
+    }, timeoutMs);
 
     ECDSAKeyIdentity.generate({ extractable: false })
       .then((innerKey) => {
