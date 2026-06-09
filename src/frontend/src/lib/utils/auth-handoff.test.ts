@@ -27,17 +27,26 @@ const stubReceiveWindow = (params: {
   opener: { closed: boolean; postMessage: ReturnType<typeof vi.fn> } | null;
   hash?: string;
   messageListeners?: ((e: MessageEvent) => void)[];
+  replaceState?: ReturnType<typeof vi.fn>;
 }) => {
-  const { opener, hash = `#h=${TEST_NONCE}`, messageListeners } = params;
+  const {
+    opener,
+    hash = `#h=${TEST_NONCE}`,
+    messageListeners,
+    replaceState,
+  } = params;
+  const locationStub = {
+    origin: "https://id.ai",
+    hash,
+    pathname: "/manage",
+    search: "",
+  };
+  vi.stubGlobal("location", locationStub);
+  vi.stubGlobal("history", { replaceState: replaceState ?? vi.fn() });
   vi.stubGlobal("window", {
     ...window,
     opener,
-    location: {
-      origin: "https://id.ai",
-      hash,
-      pathname: "/manage",
-      search: "",
-    },
+    location: locationStub,
     addEventListener:
       messageListeners !== undefined
         ? (type: string, listener: EventListenerOrEventListenerObject) => {
@@ -478,6 +487,32 @@ describe("receiveAuthFromOpener", () => {
 
     const result = await receiveAuthFromOpener({ timeoutMs: 50 });
     expect(result).toBeNull();
+  });
+
+  it("eagerly strips the h= nonce from the URL fragment", () => {
+    const replaceState = vi.fn();
+    stubReceiveWindow({
+      opener: { closed: false, postMessage: vi.fn() },
+      hash: `#h=${TEST_NONCE}`,
+      replaceState,
+    });
+
+    void receiveAuthFromOpener({ timeoutMs: 50 });
+
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/manage");
+  });
+
+  it("preserves other hash params when stripping the h= nonce", () => {
+    const replaceState = vi.fn();
+    stubReceiveWindow({
+      opener: { closed: false, postMessage: vi.fn() },
+      hash: `#h=${TEST_NONCE}&other=keep`,
+      replaceState,
+    });
+
+    void receiveAuthFromOpener({ timeoutMs: 50 });
+
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/manage#other=keep");
   });
 
   it("ignores messages with wrong event.data.type", async () => {
