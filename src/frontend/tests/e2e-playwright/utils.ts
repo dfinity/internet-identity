@@ -287,7 +287,7 @@ export const openIiTab = async (page: Page): Promise<Page> => {
 // inside the page so the helper works the same on desktop and mobile —
 // Playwright's input-device emulation differs across contexts, but the
 // component's mousedown listener fires from any synthetic event. The
-// controller releases itself when it reaches the 1500ms duration, so no
+// controller releases itself when it reaches the 2500ms duration, so no
 // matching mouseup is needed. After completion the wizard waits 250ms then
 // runs a 380ms slide to the code-entry step; the heading wait absorbs both
 // so the caller doesn't race the transition.

@@ -184,6 +184,9 @@
           </div>
         </li>
       </ul>
+      <p class="text-text-tertiary mb-2 text-center text-xs">
+        {$t`Hold for 2.5 seconds. Release to cancel.`}
+      </p>
       <HoldToConfirm
         label={$t`Hold to confirm you started this`}
         completed={holdCompleted}
@@ -193,9 +196,6 @@
           advanceTimer = setTimeout(goToStep1, HOLD_ADVANCE_DELAY);
         }}
       />
-      <p class="text-text-tertiary mb-6 text-center text-xs">
-        {$t`Hold for 1.5 seconds. Release to cancel.`}
-      </p>
       <button
         class="btn btn-secondary btn-xl"
         onclick={handleRestart}
