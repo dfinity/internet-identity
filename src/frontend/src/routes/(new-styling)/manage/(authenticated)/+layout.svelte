@@ -146,14 +146,6 @@
     });
   };
 
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-    toaster.success({
-      title: $t`Upgrade completed successfully`,
-      duration: 4000,
-    });
-  };
-
   // --- Sign out ---
 
   const handleSignOut = (): Promise<void> => {
@@ -498,7 +490,6 @@
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
         isAuthenticating = false;
@@ -538,7 +529,6 @@
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isCreateIdentityDialogOpen = false;
         isAuthenticating = false;
