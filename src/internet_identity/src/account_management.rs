@@ -304,7 +304,8 @@ pub async fn prepare_account_delegation(
     max_ttl: Option<u64>,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    state::ensure_salt_set().await;
+    state::assert_salt_set();
+
     check_frontend_length(&origin);
 
     let account = storage_borrow(|storage| {

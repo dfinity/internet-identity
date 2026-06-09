@@ -104,7 +104,7 @@ impl OpenIdCredential {
         session_key: SessionKey,
         anchor_number: AnchorNumber,
     ) -> (UserKey, Timestamp) {
-        state::ensure_salt_set().await;
+        state::assert_salt_set();
 
         let expiration = time().saturating_add(OPENID_SESSION_DURATION_NS);
         let seed = calculate_delegation_seed(&self.key(), anchor_number);
