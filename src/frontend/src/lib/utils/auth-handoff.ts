@@ -6,6 +6,7 @@ import {
 } from "@icp-sdk/core/identity";
 import type { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
+import { z } from "zod";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { canisterId } from "$lib/globals";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
@@ -13,52 +14,34 @@ import { fromBase64, toBase64 } from "$lib/utils/utils";
 const MSG_READY = "ii-handoff:ready";
 const MSG_AUTH = "ii-handoff:auth";
 
-interface AuthHandoffReady {
-  type: typeof MSG_READY;
-  nonce: string;
-  publicKeyDer: string;
-}
+const AuthHandoffReadySchema = z.object({
+  type: z.literal(MSG_READY),
+  nonce: z.string(),
+  publicKeyDer: z.string(),
+});
+type AuthHandoffReady = z.infer<typeof AuthHandoffReadySchema>;
 
-interface AuthHandoffPayload {
-  type: typeof MSG_AUTH;
-  identityNumber: string;
-  chainJson: string;
-  authMethod: SerializedAuthMethod;
-}
+const SerializedAuthMethodSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("passkey"), credentialId: z.string() }),
+  z.object({ kind: z.literal("openid"), iss: z.string(), sub: z.string() }),
+  z.object({ kind: z.literal("recoveryPhrase"), principal: z.string() }),
+  z.object({ kind: z.literal("emailRecovery"), principal: z.string() }),
+]);
+type SerializedAuthMethod = z.infer<typeof SerializedAuthMethodSchema>;
 
-type SerializedAuthMethod =
-  | { kind: "passkey"; credentialId: string }
-  | { kind: "openid"; iss: string; sub: string }
-  | { kind: "recoveryPhrase"; principal: string }
-  | { kind: "emailRecovery"; principal: string };
+const AuthHandoffPayloadSchema = z.object({
+  type: z.literal(MSG_AUTH),
+  identityNumber: z.string(),
+  chainJson: z.string(),
+  authMethod: SerializedAuthMethodSchema,
+});
+type AuthHandoffPayload = z.infer<typeof AuthHandoffPayloadSchema>;
 
 // Nonce in the new tab's URL fragment; opener requires a match before sending auth.
 export const HANDOFF_HASH_KEY = "h";
 
 export function generateHandoffNonce(): string {
   return crypto.randomUUID();
-}
-
-function isAuthHandoffReady(data: unknown): data is AuthHandoffReady {
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    "type" in data &&
-    data.type === MSG_READY &&
-    "nonce" in data &&
-    typeof data.nonce === "string" &&
-    "publicKeyDer" in data &&
-    typeof data.publicKeyDer === "string"
-  );
-}
-
-function isAuthHandoffPayload(data: unknown): data is AuthHandoffPayload {
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    "type" in data &&
-    data.type === MSG_AUTH
-  );
 }
 
 function serializeAuthMethod(
@@ -104,32 +87,43 @@ function deserializeAuthMethod(
   };
 }
 
+function stripHandoffNonceFromUrl(): void {
+  const params = new URLSearchParams(globalThis.location.hash.slice(1));
+  if (!params.has(HANDOFF_HASH_KEY)) return;
+  params.delete(HANDOFF_HASH_KEY);
+  const remaining = params.toString();
+  const cleanUrl =
+    globalThis.location.pathname +
+    globalThis.location.search +
+    (remaining.length > 0 ? `#${remaining}` : "");
+  globalThis.history.replaceState(null, "", cleanUrl);
+}
+
 export function sendAuthToOpenedTab(
   target: Window,
   auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
   expectedNonce: string,
   timeoutMs = 2000,
 ): { cancel: () => void } {
-  let cancelled = false;
+  const controller = new AbortController();
+  const { signal } = controller;
 
   const listener = async (event: MessageEvent) => {
     if (
       event.source !== target ||
-      event.origin !== location.origin ||
-      !isAuthHandoffReady(event.data) ||
-      event.data.nonce !== expectedNonce
+      event.origin !== globalThis.location.origin
     ) {
       return;
     }
-    cleanup();
-
-    if (cancelled) {
+    const parsed = AuthHandoffReadySchema.safeParse(event.data);
+    if (!parsed.success || parsed.data.nonce !== expectedNonce) {
       return;
     }
+    clearTimeout(timer);
 
     try {
       const receiverDer = fromBase64(
-        event.data.publicKeyDer,
+        parsed.data.publicKeyDer,
       ) as DerEncodedPublicKey;
       const receiverPublicKey = { toDer: () => receiverDer };
 
@@ -143,15 +137,17 @@ export function sendAuthToOpenedTab(
         },
       );
 
-      if (!cancelled) {
-        const payload: AuthHandoffPayload = {
-          type: MSG_AUTH,
-          identityNumber: auth.identityNumber.toString(),
-          chainJson: JSON.stringify(newChain.toJSON()),
-          authMethod: serializeAuthMethod(auth.authMethod),
-        };
-        target.postMessage(payload, location.origin);
+      if (signal.aborted) {
+        return;
       }
+
+      const payload: AuthHandoffPayload = {
+        type: MSG_AUTH,
+        identityNumber: auth.identityNumber.toString(),
+        chainJson: JSON.stringify(newChain.toJSON()),
+        authMethod: serializeAuthMethod(auth.authMethod),
+      };
+      target.postMessage(payload, globalThis.location.origin);
     } catch (error) {
       // Chain creation failed — receiver will time out and fall back to
       // login. Surface the underlying error so we can debug the rare cases
@@ -160,19 +156,11 @@ export function sendAuthToOpenedTab(
     }
   };
 
-  window.addEventListener("message", listener);
-
-  function cleanup() {
-    clearTimeout(timer);
-    window.removeEventListener("message", listener);
-  }
-  const timer = setTimeout(cleanup, timeoutMs);
+  window.addEventListener("message", listener, { signal });
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   return {
-    cancel: () => {
-      cancelled = true;
-      cleanup();
-    },
+    cancel: () => controller.abort(),
   };
 }
 
@@ -189,35 +177,37 @@ export function receiveAuthFromOpener({
     return Promise.resolve(null);
   }
 
-  const nonce = new URLSearchParams(window.location.hash.slice(1)).get(
+  const nonce = new URLSearchParams(globalThis.location.hash.slice(1)).get(
     HANDOFF_HASH_KEY,
   );
   if (nonce === null) {
     return Promise.resolve(null);
   }
+  stripHandoffNonceFromUrl();
 
   return new Promise((resolve) => {
-    let settled = false;
+    const controller = new AbortController();
+    const { signal } = controller;
     let localInnerKey: ECDSAKeyIdentity | undefined;
 
     const settle = (
       value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce"> | null,
     ) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
+      if (signal.aborted) return;
+      controller.abort();
       clearTimeout(timer);
-      window.removeEventListener("message", listener);
       resolve(value);
     };
 
     const listener = (event: MessageEvent) => {
       if (
         event.source !== opener ||
-        event.origin !== location.origin ||
-        !isAuthHandoffPayload(event.data)
+        event.origin !== globalThis.location.origin
       ) {
+        return;
+      }
+      const parsed = AuthHandoffPayloadSchema.safeParse(event.data);
+      if (!parsed.success) {
         return;
       }
 
@@ -229,7 +219,7 @@ export function receiveAuthFromOpener({
 
       try {
         const chain = DelegationChain.fromJSON(
-          JSON.parse(event.data.chainJson) as Parameters<
+          JSON.parse(parsed.data.chainJson) as Parameters<
             typeof DelegationChain.fromJSON
           >[0],
         );
@@ -243,9 +233,9 @@ export function receiveAuthFromOpener({
         const identity = DelegationIdentity.fromDelegation(innerKey, chain);
 
         settle({
-          identityNumber: BigInt(event.data.identityNumber),
+          identityNumber: BigInt(parsed.data.identityNumber),
           identity,
-          authMethod: deserializeAuthMethod(event.data.authMethod),
+          authMethod: deserializeAuthMethod(parsed.data.authMethod),
         });
       } catch (error) {
         console.warn("ii-handoff: could not consume auth payload", error);
@@ -253,10 +243,10 @@ export function receiveAuthFromOpener({
       }
     };
 
-    window.addEventListener("message", listener);
+    window.addEventListener("message", listener, { signal });
 
     const timer = setTimeout(() => {
-      if (!settled) {
+      if (!signal.aborted) {
         console.warn("ii-handoff: timed out waiting for auth from opener");
       }
       settle(null);
@@ -264,20 +254,18 @@ export function receiveAuthFromOpener({
 
     ECDSAKeyIdentity.generate({ extractable: false })
       .then((innerKey) => {
-        if (settled) {
+        if (signal.aborted) {
           return;
         }
         localInnerKey = innerKey;
         const derKey = innerKey.getPublicKey().toDer();
 
-        opener.postMessage(
-          {
-            type: MSG_READY,
-            nonce,
-            publicKeyDer: toBase64(derKey),
-          } satisfies AuthHandoffReady,
-          location.origin,
-        );
+        const ready: AuthHandoffReady = {
+          type: MSG_READY,
+          nonce,
+          publicKeyDer: toBase64(derKey),
+        };
+        opener.postMessage(ready, globalThis.location.origin);
       })
       .catch(() => settle(null));
   });
