@@ -154,7 +154,9 @@
             aria-hidden="true"
           />
           <p class="text-text-primary text-base font-semibold">
-            {$t`Both devices are on the ${host} domain.`}
+            {$t`Both are on the`}
+            <span class="text-text-secondary">{host}</span>
+            {$t`domain.`}
           </p>
         </li>
       </ul>
