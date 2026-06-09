@@ -3,10 +3,10 @@
   import { t } from "$lib/stores/locale.store";
   import {
     ArrowRightIcon,
+    BookOpenIcon,
     HashIcon,
+    HeartPulseIcon,
     MailIcon,
-    RefreshCcw,
-    ShieldIcon,
   } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -208,7 +208,7 @@
     <AuthPanel class="sm:max-w-100">
       <div class="mt-auto flex flex-col sm:my-auto">
         <FeaturedIcon size="lg" class="mb-4">
-          <RefreshCcw class="size-5" />
+          <HeartPulseIcon class="size-5" />
         </FeaturedIcon>
         <h1 class="text-text-primary mb-3 text-2xl font-medium">
           {$t`Recover your identity`}
@@ -223,7 +223,7 @@
             aria-label={$t`Recover with phrase`}
           >
             <span class="flex w-full items-center gap-3">
-              <ShieldIcon class="text-fg-tertiary size-5 shrink-0" />
+              <BookOpenIcon class="text-fg-tertiary size-5 shrink-0" />
               <span
                 class="text-text-primary grow text-start text-base font-semibold"
               >
