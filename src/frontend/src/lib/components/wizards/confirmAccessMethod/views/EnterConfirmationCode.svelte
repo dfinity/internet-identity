@@ -153,16 +153,9 @@
             class="text-text-tertiary mt-0.5 size-5 shrink-0"
             aria-hidden="true"
           />
-          <div class="flex flex-col items-start gap-1.5">
-            <p class="text-text-primary text-base font-semibold">
-              {$t`Both devices are on the same domain:`}
-            </p>
-            <code
-              class="bg-bg-tertiary text-text-primary rounded-md px-2 py-1 font-mono text-sm"
-            >
-              {host}
-            </code>
-          </div>
+          <p class="text-text-primary text-base font-semibold">
+            {$t`Both devices are on the ${host} domain.`}
+          </p>
         </li>
       </ul>
       <p class="text-text-tertiary mb-2 text-center text-xs">
