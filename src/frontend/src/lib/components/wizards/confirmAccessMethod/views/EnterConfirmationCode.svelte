@@ -145,7 +145,7 @@
             aria-hidden="true"
           />
           <p class="text-text-primary text-base font-semibold">
-            {$t`I control both devices.`}
+            {$t`You control both devices.`}
           </p>
         </li>
         <li class="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
