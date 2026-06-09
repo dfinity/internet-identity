@@ -145,7 +145,8 @@
    * Granular machine sub-reason for a DoH transport failure, or
    * `undefined` for any non-DoH failure. The `DohFetchFailed` variant
    * collapses several distinct DoH causes (quorum miss, all providers
-   * down, dedup-wait timeout, malformed response) into one variant name,
+   * down, dedup-wait timeout, malformed response, recent-failure backoff)
+   * into one variant name,
    * so on its own it can't tell us *why* DoH failed — which matters most
    * for Gmail and other DoH-path providers. The canister encodes the
    * cause as the leading `snake_case` token of the `DohFetchFailed`
