@@ -118,15 +118,6 @@ async fn finalize(
     snapshot: &Snapshot,
     verification: Result<(), EmailRecoveryError>,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
-    // The verification that produced `verification` may have awaited DoH
-    // outcalls for several seconds (the `via_doh` path), and the recovery
-    // delegation stamp below awaits as well. Wall-clock has moved on, so
-    // decide the entry's liveness on a FRESH timestamp rather than the
-    // value captured before the await — otherwise an entry whose 30-min
-    // TTL lapsed mid-outcall (or that a concurrent poll already evicted)
-    // would still be treated as live.
-    let now_secs = ic_cdk::api::time() / 1_000_000_000;
-
     if let Err(e) = verification {
         let cloned = e.clone();
         pending::with_mut(nonce, now_secs, |c| {
@@ -134,19 +125,6 @@ async fn finalize(
             c.partial_verification = None;
         });
         return Err(e);
-    }
-
-    // Re-grab the entry on the fresh clock before committing anything
-    // irreversible (binding a credential / stamping a delegation):
-    // `with_mut` lazily expires and removes a stale entry, and a racing
-    // submit/poll may have advanced it past `NeedDkimLeaf` already. If
-    // it's no longer awaiting its leaf, treat the challenge as expired
-    // rather than finalizing against state that moved underneath us.
-    let still_awaiting = pending::with_mut(nonce, now_secs, |c| {
-        matches!(c.status, PendingStatus::NeedDkimLeaf { .. })
-    });
-    if still_awaiting != Some(true) {
-        return Err(EmailRecoveryError::NonceExpired);
     }
 
     match &snapshot.kind {
