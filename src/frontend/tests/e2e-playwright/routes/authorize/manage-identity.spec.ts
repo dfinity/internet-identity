@@ -45,12 +45,16 @@ test.describe("Manage your Internet Identity from authorize popover", () => {
     // Open the identity popover.
     await avatarBtn.click();
 
-    // Click "Manage your Internet Identity" — this should sign in and then
-    // open /manage in a new tab via window.open() from the popup.
-    const managePagePromise = secondPopup.context().waitForEvent("page");
+    // Click "Manage your Internet Identity" — signs in via the virtual
+    // authenticator and surfaces the "You're signed in" confirmation. The
+    // dialog's own button click then drives window.open with fresh
+    // transient activation so the flow works on Safari too.
     await secondPopup
       .getByRole("button", { name: "Manage your Internet Identity" })
       .click();
+
+    const managePagePromise = secondPopup.context().waitForEvent("page");
+    await secondPopup.getByRole("button", { name: "Open manage" }).click();
 
     const managePage = await managePagePromise;
     await managePage.waitForURL("**/manage**", { timeout: 15_000 });
