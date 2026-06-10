@@ -70,7 +70,12 @@ function createLastUsedIdentitiesStoreMock() {
     identities: Record<string, unknown>;
     selected?: unknown;
   }>({ identities: {} });
-  return { ...store, addLastUsedIdentity: () => {}, selectIdentity: () => {} };
+  return {
+    ...store,
+    addLastUsedIdentity: () => {},
+    restoreIdentity: vi.fn(),
+    selectIdentity: () => {},
+  };
 }
 
 const sessionStoreValue = vi.hoisted(() => createSessionStoreMock());
@@ -239,6 +244,26 @@ describe("AuthFlow — method-switch disambiguation", () => {
     flow.cancelMethodSwitch();
     expect(flow.view).toBe("chooseMethod");
     expect(flow.pendingMethodSwitch).toBeUndefined();
+  });
+
+  it("cancelMethodSwitch restores the previous identity in the store", () => {
+    const restoreSpy = lastUsedIdentitiesStoreValue.restoreIdentity;
+    restoreSpy.mockClear();
+    flow.requestMethodSwitch({
+      previousIdentity,
+      newMethod: "openid",
+      signedInIdentityNumber: BigInt(99),
+    });
+    flow.cancelMethodSwitch();
+    expect(restoreSpy).toHaveBeenCalledTimes(1);
+    expect(restoreSpy).toHaveBeenCalledWith(previousIdentity);
+  });
+
+  it("cancelMethodSwitch without a pending switch does not touch the store", () => {
+    const restoreSpy = lastUsedIdentitiesStoreValue.restoreIdentity;
+    restoreSpy.mockClear();
+    flow.cancelMethodSwitch();
+    expect(restoreSpy).not.toHaveBeenCalled();
   });
 });
 

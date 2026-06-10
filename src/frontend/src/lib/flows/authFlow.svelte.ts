@@ -163,6 +163,15 @@ export class AuthFlow {
   };
 
   cancelMethodSwitch = (): void => {
+    // The new auth completed BEFORE the dialog opened, so the store
+    // already recorded the new method as last-used. Without restoring
+    // the snapshot the /manage card would keep displaying the new
+    // method even though the user backed out of the switch.
+    if (this.#pendingMethodSwitch !== undefined) {
+      lastUsedIdentitiesStore.restoreIdentity(
+        this.#pendingMethodSwitch.previousIdentity,
+      );
+    }
     this.#pendingMethodSwitch = undefined;
     this.#view = "chooseMethod";
   };

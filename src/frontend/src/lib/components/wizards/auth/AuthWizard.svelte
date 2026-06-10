@@ -104,6 +104,16 @@
   // self-elevated from an inline picker).
   const reset = () => {
     if (isAuthenticating) return;
+    // Dismissing a sub-view dialog via X/backdrop must run the same
+    // cancel cleanup as the in-content "Use a different method" link
+    // (e.g. restoring lastUsedIdentities for a cancelled method switch).
+    if (
+      authFlow.view === "openIdNotConnected" ||
+      authFlow.view === "openIdAlreadyLinked" ||
+      authFlow.view === "confirmMethodSwitch"
+    ) {
+      cancelSubView();
+    }
     isElevated = false;
     pendingSsoRegistration = false;
     mode = initialMode;
