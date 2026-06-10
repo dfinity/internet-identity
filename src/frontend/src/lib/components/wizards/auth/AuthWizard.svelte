@@ -8,6 +8,7 @@
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
   import Dialog, { isInsideDialog } from "$lib/components/ui/Dialog.svelte";
+  import { isInsideAuthPanel } from "$lib/components/ui/AuthPanel.svelte";
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
@@ -55,6 +56,7 @@
   });
 
   const inDialog: boolean = isInsideDialog();
+  const inAuthPanel: boolean = isInsideAuthPanel();
   let isElevated = $state(false);
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
@@ -391,7 +393,7 @@
     signInWithSso={authFlow.signInWithSso}
     {mode}
     onSwitchMode={switchModeAvailable ? toggleMode : undefined}
-    withinDialog={inDialog || isElevated}
+    withinDialog={inDialog || isElevated || inAuthPanel}
   />
 {/snippet}
 

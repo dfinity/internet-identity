@@ -17,6 +17,7 @@
   import { Trans } from "$lib/components/locale";
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
+  import AuthPanel from "$lib/components/ui/AuthPanel.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
@@ -367,7 +368,9 @@
             "rounded-t-none",
         ]}
       >
-        {@render content()}
+        <AuthPanel>
+          {@render content()}
+        </AuthPanel>
       </div>
     </div>
   </div>
