@@ -124,9 +124,10 @@
   // re-auth dialog), the parent's X button closes the dialog and
   // unmounts us without ever calling reset(). Treat unmount with a
   // pending method switch as an implicit cancel so the store revert
-  // still runs.
+  // still runs — unless the switch was actually confirmed and we're
+  // mid-onSignIn (parent dialog closing triggered the unmount).
   onDestroy(() => {
-    if (authFlow.pendingMethodSwitch !== undefined) {
+    if (authFlow.pendingMethodSwitch !== undefined && !methodSwitchConfirmed) {
       authFlow.cancelMethodSwitch();
     }
   });
@@ -334,12 +335,23 @@
     void goto("/recovery");
   };
 
+  // Tracks whether the active pending method switch was confirmed (so
+  // the onDestroy cleanup doesn't misread the unmount as a cancel).
+  let methodSwitchConfirmed = false;
+
   const handleConfirmMethodSwitch = async (): Promise<void> => {
+    const pending = authFlow.pendingMethodSwitch;
+    if (pending === undefined) return;
     try {
       isAuthenticating = true;
-      const identityNumber = authFlow.confirmMethodSwitch();
-      await onSignIn(identityNumber);
+      methodSwitchConfirmed = true;
+      // Keep the SwitchAccessMethod view visible until onSignIn closes
+      // the parent dialog — otherwise the picker briefly flashes back
+      // in between the state reset and the dialog teardown.
+      await onSignIn(pending.signedInIdentityNumber);
+      authFlow.confirmMethodSwitch();
     } catch (error) {
+      methodSwitchConfirmed = false;
       onError(error);
     } finally {
       isAuthenticating = false;
