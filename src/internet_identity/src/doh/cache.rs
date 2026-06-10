@@ -56,6 +56,7 @@
 //!   allowlist-bounded, so this is generous headroom plus a hard memory
 //!   bound that favours recently-seen domains.
 
+use super::types::{DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
 use crate::single_flight_cache::{RetryBackoff, SingleFlightCache};
 
 /// A cached DoH answer: the TXT-record bytes, or a definitive "no such
@@ -83,10 +84,20 @@ pub const DOH_RETRY_MULTIPLIER: u64 = 2;
 /// Hard cap on cached FQDNs; over it, the least-recently-used is evicted.
 pub const DOH_MAX_ENTRIES: usize = 256;
 
-/// Construct the DoH cache with the knobs above.
+/// Construct the DoH cache with the knobs above. The freshness window
+/// (`fresh_for`) is the deploy arg `max_cache_age_secs` (default 1 h, capped
+/// 24 h), read here so the cache owns all its policy and `get_or_fill` takes
+/// none. Config only changes on upgrade, which wipes this heap cache, so the
+/// value is stable for the cache's lifetime; `None` falls back to the default.
 pub fn new_doh_cache() -> DohCache {
+    let fresh_for = crate::state::persistent_state(|p| {
+        p.doh_config.as_ref().and_then(|c| c.max_cache_age_secs)
+    })
+    .unwrap_or(DEFAULT_CACHE_AGE_SECS)
+    .min(MAX_CACHE_AGE_SECS);
     SingleFlightCache::new()
-        .with_stale_secs(DOH_STALE_SECS)
+        .with_fresh_for(fresh_for)
+        .with_stale_for(DOH_STALE_SECS)
         .with_max_entries(DOH_MAX_ENTRIES)
         .with_retry_backoff(RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER))
 }

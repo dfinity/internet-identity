@@ -56,8 +56,6 @@ pub use parser::{parse_txt_response, ParseError};
 #[allow(unused_imports)]
 pub use types::{DohError, DohProvider, PROVIDERS};
 
-use types::{DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
-
 thread_local! {
     /// Per-canister DoH cache. Heap-only — losing it on upgrade is
     /// fine, the next `smtp_request` for an affected domain just
@@ -184,11 +182,6 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
             registered_domain: registered_domain.to_string(),
         });
     }
-    let max_age = config
-        .max_cache_age_secs
-        .unwrap_or(DEFAULT_CACHE_AGE_SECS)
-        .min(MAX_CACHE_AGE_SECS);
-
     // Build the query early so an InvalidName failure short-circuits
     // before we touch the cache or claim a fill token.
     let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
@@ -206,7 +199,7 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
     // record and a definitive `NoAnswer` are both cacheable *answers* (so
     // they're shared and served for the TTL); only transient failures stay
     // `Err`, which is what the cache debounces.
-    let outcome = get_or_fill(&DOH_CACHE, name, now_secs, max_age, || async move {
+    let outcome = get_or_fill(&DOH_CACHE, name, || async move {
         let outcomes = fetch_all(&query).await;
         match decide_quorum(&outcomes) {
             Ok(bytes) => Ok(DohRecord::Txt(bytes)),
@@ -230,7 +223,7 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
         // its retry backoff, so the cache short-circuited without a new
         // fan-out and had no answer to serve stale. Transient — a retry
         // past the backoff, or a later success, resolves it.
-        Err(CacheFillError::CoolingDown) => Err(DohError::RetryBackoffActive),
+        Err(CacheFillError::Throttled) => Err(DohError::RetryBackoffActive),
     }
 }
 
@@ -256,19 +249,6 @@ fn name_within_domain(name: &str, registered_domain: &str) -> bool {
     let suffix = &n[n.len() - d.len()..];
     let dot_idx = n.len() - d.len() - 1;
     suffix.eq_ignore_ascii_case(d) && n.as_bytes()[dot_idx] == b'.'
-}
-
-#[cfg(not(test))]
-fn now_secs() -> u64 {
-    ic_cdk::api::time() / 1_000_000_000
-}
-
-/// Test-time clock. The canister-time accessor traps outside a real
-/// canister, so under `cfg(test)` we read from a thread-local the test
-/// can advance.
-#[cfg(test)]
-fn now_secs() -> u64 {
-    test_support::TEST_NOW_SECS.with(|t| *t.borrow())
 }
 
 // =====================================================================
@@ -391,15 +371,16 @@ pub(super) mod test_support {
     use std::collections::HashMap;
 
     thread_local! {
-        pub(super) static TEST_NOW_SECS: RefCell<u64> = const { RefCell::new(1_700_000_000) };
         pub(super) static MOCK_RESPONSES: RefCell<
             HashMap<&'static str, Outcome>,
         > = RefCell::new(HashMap::new());
         pub(super) static MOCK_CALL_COUNT: RefCell<usize> = const { RefCell::new(0) };
     }
 
+    /// Drive the cache's clock (the cache owns the time source now — see
+    /// `single_flight_cache::now`).
     pub(super) fn set_now(t: u64) {
-        TEST_NOW_SECS.with(|c| *c.borrow_mut() = t);
+        crate::single_flight_cache::set_test_now(t);
     }
 
     pub(super) fn set_mock(responses: &[(&'static str, Outcome)]) {
