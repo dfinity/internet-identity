@@ -867,14 +867,17 @@ fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
         .expect("await_call_no_ticks");
     let result: Result<EmailRecoveryStatus, EmailRecoveryError> =
         candid::decode_one(&raw).expect("decode submit_dkim_leaf_via_doh result");
-    let submit_status = result.expect("DoH fallback should succeed for an allowlisted domain");
+    let submit_status = result.expect("DoH fallback accept should be Ok");
+    // Synchronous accept now: the method returns `Verifying` and resolves the
+    // DKIM key in the background. The terminal verdict lands on the polled
+    // status below (the fetch + finalize ran during `fulfill_doh_outcalls`).
     assert!(
-        matches!(submit_status, EmailRecoveryStatus::RegistrationSucceeded),
-        "expected RegistrationSucceeded from the DoH fallback, got {submit_status:?}",
+        matches!(submit_status, EmailRecoveryStatus::Verifying),
+        "expected Verifying accept from the DoH fallback, got {submit_status:?}",
     );
 
-    // Polled status agrees, and the credential actually persisted to
-    // the anchor (otherwise remove would return AddressNotRegistered).
+    // Polled status is the terminal verdict, and the credential actually
+    // persisted to the anchor (otherwise remove would return AddressNotRegistered).
     let status = api::email_recovery_status(&env, canister_id, &nonce).expect("status call failed");
     assert!(
         matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
@@ -893,14 +896,15 @@ fn dnssec_path_doh_fallback_rejects_non_allowlisted_domain() {
     let (canister_id, _id, _p, nonce, _dkim_txt) =
         dnssec_flow_until_need_dkim_leaf(&env, vec![]);
 
-    // DoH fallback. The allowlist gate rejects before any outcall, so
-    // this resolves synchronously with DomainNotAllowlisted — no DoH
-    // fan-out to fulfil.
+    // DoH fallback. Synchronous accept: the allowlist gate rejects before
+    // any outcall (no detach, no DoH fan-out), so the call returns
+    // `Ok(Verifying)` and the rejection is written to the polled status by
+    // the same call — surfaced below.
     let result = api::email_recovery_submit_dkim_leaf_via_doh(&env, canister_id, &nonce)
         .expect("submit_dkim_leaf_via_doh call failed");
     assert!(
-        matches!(result, Err(EmailRecoveryError::DomainNotAllowlisted(ref d)) if d == TEST_DOMAIN),
-        "expected Err(DomainNotAllowlisted({TEST_DOMAIN})), got {result:?}",
+        matches!(result, Ok(EmailRecoveryStatus::Verifying)),
+        "expected Ok(Verifying) accept, got {result:?}",
     );
 
     // The pending entry is now terminally Failed — the user sees the
@@ -1024,27 +1028,26 @@ fn full_setup_flow_binds_credential_to_anchor() {
 // than each firing their own five-provider fan-out.
 //
 // The original dedup parked waiters on a shared future that the fetcher
-// woke when it published. On the single-threaded canister executor that
-// ran the waiter to completion *inside the fetcher's call context* —
-// first tripping `RefCell already borrowed` at doh/cache.rs:256, and
-// (once that borrow was addressed) mis-routing the waiter's reply to the
-// wrong call (`ic0.msg_reply ... already replied` on one request, "did
-// not reply" on the other). The fix makes waiters poll the cache from
-// their OWN call context instead of being woken cross-call.
+// woke when it published — on the single-threaded canister executor that
+// ran the waiter to completion inside the fetcher's call context, tripping
+// `RefCell already borrowed` and then mis-routing replies (`already
+// replied` / "did not reply"). The single-flight cache is now
+// callback-delivery: `smtp_request` is a synchronous accept (status
+// `Verifying`) and the verification is detached, so nobody awaits a reply
+// cross-call — the hazard can't arise. Dedup still must hold: a second
+// request for the same domain joins the in-flight fetch's callback queue
+// rather than firing its own fan-out.
 //
-// This test pins the public-API behaviour the fix guarantees, with the
-// dedup interleaving made explicit (and asserted) rather than left to a
-// fixed tick count:
+// This test pins that public-API behaviour with the interleaving made
+// explicit (and asserted) rather than left to a fixed tick count:
 //   1. Submit request A and drive rounds — *without answering any
 //      outcall* — until its provider outcalls are pending; A now owns
 //      the fetch.
 //   2. Submit request B and confirm it dedups: no new outcalls appear,
-//      and it stays in-flight (no terminal status) until A publishes.
+//      and its status stays `Verifying` (not terminal) until A publishes.
 //   3. Answer the single, deduped DKIM (+ DMARC) outcall set.
-//   4. Both requests reply Ok and their credentials are bound.
-//
-// Against the pre-fix cache, step 3 made the publisher trap / mis-reply
-// and the waiter never completed; with the fix both succeed.
+//   4. Both requests' statuses reach `RegistrationSucceeded` and their
+//      credentials are bound.
 #[test]
 fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
     let env = env();
@@ -1147,9 +1150,17 @@ fn concurrent_doh_dedup_for_same_domain_does_not_trap() {
         DOH_PROVIDER_URLS.len(),
         "second request must dedup onto the in-flight fetch, not issue its own DoH fan-out",
     );
+    // `smtp_request` is a synchronous accept now: B replies `Ok` immediately
+    // and its verification joins A's in-flight fetch as a queued callback.
+    // The dedup invariant is that B issues no new fan-out (asserted above)
+    // and its pending status stays `Verifying` — not terminal — until A's
+    // fetch publishes and drains both callbacks.
+    let status_b_inflight =
+        api::email_recovery_status(&env, canister_id, &challenge_b.nonce).expect("status B");
     assert!(
-        env.ingress_status(msg_b.clone()).is_none(),
-        "the dedup waiter must still be in-flight (no terminal status) before the fetcher publishes",
+        matches!(status_b_inflight, EmailRecoveryStatus::Verifying),
+        "the dedup waiter must be Verifying (joined A's fetch, no terminal status) \
+         before the fetcher publishes, got {status_b_inflight:?}",
     );
 
     // 3. Answer the single, deduped DKIM + DMARC outcall set.
