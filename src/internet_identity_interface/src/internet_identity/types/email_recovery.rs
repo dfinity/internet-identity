@@ -209,6 +209,44 @@ pub struct EmailRecoverySubmitDkimLeafArg {
     pub extra_chains: Vec<DelegationChain>,
 }
 
+/// Argument to `email_recovery_submit_dkim_leaf_via_doh` — the DoH
+/// fallback sibling of `email_recovery_submit_dkim_leaf`. Wrapped in a
+/// record (like [`EmailRecoverySubmitDkimLeafArg`]) so the method can
+/// grow fields without a breaking interface change; `nonce` is the
+/// lookup key and is always required.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct EmailRecoverySubmitDkimLeafViaDohArg {
+    /// The challenge nonce from `email_recovery_credential_prepare_add`
+    /// (or `email_recovery_prepare_delegation` for recovery). The DoH
+    /// fallback carries no leaf data; the canister resolves the DKIM
+    /// key over its own allowlist-gated DoH path.
+    pub nonce: String,
+}
+
+/// Why a DoH resolution failed, as a typed discriminant rather than a
+/// free-form string. The FE reads this directly to segment the
+/// `doh_reason` analytics property — no string parsing — and adding a
+/// new cause is a compile error on the FE until it's handled.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
+pub enum DohFailureReason {
+    /// Every provider's outcall failed (network error / non-200 / etc).
+    AllProvidersFailed,
+    /// A dedup waiter polled the cache for an in-flight fetch up to its
+    /// cap without the owning fetch publishing a result.
+    DedupWaitTimeout,
+    /// A recent fetch for this key failed and the single-flight cache is
+    /// in its retry-backoff window, so the request was rejected without
+    /// issuing fresh outcalls.
+    RetryBackoffActive,
+    /// Outcalls succeeded but the responses didn't reach the quorum
+    /// threshold of identical TXT bytes.
+    QuorumFailed { agreeing: u32, total: u32 },
+    /// A response was received but failed to parse as a DNS message
+    /// with a valid TXT record (or the TXT wasn't valid UTF-8). The
+    /// inner string is diagnostic detail.
+    ResponseMalformed(String),
+}
+
 /// Errors surfaced by every email-recovery flow method.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
 pub enum EmailRecoveryError {
@@ -224,8 +262,9 @@ pub enum EmailRecoveryError {
     /// the allowlist (`DohConfig.allowed_domains`).
     DomainNotAllowlisted(String),
     /// DoH path: `crate::doh::fetch_txt` couldn't reach quorum or
-    /// reported a transport failure.
-    DohFetchFailed(String),
+    /// reported a transport failure. The inner [`DohFailureReason`]
+    /// names the specific cause.
+    DohFetchFailed(DohFailureReason),
     /// Catch-all for "this domain can't be verified by any supported
     /// path".
     DomainNotSupported(String),
@@ -241,6 +280,14 @@ pub enum EmailRecoveryError {
     /// the leaf differs from the `s=` tag the email was signed
     /// under. The FE typically retries the DoH walk and resubmits.
     DkimLeafMismatch,
+    /// `email_recovery_submit_dkim_leaf` was called with an empty
+    /// `hops` vector. A genuine DNSSEC submission always carries at
+    /// least the final TXT hop; an FE that can't walk DNSSEC must call
+    /// `email_recovery_submit_dkim_leaf_via_doh` instead. Distinct from
+    /// `DkimLeafMismatch` (which means a *non-empty* chain failed to
+    /// validate) so the malformed-request case is unambiguous in
+    /// telemetry and user-facing copy.
+    EmptyDkimLeafHops,
     /// The submit-leaf call arrived but the pending challenge isn't
     /// in the right state for it. Either the email hasn't arrived
     /// yet (status is still `Pending`), or it already advanced past
@@ -281,6 +328,7 @@ pub fn error_code_name(error: &EmailRecoveryError) -> &'static str {
         EmailRecoveryError::DomainNotSupported(_) => "DomainNotSupported",
         EmailRecoveryError::EmailVerificationFailed(_) => "EmailVerificationFailed",
         EmailRecoveryError::DkimLeafMismatch => "DkimLeafMismatch",
+        EmailRecoveryError::EmptyDkimLeafHops => "EmptyDkimLeafHops",
         EmailRecoveryError::NoDkimLeafExpected => "NoDkimLeafExpected",
         EmailRecoveryError::AddressMismatch => "AddressMismatch",
         EmailRecoveryError::SubjectNotSigned => "SubjectNotSigned",

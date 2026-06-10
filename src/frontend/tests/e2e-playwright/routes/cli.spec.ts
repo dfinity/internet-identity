@@ -432,7 +432,7 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   await page.waitForURL(II_URL + "/manage");
   await enableCliAccessInSettings(page, isMobile);
 
-  // Principal the CLI links via `icp identity link ii --app nice-name.com`: the
+  // Principal the CLI links via `icp identity link web --app nice-name.com`: the
   // self-authenticating principal of the delegation chain's root public key.
   await page.goto(
     await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),

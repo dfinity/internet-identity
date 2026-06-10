@@ -60,7 +60,7 @@ use super::pending::{PartialVerification, PendingKind, PendingStatus};
 use crate::email_recovery::pending;
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryCredential, EmailRecoveryError,
+    DohFailureReason, EmailRecoveryCredential, EmailRecoveryError,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
@@ -675,8 +675,11 @@ async fn verify_setup_email_doh(
         Err(e) => return Err(map_doh_error(e, &domain)),
     };
 
-    let dkim_txt = std::str::from_utf8(&dkim_bytes)
-        .map_err(|_| EmailRecoveryError::DohFetchFailed("DKIM TXT is not valid UTF-8".into()))?;
+    let dkim_txt = std::str::from_utf8(&dkim_bytes).map_err(|_| {
+        EmailRecoveryError::DohFetchFailed(DohFailureReason::ResponseMalformed(
+            "DKIM TXT is not valid UTF-8".into(),
+        ))
+    })?;
     let dmarc_txt_opt = match dmarc_bytes_opt.as_deref().map(std::str::from_utf8) {
         Some(Ok(s)) => Some(s),
         Some(Err(_)) | None => None,
@@ -770,11 +773,12 @@ pub(super) fn extract_from_address(
 /// `NameOutsideRegisteredDomain`) → `InternalCanisterError`; everything
 /// else transient → `DohFetchFailed` ("try again").
 ///
-/// **Analytics contract:** each `DohFetchFailed` payload starts with a
-/// stable `snake_case` token before the first `:` (`all_providers_failed`,
-/// `dedup_wait_timeout`, `quorum_failed`, `response_malformed`), which the
-/// FE surfaces as the `doh_reason` funnel property (`dohSubReason` in
-/// `SetupEmailRecoveryWizard.svelte`). Keep the tokens stable.
+/// **Analytics contract:** each `DohFetchFailed` carries a typed
+/// [`DohFailureReason`] discriminant (`AllProvidersFailed`,
+/// `DedupWaitTimeout`, `QuorumFailed`, `ResponseMalformed`), which the
+/// FE reads directly to set the `doh_reason` funnel property
+/// (`dohSubReason` in `shared/errors.ts`). The discriminant is the
+/// contract — keep the variant set in sync with the FE switch.
 ///
 /// `pub(super)` so the DNSSEC-path DoH fallback in `submit_leaf.rs`
 /// (empty `hops`) maps its own `fetch_txt` errors identically.
@@ -784,18 +788,21 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
         DohError::DomainNotAllowed | DohError::NotConfigured => {
             EmailRecoveryError::DomainNotAllowlisted(domain.to_string())
         }
-        DohError::AllProvidersFailed => EmailRecoveryError::DohFetchFailed(
-            "all_providers_failed: all DoH providers failed".into(),
-        ),
-        DohError::DedupWaitTimedOut => EmailRecoveryError::DohFetchFailed(
-            "dedup_wait_timeout: timed out waiting on an in-flight fetch".into(),
-        ),
-        DohError::RetryBackoffActive => EmailRecoveryError::DohFetchFailed(
-            "retry_backoff_active: a recent fetch failed and is backing off".into(),
-        ),
-        DohError::QuorumFailed { agreeing, total } => EmailRecoveryError::DohFetchFailed(format!(
-            "quorum_failed: {agreeing} of {total} providers agreed",
-        )),
+        DohError::AllProvidersFailed => {
+            EmailRecoveryError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
+        }
+        DohError::DedupWaitTimedOut => {
+            EmailRecoveryError::DohFetchFailed(DohFailureReason::DedupWaitTimeout)
+        }
+        DohError::RetryBackoffActive => {
+            EmailRecoveryError::DohFetchFailed(DohFailureReason::RetryBackoffActive)
+        }
+        DohError::QuorumFailed { agreeing, total } => {
+            EmailRecoveryError::DohFetchFailed(DohFailureReason::QuorumFailed {
+                agreeing: agreeing as u32,
+                total: total as u32,
+            })
+        }
         // `NoAnswer` from the DMARC fetch is handled inline at the
         // call site (it switches the verifier to the strict-alignment
         // fallback). If we land here it's from the DKIM fetch — a
@@ -807,7 +814,7 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
             "DKIM record not found at signed selector".into(),
         ),
         DohError::ResponseMalformed(msg) => {
-            EmailRecoveryError::DohFetchFailed(format!("response_malformed: {msg}"))
+            EmailRecoveryError::DohFetchFailed(DohFailureReason::ResponseMalformed(msg))
         }
         DohError::InvalidName(msg) => {
             EmailRecoveryError::InternalCanisterError(format!("DoH rejected query name: {msg}"))
@@ -1002,29 +1009,41 @@ mod tests {
     fn map_doh_error_emits_stable_analytics_tokens() {
         use crate::doh::DohError;
 
-        // The leading snake_case token (up to the first ':') of each
-        // `DohFetchFailed` payload is a contract consumed by the FE's
-        // `doh_reason` analytics property — keep these stable and in
-        // sync with `dohSubReason` in SetupEmailRecoveryWizard.svelte.
-        let token = |e: DohError| -> String {
+        // Each `DohError` maps to a typed `DohFailureReason` discriminant
+        // — the contract the FE's `doh_reason` analytics property reads
+        // (`dohSubReason` in `shared/errors.ts`). Keep the variant set in
+        // sync with that FE switch.
+        let reason = |e: DohError| -> DohFailureReason {
             match map_doh_error(e, "example.com") {
-                EmailRecoveryError::DohFetchFailed(s) => s.split(':').next().unwrap().to_string(),
+                EmailRecoveryError::DohFetchFailed(r) => r,
                 other => panic!("expected DohFetchFailed, got {other:?}"),
             }
         };
-        assert_eq!(token(DohError::AllProvidersFailed), "all_providers_failed");
-        assert_eq!(token(DohError::DedupWaitTimedOut), "dedup_wait_timeout");
-        assert_eq!(token(DohError::RetryBackoffActive), "retry_backoff_active");
         assert_eq!(
-            token(DohError::QuorumFailed {
+            reason(DohError::AllProvidersFailed),
+            DohFailureReason::AllProvidersFailed
+        );
+        assert_eq!(
+            reason(DohError::DedupWaitTimedOut),
+            DohFailureReason::DedupWaitTimeout
+        );
+        assert_eq!(
+            reason(DohError::RetryBackoffActive),
+            DohFailureReason::RetryBackoffActive
+        );
+        assert_eq!(
+            reason(DohError::QuorumFailed {
                 agreeing: 2,
                 total: 5
             }),
-            "quorum_failed"
+            DohFailureReason::QuorumFailed {
+                agreeing: 2,
+                total: 5
+            }
         );
         assert_eq!(
-            token(DohError::ResponseMalformed("bad".into())),
-            "response_malformed"
+            reason(DohError::ResponseMalformed("bad".into())),
+            DohFailureReason::ResponseMalformed("bad".into())
         );
 
         // The non-`DohFetchFailed` causes keep their own distinct

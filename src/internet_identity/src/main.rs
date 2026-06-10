@@ -1450,7 +1450,7 @@ mod email_recovery_api {
     use internet_identity_interface::internet_identity::types::email_recovery::{
         EmailRecoveryChallenge, EmailRecoveryDiagnostics, EmailRecoveryDnsInput,
         EmailRecoveryError, EmailRecoveryGetDelegationArgs, EmailRecoveryStatus,
-        EmailRecoverySubmitDkimLeafArg,
+        EmailRecoverySubmitDkimLeafArg, EmailRecoverySubmitDkimLeafViaDohArg,
     };
     use internet_identity_interface::internet_identity::types::SessionKey;
 
@@ -1613,6 +1613,29 @@ mod email_recovery_api {
     ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
         email_recovery::submit_dkim_leaf(arg, now_secs).await
+    }
+
+    /// Anonymous. DoH-fallback sibling of
+    /// `email_recovery_submit_dkim_leaf`. The FE calls this instead of
+    /// submitting hops when it can't walk a fully-signed DNSSEC
+    /// resolution for the leaf — the DKIM record CNAMEs into an
+    /// unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
+    /// `live.com`, …). It carries no leaf data: the canister resolves
+    /// the DKIM key over its own allowlist-gated DoH path, reusing the
+    /// partial-verification record stashed at email-arrival time, then
+    /// runs the same DMARC alignment + binding. A domain the operator
+    /// hasn't enabled returns `DomainNotAllowlisted` rather than
+    /// leaving the entry stuck in `NeedDkimLeaf` until it expires.
+    ///
+    /// Anonymous for the same reason as
+    /// `email_recovery_submit_dkim_leaf`: the 64-bit nonce is the only
+    /// authentication, and the call is a no-op against any other entry.
+    #[update]
+    async fn email_recovery_submit_dkim_leaf_via_doh(
+        arg: EmailRecoverySubmitDkimLeafViaDohArg,
+    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs).await
     }
 
     /// **Anonymous query.** Final step of the recovery flow: after
