@@ -3,10 +3,7 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import { ArrowRightIcon, RepeatIcon, UserIcon } from "@lucide/svelte";
-  import {
-    lastUsedIdentitiesStore,
-    type LastUsedIdentity,
-  } from "$lib/stores/last-used-identities.store";
+  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import { getMetadataString, findConfig } from "$lib/utils/openID";
   import type { MethodTag } from "$lib/flows/authFlow.svelte";
 
@@ -16,7 +13,11 @@
     | { type: "sso"; name: string };
 
   interface Props {
-    previousIdentityNumber: bigint;
+    // Snapshot of the previously-signed-in identity captured BEFORE the
+    // new sign-in mutated the live store. Reading from
+    // `lastUsedIdentitiesStore` here would race the store update and
+    // show the new method as the "from" side of the switch.
+    previousIdentity: LastUsedIdentity;
     newMethod: MethodTag;
     providerIssuer?: string;
     providerName?: string;
@@ -25,7 +26,7 @@
   }
 
   let {
-    previousIdentityNumber,
+    previousIdentity,
     newMethod,
     providerIssuer,
     providerName,
@@ -33,27 +34,24 @@
     onCancel,
   }: Props = $props();
 
-  const previous: LastUsedIdentity | undefined = $derived(
-    $lastUsedIdentitiesStore.identities[previousIdentityNumber.toString()],
-  );
-
   const previousEmail: string | undefined = $derived.by(() => {
-    if (previous === undefined) return undefined;
     if (
-      "openid" in previous.authMethod &&
-      previous.authMethod.openid.metadata !== undefined
+      "openid" in previousIdentity.authMethod &&
+      previousIdentity.authMethod.openid.metadata !== undefined
     ) {
-      return getMetadataString(previous.authMethod.openid.metadata, "email");
+      return getMetadataString(
+        previousIdentity.authMethod.openid.metadata,
+        "email",
+      );
     }
-    if ("sso" in previous.authMethod) {
-      return previous.authMethod.sso.email;
+    if ("sso" in previousIdentity.authMethod) {
+      return previousIdentity.authMethod.sso.email;
     }
     return undefined;
   });
 
-  const fromMethod: AccessMethod | undefined = $derived.by(() => {
-    if (previous === undefined) return undefined;
-    const m = previous.authMethod;
+  const fromMethod: AccessMethod = $derived.by(() => {
+    const m = previousIdentity.authMethod;
     if ("passkey" in m) return { type: "passkey" };
     if ("openid" in m) {
       // findConfig handles template issuers (e.g. Microsoft's
@@ -90,20 +88,19 @@
   });
 
   const userName: string = $derived(
-    previous?.name ??
+    previousIdentity.name ??
       previousEmail ??
-      (previous !== undefined ? `${previous.identityNumber}` : ""),
+      `${previousIdentity.identityNumber}`,
   );
   const userEmail: string | undefined = $derived(
-    previous?.name !== undefined ? previousEmail : undefined,
+    previousIdentity.name !== undefined ? previousEmail : undefined,
   );
 
   const methodLabel = (m: AccessMethod): string =>
     m.type === "passkey" ? $t`Passkey` : m.name;
 </script>
 
-{#if fromMethod !== undefined}
-  <div class="flex flex-col">
+<div class="flex flex-col">
     <div class="flex flex-col items-start">
       <h2
         class="text-text-primary text-[22px] leading-[26.4px] font-medium tracking-tight"
@@ -178,4 +175,3 @@
       </button>
     {/if}
   </div>
-{/if}

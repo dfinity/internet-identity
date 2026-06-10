@@ -153,6 +153,7 @@ vi.mock("$lib/utils/utils", () => ({
 }));
 
 import { AuthFlow } from "./authFlow.svelte";
+import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
 import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
 describe("AuthFlow — mode", () => {
@@ -177,15 +178,23 @@ describe("AuthFlow — method-switch disambiguation", () => {
     flow = new AuthFlow({ trackLastUsed: false });
   });
 
+  const previousIdentity: LastUsedIdentity = {
+    identityNumber: BigInt(42),
+    authMethod: {
+      passkey: { credentialId: new Uint8Array([1, 2, 3]) },
+    },
+    lastUsedTimestampMillis: 0,
+  };
+
   it("requestMethodSwitch parks state and transitions view", () => {
     flow.requestMethodSwitch({
-      previousIdentityNumber: BigInt(42),
+      previousIdentity,
       newMethod: "passkey",
       signedInIdentityNumber: BigInt(99),
     });
     expect(flow.view).toBe("confirmMethodSwitch");
     expect(flow.pendingMethodSwitch).toEqual({
-      previousIdentityNumber: BigInt(42),
+      previousIdentity,
       newMethod: "passkey",
       signedInIdentityNumber: BigInt(99),
     });
@@ -193,7 +202,7 @@ describe("AuthFlow — method-switch disambiguation", () => {
 
   it("requestMethodSwitch preserves optional provider info for openid", () => {
     flow.requestMethodSwitch({
-      previousIdentityNumber: BigInt(42),
+      previousIdentity,
       newMethod: "openid",
       signedInIdentityNumber: BigInt(99),
       providerIssuer: "https://accounts.google.com",
@@ -207,7 +216,7 @@ describe("AuthFlow — method-switch disambiguation", () => {
 
   it("confirmMethodSwitch returns the signed-in identity number and clears state", () => {
     flow.requestMethodSwitch({
-      previousIdentityNumber: BigInt(42),
+      previousIdentity,
       newMethod: "sso",
       signedInIdentityNumber: BigInt(123),
     });
@@ -223,7 +232,7 @@ describe("AuthFlow — method-switch disambiguation", () => {
 
   it("cancelMethodSwitch clears state and returns to chooseMethod", () => {
     flow.requestMethodSwitch({
-      previousIdentityNumber: BigInt(42),
+      previousIdentity,
       newMethod: "passkey",
       signedInIdentityNumber: BigInt(99),
     });

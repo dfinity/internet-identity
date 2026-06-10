@@ -78,7 +78,7 @@
     if (previousSnapshot === undefined) return false;
     if (methodType(previousSnapshot.authMethod) === newMethod) return false;
     authFlow.requestMethodSwitch({
-      previousIdentityNumber: previousSnapshot.identityNumber,
+      previousIdentity: previousSnapshot,
       newMethod,
       signedInIdentityNumber,
       ...providerInfo,
@@ -370,8 +370,7 @@
     />
   {:else if authFlow.view === "confirmMethodSwitch" && authFlow.pendingMethodSwitch !== undefined}
     <SwitchAccessMethod
-      previousIdentityNumber={authFlow.pendingMethodSwitch
-        .previousIdentityNumber}
+      previousIdentity={authFlow.pendingMethodSwitch.previousIdentity}
       newMethod={authFlow.pendingMethodSwitch.newMethod}
       providerIssuer={authFlow.pendingMethodSwitch.providerIssuer}
       providerName={authFlow.pendingMethodSwitch.providerName}

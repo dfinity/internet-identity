@@ -12,7 +12,10 @@ import {
   authenticatedStore,
   authenticationStore,
 } from "$lib/stores/authentication.store";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import {
+  lastUsedIdentitiesStore,
+  type LastUsedIdentity,
+} from "$lib/stores/last-used-identities.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
 import { features } from "$lib/legacy/features";
@@ -75,7 +78,7 @@ export class AuthFlow {
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
   #pendingMethodSwitch = $state<{
-    previousIdentityNumber: bigint;
+    previousIdentity: LastUsedIdentity;
     newMethod: MethodTag;
     signedInIdentityNumber: bigint;
     providerIssuer?: string;
@@ -138,7 +141,7 @@ export class AuthFlow {
   };
 
   requestMethodSwitch = (args: {
-    previousIdentityNumber: bigint;
+    previousIdentity: LastUsedIdentity;
     newMethod: MethodTag;
     signedInIdentityNumber: bigint;
     providerIssuer?: string;
