@@ -1,103 +1,84 @@
-//! Single-flight cache for IC canister code: stale-while-revalidate +
-//! stale-if-error, with concurrent-fill dedup, exponential-backoff retry,
-//! and an LRU size bound.
+//! Single-flight cache for IC canister code: a memoised async fill with
+//! concurrent-fill dedup, stale-while-revalidate + stale-if-error,
+//! exponential-backoff retry, and an LRU size bound — **callback delivery**.
+//!
+//! The cache does not return values. You give [`with_value`] a key and a
+//! callback; the callback is invoked once with the result when it's
+//! available. The fill is set once, in the constructor. This shape exists
+//! because the IC can't block one call on another's in-flight work — waking
+//! another call's task runs it inside the filler's context and mis-routes
+//! its reply. So rather than make callers wait, the owning fill is detached
+//! (`ic_cdk::spawn`) and every interested caller's callback runs when the
+//! fill lands. Callers return immediately; downstream state is updated in the
+//! callback and observed by later polls.
 //!
 //! ## The time model — one vocabulary
-//!
-//! Every value has two configured **durations** and three derived
-//! **deadlines** (all absolute wall-clock seconds):
 //!
 //! ```text
 //!   filled_at ──fresh_for──▶ fresh_until ──stale_for──▶ evict_at
 //! ```
 //!
-//! - `fresh_for` — how long a freshly filled value is authoritative; cache-
-//!   wide policy set once via `with_fresh_for` (for DoH it's the deploy arg
-//!   `max_cache_age_secs`, read in `new_doh_cache`). This is **not** a DNS
-//!   TTL — the DoH `transform` strips that.
+//! - `fresh_for` — how long a freshly filled value is authoritative.
 //! - `fresh_until = filled_at + fresh_for` — fresh below it, stale above.
-//! - `stale_for` — extra window a stale value is still served as a
-//!   fallback while a refresh is attempted.
-//! - `evict_at = fresh_until + stale_for` — hard deadline; the entry is
-//!   dropped at/after it (or earlier under LRU pressure).
-//! - `retry_at` — a failed fill parks the key until here
-//!   (`now + backoff(failures)`), itself capped by `evict_at`.
+//! - `stale_for` — extra window a stale value is still served as a fallback.
+//! - `evict_at = fresh_until + stale_for` — hard deadline; dropped at/after it.
+//! - `retry_at` — a failed fill parks the key until here, capped by `evict_at`.
 //!
-//! ## What a lookup decides
+//! ## What a lookup decides ([`Lookup`])
 //!
-//! [`get_or_fill`] is the entry point; it drives [`SingleFlightCache::lookup`],
-//! which returns exactly one of four outcomes (see [`Lookup`]):
+//! - **`Deliver(v)`** — a value is servable now (fresh, or stale within the
+//!   cooldown); the callback runs immediately.
+//! - **`StartFill`** — nothing servable and no fill in flight; the callback
+//!   joins a fresh queue and the fill is spawned.
+//! - **`Joining`** — a fill is already in flight; the callback joins its queue
+//!   (dedup — no second fill).
+//! - **`Throttled`** — a recent fill failed, backoff not elapsed, no value;
+//!   the callback gets `Err(Throttled)` immediately.
 //!
-//! - **`Serve(v)`** — a value is servable right now (fresh, or stale within
-//!   the cooldown). Returned with no fill.
-//! - **`Wait`** — a fill/refresh is in flight; the caller polls and
-//!   re-checks. Carries the stale value to fall back on if the wait times
-//!   out.
-//! - **`Fill`** — nothing fresher is in flight; the caller owns a (blocking)
-//!   fill. Carries the stale value to fall back on if that fill fails
-//!   (stale-if-error).
-//! - **`Throttled`** — a recent fill failed, its backoff hasn't elapsed, and
-//!   there is no value to serve. The caller errors out.
+//! ## Delivery contract
 //!
-//! ## The one invariant
+//! Every callback is invoked exactly once with a `Result<V,
+//! CacheFillError<E>>`: `Ok` for a servable value (fresh, stale, or freshly
+//! filled), or an error naming why nothing was servable (`FillFailed` /
+//! `Throttled` / `QueueFull`). A fill is shared: one fan-out, N callbacks.
+//! `fill_id` tokens make a superseded or abandoned fill's late completion a
+//! no-op, and on takeover the queued callbacks are retained and drained by
+//! the replacement fill — so a trapped fill never strands its waiters.
 //!
-//! **`get_or_fill` returns `Ok` iff a value is servable** — fresh, stale, or
-//! freshly filled. The three [`CacheFillError`] variants only name *why*
-//! nothing was servable (own fill failed cold / foreign fill wedged /
-//! throttled with no value). Because `lookup` carries the servable value in
-//! every outcome that has one, the fallback is read once, at lookup time —
-//! there is no second "is anything servable" query.
+//! ## Trap isolation
 //!
-//! The value carried by `Wait`/`Fill` is captured at lookup time. For
-//! `Fill` there is an `.await` (the fill) before the fallback is used, so a
-//! served stale value may be up to one fill-duration past its `evict_at` —
-//! a deliberate soft bound (a barely-expired value beats failing the
-//! caller; the stale window is sized in minutes, the overshoot in seconds).
-//!
-//! ## Single-flight, uniform value
-//!
-//! Once a fill or refresh is in flight, concurrent callers `Wait` on it and
-//! all converge on the same outcome: the fresh value on success, or the same
-//! stale value on failure. `fill_id` tokens make a superseded or abandoned
-//! fill's late [`SingleFlightCache::publish`] a no-op, so it can't clobber
-//! fresher state.
-//!
-//! ## Why the waiter polls instead of being woken
-//!
-//! A waiter does not block on a shared future the filler wakes. The canister
-//! runs a single wasm thread, and waking another call's task runs it to
-//! completion *inside the filler's* call context — mis-routing the reply
-//! (`ic0.msg_reply ... already replied`). Instead each waiter polls from its
-//! OWN call context, yielding a cheap management-canister round
-//! ([`yield_round`]) between checks. The cache holds no `Waker`s and
-//! [`get_or_fill`] releases the cache borrow before every `.await`.
+//! When a fill completes, [`complete_fill`](SingleFlightCache::complete_fill)
+//! commits the fetched value, then the queued callbacks are drained
+//! synchronously in that one response execution. The callbacks are themselves
+//! synchronous (their async tail — e.g. a follow-up fetch — re-enters
+//! `with_value`, which spawns its own fill), so spawning them would not
+//! isolate them; they must be no-trap, which the backend rule already
+//! mandates. A trap in the drain rolls the batch back and the value is
+//! re-fetched on the next trigger — fail-safe.
 
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::hash::Hash;
+use std::pin::Pin;
 use std::thread::LocalKey;
 
-/// Default for how long an in-flight claim may sit before a new arrival
-/// treats the fill as abandoned and takes it over.
-///
-/// The IC commits state changes made *before* an `.await`, so if a filler's
-/// post-yield continuation traps its in-flight marker survives, and later
-/// arrivals would otherwise wait on it forever; this window lets one take
-/// the fill over. 120 s is comfortably longer than any plausible HTTP-outcall
-/// round trip yet quick enough that a genuinely stuck entry clears within a
-/// couple of retries.
+/// Default for how long an in-flight claim may sit before a new arrival treats
+/// the fill as abandoned and takes it over (e.g. its spawned task trapped
+/// after the outcall). 120 s comfortably exceeds any HTTP-outcall round trip
+/// while clearing a genuinely stuck entry within a couple of retries.
 pub const DEFAULT_ABANDON_FILL_AFTER_SECS: u64 = 120;
 
-/// Upper bound on how many times a waiter polls before giving up. Each poll
-/// yields one round via [`yield_round`]; on giving up the waiter falls back
-/// to a stale value if one exists, else [`CacheFillError::WaitTimedOut`].
-const MAX_WAIT_POLLS: u32 = 100;
+/// Default cap on callbacks queued for a single in-flight key. Past it, a new
+/// caller's callback fires immediately with [`CacheFillError::QueueFull`]
+/// (transient) rather than enqueuing — bounding memory without dropping work:
+/// the in-flight fill still completes and caches, so a retry hits the fresh
+/// value with no extra fan-out.
+pub const DEFAULT_MAX_WAITERS: usize = 32;
 
 /// Exponential backoff for the failure path: `delay = base_secs *
-/// multiplier^(consecutive_failures - 1)`, reset on success. No explicit
-/// cap — the entry lifetime (`evict_at`) bounds and resets it.
+/// multiplier^(consecutive_failures - 1)`, reset on success. No explicit cap —
+/// the entry lifetime (`evict_at`) bounds and resets it.
 #[derive(Clone, Copy)]
 pub struct RetryBackoff {
     base_secs: u64,
@@ -126,89 +107,90 @@ impl RetryBackoff {
     }
 }
 
-/// One cache record. `value` is `Some` after a success (fresh or stale) and
-/// `None` for a cold-failure marker. All deadlines are absolute seconds; see
-/// the module docs for the `fresh_until`/`evict_at`/`retry_at` model.
+/// One cache record. `value` is `Some` after a success and `None` for a
+/// cold-failure marker. All deadlines are absolute seconds.
 struct Entry<V> {
     value: Option<V>,
-    /// Fresh below this (only meaningful with a value).
     fresh_until: u64,
-    /// Hard-evict at/after this (`last_success + fresh_for + stale_for`, or
-    /// for a cold-failure marker `failure_time + fresh_for + stale_for`).
     evict_at: u64,
-    /// Earliest a (re)fill may run — the failure-backoff throttle.
     retry_at: u64,
-    /// Consecutive failures, for the backoff. Reset to 0 on success.
     failures: u32,
-    /// Monotonic access stamp for LRU eviction (a counter, not seconds).
     lru_stamp: u64,
 }
 
 impl<V> Entry<V> {
-    /// Within the freshness window — servable with no refresh.
     fn is_fresh(&self, now: u64) -> bool {
         now < self.fresh_until
     }
-
-    /// Not yet hard-evicted — still servable as a stale fallback.
     fn is_alive(&self, now: u64) -> bool {
         now < self.evict_at
     }
-
-    /// Inside the failure-backoff window — a (re)fill must not run yet.
     fn is_throttled(&self, now: u64) -> bool {
         now < self.retry_at
     }
 }
 
 /// Marker for an in-flight fill. `fill_id` identifies *this* attempt so
-/// [`SingleFlightCache::publish`] can tell whether a takeover replaced it;
-/// `claimed_at` drives the abandonment check.
+/// [`complete_fill`](SingleFlightCache::complete_fill) can tell whether a
+/// takeover replaced it; `claimed_at` drives the abandonment check.
 struct InFlight {
     fill_id: u64,
     claimed_at: u64,
 }
 
-/// In-memory single-flight cache keyed by `K`, holding values of type `V`.
-pub struct SingleFlightCache<K, V> {
+/// A boxed fill future and the boxed fill function that produces one per key.
+type BoxFuture<V, E> = Pin<Box<dyn Future<Output = Result<V, E>>>>;
+type FillFn<K, V, E> = Box<dyn Fn(K) -> BoxFuture<V, E>>;
+/// A queued callback, invoked once with the delivered result.
+type OnReady<V, E> = Box<dyn FnOnce(Result<V, CacheFillError<E>>)>;
+/// What `complete_fill` hands back: the drained callbacks plus the single
+/// result to deliver to each.
+type Drained<V, E> = (Vec<OnReady<V, E>>, Result<V, CacheFillError<E>>);
+
+/// In-memory single-flight cache keyed by `K`, holding values of type `V`
+/// whose fill may fail with `E`. See the module docs.
+pub struct SingleFlightCache<K, V, E> {
     entries: HashMap<K, Entry<V>>,
     in_flight: HashMap<K, InFlight>,
+    /// Callbacks waiting on each in-flight key, drained when it completes.
+    waiters: HashMap<K, Vec<OnReady<V, E>>>,
+    /// The shared fill, set in the constructor.
+    fill: FillFn<K, V, E>,
     next_fill_id: u64,
-    /// Monotonic counter stamped onto entries on access, for LRU.
     access_clock: u64,
-    /// How long a freshly filled value stays authoritative (its TTL).
     fresh_for: u64,
-    /// Extra time a value is served past `fresh_until` (stale-while-revalidate).
     stale_for: u64,
-    /// Hard cap on entries; over it, the least-recently-used is evicted.
     max_entries: usize,
-    /// Failure backoff; `None` means immediately retryable.
+    max_waiters: usize,
     backoff: Option<RetryBackoff>,
-    /// See [`DEFAULT_ABANDON_FILL_AFTER_SECS`].
     abandon_fill_after: u64,
 }
 
-impl<K, V> SingleFlightCache<K, V> {
-    /// A cache with no stale window, no size bound, and no failure backoff
-    /// — a failed fill caches nothing and is immediately retryable. Use the
-    /// `with_*` builders to opt into stale-serving, an LRU cap, and backoff.
-    pub fn new() -> Self {
+impl<K, V, E> SingleFlightCache<K, V, E> {
+    /// Build a cache with its shared async `fill` — run once per cold/stale
+    /// key under single-flight dedup. No stale window, no size bound, and no
+    /// backoff by default; opt into those with the `with_*` builders.
+    pub fn new<Fut>(fill: impl Fn(K) -> Fut + 'static) -> Self
+    where
+        Fut: Future<Output = Result<V, E>> + 'static,
+    {
         Self {
             entries: HashMap::new(),
             in_flight: HashMap::new(),
+            waiters: HashMap::new(),
+            fill: Box::new(move |k| Box::pin(fill(k))),
             next_fill_id: 0,
             access_clock: 0,
             fresh_for: 0,
             stale_for: 0,
             max_entries: usize::MAX,
+            max_waiters: DEFAULT_MAX_WAITERS,
             backoff: None,
             abandon_fill_after: DEFAULT_ABANDON_FILL_AFTER_SECS,
         }
     }
 
-    /// How long a freshly filled value stays fresh (its TTL). This is cache-
-    /// wide policy: every fill gets the same window. `0` (the default) means
-    /// values are born already stale.
+    /// How long a freshly filled value stays fresh (its TTL).
     pub fn with_fresh_for(mut self, fresh_for: u64) -> Self {
         self.fresh_for = fresh_for;
         self
@@ -221,15 +203,21 @@ impl<K, V> SingleFlightCache<K, V> {
         self
     }
 
-    /// Cap the cache at `max_entries`; over it, evict the least-recently-
-    /// used entry. Protects a hot key from a churn of one-off keys.
+    /// Cap the cache at `max_entries`; over it, evict the least-recently-used.
     pub fn with_max_entries(mut self, max_entries: usize) -> Self {
         self.max_entries = max_entries.max(1);
         self
     }
 
-    /// Debounce a failed fill with exponential backoff (see [`RetryBackoff`])
-    /// instead of allowing an immediate retry.
+    /// Cap callbacks queued per in-flight key; over it, a new caller gets
+    /// [`CacheFillError::QueueFull`] (see [`DEFAULT_MAX_WAITERS`]).
+    pub fn with_max_waiters(mut self, max_waiters: usize) -> Self {
+        self.max_waiters = max_waiters.max(1);
+        self
+    }
+
+    /// Debounce a failed fill with exponential backoff instead of an immediate
+    /// retry.
     pub fn with_retry_backoff(mut self, backoff: RetryBackoff) -> Self {
         self.backoff = Some(backoff);
         self
@@ -244,25 +232,10 @@ impl<K, V> SingleFlightCache<K, V> {
     }
 }
 
-impl<K, V> Default for SingleFlightCache<K, V> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
-    /// Decide what an incoming request for `key` should do, carrying the
-    /// value to serve (or fall back on) where one exists. See [`Lookup`] and
-    /// the module docs for the semantics. Drops a fully-dead entry, honours
-    /// the in-flight dedup, and otherwise classifies the entry.
-    fn lookup<Q>(&mut self, key: &Q, now: u64) -> Lookup<V>
-    where
-        K: Borrow<Q>,
-        Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
-        V: Clone,
-    {
-        // Drop a fully-dead entry so the rest reasons over a live one; from
-        // here on, a present entry is guaranteed alive (`now < evict_at`).
+impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
+    /// Classify an incoming request for `key`, claiming the in-flight marker
+    /// for a `StartFill`. Drops a fully-dead entry first.
+    fn lookup(&mut self, key: &K, now: u64) -> Lookup<V> {
         if self.entries.get(key).is_some_and(|e| !e.is_alive(now)) {
             self.entries.remove(key);
         }
@@ -272,84 +245,85 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
             .get(key)
             .is_some_and(|f| now.saturating_sub(f.claimed_at) < self.abandon_fill_after);
 
-        // No live entry: wait on an in-flight fill, else claim a cold one.
         let Some(e) = self.entries.get(key) else {
             return if inflight_fresh {
-                Lookup::Wait { servable: None }
+                Lookup::Joining
             } else {
-                Lookup::Fill {
-                    token: self.claim(key, now),
-                    servable: None,
-                }
+                Lookup::StartFill(self.claim(key, now))
             };
         };
 
-        // Snapshot what we need as owned/copy values, then release the
-        // borrow so `touch`/`claim` (which need `&mut self`) can run.
         let value = e.value.clone();
         let is_fresh = e.is_fresh(now);
         let is_throttled = e.is_throttled(now);
 
-        // Priority order (matches the temperatures in the module docs):
-        // fresh value → serve; else a live fill → wait; else a stale value
-        // within the cooldown → serve; else value-less cooldown → cool;
-        // else a (re)fill is due → claim it.
         if is_fresh {
             if let Some(v) = value.as_ref() {
                 self.touch(key);
-                return Lookup::Serve(v.clone());
+                return Lookup::Deliver(v.clone());
             }
-            // A fresh marker carries no value (can't occur today); fall through.
         }
         if inflight_fresh {
-            return Lookup::Wait { servable: value };
+            return Lookup::Joining;
         }
         if is_throttled {
             return match value {
                 Some(v) => {
                     self.touch(key);
-                    Lookup::Serve(v)
+                    Lookup::Deliver(v)
                 }
                 None => Lookup::Throttled,
             };
         }
-        Lookup::Fill {
-            token: self.claim(key, now),
-            servable: value,
-        }
+        // Refresh/refill due. Any stale value stays in `entries` for
+        // stale-if-error; claim the fill.
+        Lookup::StartFill(self.claim(key, now))
     }
 
-    /// Publish the outcome of the fill you owned. `Some` on success (stored
-    /// fresh for `fresh_for`, backoff reset), `None` on failure (any prior
-    /// value is kept for stale-serving; a backoff cooldown is parked).
-    /// Cleared/written only if the in-flight marker is still *yours*, so a
-    /// superseded fill can't clobber fresher state. Sweeps expired entries.
-    fn publish<Q>(&mut self, key: &Q, token: FillToken, value: Option<V>, now: u64)
-    where
-        K: Borrow<Q>,
-        Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
-    {
-        let fresh_for = self.fresh_for;
+    /// Queue `cb` for an in-flight `key`. Returns it back (un-queued) if the
+    /// key's waiter list is already at `max_waiters`.
+    fn enqueue(&mut self, key: &K, cb: OnReady<V, E>) -> Result<(), OnReady<V, E>> {
+        let q = self.waiters.entry(key.clone()).or_default();
+        if q.len() >= self.max_waiters {
+            return Err(cb);
+        }
+        q.push(cb);
+        Ok(())
+    }
+
+    /// Apply the outcome of the fill identified by `token` and take its queued
+    /// callbacks plus the value to deliver to each. `Some` stores fresh and
+    /// resets backoff; `None` keeps any prior value for stale-serving and
+    /// parks a backoff cooldown. A no-op returning no callbacks if the marker
+    /// is no longer ours (a takeover replaced us). The caller delivers the
+    /// returned callbacks outside the cache borrow.
+    fn complete_fill(
+        &mut self,
+        key: &K,
+        token: FillToken,
+        result: Result<V, E>,
+        now: u64,
+    ) -> Drained<V, E> {
         let still_ours = self
             .in_flight
             .get(key)
             .is_some_and(|f| f.fill_id == token.fill_id);
         if !still_ours {
+            // A takeover owns this key now; let its fill deliver. Drop our
+            // result without clobbering fresher state.
             self.sweep_expired(now);
-            return;
+            return (Vec::new(), result.map_err(CacheFillError::FillFailed));
         }
         self.in_flight.remove(key);
 
-        match value {
+        match result.as_ref().ok() {
             Some(v) => {
-                let fresh_until = now.saturating_add(fresh_for);
+                let fresh_until = now.saturating_add(self.fresh_for);
                 let evict_at = fresh_until.saturating_add(self.stale_for);
-                // Success: store fresh, reset the backoff. `retry_at` points
-                // at stale onset so the first stale lookup refreshes.
                 self.upsert(
                     key,
                     Entry {
-                        value: Some(v),
+                        value: Some(v.clone()),
                         fresh_until,
                         evict_at,
                         retry_at: fresh_until,
@@ -359,11 +333,6 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
                 );
             }
             None => {
-                // Without a backoff configured there is no negative caching:
-                // keep any existing value for stale-if-error serving, but
-                // record nothing for a value-less failure, so the key stays
-                // immediately re-fetchable. The in-flight marker was already
-                // cleared above.
                 if let Some(backoff) = self.backoff {
                     let failures = self
                         .entries
@@ -372,21 +341,20 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
                         .saturating_add(1);
                     let retry_at = now.saturating_add(backoff.delay_secs(failures));
                     if let Some(e) = self.entries.get_mut(key) {
-                        // Stale-if-error: keep the existing value and its
-                        // `evict_at` (the value still dies relative to the
-                        // last success); just bump the throttle and count.
-                        // For a cold-failure marker, also refresh its life.
+                        // Stale-if-error: keep the value and its `evict_at`
+                        // (it dies relative to the last success); just bump
+                        // the throttle. For a value-less marker, refresh life.
                         e.retry_at = retry_at;
                         e.failures = failures;
                         if e.value.is_none() {
-                            e.evict_at =
-                                now.saturating_add(fresh_for).saturating_add(self.stale_for);
+                            e.evict_at = now
+                                .saturating_add(self.fresh_for)
+                                .saturating_add(self.stale_for);
                         }
                     } else {
-                        // New cold-failure marker: no value to serve, but
-                        // bounded by its own `evict_at` so the backoff can't
-                        // grow forever.
-                        let evict_at = now.saturating_add(fresh_for).saturating_add(self.stale_for);
+                        let evict_at = now
+                            .saturating_add(self.fresh_for)
+                            .saturating_add(self.stale_for);
                         self.upsert(
                             key,
                             Entry {
@@ -403,19 +371,25 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
             }
         }
 
+        let waiters = self.waiters.remove(key).unwrap_or_default();
+        // Stale-if-error: a kept value beats surfacing the failure.
+        let delivery = match result {
+            Ok(v) => Ok(v),
+            Err(e) => match self.servable_value(key, now) {
+                Some(v) => Ok(v),
+                None => Err(CacheFillError::FillFailed(e)),
+            },
+        };
         self.sweep_expired(now);
+        (waiters, delivery)
     }
 
     /// Mark a fresh in-flight attempt for `key`, returning its token.
-    fn claim<Q>(&mut self, key: &Q, now: u64) -> FillToken
-    where
-        K: Borrow<Q>,
-        Q: ToOwned<Owned = K> + ?Sized,
-    {
+    fn claim(&mut self, key: &K, now: u64) -> FillToken {
         let fill_id = self.next_fill_id;
         self.next_fill_id = self.next_fill_id.wrapping_add(1);
         self.in_flight.insert(
-            key.to_owned(),
+            key.clone(),
             InFlight {
                 fill_id,
                 claimed_at: now,
@@ -424,12 +398,7 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
         FillToken { fill_id }
     }
 
-    /// Bump the access stamp on an existing entry (LRU recency).
-    fn touch<Q>(&mut self, key: &Q)
-    where
-        K: Borrow<Q>,
-        Q: Eq + Hash + ?Sized,
-    {
+    fn touch(&mut self, key: &K) {
         self.access_clock = self.access_clock.wrapping_add(1);
         let stamp = self.access_clock;
         if let Some(e) = self.entries.get_mut(key) {
@@ -437,23 +406,15 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
         }
     }
 
-    /// Insert/overwrite an entry, stamping it most-recently-used and
-    /// evicting the least-recently-used entry first if a *new* key would
-    /// exceed `max_entries`.
-    fn upsert<Q>(&mut self, key: &Q, mut entry: Entry<V>)
-    where
-        K: Borrow<Q>,
-        Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
-    {
+    fn upsert(&mut self, key: &K, mut entry: Entry<V>) {
         self.access_clock = self.access_clock.wrapping_add(1);
         entry.lru_stamp = self.access_clock;
         if !self.entries.contains_key(key) && self.entries.len() >= self.max_entries {
             self.evict_lru();
         }
-        self.entries.insert(key.to_owned(), entry);
+        self.entries.insert(key.clone(), entry);
     }
 
-    /// Evict the least-recently-used entry (smallest `lru_stamp`).
     fn evict_lru(&mut self) {
         if let Some(victim) = self
             .entries
@@ -465,22 +426,11 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
         }
     }
 
-    /// Drop every entry at/past its `evict_at` — bounds memory for an
-    /// unbounded key space and clears dead cold-failure markers.
     fn sweep_expired(&mut self, now: u64) {
         self.entries.retain(|_, e| e.is_alive(now));
     }
 
-    /// The value servable for `key` as of `now` (fresh or stale), if any.
-    /// Test-only: production reads the servable value straight off the
-    /// [`Lookup`] outcome, but tests assert on it directly.
-    #[cfg(test)]
-    fn servable_value<Q>(&self, key: &Q, now: u64) -> Option<V>
-    where
-        K: Borrow<Q>,
-        Q: Eq + Hash + ?Sized,
-        V: Clone,
-    {
+    fn servable_value(&self, key: &K, now: u64) -> Option<V> {
         self.entries
             .get(key)
             .filter(|e| e.is_alive(now))
@@ -488,115 +438,127 @@ impl<K: Eq + Hash + Clone, V> SingleFlightCache<K, V> {
     }
 }
 
-/// What [`SingleFlightCache::lookup`] resolved to, carrying the servable
-/// value where one exists. See the module docs for the full semantics.
+/// What [`SingleFlightCache::lookup`] resolved to.
 enum Lookup<V> {
-    /// A servable value (fresh, or stale within the cooldown) — return it.
-    Serve(V),
-    /// A fill/refresh is in flight; wait and re-check. `servable` is the
-    /// value to fall back on if the wait times out (`None` if nothing yet).
-    Wait { servable: Option<V> },
-    /// Nothing fresher is in flight; the holder owns the fill. `servable` is
-    /// the value to fall back on if the fill fails (stale-if-error).
-    Fill {
-        token: FillToken,
-        servable: Option<V>,
-    },
-    /// A recent fill failed, its backoff hasn't elapsed, and there is no
-    /// value to serve — the caller errors out.
+    /// A servable value (fresh, or stale within the cooldown).
+    Deliver(V),
+    /// Nothing servable and no fill in flight; the holder owns the fill.
+    StartFill(FillToken),
+    /// A fill is already in flight; join its waiter queue.
+    Joining,
+    /// A recent fill failed, backoff not elapsed, no value to serve.
     Throttled,
 }
 
-/// Opaque handle a [`Lookup::Fill`] caller passes back to
-/// [`SingleFlightCache::publish`].
+/// Opaque handle for the fill a [`Lookup::StartFill`] caller owns.
 struct FillToken {
     fill_id: u64,
 }
 
-/// Why [`get_or_fill`] returned without a value. Each names a distinct "no
-/// value was servable" situation — the only way to get an `Err`.
+/// Why a callback received an error instead of a value.
+#[derive(Clone, Debug, PartialEq)]
 pub enum CacheFillError<E> {
-    /// The fill we owned failed and there was no value to fall back on.
-    Fill(E),
-    /// A foreign in-flight fill didn't publish within [`MAX_WAIT_POLLS`]
-    /// and there was no stale value to serve. Transient.
-    WaitTimedOut,
-    /// A recent fill failed and the backoff cooldown hasn't elapsed; the
-    /// fill was not run and there is no servable value.
+    /// The fill failed and there was no value to fall back on.
+    FillFailed(E),
+    /// A recent fill failed and the backoff cooldown hasn't elapsed.
     Throttled,
+    /// The key's waiter queue was full; retry shortly.
+    QueueFull,
 }
 
-/// Get `key` from `cache`, or fill it once under single-flight dedup, with
-/// stale-while-revalidate + stale-if-error and exponential-backoff retry.
-///
-/// Returns `Ok` iff a value is servable — fresh, stale, or freshly filled;
-/// the [`CacheFillError`] variants only name *why* nothing was servable. See
-/// the module docs for the full semantics, including the soft `evict_at`
-/// bound on the stale-if-error fallback.
-///
-/// Takes only the three operands — what to cache, under what key, and how to
-/// produce it. All policy (freshness, stale window, backoff, size) lives on
-/// the cache. Time comes from the module's [`now`] (IC time; a test clock
-/// under `cfg(test)`). The cache borrow is released before every `.await`, as
-/// the single-threaded executor requires.
-pub async fn get_or_fill<K, V, Q, E, Fut>(
-    cache: &'static LocalKey<RefCell<SingleFlightCache<K, V>>>,
-    key: &Q,
-    fill: impl FnOnce() -> Fut,
-) -> Result<V, CacheFillError<E>>
-where
-    K: Eq + Hash + Clone + Borrow<Q>,
-    Q: Eq + Hash + ToOwned<Owned = K> + ?Sized,
-    V: Clone,
-    Fut: Future<Output = Result<V, E>>,
+/// Request the value for `key`, invoking `on_ready` once when it's available
+/// — synchronously now for a servable value or an immediate error, or later
+/// from the shared fill's completion. See the module docs for the contract.
+pub fn with_value<K, V, E>(
+    cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>,
+    key: K,
+    on_ready: impl FnOnce(Result<V, CacheFillError<E>>) + 'static,
+) where
+    K: Eq + Hash + Clone + 'static,
+    V: Clone + 'static,
+    E: Clone + 'static,
 {
-    let mut waits = 0u32;
-    let (token, fallback) = loop {
-        let now = now();
-        match cache.with(|c| c.borrow_mut().lookup(key, now)) {
-            Lookup::Serve(value) => return Ok(value),
-            Lookup::Throttled => return Err(CacheFillError::Throttled),
-            Lookup::Fill { token, servable } => break (token, servable),
-            Lookup::Wait { servable } => {
-                if waits >= MAX_WAIT_POLLS {
-                    // A wedged owner: serve the stale value if one exists,
-                    // else report the transient timeout.
-                    return servable
-                        .map(Ok)
-                        .unwrap_or(Err(CacheFillError::WaitTimedOut));
-                }
-                waits += 1;
-                yield_round().await;
-            }
-        }
-    };
-
-    // We own the fill.
-    let result = fill().await;
+    let on_ready: OnReady<V, E> = Box::new(on_ready);
     let now = now();
-    let fetched = result.as_ref().ok().cloned();
-    cache.with(|c| c.borrow_mut().publish(key, token, fetched, now));
-    match result {
-        Ok(value) => Ok(value),
-        // Stale-if-error: the value we saw at claim time beats the failure
-        // (soft bound — it may be up to one fill-duration past `evict_at`).
-        Err(e) => fallback.map(Ok).unwrap_or(Err(CacheFillError::Fill(e))),
+    let action = cache.with(|c| {
+        let mut c = c.borrow_mut();
+        match c.lookup(&key, now) {
+            Lookup::Deliver(v) => Action::DeliverNow(on_ready, Ok(v)),
+            Lookup::Throttled => Action::DeliverNow(on_ready, Err(CacheFillError::Throttled)),
+            // A fresh `StartFill` claim has an empty queue, so enqueue can't
+            // overflow; spawn the fill once the borrow is released.
+            Lookup::StartFill(token) => {
+                let _ = c.enqueue(&key, on_ready);
+                Action::Spawn(token)
+            }
+            Lookup::Joining => match c.enqueue(&key, on_ready) {
+                Ok(()) => Action::Joined,
+                Err(cb) => Action::DeliverNow(cb, Err(CacheFillError::QueueFull)),
+            },
+        }
+    });
+    // Side effects run outside the cache borrow: a callback may re-enter
+    // `with_value` (e.g. a follow-up fetch), and `spawn_fill` re-borrows.
+    match action {
+        Action::DeliverNow(cb, result) => cb(result),
+        Action::Spawn(token) => spawn_fill(cache, key, token),
+        Action::Joined => {}
     }
 }
 
-/// Current wall-clock time in seconds. The cache owns its time source (the
-/// same cfg-seam shape as [`yield_round`]) so `get_or_fill` takes no clock.
+/// What [`with_value`] should do once the cache borrow is released.
+enum Action<V, E> {
+    DeliverNow(OnReady<V, E>, Result<V, CacheFillError<E>>),
+    Spawn(FillToken),
+    Joined,
+}
+
+/// Build the fill future for `key` and detach it; on completion apply the
+/// outcome and deliver every queued callback.
+fn spawn_fill<K, V, E>(
+    cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>,
+    key: K,
+    token: FillToken,
+) where
+    K: Eq + Hash + Clone + 'static,
+    V: Clone + 'static,
+    E: Clone + 'static,
+{
+    let fill_fut = cache.with(|c| (c.borrow().fill)(key.clone()));
+    detach(async move {
+        let result = fill_fut.await;
+        let now = now();
+        let (waiters, delivery) =
+            cache.with(|c| c.borrow_mut().complete_fill(&key, token, result, now));
+        for cb in waiters {
+            cb(delivery.clone());
+        }
+    });
+}
+
+/// Current wall-clock time in seconds. The cache owns its time source so
+/// `with_value` takes no clock (same cfg-seam shape as [`detach`]).
 #[cfg(not(test))]
 fn now() -> u64 {
     ic_cdk::api::time() / 1_000_000_000
 }
 
-// Test clock — `now()` reads it; advance it with `set_test_now`. The
-// canister-time accessor traps off a real canister, so under `cfg(test)` the
-// cache reads a thread-local the test drives.
+/// Detach the fill task: on a real canister `ic_cdk::spawn` drives it (its
+/// outcall await suspends it, so the spawning call returns immediately).
+#[cfg(not(test))]
+fn detach(fut: impl Future<Output = ()> + 'static) {
+    ic_cdk::spawn(fut);
+}
+
+// ---- test-only time + executor ----
+//
+// `ic_cdk::spawn` traps off-wasm, so under `cfg(test)` detached fills are
+// stashed and the test drives them via `run_detached`; `now()` reads a
+// thread-local clock advanced with `set_test_now`.
 #[cfg(test)]
 thread_local! {
     static TEST_NOW: std::cell::Cell<u64> = const { std::cell::Cell::new(1_700_000_000) };
+    static DETACHED: RefCell<Vec<Pin<Box<dyn Future<Output = ()>>>>> = const { RefCell::new(Vec::new()) };
 }
 
 #[cfg(test)]
@@ -604,289 +566,254 @@ fn now() -> u64 {
     TEST_NOW.with(|c| c.get())
 }
 
-/// Set the test clock (seconds). Used by this module's tests and by the DoH
+/// Set the test clock (seconds). Used by this module's tests and the DoH
 /// integration tests, which drive cache time through it.
 #[cfg(test)]
 pub(crate) fn set_test_now(secs: u64) {
     TEST_NOW.with(|c| c.set(secs));
 }
 
-/// Yield one round, resuming in the caller's OWN call context (see the
-/// module docs for why a waiter must not be woken cross-call). Awaiting a
-/// cheap management-canister round-trip gives up a round and comes back in
-/// our own context; the random bytes are unused.
-#[cfg(not(test))]
-async fn yield_round() {
-    let _ =
-        ic_cdk::call::<(), (Vec<u8>,)>(candid::Principal::management_canister(), "raw_rand", ())
-            .await;
+#[cfg(test)]
+fn detach(fut: impl Future<Output = ()> + 'static) {
+    DETACHED.with(|d| d.borrow_mut().push(Box::pin(fut)));
 }
 
-/// Host-test stand-in: there is no executor to yield to, so a poll is a
-/// no-op. The [`MAX_WAIT_POLLS`] counter still bounds the loop.
+/// Drive every detached fill to completion (and any fills they spawn in turn).
+/// Test fills must be synchronous — a single poll completes them.
 #[cfg(test)]
-async fn yield_round() {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::future::Future;
-    use std::pin::Pin;
+pub(crate) fn run_detached() {
     use std::sync::Arc;
     use std::task::{Context, Poll, Wake, Waker};
-
-    /// Minimal block-on. Under `cfg(test)` [`yield_round`] is a no-op, so
-    /// these futures complete in a single poll — no executor needed.
     struct NoopWaker;
     impl Wake for NoopWaker {
         fn wake(self: Arc<Self>) {}
     }
-    fn block_on<F: Future>(mut f: F) -> F::Output {
-        // SAFETY: `f` is on the stack and we don't move it out.
-        let mut f = unsafe { Pin::new_unchecked(&mut f) };
-        let waker = Waker::from(Arc::new(NoopWaker));
+    let waker = Waker::from(Arc::new(NoopWaker));
+    loop {
+        let Some(mut fut) = DETACHED.with(|d| d.borrow_mut().pop()) else {
+            break;
+        };
         let mut cx = Context::from_waker(&waker);
-        match f.as_mut().poll(&mut cx) {
-            Poll::Ready(out) => out,
-            Poll::Pending => panic!("test future returned Pending — test setup is incorrect"),
+        match fut.as_mut().poll(&mut cx) {
+            Poll::Ready(()) => {}
+            Poll::Pending => {
+                panic!("detached fill returned Pending — test fills must be synchronous")
+            }
         }
     }
+}
 
-    fn expect_fill<V>(state: Lookup<V>) -> FillToken {
-        match state {
-            Lookup::Fill { token, .. } => token,
-            _ => panic!("expected Fill"),
-        }
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    // ---- lookup / publish state machine ----
+    // ---- lookup / complete_fill state machine ----
     //
-    // `lookup`/`publish` take an explicit `now` so these drive the state
-    // machine tick by tick; `fresh_for` is cache-wide policy set on the
-    // builder.
+    // These drive the machine directly with an explicit `now`; the fill is
+    // never run (it's the `with_value` path that spawns), so a stub suffices.
+    fn cache(fresh_for: u64) -> SingleFlightCache<&'static str, &'static str, ()> {
+        SingleFlightCache::new(|_k| async { Err(()) }).with_fresh_for(fresh_for)
+    }
+
+    fn expect_fill(state: Lookup<&'static str>) -> FillToken {
+        match state {
+            Lookup::StartFill(token) => token,
+            _ => panic!("expected StartFill"),
+        }
+    }
 
     #[test]
     fn fresh_then_stale_then_dead() {
         // fresh_for 100, stale_for 50 → fresh [0,100), stale [100,150), dead ≥150.
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(100)
-            .with_stale_for(50);
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, Some("v"), 0);
-        assert!(matches!(c.lookup("k", 50), Lookup::Serve("v")));
+        let mut c = cache(100).with_stale_for(50);
+        let t = expect_fill(c.lookup(&"k", 0));
+        let _ = c.complete_fill(&"k", t, Ok("v"), 0);
+        assert!(matches!(c.lookup(&"k", 50), Lookup::Deliver("v")));
 
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(100)
-            .with_stale_for(50);
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, Some("v"), 0);
-        // Stale: refresh due → Fill, value retained.
-        assert!(matches!(c.lookup("k", 120), Lookup::Fill { .. }));
+        let mut c = cache(100).with_stale_for(50);
+        let t = expect_fill(c.lookup(&"k", 0));
+        let _ = c.complete_fill(&"k", t, Ok("v"), 0);
+        // Stale, refresh due → StartFill, value retained.
+        assert!(matches!(c.lookup(&"k", 120), Lookup::StartFill(_)));
         assert!(c.entries.get("k").and_then(|e| e.value).is_some());
 
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(100)
-            .with_stale_for(50);
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, Some("v"), 0);
+        let mut c = cache(100).with_stale_for(50);
+        let t = expect_fill(c.lookup(&"k", 0));
+        let _ = c.complete_fill(&"k", t, Ok("v"), 0);
         // Dead: evicted, fill path.
-        assert!(matches!(c.lookup("k", 150), Lookup::Fill { .. }));
+        assert!(matches!(c.lookup(&"k", 150), Lookup::StartFill(_)));
     }
 
     #[test]
-    fn concurrent_lookup_waits_when_fill_in_flight() {
-        let mut c = SingleFlightCache::<String, &str>::new();
-        let _t = expect_fill(c.lookup("k", 0));
-        assert!(matches!(c.lookup("k", 0), Lookup::Wait { .. }));
+    fn concurrent_lookup_joins_when_fill_in_flight() {
+        let mut c = cache(0);
+        let _t = expect_fill(c.lookup(&"k", 0));
+        assert!(matches!(c.lookup(&"k", 0), Lookup::Joining));
     }
 
     #[test]
     fn failed_refresh_keeps_serving_stale() {
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(100)
+        let mut c = cache(100)
             .with_stale_for(1000)
             .with_retry_backoff(RetryBackoff::new(60, 2));
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, Some("good"), 0);
-        let t2 = expect_fill(c.lookup("k", 100)); // refresh due, owns refill
-        c.publish("k", t2, None, 100); // refresh fails
-                                       // Within the backoff window: serve the OLD value, no fill.
-        assert!(matches!(c.lookup("k", 130), Lookup::Serve("good")));
+        let t = expect_fill(c.lookup(&"k", 0));
+        let _ = c.complete_fill(&"k", t, Ok("good"), 0);
+        let t2 = expect_fill(c.lookup(&"k", 100)); // refresh due
+        let _ = c.complete_fill(&"k", t2, Err(()), 100); // refresh fails
+                                                         // Within backoff: serve the OLD value, no fill.
+        assert!(matches!(c.lookup(&"k", 130), Lookup::Deliver("good")));
         // After the backoff (base 60s): refresh due again.
-        assert!(matches!(c.lookup("k", 160), Lookup::Fill { .. }));
+        assert!(matches!(c.lookup(&"k", 160), Lookup::StartFill(_)));
     }
 
     #[test]
     fn cold_failure_throttles_then_retries() {
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(100)
+        let mut c = cache(100)
             .with_stale_for(1000)
             .with_retry_backoff(RetryBackoff::new(60, 2));
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, None, 0); // cold fill fails → marker, no value
-        assert!(matches!(c.lookup("k", 30), Lookup::Throttled));
-        // After base 60s the cold key may be refilled.
-        assert!(matches!(c.lookup("k", 61), Lookup::Fill { .. }));
+        let t = expect_fill(c.lookup(&"k", 0));
+        let _ = c.complete_fill(&"k", t, Err(()), 0); // cold fill fails → marker
+        assert!(matches!(c.lookup(&"k", 30), Lookup::Throttled));
+        assert!(matches!(c.lookup(&"k", 61), Lookup::StartFill(_)));
     }
 
     #[test]
     fn backoff_grows_then_resets_on_success() {
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(1000)
+        let mut c = cache(1000)
             .with_stale_for(100_000)
             .with_retry_backoff(RetryBackoff::new(60, 2));
-        // fail 1 @0 → next at 60.
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, None, 0);
+        let t = expect_fill(c.lookup(&"k", 0));
+        let _ = c.complete_fill(&"k", t, Err(()), 0);
         assert_eq!(c.entries.get("k").map(|e| e.retry_at), Some(60));
-        // fail 2 @60 → next at 60 + 120 = 180.
-        let t = expect_fill(c.lookup("k", 60));
-        c.publish("k", t, None, 60);
+        let t = expect_fill(c.lookup(&"k", 60));
+        let _ = c.complete_fill(&"k", t, Err(()), 60);
         assert_eq!(c.entries.get("k").map(|e| e.retry_at), Some(180));
-        // success resets the failure count.
-        let t = expect_fill(c.lookup("k", 180));
-        c.publish("k", t, Some("v"), 180);
+        let t = expect_fill(c.lookup(&"k", 180));
+        let _ = c.complete_fill(&"k", t, Ok("v"), 180);
         assert_eq!(c.entries.get("k").map(|e| e.failures), Some(0));
     }
 
     #[test]
-    fn no_backoff_is_immediately_retryable() {
-        let mut c = SingleFlightCache::<String, &str>::new().with_fresh_for(100);
-        let t = expect_fill(c.lookup("k", 0));
-        c.publish("k", t, None, 0);
-        // No value cached, no throttle: next lookup is a fresh Fill.
-        assert!(matches!(c.lookup("k", 0), Lookup::Fill { .. }));
-    }
-
-    #[test]
-    fn superseded_owner_publish_does_not_overwrite() {
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(1000)
-            .with_abandon_fill_after(100);
-        let a = expect_fill(c.lookup("k", 0));
-        let cc = expect_fill(c.lookup("k", 101)); // A presumed abandoned, C takes over
-        c.publish("k", a, Some("A"), 0); // A's late publish
+    fn superseded_owner_complete_does_not_overwrite() {
+        let mut c = cache(1000).with_abandon_fill_after(100);
+        let a = expect_fill(c.lookup(&"k", 0));
+        let _cc = expect_fill(c.lookup(&"k", 101)); // A abandoned, C takes over
+        let _ = c.complete_fill(&"k", a, Ok("A"), 0); // A's late completion
         assert!(
-            c.servable_value("k", 0).is_none(),
-            "A's stale publish must not land after takeover"
+            c.servable_value(&"k", 0).is_none(),
+            "A's stale completion must not land after takeover"
         );
-        c.publish("k", cc, Some("C"), 101);
-        assert_eq!(c.servable_value("k", 200), Some("C"));
     }
 
     #[test]
     fn lru_evicts_least_recently_used_when_full() {
-        let mut c = SingleFlightCache::<String, &str>::new()
-            .with_fresh_for(10_000)
-            .with_max_entries(2);
+        let mut c = cache(10_000).with_max_entries(2);
         for (k, t) in [("a", 0u64), ("b", 1)] {
-            let tok = expect_fill(c.lookup(k, t));
-            c.publish(k, tok, Some("v"), t);
+            let tok = expect_fill(c.lookup(&k, t));
+            let _ = c.complete_fill(&k, tok, Ok("v"), t);
         }
-        // Touch "a" so "b" is the LRU.
-        assert!(matches!(c.lookup("a", 2), Lookup::Serve(_)));
-        // Insert "c": over capacity → evict the LRU ("b").
-        let tok = expect_fill(c.lookup("c", 3));
-        c.publish("c", tok, Some("v"), 3);
+        assert!(matches!(c.lookup(&"a", 2), Lookup::Deliver(_)));
+        let tok = expect_fill(c.lookup(&"c", 3));
+        let _ = c.complete_fill(&"c", tok, Ok("v"), 3);
         assert!(c.entries.contains_key("a"));
         assert!(c.entries.contains_key("c"));
         assert!(!c.entries.contains_key("b"), "b was least-recently-used");
-        assert_eq!(c.entries.len(), 2);
     }
 
-    #[test]
-    fn sweep_drops_dead_entries() {
-        let mut c = SingleFlightCache::<String, &str>::new().with_fresh_for(1000);
-        c.entries.insert(
-            "old".into(),
-            Entry {
-                value: Some("x"),
-                fresh_until: 10,
-                evict_at: 10,
-                retry_at: 10,
-                failures: 0,
-                lru_stamp: 0,
-            },
-        );
-        // A publish at t=100 sweeps the dead "old" entry.
-        let t = expect_fill(c.lookup("new", 100));
-        c.publish("new", t, Some("v"), 100);
-        assert!(!c.entries.contains_key("old"));
-        assert!(c.entries.contains_key("new"));
-    }
-
-    // ---- get_or_fill end to end ----
-    //
-    // `get_or_fill` takes no clock; it reads the module's `now()`, which under
-    // `cfg(test)` returns the [`set_test_now`] thread-local. `fresh_for` is on
-    // the cache (100s here).
+    // ---- with_value end to end (callback delivery via the test executor) ----
 
     thread_local! {
-        static TEST_CACHE: RefCell<SingleFlightCache<String, i32>> = RefCell::new(
-            SingleFlightCache::new()
-                .with_fresh_for(100)
-                .with_stale_for(50)
-                .with_retry_backoff(RetryBackoff::new(60, 2)),
-        );
+        static E2E: RefCell<SingleFlightCache<&'static str, i32, &'static str>> = RefCell::new(build_e2e());
+        static DELIVERED: RefCell<Vec<Result<i32, CacheFillError<&'static str>>>> =
+            const { RefCell::new(Vec::new()) };
+        static FILL_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+        static FILL_RESULT: std::cell::Cell<Result<i32, &'static str>> = const { std::cell::Cell::new(Ok(7)) };
     }
-    fn reset() {
-        TEST_CACHE.with(|c| {
-            *c.borrow_mut() = SingleFlightCache::new()
-                .with_fresh_for(100)
-                .with_stale_for(50)
-                .with_retry_backoff(RetryBackoff::new(60, 2))
-        });
+
+    fn build_e2e() -> SingleFlightCache<&'static str, i32, &'static str> {
+        SingleFlightCache::new(|_k| async {
+            FILL_COUNT.with(|c| c.set(c.get() + 1));
+            FILL_RESULT.with(|r| r.get())
+        })
+        .with_fresh_for(100)
+        .with_stale_for(50)
+        .with_retry_backoff(RetryBackoff::new(60, 2))
+    }
+
+    fn reset_e2e(fill_result: Result<i32, &'static str>) {
+        E2E.with(|c| *c.borrow_mut() = build_e2e());
+        DELIVERED.with(|d| d.borrow_mut().clear());
+        FILL_COUNT.with(|c| c.set(0));
+        FILL_RESULT.with(|r| r.set(fill_result));
+        set_test_now(0);
+        run_detached(); // drain anything left from a prior test on this thread
+    }
+
+    fn record() -> impl FnOnce(Result<i32, CacheFillError<&'static str>>) + 'static {
+        |r| DELIVERED.with(|d| d.borrow_mut().push(r))
+    }
+    fn delivered() -> Vec<Result<i32, CacheFillError<&'static str>>> {
+        DELIVERED.with(|d| d.borrow().clone())
     }
 
     #[test]
-    fn get_or_fill_warm_skips_fill() {
-        reset();
-        set_test_now(0);
-        let r: Result<i32, CacheFillError<()>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async { Ok(7) }));
-        assert!(matches!(r, Ok(7)));
+    fn with_value_spawns_fill_then_delivers() {
+        reset_e2e(Ok(7));
+        with_value(&E2E, "k", record());
+        // Cold: the fill is detached, nothing delivered yet.
+        assert!(delivered().is_empty());
+        run_detached();
+        assert_eq!(delivered(), vec![Ok(7)]);
+        assert_eq!(FILL_COUNT.with(|c| c.get()), 1);
+
+        // Within TTL: delivered synchronously, no fill.
         set_test_now(50);
-        let r2: Result<i32, CacheFillError<()>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async {
-                panic!("must not fill on warm hit")
-            }));
-        assert!(matches!(r2, Ok(7)));
+        DELIVERED.with(|d| d.borrow_mut().clear());
+        with_value(&E2E, "k", record());
+        assert_eq!(delivered(), vec![Ok(7)]);
+        assert_eq!(FILL_COUNT.with(|c| c.get()), 1);
     }
 
     #[test]
-    fn get_or_fill_serves_stale_on_failed_refresh() {
-        reset();
-        set_test_now(0);
-        let _: Result<i32, CacheFillError<()>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async { Ok(7) }));
-        // now=110 → stale, refresh due; this caller owns it and it fails,
-        // so stale-if-error returns the old value.
-        set_test_now(110);
-        let r: Result<i32, CacheFillError<&str>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async { Err("boom") }));
-        assert!(matches!(r, Ok(7)), "stale value should be served on error");
-        // Within backoff: still stale, fill not even called.
-        set_test_now(120);
-        let r2: Result<i32, CacheFillError<()>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async {
-                panic!("must not fill during backoff")
-            }));
-        assert!(matches!(r2, Ok(7)));
+    fn concurrent_callers_share_one_fill() {
+        reset_e2e(Ok(7));
+        with_value(&E2E, "k", record());
+        with_value(&E2E, "k", record()); // joins the in-flight fill
+        run_detached();
+        assert_eq!(delivered(), vec![Ok(7), Ok(7)]);
+        assert_eq!(FILL_COUNT.with(|c| c.get()), 1, "one fan-out for both");
     }
 
     #[test]
-    fn get_or_fill_cold_failure_errors_then_throttles() {
-        reset();
-        set_test_now(0);
-        let r: Result<i32, CacheFillError<&str>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async { Err("boom") }));
-        assert!(matches!(r, Err(CacheFillError::Fill("boom"))));
-        // Within backoff a cold key short-circuits without filling.
+    fn cold_failure_delivers_error_then_throttles() {
+        reset_e2e(Err("boom"));
+        with_value(&E2E, "k", record());
+        run_detached();
+        assert_eq!(delivered(), vec![Err(CacheFillError::FillFailed("boom"))]);
+        // Within backoff: throttled immediately, no fill.
         set_test_now(30);
-        let r2: Result<i32, CacheFillError<()>> =
-            block_on(get_or_fill(&TEST_CACHE, "k", || async {
-                panic!("must not fill while throttled")
-            }));
-        assert!(matches!(r2, Err(CacheFillError::Throttled)));
+        DELIVERED.with(|d| d.borrow_mut().clear());
+        with_value(&E2E, "k", record());
+        assert_eq!(delivered(), vec![Err(CacheFillError::Throttled)]);
+        assert_eq!(FILL_COUNT.with(|c| c.get()), 1, "no refill while throttled");
+    }
+
+    #[test]
+    fn overflowing_waiters_get_queue_full() {
+        E2E.with(|c| *c.borrow_mut() = build_e2e().with_max_waiters(1));
+        DELIVERED.with(|d| d.borrow_mut().clear());
+        FILL_COUNT.with(|c| c.set(0));
+        FILL_RESULT.with(|r| r.set(Ok(7)));
+        set_test_now(0);
+
+        with_value(&E2E, "k", record()); // StartFill, queue=[cb]
+        with_value(&E2E, "k", record()); // Joining, queue full → QueueFull now
+        assert_eq!(delivered(), vec![Err(CacheFillError::QueueFull)]);
+        run_detached();
+        assert_eq!(
+            delivered(),
+            vec![Err(CacheFillError::QueueFull), Ok(7)],
+            "the queued caller still gets the value"
+        );
     }
 }

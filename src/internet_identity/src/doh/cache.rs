@@ -9,9 +9,10 @@
 //! and is heap-only — losing it on upgrade is fine, we just refetch.
 //!
 //! `super::fetch_txt` drives it through
-//! [`get_or_fill`](crate::single_flight_cache::get_or_fill), which owns the
-//! lookup/wait/publish dance (including the IC-specific reason waiters poll
-//! from their own call context rather than being woken — see that module).
+//! [`with_value`](crate::single_flight_cache::with_value), which dedups the
+//! fan-out and delivers the result to a callback once the detached fill
+//! lands (see that module for the IC reply-routing reason it's push, not
+//! blocking).
 //!
 //! ## What counts as a cacheable answer vs. a failure
 //!
@@ -56,7 +57,9 @@
 //!   allowlist-bounded, so this is generous headroom plus a hard memory
 //!   bound that favours recently-seen domains.
 
-use super::types::{DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
+use std::future::Future;
+
+use super::types::{DohError, DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
 use crate::single_flight_cache::{RetryBackoff, SingleFlightCache};
 
 /// A cached DoH answer: the TXT-record bytes, or a definitive "no such
@@ -68,8 +71,10 @@ pub enum DohRecord {
     NoAnswer,
 }
 
-/// DoH cache: FQDN → [`DohRecord`], with concurrent-fetch dedup.
-pub type DohCache = SingleFlightCache<String, DohRecord>;
+/// DoH cache: FQDN → [`DohRecord`], with concurrent-fetch dedup. Fills may
+/// fail transiently with [`DohError`]; a definitive `NoAnswer` is a cached
+/// answer, not a failure (see the module docs).
+pub type DohCache = SingleFlightCache<String, DohRecord, DohError>;
 
 /// Serve a cached answer up to 10 min past its TTL while refreshing
 /// (stale-while-revalidate). Short on purpose — see the module docs.
@@ -84,18 +89,23 @@ pub const DOH_RETRY_MULTIPLIER: u64 = 2;
 /// Hard cap on cached FQDNs; over it, the least-recently-used is evicted.
 pub const DOH_MAX_ENTRIES: usize = 256;
 
-/// Construct the DoH cache with the knobs above. The freshness window
-/// (`fresh_for`) is the deploy arg `max_cache_age_secs` (default 1 h, capped
-/// 24 h), read here so the cache owns all its policy and `get_or_fill` takes
-/// none. Config only changes on upgrade, which wipes this heap cache, so the
-/// value is stable for the cache's lifetime; `None` falls back to the default.
-pub fn new_doh_cache() -> DohCache {
+/// Construct the DoH cache around its shared `fill` (the five-provider
+/// fan-out for one FQDN, defined in the parent module where the outcall
+/// plumbing lives). The freshness window (`fresh_for`) is the deploy arg
+/// `max_cache_age_secs` (default 1 h, capped 24 h), read here so the cache
+/// owns all its policy. Config only changes on upgrade, which wipes this heap
+/// cache, so the value is stable for the cache's lifetime; `None` falls back
+/// to the default.
+pub fn new_doh_cache<Fut>(fill: impl Fn(String) -> Fut + 'static) -> DohCache
+where
+    Fut: Future<Output = Result<DohRecord, DohError>> + 'static,
+{
     let fresh_for = crate::state::persistent_state(|p| {
         p.doh_config.as_ref().and_then(|c| c.max_cache_age_secs)
     })
     .unwrap_or(DEFAULT_CACHE_AGE_SECS)
     .min(MAX_CACHE_AGE_SECS);
-    SingleFlightCache::new()
+    SingleFlightCache::new(fill)
         .with_fresh_for(fresh_for)
         .with_stale_for(DOH_STALE_SECS)
         .with_max_entries(DOH_MAX_ENTRIES)

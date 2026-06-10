@@ -98,15 +98,21 @@ pub async fn submit_dkim_leaf(
 /// enabled comes back as `DomainNotAllowlisted` rather than leaving the
 /// pending entry stuck in `NeedDkimLeaf` until it expires. Returns the
 /// same post-call polling status as `submit_dkim_leaf`.
-pub async fn submit_dkim_leaf_via_doh(
+pub fn submit_dkim_leaf_via_doh(
     nonce: String,
     now_secs: u64,
 ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
-
-    let verification = run_doh_fallback(&snapshot).await;
-    finalize(&nonce, &snapshot, verification, now_secs).await
+    // Resolve the DKIM key over DoH and verify in the background; the call
+    // returns `Verifying` immediately and the FE polls until it flips
+    // terminal (rather than blocking on the outcall). `run_doh_fallback`
+    // detaches the fetches and finalizes via callback.
+    pending::with_mut(&nonce, now_secs, |c| {
+        c.status = PendingStatus::Verifying;
+    });
+    run_doh_fallback(snapshot, nonce, now_secs);
+    Ok(EmailRecoveryStatus::Verifying)
 }
 
 /// Shared tail of both submit methods: on a failed `verification`,
@@ -210,12 +216,8 @@ struct Snapshot {
 
 #[derive(Clone, Debug)]
 enum SnapshotKind {
-    Register {
-        anchor: AnchorNumber,
-    },
-    Recovery {
-        session_pk: SessionKey,
-    },
+    Register { anchor: AnchorNumber },
+    Recovery { session_pk: SessionKey },
 }
 
 impl Snapshot {
@@ -378,30 +380,92 @@ fn run_submit(
 /// which [`super::smtp::map_doh_error`] folds into
 /// `DomainNotAllowlisted` — the FE turns that into the unsupported-domain
 /// view.
-async fn run_doh_fallback(snapshot: &Snapshot) -> Result<(), EmailRecoveryError> {
+fn run_doh_fallback(snapshot: Snapshot, nonce: String, now_secs: u64) {
     // DKIM key lives at `<selector>._domainkey.<d>`; the allowlist gate
-    // and the in-domain check both key off the registered domain.
+    // and the in-domain check both key off the registered domain. The
+    // DKIM + optional-DMARC fetch is deduped through the cache and
+    // delivered to the callback (see `doh::fetch_txt_pair`); a missing
+    // DMARC record drops us to strict `d=` alignment, any other DMARC
+    // failure propagates — same handling as `smtp::verify_setup_email_doh`.
     let dkim_fqdn = format!(
         "{}._domainkey.{}",
         snapshot.expected_selector, snapshot.signing_domain
     );
     let dmarc_fqdn = format!("_dmarc.{}", snapshot.registered_domain);
+    let registered_domain = snapshot.registered_domain.clone();
 
-    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &snapshot.registered_domain)
-        .await
-        .map_err(|e| super::smtp::map_doh_error(e, &snapshot.registered_domain))?;
+    crate::doh::fetch_txt_pair(
+        dkim_fqdn.clone(),
+        dmarc_fqdn,
+        registered_domain.clone(),
+        move |pair| {
+            let verification = match pair {
+                Ok((dkim_bytes, dmarc_bytes)) => verify_dkim_key_against_partial(
+                    &dkim_bytes,
+                    dmarc_bytes.as_deref(),
+                    &snapshot,
+                    &dkim_fqdn,
+                ),
+                Err(e) => Err(super::smtp::map_doh_error(e, &registered_domain)),
+            };
+            finalize_via_doh(nonce, snapshot, verification, now_secs);
+        },
+    );
+}
 
-    // DMARC: a quorum reporting "no record" is a valid DNS state and
-    // drops us to strict `d=` alignment; any other failure must
-    // propagate rather than quietly tighten the check. Mirrors the
-    // handling in `smtp::verify_setup_email_doh`.
-    let dmarc_bytes = match crate::doh::fetch_txt(&dmarc_fqdn, &snapshot.registered_domain).await {
-        Ok(bytes) => Some(bytes),
-        Err(crate::doh::DohError::NoAnswer) => None,
-        Err(e) => return Err(super::smtp::map_doh_error(e, &snapshot.registered_domain)),
-    };
-
-    verify_dkim_key_against_partial(&dkim_bytes, dmarc_bytes.as_deref(), snapshot, &dkim_fqdn)
+/// Callback-style tail of the DoH fallback: apply the verdict to the pending
+/// entry the FE polls. Mirrors [`finalize`], but sets status instead of
+/// returning it (the FE polls), and the recovery leg — whose delegation
+/// stamping is async — is detached so this completion execution returns.
+fn finalize_via_doh(
+    nonce: String,
+    snapshot: Snapshot,
+    verification: Result<(), EmailRecoveryError>,
+    now_secs: u64,
+) {
+    match verification {
+        Err(e) => {
+            pending::with_mut(&nonce, now_secs, |c| {
+                c.status = PendingStatus::Failed(e);
+                c.partial_verification = None;
+            });
+        }
+        Ok(()) => match &snapshot.kind {
+            SnapshotKind::Register { anchor } => {
+                let result =
+                    super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs);
+                pending::with_mut(&nonce, now_secs, |c| {
+                    c.partial_verification = None;
+                    c.status = match result {
+                        Ok(()) => PendingStatus::Succeeded,
+                        Err(e) => PendingStatus::Failed(e),
+                    };
+                });
+            }
+            SnapshotKind::Recovery { session_pk } => {
+                let smtp_snapshot = super::smtp::recovery_snapshot(
+                    snapshot.claimed_address.clone(),
+                    snapshot.registered_domain.clone(),
+                    session_pk.clone(),
+                );
+                let session_pk = session_pk.clone();
+                ic_cdk::spawn(async move {
+                    match super::smtp::stamp_recovery_delegation(&smtp_snapshot, &session_pk).await
+                    {
+                        Ok(outcome) => pending::with_mut(&nonce, now_secs, |c| {
+                            c.recovery_outcome = Some(outcome);
+                            c.status = PendingStatus::Succeeded;
+                            c.partial_verification = None;
+                        }),
+                        Err(e) => pending::with_mut(&nonce, now_secs, |c| {
+                            c.status = PendingStatus::Failed(e);
+                            c.partial_verification = None;
+                        }),
+                    };
+                });
+            }
+        },
+    }
 }
 
 /// Steps 4–6 of leaf verification, shared by the DNSSEC hop-walk path

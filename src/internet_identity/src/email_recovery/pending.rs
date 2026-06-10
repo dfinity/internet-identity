@@ -193,7 +193,15 @@ pub enum PendingKind {
 #[derive(Clone, Debug)]
 pub enum PendingStatus {
     Pending,
-    NeedDkimLeaf { selector: String },
+    NeedDkimLeaf {
+        selector: String,
+    },
+    /// (DoH path only.) The email arrived and DKIM/DMARC resolution +
+    /// verification is running in the background (detached after the
+    /// `smtp_request` accept). The FE polls until this flips to
+    /// `Succeeded`/`Failed`. The DNSSEC path never enters this state — it
+    /// hands off to the FE via `NeedDkimLeaf` instead.
+    Verifying,
     Succeeded,
     Failed(EmailRecoveryError),
     Expired,
@@ -256,6 +264,7 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
             None => EmailRecoveryStatus::Expired, // Same observable effect as TTL eviction.
             Some(c) => match &c.status {
                 PendingStatus::Pending => EmailRecoveryStatus::Pending,
+                PendingStatus::Verifying => EmailRecoveryStatus::Verifying,
                 PendingStatus::NeedDkimLeaf { selector } => EmailRecoveryStatus::NeedDkimLeaf {
                     selector: selector.clone(),
                 },
@@ -311,6 +320,7 @@ pub fn diagnostics_of(nonce: &str, now_secs: u64) -> Option<EmailRecoveryDiagnos
         let c = map.get(nonce)?;
         let reason_code = match &c.status {
             PendingStatus::Pending => "Pending".to_string(),
+            PendingStatus::Verifying => "Verifying".to_string(),
             PendingStatus::NeedDkimLeaf { .. } => "NeedDkimLeaf".to_string(),
             PendingStatus::Succeeded => "Succeeded".to_string(),
             PendingStatus::Expired => "Expired".to_string(),

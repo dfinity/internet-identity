@@ -171,7 +171,7 @@ fn single_recipient(
 /// malformed request shape, and `Ok` for *verification* outcomes —
 /// see the module-level note on why we don't surface per-message
 /// verification failures.
-pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
+pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // Bound-check up front so a malformed gateway-side payload
     // returns a clean syntax error instead of trapping somewhere
     // inside the verifier.
@@ -340,47 +340,71 @@ pub async fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             }
         }
     } else {
-        // DoH path — the canister can fetch the DKIM TXT itself, so
-        // verification finishes synchronously inside this one call.
-        let outcome = verify_setup_email_doh(&request, &snapshot, now_secs).await;
-        match outcome {
-            Ok(()) => match &snapshot.kind {
-                SnapshotKind::Setup { anchor } => {
-                    if let Err(e) = bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
-                        pending::with_mut(&nonce, now_secs, |c| {
-                            c.status = PendingStatus::Failed(e);
-                        });
-                    } else {
-                        pending::with_mut(&nonce, now_secs, |c| {
-                            c.status = PendingStatus::Succeeded;
-                        });
-                    }
-                }
-                SnapshotKind::Recovery { session_pk } => {
-                    match stamp_recovery_delegation(&snapshot, session_pk).await {
-                        Ok(outcome) => {
-                            pending::with_mut(&nonce, now_secs, |c| {
-                                c.recovery_outcome = Some(outcome);
-                                c.status = PendingStatus::Succeeded;
-                            });
-                        }
-                        Err(e) => {
-                            pending::with_mut(&nonce, now_secs, |c| {
-                                c.status = PendingStatus::Failed(e);
-                            });
-                        }
-                    }
-                }
-            },
-            Err(reason) => {
-                pending::with_mut(&nonce, now_secs, |c| {
-                    c.status = PendingStatus::Failed(reason);
-                });
-            }
-        }
+        // DoH path — resolve DKIM/DMARC and verify in the background. The
+        // gateway gets `Ok` now; the FE polls `Verifying` until it flips
+        // terminal. `verify_setup_email_doh` detaches the fetches and calls
+        // back with the verdict, which `finalize_doh_verification` applies.
+        pending::with_mut(&nonce, now_secs, |c| {
+            c.status = PendingStatus::Verifying;
+        });
+        let finalize_nonce = nonce.clone();
+        let finalize_snapshot = snapshot.clone();
+        verify_setup_email_doh(request, snapshot, now_secs, move |outcome| {
+            finalize_doh_verification(finalize_nonce, finalize_snapshot, outcome, now_secs);
+        });
     }
 
     SmtpResponse::Ok {}
+}
+
+/// Apply a DoH-path verification verdict to the pending challenge. On
+/// success: setup binds the credential synchronously; recovery detaches a
+/// task to stamp the delegation (a second async leg) and then flips status.
+/// Runs in the fetch's completion execution, so it must not trap (it doesn't
+/// — `bind_credential`/`pending::with_mut` are fail-closed, and the recovery
+/// leg is detached).
+fn finalize_doh_verification(
+    nonce: String,
+    snapshot: PendingSnapshot,
+    outcome: Result<(), EmailRecoveryError>,
+    now_secs: u64,
+) {
+    match outcome {
+        Err(reason) => {
+            pending::with_mut(&nonce, now_secs, |c| {
+                c.status = PendingStatus::Failed(reason);
+            });
+        }
+        Ok(()) => match &snapshot.kind {
+            SnapshotKind::Setup { anchor } => {
+                let result = bind_credential(*anchor, &snapshot.claimed_address, now_secs);
+                pending::with_mut(&nonce, now_secs, |c| {
+                    c.status = match result {
+                        Ok(()) => PendingStatus::Succeeded,
+                        Err(e) => PendingStatus::Failed(e),
+                    };
+                });
+            }
+            SnapshotKind::Recovery { session_pk } => {
+                // Stamping the delegation is a second async leg; detach it so
+                // this completion execution returns. The FE keeps polling
+                // `Verifying` until the spawned task flips the status.
+                let session_pk = session_pk.clone();
+                let snapshot = snapshot.clone();
+                ic_cdk::spawn(async move {
+                    match stamp_recovery_delegation(&snapshot, &session_pk).await {
+                        Ok(recovery_outcome) => pending::with_mut(&nonce, now_secs, |c| {
+                            c.recovery_outcome = Some(recovery_outcome);
+                            c.status = PendingStatus::Succeeded;
+                        }),
+                        Err(e) => pending::with_mut(&nonce, now_secs, |c| {
+                            c.status = PendingStatus::Failed(e);
+                        }),
+                    };
+                });
+            }
+        },
+    }
 }
 
 /// Snapshot of the pending challenge taken under the brief `RefCell`
@@ -623,69 +647,92 @@ fn prepare_partial_verification(
 // DoH path: full verification synchronously inside smtp_request.
 // =========================================================================
 
-/// Run the legacy single-pass verification pipeline against a known
-/// pending challenge: fetch the DKIM TXT (and DMARC) via DoH, run
-/// `dmarc::verify_email`, and confirm the From: matches the claimed
-/// address. Returns `Ok(())` on success, or `Err(EmailRecoveryError)`
-/// for a typed reason that's suitable to stash on the pending
-/// challenge for the FE's poll.
-async fn verify_setup_email_doh(
+/// DoH-path setup verification, callback-delivered. Reads the DKIM selector
+/// from the email, resolves the DKIM key (+ optional DMARC policy) through
+/// the dedup cache, runs `dmarc::verify_email`, and pins the From: to the
+/// claimed address. `on_done` fires with the verdict once the detached
+/// fetches land — this call returns immediately. The verdict is a typed
+/// reason suitable to stash on the pending challenge for the FE's poll.
+fn verify_setup_email_doh(
+    request: SmtpRequest,
+    snapshot: PendingSnapshot,
+    now_secs: u64,
+    on_done: impl FnOnce(Result<(), EmailRecoveryError>) + 'static,
+) {
+    // Sync prefix: read the selector from the DKIM-Signature header (the DoH
+    // path has none cached at prepare time) and build the names to resolve.
+    let prep = (|| {
+        let message = request.message.as_ref().ok_or_else(|| {
+            EmailRecoveryError::EmailVerificationFailed("missing message body".into())
+        })?;
+        let dkim_header = message
+            .headers
+            .iter()
+            .find(|h| h.name.eq_ignore_ascii_case("DKIM-Signature"))
+            .ok_or_else(|| {
+                EmailRecoveryError::EmailVerificationFailed("no DKIM-Signature header".into())
+            })?;
+        let sig = crate::dkim::parse_dkim_signature(&dkim_header.value).map_err(|e| {
+            EmailRecoveryError::EmailVerificationFailed(format!("DKIM-Signature parse: {e}"))
+        })?;
+        let domain = snapshot
+            .claimed_address
+            .rsplit_once('@')
+            .map(|(_, d)| d.to_string())
+            .ok_or_else(|| {
+                EmailRecoveryError::InternalCanisterError(
+                    "stored claimed address has no '@'".into(),
+                )
+            })?;
+        Ok::<_, EmailRecoveryError>((sig.s, domain))
+    })();
+    let (selector, domain) = match prep {
+        Ok(v) => v,
+        Err(e) => return on_done(Err(e)),
+    };
+    let dkim_fqdn = format!("{selector}._domainkey.{domain}");
+    let dmarc_fqdn = format!("_dmarc.{domain}");
+
+    crate::doh::fetch_txt_pair(dkim_fqdn, dmarc_fqdn, domain.clone(), move |pair| {
+        let (dkim_bytes, dmarc_bytes_opt) = match pair {
+            Ok(v) => v,
+            Err(e) => return on_done(Err(map_doh_error(e, &domain))),
+        };
+        on_done(finish_setup_verification(
+            &request,
+            &snapshot,
+            now_secs,
+            &dkim_bytes,
+            dmarc_bytes_opt.as_deref(),
+        ));
+    });
+}
+
+/// Sync tail of DoH-path setup verification, once the DKIM TXT (+ optional
+/// DMARC) are in hand: decode, run the combined `dmarc::verify_email`, and
+/// confirm the From: matches the claimed address. The verifier already
+/// aligns From:'s domain with DKIM's `d=` and the DMARC record; pinning the
+/// full address here closes the same-domain-different-mailbox gap.
+fn finish_setup_verification(
     request: &SmtpRequest,
     snapshot: &PendingSnapshot,
     now_secs: u64,
+    dkim_bytes: &[u8],
+    dmarc_bytes_opt: Option<&[u8]>,
 ) -> Result<(), EmailRecoveryError> {
-    // We need a selector to fetch the DKIM TXT, and on the DoH path
-    // we don't have one cached at prepare time. Read it directly
-    // from the email's DKIM-Signature header.
     let message = request.message.as_ref().ok_or_else(|| {
         EmailRecoveryError::EmailVerificationFailed("missing message body".into())
     })?;
-    let dkim_header = message
-        .headers
-        .iter()
-        .find(|h| h.name.eq_ignore_ascii_case("DKIM-Signature"))
-        .ok_or_else(|| {
-            EmailRecoveryError::EmailVerificationFailed("no DKIM-Signature header".into())
-        })?;
-    let sig = crate::dkim::parse_dkim_signature(&dkim_header.value).map_err(|e| {
-        EmailRecoveryError::EmailVerificationFailed(format!("DKIM-Signature parse: {e}"))
-    })?;
-    let domain = snapshot
-        .claimed_address
-        .rsplit_once('@')
-        .map(|(_, d)| d.to_string())
-        .ok_or_else(|| {
-            EmailRecoveryError::InternalCanisterError("stored claimed address has no '@'".into())
-        })?;
-    let dkim_fqdn = format!("{}._domainkey.{}", sig.s, domain);
-    let dmarc_fqdn = format!("_dmarc.{}", domain);
-    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &domain)
-        .await
-        .map_err(|e| map_doh_error(e, &domain))?;
-    // DMARC: a quorum of providers reporting "no record" is a valid
-    // DNS state ("no policy published" per RFC 7489) and lets the
-    // verifier fall back to strict alignment (design §6.3). Any other
-    // failure mode — transient outage, quorum disagreement, transport
-    // error — must NOT silently take the same fallback: that would
-    // turn a transient DoH outage into a quietly stricter check that
-    // could break legitimate setup flows. Propagate everything else.
-    let dmarc_bytes_opt = match crate::doh::fetch_txt(&dmarc_fqdn, &domain).await {
-        Ok(bytes) => Some(bytes),
-        Err(crate::doh::DohError::NoAnswer) => None,
-        Err(e) => return Err(map_doh_error(e, &domain)),
-    };
-
-    let dkim_txt = std::str::from_utf8(&dkim_bytes).map_err(|_| {
+    let dkim_txt = std::str::from_utf8(dkim_bytes).map_err(|_| {
         EmailRecoveryError::DohFetchFailed(DohFailureReason::ResponseMalformed(
             "DKIM TXT is not valid UTF-8".into(),
         ))
     })?;
-    let dmarc_txt_opt = match dmarc_bytes_opt.as_deref().map(std::str::from_utf8) {
+    let dmarc_txt_opt = match dmarc_bytes_opt.map(std::str::from_utf8) {
         Some(Ok(s)) => Some(s),
         Some(Err(_)) | None => None,
     };
 
-    // Run the combined DKIM + DMARC verifier.
     let status = crate::dmarc::verify_email(request, dkim_txt, dmarc_txt_opt, now_secs);
     match status {
         crate::dmarc::EmailVerificationStatus::Verified { .. } => {}
@@ -696,12 +743,6 @@ async fn verify_setup_email_doh(
         }
     }
 
-    // Verify the From: matches the claimed address. The verifier
-    // already checks that From:'s domain aligns with DKIM's d=,
-    // and that the domain matches the DMARC record — so the only
-    // gap is that an attacker who controls a different mailbox at
-    // the same domain could otherwise complete a victim's setup.
-    // Pin the address explicitly here.
     let from = extract_from_address(message)?;
     if !from.eq_ignore_ascii_case(&snapshot.claimed_address) {
         return Err(EmailRecoveryError::AddressMismatch);

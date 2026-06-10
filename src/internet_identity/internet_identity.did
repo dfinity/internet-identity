@@ -644,6 +644,7 @@ type EmailRecoveryError = variant {
 
 type EmailRecoveryStatus = variant {
     Pending;
+    Verifying;
     NeedDkimLeaf : record { selector : text };
     RegistrationSucceeded;
     RecoveryReady : record {

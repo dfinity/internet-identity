@@ -77,8 +77,8 @@ export interface EmailRecoveryPollDeps<E extends Record<string, string>> {
   /**
    * Handle a terminal *success* status. Returns `true` if `status` was a
    * terminal success (the loop then stops); `false` for any
-   * non-terminal status (`Pending` / `NeedDkimLeaf`), so the loop keeps
-   * going. Setup checks `RegistrationSucceeded` (synchronous); recovery
+   * non-terminal status (`Pending` / `Verifying` / `NeedDkimLeaf`), so the
+   * loop keeps going. Setup checks `RegistrationSucceeded`; recovery
    * checks `RecoveryReady` and awaits the delegation retrieval.
    */
   handleSuccess: (status: EmailRecoveryStatus) => boolean | Promise<boolean>;

@@ -610,6 +610,7 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   } |
   { 'RegistrationSucceeded' : null } |
   { 'Expired' : null } |
+  { 'Verifying' : null } |
   { 'Pending' : null };
 export interface EmailRecoverySubmitDkimLeafArg {
   /**

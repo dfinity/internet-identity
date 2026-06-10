@@ -358,6 +358,12 @@ pub enum EmailRecoveryStatus {
     /// message); the FE uses it both to query DoH and as the
     /// leaf's owner-name component.
     NeedDkimLeaf { selector: String },
+    /// (DoH path only.) The email arrived and the canister is resolving
+    /// DKIM/DMARC and verifying in the background — the `smtp_request`
+    /// accept returns before this finishes. The FE keeps polling until it
+    /// flips to `RegistrationSucceeded` / `RecoveryReady` / `Failed`. The
+    /// DNSSEC path uses `NeedDkimLeaf` instead and never reports this.
+    Verifying,
     /// Setup succeeded. The address is now bound to the anchor; the
     /// FE shows "all set" and ends the wizard.
     RegistrationSucceeded,

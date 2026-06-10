@@ -369,6 +369,7 @@ export const idlFactory = ({ IDL }) => {
     }),
     'RegistrationSucceeded' : IDL.Null,
     'Expired' : IDL.Null,
+    'Verifying' : IDL.Null,
     'Pending' : IDL.Null,
   });
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({

@@ -1526,10 +1526,13 @@ mod email_recovery_api {
     /// defense-in-depth against a direct caller spoofing just the
     /// user-part.
     #[update]
-    async fn smtp_request(
+    fn smtp_request(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
     ) -> internet_identity_interface::internet_identity::types::smtp::SmtpResponse {
-        email_recovery::handle_smtp_request(request).await
+        // Synchronous accept: the DoH path detaches verification and the FE
+        // polls `email_recovery_status` for the outcome, so the gateway
+        // isn't held for the outcall round trip.
+        email_recovery::handle_smtp_request(request)
     }
 
     /// Open query — the off-chain SMTP gateway calls this at
@@ -1631,11 +1634,13 @@ mod email_recovery_api {
     /// `email_recovery_submit_dkim_leaf`: the 64-bit nonce is the only
     /// authentication, and the call is a no-op against any other entry.
     #[update]
-    async fn email_recovery_submit_dkim_leaf_via_doh(
+    fn email_recovery_submit_dkim_leaf_via_doh(
         arg: EmailRecoverySubmitDkimLeafViaDohArg,
     ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs).await
+        // Detaches the DoH resolution + verification and returns `Verifying`;
+        // the FE polls `email_recovery_status` for the terminal outcome.
+        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs)
     }
 
     /// **Anonymous query.** Final step of the recovery flow: after
@@ -1715,7 +1720,6 @@ mod email_recovery_api {
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
         Ok(())
     }
-
 }
 
 mod attribute_sharing {
