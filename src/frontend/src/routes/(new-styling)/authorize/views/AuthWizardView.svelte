@@ -9,7 +9,6 @@
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     mode?: AuthMode;
   }
@@ -17,7 +16,6 @@
   let {
     onSignIn,
     onSignUp,
-    onUpgrade,
     onError,
     mode = $bindable("both"),
   }: Props = $props();
@@ -31,7 +29,7 @@
   );
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} {onUpgrade} {onError} bind:mode>
+<AuthWizard {onSignIn} {onSignUp} {onError} bind:mode>
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {mode === "signup"

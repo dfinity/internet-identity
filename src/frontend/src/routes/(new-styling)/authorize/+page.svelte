@@ -87,11 +87,6 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
-  const handleAuthWizardUpgrade = (): Promise<void> => {
-    upgradeSuccess = true;
-    return Promise.resolve();
-  };
-
   const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
     authorizationStore.authorize(accountNumber);
   };
@@ -422,7 +417,6 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
-    onUpgrade={handleAuthWizardUpgrade}
     onError={handleError}
     mode="signin"
   />

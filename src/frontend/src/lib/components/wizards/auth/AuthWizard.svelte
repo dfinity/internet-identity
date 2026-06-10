@@ -11,7 +11,6 @@
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
-  import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import ContinueOnAnotherDeviceView from "$lib/components/wizards/auth/views/ContinueOnAnotherDeviceView.svelte";
@@ -32,7 +31,6 @@
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     mode?: AuthMode;
     children?: Snippet<[boolean?]>;
@@ -41,7 +39,6 @@
   let {
     onSignIn,
     onSignUp,
-    onUpgrade,
     onError,
     mode = $bindable("both"),
     children,
@@ -61,7 +58,6 @@
   let isElevated = $state(false);
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
-  let isUpgrading = $state(false);
   let pendingSsoRegistration = false;
 
   const methodType = (m: LastUsedIdentity["authMethod"]): MethodTag =>
@@ -337,7 +333,6 @@
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
-      upgrade={() => (isUpgrading = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
@@ -404,7 +399,7 @@
      wizard's view changes. Prevents remount races between captcha and
      post-captcha views when SvelteKit navigation interleaves with the
      Dialog's onNavigate outro-pause. -->
-{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined && !isContinueFromAnotherDeviceVisible && !isUpgrading}
+{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined && !isContinueFromAnotherDeviceVisible}
   {@render pickerBlock()}
 {:else}
   {@const dialogOnClose =
@@ -412,9 +407,7 @@
       ? undefined
       : isContinueFromAnotherDeviceVisible
         ? () => (isContinueFromAnotherDeviceVisible = false)
-        : isUpgrading
-          ? () => (isUpgrading = false)
-          : reset}
+        : reset}
   <!-- When the wizard is nested inside a parent Dialog, pass through
        and render content directly into the parent — avoids stacking
        two <dialog> elements (Safari renders both visibly, focus and
@@ -426,8 +419,6 @@
       <SolveCaptcha {...authFlow.captcha} />
     {:else if isContinueFromAnotherDeviceVisible}
       <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
-    {:else if isUpgrading}
-      <MigrationWizard onSuccess={onUpgrade} {onError} />
     {:else if authFlow.view === "chooseMethod"}
       {@render pickerBlock()}
     {:else}
