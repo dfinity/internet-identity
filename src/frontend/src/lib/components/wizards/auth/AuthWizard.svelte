@@ -4,7 +4,7 @@
     type AuthMode,
     type MethodTag,
   } from "$lib/flows/authFlow.svelte";
-  import { type Snippet, untrack } from "svelte";
+  import { type Snippet, untrack, onDestroy } from "svelte";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
   import Dialog, { isInsideDialog } from "$lib/components/ui/Dialog.svelte";
@@ -119,6 +119,17 @@
     mode = initialMode;
     authFlow.chooseMethod();
   };
+
+  // When AuthWizard is nested inside a parent Dialog (e.g. /manage's
+  // re-auth dialog), the parent's X button closes the dialog and
+  // unmounts us without ever calling reset(). Treat unmount with a
+  // pending method switch as an implicit cancel so the store revert
+  // still runs.
+  onDestroy(() => {
+    if (authFlow.pendingMethodSwitch !== undefined) {
+      authFlow.cancelMethodSwitch();
+    }
+  });
 
   // Sub-view cancel — clears the active sub-view but preserves mode and
   // elevation. Fires when the user closes a sub-view dialog (e.g. OIDC
