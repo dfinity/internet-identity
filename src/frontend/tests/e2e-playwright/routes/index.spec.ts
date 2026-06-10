@@ -128,7 +128,13 @@ test.describe("First visit", () => {
       if (menuVisible) {
         await existingMenuButton.click();
       }
-      await existingDevicePage.getByRole("link", { name: "Access" }).click();
+      const existingAccessLink = existingDevicePage.getByRole("link", {
+        name: "Access",
+      });
+      // Mobile hamburger drawer animates open; without this wait the
+      // click below can hang waiting for the link to become stable.
+      await existingAccessLink.waitFor({ state: "visible" });
+      await existingAccessLink.click();
       await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
       // Switch to new device and verify we are signed in
