@@ -109,7 +109,7 @@
             hidden={!hasCredential(provider.issuer)}
           >
             <button
-              class="btn btn-secondary btn-xl flex-1"
+              class="border-border-secondary text-fg-primary bg-bg-primary hover:not-disabled:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex h-16 w-full flex-col items-center justify-center gap-1.5 rounded-md border text-xs font-semibold outline-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2"
               onclick={() => handleContinueWithOpenId(provider)}
               disabled={authenticatingProviderId !== undefined ||
                 hasCredential(provider.issuer)}
@@ -118,10 +118,11 @@
               {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
               {:else if provider.logo}
-                <div class="size-6">
+                <div class="size-5">
                   <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
                   {@html provider.logo}
                 </div>
+                <span>{name}</span>
               {/if}
             </button>
           </Tooltip>
@@ -133,12 +134,13 @@
         the backend canary allowlist are rejected there.
       -->
       <button
-        class="btn btn-secondary btn-xl flex-1"
+        class="border-border-secondary text-fg-primary bg-bg-primary hover:not-disabled:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex h-16 w-full flex-col items-center justify-center gap-1.5 rounded-md border text-xs font-semibold outline-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={$t`Continue with SSO`}
       >
-        <SsoIcon class="size-6" />
+        <SsoIcon class="size-5" />
+        <span>{$t`SSO`}</span>
       </button>
     </div>
   </div>
