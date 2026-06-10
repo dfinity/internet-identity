@@ -89,6 +89,12 @@ pub const DOH_RETRY_MULTIPLIER: u64 = 2;
 /// Hard cap on cached FQDNs; over it, the least-recently-used is evicted.
 pub const DOH_MAX_ENTRIES: usize = 256;
 
+/// Cap on callbacks queued behind one in-flight fetch for a single FQDN.
+/// Over it a caller gets `QueueFull` (transient, retry past the burst). The
+/// key space is allowlist-bounded, so this is generous headroom for a
+/// concurrency spike on one popular domain.
+pub const DOH_MAX_WAITERS: usize = 32;
+
 /// Construct the DoH cache around its shared `fill` (the five-provider
 /// fan-out for one FQDN, defined in the parent module where the outcall
 /// plumbing lives). The freshness window (`fresh_for`) is the deploy arg
@@ -109,5 +115,6 @@ where
         .with_fresh_for(fresh_for)
         .with_stale_for(DOH_STALE_SECS)
         .with_max_entries(DOH_MAX_ENTRIES)
+        .with_max_waiters(DOH_MAX_WAITERS)
         .with_retry_backoff(RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER))
 }

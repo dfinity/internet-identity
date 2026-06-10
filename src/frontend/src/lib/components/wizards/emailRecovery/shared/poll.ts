@@ -52,14 +52,15 @@ export interface EmailRecoveryPollDeps<E extends Record<string, string>> {
   // --- canister wrappers ------------------------------------------------
   /** `email_recovery_status` (query). */
   status: (nonce: string) => Promise<EmailRecoveryStatus>;
-  /** `email_recovery_submit_dkim_leaf` — the DNSSEC path (≥1 hop). */
-  submitDkimLeaf: (
-    arg: EmailRecoverySubmitDkimLeafArg,
-  ) => Promise<EmailRecoveryStatus>;
+  /** `email_recovery_submit_dkim_leaf` — the DNSSEC path (≥1 hop). Accepts
+   *  the leaf and returns; the verdict is read by polling `status`. Rejects
+   *  only on a call-level error (unknown nonce / wrong state). */
+  submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
   /** `email_recovery_submit_dkim_leaf_via_doh` — the DoH fallback, used
    *  when the DKIM record CNAMEs into an unsigned zone and the DNSSEC
-   *  walk yields nothing. Carries only the nonce. */
-  submitDkimLeafViaDoh: (nonce: string) => Promise<EmailRecoveryStatus>;
+   *  walk yields nothing. Carries only the nonce. Accept-only like
+   *  `submitDkimLeaf`; poll `status` for the verdict. */
+  submitDkimLeafViaDoh: (nonce: string) => Promise<void>;
   /** `email_recovery_diagnostics` (query). */
   diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
 
@@ -215,24 +216,19 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
         const selector = result.NeedDkimLeaf.selector;
         try {
           const walked = await assembleDkimResolution(domain, selector);
-          const submission =
-            walked !== undefined
-              ? await submitDkimLeaf({
-                  nonce,
-                  hops: walked.hops,
-                  extra_chains: walked.extraChains,
-                })
-              : await submitDkimLeafViaDoh(nonce);
+          if (walked !== undefined) {
+            await submitDkimLeaf({
+              nonce,
+              hops: walked.hops,
+              extra_chains: walked.extraChains,
+            });
+          } else {
+            await submitDkimLeafViaDoh(nonce);
+          }
           funnel.trigger(events.dkimLeafSubmitted);
-          if (await handleSuccess(submission)) {
-            return;
-          }
-          if ("Failed" in submission || "Expired" in submission) {
-            await handleTerminalFailure(submission);
-            return;
-          }
-          // Pending / NeedDkimLeaf from a submit: non-terminal, fall
-          // through and let the polling loop carry the flow forward.
+          // The submit only *accepts* — it carries no verdict. The pending
+          // status is the single source of truth, so just fall through and
+          // let the polling loop carry the flow to its terminal state.
         } catch (e) {
           // A canister `Err` IS the terminal verdict — the contract hands
           // it to us directly, so route it now (exactly as an

@@ -534,8 +534,8 @@ export interface DohConfig {
  * `doh_reason` analytics property — no string parsing.
  */
 export type DohFailureReason = { 'AllProvidersFailed' : null } |
-  { 'DedupQueueFull' : null } |
-  { 'RetryBackoffActive' : null } |
+  { 'QueueFull' : null } |
+  { 'Throttled' : null } |
   { 'ResponseMalformed' : string } |
   { 'QuorumFailed' : { 'total' : number, 'agreeing' : number } };
 export interface DummyAuthConfig {
@@ -1728,7 +1728,7 @@ export interface _SERVICE {
   'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
   'email_recovery_submit_dkim_leaf' : ActorMethod<
     [EmailRecoverySubmitDkimLeafArg],
-    { 'Ok' : EmailRecoveryStatus } |
+    { 'Ok' : null } |
       { 'Err' : EmailRecoveryError }
   >,
   /**
@@ -1740,7 +1740,7 @@ export interface _SERVICE {
    */
   'email_recovery_submit_dkim_leaf_via_doh' : ActorMethod<
     [EmailRecoverySubmitDkimLeafViaDohArg],
-    { 'Ok' : EmailRecoveryStatus } |
+    { 'Ok' : null } |
       { 'Err' : EmailRecoveryError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,

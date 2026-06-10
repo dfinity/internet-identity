@@ -615,8 +615,8 @@ type DnsProofBundle = record {
 // `doh_reason` analytics property — no string parsing.
 type DohFailureReason = variant {
     AllProvidersFailed;
-    DedupQueueFull;
-    RetryBackoffActive;
+    QueueFull;
+    Throttled;
     QuorumFailed : record { agreeing : nat32; total : nat32 };
     ResponseMalformed : text;
 };
@@ -1546,13 +1546,13 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
-    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok; Err : EmailRecoveryError });
     // DoH-fallback sibling of email_recovery_submit_dkim_leaf, called
     // with just the nonce when the FE can't walk a fully-signed DNSSEC
     // resolution for the leaf (the DKIM record CNAMEs into an unsigned
     // zone). The canister resolves the DKIM key over its own
     // allowlist-gated DoH path.
-    email_recovery_submit_dkim_leaf_via_doh : (EmailRecoverySubmitDkimLeafViaDohArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_submit_dkim_leaf_via_doh : (EmailRecoverySubmitDkimLeafViaDohArg) -> (variant { Ok; Err : EmailRecoveryError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 

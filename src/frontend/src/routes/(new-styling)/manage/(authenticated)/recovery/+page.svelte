@@ -281,17 +281,23 @@
   const diagnosticsEmailRecovery = (nonce: string) =>
     anonymousActor.email_recovery_diagnostics(nonce);
 
-  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
-  const submitEmailDkimLeaf = (arg: EmailRecoverySubmitDkimLeafArg) =>
-    anonymousActor
-      .email_recovery_submit_dkim_leaf(arg)
-      .then(throwCanisterError);
+  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
+   *  rejects on a call-level error, otherwise resolves void (poll for the
+   *  verdict). */
+  const submitEmailDkimLeaf = async (
+    arg: EmailRecoverySubmitDkimLeafArg,
+  ): Promise<void> => {
+    throwCanisterError(
+      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+    );
+  };
 
   /** Anonymous wrapper around `email_recovery_submit_dkim_leaf_via_doh`. */
-  const submitEmailDkimLeafViaDoh = (nonce: string) =>
-    anonymousActor
-      .email_recovery_submit_dkim_leaf_via_doh({ nonce })
-      .then(throwCanisterError);
+  const submitEmailDkimLeafViaDoh = async (nonce: string): Promise<void> => {
+    throwCanisterError(
+      await anonymousActor.email_recovery_submit_dkim_leaf_via_doh({ nonce }),
+    );
+  };
 
   const handleRemoveEmail = async () => {
     if (emailRecovery === undefined) return;

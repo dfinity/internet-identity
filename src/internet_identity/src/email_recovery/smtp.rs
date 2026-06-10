@@ -816,7 +816,7 @@ pub(super) fn extract_from_address(
 ///
 /// **Analytics contract:** each `DohFetchFailed` carries a typed
 /// [`DohFailureReason`] discriminant (`AllProvidersFailed`,
-/// `DedupQueueFull`, `QuorumFailed`, `ResponseMalformed`), which the
+/// `QueueFull`, `QuorumFailed`, `ResponseMalformed`), which the
 /// FE reads directly to set the `doh_reason` funnel property
 /// (`dohSubReason` in `shared/errors.ts`). The discriminant is the
 /// contract — keep the variant set in sync with the FE switch.
@@ -832,12 +832,8 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
         DohError::AllProvidersFailed => {
             EmailRecoveryError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
         }
-        DohError::DedupQueueFull => {
-            EmailRecoveryError::DohFetchFailed(DohFailureReason::DedupQueueFull)
-        }
-        DohError::RetryBackoffActive => {
-            EmailRecoveryError::DohFetchFailed(DohFailureReason::RetryBackoffActive)
-        }
+        DohError::QueueFull => EmailRecoveryError::DohFetchFailed(DohFailureReason::QueueFull),
+        DohError::Throttled => EmailRecoveryError::DohFetchFailed(DohFailureReason::Throttled),
         DohError::QuorumFailed { agreeing, total } => {
             EmailRecoveryError::DohFetchFailed(DohFailureReason::QuorumFailed {
                 agreeing: agreeing as u32,
@@ -1100,14 +1096,8 @@ mod tests {
             reason(DohError::AllProvidersFailed),
             DohFailureReason::AllProvidersFailed
         );
-        assert_eq!(
-            reason(DohError::DedupQueueFull),
-            DohFailureReason::DedupQueueFull
-        );
-        assert_eq!(
-            reason(DohError::RetryBackoffActive),
-            DohFailureReason::RetryBackoffActive
-        );
+        assert_eq!(reason(DohError::QueueFull), DohFailureReason::QueueFull);
+        assert_eq!(reason(DohError::Throttled), DohFailureReason::Throttled);
         assert_eq!(
             reason(DohError::QuorumFailed {
                 agreeing: 2,

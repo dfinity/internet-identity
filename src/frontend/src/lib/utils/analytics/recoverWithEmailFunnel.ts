@@ -20,7 +20,7 @@ import { Funnel } from "./Funnel";
  *         email-recovery-recover-signed-in
  *     | email-recovery-recover-failed   (with `reason = <variant>`, plus
  *       `doh_reason = quorum_failed | all_providers_failed |
- *       dedup_queue_full | response_malformed` when the DoH path's
+ *       queue_full | response_malformed` when the DoH path's
  *       `DohFetchFailed` was the cause — same segmentation the setup
  *       funnel records)
  * end-email-recovery-recover       (CLOSE — terminal state, carries `duration-…`)

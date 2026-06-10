@@ -686,7 +686,7 @@ fn full_setup_flow_via_dnssec_path() {
     //    the cached zone DNSKEY, runs the cryptographic signature
     //    check using the cached digest, checks DMARC + From: match,
     //    and binds the credential.
-    let submit_status = api::email_recovery_submit_dkim_leaf(
+    api::email_recovery_submit_dkim_leaf(
         &env,
         canister_id,
         internet_identity_interface::internet_identity::types::email_recovery::EmailRecoverySubmitDkimLeafArg {
@@ -696,13 +696,9 @@ fn full_setup_flow_via_dnssec_path() {
         },
     )
     .expect("submit_dkim_leaf call failed")
-    .expect("submit_dkim_leaf should succeed");
-    assert!(
-        matches!(submit_status, EmailRecoveryStatus::RegistrationSucceeded),
-        "expected RegistrationSucceeded from submit_dkim_leaf, got {submit_status:?}",
-    );
+    .expect("submit_dkim_leaf should be accepted");
 
-    // 6. Polled status also reflects the success.
+    // 6. The submit only accepts; the verdict is on the polled status.
     let status = api::email_recovery_status(&env, canister_id, &challenge.nonce)
         .expect("status call failed");
     assert!(
@@ -865,16 +861,12 @@ fn dnssec_path_falls_back_to_doh_when_leaf_is_unsigned() {
     let raw = env
         .await_call_no_ticks(raw_msg_id)
         .expect("await_call_no_ticks");
-    let result: Result<EmailRecoveryStatus, EmailRecoveryError> =
+    let result: Result<(), EmailRecoveryError> =
         candid::decode_one(&raw).expect("decode submit_dkim_leaf_via_doh result");
-    let submit_status = result.expect("DoH fallback accept should be Ok");
-    // Synchronous accept now: the method returns `Verifying` and resolves the
-    // DKIM key in the background. The terminal verdict lands on the polled
-    // status below (the fetch + finalize ran during `fulfill_doh_outcalls`).
-    assert!(
-        matches!(submit_status, EmailRecoveryStatus::Verifying),
-        "expected Verifying accept from the DoH fallback, got {submit_status:?}",
-    );
+    // Accept-only now: the call resolves `Ok(())` and the DKIM key is resolved
+    // in the background. The terminal verdict lands on the polled status below
+    // (the fetch + finalize ran during `fulfill_doh_outcalls`).
+    result.expect("DoH fallback should be accepted");
 
     // Polled status is the terminal verdict, and the credential actually
     // persisted to the anchor (otherwise remove would return AddressNotRegistered).
@@ -893,8 +885,7 @@ fn dnssec_path_doh_fallback_rejects_non_allowlisted_domain() {
     let env = env();
     // TEST_DOMAIN is DNSSEC-signed (so the DNSSEC path + NeedDkimLeaf
     // are reached) but is NOT on the DoH allowlist.
-    let (canister_id, _id, _p, nonce, _dkim_txt) =
-        dnssec_flow_until_need_dkim_leaf(&env, vec![]);
+    let (canister_id, _id, _p, nonce, _dkim_txt) = dnssec_flow_until_need_dkim_leaf(&env, vec![]);
 
     // DoH fallback. Synchronous accept: the allowlist gate rejects before
     // any outcall (no detach, no DoH fan-out), so the call returns
@@ -903,8 +894,8 @@ fn dnssec_path_doh_fallback_rejects_non_allowlisted_domain() {
     let result = api::email_recovery_submit_dkim_leaf_via_doh(&env, canister_id, &nonce)
         .expect("submit_dkim_leaf_via_doh call failed");
     assert!(
-        matches!(result, Ok(EmailRecoveryStatus::Verifying)),
-        "expected Ok(Verifying) accept, got {result:?}",
+        matches!(result, Ok(())),
+        "expected Ok(()) accept, got {result:?}",
     );
 
     // The pending entry is now terminally Failed — the user sees the

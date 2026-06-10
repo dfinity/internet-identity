@@ -1,5 +1,6 @@
 //! Second-phase DNSSEC leaf submission, exposed as two canister
-//! methods that share a finalize tail:
+//! methods that each accept the leaf and stamp the verdict on the
+//! pending challenge the FE polls (neither returns the verdict):
 //!
 //! - `email_recovery_submit_dkim_leaf(arg)` — the FE walked a
 //!   fully-signed DNSSEC resolution and submits the
@@ -47,7 +48,7 @@
 use super::pending::{PendingKind, PendingStatus};
 use crate::email_recovery::pending;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryError, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
+    EmailRecoveryError, EmailRecoverySubmitDkimLeafArg,
 };
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DelegationChain, SessionKey, SignedRRset,
@@ -55,12 +56,13 @@ use internet_identity_interface::internet_identity::types::{
 
 /// Body of `email_recovery_submit_dkim_leaf(arg)` — the DNSSEC path.
 /// The FE walked a fully-signed DNSSEC resolution for the leaf and
-/// submits the `(hops, extra_chains)` bundle here. Returns the
-/// post-call polling status — `RegistrationSucceeded` for the setup
-/// flow, `RecoveryReady{...}` for the recovery flow, or
-/// `Failed(reason)`. The FE can also poll
-/// `email_recovery_status(nonce)` for the same answer; returning it
-/// here saves the FE one round-trip on the happy path.
+/// submits the `(hops, extra_chains)` bundle here. **Accept-only:**
+/// returns `Ok(())` once the leaf is processed and the verdict written
+/// to the pending status, or `Err` for a call-level rejection (unknown
+/// nonce / not in `NeedDkimLeaf`). The verification verdict
+/// (`RegistrationSucceeded` / `RecoveryReady` / `Failed`) is read by
+/// polling `email_recovery_status(nonce)` — the single source of truth,
+/// shared with the asynchronous DoH paths.
 ///
 /// When the leaf's DKIM record CNAMEs into an *unsigned* zone the FE
 /// can't walk DNSSEC at all (the `outlook.com` ->
@@ -69,7 +71,7 @@ use internet_identity_interface::internet_identity::types::{
 pub async fn submit_dkim_leaf(
     arg: EmailRecoverySubmitDkimLeafArg,
     now_secs: u64,
-) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+) -> Result<(), EmailRecoveryError> {
     let EmailRecoverySubmitDkimLeafArg {
         nonce,
         hops,
@@ -79,12 +81,15 @@ pub async fn submit_dkim_leaf(
     // Snapshot everything we need under one borrow so the rest of
     // the function works against owned data. Includes early
     // rejection of "not a DNSSEC pending entry" / "not in
-    // NeedDkimLeaf state" / etc.
+    // NeedDkimLeaf state" / etc. — these are call-level errors,
+    // returned to the FE; the verification verdict goes on the polled
+    // status instead (single source of truth).
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_submit(&hops, &extra_chains, &snapshot, now_secs);
-    finalize(&nonce, &snapshot, verification, now_secs).await
+    finalize(&nonce, &snapshot, verification, now_secs).await;
+    Ok(())
 }
 
 /// Body of `email_recovery_submit_dkim_leaf_via_doh(nonce)` — the DoH
@@ -95,64 +100,53 @@ pub async fn submit_dkim_leaf(
 /// `live.com`, …). It carries no leaf data: the canister resolves the
 /// DKIM key over its own allowlist-gated DoH path, reusing the cached
 /// `partial_verification` crypto material. A domain the operator hasn't
-/// enabled comes back as `DomainNotAllowlisted` rather than leaving the
-/// pending entry stuck in `NeedDkimLeaf` until it expires. Returns the
-/// same post-call polling status as `submit_dkim_leaf`.
-pub fn submit_dkim_leaf_via_doh(
-    nonce: String,
-    now_secs: u64,
-) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+/// enabled lands as `Failed(DomainNotAllowlisted)` on the polled status
+/// rather than leaving the pending entry stuck in `NeedDkimLeaf` until it
+/// expires. Accept-only like `submit_dkim_leaf`: returns `Ok(())` and the
+/// verdict is read by polling `email_recovery_status`.
+pub fn submit_dkim_leaf_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailRecoveryError> {
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
     // Resolve the DKIM key over DoH and verify in the background; the call
-    // returns `Verifying` immediately and the FE polls until it flips
-    // terminal (rather than blocking on the outcall). `run_doh_fallback`
-    // detaches the fetches and finalizes via callback.
+    // accepts (`Ok`) immediately and the FE polls `email_recovery_status`
+    // until it flips terminal (rather than blocking on the outcall).
+    // `run_doh_fallback` detaches the fetches and finalizes via callback.
     pending::with_mut(&nonce, now_secs, |c| {
         c.status = PendingStatus::Verifying;
     });
     run_doh_fallback(snapshot, nonce, now_secs);
-    Ok(EmailRecoveryStatus::Verifying)
+    Ok(())
 }
 
-/// Shared tail of both submit methods: on a failed `verification`,
-/// stamp the pending entry `Failed` and surface the error; on success,
-/// finalize per kind — setup binds the credential, recovery stamps a
-/// delegation seed.
+/// Tail of the DNSSEC submit path: stamp the verdict onto the pending entry
+/// the FE polls (it returns nothing — the status is the source of truth). On
+/// a failed `verification` → `Failed`; on success, per kind — setup binds the
+/// credential, recovery stamps a delegation seed. (The DoH paths use
+/// [`finalize_via_doh`], which detaches the recovery leg.)
 async fn finalize(
     nonce: &str,
     snapshot: &Snapshot,
     verification: Result<(), EmailRecoveryError>,
     now_secs: u64,
-) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+) {
     if let Err(e) = verification {
-        let cloned = e.clone();
         pending::with_mut(nonce, now_secs, |c| {
-            c.status = PendingStatus::Failed(cloned);
+            c.status = PendingStatus::Failed(e);
             c.partial_verification = None;
         });
-        return Err(e);
+        return;
     }
 
     match &snapshot.kind {
         SnapshotKind::Register { anchor } => {
-            match super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
-                Ok(()) => {
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.status = PendingStatus::Succeeded;
-                        c.partial_verification = None;
-                    });
-                    Ok(EmailRecoveryStatus::RegistrationSucceeded)
-                }
-                Err(e) => {
-                    let cloned = e.clone();
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.status = PendingStatus::Failed(cloned);
-                        c.partial_verification = None;
-                    });
-                    Err(e)
-                }
-            }
+            let result = super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs);
+            pending::with_mut(nonce, now_secs, |c| {
+                c.partial_verification = None;
+                c.status = match result {
+                    Ok(()) => PendingStatus::Succeeded,
+                    Err(e) => PendingStatus::Failed(e),
+                };
+            });
         }
         SnapshotKind::Recovery { session_pk } => {
             // Build a transient `PendingSnapshot` shape that
@@ -166,30 +160,16 @@ async fn finalize(
                 session_pk.clone(),
             );
             match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk).await {
-                Ok(outcome) => {
-                    let user_key = serde_bytes::ByteBuf::from(outcome.user_key.clone());
-                    let expiration = outcome.expiration;
-                    let anchor_number = outcome.anchor_number;
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.recovery_outcome = Some(outcome);
-                        c.status = PendingStatus::Succeeded;
-                        c.partial_verification = None;
-                    });
-                    Ok(EmailRecoveryStatus::RecoveryReady {
-                        user_key,
-                        expiration,
-                        anchor_number,
-                    })
-                }
-                Err(e) => {
-                    let cloned = e.clone();
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.status = PendingStatus::Failed(cloned);
-                        c.partial_verification = None;
-                    });
-                    Err(e)
-                }
-            }
+                Ok(outcome) => pending::with_mut(nonce, now_secs, |c| {
+                    c.recovery_outcome = Some(outcome);
+                    c.status = PendingStatus::Succeeded;
+                    c.partial_verification = None;
+                }),
+                Err(e) => pending::with_mut(nonce, now_secs, |c| {
+                    c.status = PendingStatus::Failed(e);
+                    c.partial_verification = None;
+                }),
+            };
         }
     }
 }

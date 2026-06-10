@@ -235,11 +235,11 @@ pub enum DohFailureReason {
     /// behind one in-flight fetch and the dedup waiter queue hit its cap,
     /// so this request was turned away. Transient: the in-flight fetch
     /// still caches, so a retry past the burst succeeds.
-    DedupQueueFull,
+    QueueFull,
     /// A recent fetch for this key failed and the single-flight cache is
     /// in its retry-backoff window, so the request was rejected without
     /// issuing fresh outcalls.
-    RetryBackoffActive,
+    Throttled,
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
     QuorumFailed { agreeing: u32, total: u32 },

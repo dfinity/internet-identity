@@ -93,16 +93,16 @@ pub enum DohError {
     /// burst on one domain, not at the providers being down. Transient: the
     /// in-flight fetch still completes and caches, so a retry past the burst
     /// succeeds with no extra fan-out.
-    DedupQueueFull,
+    QueueFull,
     /// A recent *transient* fetch for this name failed and the cache is
     /// still within its retry backoff, so no new fan-out was issued and
     /// there was no cached answer to serve. Distinct from
     /// [`Self::AllProvidersFailed`] (this caller's own fan-out came back
-    /// empty) and [`Self::DedupQueueFull`] (the dedup waiter queue was
+    /// empty) and [`Self::QueueFull`] (the dedup waiter queue was
     /// full): a spike here means repeated transient failures
     /// backing off, not providers down right now. Transient — a retry past
     /// the backoff, or a later success, resolves it.
-    RetryBackoffActive,
+    Throttled,
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
     QuorumFailed { agreeing: usize, total: usize },

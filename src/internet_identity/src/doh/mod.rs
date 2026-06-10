@@ -91,8 +91,8 @@ fn map_cache_result(
         Ok(DohRecord::Txt(bytes)) => Ok(bytes),
         Ok(DohRecord::NoAnswer) => Err(DohError::NoAnswer),
         Err(CacheFillError::FillFailed(e)) => Err(e),
-        Err(CacheFillError::Throttled) => Err(DohError::RetryBackoffActive),
-        Err(CacheFillError::QueueFull) => Err(DohError::DedupQueueFull),
+        Err(CacheFillError::Throttled) => Err(DohError::Throttled),
+        Err(CacheFillError::QueueFull) => Err(DohError::QueueFull),
     }
 }
 
@@ -574,7 +574,7 @@ mod tests {
         set_mock(&agreeing_dkim());
         set_now(1_001);
         let r2 = fetch("x._domainkey.example.com", "example.com");
-        assert!(matches!(r2, Err(DohError::RetryBackoffActive)));
+        assert!(matches!(r2, Err(DohError::Throttled)));
         assert_eq!(call_count(), 1, "transient failure is debounced");
 
         // But it's not poisoned: past the backoff a follow-up re-fetches

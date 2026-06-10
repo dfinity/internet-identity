@@ -1613,8 +1613,11 @@ mod email_recovery_api {
     #[update]
     async fn email_recovery_submit_dkim_leaf(
         arg: EmailRecoverySubmitDkimLeafArg,
-    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+    ) -> Result<(), EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        // `Ok` = accepted; the verdict (Succeeded / Failed / RecoveryReady)
+        // is read from `email_recovery_status`. `Err` is a call-level
+        // rejection (unknown nonce / wrong state) only.
         email_recovery::submit_dkim_leaf(arg, now_secs).await
     }
 
@@ -1636,9 +1639,9 @@ mod email_recovery_api {
     #[update]
     fn email_recovery_submit_dkim_leaf_via_doh(
         arg: EmailRecoverySubmitDkimLeafViaDohArg,
-    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+    ) -> Result<(), EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        // Detaches the DoH resolution + verification and returns `Verifying`;
+        // `Ok` = accepted; the DoH resolution + verification run detached and
         // the FE polls `email_recovery_status` for the terminal outcome.
         email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs)
     }

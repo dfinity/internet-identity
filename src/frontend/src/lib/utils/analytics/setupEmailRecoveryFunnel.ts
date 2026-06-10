@@ -17,7 +17,7 @@ import { Funnel } from "./Funnel";
  *     email-recovery-setup-succeeded
  *     | email-recovery-setup-failed   (with `reason = <variant>`, plus
  *       `doh_reason = quorum_failed | all_providers_failed |
- *       dedup_queue_full | response_malformed | retry_backoff_active`
+ *       queue_full | response_malformed | throttled`
  *       when the DoH path's
  *       `DohFetchFailed` was the cause — lets the funnel be segmented by
  *       *why* DoH failed, which is what bites non-DNSSEC providers like

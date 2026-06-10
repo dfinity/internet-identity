@@ -308,8 +308,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const DohFailureReason = IDL.Variant({
     'AllProvidersFailed' : IDL.Null,
-    'DedupQueueFull' : IDL.Null,
-    'RetryBackoffActive' : IDL.Null,
+    'QueueFull' : IDL.Null,
+    'Throttled' : IDL.Null,
     'ResponseMalformed' : IDL.Text,
     'QuorumFailed' : IDL.Record({
       'total' : IDL.Nat32,
@@ -920,22 +920,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'email_recovery_submit_dkim_leaf' : IDL.Func(
         [EmailRecoverySubmitDkimLeafArg],
-        [
-          IDL.Variant({
-            'Ok' : EmailRecoveryStatus,
-            'Err' : EmailRecoveryError,
-          }),
-        ],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),
     'email_recovery_submit_dkim_leaf_via_doh' : IDL.Func(
         [EmailRecoverySubmitDkimLeafViaDohArg],
-        [
-          IDL.Variant({
-            'Ok' : EmailRecoveryStatus,
-            'Err' : EmailRecoveryError,
-          }),
-        ],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
