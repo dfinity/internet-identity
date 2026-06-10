@@ -693,7 +693,7 @@ fn verify_setup_email_doh(
     let dkim_fqdn = format!("{selector}._domainkey.{domain}");
     let dmarc_fqdn = format!("_dmarc.{domain}");
 
-    crate::doh::fetch_txt_pair(dkim_fqdn, dmarc_fqdn, domain.clone(), move |pair| {
+    fetch_dkim_and_dmarc(dkim_fqdn, dmarc_fqdn, domain.clone(), move |pair| {
         let (dkim_bytes, dmarc_bytes_opt) = match pair {
             Ok(v) => v,
             Err(e) => return on_done(Err(map_doh_error(e, &domain))),
@@ -816,7 +816,7 @@ pub(super) fn extract_from_address(
 ///
 /// **Analytics contract:** each `DohFetchFailed` carries a typed
 /// [`DohFailureReason`] discriminant (`AllProvidersFailed`,
-/// `DedupWaitTimeout`, `QuorumFailed`, `ResponseMalformed`), which the
+/// `DedupQueueFull`, `QuorumFailed`, `ResponseMalformed`), which the
 /// FE reads directly to set the `doh_reason` funnel property
 /// (`dohSubReason` in `shared/errors.ts`). The discriminant is the
 /// contract — keep the variant set in sync with the FE switch.
@@ -832,8 +832,8 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
         DohError::AllProvidersFailed => {
             EmailRecoveryError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
         }
-        DohError::DedupWaitTimedOut => {
-            EmailRecoveryError::DohFetchFailed(DohFailureReason::DedupWaitTimeout)
+        DohError::DedupQueueFull => {
+            EmailRecoveryError::DohFetchFailed(DohFailureReason::DedupQueueFull)
         }
         DohError::RetryBackoffActive => {
             EmailRecoveryError::DohFetchFailed(DohFailureReason::RetryBackoffActive)
@@ -867,6 +867,42 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
             "DoH rejected name {name:?} as outside registered domain {registered_domain:?}"
         )),
     }
+}
+
+/// Resolve the DKIM key (required) and the DMARC policy (optional) for a
+/// verification over the DoH cache, delivering both to `on_ready`. A
+/// definitive DMARC `NoAnswer` yields `None` — the valid "no policy
+/// published" state (RFC 7489) that drops the verifier to strict `d=`
+/// alignment (design §6.3); any *other* DMARC failure (transient outage,
+/// quorum miss, transport error) propagates rather than quietly tightening
+/// the check. Each fetch is independently deduped through the cache and the
+/// callbacks chain, so neither call blocks.
+///
+/// `pub(super)` so the DNSSEC-path DoH fallback in `submit_leaf.rs` resolves
+/// the same DKIM-required/DMARC-optional pair through one place — keeping
+/// that security-relevant `NoAnswer`-handling rule from drifting between the
+/// two call sites.
+pub(super) fn fetch_dkim_and_dmarc(
+    dkim_fqdn: String,
+    dmarc_fqdn: String,
+    registered_domain: String,
+    on_ready: impl FnOnce(Result<(Vec<u8>, Option<Vec<u8>>), crate::doh::DohError>) + 'static,
+) {
+    let domain_for_dmarc = registered_domain.clone();
+    crate::doh::fetch_txt(&dkim_fqdn, &registered_domain, move |dkim| {
+        let dkim = match dkim {
+            Ok(bytes) => bytes,
+            Err(e) => return on_ready(Err(e)),
+        };
+        crate::doh::fetch_txt(&dmarc_fqdn, &domain_for_dmarc, move |dmarc| {
+            let dmarc = match dmarc {
+                Ok(bytes) => Some(bytes),
+                Err(crate::doh::DohError::NoAnswer) => None,
+                Err(e) => return on_ready(Err(e)),
+            };
+            on_ready(Ok((dkim, dmarc)));
+        });
+    });
 }
 
 /// Write the verified credential to the anchor. Inline rather than
@@ -1065,8 +1101,8 @@ mod tests {
             DohFailureReason::AllProvidersFailed
         );
         assert_eq!(
-            reason(DohError::DedupWaitTimedOut),
-            DohFailureReason::DedupWaitTimeout
+            reason(DohError::DedupQueueFull),
+            DohFailureReason::DedupQueueFull
         );
         assert_eq!(
             reason(DohError::RetryBackoffActive),

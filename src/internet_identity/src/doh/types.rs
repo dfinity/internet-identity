@@ -83,21 +83,23 @@ pub enum DohError {
     /// Every provider's outcall failed (network error / non-200 / etc).
     /// "Every" means all of `PROVIDERS.len()` — currently five.
     AllProvidersFailed,
-    /// A dedup *waiter* gave up: it polled the cache for an in-flight
-    /// fetch up to the caller's poll cap without the owning fetch
-    /// publishing a result (see `super::fetch_txt`). Deliberately
-    /// distinct from [`Self::AllProvidersFailed`] — which means *this*
-    /// caller's own five-provider fan-out came back empty — so the two
-    /// can be told apart in diagnostics: a spike of this variant points
-    /// at the dedup wait being too short for real outcall latency (or a
-    /// wedged owner), not at the providers themselves being down.
-    DedupWaitTimedOut,
+    /// Too many concurrent verifications for the same domain piled up
+    /// behind one in-flight fetch: the dedup waiter queue hit its cap, so
+    /// this caller was turned away instead of enqueued (see the cache's
+    /// `with_max_waiters`). Deliberately distinct from
+    /// [`Self::AllProvidersFailed`] — which means *this* caller's own
+    /// five-provider fan-out came back empty — so the two can be told apart
+    /// in diagnostics: a spike of this variant points at a concurrency
+    /// burst on one domain, not at the providers being down. Transient: the
+    /// in-flight fetch still completes and caches, so a retry past the burst
+    /// succeeds with no extra fan-out.
+    DedupQueueFull,
     /// A recent *transient* fetch for this name failed and the cache is
     /// still within its retry backoff, so no new fan-out was issued and
     /// there was no cached answer to serve. Distinct from
     /// [`Self::AllProvidersFailed`] (this caller's own fan-out came back
-    /// empty) and [`Self::DedupWaitTimedOut`] (waited on someone else's
-    /// in-flight fetch): a spike here means repeated transient failures
+    /// empty) and [`Self::DedupQueueFull`] (the dedup waiter queue was
+    /// full): a spike here means repeated transient failures
     /// backing off, not providers down right now. Transient — a retry past
     /// the backoff, or a later success, resolves it.
     RetryBackoffActive,

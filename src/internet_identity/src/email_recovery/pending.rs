@@ -196,11 +196,12 @@ pub enum PendingStatus {
     NeedDkimLeaf {
         selector: String,
     },
-    /// (DoH path only.) The email arrived and DKIM/DMARC resolution +
-    /// verification is running in the background (detached after the
-    /// `smtp_request` accept). The FE polls until this flips to
-    /// `Succeeded`/`Failed`. The DNSSEC path never enters this state — it
-    /// hands off to the FE via `NeedDkimLeaf` instead.
+    /// The email arrived and DKIM/DMARC resolution + verification is running
+    /// in the background, detached after a synchronous accept. Reached on the
+    /// DoH path (`smtp_request`) and on the DNSSEC path's DoH fallback
+    /// (`submit_dkim_leaf_via_doh`, when the leaf CNAMEs into an unsigned
+    /// zone). The FE polls until this flips to `Succeeded`/`Failed`. The
+    /// DNSSEC leaf-walk path reports `NeedDkimLeaf` first.
     Verifying,
     Succeeded,
     Failed(EmailRecoveryError),

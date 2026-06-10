@@ -615,7 +615,7 @@ type DnsProofBundle = record {
 // `doh_reason` analytics property — no string parsing.
 type DohFailureReason = variant {
     AllProvidersFailed;
-    DedupWaitTimeout;
+    DedupQueueFull;
     RetryBackoffActive;
     QuorumFailed : record { agreeing : nat32; total : nat32 };
     ResponseMalformed : text;

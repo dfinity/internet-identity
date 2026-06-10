@@ -231,9 +231,11 @@ pub struct EmailRecoverySubmitDkimLeafViaDohArg {
 pub enum DohFailureReason {
     /// Every provider's outcall failed (network error / non-200 / etc).
     AllProvidersFailed,
-    /// A dedup waiter polled the cache for an in-flight fetch up to its
-    /// cap without the owning fetch publishing a result.
-    DedupWaitTimeout,
+    /// Too many concurrent verifications for the same domain piled up
+    /// behind one in-flight fetch and the dedup waiter queue hit its cap,
+    /// so this request was turned away. Transient: the in-flight fetch
+    /// still caches, so a retry past the burst succeeds.
+    DedupQueueFull,
     /// A recent fetch for this key failed and the single-flight cache is
     /// in its retry-backoff window, so the request was rejected without
     /// issuing fresh outcalls.
@@ -358,11 +360,13 @@ pub enum EmailRecoveryStatus {
     /// message); the FE uses it both to query DoH and as the
     /// leaf's owner-name component.
     NeedDkimLeaf { selector: String },
-    /// (DoH path only.) The email arrived and the canister is resolving
-    /// DKIM/DMARC and verifying in the background — the `smtp_request`
-    /// accept returns before this finishes. The FE keeps polling until it
-    /// flips to `RegistrationSucceeded` / `RecoveryReady` / `Failed`. The
-    /// DNSSEC path uses `NeedDkimLeaf` instead and never reports this.
+    /// The email arrived and the canister is resolving DKIM/DMARC over DoH
+    /// and verifying in the background — the accept returns before this
+    /// finishes. Reached on the DoH path (`smtp_request`) and on the DNSSEC
+    /// path's DoH fallback (`email_recovery_submit_dkim_leaf_via_doh`, used
+    /// when the DKIM leaf CNAMEs into an unsigned zone). The FE keeps polling
+    /// until it flips to `RegistrationSucceeded` / `RecoveryReady` /
+    /// `Failed`. The DNSSEC leaf-walk path reports `NeedDkimLeaf` first.
     Verifying,
     /// Setup succeeded. The address is now bound to the anchor; the
     /// FE shows "all set" and ends the wizard.

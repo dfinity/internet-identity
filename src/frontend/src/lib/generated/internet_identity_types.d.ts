@@ -533,8 +533,8 @@ export interface DohConfig {
  * free-form string. The FE reads this directly to segment the
  * `doh_reason` analytics property — no string parsing.
  */
-export type DohFailureReason = { 'DedupWaitTimeout' : null } |
-  { 'AllProvidersFailed' : null } |
+export type DohFailureReason = { 'AllProvidersFailed' : null } |
+  { 'DedupQueueFull' : null } |
   { 'RetryBackoffActive' : null } |
   { 'ResponseMalformed' : string } |
   { 'QuorumFailed' : { 'total' : number, 'agreeing' : number } };

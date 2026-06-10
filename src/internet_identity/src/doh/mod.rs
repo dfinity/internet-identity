@@ -81,8 +81,9 @@ async fn doh_fill(name: String) -> Result<DohRecord, DohError> {
 
 /// Map a cache delivery to the FQDN's TXT bytes. `NoAnswer` is a definitive
 /// negative (the DMARC path turns it into the strict-alignment fallback);
-/// `QueueFull` reuses `DedupWaitTimedOut` — both are transient dedup
-/// backpressure that a retry past the burst resolves.
+/// `Throttled` and `QueueFull` are the cache's two transient backpressure
+/// signals — a recent failure still backing off, or too many concurrent
+/// waiters on one domain — each a retry-shortly for the caller.
 fn map_cache_result(
     result: Result<DohRecord, CacheFillError<DohError>>,
 ) -> Result<Vec<u8>, DohError> {
@@ -91,7 +92,7 @@ fn map_cache_result(
         Ok(DohRecord::NoAnswer) => Err(DohError::NoAnswer),
         Err(CacheFillError::FillFailed(e)) => Err(e),
         Err(CacheFillError::Throttled) => Err(DohError::RetryBackoffActive),
-        Err(CacheFillError::QueueFull) => Err(DohError::DedupWaitTimedOut),
+        Err(CacheFillError::QueueFull) => Err(DohError::DedupQueueFull),
     }
 }
 
@@ -231,36 +232,6 @@ pub fn fetch_txt(
     // cached answer), never blocking this call.
     with_value(&DOH_CACHE, name.to_string(), move |result| {
         on_ready(map_cache_result(result))
-    });
-}
-
-/// Fetch a `primary` TXT (required) and a `secondary` TXT (optional — a
-/// definitive `NoAnswer` yields `None`), delivering both to `on_ready`. This
-/// is the DKIM-key-plus-optional-DMARC-policy shape both email-recovery DoH
-/// paths need: a missing DMARC record is a valid DNS state that drops the
-/// verifier to strict alignment, but any other DMARC failure must propagate
-/// rather than quietly tighten the check. Each fetch is independently deduped
-/// through the cache; the callbacks chain so neither call blocks.
-pub fn fetch_txt_pair(
-    primary_fqdn: String,
-    secondary_fqdn: String,
-    registered_domain: String,
-    on_ready: impl FnOnce(Result<(Vec<u8>, Option<Vec<u8>>), DohError>) + 'static,
-) {
-    let domain_for_secondary = registered_domain.clone();
-    fetch_txt(&primary_fqdn, &registered_domain, move |primary| {
-        let primary = match primary {
-            Ok(bytes) => bytes,
-            Err(e) => return on_ready(Err(e)),
-        };
-        fetch_txt(&secondary_fqdn, &domain_for_secondary, move |secondary| {
-            let secondary = match secondary {
-                Ok(bytes) => Some(bytes),
-                Err(DohError::NoAnswer) => None,
-                Err(e) => return on_ready(Err(e)),
-            };
-            on_ready(Ok((primary, secondary)));
-        });
     });
 }
 

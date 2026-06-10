@@ -307,8 +307,8 @@ export const idlFactory = ({ IDL }) => {
     'expires_at' : Timestamp,
   });
   const DohFailureReason = IDL.Variant({
-    'DedupWaitTimeout' : IDL.Null,
     'AllProvidersFailed' : IDL.Null,
+    'DedupQueueFull' : IDL.Null,
     'RetryBackoffActive' : IDL.Null,
     'ResponseMalformed' : IDL.Text,
     'QuorumFailed' : IDL.Record({

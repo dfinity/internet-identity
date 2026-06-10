@@ -384,9 +384,10 @@ fn run_doh_fallback(snapshot: Snapshot, nonce: String, now_secs: u64) {
     // DKIM key lives at `<selector>._domainkey.<d>`; the allowlist gate
     // and the in-domain check both key off the registered domain. The
     // DKIM + optional-DMARC fetch is deduped through the cache and
-    // delivered to the callback (see `doh::fetch_txt_pair`); a missing
-    // DMARC record drops us to strict `d=` alignment, any other DMARC
-    // failure propagates — same handling as `smtp::verify_setup_email_doh`.
+    // delivered to the callback via the shared `smtp::fetch_dkim_and_dmarc`,
+    // so the DMARC `NoAnswer`-handling rule (missing record → strict `d=`
+    // alignment, any other failure propagates) stays identical to the
+    // synchronous DoH path in `smtp::verify_setup_email_doh`.
     let dkim_fqdn = format!(
         "{}._domainkey.{}",
         snapshot.expected_selector, snapshot.signing_domain
@@ -394,7 +395,7 @@ fn run_doh_fallback(snapshot: Snapshot, nonce: String, now_secs: u64) {
     let dmarc_fqdn = format!("_dmarc.{}", snapshot.registered_domain);
     let registered_domain = snapshot.registered_domain.clone();
 
-    crate::doh::fetch_txt_pair(
+    super::smtp::fetch_dkim_and_dmarc(
         dkim_fqdn.clone(),
         dmarc_fqdn,
         registered_domain.clone(),
