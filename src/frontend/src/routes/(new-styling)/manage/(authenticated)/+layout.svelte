@@ -446,16 +446,19 @@
       }}
       bind:mode={authDialogMode}
     >
-      <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {authDialogMode === "signup"
-          ? $t`Create another identity`
-          : $t`Sign in`}
+      <h1
+        class={[
+          "text-text-primary mt-2 self-start text-2xl font-medium",
+          authDialogMode === "signin" ? "mb-2" : "mb-6",
+        ]}
+      >
+        {authDialogMode === "signup" ? $t`Add a new identity` : $t`Sign in`}
       </h1>
-      <p class="text-text-secondary mb-6 self-start text-sm">
-        {authDialogMode === "signup"
-          ? $t`Set up a new identity.`
-          : $t`Choose method to continue`}
-      </p>
+      {#if authDialogMode === "signin"}
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`Choose method to continue`}
+        </p>
+      {/if}
     </AuthWizard>
   </Dialog>
 {/if}
