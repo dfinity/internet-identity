@@ -1,0 +1,93 @@
+name: Dependency Updates
+
+on:
+  schedule:
+    - cron: "30 7 * * MON"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-deps:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_APP_ID }}
+          private-key: ${{ secrets.PR_AUTOMATION_BOT_PUBLIC_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Update rust
+        id: update-rust
+        run: ./scripts/update-deps/update-rust
+        continue-on-error: true
+
+      - name: Update node
+        id: update-node
+        run: ./scripts/update-deps/update-node
+        continue-on-error: true
+
+      - name: Update didc
+        id: update-didc
+        run: ./scripts/update-deps/update-didc
+        continue-on-error: true
+
+      - name: Update icp-cli
+        id: update-icp-cli
+        run: ./scripts/update-deps/update-icp-cli
+        continue-on-error: true
+
+      - name: Report failed updaters to Slack
+        if: |
+          steps.update-rust.outcome == 'failure' ||
+          steps.update-node.outcome == 'failure' ||
+          steps.update-didc.outcome == 'failure' ||
+          steps.update-icp-cli.outcome == 'failure'
+        uses: ./.github/actions/slack
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: |
+            One or more dependency updaters failed in https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            rust=${{ steps.update-rust.outcome }} node=${{ steps.update-node.outcome }} didc=${{ steps.update-didc.outcome }} icp-cli=${{ steps.update-icp-cli.outcome }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          base: main
+          add-paths: |
+            rust-toolchain.toml
+            .node-version
+            .nvmrc
+            .didc-release
+            .didc-checksums
+            .icp-cli-version
+          commit-message: "chore(ci): update dependencies"
+          committer: GitHub <noreply@github.com>
+          branch: bot-deps-update
+          delete-branch: true
+          title: "chore(ci): update dependencies"
+          body: |
+            Automated dependency bump produced by `.github/workflows/update-deps.yml`.
+
+            Per-tool outcome:
+            - rust: ${{ steps.update-rust.outcome }}
+            - node: ${{ steps.update-node.outcome }}
+            - didc: ${{ steps.update-didc.outcome }}
+            - icp-cli: ${{ steps.update-icp-cli.outcome }}
+
+      - name: Notify Slack on job failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Dependency update workflow failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
