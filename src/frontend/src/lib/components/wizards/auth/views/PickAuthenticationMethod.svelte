@@ -184,7 +184,7 @@
               : $t`Already have an identity?`)}
         </div>
         {#if switchModeTitle === undefined}
-          <div class="text-text-tertiary mt-1.5 text-xs">
+          <div class="text-text-tertiary mt-1 text-xs">
             {mode === "signin"
               ? $t`Create one in seconds.`
               : $t`Use a passkey or familiar provider.`}
