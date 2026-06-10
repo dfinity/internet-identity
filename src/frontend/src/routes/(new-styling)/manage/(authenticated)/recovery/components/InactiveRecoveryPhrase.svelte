@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ShieldOffIcon } from "@lucide/svelte";
+  import { BookXIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
@@ -19,7 +19,7 @@
   ]}
 >
   <div class="mb-3 flex h-9 flex-row items-center">
-    <ShieldOffIcon class="text-fg-tertiary size-6" />
+    <BookXIcon class="text-fg-tertiary size-6" />
     <button
       class="btn btn-primary btn-sm ms-auto"
       onclick={onActivate}

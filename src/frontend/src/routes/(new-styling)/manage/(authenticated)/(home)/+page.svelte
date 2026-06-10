@@ -4,10 +4,10 @@
   import { goto } from "$app/navigation";
   import {
     ArrowUpRightIcon,
+    BookAlertIcon,
+    BookOpenIcon,
     MailIcon,
     PlusIcon,
-    ShieldAlertIcon,
-    ShieldIcon,
   } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -61,17 +61,17 @@
       },
       "setup-phrase": {
         label: $t`Set up recovery phrase`,
-        icon: ShieldIcon,
+        icon: BookOpenIcon,
         onclick: () => goto("/manage/recovery", { state: { activate: true } }),
       },
       "verify-phrase": {
         label: $t`Verify recovery phrase`,
-        icon: ShieldAlertIcon,
+        icon: BookAlertIcon,
         onclick: () => goto("/manage/recovery", { state: { verify: true } }),
       },
       "reset-phrase": {
         label: $t`Reset recovery phrase`,
-        icon: ShieldIcon,
+        icon: BookOpenIcon,
         onclick: () => goto("/manage/recovery", { state: { reset: true } }),
       },
     });

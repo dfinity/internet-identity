@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    BriefcaseMedicalIcon,
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
@@ -9,7 +10,6 @@
     CodeIcon,
     LanguagesIcon,
     SettingsIcon,
-    ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
@@ -145,14 +145,6 @@
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
-    });
-  };
-
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-    toaster.success({
-      title: $t`Upgrade completed successfully`,
-      duration: 4000,
     });
   };
 
@@ -380,7 +372,7 @@
             href="/manage/recovery"
             current={page.url.pathname === "/manage/recovery"}
           >
-            <ShieldIcon class="size-5 sm:max-md:mx-auto" />
+            <BriefcaseMedicalIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>
@@ -512,7 +504,6 @@
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
         isAuthenticating = false;
@@ -552,7 +543,6 @@
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isCreateIdentityDialogOpen = false;
         isAuthenticating = false;
