@@ -151,12 +151,7 @@
     </div>
   </div>
   {#if showLostAccess}
-    <div
-      class={[
-        "flex flex-row items-center justify-between gap-4",
-        !withinDialog && "border-border-secondary border-b",
-      ]}
-    >
+    <div class="flex flex-row items-center justify-between gap-4">
       <p class="text-text-tertiary text-sm">
         {$t`Lost access to your identity?`}
       </p>
@@ -168,6 +163,9 @@
         {$t`Recover`}
       </a>
     </div>
+  {/if}
+  {#if showLostAccess && showSwitchMode && !withinDialog}
+    <div class="border-border-secondary border-t" aria-hidden="true"></div>
   {/if}
   {#if showSwitchMode}
     <div
