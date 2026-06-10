@@ -252,6 +252,16 @@ export class CanisterError<T extends Record<string, unknown>> extends Error {
   ): UnionToIntersection<T>[S] {
     return this.#value[type as keyof T] as UnionToIntersection<T>[S];
   }
+
+  /**
+   * The full wrapped candid error value — the whole `{ Variant: payload }`
+   * object, not just one variant's payload like `value(type)`. Lets a
+   * caught canister error be routed by the same value-based helpers that
+   * handle the equivalent `Err`-shaped response field.
+   */
+  get raw(): T {
+    return this.#value;
+  }
 }
 
 export const isCanisterError = <T extends Record<string, unknown>>(

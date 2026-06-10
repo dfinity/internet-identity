@@ -110,6 +110,29 @@ class RecoverIdentityWizard {
   }
 }
 
+class MigrationWizard {
+  #view: Locator;
+
+  constructor(view: Locator) {
+    this.#view = view;
+  }
+
+  async enterIdentityNumber(num: bigint | number): Promise<void> {
+    await this.#view
+      .getByPlaceholder("Internet Identity number")
+      .fill(num.toString());
+    await this.#view.getByRole("button", { name: "Continue" }).click();
+  }
+
+  async nameAndUpgrade(name: string): Promise<void> {
+    await expect(
+      this.#view.getByRole("heading", { name: "Name your identity" }),
+    ).toBeVisible();
+    await this.#view.getByLabel("Identity name").fill(name);
+    await this.#view.getByRole("button", { name: "Upgrade identity" }).click();
+  }
+}
+
 class RecoveryPage {
   #page: Page;
 
@@ -130,6 +153,18 @@ class RecoveryPage {
     const dialog = this.#page.getByRole("dialog");
     const wizard = new RecoverIdentityWizard(dialog);
     await expect(dialog).toBeVisible();
+    const value = await fn(wizard);
+    await expect(dialog).toBeHidden();
+    return value;
+  }
+
+  async startIdentityNumberUpgrade<T>(
+    fn: (wizard: MigrationWizard) => Promise<T>,
+  ): Promise<T> {
+    await this.#page.getByRole("button", { name: /^Legacy identity/ }).click();
+    const dialog = this.#page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const wizard = new MigrationWizard(dialog);
     const value = await fn(wizard);
     await expect(dialog).toBeHidden();
     return value;

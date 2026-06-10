@@ -540,29 +540,30 @@ type EmailRecoveryDnsInput = record {
 
 type EmailRecoverySubmitDkimLeafArg = record {
     nonce : text;
-    // The DKIM resolution chain in CNAME order, ending in a TXT,
-    // bounded by `MAX_CNAME_HOPS = 4` at the canister side. For the
-    // Gmail-style direct-TXT case this is a single-element vec.
+    // The DKIM resolution chain in CNAME order, ending in a TXT. At
+    // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
+    // canister side. For the Gmail-style direct-TXT case this is a
+    // single-element vec.
     //
-    // An EMPTY vec is a distinct signal: the FE could not walk a
-    // fully-signed DNSSEC resolution for this leaf, because the DKIM
-    // record CNAMEs into an unsigned zone (e.g.
+    // When the FE cannot walk a fully-signed DNSSEC resolution for the
+    // leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
     // `selector1._domainkey.outlook.com` is a signed CNAME into the
-    // unsigned `outbound.protection.outlook.com`). The DNSSEC walk has
-    // to verify every hop and so fails on the unsigned one. The
-    // canister then resolves the key over its own DoH path: it issues
-    // ONE outcall for the in-zone name
-    // `<selector>._domainkey.<signing_domain>` and lets the recursive
-    // resolver chase the CNAME, so the unsigned target zone is never
-    // queried (or allowlist-checked) directly. The fetch is
-    // allowlist-gated on the registered domain; a non-allowlisted
-    // domain comes back as `DomainNotAllowlisted` rather than leaving
-    // the entry pending until it expires.
+    // unsigned `outbound.protection.outlook.com`) — it must NOT submit
+    // an empty vec here; it calls `email_recovery_submit_dkim_leaf_via_doh`
+    // instead, which resolves the key over the canister's DoH path.
     hops : vec SignedRRset;
     // Delegation chains for signed zones touched by `hops` that
     // weren't already covered by the skeleton chain anchored at
     // prepare time. Empty for same-zone resolution.
     extra_chains : vec DelegationChain;
+};
+
+// Argument to email_recovery_submit_dkim_leaf_via_doh. Wrapped in a
+// record (like EmailRecoverySubmitDkimLeafArg) so the method can grow
+// fields without a breaking interface change; nonce is the lookup key
+// and is always required.
+type EmailRecoverySubmitDkimLeafViaDohArg = record {
+    nonce : text;
 };
 
 // DNSSEC proof bundle and supporting types — see
@@ -609,15 +610,29 @@ type DnsProofBundle = record {
     hops : vec SignedRRset;
 };
 
+// Why a DoH resolution failed, as a typed discriminant rather than a
+// free-form string. The FE reads this directly to segment the
+// `doh_reason` analytics property — no string parsing.
+type DohFailureReason = variant {
+    AllProvidersFailed;
+    DedupWaitTimeout;
+    QuorumFailed : record { agreeing : nat32; total : nat32 };
+    ResponseMalformed : text;
+};
+
 type EmailRecoveryError = variant {
     Unauthorized : principal;
     NonceUnknown;
     NonceExpired;
     DomainNotAllowlisted : text;
-    DohFetchFailed : text;
+    DohFetchFailed : DohFailureReason;
     DomainNotSupported : text;
     EmailVerificationFailed : text;
     DkimLeafMismatch;
+    // email_recovery_submit_dkim_leaf was called with an empty `hops`
+    // vector; an FE that can't walk DNSSEC must call
+    // email_recovery_submit_dkim_leaf_via_doh instead.
+    EmptyDkimLeafHops;
     NoDkimLeafExpected;
     AddressMismatch;
     SubjectNotSigned;
@@ -1530,6 +1545,12 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
     email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    // DoH-fallback sibling of email_recovery_submit_dkim_leaf, called
+    // with just the nonce when the FE can't walk a fully-signed DNSSEC
+    // resolution for the leaf (the DKIM record CNAMEs into an unsigned
+    // zone). The canister resolves the DKIM key over its own
+    // allowlist-gated DoH path.
+    email_recovery_submit_dkim_leaf_via_doh : (EmailRecoverySubmitDkimLeafViaDohArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 

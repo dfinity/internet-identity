@@ -2,7 +2,7 @@
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
-    /** Command the user ran in their terminal (e.g. `icp identity link ii`). */
+    /** Command the user ran in their terminal (e.g. `icp identity link web`). */
     command: string;
     /** Progress line under the command. */
     progressLine?: string;
