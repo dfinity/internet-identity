@@ -81,6 +81,21 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
+    <Tooltip
+      label={$t`You have reached the maximum number of passkeys`}
+      hidden={maxPasskeysReached !== true}
+    >
+      <button
+        class="btn btn-primary btn-xl h-14"
+        onclick={continueWithPasskey}
+        disabled={!isPasskeySupported ||
+          authenticatingProviderId !== undefined ||
+          maxPasskeysReached}
+      >
+        <PasskeyIcon />
+        <span>{$t`Continue with passkey`}</span>
+      </button>
+    </Tooltip>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider (provider.issuer)}
         {@const name = provider.name}
@@ -126,21 +141,6 @@
         <SsoIcon class="size-6" />
       </button>
     </div>
-    <Tooltip
-      label={$t`You have reached the maximum number of passkeys`}
-      hidden={maxPasskeysReached !== true}
-    >
-      <button
-        class="btn btn-secondary btn-xl"
-        onclick={continueWithPasskey}
-        disabled={!isPasskeySupported ||
-          authenticatingProviderId !== undefined ||
-          maxPasskeysReached}
-      >
-        <PasskeyIcon />
-        <span>{$t`Continue with passkey`}</span>
-      </button>
-    </Tooltip>
   </div>
 </div>
 
