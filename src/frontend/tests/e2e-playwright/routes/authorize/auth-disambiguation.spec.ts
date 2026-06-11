@@ -46,10 +46,12 @@ test.describe("AuthWizardView heading and subtitle", () => {
         .click();
       await expect(authPage.getByRole("dialog")).toBeVisible();
 
-      // Sign-up dialog must NOT show the "Already have an identity?" footer
+      // At /authorize the picker lives inside an AuthPanel, so the sign-up
+      // dialog keeps the reverse "Already have an identity?" toggle — the
+      // user can switch back to signing in without closing the dialog.
       await expect(
         authPage.getByText("Already have an identity?"),
-      ).toBeHidden();
+      ).toBeVisible();
 
       await authPage.getByRole("button", { name: "Close" }).click();
       await expect(authPage.getByRole("dialog")).toBeHidden();
