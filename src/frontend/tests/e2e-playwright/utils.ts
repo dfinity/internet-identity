@@ -283,6 +283,20 @@ export const openIiTab = async (page: Page): Promise<Page> => {
   return await pagePromise;
 };
 
+// HoldToConfirm requires a sustained press. Dispatching `mousedown` directly
+// bypasses Playwright's input-device emulation (which differs across desktop
+// and mobile contexts) — the component's listener fires on any synthetic
+// event. The controller releases itself at the 2500ms duration, so no
+// matching mouseup is needed.
+export const holdToConfirm = async (page: Page): Promise<void> => {
+  await page
+    .getByRole("button", { name: "Hold to confirm" })
+    .dispatchEvent("mousedown");
+  await page
+    .getByRole("heading", { level: 1, name: "Enter the code" })
+    .waitFor();
+};
+
 /**
  * Waits for nth message to appear in test app
  */
