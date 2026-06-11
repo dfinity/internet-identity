@@ -117,11 +117,13 @@
             >
               {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
-              {:else if provider.logo}
-                <div class="size-5">
-                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
-                  {@html provider.logo}
-                </div>
+              {:else}
+                {#if provider.logo}
+                  <div class="size-5">
+                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
+                    {@html provider.logo}
+                  </div>
+                {/if}
                 <span>{name}</span>
               {/if}
             </button>
