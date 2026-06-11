@@ -32,11 +32,11 @@ open_prs=$(gh api --paginate "repos/${REPO}/pulls?state=open&per_page=100" \
 # Group runs by (pr_number, head_sha). For runs with empty pull_requests[],
 # fall back to matching head_sha against the open-PR list.
 grouped=$(jq -n \
-  --slurpfile runs <(echo "$runs") \
-  --slurpfile prs <(echo "$open_prs") \
+  --slurpfile runs_json <(printf '%s' "$runs") \
+  --slurpfile prs_json <(printf '%s' "$open_prs") \
   '
-  ($runs[0]) as $runs |
-  ($prs[0]) as $prs |
+  ($runs_json[0]) as $runs |
+  ($prs_json[0]) as $prs |
   ($prs | map({key: .head_sha, value: .}) | from_entries) as $sha_map |
   [
     $runs[] |
