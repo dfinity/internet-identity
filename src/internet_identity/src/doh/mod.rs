@@ -586,22 +586,6 @@ mod tests {
     }
 
     #[test]
-    fn max_cache_age_is_capped() {
-        // Asking for 999_999s caps at MAX_CACHE_AGE_SECS (24h).
-        install_config(&["example.com"], Some(999_999));
-        reset_cache();
-        set_mock(&agreeing_dkim());
-        set_now(0);
-
-        let _ = fetch("x._domainkey.example.com", "example.com");
-
-        // Day after the cap (24h+1s): cache must have expired.
-        set_now(types::MAX_CACHE_AGE_SECS + 1);
-        let _ = fetch("x._domainkey.example.com", "example.com");
-        assert_eq!(call_count(), 2, "cache must respect MAX_CACHE_AGE_SECS");
-    }
-
-    #[test]
     fn rejects_name_outside_registered_domain() {
         install_config(&["gmail.com"], None);
         reset_cache();

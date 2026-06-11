@@ -67,11 +67,6 @@ pub const QUORUM_THRESHOLD: usize = 3;
 /// flow's expected duration.
 pub const DEFAULT_CACHE_AGE_SECS: u64 = 3600;
 
-/// Hard cap on `DohConfig.max_cache_age_secs`. Stale keys can break
-/// recovery for users mid-flow when a provider rotates; the cap keeps
-/// "stuck cache" from being the failure mode.
-pub const MAX_CACHE_AGE_SECS: u64 = 24 * 3600;
-
 /// All the ways the DoH path can fail. The verifier collapses these
 /// into a single fail-reason variant up the call stack; the granular
 /// shape is for diagnostics and tests.
@@ -85,8 +80,8 @@ pub enum DohError {
     AllProvidersFailed,
     /// Too many concurrent verifications for the same domain piled up
     /// behind one in-flight fetch: the dedup waiter queue hit its cap, so
-    /// this caller was turned away instead of enqueued (see the cache's
-    /// `with_max_waiters`). Deliberately distinct from
+    /// this caller was turned away instead of enqueued (the cache's
+    /// `max_waiters`). Deliberately distinct from
     /// [`Self::AllProvidersFailed`] — which means *this* caller's own
     /// five-provider fan-out came back empty — so the two can be told apart
     /// in diagnostics: a spike of this variant points at a concurrency
@@ -179,11 +174,6 @@ mod tests {
         // 3-of-5 is a strict majority. If we accidentally relax to
         // 2-of-5, two split-bucket factions could each claim "quorum".
         assert!(QUORUM_THRESHOLD * 2 > PROVIDERS.len());
-    }
-
-    #[test]
-    fn cache_age_cap_is_one_day() {
-        assert_eq!(MAX_CACHE_AGE_SECS, 86_400);
     }
 
     #[test]

@@ -32,20 +32,20 @@
 //!
 //! ## Knobs for DKIM email recovery
 //!
-//! - **`ttl`** is per-fetch, from the deploy-arg `max_cache_age_secs`
-//!   (default 1 h, capped 24 h) — passed by `fetch_txt`, not fixed here.
-//!   It is a canister-side lifetime, **not** the record's DNS TTL: the
-//!   `transform` strips the TTL (it decrements per second, so replicas
-//!   would disagree and break outcall consensus), and a DKIM/DMARC record
-//!   carries no expiry of its own, so there is no record-derived window to
-//!   honour.
-//! - **Stale window ([`DOH_STALE_SECS`], 10 min).** A cached answer keeps
-//!   being served for a short window past its TTL while a refresh is
-//!   retried, so a transient DoH/quorum blip doesn't fail an in-progress
-//!   recovery (stale-while-revalidate / stale-if-error). The window is
-//!   deliberately short: serving a *stale* DKIM key trusts a possibly-
-//!   rotated key a little longer, and 10 min is negligible against DNS
-//!   propagation / selector-overlap while still riding out a brief outage.
+//! - **`fresh_for`** is the cache's freshness window, from the deploy-arg
+//!   `max_cache_age_secs` (default 1 h when unset; the operator value is used
+//!   verbatim), set on the cache in `new_doh_cache`. It is a canister-side
+//!   lifetime, **not** the record's DNS TTL: the `transform` strips the TTL
+//!   (it decrements per second, so replicas would disagree and break outcall
+//!   consensus), and a DKIM/DMARC record carries no expiry of its own, so
+//!   there is no record-derived window to honour.
+//! - **Stale window ([`DOH_STALE_SECS`], 30 min).** A cached answer keeps
+//!   being served past its TTL while a refresh is retried, so a transient
+//!   DoH/quorum blip doesn't fail an in-progress recovery (stale-while-
+//!   revalidate / stale-if-error). Sized to the 30-min challenge TTL so a
+//!   recovery in flight can ride out an outage for its whole life; the
+//!   security cost — trusting a possibly-rotated DKIM key up to 30 min
+//!   longer — is negligible against DKIM's weeks-long rotation cadence.
 //! - **Retry backoff ([`DOH_RETRY_BASE_SECS`] × [`DOH_RETRY_MULTIPLIER`]).**
 //!   A *transient* failed fetch debounces the five-provider fan-out (1 min,
 //!   then 2, 4, …, reset on success) instead of re-firing on every message.
@@ -59,8 +59,8 @@
 
 use std::future::Future;
 
-use super::types::{DohError, DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
-use crate::single_flight_cache::{RetryBackoff, SingleFlightCache};
+use super::types::{DohError, DEFAULT_CACHE_AGE_SECS};
+use crate::single_flight_cache::{CacheConfig, RetryBackoff, SingleFlightCache};
 
 /// A cached DoH answer: the TXT-record bytes, or a definitive "no such
 /// record" verdict. Both are stable, shareable answers — see the module
@@ -76,9 +76,11 @@ pub enum DohRecord {
 /// answer, not a failure (see the module docs).
 pub type DohCache = SingleFlightCache<String, DohRecord, DohError>;
 
-/// Serve a cached answer up to 10 min past its TTL while refreshing
-/// (stale-while-revalidate). Short on purpose — see the module docs.
-pub const DOH_STALE_SECS: u64 = 600;
+/// Serve a cached answer up to 30 min past its TTL while refreshing
+/// (stale-while-revalidate / stale-if-error). Matches the 30-min challenge
+/// TTL, so a recovery in flight can ride out a DoH outage for its whole life
+/// — see the module docs.
+pub const DOH_STALE_SECS: u64 = 1800;
 
 /// First transient failed fetch waits this long before the next attempt.
 pub const DOH_RETRY_BASE_SECS: u64 = 60;
@@ -90,18 +92,32 @@ pub const DOH_RETRY_MULTIPLIER: u64 = 2;
 pub const DOH_MAX_ENTRIES: usize = 256;
 
 /// Cap on callbacks queued behind one in-flight fetch for a single FQDN.
-/// Over it a caller gets `QueueFull` (transient, retry past the burst). The
-/// key space is allowlist-bounded, so this is generous headroom for a
-/// concurrency spike on one popular domain.
-pub const DOH_MAX_WAITERS: usize = 32;
+/// Over it a caller gets `QueueFull` (transient, retry past the burst).
+///
+/// Sized for availability: a burst of recoveries for one popular provider
+/// (Gmail) that lands in the brief window while its key is being (re)fetched
+/// all joins this one queue, so the cap must clear a realistic spike. It's
+/// also bounded *above* by the per-message instruction limit — the queue
+/// drains in a single execution and each callback runs a full DKIM verify —
+/// so this sits comfortably between "a legitimate crowd can't hit it" and
+/// "the drain can't blow the instruction ceiling" (headroom is low-thousands
+/// of verifies).
+pub const DOH_MAX_WAITERS: usize = 256;
+
+/// Take over an in-flight fetch whose owner trapped after the outcall once
+/// it's this old. Far longer than a healthy 5-provider fan-out (a few
+/// seconds), so a live fetch is never abandoned; short enough that a wedged
+/// FQDN — which would otherwise block every verification for that domain
+/// until the entry dies — recovers within a retry or two.
+pub const DOH_ABANDON_FILL_AFTER_SECS: u64 = 120;
 
 /// Construct the DoH cache around its shared `fill` (the five-provider
 /// fan-out for one FQDN, defined in the parent module where the outcall
 /// plumbing lives). The freshness window (`fresh_for`) is the deploy arg
-/// `max_cache_age_secs` (default 1 h, capped 24 h), read here so the cache
-/// owns all its policy. Config only changes on upgrade, which wipes this heap
-/// cache, so the value is stable for the cache's lifetime; `None` falls back
-/// to the default.
+/// `max_cache_age_secs` (default 1 h when unset; the operator-chosen value is
+/// used verbatim), read here so the cache owns all its policy. Config only
+/// changes on upgrade, which wipes this heap cache, so the value is stable for
+/// the cache's lifetime.
 pub fn new_doh_cache<Fut>(fill: impl Fn(String) -> Fut + 'static) -> DohCache
 where
     Fut: Future<Output = Result<DohRecord, DohError>> + 'static,
@@ -109,12 +125,16 @@ where
     let fresh_for = crate::state::persistent_state(|p| {
         p.doh_config.as_ref().and_then(|c| c.max_cache_age_secs)
     })
-    .unwrap_or(DEFAULT_CACHE_AGE_SECS)
-    .min(MAX_CACHE_AGE_SECS);
-    SingleFlightCache::new(fill)
-        .with_fresh_for(fresh_for)
-        .with_stale_for(DOH_STALE_SECS)
-        .with_max_entries(DOH_MAX_ENTRIES)
-        .with_max_waiters(DOH_MAX_WAITERS)
-        .with_retry_backoff(RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER))
+    .unwrap_or(DEFAULT_CACHE_AGE_SECS);
+    SingleFlightCache::new(
+        fill,
+        CacheConfig {
+            fresh_for,
+            stale_for: DOH_STALE_SECS,
+            max_entries: DOH_MAX_ENTRIES,
+            max_waiters: DOH_MAX_WAITERS,
+            backoff: RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER),
+            abandon_fill_after: DOH_ABANDON_FILL_AFTER_SECS,
+        },
+    )
 }
