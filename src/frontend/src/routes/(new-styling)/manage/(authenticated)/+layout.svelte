@@ -454,11 +454,9 @@
       >
         {authDialogMode === "signup" ? $t`Add a new identity` : $t`Sign in`}
       </h1>
-      {#if authDialogMode === "signin"}
-        <p class="text-text-secondary mb-6 self-start text-sm">
-          {$t`Choose method to continue`}
-        </p>
-      {/if}
+      <p class="text-text-secondary mb-6 self-start text-sm">
+        {$t`Choose method to continue`}
+      </p>
     </AuthWizard>
   </Dialog>
 {/if}
