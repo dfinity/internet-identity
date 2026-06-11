@@ -8,11 +8,12 @@
 //! flurry of mail from one sender triggers a single five-provider fan-out,
 //! and is heap-only — losing it on upgrade is fine, we just refetch.
 //!
-//! `super::fetch_txt` drives it through
-//! [`with_value`](crate::single_flight_cache::with_value), which dedups the
-//! fan-out and delivers the result to a callback once the detached fill
-//! lands (see that module for the IC reply-routing reason it's push, not
-//! blocking).
+//! `super::fetch_txt` reads it through
+//! [`get`](crate::single_flight_cache::get), which dedups the fan-out and
+//! answers immediately — [`Ready`](crate::single_flight_cache::Cached::Ready)
+//! with the record, or [`Pending`](crate::single_flight_cache::Cached::Pending)
+//! while a detached fetch is in flight (see that module for the IC
+//! reply-routing reason it's poll, not blocking).
 //!
 //! ## What counts as a cacheable answer vs. a failure
 //!
@@ -91,19 +92,6 @@ pub const DOH_RETRY_MULTIPLIER: u64 = 2;
 /// Hard cap on cached FQDNs; over it, the least-recently-used is evicted.
 pub const DOH_MAX_ENTRIES: usize = 256;
 
-/// Cap on callbacks queued behind one in-flight fetch for a single FQDN.
-/// Over it a caller gets `QueueFull` (transient, retry past the burst).
-///
-/// Sized for availability: a burst of recoveries for one popular provider
-/// (Gmail) that lands in the brief window while its key is being (re)fetched
-/// all joins this one queue, so the cap must clear a realistic spike. It's
-/// also bounded *above* by the per-message instruction limit — the queue
-/// drains in a single execution and each callback runs a full DKIM verify —
-/// so this sits comfortably between "a legitimate crowd can't hit it" and
-/// "the drain can't blow the instruction ceiling" (headroom is low-thousands
-/// of verifies).
-pub const DOH_MAX_WAITERS: usize = 256;
-
 /// Take over an in-flight fetch whose owner trapped after the outcall once
 /// it's this old. Far longer than a healthy 5-provider fan-out (a few
 /// seconds), so a live fetch is never abandoned; short enough that a wedged
@@ -132,7 +120,6 @@ where
             fresh_for,
             stale_for: DOH_STALE_SECS,
             max_entries: DOH_MAX_ENTRIES,
-            max_waiters: DOH_MAX_WAITERS,
             backoff: RetryBackoff::new(DOH_RETRY_BASE_SECS, DOH_RETRY_MULTIPLIER),
             abandon_fill_after: DOH_ABANDON_FILL_AFTER_SECS,
         },

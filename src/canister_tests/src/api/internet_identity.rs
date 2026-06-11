@@ -652,19 +652,19 @@ pub fn email_recovery_submit_dkim_leaf(
     .map(|(x,)| x)
 }
 
-pub fn email_recovery_submit_dkim_leaf_via_doh(
+pub fn email_recovery_resolve_via_doh(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
 ) -> Result<Result<(), types::email_recovery::EmailRecoveryError>, RejectResponse> {
-    let arg = types::email_recovery::EmailRecoverySubmitDkimLeafViaDohArg {
+    let arg = types::email_recovery::EmailRecoveryResolveViaDohArg {
         nonce: nonce.to_string(),
     };
     call_candid(
         env,
         canister_id,
         RawEffectivePrincipal::None,
-        "email_recovery_submit_dkim_leaf_via_doh",
+        "email_recovery_resolve_via_doh",
         (arg,),
     )
     .map(|(x,)| x)
