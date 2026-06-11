@@ -288,9 +288,7 @@ export const openIiTab = async (page: Page): Promise<Page> => {
 // Playwright's input-device emulation differs across contexts, but the
 // component's mousedown listener fires from any synthetic event. The
 // controller releases itself when it reaches the 2500ms duration, so no
-// matching mouseup is needed. After completion the wizard waits 250ms then
-// runs a 380ms slide to the code-entry step; the heading wait absorbs both
-// so the caller doesn't race the transition.
+// matching mouseup is needed.
 export const holdToConfirm = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
     const button = document.querySelector<HTMLButtonElement>(
@@ -304,9 +302,6 @@ export const holdToConfirm = async (page: Page): Promise<void> => {
   await page
     .getByRole("heading", { level: 1, name: "Enter the code" })
     .waitFor();
-  // Slide animation is 380ms; let it settle so the first .fill() doesn't
-  // race with the inputs still moving.
-  await page.waitForTimeout(400);
 };
 
 /**
