@@ -137,6 +137,11 @@
     dialogRef?.showModal();
     dialogRef?.setAttribute("data-visible", "true");
 
+    // Only the outermost dialog owns the global keyboard-overlay state; a
+    // nested (passthrough) dialog has no <dialog> of its own, and its unmount
+    // cleanup would otherwise flip the ancestor's overlay handling back off.
+    if (nested) return;
+
     // Keep the dialog above the software keyboard when it opens:
     // - Most browsers: the VirtualKeyboard API handles this natively.
     // - Safari/iOS: no API, so we measure the keyboard height ourselves
