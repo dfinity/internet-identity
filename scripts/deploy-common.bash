@@ -1022,9 +1022,7 @@ encode_install_arg_bin() {
 # -------------------------
 # Routes the install/upgrade through the proxy canister at PROXY_CANISTER_ID,
 # which is the legacy staging wallet reinstalled with the icp-cli proxy
-# WASM (see
-# https://cli.internetcomputer.org/0.2/migration/from-dfx/#replacing-the-dfx-wallet-canister).
-# The proxy keeps the wallet's canister ID — and therefore its
+# WASM. The proxy keeps the wallet's canister ID — and therefore its
 # controllership of the staging canisters — but now exposes the `proxy`
 # method icp-cli's `--proxy` expects.
 #
