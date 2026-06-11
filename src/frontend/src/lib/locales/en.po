@@ -97,9 +97,6 @@ msgstr "<0>Seamless passkey integration:</0> We continue to embrace passkeys as 
 msgid "A 24-word phrase you write down and keep offline."
 msgstr "A 24-word phrase you write down and keep offline."
 
-msgid "A few things could be going on:"
-msgstr "A few things could be going on:"
-
 msgid "About"
 msgstr "About"
 
@@ -142,6 +139,9 @@ msgstr "Add access method"
 msgid "Add another account"
 msgstr "Add another account"
 
+msgid "Add another identity"
+msgstr "Add another identity"
+
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Add another method or sign in via recovery to remove"
 
@@ -153,9 +153,6 @@ msgstr "Add another passkey"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Add another way to sign in with a passkey or third-party account for secure access."
-
-msgid "Add identity"
-msgstr "Add identity"
 
 msgid "Add new"
 msgstr "Add new"
@@ -177,12 +174,6 @@ msgstr "Allow to access this info"
 
 msgid "Allowing access"
 msgstr "Allowing access"
-
-msgid "Already connected"
-msgstr "Already connected"
-
-msgid "Already have an identity?"
-msgstr "Already have an identity?"
 
 msgid "Already signed-in"
 msgstr "Already signed-in"
@@ -262,6 +253,9 @@ msgstr "Choose an account"
 msgid "choose language to continue"
 msgstr "choose language to continue"
 
+msgid "Choose method"
+msgstr "Choose method"
+
 msgid "Choose method to continue"
 msgstr "Choose method to continue"
 
@@ -316,9 +310,6 @@ msgstr "Confirmation code"
 msgid "Confirming..."
 msgstr "Confirming..."
 
-msgid "Connected"
-msgstr "Connected"
-
 msgid "Connection closed"
 msgstr "Connection closed"
 
@@ -331,9 +322,6 @@ msgstr "Continue on another device"
 msgid "Continue on your new device"
 msgstr "Continue on your new device"
 
-msgid "Continue to {dappName}"
-msgstr "Continue to {dappName}"
-
 msgid "Continue with {name}"
 msgstr "Continue with {name}"
 
@@ -343,14 +331,8 @@ msgstr "Continue with passkey"
 msgid "Continue with SSO"
 msgstr "Continue with SSO"
 
-msgid "Copied"
-msgstr "Copied"
-
 msgid "Copied to clipboard"
 msgstr "Copied to clipboard"
-
-msgid "Copy error details"
-msgstr "Copy error details"
 
 msgid "Copy install command: {command}"
 msgstr "Copy install command: {command}"
@@ -367,14 +349,8 @@ msgstr "Couldn't load SSO settings from {domainInput}. Ask your SSO admin to che
 msgid "Create account"
 msgstr "Create account"
 
-msgid "Create an Identity"
-msgstr "Create an Identity"
-
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
 msgstr "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
-
-msgid "Create another identity"
-msgstr "Create another identity"
 
 msgid "Create identity"
 msgstr "Create identity"
@@ -382,14 +358,8 @@ msgstr "Create identity"
 msgid "Create new identity"
 msgstr "Create new identity"
 
-msgid "Create one in seconds."
-msgstr "Create one in seconds."
-
 msgid "Create passkey"
 msgstr "Create passkey"
-
-msgid "Create your Identity"
-msgstr "Create your Identity"
 
 msgid "Created {0}"
 msgstr "Created {0}"
@@ -417,9 +387,6 @@ msgstr "Currently signed in with this account"
 
 msgid "Currently signed in with this passkey"
 msgstr "Currently signed in with this passkey"
-
-msgid "Currently signed in with this recovery email"
-msgstr "Currently signed in with this recovery email"
 
 msgid "Currently signed in with this recovery phrase"
 msgstr "Currently signed in with this recovery phrase"
@@ -453,9 +420,6 @@ msgstr "Edit {name}"
 
 msgid "Edit account"
 msgstr "Edit account"
-
-msgid "Edit identities"
-msgstr "Edit identities"
 
 msgid "Email address"
 msgstr "Email address"
@@ -626,9 +590,6 @@ msgstr "Identity removed"
 msgid "Identity upgraded."
 msgstr "Identity upgraded."
 
-msgid "If this keeps happening, copy these details and include them in a"
-msgstr "If this keeps happening, copy these details and include them in a"
-
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 
@@ -722,9 +683,6 @@ msgstr "It won't be removed from your device or password manager."
 msgid "Keep it secret"
 msgstr "Keep it secret"
 
-msgid "Keep your access and recovery methods up to date."
-msgstr "Keep your access and recovery methods up to date."
-
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
 msgstr "Kept on a physical key. Authenticate on supported devices via tap/insert."
 
@@ -791,9 +749,6 @@ msgstr "Manage your identities and stay in control of your apps and websites wit
 msgid "Manage your identity"
 msgstr "Manage your identity"
 
-msgid "Manage your Identity"
-msgstr "Manage your Identity"
-
 msgid "Manage your Internet Identity"
 msgstr "Manage your Internet Identity"
 
@@ -830,9 +785,6 @@ msgstr "Name your identity"
 msgid "Name:"
 msgstr "Name:"
 
-msgid "New to Internet Identity?"
-msgstr "New to Internet Identity?"
-
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 
@@ -850,9 +802,6 @@ msgstr "No. Your face ID or fingerprint is only used to create or unlock your pa
 
 msgid "Not activated"
 msgstr "Not activated"
-
-msgid "Not connected yet"
-msgstr "Not connected yet"
 
 msgid "Not upgraded"
 msgstr "Not upgraded"
@@ -1094,17 +1043,11 @@ msgstr "Session timed out"
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
-msgid "Set up a new identity."
-msgstr "Set up a new identity."
-
 msgid "Set up recovery email"
 msgstr "Set up recovery email"
 
 msgid "Set up recovery phrase"
 msgstr "Set up recovery phrase"
-
-msgid "Set up your private, passwordless identity."
-msgstr "Set up your private, passwordless identity."
 
 msgid "Settings"
 msgstr "Settings"
@@ -1124,32 +1067,20 @@ msgstr "Sign in again to continue where you left off."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Sign in by sending a signed email from your inbox."
 
+msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
+msgstr "Sign in or create an identity to access apps without passwords or sharing personal data."
+
 msgid "Sign in there."
 msgstr "Sign in there."
 
-msgid "Sign in to Internet Identity"
-msgstr "Sign in to Internet Identity"
+msgid "Sign in to manage your identity"
+msgstr "Sign in to manage your identity"
 
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"
 
-msgid "Sign in with {name}"
-msgstr "Sign in with {name}"
-
 msgid "Sign in with another identity"
 msgstr "Sign in with another identity"
-
-msgid "Sign in with another method before changing this email"
-msgstr "Sign in with another method before changing this email"
-
-msgid "Sign in with another method before removing this email"
-msgstr "Sign in with another method before removing this email"
-
-msgid "Sign in with passkey"
-msgstr "Sign in with passkey"
-
-msgid "Sign in with SSO"
-msgstr "Sign in with SSO"
 
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Sign in with your {displayName} account from any device."
@@ -1168,18 +1099,6 @@ msgstr "Sign out from this device"
 
 msgid "Sign out to remove"
 msgstr "Sign out to remove"
-
-msgid "Sign up"
-msgstr "Sign up"
-
-msgid "Sign up with {name}"
-msgstr "Sign up with {name}"
-
-msgid "Sign up with passkey"
-msgstr "Sign up with passkey"
-
-msgid "Sign up with SSO"
-msgstr "Sign up with SSO"
 
 msgid "Sign-in"
 msgstr "Sign-in"
@@ -1278,9 +1197,6 @@ msgstr "Successfully switched access method"
 msgid "Support"
 msgstr "Support"
 
-msgid "support request"
-msgstr "support request"
-
 msgid "Switch"
 msgstr "Switch"
 
@@ -1289,9 +1205,6 @@ msgstr "Switch access method"
 
 msgid "Switch identity"
 msgstr "Switch identity"
-
-msgid "Switch method"
-msgstr "Switch method"
 
 msgid "Switch to another method before removing"
 msgstr "Switch to another method before removing"
@@ -1335,9 +1248,6 @@ msgstr "The CLI gets its own account, separate from your other apps."
 msgid "The CLI sign-in couldn't be completed. Check the CLI for details."
 msgstr "The CLI sign-in couldn't be completed. Check the CLI for details."
 
-msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
-msgstr "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
-
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
 msgstr "The email needs to come from the address above directly. Aliases and forwarders won't work."
 
@@ -1353,15 +1263,6 @@ msgstr "The phrase was entered correctly but belongs to a product other than Int
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 
-msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
-msgstr "This {resolvedProviderName} account is already connected to an Internet Identity."
-
-msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
-msgstr "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
-
-msgid "This account is already attached to your identity. Your active access method will be switched to it."
-msgstr "This account is already attached to your identity. Your active access method will be switched to it."
-
 msgid "This app has moved to the new Internet Identity"
 msgstr "This app has moved to the new Internet Identity"
 
@@ -1376,9 +1277,6 @@ msgstr "This is now the default method used to authenticate moving forward on th
 
 msgid "This is the access method you're currently signed in with."
 msgstr "This is the access method you're currently signed in with."
-
-msgid "This is the recovery method you're currently signed in with."
-msgstr "This is the recovery method you're currently signed in with."
 
 msgid "This legacy passkey is no longer usable and should be removed."
 msgstr "This legacy passkey is no longer usable and should be removed."
@@ -1410,8 +1308,11 @@ msgstr "To accept email from a domain we either need DNSSEC at its apex (so we c
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "To confirm it's you, enter below code on your <0>existing device</0>."
 
-msgid "to continue to {dappName}"
-msgstr "to continue to {dappName}"
+msgid "to continue with <0>{application}</0>"
+msgstr "to continue with <0>{application}</0>"
+
+msgid "to continue with this app"
+msgstr "to continue with this app"
 
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "To continue, create a passkey to secure your identity and simplify future sign-ins."
@@ -1512,12 +1413,6 @@ msgstr "Upgrading identity..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 
-msgid "Use a different method"
-msgstr "Use a different method"
-
-msgid "Use a passkey or familiar provider."
-msgstr "Use a passkey or familiar provider."
-
 msgid "Use existing identity"
 msgstr "Use existing identity"
 
@@ -1592,9 +1487,6 @@ msgstr "What's your name?"
 
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you (without ever sharing your personal info or a password)."
 msgstr "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you (without ever sharing your personal info or a password)."
-
-msgid "Why am I seeing this?"
-msgstr "Why am I seeing this?"
 
 msgid "Why isn't this supported?"
 msgstr "Why isn't this supported?"
@@ -1671,12 +1563,6 @@ msgstr "You may close this page."
 msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
 msgstr "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
 
-msgid "You signed up before with a different access method."
-msgstr "You signed up before with a different access method."
-
-msgid "You unlinked this {resolvedProviderName} account from your identity."
-msgstr "You unlinked this {resolvedProviderName} account from your identity."
-
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 
@@ -1700,9 +1586,6 @@ msgstr "You're signed in"
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "You're signing in as <0>{name}</0>."
-
-msgid "You've never used this {resolvedProviderName} account with Internet Identity."
-msgstr "You've never used this {resolvedProviderName} account with Internet Identity."
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
