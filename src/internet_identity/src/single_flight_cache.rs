@@ -35,11 +35,13 @@
 //! ## What a `get` resolves to
 //!
 //! - **Fresh value** → `Ready(v)`, no fill.
-//! - **Fill in flight** (cold, or refreshing a stale value) → `Pending`. We
-//!   want the fresh result, so we wait for it via the next poll rather than
-//!   serving stale early.
-//! - **Refresh/refill due, none in flight** → spawn the fill, `Pending`. Any
-//!   stale value is retained for stale-if-error.
+//! - **Refresh/refill due, none in flight** → spawn the fill; serve the stale
+//!   value now if one exists (`Ready(stale)`, stale-while-revalidate), else
+//!   `Pending`. The stale value also stays cached for stale-if-error.
+//! - **Fill in flight** (cold, or a refill already spawned by an earlier
+//!   `get`) → `Ready(stale)` if a stale value exists (served throughout the
+//!   revalidation), else `Pending` (a cold fill has nothing yet). Either way
+//!   no second fill is spawned — the in-flight marker dedups it.
 //! - **Failed fill within backoff** → `Ready(stale)` if a last-good value
 //!   exists (stale-if-error), else `Pending` (poll out the backoff).
 //!
@@ -218,7 +220,7 @@ impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
             return if inflight_fresh {
                 Lookup::Pending
             } else {
-                Lookup::StartFill(self.claim(key, now))
+                Lookup::StartFill(self.claim(key, now), None)
             };
         };
 
@@ -232,25 +234,22 @@ impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
                 return Lookup::Ready(v.clone());
             }
         }
-        // A fill is in flight (cold, or refreshing a stale value). Wait for
-        // the fresh result via the next poll rather than serving stale early.
-        if inflight_fresh {
-            return Lookup::Pending;
-        }
-        if is_throttled {
-            // A recent fill failed and we're backing off. Serve the last-good
-            // value if we have one (stale-if-error); otherwise poll it out.
-            return match value {
-                Some(v) => {
-                    self.touch(key);
-                    Lookup::Ready(v)
-                }
-                None => Lookup::Pending,
+        // A fill is in flight (cold, or a refill spawned by an earlier get), or
+        // a recent fill failed and we're backing off. Either way we don't start
+        // a fill here; serve the last-good value if we have one — stale-while-
+        // revalidate while the refill runs, stale-if-error during backoff —
+        // otherwise poll again (a cold fill has nothing to serve yet).
+        if inflight_fresh || is_throttled {
+            let Some(v) = value else {
+                return Lookup::Pending;
             };
+            self.touch(key);
+            return Lookup::Ready(v);
         }
-        // Refresh/refill due. Any stale value stays in `entries` for
-        // stale-if-error; claim the fill.
-        Lookup::StartFill(self.claim(key, now))
+        // Refresh/refill due. Claim the fill and hand back any stale value so
+        // the caller serves it now (stale-while-revalidate); it also stays in
+        // `entries` for stale-if-error if the refill fails.
+        Lookup::StartFill(self.claim(key, now), value)
     }
 
     /// Apply the outcome of the fill identified by `token`. `Ok` stores fresh
@@ -387,8 +386,10 @@ impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
 enum Lookup<V> {
     /// A servable value (fresh, or last-good while a failed fill backs off).
     Ready(V),
-    /// Nothing servable and no fill in flight; the holder owns the fill.
-    StartFill(FillToken),
+    /// No fill in flight; the holder owns the fill it must spawn. Carries any
+    /// stale value to serve meanwhile (stale-while-revalidate); `None` when
+    /// cold (nothing servable yet).
+    StartFill(FillToken, Option<V>),
     /// Nothing servable: a fill is in flight, or a failed fill is backing off
     /// with no value to serve. Poll again later.
     Pending,
@@ -428,9 +429,9 @@ where
         Lookup::Pending => Cached::Pending,
         // Spawn the fill once the cache borrow is released (`spawn_fill`
         // re-borrows it).
-        Lookup::StartFill(token) => {
+        Lookup::StartFill(token, value) => {
             spawn_fill(cache, key, token);
-            Cached::Pending
+            value.map_or(Cached::Pending, Cached::Ready)
         }
     }
 }
@@ -546,7 +547,7 @@ mod tests {
 
     fn expect_fill(state: Lookup<&'static str>) -> FillToken {
         match state {
-            Lookup::StartFill(token) => token,
+            Lookup::StartFill(token, _) => token,
             _ => panic!("expected StartFill"),
         }
     }
@@ -571,7 +572,7 @@ mod tests {
         let t = expect_fill(c.lookup(&"k", 0));
         c.complete_fill(&"k", t, Ok("v"), 0);
         // Stale, refresh due → StartFill, value retained for stale-if-error.
-        assert!(matches!(c.lookup(&"k", 120), Lookup::StartFill(_)));
+        assert!(matches!(c.lookup(&"k", 120), Lookup::StartFill(..)));
         assert!(c.entries.get("k").and_then(|e| e.value).is_some());
 
         let mut c = cache(CacheConfig {
@@ -582,7 +583,7 @@ mod tests {
         let t = expect_fill(c.lookup(&"k", 0));
         c.complete_fill(&"k", t, Ok("v"), 0);
         // Dead: evicted, fill path.
-        assert!(matches!(c.lookup(&"k", 150), Lookup::StartFill(_)));
+        assert!(matches!(c.lookup(&"k", 150), Lookup::StartFill(..)));
     }
 
     #[test]
@@ -593,9 +594,9 @@ mod tests {
     }
 
     #[test]
-    fn refreshing_stale_waits_for_fresh_not_served_early() {
-        // While a refill is in flight over a stale value, a concurrent get
-        // waits for the fresh result (Pending) rather than serving stale.
+    fn refreshing_stale_serves_stale_to_concurrent_get() {
+        // While a refill is in flight over a stale value, a concurrent get is
+        // served the stale value (stale-while-revalidate), not made to wait.
         let mut c = cache(CacheConfig {
             fresh_for: 100,
             stale_for: 1000,
@@ -604,7 +605,7 @@ mod tests {
         let t = expect_fill(c.lookup(&"k", 0));
         c.complete_fill(&"k", t, Ok("good"), 0);
         let _refill = expect_fill(c.lookup(&"k", 120)); // stale, refresh due → claim
-        assert!(matches!(c.lookup(&"k", 121), Lookup::Pending));
+        assert!(matches!(c.lookup(&"k", 121), Lookup::Ready("good")));
     }
 
     #[test]
@@ -621,7 +622,7 @@ mod tests {
                                                  // Within backoff: serve the OLD value, no fill (stale-if-error).
         assert!(matches!(c.lookup(&"k", 130), Lookup::Ready("good")));
         // After the backoff (base 60s): refresh due again.
-        assert!(matches!(c.lookup(&"k", 160), Lookup::StartFill(_)));
+        assert!(matches!(c.lookup(&"k", 160), Lookup::StartFill(..)));
     }
 
     #[test]
@@ -634,7 +635,7 @@ mod tests {
         let t = expect_fill(c.lookup(&"k", 0));
         c.complete_fill(&"k", t, Err(()), 0); // cold fill fails → marker, no value
         assert!(matches!(c.lookup(&"k", 30), Lookup::Pending)); // backing off, nothing to serve
-        assert!(matches!(c.lookup(&"k", 61), Lookup::StartFill(_)));
+        assert!(matches!(c.lookup(&"k", 61), Lookup::StartFill(..)));
     }
 
     #[test]
@@ -778,8 +779,11 @@ mod tests {
                         // Stale window (fresh_for 100, stale_for 50 → stale [100,150)).
         set_test_now(120);
         FILL_RESULT.with(|r| r.set(Ok(8)));
-        // Refresh due → spawn refill, wait for fresh (not served stale).
-        assert_eq!(get(&E2E, "k"), Cached::Pending);
+        // Refresh due → spawn refill and serve the stale value now
+        // (stale-while-revalidate). A concurrent poll while the refill runs is
+        // served the stale value too, and does not spawn a second fill.
+        assert_eq!(get(&E2E, "k"), Cached::Ready(7));
+        assert_eq!(get(&E2E, "k"), Cached::Ready(7));
         run_detached();
         assert_eq!(get(&E2E, "k"), Cached::Ready(8));
         assert_eq!(fill_count(), 2);
@@ -792,9 +796,10 @@ mod tests {
         run_detached(); // fresh 7 at t0
         set_test_now(120);
         FILL_RESULT.with(|r| r.set(Err("down")));
-        assert_eq!(get(&E2E, "k"), Cached::Pending); // refill due → spawn
+        // Refill due → spawn and serve stale 7 now (stale-while-revalidate).
+        assert_eq!(get(&E2E, "k"), Cached::Ready(7));
         run_detached(); // refill fails, keeps stale 7, parks backoff
-                        // Within backoff: serve the last-good value.
+                        // Within backoff: still serve the last-good value (stale-if-error).
         set_test_now(121);
         assert_eq!(get(&E2E, "k"), Cached::Ready(7));
     }

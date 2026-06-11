@@ -84,7 +84,7 @@ pub type DohCache = SingleFlightCache<String, DohRecord, DohError>;
 pub const DOH_STALE_SECS: u64 = 1800;
 
 /// First transient failed fetch waits this long before the next attempt.
-pub const DOH_RETRY_BASE_SECS: u64 = 60;
+pub const DOH_RETRY_BASE_SECS: u64 = 15;
 
 /// Each further consecutive transient failure multiplies the wait by this.
 pub const DOH_RETRY_MULTIPLIER: u64 = 2;
