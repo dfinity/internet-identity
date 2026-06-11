@@ -120,10 +120,12 @@
             {#if authenticatingProviderId === key}
               <ProgressRing />
             {:else}
-              <div class="size-5">
-                <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
-                {@html provider.logo}
-              </div>
+              {#if provider.logo}
+                <div class="size-5">
+                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
+                  {@html provider.logo}
+                </div>
+              {/if}
               <span>{name}</span>
             {/if}
           </button>
