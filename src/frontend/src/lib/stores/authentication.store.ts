@@ -25,14 +25,20 @@ export interface Authenticated {
     | { emailRecovery: { principal: Principal } };
 }
 
+// `agent`/`actor` are created once in `init()` and shared by the store;
+// `salt`/`nonce` are derived inside `set()` from `identity.getPrincipal()`.
+// Callers never supply any of the four, so flows yield this shape.
+export type AuthenticationResult = Omit<
+  Authenticated,
+  "agent" | "actor" | "salt" | "nonce"
+>;
+
 type AuthenticationStore = Readable<Authenticated | undefined> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
   }) => void;
-  set: (
-    value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
-  ) => Promise<void>;
+  set: (value: AuthenticationResult) => Promise<void>;
   reset: () => void;
 };
 
