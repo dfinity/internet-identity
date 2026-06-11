@@ -9,6 +9,7 @@
     RotateCcwIcon,
   } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   const host = typeof window === "undefined" ? "" : window.location.host;
 
@@ -154,9 +155,9 @@
             aria-hidden="true"
           />
           <p class="text-text-primary text-base font-semibold">
-            {$t`Both are on the`}
-            <span class="text-text-secondary">{host}</span>
-            {$t`domain.`}
+            <Trans>
+              Both are on the <span class="text-text-secondary">{host}</span> domain.
+            </Trans>
           </p>
         </li>
       </ul>
