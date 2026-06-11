@@ -460,16 +460,23 @@ mod tests {
         Outcome::NoAnswer
     }
 
-    fn agreeing_dkim() -> Vec<(&'static str, Outcome)> {
-        // Three provider responses agree, two disagree — quorum (3-of-
-        // 5) hits.
+    /// A mock where three providers agree on `bytes` and two fail — quorum
+    /// (3-of-5) hits on `bytes`. Lets a test publish a *different* record on a
+    /// refresh so it can tell the refreshed value apart from the stale one.
+    fn agreeing(bytes: &'static [u8]) -> Vec<(&'static str, Outcome)> {
         vec![
-            (PROVIDERS[0].url, ok(b"v=DKIM1; k=rsa; p=...")),
-            (PROVIDERS[1].url, ok(b"v=DKIM1; k=rsa; p=...")),
-            (PROVIDERS[2].url, ok(b"v=DKIM1; k=rsa; p=...")),
+            (PROVIDERS[0].url, ok(bytes)),
+            (PROVIDERS[1].url, ok(bytes)),
+            (PROVIDERS[2].url, ok(bytes)),
             (PROVIDERS[3].url, fail("network down")),
             (PROVIDERS[4].url, fail("403")),
         ]
+    }
+
+    fn agreeing_dkim() -> Vec<(&'static str, Outcome)> {
+        // Three provider responses agree, two disagree — quorum (3-of-
+        // 5) hits.
+        agreeing(b"v=DKIM1; k=rsa; p=...")
     }
 
     #[test]
@@ -519,16 +526,84 @@ mod tests {
     fn refetches_after_ttl_expires() {
         install_config(&["example.com"], Some(60));
         reset_cache();
-        set_mock(&agreeing_dkim());
+        set_mock(&agreeing(b"old key"));
         set_now(1_000);
 
-        let _ = fetch("x._domainkey.example.com", "example.com");
+        let r1 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r1, ready_txt(b"old key"));
         assert_eq!(call_count(), 1);
 
-        // Advance past the TTL — the cache should be cold again.
+        // The record rotates while the entry is cached.
+        set_mock(&agreeing(b"new key"));
+
+        // Past the TTL the value is stale, not gone: the fetch serves the
+        // stale value immediately (stale-while-revalidate) and spawns exactly
+        // one background refresh — it never blocks the caller on a fresh
+        // outcall. The stale value also stays cached for stale-if-error.
         set_now(1_000 + 60 + 1);
-        let _ = fetch("x._domainkey.example.com", "example.com");
-        assert_eq!(call_count(), 2, "should re-fetch after TTL");
+        let stale = fetch_txt("x._domainkey.example.com", "example.com").unwrap();
+        assert_eq!(stale, Cached::Ready(DohRecord::Txt(b"old key".to_vec())));
+        assert_eq!(
+            call_count(),
+            1,
+            "stale serve must not fan out synchronously"
+        );
+
+        // Draining the background refresh is the re-fetch: one fan-out, and it
+        // picks up the rotated record.
+        run_detached();
+        assert_eq!(
+            call_count(),
+            2,
+            "stale serve triggers exactly one background re-fetch"
+        );
+        let r3 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r3, ready_txt(b"new key"));
+        assert_eq!(
+            call_count(),
+            2,
+            "refreshed value is fresh, served without another outcall"
+        );
+    }
+
+    #[test]
+    fn serves_stale_through_a_transient_refresh_failure() {
+        // stale-if-error at the DoH layer: once a record is cached, a refresh
+        // that hits a transient quorum failure keeps serving the last-good
+        // value (and debounces the re-fetch) rather than failing an
+        // in-progress recovery — the whole point of the stale window.
+        install_config(&["example.com"], Some(60));
+        reset_cache();
+        set_mock(&agreeing(b"good key"));
+        set_now(1_000);
+
+        let r1 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r1, ready_txt(b"good key"));
+        assert_eq!(call_count(), 1);
+
+        // The next refresh can't reach quorum (five distinct answers).
+        set_mock(&[
+            (PROVIDERS[0].url, ok(b"a")),
+            (PROVIDERS[1].url, ok(b"b")),
+            (PROVIDERS[2].url, ok(b"c")),
+            (PROVIDERS[3].url, ok(b"d")),
+            (PROVIDERS[4].url, ok(b"e")),
+        ]);
+
+        // Past the TTL but inside the 30-min stale window: the stale value is
+        // served immediately and exactly one background refresh is spawned.
+        set_now(1_000 + 60 + 1);
+        let stale = fetch_txt("x._domainkey.example.com", "example.com").unwrap();
+        assert_eq!(stale, Cached::Ready(DohRecord::Txt(b"good key".to_vec())));
+        run_detached(); // the refresh fails transiently → backoff parked
+        assert_eq!(call_count(), 2);
+
+        // The failed refresh did not poison the entry: it still serves the
+        // last-good value, and the transient failure is debounced (no second
+        // fan-out while backing off).
+        let still = fetch_txt("x._domainkey.example.com", "example.com").unwrap();
+        assert_eq!(still, Cached::Ready(DohRecord::Txt(b"good key".to_vec())));
+        assert_eq!(call_count(), 2, "transient refresh failure is debounced");
     }
 
     #[test]
@@ -659,8 +734,25 @@ mod tests {
         assert_eq!(r2, Ok(Cached::Ready(DohRecord::NoAnswer)));
         assert_eq!(call_count(), 1, "NoAnswer is cached, not re-fetched");
 
-        // Past the TTL: the entry refreshes and picks up the new record.
+        // Past the TTL the NoAnswer is stale, not gone: it is still served
+        // immediately (stale-while-revalidate) while exactly one background
+        // refresh runs.
         set_now(1_000 + 3600 + 1);
+        let stale = fetch_txt("_dmarc.example.com", "example.com").unwrap();
+        assert_eq!(stale, Cached::Ready(DohRecord::NoAnswer));
+        assert_eq!(
+            call_count(),
+            1,
+            "stale NoAnswer serve must not fan out synchronously"
+        );
+
+        // Draining the background refresh picks up the now-published record.
+        run_detached();
+        assert_eq!(
+            call_count(),
+            2,
+            "stale serve triggers exactly one background re-fetch"
+        );
         let r3 = fetch("_dmarc.example.com", "example.com");
         assert_eq!(r3, ready_txt(b"v=DKIM1; k=rsa; p=..."));
         assert_eq!(call_count(), 2);

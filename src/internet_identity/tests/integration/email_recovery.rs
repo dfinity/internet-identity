@@ -960,6 +960,71 @@ fn full_setup_flow_binds_credential_to_anchor() {
         .expect("remove should succeed");
 }
 
+#[test]
+fn resolve_via_doh_is_a_no_op_once_terminal() {
+    // The FE poll loop calls `resolve_via_doh` on every tick while the status
+    // is `ResolvingDoh`. A late tick can land after a concurrent poll has
+    // already finished verification, so the method must be idempotent: once
+    // the entry is terminal it accepts silently (`Ok(())`) without re-running
+    // the verification or disturbing the stamped verdict. This pins that the
+    // poll model is safe to over-call.
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let challenge =
+        api::email_recovery_credential_prepare_add(&env, canister_id, p, id, dns_input())
+            .expect("prepare_add call failed")
+            .expect("prepare_add failed");
+
+    let signer = dkim_signer::TestSigner::new(TEST_DOMAIN, TEST_SELECTOR);
+    let now_secs = time(&env) / 1_000_000_000;
+    let signed = signer.sign_email(SignedEmailParams {
+        from: TEST_ADDRESS,
+        to: "register@id.ai",
+        subject: &challenge.nonce,
+        body: TEST_BODY,
+        timestamp: now_secs,
+    });
+    let dkim_txt = signer.public_txt_record();
+    let resp = api::smtp_request(&env, canister_id, &signed.request).expect("smtp_request call");
+    assert!(matches!(resp, SmtpResponse::Ok {}));
+
+    let status = drive_doh_resolution(&env, canister_id, &challenge.nonce, &dkim_txt);
+    assert!(
+        matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+        "expected RegistrationSucceeded, got {status:?}",
+    );
+
+    // Extra polls after the terminal verdict are accepted silently and leave
+    // the status untouched — no re-verification, no NonceUnknown.
+    for _ in 0..3 {
+        api::email_recovery_resolve_via_doh(&env, canister_id, &challenge.nonce)
+            .expect("resolve_via_doh call failed")
+            .expect("a post-terminal poll must be a silent no-op");
+        let status =
+            api::email_recovery_status(&env, canister_id, &challenge.nonce).expect("status call");
+        assert!(
+            matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+            "status must stay RegistrationSucceeded across extra polls, got {status:?}",
+        );
+    }
+
+    // The binding is intact and was applied exactly once: the first remove
+    // succeeds, a second reports nothing bound (the idempotent polls did not
+    // double-bind or corrupt the anchor).
+    api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+        .expect("remove call failed")
+        .expect("remove should succeed");
+    let second_remove =
+        api::email_recovery_credential_remove(&env, canister_id, p, id, TEST_ADDRESS)
+            .expect("second remove call failed");
+    assert!(
+        matches!(second_remove, Err(EmailRecoveryError::AddressNotRegistered)),
+        "credential should have been bound exactly once, got {second_remove:?}",
+    );
+}
+
 // ===================================================================
 // DoH path: concurrent in-flight dedup — regression coverage
 // ===================================================================

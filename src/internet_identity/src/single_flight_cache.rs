@@ -691,6 +691,82 @@ mod tests {
         assert!(!c.entries.contains_key("b"), "b was least-recently-used");
     }
 
+    #[test]
+    fn delay_secs_saturates_on_large_failure_count() {
+        // `multiplier^(failures-1)` overflows u64 long before a real backoff
+        // reaches it; the saturating math must clamp to u64::MAX, never wrap
+        // or panic (a wrapped tiny delay would defeat the throttle).
+        let b = RetryBackoff::new(60, 2);
+        assert_eq!(b.delay_secs(1), 60, "first failure waits the base");
+        assert_eq!(b.delay_secs(2), 120);
+        assert_eq!(b.delay_secs(3), 240);
+        assert_eq!(b.delay_secs(u32::MAX), u64::MAX, "clamps, not wraps");
+        // A huge base saturates on the multiply too.
+        assert_eq!(RetryBackoff::new(u64::MAX, 2).delay_secs(2), u64::MAX);
+    }
+
+    #[test]
+    fn max_entries_clamped_to_at_least_one() {
+        // A 0 cap is nonsensical (and would make the evict-when-full guard
+        // behave oddly); the constructor clamps it to a single slot.
+        let mut c = cache(CacheConfig {
+            fresh_for: 1000,
+            max_entries: 0,
+            ..base_config()
+        });
+        assert_eq!(c.max_entries, 1, "0 cap clamps to 1");
+        let t = expect_fill(c.lookup(&"a", 0));
+        c.complete_fill(&"a", t, Ok("v"), 0);
+        let t = expect_fill(c.lookup(&"b", 0));
+        c.complete_fill(&"b", t, Ok("v"), 0);
+        assert!(
+            !c.entries.contains_key("a"),
+            "single slot evicts the old key"
+        );
+        assert!(c.entries.contains_key("b"));
+    }
+
+    #[test]
+    fn complete_fill_sweeps_every_expired_entry() {
+        // The sweep at the end of `complete_fill` is global, not just the
+        // key being completed: every dead entry goes in one pass.
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 0,
+            ..base_config()
+        });
+        for k in ["a", "b", "c"] {
+            let t = expect_fill(c.lookup(&k, 0));
+            c.complete_fill(&k, t, Ok("v"), 0); // evict_at = 100 each
+        }
+        assert_eq!(c.entries.len(), 3);
+        // Complete a fourth fill well past the others' evict_at.
+        let t = expect_fill(c.lookup(&"d", 1000));
+        c.complete_fill(&"d", t, Ok("v"), 1000);
+        assert_eq!(c.entries.len(), 1, "all three dead entries swept at once");
+        assert!(c.entries.contains_key("d"));
+    }
+
+    #[test]
+    fn stale_for_zero_disables_stale_serving() {
+        // With `stale_for` 0, `evict_at == fresh_until`: the instant a value
+        // goes stale it is also dead, so there is nothing to serve while the
+        // refill runs — a refresh is a cold `StartFill` with no value.
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 0,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("v"), 0);
+        assert!(matches!(c.lookup(&"k", 50), Lookup::Ready("v")));
+        let stale = match c.lookup(&"k", 100) {
+            Lookup::StartFill(_, stale) => stale,
+            _ => panic!("expected cold StartFill once dead"),
+        };
+        assert!(stale.is_none(), "no stale value to serve once evicted");
+    }
+
     // ---- get end to end (poll model via the test executor) ----
 
     thread_local! {
@@ -801,6 +877,29 @@ mod tests {
         run_detached(); // refill fails, keeps stale 7, parks backoff
                         // Within backoff: still serve the last-good value (stale-if-error).
         set_test_now(121);
+        assert_eq!(get(&E2E, "k"), Cached::Ready(7));
+    }
+
+    #[test]
+    fn abandoned_fill_is_taken_over_by_next_get() {
+        reset_e2e(Ok(7));
+        // A cold get claims the in-flight marker and spawns a fill, but we
+        // never drive it — standing in for a fill whose task trapped after
+        // claiming, leaving the marker stranded.
+        assert_eq!(get(&E2E, "k"), Cached::Pending);
+        assert_eq!(fill_count(), 0, "spawned, not yet driven");
+        // A poll within the abandonment window (base_config: 120s) sees the
+        // claim as live and just waits — no second fan-out.
+        set_test_now(60);
+        assert_eq!(get(&E2E, "k"), Cached::Pending);
+        // Past `abandon_fill_after`, the stranded claim is taken over: the
+        // next get spawns a fresh fill instead of polling Pending forever.
+        set_test_now(121);
+        FILL_COUNT.with(|c| c.set(0)); // count only the takeover's fill
+        assert_eq!(get(&E2E, "k"), Cached::Pending);
+        run_detached();
+        assert!(fill_count() >= 1, "takeover re-fans-out the fill");
+        // The recovered value is now servable.
         assert_eq!(get(&E2E, "k"), Cached::Ready(7));
     }
 }
