@@ -13,8 +13,10 @@
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
-  import { afterNavigate, goto } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
+  import { HANDOFF_HASH_KEY } from "$lib/utils/auth-handoff";
   import { onMount } from "svelte";
+  import { SvelteURLSearchParams } from "svelte/reactivity";
   import { analytics } from "$lib/utils/analytics/analytics";
   import {
     authenticatedStore,
@@ -197,6 +199,18 @@
 
   afterNavigate(() => {
     isMobileSidebarOpen = false;
+    // Sticky cleanup of the handoff nonce; the eager strip can be undone by SvelteKit's router re-syncing.
+    const hash = window.location.hash.slice(1);
+    if (hash.length === 0) return;
+    const params = new SvelteURLSearchParams(hash);
+    if (!params.has(HANDOFF_HASH_KEY)) return;
+    params.delete(HANDOFF_HASH_KEY);
+    const remaining = params.toString();
+    const cleanUrl =
+      window.location.pathname +
+      window.location.search +
+      (remaining.length > 0 ? `#${remaining}` : "");
+    replaceState(cleanUrl, page.state);
   });
 
   // Pre-fetch passkey credential ids
