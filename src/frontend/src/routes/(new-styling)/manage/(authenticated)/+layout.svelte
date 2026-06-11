@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    BriefcaseMedicalIcon,
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
@@ -9,7 +10,6 @@
     CodeIcon,
     LanguagesIcon,
     SettingsIcon,
-    ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
@@ -306,7 +306,7 @@
             href="/manage/recovery"
             current={page.url.pathname === "/manage/recovery"}
           >
-            <ShieldIcon class="size-5 sm:max-md:mx-auto" />
+            <BriefcaseMedicalIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>

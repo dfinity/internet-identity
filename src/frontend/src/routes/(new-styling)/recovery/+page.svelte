@@ -4,8 +4,8 @@
   import {
     ArrowRightIcon,
     BookOpenIcon,
+    BriefcaseMedicalIcon,
     HashIcon,
-    HeartPulseIcon,
     MailIcon,
   } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
@@ -25,6 +25,7 @@
   import type {
     EmailRecoveryDnsInput,
     EmailRecoveryGetDelegationArgs,
+    EmailRecoverySubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -93,11 +94,14 @@
   const emailRecoveryDiagnostics = (nonce: string) =>
     anonymousActor.email_recovery_diagnostics(nonce);
 
-  const submitEmailDkimLeaf = (
-    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
-  ) =>
+  const submitEmailDkimLeaf = (arg: EmailRecoverySubmitDkimLeafArg) =>
     anonymousActor
       .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
+  const submitEmailDkimLeafViaDoh = (nonce: string) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf_via_doh({ nonce })
       .then(throwCanisterError);
 
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
@@ -208,7 +212,7 @@
     <AuthPanel class="sm:max-w-100">
       <div class="mt-auto flex flex-col sm:my-auto">
         <FeaturedIcon size="lg" class="mb-4">
-          <HeartPulseIcon class="size-5" />
+          <BriefcaseMedicalIcon class="size-5" />
         </FeaturedIcon>
         <h1 class="text-text-primary mb-3 text-2xl font-medium">
           {$t`Recover your identity`}
@@ -321,6 +325,7 @@
       status={emailRecoveryStatus}
       diagnostics={emailRecoveryDiagnostics}
       submitDkimLeaf={submitEmailDkimLeaf}
+      submitDkimLeafViaDoh={submitEmailDkimLeafViaDoh}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
     />

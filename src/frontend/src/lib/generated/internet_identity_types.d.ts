@@ -528,6 +528,15 @@ export interface DohConfig {
   'max_cache_age_secs' : [] | [bigint],
   'allowed_domains' : Array<string>,
 }
+/**
+ * Why a DoH resolution failed, as a typed discriminant rather than a
+ * free-form string. The FE reads this directly to segment the
+ * `doh_reason` analytics property — no string parsing.
+ */
+export type DohFailureReason = { 'DedupWaitTimeout' : null } |
+  { 'AllProvidersFailed' : null } |
+  { 'ResponseMalformed' : string } |
+  { 'QuorumFailed' : { 'total' : number, 'agreeing' : number } };
 export interface DummyAuthConfig {
   /**
    * Prompts user for a index value (0 - 255) when set to true,
@@ -566,10 +575,18 @@ export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
   { 'DkimLeafMismatch' : null } |
   { 'InternalCanisterError' : string } |
   { 'NonceUnknown' : null } |
-  { 'DohFetchFailed' : string } |
+  { 'DohFetchFailed' : DohFailureReason } |
   { 'NoDkimLeafExpected' : null } |
   { 'DomainNotSupported' : string } |
   { 'AddressNotRegistered' : null } |
+  {
+    /**
+     * email_recovery_submit_dkim_leaf was called with an empty `hops`
+     * vector; an FE that can't walk DNSSEC must call
+     * email_recovery_submit_dkim_leaf_via_doh instead.
+     */
+    'EmptyDkimLeafHops' : null
+  } |
   { 'Unauthorized' : Principal } |
   { 'NonceExpired' : null } |
   { 'AddressMismatch' : null } |
@@ -605,10 +622,24 @@ export interface EmailRecoverySubmitDkimLeafArg {
    * least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
    * canister side. For the Gmail-style direct-TXT case this is a
    * single-element vec.
+   * 
+   * When the FE cannot walk a fully-signed DNSSEC resolution for the
+   * leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
+   * `selector1._domainkey.outlook.com` is a signed CNAME into the
+   * unsigned `outbound.protection.outlook.com`) — it must NOT submit
+   * an empty vec here; it calls `email_recovery_submit_dkim_leaf_via_doh`
+   * instead, which resolves the key over the canister's DoH path.
    */
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
+/**
+ * Argument to email_recovery_submit_dkim_leaf_via_doh. Wrapped in a
+ * record (like EmailRecoverySubmitDkimLeafArg) so the method can grow
+ * fields without a breaking interface change; nonce is the lookup key
+ * and is always required.
+ */
+export interface EmailRecoverySubmitDkimLeafViaDohArg { 'nonce' : string }
 export type FrontendHostname = string;
 export type GetAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
@@ -1695,6 +1726,18 @@ export interface _SERVICE {
   'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
   'email_recovery_submit_dkim_leaf' : ActorMethod<
     [EmailRecoverySubmitDkimLeafArg],
+    { 'Ok' : EmailRecoveryStatus } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  /**
+   * DoH-fallback sibling of email_recovery_submit_dkim_leaf, called
+   * with just the nonce when the FE can't walk a fully-signed DNSSEC
+   * resolution for the leaf (the DKIM record CNAMEs into an unsigned
+   * zone). The canister resolves the DKIM key over its own
+   * allowlist-gated DoH path.
+   */
+  'email_recovery_submit_dkim_leaf_via_doh' : ActorMethod<
+    [EmailRecoverySubmitDkimLeafViaDohArg],
     { 'Ok' : EmailRecoveryStatus } |
       { 'Err' : EmailRecoveryError }
   >,

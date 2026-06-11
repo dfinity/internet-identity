@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ShieldCheckIcon, LockKeyholeIcon } from "@lucide/svelte";
+  import { BookOpenCheckIcon, LockKeyholeIcon } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
@@ -35,7 +35,7 @@
   ]}
 >
   <div class="mb-3 flex h-9 flex-row items-center">
-    <ShieldCheckIcon class="text-fg-success-primary size-6" />
+    <BookOpenCheckIcon class="text-fg-success-primary size-6" />
     {#if isCurrentAccessMethod}
       <Tooltip
         label={$t`Currently active`}
