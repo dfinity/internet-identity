@@ -7,7 +7,10 @@ import {
 import type { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
-import type { Authenticated } from "$lib/stores/authentication.store";
+import type {
+  Authenticated,
+  AuthenticationResult,
+} from "$lib/stores/authentication.store";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
 
 const MSG_READY = "ii-handoff:ready";
@@ -94,7 +97,7 @@ function stripHandoffMarkerFromUrl(): void {
 
 export function sendAuthToOpenedTab(
   target: Window,
-  auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
+  auth: AuthenticationResult,
   timeoutMs = 2000,
 ): { cancel: () => void } {
   const controller = new AbortController();
@@ -159,10 +162,7 @@ export function receiveAuthFromOpener({
   timeoutMs = 2000,
 }: {
   timeoutMs?: number;
-} = {}): Promise<Omit<
-  Authenticated,
-  "agent" | "actor" | "salt" | "nonce"
-> | null> {
+} = {}): Promise<AuthenticationResult | null> {
   const opener = window.opener as Window | null;
   if (opener === null || opener.closed) {
     return Promise.resolve(null);
@@ -179,9 +179,7 @@ export function receiveAuthFromOpener({
     const { signal } = controller;
     let localInnerKey: ECDSAKeyIdentity | undefined;
 
-    const settle = (
-      value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce"> | null,
-    ) => {
+    const settle = (value: AuthenticationResult | null) => {
       if (signal.aborted) return;
       controller.abort();
       clearTimeout(timer);

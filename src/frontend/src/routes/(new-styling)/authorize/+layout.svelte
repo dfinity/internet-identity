@@ -9,7 +9,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import {
     authenticationStore,
-    type Authenticated,
+    type AuthenticationResult,
   } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -148,9 +148,7 @@
   // (and strict Firefox), so a follow-up window.open() would be silently
   // blocked. The confirmation dialog's own button click provides fresh
   // activation and drives window.open from there.
-  let pendingManageOpen = $state<{
-    auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
-  }>();
+  let pendingManageOpen = $state<{ auth: AuthenticationResult }>();
   let signUpOpenedFromSignInModal = $state(false);
 
   let notConnectedPayload = $state<{
@@ -302,9 +300,7 @@
       isAuthenticating = false;
     }
   };
-  const handleOpenManageTab = (pending: {
-    auth: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">;
-  }) => {
+  const handleOpenManageTab = (pending: { auth: AuthenticationResult }) => {
     const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
     if (w === null) {
       pendingManageOpen = undefined;
