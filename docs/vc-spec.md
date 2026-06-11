@@ -164,7 +164,7 @@ This call must be authenticated, i.e. the sender must match the principal for wh
 The value of `prepared_context` is basically used to transfer information between `prepare_credential`
 and `get_credential` steps, and it is totally up to the issuer to decide on the content of
 that field. That is, the issuer creates `prepared_context`, and is the only entity that
-consumes it. For example, when using [canister signatures](https://docs.internetcomputer.org/references/ic-interface-spec/index#canister-signatures)
+consumes it. For example, when using [canister signatures](https://docs.internetcomputer.org/references/ic-interface-spec#canister-signatures)
 the context contains a time-stamped yet unsigned VC, for which the canister signature will be
 available only at `get_credential`-call.
 
