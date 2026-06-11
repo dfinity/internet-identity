@@ -182,7 +182,7 @@
         <div class="text-text-primary text-sm font-semibold">
           {switchModeTitle ??
             (mode === "signin"
-              ? $t`New to Internet Identity?`
+              ? $t`Want a new identity?`
               : $t`Already have an identity?`)}
         </div>
         {#if switchModeTitle === undefined}
