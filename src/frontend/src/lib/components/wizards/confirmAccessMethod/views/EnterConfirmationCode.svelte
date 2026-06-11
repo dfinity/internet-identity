@@ -54,33 +54,30 @@
     }
   };
 
-  const goToStep1 = () => {
-    advanceTimer = undefined;
-    step = 1;
-  };
-
-  const goToStep0 = () => {
+  const clearAdvanceTimer = () => {
     if (advanceTimer !== undefined) {
       clearTimeout(advanceTimer);
       advanceTimer = undefined;
     }
+  };
+
+  const goToStep1 = () => {
+    clearAdvanceTimer();
+    step = 1;
+  };
+
+  const goToStep0 = () => {
+    clearAdvanceTimer();
     step = 0;
     holdCompleted = false;
   };
 
   const handleRestart = () => {
-    if (advanceTimer !== undefined) {
-      clearTimeout(advanceTimer);
-      advanceTimer = undefined;
-    }
+    clearAdvanceTimer();
     restart();
   };
 
-  $effect(() => () => {
-    if (advanceTimer !== undefined) {
-      clearTimeout(advanceTimer);
-    }
-  });
+  $effect(() => () => clearAdvanceTimer());
 
   $effect(() => {
     if (confirmationCode.length > 0) {
