@@ -58,10 +58,15 @@ function serializeAuthMethod(
       principal: method.recoveryPhrase.principal.toText(),
     };
   }
-  return {
-    kind: "emailRecovery",
-    principal: method.emailRecovery.principal.toText(),
-  };
+  if ("emailRecovery" in method) {
+    return {
+      kind: "emailRecovery",
+      principal: method.emailRecovery.principal.toText(),
+    };
+  }
+
+  method satisfies never;
+  throw new Error("unreachable: unknown auth method variant");
 }
 
 function deserializeAuthMethod(
