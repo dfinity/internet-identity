@@ -89,13 +89,13 @@ while IFS= read -r entry; do
   pr_title=$(echo "$pr_info" | jq -r '.title')
   pr_html=$(echo "$pr_info"  | jq -r '.html_url')
 
-  # Dedup: look for our marker comment with this head SHA.
+  # Dedup: look for our marker comment with this head SHA. Marker
+  # bodies are multi-line, so grep the full stream of comment bodies;
+  # collapsing to one line (tail -1) only ever saw the footer line,
+  # never the marker, and re-notified on every cron tick.
   marker="${MARKER_PREFIX} head=${head_sha} -->"
-  existing=$(gh api --paginate "repos/${REPO}/issues/${pr_number}/comments" \
-    --jq '.[] | select(.body | contains("'"${MARKER_PREFIX}"'")) | .body' \
-    | tail -1)
-
-  if echo "${existing:-}" | grep -qF "head=${head_sha}"; then
+  if gh api --paginate "repos/${REPO}/issues/${pr_number}/comments" \
+       --jq '.[].body' | grep -qF "${MARKER_PREFIX} head=${head_sha}"; then
     echo "PR #${pr_number} head=${head_short}: already notified, skipping."
     continue
   fi
@@ -104,18 +104,22 @@ while IFS= read -r entry; do
 
   slack_text=":warning: *CI approval needed* for <${pr_html}|${pr_title}> by \`${actor}\`\n:point_right: Head: \`${head_short}\` · ${run_count} pending run(s)\n<${approve_url}|Approve workflow runs>"
 
-  response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+  # A transport-level curl failure must not abort the run (set -e);
+  # treat it as HTTP 000 and fall through to the non-200 branch.
+  response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 -X POST \
     -H 'Content-Type: application/json' \
     --data "$(jq -n --arg text "$slack_text" '{text: $text}')" \
-    "$SLACK_PRIVATE_IDENTITY_WEBHOOK_URL")
+    "$SLACK_PRIVATE_IDENTITY_WEBHOOK_URL" || true)
+  response="${response:-000}"
 
-  if [[ "$response" == "200" ]]; then
-    echo "PR #${pr_number} head=${head_short}: Slack notification sent."
-  else
-    echo "PR #${pr_number} head=${head_short}: Slack returned HTTP ${response}."
+  if [[ "$response" != "200" ]]; then
+    # No marker on failure: the next cron tick retries the delivery.
+    echo "PR #${pr_number} head=${head_short}: Slack returned HTTP ${response}; will retry next run."
+    continue
   fi
+  echo "PR #${pr_number} head=${head_short}: Slack notification sent."
 
-  # Post dedup marker on the PR.
+  # Post dedup marker on the PR (only after a confirmed 200 send).
   marker_body="${marker}
 :robot_face: Slack notification sent for CI approval on head \`${head_short}\` (${run_count} pending run(s)).
 
