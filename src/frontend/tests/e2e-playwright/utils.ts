@@ -140,7 +140,7 @@ export const createNewIdentityInII = async (
   if (onContinueScreen) {
     // If we're on the continue screen, go through the identity switcher
     await page.getByRole("button", { name: "Switch identity" }).click();
-    await page.getByRole("button", { name: "Add another identity" }).click();
+    await page.getByRole("button", { name: "Add identity" }).click();
   }
 
   // Create passkey identity
@@ -656,6 +656,93 @@ export const createActorForCredential = async (
     canisterId,
   });
   return actor;
+};
+
+export const LEGACY_PASSKEY_ALIAS = "pre-upgrade-passkey";
+
+/**
+ * Creates a virtual authenticator scoped to LEGACY_II_URL, registers a
+ * passkey credential against that RP ID, removes the authenticator, and
+ * returns the raw CDP credential so callers can re-add it on demand.
+ */
+export const createLegacyCredential = async (
+  page: Page,
+): Promise<Protocol.WebAuthn.Credential> => {
+  await page.goto(LEGACY_II_URL + "/self-service");
+  const legacyAuthenticatorId = await addVirtualAuthenticator(page);
+  await page.evaluate(
+    async (rpId) => {
+      await navigator.credentials.create({
+        publicKey: {
+          challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+          attestation: "direct",
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+          rp: { name: "Internet Identity Service", id: rpId },
+          user: {
+            id: window.crypto.getRandomValues(new Uint8Array(16)),
+            displayName: "Internet Identity User",
+            name: "Internet Identity User",
+          },
+        },
+      });
+    },
+    LEGACY_II_URL.replace(/^https?:\/\//, ""),
+  );
+  const [credential] = await getCredentialsFromVirtualAuthenticator(
+    page,
+    legacyAuthenticatorId,
+  );
+  await removeVirtualAuthenticator(page, legacyAuthenticatorId);
+  return credential;
+};
+
+/**
+ * Registers a legacy passkey on the given identity and removes the existing
+ * modern passkey, leaving the identity in the pre-upgrade state (only
+ * accessible via the legacy RP ID).
+ *
+ * @param actor - An actor authenticated as `identity.credentials[0]`
+ * @param identity - The fixture identity whose passkey will be swapped
+ * @param legacyCredential - The CDP credential created by `createLegacyCredential`
+ * @param alias - Alias stored in the passkey metadata (defaults to LEGACY_PASSKEY_ALIAS)
+ */
+export const swapToLegacyOnlyIdentity = async (
+  actor: ActorSubclass<_SERVICE>,
+  identity: {
+    identityNumber: bigint;
+    credentials: Protocol.WebAuthn.Credential[];
+  },
+  legacyCredential: Protocol.WebAuthn.Credential,
+  alias: string = LEGACY_PASSKEY_ALIAS,
+): Promise<void> => {
+  const legacyIdentity =
+    await CredentialIdentity.fromCredential(legacyCredential);
+  await actor.authn_method_add(identity.identityNumber, {
+    metadata: [
+      ["alias", { String: alias }],
+      ["origin", { String: LEGACY_II_URL }],
+    ],
+    authn_method: {
+      WebAuthn: {
+        pubkey: legacyIdentity.getPublicKey().toDer(),
+        credential_id: fromBase64URL(legacyCredential.credentialId),
+        aaguid: [],
+      },
+    },
+    security_settings: {
+      protection: { Unprotected: null },
+      purpose: { Authentication: null },
+    },
+    last_authentication: [],
+  });
+
+  const modernIdentity = await CredentialIdentity.fromCredential(
+    identity.credentials[0],
+  );
+  await actor.authn_method_remove(
+    identity.identityNumber,
+    modernIdentity.getPublicKey().toDer(),
+  );
 };
 
 /**

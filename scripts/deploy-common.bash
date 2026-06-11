@@ -2,7 +2,7 @@
 # Shared helpers for deploy-pr-to-beta and deploy-local-to-beta.
 #
 # Responsibilities:
-# - CLI arg parsing for staging selection (-sa/-sb/-sc/--staging custom),
+# - CLI arg parsing for staging selection (-sa/-sb/-sc/-sd/--staging custom),
 #   end selection (-fe/-be/--end), dry-run, no-checks, and (for the local
 #   script) the rebuild flags.
 # - Reachability + consistency checks against the selected staging canisters.
@@ -23,7 +23,7 @@
 # - An icp install runner that honours --dry-run.
 #
 # Globals set by parse_common_args (and expected by later helpers):
-#   STAGING_NAME       : "a" | "b" | "c" | "custom"
+#   STAGING_NAME       : "a" | "b" | "c" | "d" | "custom"
 #   BE_ID, FE_ID       : principals (text form)
 #   BE_URL, FE_URL     : https://... URLs
 #   DEPLOY_FE          : true | false
@@ -64,6 +64,7 @@ staging_be_id() {
         a) echo "fgte5-ciaaa-aaaad-aaatq-cai" ;;
         b) echo "jqajs-xiaaa-aaaad-aab5q-cai" ;;
         c) echo "y2aaj-miaaa-aaaad-aacxq-cai" ;;
+        d) echo "u6uxm-3qaaa-aaaad-ags6a-cai" ;;
         *) return 1 ;;
     esac
 }
@@ -72,6 +73,7 @@ staging_fe_id() {
         a) echo "gjxif-ryaaa-aaaad-ae4ka-cai" ;;
         b) echo "uhh2r-oyaaa-aaaad-agbva-cai" ;;
         c) echo "uag4f-daaaa-aaaad-agbvq-cai" ;;
+        d) echo "uzvry-wiaaa-aaaad-ags6q-cai" ;;
         *) return 1 ;;
     esac
 }
@@ -147,6 +149,7 @@ Common options:
   --staging-a, -sa          Use Staging A
   --staging-b, -sb          Use Staging B
   --staging-c, -sc          Use Staging C
+  --staging-d, -sd          Use Staging D
   --staging custom          Prompt for a custom (BE_ID, FE_ID, BE_URL, FE_URL) quad
   --end <front|back>        Which end(s) to deploy (can be repeated)
   -fe                       Shortcut for --end front
@@ -166,6 +169,12 @@ Common options:
   --doh-domains <a,b,...>   Override the default DoH allowlist (only used
                             with --update-email-recovery-init). Empty
                             disables the DoH path (DNSSEC-only).
+  --openid-configs-file <path>
+                            Set the backend openid_configs init arg from a
+                            Candid-text file holding an opt vec OpenIdConfig
+                            value (e.g. opt vec { record { ... } }, or
+                            opt vec {} to clear all providers). Omit to leave
+                            the current on-chain value untouched.
   -h, --help                Show this help
 EOF
 }
@@ -191,6 +200,10 @@ parse_common_args() {
     # default) from "--doh-domains '' was passed" (operator wants the
     # empty list to disable the DoH path entirely).
     DOH_DOMAINS_ARG_SET=false
+    # Path to a Candid-text file holding the backend `openid_configs` value
+    # to set on this upgrade. Empty = not passed = leave the field at `null`
+    # (preserve the previously stored value).
+    OPENID_CONFIGS_FILE=""
     REMAINING_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -211,17 +224,21 @@ parse_common_args() {
                 STAGING_NAME="c"
                 shift
                 ;;
+            -sd|--staging-d)
+                STAGING_NAME="d"
+                shift
+                ;;
             --staging)
                 shift
                 if [ $# -eq 0 ]; then
-                    echo "Error: --staging requires an argument (a|b|c|custom)" >&2
+                    echo "Error: --staging requires an argument (a|b|c|d|custom)" >&2
                     return 1
                 fi
                 case "$1" in
-                    a|b|c)   STAGING_NAME="$1" ;;
+                    a|b|c|d) STAGING_NAME="$1" ;;
                     custom)  STAGING_NAME="custom" ;;
                     *)
-                        echo "Error: --staging value must be a|b|c|custom, got '$1'" >&2
+                        echo "Error: --staging value must be a|b|c|d|custom, got '$1'" >&2
                         return 1
                         ;;
                 esac
@@ -310,6 +327,30 @@ parse_common_args() {
                 DOH_DOMAINS_ARG_SET=true
                 shift
                 ;;
+            --openid-configs-file)
+                shift
+                if [ $# -eq 0 ]; then
+                    echo "Error: --openid-configs-file requires a path to a Candid-text file" >&2
+                    return 1
+                fi
+                if [ ! -f "$1" ]; then
+                    echo "Error: --openid-configs-file: no such file: $1" >&2
+                    return 1
+                fi
+                if [ ! -r "$1" ]; then
+                    echo "Error: --openid-configs-file: file is not readable: $1" >&2
+                    return 1
+                fi
+                # Reject empty / whitespace-only files now so the operator gets
+                # a clear message here rather than an opaque didc parse error at
+                # encode time.
+                if ! grep -q '[^[:space:]]' "$1"; then
+                    echo "Error: --openid-configs-file: file is empty or contains only whitespace: $1" >&2
+                    return 1
+                fi
+                OPENID_CONFIGS_FILE="$1"
+                shift
+                ;;
             --)
                 shift
                 REMAINING_ARGS+=("$@")
@@ -327,7 +368,7 @@ parse_common_args() {
     done
 
     if [ -z "$STAGING_NAME" ]; then
-        echo "Error: staging must be specified (use -sa/-sb/-sc or --staging custom)" >&2
+        echo "Error: staging must be specified (use -sa/-sb/-sc/-sd or --staging custom)" >&2
         return 1
     fi
     if [ "$DEPLOY_FE" = false ] && [ "$DEPLOY_BE" = false ]; then
@@ -341,7 +382,7 @@ parse_common_args() {
 # fill the canonical ids/URLs directly; for `custom` we prompt.
 resolve_staging_config() {
     case "$STAGING_NAME" in
-        a|b|c)
+        a|b|c|d)
             BE_ID="$(staging_be_id "$STAGING_NAME")"
             FE_ID="$(staging_fe_id "$STAGING_NAME")"
             BE_URL="$(canister_default_url "$BE_ID")"
@@ -643,9 +684,11 @@ EOF
 # Build the BE install arg. The BE init type is `opt InternetIdentityInit`
 # where every field is itself `opt` and "absent" = preserve previous value,
 # so we only set the fields that follow from the shared quad (BE_ID, BE_URL,
-# FE_URL) plus — when `UPDATE_EMAIL_RECOVERY_INIT` is true — the
-# `dnssec_config` and `doh_config` knobs the email-recovery flow needs.
-# Everything else stays untouched on upgrade.
+# FE_URL), the prompted backend_origin/related_origins, the
+# `--openid-configs-file` contents (when passed), and — when
+# `UPDATE_EMAIL_RECOVERY_INIT` is true — the `dnssec_config`/`doh_config`
+# knobs the email-recovery flow needs. Everything left unset stays untouched
+# on upgrade.
 #
 # Output: Candid text on stdout.
 build_be_install_arg() {
@@ -670,12 +713,28 @@ EXTRA
 )
     fi
 
+    # `openid_configs` stays `null` (= preserve the previous on-chain value)
+    # unless --openid-configs-file was passed; its Candid contents are then
+    # emitted verbatim. parse_common_args already validated the path, but the
+    # read is re-checked here (separately from the `local` declaration, whose
+    # exit status would otherwise mask cat's) so a file that vanished or was
+    # emptied after parsing fails loudly instead of emitting `... = ;`.
+    local openid_configs_arg="null"
+    if [ -n "$OPENID_CONFIGS_FILE" ]; then
+        if ! openid_configs_arg="$(cat "$OPENID_CONFIGS_FILE")" \
+                || [ -z "${openid_configs_arg//[[:space:]]/}" ]; then
+            echo "Error: failed to read --openid-configs-file (or it is now empty): $OPENID_CONFIGS_FILE" >&2
+            return 1
+        fi
+    fi
+
     cat <<EOF
 (
   opt record {
     backend_canister_id = opt principal "$BE_ID";
     backend_origin = $BE_BACKEND_ORIGIN_ARG;
     related_origins = $BE_RELATED_ORIGINS_ARG;
+    openid_configs = $openid_configs_arg;
 $extra
   }
 )
@@ -961,11 +1020,9 @@ encode_install_arg_bin() {
 # -------------------------
 # Proxy-routed install runner (honours DRY_RUN)
 # -------------------------
-# Routes the upgrade through the proxy canister at PROXY_CANISTER_ID,
+# Routes the install/upgrade through the proxy canister at PROXY_CANISTER_ID,
 # which is the legacy staging wallet reinstalled with the icp-cli proxy
-# WASM (see
-# https://cli.internetcomputer.org/0.2/migration/from-dfx/#replacing-the-dfx-wallet-canister).
-# The proxy keeps the wallet's canister ID — and therefore its
+# WASM. The proxy keeps the wallet's canister ID — and therefore its
 # controllership of the staging canisters — but now exposes the `proxy`
 # method icp-cli's `--proxy` expects.
 #
@@ -989,11 +1046,31 @@ run_icp_install() {
         return 1
     fi
 
+    # Choose install vs upgrade based on whether the canister already holds a
+    # Wasm module on chain. A freshly created staging canister (e.g. a new
+    # Staging-D, or any canister whose code was uninstalled) has none, so
+    # `--mode upgrade` fails with "canister contains no Wasm module"; it needs
+    # `--mode install`. We deliberately only ever pick install/upgrade — never
+    # `reinstall`, which would wipe the canister's state.
+    #
+    # Detection reuses the public ic-api module_hash (same source --reconfigure
+    # relies on, and which reliably reports a hash for the live staging
+    # canisters). A present hash ⇒ upgrade; absent ⇒ install. The only
+    # ambiguous case is "installed canister but ic-api momentarily
+    # unreachable", which would mis-pick install — but `--mode install` on an
+    # already-installed canister is rejected by the IC (non-destructive), so
+    # the operator just sees an error and re-runs, rather than losing state.
+    local mode="upgrade"
+    if [ -z "$(fetch_onchain_module_hash "$canister_id")" ]; then
+        mode="install"
+        echo "  $canister_id has no Wasm module on chain (per ic-api) — using --mode install (fresh canister)." >&2
+    fi
+
     local cmd=(
         icp canister install "$canister_id"
             -e "$IC_NETWORK"
             --proxy "$PROXY_CANISTER_ID"
-            --mode upgrade
+            --mode "$mode"
             --wasm "$wasm_path"
             --args-file "$install_arg_bin"
             --args-format bin
@@ -1014,9 +1091,9 @@ run_icp_install() {
     # less obvious place.
     bootstrap_init_args || return 1
 
-    echo "Upgrading canister $canister_id ..."
+    echo "Running icp canister install (--mode $mode) on $canister_id ..."
     "${cmd[@]}"
-    echo "Upgrade of $canister_id complete."
+    echo "Done (--mode $mode) on $canister_id."
 }
 
 # -------------------------

@@ -306,21 +306,41 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
+  const DohFailureReason = IDL.Variant({
+    'DedupWaitTimeout' : IDL.Null,
+    'AllProvidersFailed' : IDL.Null,
+    'ResponseMalformed' : IDL.Text,
+    'QuorumFailed' : IDL.Record({
+      'total' : IDL.Nat32,
+      'agreeing' : IDL.Nat32,
+    }),
+  });
   const EmailRecoveryError = IDL.Variant({
     'EmailVerificationFailed' : IDL.Text,
     'DkimLeafMismatch' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NonceUnknown' : IDL.Null,
-    'DohFetchFailed' : IDL.Text,
+    'DohFetchFailed' : DohFailureReason,
     'NoDkimLeafExpected' : IDL.Null,
     'DomainNotSupported' : IDL.Text,
     'AddressNotRegistered' : IDL.Null,
+    'EmptyDkimLeafHops' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'NonceExpired' : IDL.Null,
     'AddressMismatch' : IDL.Null,
     'DomainNotAllowlisted' : IDL.Text,
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
+  });
+  const VerificationPath = IDL.Variant({
+    'Doh' : IDL.Null,
+    'Dnssec' : IDL.Null,
+  });
+  const EmailRecoveryDiagnostics = IDL.Record({
+    'created_at' : Timestamp,
+    'verification_path' : VerificationPath,
+    'message_id' : IDL.Opt(IDL.Text),
+    'reason_code' : IDL.Text,
   });
   const SessionKey = PublicKey;
   const EmailRecoveryGetDelegationArgs = IDL.Record({
@@ -353,6 +373,9 @@ export const idlFactory = ({ IDL }) => {
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({
     'extra_chains' : IDL.Vec(DelegationChain),
     'hops' : IDL.Vec(SignedRRset),
+    'nonce' : IDL.Text,
+  });
+  const EmailRecoverySubmitDkimLeafViaDohArg = IDL.Record({
     'nonce' : IDL.Text,
   });
   const BufferedArchiveEntry = IDL.Record({
@@ -698,6 +721,7 @@ export const idlFactory = ({ IDL }) => {
     'envelope' : IDL.Opt(SmtpEnvelope),
     'message' : IDL.Opt(SmtpMessage),
     'gateway_flags' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'message_id' : IDL.Opt(IDL.Text),
   });
   const SmtpRequestError = IDL.Record({
     'code' : IDL.Nat64,
@@ -867,6 +891,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),
+    'email_recovery_diagnostics' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(EmailRecoveryDiagnostics)],
+        ['query'],
+      ),
     'email_recovery_get_delegation' : IDL.Func(
         [EmailRecoveryGetDelegationArgs],
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : EmailRecoveryError })],
@@ -889,6 +918,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'email_recovery_submit_dkim_leaf' : IDL.Func(
         [EmailRecoverySubmitDkimLeafArg],
+        [
+          IDL.Variant({
+            'Ok' : EmailRecoveryStatus,
+            'Err' : EmailRecoveryError,
+          }),
+        ],
+        [],
+      ),
+    'email_recovery_submit_dkim_leaf_via_doh' : IDL.Func(
+        [EmailRecoverySubmitDkimLeafViaDohArg],
         [
           IDL.Variant({
             'Ok' : EmailRecoveryStatus,

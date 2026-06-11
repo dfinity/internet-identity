@@ -3,9 +3,10 @@
   import { t } from "$lib/stores/locale.store";
   import {
     ArrowRightIcon,
+    BookOpenIcon,
+    BriefcaseMedicalIcon,
+    HashIcon,
     MailIcon,
-    RefreshCcw,
-    ShieldIcon,
   } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -16,6 +17,7 @@
     type FoundIdentity,
     RecoverIdentityWizard,
   } from "$lib/components/wizards/recoverIdentity";
+  import { MigrationWizard } from "$lib/components/wizards/migration";
   import {
     RecoverWithEmailWizard,
     type RecoverySuccess,
@@ -23,6 +25,7 @@
   import type {
     EmailRecoveryDnsInput,
     EmailRecoveryGetDelegationArgs,
+    EmailRecoverySubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -43,6 +46,7 @@
 
   let showRecoveryDialog = $state(false);
   let showEmailRecoveryDialog = $state(false);
+  let showIdentityNumberDialog = $state(false);
 
   const handleSubmit = async (
     recoveryPhrase: string[],
@@ -87,11 +91,17 @@
   const emailRecoveryStatus = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);
 
-  const submitEmailDkimLeaf = (
-    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
-  ) =>
+  const emailRecoveryDiagnostics = (nonce: string) =>
+    anonymousActor.email_recovery_diagnostics(nonce);
+
+  const submitEmailDkimLeaf = (arg: EmailRecoverySubmitDkimLeafArg) =>
     anonymousActor
       .email_recovery_submit_dkim_leaf(arg)
+      .then(throwCanisterError);
+
+  const submitEmailDkimLeafViaDoh = (nonce: string) =>
+    anonymousActor
+      .email_recovery_submit_dkim_leaf_via_doh({ nonce })
       .then(throwCanisterError);
 
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
@@ -177,6 +187,22 @@
       handleError(error);
     }
   };
+
+  const handleIdentityNumberSuccess = async (_identityNumber: bigint) => {
+    try {
+      showIdentityNumberDialog = false;
+      await preloadData("/manage/access");
+      await goto("/manage/access");
+      toaster.success({
+        title: $t`Successfully restored access to your identity`,
+        description: $t`You can manage your access methods on this page.`,
+        duration: 5000,
+      });
+    } catch (error) {
+      showIdentityNumberDialog = false;
+      handleError(error);
+    }
+  };
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
@@ -186,7 +212,7 @@
     <AuthPanel class="sm:max-w-100">
       <div class="mt-auto flex flex-col sm:my-auto">
         <FeaturedIcon size="lg" class="mb-4">
-          <RefreshCcw class="size-5" />
+          <BriefcaseMedicalIcon class="size-5" />
         </FeaturedIcon>
         <h1 class="text-text-primary mb-3 text-2xl font-medium">
           {$t`Recover your identity`}
@@ -201,7 +227,7 @@
             aria-label={$t`Recover with phrase`}
           >
             <span class="flex w-full items-center gap-3">
-              <ShieldIcon class="text-fg-tertiary size-5 shrink-0" />
+              <BookOpenIcon class="text-fg-tertiary size-5 shrink-0" />
               <span
                 class="text-text-primary grow text-start text-base font-semibold"
               >
@@ -245,6 +271,29 @@
               </span>
             </ButtonCard>
           {/if}
+          <ButtonCard
+            onclick={() => (showIdentityNumberDialog = true)}
+            class="group !flex-col !items-stretch !gap-1 py-4 text-start"
+          >
+            <span class="flex w-full items-center gap-3">
+              <HashIcon class="text-fg-tertiary size-5 shrink-0" />
+              <span
+                class="text-text-primary grow text-start text-base font-semibold"
+              >
+                {$t`Legacy identity`}
+              </span>
+              <ArrowRightIcon
+                class={[
+                  "text-fg-tertiary me-3 size-5 shrink-0 transform opacity-0 transition-all duration-200 rtl:-scale-x-100",
+                  "group-enabled:group-hover:me-2 group-enabled:group-hover:opacity-100",
+                  "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
+                ]}
+              />
+            </span>
+            <span class="text-text-tertiary ps-8 text-sm font-normal">
+              {$t`Enter your identity number.`}
+            </span>
+          </ButtonCard>
         </div>
         <a href="/" class="btn btn-secondary btn-xl">
           {$t`Cancel`}
@@ -274,9 +323,23 @@
     <RecoverWithEmailWizard
       prepareDelegation={prepareEmailDelegation}
       status={emailRecoveryStatus}
+      diagnostics={emailRecoveryDiagnostics}
       submitDkimLeaf={submitEmailDkimLeaf}
+      submitDkimLeafViaDoh={submitEmailDkimLeafViaDoh}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
+    />
+  </Dialog>
+{/if}
+
+{#if showIdentityNumberDialog}
+  <Dialog onClose={() => (showIdentityNumberDialog = false)}>
+    <MigrationWizard
+      onSuccess={handleIdentityNumberSuccess}
+      onError={(error) => {
+        showIdentityNumberDialog = false;
+        handleError(error);
+      }}
     />
   </Dialog>
 {/if}

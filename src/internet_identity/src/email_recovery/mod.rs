@@ -51,7 +51,7 @@ mod submit_leaf;
 pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};
 pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
-pub use submit_leaf::submit_dkim_leaf;
+pub use submit_leaf::{submit_dkim_leaf, submit_dkim_leaf_via_doh};
 
 /// Wrapper around `pending::status_of` so the canister method in
 /// `main.rs` doesn't need to know which submodule the heap state
@@ -61,6 +61,20 @@ pub fn pending_status(
     now_secs: u64,
 ) -> internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryStatus {
     pending::status_of(nonce, now_secs)
+}
+
+/// Wrapper around `pending::diagnostics_of` (see
+/// `EmailRecoveryDiagnostics`) so the canister method in `main.rs`
+/// doesn't reach into the submodule. Returns `None` for an
+/// unknown/expired nonce; the record carries strictly-public fields
+/// only.
+pub fn pending_diagnostics(
+    nonce: &str,
+    now_secs: u64,
+) -> Option<
+    internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryDiagnostics,
+> {
+    pending::diagnostics_of(nonce, now_secs)
 }
 
 /// Look up the cached `RecoveryOutcome.seed` for a recovery-flow

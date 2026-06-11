@@ -66,6 +66,23 @@ const TYPE_DNSKEY = 48;
 const MAX_CNAME_HOPS = 4;
 
 /**
+ * IANA DNSSEC algorithm numbers the canister-side verifier can check
+ * (`crate::dnssec::signature::verify_signature_for_alg`): RSA/SHA-256
+ * (8), RSA/SHA-512 (10), ECDSA-P256/SHA-256 (13), Ed25519 (15).
+ *
+ * A zone may sign one RRset with several algorithms at once (key
+ * rollover, or a modern signature published alongside a legacy one —
+ * e.g. mailbox.org double-signs with RSA/SHA-512 and the deprecated
+ * RSA/SHA-1). We must bundle a signature the canister supports;
+ * picking an unsupported one (or having no supported one at all)
+ * makes the chain fail verification canister-side. Keep this set in
+ * sync with the Rust dispatch.
+ */
+const SUPPORTED_DNSSEC_ALGORITHMS: ReadonlySet<number> = new Set([
+  8, 10, 13, 15,
+]);
+
+/**
  * Build the prepare-time skeleton bundle: chain rooted at IANA down
  * to `<domain>`, plus the DMARC TXT at `_dmarc.<domain>` when the
  * zone publishes one and `wantDmarc` is true. The DKIM resolution
@@ -377,17 +394,7 @@ async function fetchSignedRRsetEither(
   const rrsigs = msg.answers.filter(
     (rr) => rr.type === TYPE_RRSIG && rr.name.toLowerCase() === lowerName,
   );
-  let coveringRrsig: DnsRR | undefined;
-  for (const candidate of rrsigs) {
-    if (candidate.rdata.length < 2) {
-      continue;
-    }
-    const typeCovered = (candidate.rdata[0] << 8) | candidate.rdata[1];
-    if (typeCovered === matchedType) {
-      coveringRrsig = candidate;
-      break;
-    }
-  }
+  const coveringRrsig = selectSupportedCoveringRrsig(rrsigs, matchedType);
   if (coveringRrsig === undefined) {
     return undefined;
   }
@@ -404,6 +411,38 @@ async function fetchSignedRRsetEither(
     },
     signerName: rrsig.signer_name as Uint8Array,
   };
+}
+
+/**
+ * From the RRSIGs present at one owner name, pick the first that both
+ * covers `matchedType` and uses an algorithm the canister can verify
+ * ({@link SUPPORTED_DNSSEC_ALGORITHMS}).
+ *
+ * Returns `undefined` when every covering RRSIG uses an unsupported
+ * algorithm (a SHA-1-only zone, say). The walk then aborts and
+ * `assembleSkeleton` yields nothing, so the wizard falls through to
+ * the canister's DoH path — the same outcome as an unsigned zone.
+ * Exported for unit testing the selection in isolation.
+ */
+export function selectSupportedCoveringRrsig(
+  rrsigs: DnsRR[],
+  matchedType: number,
+): DnsRR | undefined {
+  for (const candidate of rrsigs) {
+    // RRSIG RDATA layout: type-covered (2 bytes) | algorithm (1 byte) | …
+    if (candidate.rdata.length < 3) {
+      continue;
+    }
+    const typeCovered = (candidate.rdata[0] << 8) | candidate.rdata[1];
+    if (typeCovered !== matchedType) {
+      continue;
+    }
+    if (!SUPPORTED_DNSSEC_ALGORITHMS.has(candidate.rdata[2])) {
+      continue;
+    }
+    return candidate;
+  }
+  return undefined;
 }
 
 /**

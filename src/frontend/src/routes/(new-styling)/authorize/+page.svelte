@@ -24,6 +24,18 @@
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
   import {
+    AuthWizard,
+    SignUpHero,
+    IdentityNotConnected,
+    IdentityAlreadyLinked,
+    SwitchAccessMethod,
+  } from "$lib/components/wizards/auth";
+  import type { AccessMethod } from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
+  import { backendCanisterConfig } from "$lib/globals";
+  import { getMetadataString } from "$lib/utils/openID";
+  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import { goto } from "$app/navigation";
+  import {
     type AttributeConsent,
     attributeConsentStore,
     attributeConsentResultStore,
@@ -50,6 +62,49 @@
   // --- Local state ---
   let upgradeSuccess = $state(false);
   let openIdResumeProcessing = $state(false);
+  let isCreateIdentityDialogOpen = $state(false);
+
+  // --- Disambiguation dialog payloads (mirrors homepage flow) ---
+  let notConnectedPayload = $state<{
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    resume: () => Promise<void>;
+    cancel: () => void;
+  }>();
+  let isResumingRegistration = $state(false);
+  let alreadyLinkedPayload = $state<{
+    providerName: string;
+    providerLogo?: string;
+    userName?: string;
+    userEmail?: string;
+    signIn: () => Promise<void>;
+    cancel: () => void;
+  }>();
+  let isSigningInAlreadyLinked = $state(false);
+  let methodSwitchPayload = $state<{
+    previous: LastUsedIdentity;
+    newProvider: AccessMethod;
+    proceed: () => Promise<void>;
+  }>();
+
+  const authMethodToAccessMethod = (
+    m: LastUsedIdentity["authMethod"],
+  ): AccessMethod => {
+    if ("passkey" in m) return { type: "passkey" };
+    if ("openid" in m) {
+      const config = backendCanisterConfig.openid_configs[0]?.find(
+        (c) => c.issuer === m.openid.iss,
+      );
+      return {
+        type: "openid",
+        logo: config?.logo ?? "",
+        name: config?.name ?? m.openid.iss,
+      };
+    }
+    return { type: "sso", name: m.sso.name ?? m.sso.domain };
+  };
 
   // --- Upgrade panel state ---
   let isUpgradeCollapsed = $state(
@@ -77,6 +132,7 @@
   // --- Handlers ---
   const handleAuthWizardSignIn = (identityNumber: bigint): Promise<void> => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    isCreateIdentityDialogOpen = false;
     return Promise.resolve();
   };
   const handleAuthWizardSignUp = (identityNumber: bigint): Promise<void> => {
@@ -85,13 +141,9 @@
       duration: 4000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    isCreateIdentityDialogOpen = false;
     return Promise.resolve();
   };
-  const handleAuthWizardUpgrade = (): Promise<void> => {
-    upgradeSuccess = true;
-    return Promise.resolve();
-  };
-
   const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
     authorizationStore.authorize(accountNumber);
   };
@@ -422,7 +474,132 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
-    onUpgrade={handleAuthWizardUpgrade}
     onError={handleError}
+    onOpenIdNotConnected={(args) => (notConnectedPayload = args)}
+    onMethodSwitch={(args) => (methodSwitchPayload = args)}
+    onSwitchMode={() => {
+      isCreateIdentityDialogOpen = true;
+    }}
+    mode="signin"
   />
 {/snippet}
+
+{#if isCreateIdentityDialogOpen}
+  <Dialog
+    onClose={() => {
+      isCreateIdentityDialogOpen = false;
+    }}
+  >
+    <AuthWizard
+      onSignIn={handleAuthWizardSignIn}
+      onSignUp={handleAuthWizardSignUp}
+      onError={(error) => {
+        isCreateIdentityDialogOpen = false;
+        handleError(error);
+      }}
+      onMethodSwitch={(args) => (methodSwitchPayload = args)}
+      onOpenIdAlreadyLinked={(args) => (alreadyLinkedPayload = args)}
+      onSwitchMode={undefined}
+      withinDialog={true}
+      mode="signup"
+    >
+      <SignUpHero />
+    </AuthWizard>
+  </Dialog>
+{/if}
+
+{#if notConnectedPayload !== undefined}
+  {@const payload = notConnectedPayload}
+  <Dialog
+    onClose={() => {
+      if (isResumingRegistration) {
+        return;
+      }
+      payload.cancel();
+      notConnectedPayload = undefined;
+    }}
+  >
+    <IdentityNotConnected
+      providerName={payload.providerName}
+      providerLogo={payload.providerLogo}
+      userName={payload.userName ?? payload.userEmail ?? payload.providerName}
+      userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
+      loading={isResumingRegistration}
+      onSignUp={async () => {
+        isResumingRegistration = true;
+        try {
+          await payload.resume();
+        } finally {
+          isResumingRegistration = false;
+          notConnectedPayload = undefined;
+        }
+      }}
+      onRecover={() => {
+        payload.cancel();
+        notConnectedPayload = undefined;
+        void goto("/recovery");
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if alreadyLinkedPayload !== undefined}
+  {@const payload = alreadyLinkedPayload}
+  <Dialog
+    onClose={() => {
+      if (isSigningInAlreadyLinked) {
+        return;
+      }
+      payload.cancel();
+      alreadyLinkedPayload = undefined;
+    }}
+  >
+    <IdentityAlreadyLinked
+      providerName={payload.providerName}
+      providerLogo={payload.providerLogo}
+      userName={payload.userName ?? payload.userEmail ?? payload.providerName}
+      userEmail={payload.userName !== undefined ? payload.userEmail : undefined}
+      loading={isSigningInAlreadyLinked}
+      onSignIn={async () => {
+        isSigningInAlreadyLinked = true;
+        try {
+          await payload.signIn();
+        } finally {
+          isSigningInAlreadyLinked = false;
+          alreadyLinkedPayload = undefined;
+        }
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if methodSwitchPayload !== undefined}
+  {@const payload = methodSwitchPayload}
+  {@const previous = payload.previous}
+  {@const previousEmail =
+    "openid" in previous.authMethod &&
+    previous.authMethod.openid.metadata !== undefined
+      ? getMetadataString(previous.authMethod.openid.metadata, "email")
+      : "sso" in previous.authMethod
+        ? previous.authMethod.sso.email
+        : undefined}
+  <Dialog
+    onClose={() => {
+      const proceed = payload.proceed;
+      methodSwitchPayload = undefined;
+      void proceed();
+    }}
+  >
+    <SwitchAccessMethod
+      userName={previous.name ?? previousEmail ?? `${previous.identityNumber}`}
+      userEmail={previous.name !== undefined ? previousEmail : undefined}
+      fromMethod={authMethodToAccessMethod(previous.authMethod)}
+      toMethod={payload.newProvider}
+      onSwitch={() => {
+        const proceed = payload.proceed;
+        methodSwitchPayload = undefined;
+        void proceed();
+      }}
+    />
+  </Dialog>
+{/if}

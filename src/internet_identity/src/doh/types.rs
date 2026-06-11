@@ -83,6 +83,15 @@ pub enum DohError {
     /// Every provider's outcall failed (network error / non-200 / etc).
     /// "Every" means all of `PROVIDERS.len()` — currently five.
     AllProvidersFailed,
+    /// A dedup *waiter* gave up: it polled the cache for an in-flight
+    /// fetch up to the caller's poll cap without the owning fetch
+    /// publishing a result (see `super::fetch_txt`). Deliberately
+    /// distinct from [`Self::AllProvidersFailed`] — which means *this*
+    /// caller's own five-provider fan-out came back empty — so the two
+    /// can be told apart in diagnostics: a spike of this variant points
+    /// at the dedup wait being too short for real outcall latency (or a
+    /// wedged owner), not at the providers themselves being down.
+    DedupWaitTimedOut,
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
     QuorumFailed { agreeing: usize, total: usize },

@@ -13,9 +13,6 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::TimerId;
-use std::cell::RefCell;
-use std::time::Duration;
 
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -82,95 +79,6 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
-
-// ---- OpenID credential key migration (temporary, see PR #3784) ----
-//
-// The `OpenIdCredentialKey` type grew an `aud` field. Existing index entries
-// were written in the legacy `(iss, sub)` CBOR array shape and must be
-// upgraded to the new `(iss, sub, aud)` CBOR map shape. Upgrading all entries
-// synchronously in `post_upgrade` would blow the instruction limit on II's
-// production canister, so we batch the work via an interval timer using the
-// same convention as the prior anchor migration (#3713).
-
-/// How long to wait between migration batches.
-const OIDC_KEY_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-/// Maximum number of index entries to upgrade per batch (= per ingress message).
-/// Matches the 2 000-anchor-per-batch convention used for previous migrations.
-const OIDC_KEY_MIGRATION_BATCH_SIZE: u64 = 2_000;
-
-thread_local! {
-    // TODO: Remove these after the data migration is complete.
-    static OIDC_KEY_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
-    static OIDC_KEY_MIGRATION_PROCESSED: RefCell<u64> = const { RefCell::new(0) };
-    static OIDC_KEY_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    static OIDC_KEY_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-/// Temporary hidden endpoint: returns any orphan-entry errors encountered
-/// during the OpenID credential key migration.
-#[update(hidden = true)]
-fn list_oidc_key_migration_errors() -> Vec<String> {
-    OIDC_KEY_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
-}
-
-/// Temporary hidden endpoint: returns `(processed_entries, is_done)` so
-/// monitoring can track migration progress.
-#[query(hidden = true)]
-fn oidc_key_migration_status() -> (u64, bool) {
-    (
-        OIDC_KEY_MIGRATION_PROCESSED.with_borrow(|c| *c),
-        OIDC_KEY_MIGRATION_DONE.with_borrow(|d| *d),
-    )
-}
-
-/// Process one batch of the OpenID credential key migration. Bound to the
-/// interval timer set up in [`init_oidc_key_migration_timer`]; clears the
-/// timer once the migration signals completion.
-fn run_oidc_key_migration_batch() {
-    if OIDC_KEY_MIGRATION_DONE.with_borrow(|done| *done) {
-        return;
-    }
-
-    let outcome = state::storage_borrow_mut(|storage| {
-        storage.migrate_openid_credential_keys_batch(OIDC_KEY_MIGRATION_BATCH_SIZE)
-    });
-
-    OIDC_KEY_MIGRATION_PROCESSED.with_borrow_mut(|count| {
-        *count = count.saturating_add(outcome.processed);
-    });
-    if !outcome.errors.is_empty() {
-        OIDC_KEY_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
-    }
-
-    if outcome.is_done {
-        OIDC_KEY_MIGRATION_DONE.replace(true);
-        OIDC_KEY_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-            if let Some(timer_id) = id_slot.take() {
-                ic_cdk_timers::clear_timer(timer_id);
-            }
-        });
-        let processed = OIDC_KEY_MIGRATION_PROCESSED.with_borrow(|c| *c);
-        ic_cdk::println!(
-            "OpenID credential key migration COMPLETED ({processed} entries processed)."
-        );
-    }
-}
-
-/// Start the interval timer driving [`run_oidc_key_migration_batch`]. Safe to
-/// call from both `init` (the first batch will immediately see an empty index
-/// and mark the migration done) and `post_upgrade`.
-fn init_oidc_key_migration_timer() {
-    let timer_id = ic_cdk_timers::set_timer_interval(
-        OIDC_KEY_MIGRATION_BATCH_BACKOFF_SECONDS,
-        run_oidc_key_migration_batch,
-    );
-    OIDC_KEY_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
-        if let Some(old_id) = id_slot.replace(timer_id) {
-            ic_cdk_timers::clear_timer(old_id);
-        }
-    });
-}
 
 #[update]
 async fn init_salt() {
@@ -686,7 +594,7 @@ fn config() -> InternetIdentityInit {
         is_production: persistent_state.is_production,
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
-        backend_origin: None,
+        backend_origin: persistent_state.backend_origin.clone(),
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
     })
@@ -748,11 +656,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(oidc_configs) = persisted_oidc_configs {
         openid::setup_oidc(oidc_configs);
     }
-
-    // Kick off the OpenID credential key batch migration. Processes at most
-    // `OIDC_KEY_MIGRATION_BATCH_SIZE` entries per tick so each batch fits in
-    // one ingress message; timer self-clears once the migration signals done.
-    init_oidc_key_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -783,6 +686,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(related_origins) = arg.related_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.related_origins = Some(related_origins);
+            })
+        }
+        if let Some(backend_origin) = arg.backend_origin {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.backend_origin = Some(backend_origin);
             })
         }
         if let Some(openid_configs) = arg.openid_configs {
@@ -1442,8 +1350,9 @@ mod email_recovery_api {
     use ic_canister_sig_creation::signature_map::CanisterSigInputs;
     use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
     use internet_identity_interface::internet_identity::types::email_recovery::{
-        EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
-        EmailRecoveryGetDelegationArgs, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
+        EmailRecoveryChallenge, EmailRecoveryDiagnostics, EmailRecoveryDnsInput,
+        EmailRecoveryError, EmailRecoveryGetDelegationArgs, EmailRecoveryStatus,
+        EmailRecoverySubmitDkimLeafArg, EmailRecoverySubmitDkimLeafViaDohArg,
     };
     use internet_identity_interface::internet_identity::types::SessionKey;
 
@@ -1561,6 +1470,28 @@ mod email_recovery_api {
         email_recovery::pending_status(&nonce, now_secs)
     }
 
+    /// Anonymous. Returns strictly-public, user-copyable diagnostics for
+    /// a pending challenge — the gateway `message_id`, a coarse reason
+    /// code, the verification path, and the challenge creation time — so
+    /// a user who hits a recovery-email failure can paste them into a
+    /// support ticket and let support line the case up across the SMTP
+    /// gateway and canister logs.
+    ///
+    /// Returns `None` for an unknown/expired nonce, the same observable
+    /// collapse `email_recovery_status` makes to `Expired`.
+    ///
+    /// **Security:** strictly non-sensitive — NO email address, anchor,
+    /// principal, delegation/seed, or inner error string (the
+    /// `reason_code` is the failing variant's name only). Readable only
+    /// by the holder of the 64-bit nonce, exactly like
+    /// `email_recovery_status`; it adds no pre-verification distinction a
+    /// prober could use as an existence/linkage oracle.
+    #[query]
+    fn email_recovery_diagnostics(nonce: String) -> Option<EmailRecoveryDiagnostics> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::pending_diagnostics(&nonce, now_secs)
+    }
+
     /// Anonymous. Phase 2 of the DNSSEC path: once
     /// `email_recovery_status` returns `NeedDkimLeaf { selector }`,
     /// the FE walks DNSSEC for `<selector>._domainkey.<domain>` and
@@ -1584,6 +1515,29 @@ mod email_recovery_api {
     ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
         email_recovery::submit_dkim_leaf(arg, now_secs).await
+    }
+
+    /// Anonymous. DoH-fallback sibling of
+    /// `email_recovery_submit_dkim_leaf`. The FE calls this instead of
+    /// submitting hops when it can't walk a fully-signed DNSSEC
+    /// resolution for the leaf — the DKIM record CNAMEs into an
+    /// unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
+    /// `live.com`, …). It carries no leaf data: the canister resolves
+    /// the DKIM key over its own allowlist-gated DoH path, reusing the
+    /// partial-verification record stashed at email-arrival time, then
+    /// runs the same DMARC alignment + binding. A domain the operator
+    /// hasn't enabled returns `DomainNotAllowlisted` rather than
+    /// leaving the entry stuck in `NeedDkimLeaf` until it expires.
+    ///
+    /// Anonymous for the same reason as
+    /// `email_recovery_submit_dkim_leaf`: the 64-bit nonce is the only
+    /// authentication, and the call is a no-op against any other entry.
+    #[update]
+    async fn email_recovery_submit_dkim_leaf_via_doh(
+        arg: EmailRecoverySubmitDkimLeafViaDohArg,
+    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs).await
     }
 
     /// **Anonymous query.** Final step of the recovery flow: after
