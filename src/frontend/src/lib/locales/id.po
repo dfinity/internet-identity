@@ -626,8 +626,6 @@ msgstr "Identitas dihapus"
 msgid "Identity upgraded."
 msgstr "Identitas berhasil ditingkatkan."
 
-msgid "If this keeps happening, copy these details and include them in a"
-msgstr "Jika ini terus terjadi, salin detail ini dan sertakan dalam"
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Jika Anda mengelola <0>{domain}</0>, mengaktifkan DNSSEC di registrar domain Anda biasanya hanya perlu beberapa klik. Setelah menyebar, alamat ini akan berfungsi secara otomatis. Tidak diperlukan tindakan lebih lanjut dari kami."
@@ -1278,8 +1276,6 @@ msgstr "Metode akses berhasil diganti"
 msgid "Support"
 msgstr "Dukungan"
 
-msgid "support request"
-msgstr "permintaan dukungan"
 
 msgid "Switch"
 msgstr "Ganti"

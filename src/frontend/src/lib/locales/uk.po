@@ -626,8 +626,6 @@ msgstr "Ідентифікатор видалено"
 msgid "Identity upgraded."
 msgstr "Ідентифікатор оновлено."
 
-msgid "If this keeps happening, copy these details and include them in a"
-msgstr "Якщо це продовжується, скопіюйте ці деталі та вкажіть їх у"
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Якщо ви адмініструєте <0>{domain}</0>, увімкнення DNSSEC у вашого реєстратора домену зазвичай потребує лише кількох кліків. Після поширення змін ця адреса запрацює автоматично. Жодних додаткових дій з нашого боку не потрібно."
@@ -1278,8 +1276,6 @@ msgstr "Метод доступу успішно змінено"
 msgid "Support"
 msgstr "Підтримка"
 
-msgid "support request"
-msgstr "запит до служби підтримки"
 
 msgid "Switch"
 msgstr "Змінити"

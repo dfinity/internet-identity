@@ -626,8 +626,6 @@ msgstr "شناخت ہٹا دی گئی"
 msgid "Identity upgraded."
 msgstr "شناخت اپ گریڈ ہو گئی۔"
 
-msgid "If this keeps happening, copy these details and include them in a"
-msgstr "اگر یہ ہوتا رہتا ہے تو یہ تفصیلات کاپی کریں اور انہیں ایک"
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "اگر آپ <0>{domain}</0> کا انتظام کرتے ہیں، تو اپنے ڈومین رجسٹرار پر DNSSEC فعال کرنا عام طور پر چند کلکس میں ہو جاتا ہے۔ ایک بار پھیل جانے کے بعد، یہ پتہ خود بخود کام کرے گا۔ ہماری طرف سے کوئی مزید کارروائی کی ضرورت نہیں۔"
@@ -1278,8 +1276,6 @@ msgstr "رسائی کا طریقہ کامیابی سے تبدیل ہو گیا"
 msgid "Support"
 msgstr "مدد"
 
-msgid "support request"
-msgstr "سپورٹ درخواست"
 
 msgid "Switch"
 msgstr "سوئچ کریں"

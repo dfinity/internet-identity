@@ -626,8 +626,6 @@ msgstr "Identité supprimée"
 msgid "Identity upgraded."
 msgstr "Identité mise à niveau."
 
-msgid "If this keeps happening, copy these details and include them in a"
-msgstr "Si cela continue, copiez ces détails et incluez-les dans une"
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Si vous administrez <0>{domain}</0>, l'activation du DNSSEC auprès de votre bureau d'enregistrement de domaine ne prend généralement que quelques clics. Une fois propagé, cette adresse fonctionnera automatiquement. Aucune action supplémentaire de notre part n'est nécessaire."
@@ -1278,8 +1276,6 @@ msgstr "Méthode d'accès changée avec succès"
 msgid "Support"
 msgstr "Support"
 
-msgid "support request"
-msgstr "demande d'assistance"
 
 msgid "Switch"
 msgstr "Changer"

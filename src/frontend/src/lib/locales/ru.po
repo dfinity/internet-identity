@@ -626,8 +626,6 @@ msgstr "Учётная запись удалена"
 msgid "Identity upgraded."
 msgstr "Учётная запись обновлена."
 
-msgid "If this keeps happening, copy these details and include them in a"
-msgstr "Если это продолжается, скопируйте эти данные и вставьте их в"
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Если вы администрируете <0>{domain}</0>, включение DNSSEC у вашего регистратора домена обычно занимает несколько кликов. После распространения изменений этот адрес заработает автоматически. Никаких дополнительных действий с нашей стороны не потребуется."
@@ -1278,8 +1276,6 @@ msgstr "Метод доступа успешно изменён"
 msgid "Support"
 msgstr "Поддержка"
 
-msgid "support request"
-msgstr "обращение в поддержку"
 
 msgid "Switch"
 msgstr "Сменить"
