@@ -648,5 +648,11 @@
     ],
     "logo": "caffeine_logo.svg",
     "certified_attributes": true
+  },
+  {
+    "name": "Open Cloud",
+    "oneLiner": "A portal for provisioning cloud engines: a sovereign serverless cloud platform with tamperproof execution, safe upgrades, and horizontal auto-scaling.",
+    "website": "https://opencloud.org",
+    "logo": "open_cloud_logo.svg"
   }
 ]
