@@ -87,10 +87,15 @@
   };
 
   // In signup mode the toggle's "Already have an identity? Sign in" CTA
-  // is misleading when the user has none — hide it in that case. Signin
-  // mode's "New to Internet Identity? Sign up" is always useful.
+  // is misleading for fresh users with no identities. Hide it only in the
+  // bare inline-picker case where that's a real concern — inside a parent
+  // Dialog, self-elevated, or framed by an AuthPanel, the parent already
+  // committed to showing both directions of the flow.
   const switchModeAvailable = $derived(
     mode === "signin" ||
+      inDialog ||
+      isElevated ||
+      inAuthPanel ||
       Object.keys($lastUsedIdentitiesStore.identities).length > 0,
   );
 

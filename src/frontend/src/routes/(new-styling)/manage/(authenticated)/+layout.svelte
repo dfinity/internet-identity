@@ -460,12 +460,7 @@
       }}
       bind:mode={authDialogMode}
     >
-      <h1
-        class={[
-          "text-text-primary mt-2 self-start text-2xl font-medium",
-          authDialogMode === "signin" ? "mb-2" : "mb-6",
-        ]}
-      >
+      <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
         {authDialogMode === "signup" ? $t`Add a new identity` : $t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
