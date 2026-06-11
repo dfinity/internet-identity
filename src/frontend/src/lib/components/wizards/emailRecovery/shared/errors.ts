@@ -116,8 +116,6 @@ export const dohSubReason = (
   if (!("DohFetchFailed" in reason)) return undefined;
   const cause = reason.DohFetchFailed;
   if ("AllProvidersFailed" in cause) return "all_providers_failed";
-  if ("QueueFull" in cause) return "queue_full";
-  if ("Throttled" in cause) return "throttled";
   if ("QuorumFailed" in cause) return "quorum_failed";
   if ("ResponseMalformed" in cause) return "response_malformed";
   return cause satisfies never;

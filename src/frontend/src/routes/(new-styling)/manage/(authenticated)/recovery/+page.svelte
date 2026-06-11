@@ -287,15 +287,15 @@
   const submitEmailDkimLeaf = async (
     arg: EmailRecoverySubmitDkimLeafArg,
   ): Promise<void> => {
-    throwCanisterError(
+    await throwCanisterError(
       await anonymousActor.email_recovery_submit_dkim_leaf(arg),
     );
   };
 
-  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf_via_doh`. */
-  const submitEmailDkimLeafViaDoh = async (nonce: string): Promise<void> => {
-    throwCanisterError(
-      await anonymousActor.email_recovery_submit_dkim_leaf_via_doh({ nonce }),
+  /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+  const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
+    await throwCanisterError(
+      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
     );
   };
 
@@ -516,7 +516,7 @@
       status={statusEmailRecovery}
       diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
-      submitDkimLeafViaDoh={submitEmailDkimLeafViaDoh}
+      resolveViaDoh={resolveEmailViaDoh}
       onSuccess={handleEmailWizardSuccess}
     />
   </Dialog>

@@ -56,11 +56,12 @@ export interface EmailRecoveryPollDeps<E extends Record<string, string>> {
    *  the leaf and returns; the verdict is read by polling `status`. Rejects
    *  only on a call-level error (unknown nonce / wrong state). */
   submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-  /** `email_recovery_submit_dkim_leaf_via_doh` — the DoH fallback, used
-   *  when the DKIM record CNAMEs into an unsigned zone and the DNSSEC
-   *  walk yields nothing. Carries only the nonce. Accept-only like
-   *  `submitDkimLeaf`; poll `status` for the verdict. */
-  submitDkimLeafViaDoh: (nonce: string) => Promise<void>;
+  /** `email_recovery_resolve_via_doh` — resolves the DKIM key over the
+   *  canister's DoH path. Driven repeatedly while the status is
+   *  `ResolvingDoh` (the pure-DoH/Gmail case, and the fallback when a DNSSEC
+   *  leaf CNAMEs into an unsigned zone). Carries only the nonce; idempotent
+   *  and accept-only — poll `status` for the verdict. */
+  resolveViaDoh: (nonce: string) => Promise<void>;
   /** `email_recovery_diagnostics` (query). */
   diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
 
@@ -78,7 +79,7 @@ export interface EmailRecoveryPollDeps<E extends Record<string, string>> {
   /**
    * Handle a terminal *success* status. Returns `true` if `status` was a
    * terminal success (the loop then stops); `false` for any
-   * non-terminal status (`Pending` / `Verifying` / `NeedDkimLeaf`), so the
+   * non-terminal status (`Pending` / `ResolvingDoh` / `NeedDkimLeaf`), so the
    * loop keeps going. Setup checks `RegistrationSucceeded`; recovery
    * checks `RecoveryReady` and awaits the delegation retrieval.
    */
@@ -107,7 +108,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
     domain,
     status,
     submitDkimLeaf,
-    submitDkimLeafViaDoh,
+    resolveViaDoh,
     diagnostics,
     funnel,
     events,
@@ -223,7 +224,10 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
               extra_chains: walked.extraChains,
             });
           } else {
-            await submitDkimLeafViaDoh(nonce);
+            // The leaf CNAMEs into an unsigned zone — switch to the DoH
+            // path. This first call flips the status to `ResolvingDoh`; the
+            // `ResolvingDoh` branch below then drives it to a verdict.
+            await resolveViaDoh(nonce);
           }
           funnel.trigger(events.dkimLeafSubmitted);
           // The submit only *accepts* — it carries no verdict. The pending
@@ -246,6 +250,27 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
           // (`dkimLeafSubmitted`), so the poll loop would never re-submit.
           // Surface a retryable failure instead of staying silent.
           funnel.trigger(events.failed, { reason: "SubmitFailed" });
+          funnel.close();
+          toFailed(SUBMIT_FAILED_MESSAGE, await collectDiagnostics());
+          return;
+        }
+      }
+      if ("ResolvingDoh" in result) {
+        // Drive the canister's DoH key resolution. It's idempotent, so it's
+        // safe to call on each tick while the cache fetch is in flight — but
+        // a *thrown* error is a real failure to handle, not something to
+        // retry into oblivion. Mirror the submit path: a canister `Err` (the
+        // challenge is gone) is terminal, routed like an `Ok(Failed)` status;
+        // a non-canister error (transport failure) leaves the outcome unknown,
+        // so surface a retryable failure. Either way, stop — don't re-poll.
+        try {
+          await resolveViaDoh(nonce);
+        } catch (e) {
+          if (isCanisterError<EmailRecoveryError>(e)) {
+            await handleTerminalFailure({ Failed: e.raw });
+            return;
+          }
+          funnel.trigger(events.failed, { reason: "ResolveFailed" });
           funnel.close();
           toFailed(SUBMIT_FAILED_MESSAGE, await collectDiagnostics());
           return;

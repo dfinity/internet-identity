@@ -308,8 +308,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const DohFailureReason = IDL.Variant({
     'AllProvidersFailed' : IDL.Null,
-    'QueueFull' : IDL.Null,
-    'Throttled' : IDL.Null,
     'ResponseMalformed' : IDL.Text,
     'QuorumFailed' : IDL.Record({
       'total' : IDL.Nat32,
@@ -358,9 +356,11 @@ export const idlFactory = ({ IDL }) => {
     'signature' : IDL.Vec(IDL.Nat8),
     'delegation' : Delegation,
   });
+  const EmailRecoveryResolveViaDohArg = IDL.Record({ 'nonce' : IDL.Text });
   const UserKey = PublicKey;
   const EmailRecoveryStatus = IDL.Variant({
     'Failed' : EmailRecoveryError,
+    'ResolvingDoh' : IDL.Null,
     'NeedDkimLeaf' : IDL.Record({ 'selector' : IDL.Text }),
     'RecoveryReady' : IDL.Record({
       'user_key' : UserKey,
@@ -369,15 +369,11 @@ export const idlFactory = ({ IDL }) => {
     }),
     'RegistrationSucceeded' : IDL.Null,
     'Expired' : IDL.Null,
-    'Verifying' : IDL.Null,
     'Pending' : IDL.Null,
   });
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({
     'extra_chains' : IDL.Vec(DelegationChain),
     'hops' : IDL.Vec(SignedRRset),
-    'nonce' : IDL.Text,
-  });
-  const EmailRecoverySubmitDkimLeafViaDohArg = IDL.Record({
     'nonce' : IDL.Text,
   });
   const BufferedArchiveEntry = IDL.Record({
@@ -913,6 +909,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'email_recovery_resolve_via_doh' : IDL.Func(
+        [EmailRecoveryResolveViaDohArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [],
+      ),
     'email_recovery_status' : IDL.Func(
         [IDL.Text],
         [EmailRecoveryStatus],
@@ -920,11 +921,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'email_recovery_submit_dkim_leaf' : IDL.Func(
         [EmailRecoverySubmitDkimLeafArg],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
-        [],
-      ),
-    'email_recovery_submit_dkim_leaf_via_doh' : IDL.Func(
-        [EmailRecoverySubmitDkimLeafViaDohArg],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),

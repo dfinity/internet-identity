@@ -62,8 +62,8 @@
     /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
      *  rejects on a call-level error, else resolves void (poll for verdict). */
     submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf_via_doh`. */
-    submitDkimLeafViaDoh: (nonce: string) => Promise<void>;
+    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    resolveViaDoh: (nonce: string) => Promise<void>;
     /** Anonymous wrapper around `email_recovery_get_delegation`. */
     getDelegation: (
       args: EmailRecoveryGetDelegationArgs,
@@ -78,7 +78,7 @@
     status,
     diagnostics,
     submitDkimLeaf,
-    submitDkimLeafViaDoh,
+    resolveViaDoh,
     getDelegation,
     onSignedIn,
   }: Props = $props();
@@ -195,7 +195,7 @@
       domain,
       status,
       submitDkimLeaf,
-      submitDkimLeafViaDoh,
+      resolveViaDoh,
       diagnostics,
       funnel: recoverWithEmailFunnel,
       events: {
