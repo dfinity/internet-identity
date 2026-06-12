@@ -12,6 +12,11 @@ export type AuthorizationContext = {
 
 export type Authorized = {
   accountNumberPromise: Promise<bigint | undefined>;
+  /** Whether the user restricted this authorization to read-only access:
+   *  attributes certified for this session will carry
+   *  `implicit:permissions = "queries"`, which makes the IC reject update
+   *  calls that present them as `sender_info`. */
+  readOnly: boolean;
 };
 
 const contextInternal = writable<AuthorizationContext | undefined>();
@@ -30,9 +35,13 @@ export const authorizationStore = {
   },
   /** Called by the UI when the user authorizes with a specific account.
    *  Accepts a promise so the animation can start immediately while the
-   *  account number resolves asynchronously. */
-  authorize: (accountNumberPromise: Promise<bigint | undefined>): void => {
-    authorizedInternal.set({ accountNumberPromise });
+   *  account number resolves asynchronously. `readOnly` restricts the
+   *  session to read-only access (see {@link Authorized.readOnly}). */
+  authorize: (
+    accountNumberPromise: Promise<bigint | undefined>,
+    readOnly = false,
+  ): void => {
+    authorizedInternal.set({ accountNumberPromise, readOnly });
   },
   subscribe: contextInternal.subscribe,
 };

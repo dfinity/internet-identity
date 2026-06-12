@@ -651,7 +651,7 @@ pub fn verify_delegation(
     // followed by the representation independent hash of a map with entries
     // pubkey, expiration and targets (if any), using the respective values from the delegation.
     // See https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
-    let key_value_pairs = vec![
+    let mut key_value_pairs = vec![
         (
             "pubkey".to_string(),
             Value::Bytes(signed_delegation.delegation.pubkey.clone().into_vec()),
@@ -661,6 +661,12 @@ pub fn verify_delegation(
             Value::Number(signed_delegation.delegation.expiration),
         ),
     ];
+    if let Some(permissions) = &signed_delegation.delegation.permissions {
+        key_value_pairs.push((
+            "permissions".to_string(),
+            Value::String(permissions.clone()),
+        ));
+    }
     let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
     msg.extend_from_slice(DOMAIN_SEPARATOR);
     msg.extend_from_slice(

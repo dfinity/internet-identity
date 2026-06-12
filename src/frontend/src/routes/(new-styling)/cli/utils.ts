@@ -76,6 +76,7 @@ export const cliAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
+      [],
     )
     .then(throwCanisterError);
 
@@ -87,6 +88,7 @@ export const cliAuthorize = async ({
         [],
         ephemeralPublicKey,
         expiration,
+        [],
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

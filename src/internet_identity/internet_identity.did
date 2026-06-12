@@ -157,6 +157,10 @@ type Delegation = record {
     pubkey : PublicKey;
     expiration : Timestamp;
     targets : opt vec principal;
+    // Restricts the kinds of calls the delegation permits: `"queries"`
+    // restricts the sender to query calls (the IC rejects update calls
+    // authenticated through such a delegation). Absent means unrestricted.
+    permissions : opt text;
 };
 
 type SignedDelegation = record {
@@ -1644,7 +1648,11 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
-        max_ttl : opt nat64
+        max_ttl : opt nat64,
+        // When `opt true`, the prepared delegation restricts the session to
+        // query calls: it carries `permissions = "queries"`, which makes the
+        // IC reject update calls authenticated through it.
+        read_only : opt bool
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
     
     get_account_delegation : (
@@ -1652,7 +1660,9 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
-        expiration : Timestamp
+        expiration : Timestamp,
+        // Must match the value passed to `prepare_account_delegation`.
+        read_only : opt bool
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 
     get_default_account : (

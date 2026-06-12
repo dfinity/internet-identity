@@ -445,6 +445,7 @@ async fn prepare_delegation(
         None,
         session_key,
         max_time_to_live,
+        false,
         &ii_domain,
     )
     .await
@@ -473,6 +474,7 @@ fn get_delegation(
         None,
         session_key,
         expiration,
+        false,
     )
     .map(GetDelegationResponse::SignedDelegation)
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
@@ -580,6 +582,7 @@ async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    read_only: Option<bool>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
@@ -589,6 +592,7 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
+                read_only.unwrap_or(false),
                 &ii_domain,
             )
             .await
@@ -604,6 +608,7 @@ fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    read_only: Option<bool>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
         Ok(_) => account_management::get_account_delegation(
@@ -612,6 +617,7 @@ fn get_account_delegation(
             account_number,
             session_key,
             expiration,
+            read_only.unwrap_or(false),
         ),
         Err(err) => Err(err.into()),
     }
@@ -1696,6 +1702,7 @@ mod email_recovery_api {
                         pubkey: args.session_key,
                         expiration: args.expiration,
                         targets: None,
+                        permissions: None,
                     },
                     signature: serde_bytes::ByteBuf::from(signature),
                 })

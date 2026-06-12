@@ -375,6 +375,12 @@ export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'NameTooLong' : null };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
+  /**
+   * Restricts the kinds of calls the delegation permits: `"queries"`
+   * restricts the sender to query calls (the IC rejects update calls
+   * authenticated through such a delegation). Absent means unrestricted.
+   */
+  'permissions' : [] | [string],
   'pubkey' : PublicKey,
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
@@ -1783,7 +1789,14 @@ export interface _SERVICE {
    */
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
   'get_account_delegation' : ActorMethod<
-    [UserNumber, FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
+    [
+      UserNumber,
+      FrontendHostname,
+      [] | [AccountNumber],
+      SessionKey,
+      Timestamp,
+      [] | [boolean],
+    ],
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
   >,
@@ -1954,6 +1967,7 @@ export interface _SERVICE {
       [] | [AccountNumber],
       SessionKey,
       [] | [bigint],
+      [] | [boolean],
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }

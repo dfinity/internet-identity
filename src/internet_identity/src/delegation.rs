@@ -143,6 +143,57 @@ pub fn add_delegation_signature(
     sigs.add_signature(&inputs);
 }
 
+/// The value of a delegation's `permissions` field that restricts the
+/// sender to query calls: the IC rejects update calls authenticated
+/// through such a delegation.
+pub const DELEGATION_PERMISSIONS_QUERIES: &str = "queries";
+
+/// Like `ic_canister_sig_creation::delegation_signature_msg`, but
+/// additionally supports the delegation's optional `permissions` field
+/// (see the IC interface specification). Produces the identical message
+/// when `permissions` is `None`.
+pub fn delegation_signature_msg_with_permissions(
+    pubkey: &[u8],
+    expiration: Timestamp,
+    targets: Option<&Vec<Vec<u8>>>,
+    permissions: Option<&str>,
+) -> Vec<u8> {
+    use ic_representation_independent_hash::{representation_independent_hash, Value};
+
+    let mut m: Vec<(String, Value)> = vec![
+        ("pubkey".into(), Value::Bytes(pubkey.to_vec())),
+        ("expiration".into(), Value::Number(expiration)),
+    ];
+    if let Some(targets) = targets {
+        m.push((
+            "targets".into(),
+            Value::Array(targets.iter().map(|t| Value::Bytes(t.to_vec())).collect()),
+        ));
+    }
+    if let Some(permissions) = permissions {
+        m.push(("permissions".into(), Value::String(permissions.to_string())));
+    }
+    representation_independent_hash(m.as_slice()).to_vec()
+}
+
+/// Like [`add_delegation_signature`], but restricts the delegation to the
+/// given permissions when `read_only` is `true`.
+pub fn add_delegation_signature_with_permissions(
+    sigs: &mut SignatureMap,
+    pk: PublicKey,
+    seed: &[u8],
+    expiration: Timestamp,
+    read_only: bool,
+) {
+    let permissions = read_only.then_some(DELEGATION_PERMISSIONS_QUERIES);
+    let inputs = CanisterSigInputs {
+        domain: DELEGATION_SIG_DOMAIN,
+        seed,
+        message: &delegation_signature_msg_with_permissions(&pk, expiration, None, permissions),
+    };
+    sigs.add_signature(&inputs);
+}
+
 pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
     const FRONTEND_HOSTNAME_LIMIT: usize = 255;
 

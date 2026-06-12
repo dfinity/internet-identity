@@ -25,14 +25,22 @@
   } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
+  import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
     effectiveOrigin: string;
-    /** Called when the user confirms with the default account or selects a specific account. */
-    onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
+    /** Called when the user confirms with the default account or selects a
+     *  specific account. `readOnly` reflects the "Read-only mode" checkbox:
+     *  when `true`, attributes certified for this session restrict the app
+     *  to query calls (it can read on the user's behalf but cannot change
+     *  state). */
+    onAuthorize: (
+      accountNumber: Promise<bigint | undefined>,
+      readOnly?: boolean,
+    ) => void;
   }
 
   const { effectiveOrigin, onAuthorize }: Props = $props();
@@ -53,6 +61,7 @@
     }
   });
 
+  let isReadOnlyMode = $state(false);
   let isCreateAccountDialogVisible = $state(false);
   let isEditAccountDialogVisibleForNumber = $state<
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
@@ -106,7 +115,7 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      onAuthorize(accountNumberPromise);
+      onAuthorize(accountNumberPromise, isReadOnlyMode);
     } catch (error) {
       handleError(error);
     } finally {
@@ -116,7 +125,7 @@
   const handleContinueAs = (
     accountNumber: AccountNumber | PRIMARY_ACCOUNT_NUMBER,
   ) => {
-    onAuthorize(Promise.resolve(accountNumber));
+    onAuthorize(Promise.resolve(accountNumber), isReadOnlyMode);
   };
   const handleEnableMultipleAccounts = async () => {
     try {
@@ -398,6 +407,29 @@
       <button
         class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
         aria-label={$t`More information about multiple accounts`}
+      >
+        <HelpCircleIcon class="size-5" />
+      </button>
+    </Tooltip>
+  </div>
+  <div class="mt-4 flex flex-row items-center">
+    <Checkbox
+      bind:checked={isReadOnlyMode}
+      label={$t`Read-only mode`}
+      size="sm"
+      disabled={isAuthenticatingDefault}
+    />
+    <Tooltip
+      label={$t`Read-only mode`}
+      description={$t`When enabled, the app can read data on your behalf but cannot make any changes: calls that would change state are rejected. Only apps that support certified session attributes enforce this restriction.`}
+      direction="up"
+      align="end"
+      offset="0rem"
+      class="max-w-80"
+    >
+      <button
+        class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
+        aria-label={$t`More information about read-only mode`}
       >
         <HelpCircleIcon class="size-5" />
       </button>
