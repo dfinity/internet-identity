@@ -127,11 +127,6 @@ export class AuthFlow {
     return this.#ssoName ?? this.#ssoDomain;
   }
 
-  get providerLogo(): string | undefined {
-    if (this.#configIssuer === undefined) return undefined;
-    return findConfig(this.#configIssuer, undefined, [])?.logo;
-  }
-
   get pendingMethodSwitch() {
     return this.#pendingMethodSwitch;
   }

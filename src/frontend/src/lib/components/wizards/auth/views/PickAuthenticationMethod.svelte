@@ -112,7 +112,7 @@
           manual
         >
           <button
-            class="border-border-secondary text-fg-primary bg-bg-primary hover:not-disabled:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex h-16 w-full flex-col items-center justify-center gap-1.5 rounded-md border text-xs font-semibold outline-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2"
+            class="btn btn-secondary btn-tile"
             onclick={() => handleContinueWithOpenId(provider)}
             disabled={authenticatingProviderId !== undefined}
             aria-label={providerLabel(name)}
@@ -142,7 +142,7 @@
         exists.
       -->
       <button
-        class="border-border-secondary text-fg-primary bg-bg-primary hover:not-disabled:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex h-16 w-full flex-col items-center justify-center gap-1.5 rounded-md border text-xs font-semibold outline-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2"
+        class="btn btn-secondary btn-tile"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={ssoLabel}

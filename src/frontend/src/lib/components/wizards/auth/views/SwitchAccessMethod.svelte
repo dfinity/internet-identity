@@ -68,7 +68,10 @@
         name: config?.name ?? m.openid.iss,
       };
     }
-    return { type: "sso", name: m.sso.name ?? m.sso.domain };
+    if ("sso" in m) {
+      return { type: "sso", name: m.sso.name ?? m.sso.domain };
+    }
+    return m satisfies never;
   });
 
   const toMethod: AccessMethod = $derived.by(() => {
@@ -84,7 +87,10 @@
         name: config?.name ?? providerName ?? providerIssuer ?? "",
       };
     }
-    return { type: "sso", name: providerName ?? "" };
+    if (newMethod === "sso") {
+      return { type: "sso", name: providerName ?? "" };
+    }
+    return newMethod satisfies never;
   });
 
   const userName: string = $derived(

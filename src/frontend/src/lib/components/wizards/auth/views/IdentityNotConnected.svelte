@@ -12,7 +12,6 @@
   interface Props {
     issuer?: string;
     providerName?: string;
-    providerLogo?: string;
     userName?: string;
     userEmail?: string;
     onSignUp: () => void;
@@ -24,7 +23,6 @@
   let {
     issuer,
     providerName: providerNameProp,
-    providerLogo: providerLogoProp,
     userName,
     userEmail,
     onSignUp,
@@ -37,7 +35,7 @@
     issuer === undefined ? undefined : findConfig(issuer, undefined, []),
   );
   const resolvedProviderName = $derived(config?.name ?? providerNameProp ?? "");
-  const resolvedProviderLogo = $derived(config?.logo ?? providerLogoProp);
+  const resolvedProviderLogo = $derived(config?.logo);
   const resolvedUserName = $derived(
     userName ?? userEmail ?? resolvedProviderName,
   );

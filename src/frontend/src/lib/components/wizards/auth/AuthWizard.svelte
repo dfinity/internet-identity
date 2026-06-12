@@ -62,8 +62,12 @@
   let isAuthenticating = $state(false);
   let pendingSsoRegistration = false;
 
-  const methodType = (m: LastUsedIdentity["authMethod"]): MethodTag =>
-    "passkey" in m ? "passkey" : "openid" in m ? "openid" : "sso";
+  const methodType = (m: LastUsedIdentity["authMethod"]): MethodTag => {
+    if ("passkey" in m) return "passkey";
+    if ("openid" in m) return "openid";
+    if ("sso" in m) return "sso";
+    return m satisfies never;
+  };
 
   const maybeRequestMethodSwitch = (
     signedInIdentityNumber: bigint,
@@ -387,7 +391,6 @@
     <IdentityNotConnected
       issuer={authFlow.configIssuer}
       providerName={authFlow.providerName}
-      providerLogo={authFlow.providerLogo}
       userName={authFlow.userName}
       userEmail={authFlow.userEmail}
       onSignUp={handleConfirmOpenIdSignUp}
@@ -399,7 +402,6 @@
     <IdentityAlreadyLinked
       issuer={authFlow.configIssuer}
       providerName={authFlow.providerName}
-      providerLogo={authFlow.providerLogo}
       userName={authFlow.userName}
       userEmail={authFlow.userEmail}
       onSignIn={handleConfirmOpenIdSignIn}

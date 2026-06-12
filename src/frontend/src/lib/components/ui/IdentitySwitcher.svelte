@@ -52,7 +52,7 @@
   const selectedIdentity = $derived(
     initialIdentities.find(
       (identity) => identity.identityNumber === initialSelected,
-    )!,
+    ),
   );
   const otherIdentities = $derived(
     initialIdentities.filter(
@@ -107,30 +107,28 @@
   };
 </script>
 
-{#snippet selectedIdentityCard()}
+{#snippet selectedIdentityCard(identity: LastUsedIdentity)}
   <div
     class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex flex-col items-center rounded-b-2xl border-x border-b p-8"
   >
     <div class="mb-2">
-      <IdentityAvatar identity={selectedIdentity} size="lg" />
+      <IdentityAvatar {identity} size="lg" />
     </div>
     <p
       class="text-text-primary max-w-full overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap"
     >
-      {selectedIdentity.name ?? selectedIdentity.identityNumber}
+      {identity.name ?? identity.identityNumber}
     </p>
     <p
       class="text-text-tertiary mb-6 max-w-full overflow-hidden text-sm text-ellipsis whitespace-nowrap"
     >
-      {#if "openid" in selectedIdentity.authMethod && selectedIdentity.authMethod.openid.metadata !== undefined}
+      {#if "openid" in identity.authMethod && identity.authMethod.openid.metadata !== undefined}
         <span
-          >{getMetadataString(
-            selectedIdentity.authMethod.openid.metadata,
-            "email",
-          ) ?? $t`Hidden email`}</span
+          >{getMetadataString(identity.authMethod.openid.metadata, "email") ??
+            $t`Hidden email`}</span
         >
-      {:else if "sso" in selectedIdentity.authMethod}
-        {@const sso = selectedIdentity.authMethod.sso}
+      {:else if "sso" in identity.authMethod}
+        {@const sso = identity.authMethod.sso}
         <span>{sso.email ?? sso.name ?? sso.domain}</span>
       {/if}
     </p>
@@ -255,7 +253,7 @@
 >
   <div class="flex flex-col overflow-x-hidden">
     {#if selectedIdentity !== undefined}
-      {@render selectedIdentityCard()}
+      {@render selectedIdentityCard(selectedIdentity)}
     {:else}
       {@render orphanedSessionCard()}
     {/if}
