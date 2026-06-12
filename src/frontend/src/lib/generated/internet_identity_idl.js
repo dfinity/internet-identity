@@ -314,7 +314,6 @@ export const idlFactory = ({ IDL }) => {
     'expires_at' : Timestamp,
   });
   const DohFailureReason = IDL.Variant({
-    'DedupWaitTimeout' : IDL.Null,
     'AllProvidersFailed' : IDL.Null,
     'ResponseMalformed' : IDL.Text,
     'QuorumFailed' : IDL.Record({
@@ -364,9 +363,11 @@ export const idlFactory = ({ IDL }) => {
     'signature' : IDL.Vec(IDL.Nat8),
     'delegation' : Delegation,
   });
+  const EmailRecoveryResolveViaDohArg = IDL.Record({ 'nonce' : IDL.Text });
   const UserKey = PublicKey;
   const EmailRecoveryStatus = IDL.Variant({
     'Failed' : EmailRecoveryError,
+    'ResolvingDoh' : IDL.Null,
     'NeedDkimLeaf' : IDL.Record({ 'selector' : IDL.Text }),
     'RecoveryReady' : IDL.Record({
       'user_key' : UserKey,
@@ -380,9 +381,6 @@ export const idlFactory = ({ IDL }) => {
   const EmailRecoverySubmitDkimLeafArg = IDL.Record({
     'extra_chains' : IDL.Vec(DelegationChain),
     'hops' : IDL.Vec(SignedRRset),
-    'nonce' : IDL.Text,
-  });
-  const EmailRecoverySubmitDkimLeafViaDohArg = IDL.Record({
     'nonce' : IDL.Text,
   });
   const BufferedArchiveEntry = IDL.Record({
@@ -918,6 +916,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'email_recovery_resolve_via_doh' : IDL.Func(
+        [EmailRecoveryResolveViaDohArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [],
+      ),
     'email_recovery_status' : IDL.Func(
         [IDL.Text],
         [EmailRecoveryStatus],
@@ -925,22 +928,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'email_recovery_submit_dkim_leaf' : IDL.Func(
         [EmailRecoverySubmitDkimLeafArg],
-        [
-          IDL.Variant({
-            'Ok' : EmailRecoveryStatus,
-            'Err' : EmailRecoveryError,
-          }),
-        ],
-        [],
-      ),
-    'email_recovery_submit_dkim_leaf_via_doh' : IDL.Func(
-        [EmailRecoverySubmitDkimLeafViaDohArg],
-        [
-          IDL.Variant({
-            'Ok' : EmailRecoveryStatus,
-            'Err' : EmailRecoveryError,
-          }),
-        ],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),

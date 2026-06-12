@@ -209,17 +209,18 @@ pub struct EmailRecoverySubmitDkimLeafArg {
     pub extra_chains: Vec<DelegationChain>,
 }
 
-/// Argument to `email_recovery_submit_dkim_leaf_via_doh` — the DoH
-/// fallback sibling of `email_recovery_submit_dkim_leaf`. Wrapped in a
-/// record (like [`EmailRecoverySubmitDkimLeafArg`]) so the method can
-/// grow fields without a breaking interface change; `nonce` is the
-/// lookup key and is always required.
+/// Argument to `email_recovery_resolve_via_doh` — the DoH-resolution
+/// sibling of `email_recovery_submit_dkim_leaf`. Wrapped in a record
+/// (like [`EmailRecoverySubmitDkimLeafArg`]) so the method can grow
+/// fields without a breaking interface change; `nonce` is the lookup key
+/// and is always required.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct EmailRecoverySubmitDkimLeafViaDohArg {
+pub struct EmailRecoveryResolveViaDohArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`
-    /// (or `email_recovery_prepare_delegation` for recovery). The DoH
-    /// fallback carries no leaf data; the canister resolves the DKIM
-    /// key over its own allowlist-gated DoH path.
+    /// (or `email_recovery_prepare_delegation` for recovery). The method
+    /// carries no leaf data; the canister resolves the DKIM key over its
+    /// own allowlist-gated DoH path. The FE calls it repeatedly while the
+    /// status is `ResolvingDoh`.
     pub nonce: String,
 }
 
@@ -231,9 +232,6 @@ pub struct EmailRecoverySubmitDkimLeafViaDohArg {
 pub enum DohFailureReason {
     /// Every provider's outcall failed (network error / non-200 / etc).
     AllProvidersFailed,
-    /// A dedup waiter polled the cache for an in-flight fetch up to its
-    /// cap without the owning fetch publishing a result.
-    DedupWaitTimeout,
     /// Outcalls succeeded but the responses didn't reach the quorum
     /// threshold of identical TXT bytes.
     QuorumFailed { agreeing: u32, total: u32 },
@@ -354,6 +352,15 @@ pub enum EmailRecoveryStatus {
     /// message); the FE uses it both to query DoH and as the
     /// leaf's owner-name component.
     NeedDkimLeaf { selector: String },
+    /// The email arrived and the DKIM key is being resolved over DoH. The
+    /// FE drives `email_recovery_resolve_via_doh` while this is set: each
+    /// call reads the canister's DoH cache and either finishes or leaves the
+    /// status here to poll again. Reached on the DoH path (`smtp_request`
+    /// for a non-DNSSEC domain) and on the DNSSEC path's DoH fallback (when
+    /// the DKIM leaf CNAMEs into an unsigned zone). Flips to
+    /// `RegistrationSucceeded` / `RecoveryReady` / `Failed`. The DNSSEC
+    /// leaf-walk path reports `NeedDkimLeaf` first.
+    ResolvingDoh,
     /// Setup succeeded. The address is now bound to the anchor; the
     /// FE shows "all set" and ends the wizard.
     RegistrationSucceeded,

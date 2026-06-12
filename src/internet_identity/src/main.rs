@@ -62,6 +62,7 @@ mod http;
 mod ii_domain;
 
 mod openid;
+mod single_flight_cache;
 mod state;
 mod stats;
 mod storage;
@@ -1468,8 +1469,8 @@ mod email_recovery_api {
     use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
     use internet_identity_interface::internet_identity::types::email_recovery::{
         EmailRecoveryChallenge, EmailRecoveryDiagnostics, EmailRecoveryDnsInput,
-        EmailRecoveryError, EmailRecoveryGetDelegationArgs, EmailRecoveryStatus,
-        EmailRecoverySubmitDkimLeafArg, EmailRecoverySubmitDkimLeafViaDohArg,
+        EmailRecoveryError, EmailRecoveryGetDelegationArgs, EmailRecoveryResolveViaDohArg,
+        EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
     };
     use internet_identity_interface::internet_identity::types::SessionKey;
 
@@ -1545,10 +1546,13 @@ mod email_recovery_api {
     /// defense-in-depth against a direct caller spoofing just the
     /// user-part.
     #[update]
-    async fn smtp_request(
+    fn smtp_request(
         request: internet_identity_interface::internet_identity::types::smtp::SmtpRequest,
     ) -> internet_identity_interface::internet_identity::types::smtp::SmtpResponse {
-        email_recovery::handle_smtp_request(request).await
+        // Synchronous accept: the DoH path detaches verification and the FE
+        // polls `email_recovery_status` for the outcome, so the gateway
+        // isn't held for the outcall round trip.
+        email_recovery::handle_smtp_request(request)
     }
 
     /// Open query — the off-chain SMTP gateway calls this at
@@ -1629,32 +1633,40 @@ mod email_recovery_api {
     #[update]
     async fn email_recovery_submit_dkim_leaf(
         arg: EmailRecoverySubmitDkimLeafArg,
-    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+    ) -> Result<(), EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        // `Ok` = accepted; the verdict (Succeeded / Failed / RecoveryReady)
+        // is read from `email_recovery_status`. `Err` is a call-level
+        // rejection (unknown nonce / wrong state) only.
         email_recovery::submit_dkim_leaf(arg, now_secs).await
     }
 
-    /// Anonymous. DoH-fallback sibling of
-    /// `email_recovery_submit_dkim_leaf`. The FE calls this instead of
-    /// submitting hops when it can't walk a fully-signed DNSSEC
-    /// resolution for the leaf — the DKIM record CNAMEs into an
-    /// unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
-    /// `live.com`, …). It carries no leaf data: the canister resolves
-    /// the DKIM key over its own allowlist-gated DoH path, reusing the
-    /// partial-verification record stashed at email-arrival time, then
-    /// runs the same DMARC alignment + binding. A domain the operator
-    /// hasn't enabled returns `DomainNotAllowlisted` rather than
-    /// leaving the entry stuck in `NeedDkimLeaf` until it expires.
+    /// Anonymous. Resolves the DKIM key over the canister's own
+    /// allowlist-gated DoH path, reusing the partial-verification record
+    /// stashed at email-arrival time, then runs the same DMARC alignment +
+    /// binding. Used for the pure-DoH (Gmail) case and as the fallback for
+    /// the DNSSEC path when the FE can't walk a fully-signed resolution
+    /// because the DKIM record CNAMEs into an unsigned zone (`outlook.com`
+    /// -> `outbound.protection.outlook.com`, `live.com`, …).
     ///
-    /// Anonymous for the same reason as
-    /// `email_recovery_submit_dkim_leaf`: the 64-bit nonce is the only
-    /// authentication, and the call is a no-op against any other entry.
+    /// **Polled.** The FE calls this repeatedly while `email_recovery_status`
+    /// reports `ResolvingDoh`. Each call reads the DoH cache: a cache miss
+    /// spawns the fetch and returns `Ok(())` with the status left at
+    /// `ResolvingDoh` (poll again); a cache hit verifies and stamps the
+    /// terminal verdict. Idempotent — completing more than once is a no-op. A
+    /// domain the operator hasn't enabled lands as `DomainNotAllowlisted`.
+    ///
+    /// Anonymous for the same reason as `email_recovery_submit_dkim_leaf`:
+    /// the 64-bit nonce is the only authentication, and the call is a no-op
+    /// against any other entry.
     #[update]
-    async fn email_recovery_submit_dkim_leaf_via_doh(
-        arg: EmailRecoverySubmitDkimLeafViaDohArg,
-    ) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+    fn email_recovery_resolve_via_doh(
+        arg: EmailRecoveryResolveViaDohArg,
+    ) -> Result<(), EmailRecoveryError> {
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::submit_dkim_leaf_via_doh(arg.nonce, now_secs).await
+        // `Ok` = accepted; the verdict is read by polling
+        // `email_recovery_status` (the single source of truth).
+        email_recovery::resolve_via_doh(arg.nonce, now_secs)
     }
 
     /// **Anonymous query.** Final step of the recovery flow: after

@@ -67,15 +67,15 @@ pub struct PendingChallenge {
     pub cached_dmarc_txt: Option<Vec<u8>>,
     /// Partial-verification record stashed by `smtp_request` when the
     /// email arrives but the canister doesn't yet have the DKIM public
-    /// key. Holds enough to complete the signature check once
-    /// `submit_dkim_leaf` delivers the leaf. `None` until the email
-    /// arrives (DNSSEC path), or never set (DoH path, which finishes
-    /// verification synchronously inside `smtp_request`).
+    /// key. Holds enough to complete the signature check once the key is
+    /// obtained — via `submit_dkim_leaf` (DNSSEC) or `resolve_via_doh`
+    /// (DoH). `None` until the email arrives; cleared when verification
+    /// finishes (so a polled `resolve_via_doh` completes exactly once).
     pub partial_verification: Option<PartialVerification>,
-    /// Status the FE polls. Flips from `Pending` to either
-    /// `NeedDkimLeaf` (DNSSEC path, mid-verification) or a terminal
-    /// variant (DoH path, or `submit_dkim_leaf` outcome). Terminal
-    /// variants are sticky.
+    /// Status the FE polls. Flips from `Pending` (awaiting the email) to
+    /// `NeedDkimLeaf` (DNSSEC path) or `ResolvingDoh` (DoH path) when the
+    /// email arrives, then to a terminal variant once verification
+    /// finishes. Terminal variants are sticky.
     pub status: PendingStatus,
     /// Set on the recovery path when the verification pipeline
     /// completes successfully. Stored here (rather than as a payload
@@ -193,7 +193,17 @@ pub enum PendingKind {
 #[derive(Clone, Debug)]
 pub enum PendingStatus {
     Pending,
-    NeedDkimLeaf { selector: String },
+    NeedDkimLeaf {
+        selector: String,
+    },
+    /// The email arrived and the DKIM key is being resolved over DoH. The FE
+    /// drives `email_recovery_resolve_via_doh` while this is set: each call
+    /// reads the DoH cache and either finishes (cache `Ready`) or leaves the
+    /// status here to poll again (cache `Pending`). Reached on the DoH path
+    /// (`smtp_request` for a non-DNSSEC domain) and on the DNSSEC path's DoH
+    /// fallback (when the leaf CNAMEs into an unsigned zone). The DNSSEC
+    /// leaf-walk path reports `NeedDkimLeaf` first.
+    ResolvingDoh,
     Succeeded,
     Failed(EmailRecoveryError),
     Expired,
@@ -256,6 +266,7 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
             None => EmailRecoveryStatus::Expired, // Same observable effect as TTL eviction.
             Some(c) => match &c.status {
                 PendingStatus::Pending => EmailRecoveryStatus::Pending,
+                PendingStatus::ResolvingDoh => EmailRecoveryStatus::ResolvingDoh,
                 PendingStatus::NeedDkimLeaf { selector } => EmailRecoveryStatus::NeedDkimLeaf {
                     selector: selector.clone(),
                 },
@@ -311,6 +322,7 @@ pub fn diagnostics_of(nonce: &str, now_secs: u64) -> Option<EmailRecoveryDiagnos
         let c = map.get(nonce)?;
         let reason_code = match &c.status {
             PendingStatus::Pending => "Pending".to_string(),
+            PendingStatus::ResolvingDoh => "ResolvingDoh".to_string(),
             PendingStatus::NeedDkimLeaf { .. } => "NeedDkimLeaf".to_string(),
             PendingStatus::Succeeded => "Succeeded".to_string(),
             PendingStatus::Expired => "Expired".to_string(),
