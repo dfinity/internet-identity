@@ -978,7 +978,7 @@ impl<M: Memory + Clone> Storage<M> {
                     outcome.errors.push(err);
                     continue;
                 };
-                let mut stamped_any = false;
+                let mut stamped_in_anchor: u64 = 0;
                 for credential in storable_anchor
                     .openid_credentials
                     .iter_mut()
@@ -991,12 +991,17 @@ impl<M: Memory + Clone> Storage<M> {
                     }
                     credential.sso_domain = Some(entry.discovery_domain.clone());
                     credential.sso_name = entry.name.clone();
-                    stamped_any = true;
+                    stamped_in_anchor += 1;
                 }
-                if stamped_any {
+                // Count credentials actually stamped, not anchors touched: the
+                // index key is the full `(iss, sub, aud)`, so today the filter
+                // matches at most one credential per anchor, but counting per
+                // credential keeps `stamped` honest if that ever changes. Only
+                // write the anchor back when something changed.
+                if stamped_in_anchor > 0 {
                     self.stable_anchor_memory
                         .insert(anchor_number, storable_anchor);
-                    outcome.stamped += 1;
+                    outcome.stamped += stamped_in_anchor;
                 }
             }
         }

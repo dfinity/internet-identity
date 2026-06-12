@@ -19,6 +19,7 @@
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
     sso_discoverable_domains: [],
+    sso_credential_migration: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
     dummy_auth: [],
