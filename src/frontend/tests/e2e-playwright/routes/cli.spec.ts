@@ -17,10 +17,26 @@ const cliFragment = (params: {
   return fragment.toString();
 };
 
-/** Signs up a fresh identity from the inline auth wizard on the current page. */
 const signUp = async (page: Page): Promise<void> => {
-  await page.getByRole("button", { name: "Continue with passkey" }).click();
-  await page.getByRole("button", { name: "Create new identity" }).click();
+  const continueWithPasskey = page.getByRole("button", {
+    name: "Continue with passkey",
+  });
+  const signUpToggle = page.getByRole("button", {
+    name: "Sign up",
+    exact: true,
+  });
+  // Wait for whichever entry the surface renders: /cli's mode="both" picker
+  // exposes "Continue with passkey", while the homepage's mode="signin"
+  // picker exposes the "Sign up" toggle instead. We probe before branching,
+  // so the next .isVisible() needs at least one of them committed to the DOM.
+  await continueWithPasskey.or(signUpToggle).first().waitFor();
+  if (await continueWithPasskey.isVisible()) {
+    await continueWithPasskey.click();
+    await page.getByRole("button", { name: "Create new identity" }).click();
+  } else {
+    await signUpToggle.click();
+    await page.getByRole("button", { name: "Sign up with passkey" }).click();
+  }
   await page.getByLabel("Identity name").fill("Test User");
   await page.getByRole("button", { name: "Create identity" }).click();
 };
@@ -416,7 +432,7 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   await page.waitForURL(II_URL + "/manage");
   await enableCliAccessInSettings(page, isMobile);
 
-  // Principal the CLI links via `icp identity link ii --app nice-name.com`: the
+  // Principal the CLI links via `icp identity link web --app nice-name.com`: the
   // self-authenticating principal of the delegation chain's root public key.
   await page.goto(
     await cli.resolveAuthorizeUrl(page, { domain: "nice-name.com" }),
@@ -429,4 +445,47 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
 
   // Same identity + same derivation origin (nice-name.com) ⇒ same principal.
   expect(cliPrincipal).toBe(authorizePrincipal);
+});
+
+test("`--app` on a gateway domain links the same principal as its *.ic0.app domain", async ({
+  page,
+  cli,
+  isMobile,
+}) => {
+  // One identity, with device CLI access enabled so app mode isn't gated.
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await enableCliAccessInSettings(page, isMobile);
+
+  // `--app nice-name.ic0.app`: a legacy domain, used as the derivation origin
+  // as-is.
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.ic0.app" }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // `--app nice-name.icp0.io`: the same app on a gateway domain. It must remap
+  // to nice-name.ic0.app, so the same identity links the same principal.
+  // Navigate off /cli first so the second visit is a full load (a fragment-only
+  // change wouldn't re-run `load`).
+  await page.goto(II_URL);
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.icp0.io" }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // Both domains map to the same legacy origin ⇒ identical root principal. If
+  // the gateway domain weren't remapped, these would differ.
+  expect(cli.receivedDelegations.length).toBe(2);
+  expect(rootPublicKey(cli.receivedDelegations[1])).toBe(
+    rootPublicKey(cli.receivedDelegations[0]),
+  );
 });

@@ -60,12 +60,44 @@ describe("issuerMatches", () => {
     ).toBe(true);
   });
 
-  it("returns false if a required placeholder is missing in claims", () => {
+  it("falls back to template-shape regex when a claim is missing", () => {
+    // Legacy LastUsedIdentity entries (and cross-env localStorage) can
+    // reach issuerMatches without metadata. Match by template shape so the
+    // provider's name + logo still resolve on the display path.
     const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
       issuerMatches(
         "https://login.microsoftonline.com/{tid}/v2.0",
         `https://login.microsoftonline.com/${tid}/v2.0`,
+        [],
+      ),
+    ).toBe(true);
+  });
+
+  it("regex fallback rejects an issuer whose shape differs from the template", () => {
+    expect(
+      issuerMatches(
+        "https://login.microsoftonline.com/{tid}/v2.0",
+        "https://login.microsoftonline.com/v2.0",
+        [],
+      ),
+    ).toBe(false);
+    expect(
+      issuerMatches(
+        "https://login.microsoftonline.com/{tid}/v2.0",
+        "https://accounts.google.com/abc/v2.0",
+        [],
+      ),
+    ).toBe(false);
+  });
+
+  it("regex fallback treats a placeholder as a single path segment", () => {
+    // `{tid}` -> `[^/]+`, so a value containing a `/` doesn't sneak past
+    // the structural check.
+    expect(
+      issuerMatches(
+        "https://login.microsoftonline.com/{tid}/v2.0",
+        "https://login.microsoftonline.com/abc/def/v2.0",
         [],
       ),
     ).toBe(false);
@@ -215,7 +247,11 @@ describe("findConfig", () => {
     ).toBe(msCfg);
   });
 
-  it("does not match template issuer if required claim is missing", () => {
+  it("matches template issuer via shape regex when required claim is missing", () => {
+    // Display-path callers (e.g. SwitchAccessMethod resolving the previous
+    // method's name + logo) often pass empty metadata for credentials whose
+    // last-used record predates metadata-on-store. The fallback regex on
+    // issuerMatches keeps the provider lookup working in that case.
     const msCfg = createOpenIDConfig(
       "https://login.microsoftonline.com/{tid}/v2.0",
     );
@@ -227,7 +263,7 @@ describe("findConfig", () => {
         DIRECT_AUD,
         [],
       ),
-    ).toBeUndefined();
+    ).toBe(msCfg);
   });
 
   it("returns Apple config if issuer is Apple (from openid_configs)", () => {

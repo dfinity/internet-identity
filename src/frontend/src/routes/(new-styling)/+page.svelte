@@ -9,14 +9,11 @@
   import Logo from "$lib/components/ui/Logo.svelte";
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { AuthWizard } from "$lib/components/wizards/auth";
-  import {
-    afterNavigate,
-    beforeNavigate,
-    goto,
-    preloadData,
-  } from "$app/navigation";
+  import { AuthWizard, SignUpHero } from "$lib/components/wizards/auth";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
+  import { afterNavigate, beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
     AuthenticationV2Events,
@@ -41,6 +38,8 @@
   let isManageIdentitiesDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let switchingToIdentity = $state<bigint>();
+  let authDialogMode = $state<AuthMode>("signin");
+  let inlinePickerMode = $state<AuthMode>("signin");
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities).sort(
@@ -83,13 +82,6 @@
     } catch (error) {
       handleError(error);
     }
-  };
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-    toaster.success({
-      title: $t`Upgrade completed successfully`,
-      duration: 4000,
-    });
   };
   const handleSignUp = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
@@ -235,12 +227,14 @@
             <!-- Welcome-back state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
               <h1
-                class="text-text-primary mb-4 text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
+                class="text-text-primary mb-4 text-4xl font-medium tracking-tight text-balance md:text-[40px] md:leading-[1.1]"
               >
-                {$t`Internet Identity`}
+                {$t`Manage your Identity`}
               </h1>
-              <p class="text-text-tertiary mb-10 max-w-md text-base md:text-lg">
-                <Trans>Sign in to manage your identity</Trans>
+              <p
+                class="text-text-tertiary mb-8 max-w-md text-base text-balance md:text-lg"
+              >
+                <Trans>Keep your access and recovery methods up to date.</Trans>
               </p>
 
               <div
@@ -297,7 +291,7 @@
                     class="btn btn-tertiary btn-icon btn-sm ms-auto rounded-full"
                   >
                     <PencilIcon class="size-4" />
-                    <span>{$t`Edit`}</span>
+                    <span>{$t`Edit identities`}</span>
                   </button>
                 </div>
                 <ul class="flex flex-col gap-2">
@@ -341,34 +335,45 @@
               class="btn btn-tertiary mt-6 gap-2"
             >
               <PlusIcon class="size-4" />
-              {$t`Add another identity`}
+              {$t`Add identity`}
             </button>
           {:else}
             <!-- Sign-up state -->
             <div class="md:pt-[max(0px,calc(50dvh-16rem))]">
               <h1
-                class="text-text-primary mb-4 text-5xl font-medium tracking-tight text-balance md:text-6xl lg:text-7xl"
+                class="text-text-primary mb-4 text-4xl font-medium tracking-tight text-balance md:text-[40px] md:leading-[1.1]"
               >
-                {$t`Internet Identity`}
+                {$t`Manage your Identity`}
               </h1>
               <p
-                class="text-text-tertiary mb-10 max-w-md text-base text-balance md:text-lg"
+                class="text-text-tertiary mb-8 max-w-md text-base text-balance md:text-lg"
               >
-                <Trans>
-                  Sign in or create an identity to access apps without passwords
-                  or sharing personal data.
-                </Trans>
+                <Trans>Keep your access and recovery methods up to date.</Trans>
               </p>
               <AuthWizard
                 onSignIn={handleSignIn}
                 onSignUp={handleSignUp}
-                onUpgrade={handleUpgrade}
                 onError={(error) => {
                   isAuthenticating = false;
                   handleError(error);
                 }}
-                withinDialog={false}
-              />
+                bind:mode={inlinePickerMode}
+              >
+                {#snippet children(presenting)}
+                  {#if presenting === true && inlinePickerMode === "signup"}
+                    <SignUpHero />
+                  {:else if presenting === true}
+                    <h1
+                      class="text-text-primary my-2 self-start text-2xl font-medium"
+                    >
+                      {$t`Sign in`}
+                    </h1>
+                    <p class="text-text-secondary mb-6 self-start text-sm">
+                      {$t`Choose method to continue`}
+                    </p>
+                  {/if}
+                {/snippet}
+              </AuthWizard>
             </div>
           {/if}
         </div>
@@ -386,25 +391,29 @@
         return;
       }
       isAuthDialogOpen = false;
+      authDialogMode = "signin";
     }}
   >
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
         isAuthenticating = false;
         handleError(error);
       }}
-      withinDialog={true}
+      bind:mode={authDialogMode}
     >
-      <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {$t`Sign in`}
-      </h1>
-      <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`Choose method to continue`}
-      </p>
+      {#if authDialogMode === "signup"}
+        <SignUpHero />
+      {:else}
+        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+          {$t`Sign in`}
+        </h1>
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`Choose method to continue`}
+        </p>
+      {/if}
     </AuthWizard>
   </Dialog>
 {/if}

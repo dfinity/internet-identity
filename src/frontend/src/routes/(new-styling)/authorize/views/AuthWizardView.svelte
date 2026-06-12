@@ -4,36 +4,39 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
+    mode?: AuthMode;
   }
 
-  const { onSignIn, onSignUp, onUpgrade, onError }: Props = $props();
+  let {
+    onSignIn,
+    onSignUp,
+    onError,
+    mode = $bindable("both"),
+  }: Props = $props();
 
   const dapps = getDapps();
   const dapp = $derived(
     dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
   );
+  const dappName = $derived(
+    dapp?.name ?? new URL($establishedChannelStore.origin).hostname,
+  );
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} {onUpgrade} {onError}>
+<AuthWizard {onSignIn} {onSignUp} {onError} bind:mode>
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-    {$t`Choose method`}
+    {mode === "signup"
+      ? $t`Create an Identity`
+      : $t`Sign in to Internet Identity`}
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
-    {#if dapp?.name !== undefined}
-      {@const application = dapp.name}
-      <Trans>
-        to continue with <b>{application}</b>
-      </Trans>
-    {:else}
-      <Trans>to continue with this app</Trans>
-    {/if}
+    {$t`to continue to ${dappName}`}
   </p>
 </AuthWizard>

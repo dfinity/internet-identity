@@ -7,7 +7,10 @@
     authorizedStore,
   } from "$lib/stores/authorization.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { authenticationStore } from "$lib/stores/authentication.store";
+  import {
+    authenticationStore,
+    type AuthenticationResult,
+  } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import { handleError } from "$lib/components/utils/error";
@@ -16,8 +19,14 @@
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
+  import { get } from "svelte/store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
+  import {
+    HANDOFF_HASH_KEY,
+    sendAuthToOpenedTab,
+  } from "$lib/utils/auth-handoff";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -26,7 +35,7 @@
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
+  import { ChevronDownIcon, ExternalLinkIcon, UserIcon } from "@lucide/svelte";
 
   const { children }: LayoutProps = $props();
 
@@ -123,6 +132,14 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+  let authDialogMode = $state<AuthMode>("signin");
+  let pendingHandoff: { cancel: () => void } | undefined;
+  // Set when the user clicked manage but had to authenticate first — the
+  // passkey/IdP prompt consumes the click's transient activation on Safari
+  // (and strict Firefox), so a follow-up window.open() would be silently
+  // blocked. The confirmation dialog's own button click provides fresh
+  // activation and drives window.open from there.
+  let pendingManageOpen = $state<{ auth: AuthenticationResult }>();
 
   const handleSignIn = async (identityNumber: bigint) => {
     try {
@@ -146,9 +163,6 @@
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
-  };
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
   };
   const handleRemoveIdentity = (identityNumber: bigint) => {
     const isCurrent = selectedIdentity?.identityNumber === identityNumber;
@@ -187,6 +201,66 @@
         },
       });
     }
+  };
+  const handleManageIdentity = async (): Promise<void> => {
+    pendingHandoff?.cancel();
+    pendingHandoff = undefined;
+    isIdentityPopoverOpen = false;
+    if (selectedIdentity === undefined) return;
+    try {
+      isAuthenticating = true;
+      const needsAuth =
+        $authenticationStore?.identityNumber !==
+        selectedIdentity.identityNumber;
+      if (needsAuth) {
+        sessionStore.reset();
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.identities[
+            `${selectedIdentity.identityNumber}`
+          ],
+        );
+      }
+      const auth = get(authenticationStore);
+      if (auth === undefined) {
+        await goto("/manage");
+        return;
+      }
+      if (needsAuth) {
+        // The just-completed passkey/IdP prompt consumed the click's
+        // transient activation on Safari/strict Firefox, so window.open()
+        // here would be silently blocked. Surface the confirmation dialog
+        // and let its own button click drive window.open with fresh
+        // activation. When the user was already signed in we never awaited
+        // anything, so the popup goes straight through.
+        pendingManageOpen = { auth };
+        return;
+      }
+      const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
+      if (w === null) {
+        await goto("/manage");
+        return;
+      }
+      pendingHandoff = sendAuthToOpenedTab(w, auth);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+  const handleOpenManageTab = (pending: { auth: AuthenticationResult }) => {
+    const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
+    if (w === null) {
+      pendingManageOpen = undefined;
+      void goto("/manage");
+      return;
+    }
+    pendingHandoff = sendAuthToOpenedTab(w, pending.auth);
+    pendingManageOpen = undefined;
+  };
+  const dismissPendingManageOpen = () => {
+    pendingHandoff?.cancel();
+    pendingHandoff = undefined;
+    pendingManageOpen = undefined;
   };
   const authorizeDefault = async () => {
     try {
@@ -262,11 +336,7 @@
                   isIdentityPopoverOpen = false;
                   isAuthDialogOpen = true;
                 }}
-                onManageIdentity={(): Promise<void> => {
-                  isIdentityPopoverOpen = false;
-                  window.open("/manage", "_blank");
-                  return Promise.resolve();
-                }}
+                onManageIdentity={handleManageIdentity}
                 onManageIdentities={() => {
                   isIdentityPopoverOpen = false;
                   isManageIdentitiesDialogOpen = true;
@@ -286,22 +356,23 @@
                   return;
                 }
                 isAuthDialogOpen = false;
+                authDialogMode = "signin";
               }}
             >
               <AuthWizard
                 onSignIn={handleSignIn}
                 onSignUp={handleSignUp}
-                onUpgrade={handleUpgrade}
                 onError={(error) => {
                   isAuthDialogOpen = false;
+                  isAuthenticating = false;
                   handleError(error);
                 }}
-                withinDialog
+                bind:mode={authDialogMode}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
                 >
-                  {$t`Sign in`}
+                  {authDialogMode === "signup" ? $t`Sign up` : $t`Sign in`}
                 </h1>
                 <p class="text-text-secondary mb-6 self-start text-sm">
                   {$t`Choose method to continue`}
@@ -327,6 +398,27 @@
         identities={lastUsedIdentities}
         onRemoveIdentity={handleRemoveIdentity}
       />
+    </Dialog>
+  {/if}
+
+  {#if pendingManageOpen !== undefined}
+    {@const pending = pendingManageOpen}
+    <Dialog onClose={dismissPendingManageOpen}>
+      <div class="flex flex-col">
+        <h2 class="text-text-primary my-2 self-start text-2xl font-medium">
+          {$t`You're signed in`}
+        </h2>
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`Open Internet Identity in a new tab to manage your access methods and recovery options.`}
+        </p>
+        <button
+          class="btn btn-primary btn-lg w-full gap-2"
+          onclick={() => handleOpenManageTab(pending)}
+        >
+          <ExternalLinkIcon class="size-4" aria-hidden="true" />
+          {$t`Open manage`}
+        </button>
+      </div>
     </Dialog>
   {/if}
 {/if}

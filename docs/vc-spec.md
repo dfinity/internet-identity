@@ -100,7 +100,7 @@ Upon successful response identity provider displays the consent message from `Ic
 ### 2: Derivation Origin
 
 The issuer must implement also `derivation_origin`-API, which allows for taking the advantage
-of the [Alternative Derivation Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature.
+of the [Alternative Derivation Origins](https://docs.internetcomputer.org/references/internet-identity-spec#alternative-frontend-origins)-feature.
 `derivation_origin` is called by the identity provider to obtain an URL to be used as the derivation origin
 for user's principal. If an issuer doesn't use the _Alternative Derivation Origins_-feature,
 the function should return just the default value, namely the canister's URL: `https://<issuer-canister-id>.icp0.io`.
@@ -122,7 +122,7 @@ type DerivationOriginError = variant {
 ```
 
 Please note that the returned derivation origin is subject to verification via
-`.well-known/ii-alternative-origins`, as described in the [feature-description](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins).
+`.well-known/ii-alternative-origins`, as described in the [feature-description](https://docs.internetcomputer.org/references/internet-identity-spec#alternative-frontend-origins).
 
 ### 3: Prepare Credential
 
@@ -164,7 +164,7 @@ This call must be authenticated, i.e. the sender must match the principal for wh
 The value of `prepared_context` is basically used to transfer information between `prepare_credential`
 and `get_credential` steps, and it is totally up to the issuer to decide on the content of
 that field. That is, the issuer creates `prepared_context`, and is the only entity that
-consumes it. For example, when using [canister signatures](https://internetcomputer.org/docs/current/references/ic-interface-spec#canister-signatures)
+consumes it. For example, when using [canister signatures](https://docs.internetcomputer.org/references/ic-interface-spec#canister-signatures)
 the context contains a time-stamped yet unsigned VC, for which the canister signature will be
 available only at `get_credential`-call.
 
@@ -268,14 +268,14 @@ After receiving the notification that II is ready, the relying party can request
 - Method: `request_credential`
 - Params:
   - `issuer`: An issuer that the relying party trusts. It has the following properties:
-    - `origin`: The front-end origin of the issuer. If this value is different from the value returned from the `derivation_origin` canister call, then the `origin` must be a valid alternative origin as per the [Alternative Frontend Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature.
+    - `origin`: The front-end origin of the issuer. If this value is different from the value returned from the `derivation_origin` canister call, then the `origin` must be a valid alternative origin as per the [Alternative Frontend Origins](https://docs.internetcomputer.org/references/internet-identity-spec#alternative-frontend-origins)-feature.
     - `canisterId`: The canister id of the issuer canister (i.e. the one, that implements the candid issuer API as defined above).
   - `credentialSpec`: The spec of the credential that the relying party wants to request from the issuer.
     - `credentialType`: The type of the requested credential.
     - `arguments`: (optional) A map with arguments specific to the requested credentials. It maps string keys to values that must be either strings or integers.
   - `credentialSubject`: The subject of the credential as known to the relying party. Internet Identity will use this principal to ensure that the flow is completed using the matching identity.
   - `derivationOrigin`: (optional) The origin that should be used for principal derivation (instead of the client origin) during the verification of `credentialSubject` (applicable if the relying party
-    uses the [Alternative Frontend Origins](https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins)-feature).
+    uses the [Alternative Frontend Origins](https://docs.internetcomputer.org/references/internet-identity-spec#alternative-frontend-origins)-feature).
 
 #### Examples
 

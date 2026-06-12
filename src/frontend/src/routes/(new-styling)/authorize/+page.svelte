@@ -17,6 +17,7 @@
   import { Trans } from "$lib/components/locale";
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
+  import AuthPanel from "$lib/components/ui/AuthPanel.svelte";
 
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
@@ -87,11 +88,6 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
-  const handleAuthWizardUpgrade = (): Promise<void> => {
-    upgradeSuccess = true;
-    return Promise.resolve();
-  };
-
   const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
     authorizationStore.authorize(accountNumber);
   };
@@ -241,7 +237,7 @@
     directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
     const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
     const { name, email } = decodeJWT(jwt);
-    if (authFlowResult.type === "signUp") {
+    if (authFlowResult?.type === "signUp") {
       await authFlow.completeOpenIdRegistration(
         name ?? email?.split("@")[0] ?? $t`${config.name} user`,
       );
@@ -372,7 +368,9 @@
             "rounded-t-none",
         ]}
       >
-        {@render content()}
+        <AuthPanel>
+          {@render content()}
+        </AuthPanel>
       </div>
     </div>
   </div>
@@ -422,7 +420,7 @@
   <AuthWizardView
     onSignIn={handleAuthWizardSignIn}
     onSignUp={handleAuthWizardSignUp}
-    onUpgrade={handleAuthWizardUpgrade}
     onError={handleError}
+    mode="signin"
   />
 {/snippet}

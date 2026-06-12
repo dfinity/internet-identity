@@ -204,58 +204,125 @@ export class IdentityWizard {
   }
 
   async signIn(): Promise<void> {
-    await this.#goto();
-    const dialog = this.#page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "Use existing identity" }).click();
-    await expect(dialog).toBeHidden();
+    await this.#openPicker();
+    const continueWithPasskey = this.#page.getByRole("button", {
+      name: "Continue with passkey",
+    });
+    if (await continueWithPasskey.isVisible()) {
+      // mode="both" picker — opens the SetupOrUseExistingPasskey dialog
+      // with separate sign-in / sign-up branches.
+      await continueWithPasskey.click();
+      const dialog = this.#page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await dialog
+        .getByRole("button", { name: "Use existing identity" })
+        .click();
+      await expect(dialog).toBeHidden();
+      return;
+    }
+    // mode="signin" picker — goes straight to the existing-passkey
+    // WebAuthn flow; no intermediate Use existing / Create new dialog.
+    await this.#page
+      .getByRole("button", { name: "Sign in with passkey" })
+      .click();
   }
 
   async signUp(name: string): Promise<void> {
-    await this.#goto();
-    const dialog = this.#page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "Create new identity" }).click();
+    await this.#openPicker();
+    const continueWithPasskey = this.#page.getByRole("button", {
+      name: "Continue with passkey",
+    });
+    if (await continueWithPasskey.isVisible()) {
+      // mode="both" picker — opens SetupOrUseExistingPasskey, click
+      // Create new and then proceed to the name entry view.
+      await continueWithPasskey.click();
+      const dialog = this.#page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole("button", { name: "Create new identity" }).click();
+    } else {
+      // The picker is in sign-in mode by default on the new homepage.
+      // Switch to sign-up via the picker's toggle CTA, which surfaces
+      // the dedicated sign-up dialog with mode="signup" labels.
+      const signUpToggle = this.#page.getByRole("button", {
+        name: "Sign up",
+        exact: true,
+      });
+      if (await signUpToggle.isVisible()) {
+        await signUpToggle.click();
+      }
+      await this.#page
+        .getByRole("button", { name: "Sign up with passkey" })
+        .click();
+    }
+    // Only the homepage flow navigates to /manage after registration.
+    // The /authorize popup also loads at `/` (the root handles authorize
+    // via postMessage) so pathname alone can't distinguish it — check
+    // `opener()` to single out the top-level homepage page.
+    const settlesOnManage =
+      new URL(this.#page.url()).pathname === "/" &&
+      (await this.#page.opener()) === null;
     await this.#page.getByLabel("Identity name").fill(name);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
-    await expect(dialog).toBeHidden();
+    if (settlesOnManage) {
+      // Wait for the registration to actually settle on the canister
+      // before callers inspect the new identity — otherwise the fixture
+      // can race ahead and `lookup_device_key` returns empty.
+      await this.#page.waitForURL(`${II_URL}/manage`);
+    }
   }
 
   /**
-   * Used to navigate to the identity sign in/up view. The auth picker
-   * is rendered inline in the landing page's sign-up state, but on the
-   * welcome-back state and on `/authorize` it sits behind an "Add
-   * another identity" button (which opens a dialog containing it). On
-   * `/authorize` a "Switch identity" trigger also still exists.
+   * Bring the page to a state where the auth picker is on screen.
+   *
+   * The picker is rendered inline on the homepage's empty state but
+   * sits behind an "Add identity" / "Switch identity" CTA on the
+   * welcome-back state and on `/authorize` / `/manage`. The picker may
+   * be in mode="both" ("Continue with passkey") or in a mode-specific
+   * variant ("Sign in with passkey" / "Sign up with passkey") depending
+   * on which surface rendered it. Callers handle the variants
+   * themselves; this method just makes sure a picker is on screen.
    */
-  async #goto(): Promise<void> {
-    const switchIdentityLocator = this.#page.getByRole("button", {
+  async #openPicker(): Promise<void> {
+    const switchIdentity = this.#page.getByRole("button", {
       name: "Switch identity",
     });
-    const addAnotherIdentityLocator = this.#page.getByRole("button", {
-      name: "Add another identity",
+    const addIdentity = this.#page.getByRole("button", {
+      name: "Add identity",
     });
-    const continueWithPasskeyLocator = this.#page.getByRole("button", {
+    const continueWithPasskey = this.#page.getByRole("button", {
       name: "Continue with passkey",
     });
-    await switchIdentityLocator
-      .or(addAnotherIdentityLocator)
-      .or(continueWithPasskeyLocator)
+    const signInWithPasskey = this.#page.getByRole("button", {
+      name: "Sign in with passkey",
+    });
+    const signUpWithPasskey = this.#page.getByRole("button", {
+      name: "Sign up with passkey",
+    });
+    await switchIdentity
+      .or(addIdentity)
+      .or(continueWithPasskey)
+      .or(signInWithPasskey)
+      .or(signUpWithPasskey)
       .first()
       .waitFor();
 
-    // Either continue to passkey flow immediately
-    if (await continueWithPasskeyLocator.isVisible()) {
-      await continueWithPasskeyLocator.click();
+    if (
+      (await continueWithPasskey.isVisible()) ||
+      (await signInWithPasskey.isVisible()) ||
+      (await signUpWithPasskey.isVisible())
+    ) {
       return;
     }
-    // Or open the picker via the identity switcher / "Add another
-    // identity" entry point first.
-    if (await switchIdentityLocator.isVisible()) {
-      await switchIdentityLocator.click();
+    // Welcome-back surface — open the picker dialog.
+    if (await switchIdentity.isVisible()) {
+      await switchIdentity.click();
     }
-    await addAnotherIdentityLocator.click();
-    await continueWithPasskeyLocator.click();
+    await addIdentity.click();
+    await continueWithPasskey
+      .or(signInWithPasskey)
+      .or(signUpWithPasskey)
+      .first()
+      .waitFor();
   }
 }
 

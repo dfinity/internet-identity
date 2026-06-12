@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
   import { MailXIcon, CopyIcon } from "@lucide/svelte";
   import { waitFor } from "$lib/utils/utils";
   import { SUPPORT_URL } from "$lib/config";
@@ -12,8 +13,7 @@
     /** Strictly-public, copyable diagnostics blob (includes the
      *  gateway `message_id`) the user can hand to support. Absent when
      *  there's nothing useful to share (e.g. a purely FE-side failure
-     *  with no canister challenge to read). See
-     *  `setupEmailRecovery/diagnostics.ts`. */
+     *  with no canister challenge to read). See `../diagnostics.ts`. */
     diagnostics?: string;
     onRetry: () => void;
   }
@@ -61,15 +61,15 @@
         {copied ? $t`Copied` : $t`Copy error details`}
       </button>
       <p class="text-text-tertiary text-sm">
-        {$t`If this keeps happening, copy these details and include them in a`}
-        <a
-          class="text-text-primary underline"
-          href={SUPPORT_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {$t`support request`}</a
-        >.
+        <Trans>
+          If this keeps happening, copy these details and include them in a
+          <a
+            class="text-text-primary underline"
+            href={SUPPORT_URL}
+            target="_blank"
+            rel="noopener noreferrer">support request</a
+          >.
+        </Trans>
       </p>
     </div>
   {/if}

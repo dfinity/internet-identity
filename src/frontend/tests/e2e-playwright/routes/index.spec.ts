@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import { addVirtualAuthenticator, holdToConfirm, II_URL } from "../utils";
 import { test } from "../fixtures";
 import { SSO_OPENID_PORT } from "../fixtures/sso";
 
@@ -10,8 +10,10 @@ test.describe("First visit", () => {
   test("Sign up with a new passkey", async ({ page }) => {
     await addVirtualAuthenticator(page);
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
-    await page.getByRole("button", { name: "Create new identity" }).click();
+    // The homepage's empty-state picker renders in sign-in mode; toggle
+    // to sign-up via the picker CTA, which opens the sign-up dialog.
+    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await page.getByRole("button", { name: "Sign up with passkey" }).click();
     await page.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     await page.getByRole("button", { name: "Create identity" }).click();
     await page.waitForURL(II_URL + "/manage");
@@ -30,8 +32,8 @@ test.describe("First visit", () => {
   }) => {
     await addAuthenticatorForIdentity(page, identities[0].identityNumber);
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
-    await page.getByRole("button", { name: "Use existing identity" }).click();
+    // Sign-in mode picker goes directly to existing-passkey WebAuthn.
+    await page.getByRole("button", { name: "Sign in with passkey" }).click();
     await managePage.assertVisible();
   });
 
@@ -53,11 +55,10 @@ test.describe("First visit", () => {
       const newDevicePage = await newDeviceContext.newPage();
       await addVirtualAuthenticator(newDevicePage);
       await newDevicePage.goto(II_URL);
+      // No existing passkeys on the new device, so the sign-in click
+      // surfaces the "Can't find your identity?" cross-device prompt.
       await newDevicePage
-        .getByRole("button", { name: "Continue with passkey" })
-        .click();
-      await newDevicePage
-        .getByRole("button", { name: "Use existing identity" })
+        .getByRole("button", { name: "Sign in with passkey" })
         .click();
       await newDevicePage
         .getByRole("heading", {
@@ -74,10 +75,7 @@ test.describe("First visit", () => {
       );
       await existingDevicePage.goto(linkToPair);
       await existingDevicePage
-        .getByRole("button", { name: "Continue with passkey" })
-        .click();
-      await existingDevicePage
-        .getByRole("button", { name: "Use existing identity" })
+        .getByRole("button", { name: "Sign in with passkey" })
         .click();
 
       // Switch to new device and get confirmation code
@@ -94,6 +92,7 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
+      await holdToConfirm(existingDevicePage);
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);
@@ -120,10 +119,19 @@ test.describe("First visit", () => {
       await existingDevicePage
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
+      // After the wizard completes, the access page strips the ?activate=
+      // query via `goto`, which fires the layout's afterNavigate and resets
+      // isMobileSidebarOpen. Waiting for the settled URL avoids a race where
+      // the menu click would be undone by that reset.
+      await existingDevicePage.waitForURL(II_URL + "/manage/access");
       const existingMenuButton = existingDevicePage.getByRole("button", {
         name: "Open menu",
       });
-      if (await existingMenuButton.isVisible()) {
+      const menuVisible = await existingMenuButton
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (menuVisible) {
         await existingMenuButton.click();
       }
       await existingDevicePage.getByRole("link", { name: "Access" }).click();
@@ -174,6 +182,14 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      // The inline picker is in sign-in mode on the homepage, so a fresh
+      // OpenID user surfaces the "not connected yet" dialog — confirm
+      // sign-up to proceed to /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
       // Assert that dashboard is shown
       await page.waitForURL(II_URL + "/manage");
       await expect(
@@ -213,9 +229,28 @@ test.describe("First visit", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
-      // Enter identity name
+      // The inline picker is in sign-in mode on the homepage, so a fresh
+      // OpenID user surfaces the "not connected yet" dialog — confirm
+      // sign-up to proceed to the name-entry view.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
+      // Wait for the CreateIdentity view before typing.
+      await expect(
+        page.getByRole("heading", { name: "What's your name?" }),
+      ).toBeVisible();
+
+      // On mobile the HTML <dialog>'s native focus trap lands on the
+      // Close button before CreateIdentity's onMount can focus the
+      // input, so we click the input first to take focus before fill —
+      // otherwise the typed value never reaches the bound `name` state
+      // and the Create-identity button stays disabled.
       const name = "John Doe";
-      await page.getByLabel("Identity name").fill(name);
+      const input = page.getByLabel("Identity name");
+      await input.click();
+      await input.fill(name);
       await page.getByRole("button", { name: "Create identity" }).click();
 
       // Assert that dashboard is shown
@@ -248,14 +283,22 @@ test.describe("First visit", () => {
       signInWithOpenId,
       openIdUsers,
     }) => {
-      // Pick SSO to continue
+      // Pick SSO to continue — the homepage renders the inline picker in
+      // sign-in mode, so the entry button is "Sign in with SSO".
       await page.goto(II_URL);
-      const popup = await openSsoPopup(page);
+      const popup = await openSsoPopup(page, undefined, "signin");
 
       // Sign in on the IdP page (same flow as direct OpenID)
       const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
+
+      // Fresh SSO user on the homepage surfaces IdentityNotConnectedDialog
+      // — confirm sign-up to land on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
 
       // Assert that dashboard is shown
       await page.waitForURL(II_URL + "/manage");
@@ -286,14 +329,33 @@ test.describe("First visit", () => {
       openIdUsers,
     }) => {
       await page.goto(II_URL);
-      const popup = await openSsoPopup(page);
+      const popup = await openSsoPopup(page, undefined, "signin");
 
       const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
       await signInWithOpenId(popup, openIdUsers[0].id);
       await closePromise;
 
+      // Fresh SSO user surfaces IdentityNotConnectedDialog — confirm
+      // sign-up so the name-entry view appears.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
+
+      // Wait for the CreateIdentity view to fully render before typing.
+      await expect(
+        page.getByRole("heading", { name: "What's your name?" }),
+      ).toBeVisible();
+
+      // On mobile the HTML <dialog>'s native focus trap lands on the
+      // Close button before CreateIdentity's onMount can focus the
+      // input, so we click the input first to take focus before fill —
+      // otherwise the typed value never reaches the bound `name` state
+      // and the Create-identity button stays disabled.
       const name = "John Doe";
-      await page.getByLabel("Identity name").fill(name);
+      const input = page.getByLabel("Identity name");
+      await input.click();
+      await input.fill(name);
       await page.getByRole("button", { name: "Create identity" }).click();
 
       await page.waitForURL(II_URL + "/manage");
@@ -341,6 +403,13 @@ test.describe("First visit", () => {
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new OpenID user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Wipe localStorage AND IdP cookies so the second flow is fully
@@ -396,12 +465,19 @@ test.describe("First visit", () => {
     }) => {
       // Sign up first so the user exists in II.
       await page.goto(II_URL);
-      const signUpPopup = await openSsoPopup(page);
+      const signUpPopup = await openSsoPopup(page, undefined, "signin");
       const signUpClosePromise = signUpPopup.waitForEvent("close", {
         timeout: 15_000,
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new SSO user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Wipe localStorage AND IdP cookies so the second flow is fully
@@ -414,7 +490,7 @@ test.describe("First visit", () => {
 
       // Sign in via SSO — the user already exists in II so we should
       // jump straight to /manage without a name prompt.
-      const signInPopup = await openSsoPopup(page);
+      const signInPopup = await openSsoPopup(page, undefined, "signin");
       const signInClosePromise = signInPopup.waitForEvent("close", {
         timeout: 15_000,
       });
@@ -464,10 +540,10 @@ test.describe("Last used identities listed", () => {
     await signInWithIdentity(page, identities[0].identityNumber);
     await managePage.signOut();
 
-    // Now sign in through the use existing identity flow
-    await page.getByRole("button", { name: "Add another identity" }).click();
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
-    await page.getByRole("button", { name: "Use existing identity" }).click();
+    // Now sign in through the welcome-back "Add identity" entry point;
+    // the sign-in dialog opens with the mode="signin" picker.
+    await page.getByRole("button", { name: "Add identity" }).click();
+    await page.getByRole("button", { name: "Sign in with passkey" }).click();
     await managePage.assertVisible();
   });
 
@@ -484,11 +560,12 @@ test.describe("Last used identities listed", () => {
     await managePage.signOut();
     await removeAuthenticatorForIdentity(identities[0].identityNumber);
 
-    // Now sign up for a new identity
+    // Now sign up for a new identity via "Add identity" → "Sign up"
+    // toggle in the sign-in dialog → sign-up dialog.
     await addVirtualAuthenticator(page);
-    await page.getByRole("button", { name: "Add another identity" }).click();
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
-    await page.getByRole("button", { name: "Create new identity" }).click();
+    await page.getByRole("button", { name: "Add identity" }).click();
+    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await page.getByRole("button", { name: "Sign up with passkey" }).click();
     await page.getByLabel("Identity name").fill(SECONDARY_USER_NAME);
     await page.getByRole("button", { name: "Create identity" }).click();
     await managePage.assertVisible();
@@ -528,6 +605,13 @@ test.describe("Last used identities listed", () => {
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new OpenID user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Sign out (keeps the last-used entry) and clear IdP cookies so the
@@ -576,12 +660,19 @@ test.describe("Last used identities listed", () => {
     }) => {
       // Sign up first to populate the last-used SSO entry.
       await page.goto(II_URL);
-      const signUpPopup = await openSsoPopup(page);
+      const signUpPopup = await openSsoPopup(page, undefined, "signin");
       const signUpClosePromise = signUpPopup.waitForEvent("close", {
         timeout: 15_000,
       });
       await signInWithOpenId(signUpPopup, openIdUsers[0].id);
       await signUpClosePromise;
+      // Homepage picker is mode="signin"; a new SSO user is offered a
+      // "Sign up" prompt in the NotConnectedDialog before the registration
+      // settles on /manage.
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await page.waitForURL(II_URL + "/manage");
 
       // Sign out and clear IdP cookies so the re-auth popup actually

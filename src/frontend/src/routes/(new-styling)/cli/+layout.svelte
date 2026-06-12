@@ -48,8 +48,6 @@
       duration: 4000,
     });
   };
-  const handleUpgrade = (identityNumber: bigint): Promise<void> =>
-    handleSelectIdentity(identityNumber);
   const handleRemoveIdentity = (identityNumber: bigint) => {
     const isCurrent = selectedIdentity?.identityNumber === identityNumber;
     if (isCurrent) {
@@ -146,12 +144,10 @@
           <AuthWizard
             onSignIn={handleSelectIdentity}
             onSignUp={handleSignUp}
-            onUpgrade={handleUpgrade}
             onError={(error) => {
               isAuthDialogOpen = false;
               handleError(error);
             }}
-            withinDialog
           >
             <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
               {$t`Sign in`}

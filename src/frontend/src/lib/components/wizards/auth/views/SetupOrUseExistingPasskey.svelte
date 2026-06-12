@@ -10,10 +10,9 @@
   interface Props {
     setupNew: () => void;
     useExisting: () => Promise<void | "cancelled">;
-    upgrade: () => void;
   }
 
-  const { setupNew, useExisting, upgrade }: Props = $props();
+  const { setupNew, useExisting }: Props = $props();
 
   let isAuthenticating = $state(false);
   let isCancelled = $state(false);
@@ -72,16 +71,4 @@
       {/if}
     </button>
   </Tooltip>
-  <div class="border-border-tertiary my-5 border-t"></div>
-  <div class="flex flex-row items-center justify-between gap-4">
-    <p class="text-text-secondary text-sm">
-      {$t`Still have an identity number?`}
-    </p>
-    <button
-      onclick={upgrade}
-      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-    >
-      {$t`Upgrade`}
-    </button>
-  </div>
 </div>

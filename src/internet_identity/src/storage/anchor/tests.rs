@@ -672,6 +672,8 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         aud: "example-aud".into(),
         last_usage_timestamp: Some(n.into()),
         metadata: HashMap::default(),
+        sso_domain: None,
+        sso_name: None,
     }
 }
 

@@ -12,7 +12,10 @@ import {
   authenticatedStore,
   authenticationStore,
 } from "$lib/stores/authentication.store";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import {
+  lastUsedIdentitiesStore,
+  type LastUsedIdentity,
+} from "$lib/stores/last-used-identities.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
 import { features } from "$lib/legacy/features";
@@ -34,6 +37,7 @@ import {
   RequestConfig,
   decodeJWT,
   extractIssuerTemplateClaims,
+  findConfig,
   selectAuthScopes,
 } from "$lib/utils/openID";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
@@ -43,6 +47,18 @@ interface AuthFlowOptions {
   trackLastUsed?: boolean;
 }
 
+export type AuthMode = "signin" | "signup" | "both";
+
+export type MethodTag = "passkey" | "openid" | "sso";
+
+// Subset of LastUsedIdentity that the sign-in paths produce ahead of
+// the user committing to it — matches the shape `addLastUsedIdentity`
+// accepts (timestamp is stamped by the store on commit).
+export type PendingLastUsedEntry = Pick<
+  LastUsedIdentity,
+  "identityNumber" | "name" | "authMethod" | "createdAtMillis"
+>;
+
 export class AuthFlow {
   #options: Required<AuthFlowOptions>;
   #view = $state<
@@ -51,6 +67,9 @@ export class AuthFlow {
     | "setupNewPasskey"
     | "setupNewIdentity"
     | "signInWithSso"
+    | "openIdNotConnected"
+    | "openIdAlreadyLinked"
+    | "confirmMethodSwitch"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -61,14 +80,20 @@ export class AuthFlow {
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
-  // SSO sign-up state: kept separate from the direct-provider `#jwt` /
-  // `#configIssuer` pair so `completeSsoRegistration` (the SSO-specific
-  // counterpart to `completeOpenIdRegistration`) can reconstruct the
-  // `sso` LastUsedIdentity entry without leaking SSO awareness into the
-  // direct-provider methods.
   #ssoJwt = $state<string>();
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
+  #mode = $state<AuthMode>("both");
+  #pendingOpenIdSignIn = $state<bigint>();
+  #pendingMethodSwitch = $state<{
+    previousIdentity: LastUsedIdentity;
+    newMethod: MethodTag;
+    signedInIdentityNumber: bigint;
+    pendingLastUsedEntry?: PendingLastUsedEntry;
+    providerIssuer?: string;
+    providerDomain?: string;
+    providerName?: string;
+  }>();
 
   get view() {
     return this.#view;
@@ -81,6 +106,116 @@ export class AuthFlow {
   get systemOverlay() {
     return this.#systemOverlay;
   }
+
+  get mode(): AuthMode {
+    return this.#mode;
+  }
+
+  get configIssuer(): string | undefined {
+    return this.#configIssuer;
+  }
+
+  get userName(): string | undefined {
+    const jwt = this.#jwt ?? this.#ssoJwt;
+    return jwt === undefined ? undefined : decodeJWT(jwt).name;
+  }
+
+  get userEmail(): string | undefined {
+    const jwt = this.#jwt ?? this.#ssoJwt;
+    return jwt === undefined ? undefined : decodeJWT(jwt).email;
+  }
+
+  // Display name for the parked provider (OIDC or SSO). OIDC resolves
+  // via `openid_configs` by issuer; SSO falls back to discovered name
+  // or domain.
+  get providerName(): string | undefined {
+    if (this.#configIssuer !== undefined) {
+      const config = findConfig(this.#configIssuer, undefined, []);
+      return config?.name ?? this.#configIssuer;
+    }
+    return this.#ssoName ?? this.#ssoDomain;
+  }
+
+  get pendingMethodSwitch() {
+    return this.#pendingMethodSwitch;
+  }
+
+  setMode = (mode: AuthMode): void => {
+    this.#mode = mode;
+  };
+
+  requestMethodSwitch = (args: {
+    previousIdentity: LastUsedIdentity;
+    newMethod: MethodTag;
+    signedInIdentityNumber: bigint;
+    pendingLastUsedEntry?: PendingLastUsedEntry;
+    providerIssuer?: string;
+    providerDomain?: string;
+    providerName?: string;
+  }): void => {
+    this.#pendingMethodSwitch = args;
+    this.#view = "confirmMethodSwitch";
+  };
+
+  confirmMethodSwitch = (): bigint => {
+    if (this.#pendingMethodSwitch === undefined) {
+      throw new Error("No pending method switch");
+    }
+    const { signedInIdentityNumber } = this.#pendingMethodSwitch;
+    this.#pendingMethodSwitch = undefined;
+    this.#view = "chooseMethod";
+    return signedInIdentityNumber;
+  };
+
+  cancelMethodSwitch = (): void => {
+    this.#pendingMethodSwitch = undefined;
+    this.#view = "chooseMethod";
+  };
+
+  confirmOpenIdSignUp = async (): Promise<bigint | "needs-name"> => {
+    if (this.#jwt !== undefined && this.#configIssuer !== undefined) {
+      const { name } = decodeJWT(this.#jwt);
+      if (name !== undefined) {
+        return await this.completeOpenIdRegistration(name);
+      }
+      this.#view = "setupNewIdentity";
+      return "needs-name";
+    }
+    if (this.#ssoJwt !== undefined && this.#ssoDomain !== undefined) {
+      const { name } = decodeJWT(this.#ssoJwt);
+      if (name !== undefined) {
+        return await this.completeSsoRegistration(name);
+      }
+      this.#view = "setupNewIdentity";
+      return "needs-name";
+    }
+    throw new Error("No pending OpenID or SSO sign-up");
+  };
+
+  confirmOpenIdSignIn = (): bigint => {
+    if (this.#pendingOpenIdSignIn === undefined) {
+      throw new Error("No pending OpenID sign-in");
+    }
+    const identityNumber = this.#pendingOpenIdSignIn;
+    this.#pendingOpenIdSignIn = undefined;
+    this.#jwt = undefined;
+    this.#configIssuer = undefined;
+    this.#ssoJwt = undefined;
+    this.#ssoDomain = undefined;
+    this.#ssoName = undefined;
+    this.#view = "chooseMethod";
+    return identityNumber;
+  };
+
+  cancelOpenIdDisambiguation = (): void => {
+    this.#pendingOpenIdSignIn = undefined;
+    this.#jwt = undefined;
+    this.#configIssuer = undefined;
+    this.#ssoJwt = undefined;
+    this.#ssoDomain = undefined;
+    this.#ssoName = undefined;
+    this.#view = "chooseMethod";
+  };
 
   constructor(options?: AuthFlowOptions) {
     this.#options = {
@@ -108,15 +243,19 @@ export class AuthFlow {
 
   continueWithSso = async (
     ssoResult: SsoDiscoveryResult,
+    mode: AuthMode = this.#mode,
   ): Promise<
     | {
         identityNumber: bigint;
+        pendingLastUsedEntry?: PendingLastUsedEntry;
         type: "signIn";
       }
     | {
         name?: string;
+        email?: string;
         type: "signUp";
       }
+    | undefined
   > => {
     const { clientId, discovery, domain, name: ssoName } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
@@ -126,31 +265,55 @@ export class AuthFlow {
       authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
     });
     if (result.type === "signIn") {
-      if (this.#options.trackLastUsed) {
-        // `email` is purely for display fallback in the identity row
-        // (email → name → domain); decoded fresh from the JWT here so
-        // the sso variant doesn't need to remember `iss`/`sub`.
-        const { email } = decodeJWT(result.jwt);
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber: result.identityNumber,
-          name: result.info.name[0],
-          authMethod: {
-            sso: {
-              domain,
-              name: ssoName,
-              email,
-              loginHint: result.loginHint,
+      const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
+        .trackLastUsed
+        ? {
+            identityNumber: result.identityNumber,
+            name: result.info.name[0],
+            authMethod: {
+              sso: {
+                domain,
+                name: ssoName,
+                email: decodeJWT(result.jwt).email,
+                loginHint: result.loginHint,
+              },
             },
-          },
-          createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
-        });
+            createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+          }
+        : undefined;
+      if (mode === "signup") {
+        // The openIdAlreadyLinked dialog asks the user whether to sign
+        // in with the already-linked identity. Commit eagerly here —
+        // matches the existing UX: the auth succeeded, the identity is
+        // tracked, and `cancelOpenIdDisambiguation` does not revert.
+        if (lastUsedEntry !== undefined) {
+          lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
+        }
+        this.#ssoJwt = result.jwt;
+        this.#ssoDomain = domain;
+        this.#ssoName = ssoName;
+        this.#pendingOpenIdSignIn = result.identityNumber;
+        this.#view = "openIdAlreadyLinked";
+        return undefined;
       }
-      return { identityNumber: result.identityNumber, type: "signIn" };
+      return {
+        identityNumber: result.identityNumber,
+        pendingLastUsedEntry: lastUsedEntry,
+        type: "signIn",
+      };
     }
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
     this.#ssoName = ssoName;
-    return { name: result.suggestedName, type: "signUp" };
+    if (mode === "signin") {
+      this.#view = "openIdNotConnected";
+      return undefined;
+    }
+    return {
+      name: result.suggestedName,
+      email: result.email,
+      type: "signUp",
+    };
   };
 
   completeSsoRegistration = async (name: string): Promise<bigint> => {
@@ -167,7 +330,10 @@ export class AuthFlow {
     );
   };
 
-  continueWithExistingPasskey = async (): Promise<bigint> => {
+  continueWithExistingPasskey = async (): Promise<{
+    identityNumber: bigint;
+    pendingLastUsedEntry?: PendingLastUsedEntry;
+  }> => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
     const { identity, identityNumber, credentialId } =
       await authenticateWithPasskey({
@@ -178,20 +344,24 @@ export class AuthFlow {
     await authenticationStore.set({ identity, identityNumber, authMethod });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-    if (this.#options.trackLastUsed) {
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod,
-        createdAtMillis: info.created_at.map(nanosToMillis)[0],
-      });
-    }
-    return identityNumber;
+    const pendingLastUsedEntry = this.#options.trackLastUsed
+      ? {
+          identityNumber,
+          name: info.name[0],
+          authMethod,
+          createdAtMillis: info.created_at.map(nanosToMillis)[0],
+        }
+      : undefined;
+    return { identityNumber, pendingLastUsedEntry };
   };
 
   setupNewPasskey = (): void => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
     this.#view = "setupNewPasskey";
+  };
+
+  setupNewIdentity = (): void => {
+    this.#view = "setupNewIdentity";
   };
 
   submitNameAndContinue = async (
@@ -220,15 +390,21 @@ export class AuthFlow {
   continueWithOpenId = async (
     config: OpenIdConfig,
     existingJwt?: string,
+    mode: AuthMode = this.#mode,
   ): Promise<
     | {
         identityNumber: bigint;
+        name?: string;
+        email?: string;
+        pendingLastUsedEntry?: PendingLastUsedEntry;
         type: "signIn";
       }
     | {
         name?: string;
+        email?: string;
         type: "signUp";
       }
+    | undefined
   > => {
     authenticationV2Funnel.addProperties({ provider: config.name });
     const result = await this.#openIdJwtSignIn(
@@ -241,29 +417,59 @@ export class AuthFlow {
       existingJwt,
     );
     if (result.type === "signIn") {
-      if (this.#options.trackLastUsed) {
-        const authnMethod = result.info.openid_credentials[0]?.find(
-          (method) => method.iss === result.iss,
-        );
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber: result.identityNumber,
-          name: result.info.name[0],
-          authMethod: {
-            openid: {
-              iss: result.iss,
-              sub: result.sub,
-              loginHint: result.loginHint,
-              metadata: authnMethod?.metadata,
-            },
-          },
-          createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
-        });
+      const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
+        .trackLastUsed
+        ? (() => {
+            const authnMethod = result.info.openid_credentials[0]?.find(
+              (method) => method.iss === result.iss,
+            );
+            return {
+              identityNumber: result.identityNumber,
+              name: result.info.name[0],
+              authMethod: {
+                openid: {
+                  iss: result.iss,
+                  sub: result.sub,
+                  loginHint: result.loginHint,
+                  metadata: authnMethod?.metadata,
+                },
+              },
+              createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+            };
+          })()
+        : undefined;
+      if (mode === "signup") {
+        // See `continueWithSso`: the openIdAlreadyLinked path commits
+        // eagerly to preserve the existing UX of that disambiguation.
+        if (lastUsedEntry !== undefined) {
+          lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
+        }
+        this.#jwt = result.jwt;
+        this.#configIssuer = config.issuer;
+        this.#pendingOpenIdSignIn = result.identityNumber;
+        this.#view = "openIdAlreadyLinked";
+        return undefined;
       }
-      return { identityNumber: result.identityNumber, type: "signIn" };
+      const { name: jwtName, email } = decodeJWT(result.jwt);
+      return {
+        identityNumber: result.identityNumber,
+        name: result.info.name[0] ?? jwtName,
+        email,
+        pendingLastUsedEntry: lastUsedEntry,
+        type: "signIn",
+      };
     }
     this.#jwt = result.jwt;
     this.#configIssuer = config.issuer;
-    return { name: result.suggestedName, type: "signUp" };
+    if (mode === "signin") {
+      this.#view = "openIdNotConnected";
+      return undefined;
+    }
+    return {
+      name: result.suggestedName,
+      email: result.email,
+      type: "signUp",
+    };
   };
 
   // Shared core for `continueWithOpenId` / `continueWithSso`. Acquires the
@@ -289,6 +495,7 @@ export class AuthFlow {
         type: "signUp";
         jwt: string;
         suggestedName?: string;
+        email?: string;
       }
   > => {
     let jwt: string | undefined = existingJwt;
@@ -340,14 +547,11 @@ export class AuthFlow {
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor"
       ) {
-        const { name } = decodeJWT(jwt);
+        const { name, email } = decodeJWT(jwt);
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.RegisterWithOpenID,
         );
-        if (name === undefined) {
-          this.#view = "setupNewIdentity";
-        }
-        return { type: "signUp", jwt, suggestedName: name };
+        return { type: "signUp", jwt, suggestedName: name, email };
       }
       throw error;
     }

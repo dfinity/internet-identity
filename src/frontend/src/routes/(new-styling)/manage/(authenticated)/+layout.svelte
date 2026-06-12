@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    BriefcaseMedicalIcon,
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
@@ -9,12 +10,13 @@
     CodeIcon,
     LanguagesIcon,
     SettingsIcon,
-    ShieldIcon,
     UserIcon,
   } from "@lucide/svelte";
   import { page } from "$app/state";
-  import { afterNavigate, goto } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
+  import { HANDOFF_HASH_KEY } from "$lib/utils/auth-handoff";
   import { onMount } from "svelte";
+  import { SvelteURLSearchParams } from "svelte/reactivity";
   import { analytics } from "$lib/utils/analytics/analytics";
   import {
     authenticatedStore,
@@ -37,7 +39,8 @@
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
   import ReauthPrompt from "$lib/components/ui/ReauthPrompt.svelte";
-  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
+  import { AuthWizard } from "$lib/components/wizards/auth";
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
 
   // --- Props & state ---
@@ -54,6 +57,7 @@
   let isSignOutDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
   let isReauthDialogOpen = $state(false);
+  let authDialogMode = $state<AuthMode>("signin");
 
   // --- Derived ---
 
@@ -89,14 +93,6 @@
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
-    });
-  };
-
-  const handleUpgrade = async (identityNumber: bigint) => {
-    await handleSignIn(identityNumber);
-    toaster.success({
-      title: $t`Upgrade completed successfully`,
-      duration: 4000,
     });
   };
 
@@ -203,6 +199,18 @@
 
   afterNavigate(() => {
     isMobileSidebarOpen = false;
+    // Sticky cleanup of the handoff nonce; the eager strip can be undone by SvelteKit's router re-syncing.
+    const hash = window.location.hash.slice(1);
+    if (hash.length === 0) return;
+    const params = new SvelteURLSearchParams(hash);
+    if (!params.has(HANDOFF_HASH_KEY)) return;
+    params.delete(HANDOFF_HASH_KEY);
+    const remaining = params.toString();
+    const cleanUrl =
+      window.location.pathname +
+      window.location.search +
+      (remaining.length > 0 ? `#${remaining}` : "");
+    replaceState(cleanUrl, page.state);
   });
 
   // Pre-fetch passkey credential ids
@@ -312,7 +320,7 @@
             href="/manage/recovery"
             current={page.url.pathname === "/manage/recovery"}
           >
-            <ShieldIcon class="size-5 sm:max-md:mx-auto" />
+            <BriefcaseMedicalIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Recovery`}</span>
           </NavItem>
         </li>
@@ -439,21 +447,21 @@
         return;
       }
       isAuthDialogOpen = false;
+      authDialogMode = "signin";
     }}
   >
     <AuthWizard
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
         isAuthenticating = false;
         handleError(error);
       }}
-      withinDialog
+      bind:mode={authDialogMode}
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {$t`Sign in`}
+        {authDialogMode === "signup" ? $t`Add a new identity` : $t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
         {$t`Choose method to continue`}
