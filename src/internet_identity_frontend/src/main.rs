@@ -6,7 +6,10 @@ use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
+use ic_cdk_macros::update;
+use ic_http_certification::{
+    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, Method, StatusCode,
+};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::InternetIdentityFrontendArgs;
 use serde_json::json;
@@ -14,9 +17,22 @@ use sha2::Digest;
 use std::io::Read;
 use std::{cell::RefCell, rc::Rc};
 
+mod callback;
+
+/// Subset of the init args needed to build response headers at request time.
+/// Asset headers are built once during certification with the args in hand;
+/// dynamically rendered responses (the POST /callback translator) construct
+/// their headers per request, so these args are retained here.
+#[derive(Default)]
+struct HeaderConfig {
+    related_origins: Option<Vec<String>>,
+    dev_csp: bool,
+}
+
 thread_local! {
     static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
     static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone())));
+    static HEADER_CONFIG: RefCell<HeaderConfig> = RefCell::new(HeaderConfig::default());
 }
 
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
@@ -37,6 +53,13 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
     let related_origins = args.related_origins.as_ref();
     let dev_csp = args.dev_csp.unwrap_or(false);
+
+    HEADER_CONFIG.with_borrow_mut(|config| {
+        *config = HeaderConfig {
+            related_origins: args.related_origins.clone(),
+            dev_csp,
+        };
+    });
 
     // Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -140,6 +163,22 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
         }
         ic_cdk::api::set_certified_data(&asset_router.borrow().root_hash());
     });
+}
+
+/// Headers for dynamically rendered responses, built from the retained
+/// [`HeaderConfig`] so they match the headers certified onto static assets.
+pub(crate) fn dynamic_response_headers(
+    integrity_hashes: Vec<String>,
+    additional_headers: Vec<HeaderField>,
+) -> Vec<HeaderField> {
+    HEADER_CONFIG.with_borrow(|config| {
+        get_asset_headers(
+            integrity_hashes,
+            config.related_origins.as_ref(),
+            config.dev_csp,
+            additional_headers,
+        )
+    })
 }
 
 fn get_asset_headers(
@@ -473,6 +512,18 @@ fn extract_inline_scripts(content: String) -> Vec<String> {
 
 #[query]
 fn http_request(request: HttpRequest) -> HttpResponse {
+    if request.method() == Method::POST {
+        if callback::is_callback_post(&request) {
+            // Query responses can't certify dynamically rendered content;
+            // upgrade the IdP's form_post callback to update mode so the
+            // response is certified via consensus.
+            return HttpResponse::builder()
+                .with_status_code(StatusCode::OK)
+                .with_upgrade(true)
+                .build();
+        }
+        return method_not_allowed();
+    }
     ASSET_ROUTER.with_borrow(|asset_router| {
         if let Ok(response) = asset_router.serve_asset(
             &ic_cdk::api::data_certificate().expect("No data certificate available"),
@@ -483,6 +534,21 @@ fn http_request(request: HttpRequest) -> HttpResponse {
             ic_cdk::trap("Failed to serve asset");
         }
     })
+}
+
+#[update]
+fn http_request_update(request: HttpRequest) -> HttpResponse {
+    if callback::is_callback_post(&request) {
+        return callback::handle_form_post_callback(request.body());
+    }
+    method_not_allowed()
+}
+
+fn method_not_allowed() -> HttpResponse<'static> {
+    HttpResponse::builder()
+        .with_status_code(StatusCode::METHOD_NOT_ALLOWED)
+        .with_headers(vec![("Allow".to_string(), "GET, POST".to_string())])
+        .build()
 }
 
 // Order dependent: do not move above any exposed canister method!

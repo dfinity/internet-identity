@@ -7,6 +7,7 @@ import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import {
   CallbackPopupClosedError,
+  getStringProp,
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "../../routes/(new-styling)/callback/utils";
@@ -94,8 +95,8 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Raised when an OAuth provider redirects back to II with an `error` (and
- * optional `error_description`) in the callback fragment — per RFC 6749
+ * Raised when an OAuth provider reports an `error` (and optional
+ * `error_description`) through the callback — per RFC 6749
  * §4.1.2.1 / 4.2.2.1. Typical causes are the SSO app being misconfigured:
  *   • `unsupported_response_type` — the Okta/Auth0/etc. app doesn't allow
  *     the hybrid flow we request (`response_type=id_token code`).
@@ -137,7 +138,11 @@ export const createRedirectURL = (
   // Even though we only need an id token, we're still asking for a code
   // because some identity providers (AppleID) will throw an error otherwise.
   authURL.searchParams.set("response_type", "code id_token");
-  authURL.searchParams.set("response_mode", "fragment");
+  // The IdP POSTs the response to the canister's /callback handler, which
+  // returns certified HTML that delivers the payload to the frontend. Unlike
+  // `fragment`, `form_post` works across Okta/Auth0/Apple and never puts the
+  // id_token in a URL.
+  authURL.searchParams.set("response_mode", "form_post");
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
   authURL.searchParams.set("scope", config.authScope);
@@ -157,38 +162,40 @@ export const createRedirectURL = (
 };
 
 /**
- * Parse the OAuth authorize callback URL and extract the `id_token`.
+ * Validate the callback payload delivered by the canister's POST /callback
+ * landing page and extract the `id_token`.
  *
- * Exported so `requestWithPopup` and tests can share a single source of
- * truth for how a callback fragment is interpreted. Throws:
- *   - `Error("Invalid state")` if the callback's `state` doesn't match
+ * Exported so `requestWithPopup`, `resumeOpenId` and tests can share a
+ * single source of truth for how a callback payload is interpreted. The
+ * payload arrives as `unknown` (it crosses a BroadcastChannel or a
+ * sessionStorage JSON round-trip), so the shape is revalidated here. Throws:
+ *   - `Error("Invalid state")` if the payload's `state` doesn't match
  *     `expectedState` (CSRF guard).
- *   - `OAuthProviderError` if the callback carries an `error=...`
- *     fragment (RFC 6749 §4.1.2.1 / 4.2.2.1) — checked BEFORE the
- *     `id_token` null-check so a misconfigured SSO app surfaces its
- *     own message instead of a generic "No token received" that looks
- *     like a bug in II.
+ *   - `OAuthProviderError` if the payload carries an `error` field
+ *     (RFC 6749 §4.1.2.1 / 4.2.2.1) — checked BEFORE the `id_token`
+ *     check so a misconfigured SSO app surfaces its own message instead
+ *     of a generic "No token received" that looks like a bug in II.
  *   - `Error("No token received")` if neither `id_token` nor `error`
- *     was in the fragment (fallback for spec-violating providers).
+ *     is present (fallback for spec-violating providers).
  */
 export const extractIdTokenFromCallback = (
-  callback: string,
+  callback: unknown,
   expectedState: string,
 ): string => {
-  const callbackURL = new URL(callback);
-  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
-  if (searchParams.get("state") !== expectedState) {
+  const payload =
+    typeof callback === "object" && callback !== null ? callback : {};
+  if (getStringProp(payload, "state") !== expectedState) {
     throw new Error("Invalid state");
   }
-  const error = searchParams.get("error");
-  if (error !== null) {
+  const error = getStringProp(payload, "error");
+  if (error !== undefined) {
     throw new OAuthProviderError(
       error,
-      searchParams.get("error_description") ?? undefined,
+      getStringProp(payload, "error_description"),
     );
   }
-  const id_token = searchParams.get("id_token");
-  if (id_token === null) {
+  const id_token = getStringProp(payload, "id_token");
+  if (id_token === undefined) {
     throw new Error("No token received");
   }
   return id_token;

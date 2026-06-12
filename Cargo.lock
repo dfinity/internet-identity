@@ -2274,6 +2274,7 @@ dependencies = [
  "candid_parser",
  "canister_tests",
  "flate2",
+ "form_urlencoded",
  "ic-asset-certification",
  "ic-cdk 0.16.1",
  "ic-cdk-macros 0.16.0",
