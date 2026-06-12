@@ -443,14 +443,20 @@ fn frontend_canister_translates_form_post_callback() -> Result<(), RejectRespons
     assert!(body.contains("BroadcastChannel(\"redirect_callback\")"));
     assert!(body.contains("sessionStorage.setItem(\"ii-openid-callback-data\""));
 
-    // The inline script must be pinned in the CSP so nothing else can run.
-    let csp = response
+    // The inline script must be pinned in the CSP with no permissive fallback
+    // so nothing else can run. The SPA-wide CSP is replaced, not appended, so
+    // there is exactly one CSP header.
+    let csps: Vec<&String> = response
         .headers
         .iter()
-        .find(|(name, _)| name.to_lowercase() == "content-security-policy")
-        .map(|(_, value)| value.clone())
-        .expect("Content-Security-Policy header missing");
-    assert!(csp.contains("sha384-"));
+        .filter(|(name, _)| name.to_lowercase() == "content-security-policy")
+        .map(|(_, value)| value)
+        .collect();
+    assert_eq!(csps.len(), 1, "expected exactly one CSP header");
+    let csp = csps[0];
+    assert!(csp.contains("script-src 'sha384-"));
+    assert!(!csp.contains("unsafe-inline"));
+    assert!(!csp.contains("unsafe-eval"));
 
     let cache_control = response
         .headers

@@ -167,13 +167,12 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
 
 /// Headers for dynamically rendered responses, built from the retained
 /// [`HeaderConfig`] so they match the headers certified onto static assets.
-pub(crate) fn dynamic_response_headers(
-    integrity_hashes: Vec<String>,
-    additional_headers: Vec<HeaderField>,
-) -> Vec<HeaderField> {
+/// The caller supplies its own `Content-Security-Policy` among
+/// `additional_headers`, so no inline-script integrity hashes are passed here.
+pub(crate) fn dynamic_response_headers(additional_headers: Vec<HeaderField>) -> Vec<HeaderField> {
     HEADER_CONFIG.with_borrow(|config| {
         get_asset_headers(
-            integrity_hashes,
+            vec![],
             config.related_origins.as_ref(),
             config.dev_csp,
             additional_headers,
@@ -547,7 +546,9 @@ fn http_request_update(request: HttpRequest) -> HttpResponse {
 fn method_not_allowed() -> HttpResponse<'static> {
     HttpResponse::builder()
         .with_status_code(StatusCode::METHOD_NOT_ALLOWED)
-        .with_headers(vec![("Allow".to_string(), "GET, POST".to_string())])
+        // Only reached for non-/callback resources, which serve GET assets
+        // (POST is handled on /callback alone, via the query→update upgrade).
+        .with_headers(vec![("Allow".to_string(), "GET".to_string())])
         .build()
 }
 

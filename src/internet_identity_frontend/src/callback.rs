@@ -17,7 +17,7 @@
 use crate::dynamic_response_headers;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use ic_http_certification::{HttpRequest, HttpResponse, Method, StatusCode};
+use ic_http_certification::{HeaderField, HttpRequest, HttpResponse, Method, StatusCode};
 use sha2::Digest;
 use std::borrow::Cow;
 
@@ -232,7 +232,17 @@ fn render_callback_landing(payload: &CallbackPayload) -> HttpResponse<'static> {
 </body>
 </html>"#
     );
-    html_response(StatusCode::OK, html, vec![callback_script_hash()])
+    // Scope the CSP to this page instead of inheriting the SPA's permissive
+    // `script-src 'self' 'unsafe-inline' 'unsafe-eval'` (needed for SvelteKit
+    // + agent-js wasm). This page runs exactly one known inline script, so
+    // pinning to its hash with no `unsafe-inline`/`unsafe-eval`/`'self'`
+    // fallback makes the hash genuinely load-bearing rather than relying on
+    // the CSP3 rule that a hash makes browsers ignore `unsafe-inline`.
+    let csp = format!(
+        "default-src 'none'; script-src '{}'; base-uri 'none'; frame-ancestors 'none'",
+        callback_script_hash()
+    );
+    html_response(StatusCode::OK, html, csp)
 }
 
 /// Static page for bodies that can't be translated. `reason` is always one
@@ -250,22 +260,33 @@ fn render_error_page(reason: &str) -> HttpResponse<'static> {
 </body>
 </html>"#
     );
-    html_response(StatusCode::BAD_REQUEST, html, vec![])
+    // No inline script on the error page, so deny scripts entirely.
+    html_response(
+        StatusCode::BAD_REQUEST,
+        html,
+        "default-src 'none'; base-uri 'none'; frame-ancestors 'none'".to_string(),
+    )
 }
 
 fn html_response(
     status_code: StatusCode,
     html: String,
-    integrity_hashes: Vec<String>,
+    content_security_policy: String,
 ) -> HttpResponse<'static> {
-    let headers = dynamic_response_headers(
-        integrity_hashes,
-        vec![
-            ("content-type".to_string(), "text/html".to_string()),
-            // The payload is single-use and session-bound; never cache it.
-            ("cache-control".to_string(), "no-store".to_string()),
-        ],
-    );
+    // Take the shared security headers, then swap in this page's own CSP in
+    // place of the SPA-wide one (see `render_callback_landing`).
+    let mut headers: Vec<HeaderField> = dynamic_response_headers(vec![
+        ("content-type".to_string(), "text/html".to_string()),
+        // The payload is single-use and session-bound; never cache it.
+        ("cache-control".to_string(), "no-store".to_string()),
+    ])
+    .into_iter()
+    .filter(|(name, _)| !name.eq_ignore_ascii_case("content-security-policy"))
+    .collect();
+    headers.push((
+        "Content-Security-Policy".to_string(),
+        content_security_policy,
+    ));
     HttpResponse::builder()
         .with_status_code(status_code)
         .with_headers(headers)
@@ -472,13 +493,20 @@ mod tests {
         let body = std::str::from_utf8(response.body()).unwrap();
         assert!(body.contains(ID_TOKEN));
         assert!(body.contains(CALLBACK_SCRIPT));
-        let csp = response
+        let csp_headers: Vec<&str> = response
             .headers()
             .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case("content-security-policy"))
+            .filter(|(name, _)| name.eq_ignore_ascii_case("content-security-policy"))
             .map(|(_, value)| value.as_str())
-            .unwrap();
-        assert!(csp.contains(&callback_script_hash()));
+            .collect();
+        // Exactly one CSP (the SPA-wide one is replaced, not appended), and it
+        // pins the inline script by hash with no permissive fallback — so the
+        // hash actually governs execution.
+        assert_eq!(csp_headers.len(), 1);
+        let csp = csp_headers[0];
+        assert!(csp.contains(&format!("script-src '{}'", callback_script_hash())));
+        assert!(!csp.contains("unsafe-inline"));
+        assert!(!csp.contains("unsafe-eval"));
         let cache_control = response
             .headers()
             .iter()
