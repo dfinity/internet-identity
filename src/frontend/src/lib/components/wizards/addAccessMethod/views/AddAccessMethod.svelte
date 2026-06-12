@@ -109,7 +109,7 @@
             hidden={!hasCredential(provider.issuer)}
           >
             <button
-              class="btn btn-secondary btn-tile"
+              class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
               onclick={() => handleContinueWithOpenId(provider)}
               disabled={authenticatingProviderId !== undefined ||
                 hasCredential(provider.issuer)}
@@ -136,7 +136,7 @@
         the backend canary allowlist are rejected there.
       -->
       <button
-        class="btn btn-secondary btn-tile"
+        class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={$t`Continue with SSO`}

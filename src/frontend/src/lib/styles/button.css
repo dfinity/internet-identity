@@ -76,10 +76,6 @@
   @apply h-12 gap-2.5 px-4.5 text-base;
 }
 
-@utility btn-tile {
-  @apply h-16 w-full flex-col gap-1.5 text-xs whitespace-normal;
-}
-
 @utility btn-icon {
   @apply aspect-square !gap-0 !p-0;
   @apply [&_>_span]:sr-only;
