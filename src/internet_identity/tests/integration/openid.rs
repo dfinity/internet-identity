@@ -349,13 +349,18 @@ fn should_backfill_sso_fields_via_credential_migration() -> Result<(), RejectRes
     assert_eq!(credentials[0].sso_name, None);
 
     // Upgrade with a migration entry matching the stored credential's
-    // `(iss, aud)`.
+    // `(iss, aud)`. The stamped values `acme.com` / `Acme Corp` exist ONLY
+    // in this arg: no discovery task is ever registered in this test, so the
+    // response-shaping fallback (`sso_fields_for`, which reads
+    // `DISCOVERY_TASKS`) can only ever yield `(None, None)` here. The
+    // post-upgrade assertions below therefore prove the values came from the
+    // stored stamp written by the migration, not from the live fallback.
     let arg = InternetIdentityInit {
         sso_credential_migration: Some(vec![SsoCredentialMigrationEntry {
             discovery_domain: "acme.com".into(),
             issuer: claims.iss.clone(),
             client_id: claims.aud.clone(),
-            sso_name: Some("Acme Corp".into()),
+            name: Some("Acme Corp".into()),
         }]),
         ..Default::default()
     };

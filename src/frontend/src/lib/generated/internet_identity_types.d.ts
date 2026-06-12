@@ -1492,15 +1492,20 @@ export type SmtpResponse = { 'Ok' : {} } |
 /**
  * One entry of the `sso_credential_migration` backfill. Maps the
  * (iss, aud) pair of stored SSO credentials to the discovery domain (and
- * optional human-readable name) they were registered through.
+ * optional human-readable name) they were registered through. Field names
+ * match the `discovered_oidc_configs` query output so the deployer can
+ * transcribe its result field-for-field.
  */
 export interface SsoCredentialMigrationEntry {
+  /**
+   * Human-readable SSO label; stamped onto the credential's `sso_name`.
+   */
+  'name' : [] | [string],
   /**
    * Matches the stored credential's `iss`.
    */
   'issuer' : string,
   'discovery_domain' : string,
-  'sso_name' : [] | [string],
   /**
    * Matches the stored credential's `aud`.
    */

@@ -315,9 +315,9 @@ pub struct InternetIdentityInit {
 /// One entry of the `sso_credential_migration` backfill (see
 /// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
 /// pair of stored SSO credentials to the discovery domain (and optional
-/// human-readable name) they were registered through. The deployer builds
-/// the list from the running canister's `discovered_oidc_configs` query
-/// before submitting the upgrade proposal.
+/// human-readable name) they were registered through. Field names match the
+/// `discovered_oidc_configs` query output so the deployer can transcribe its
+/// result field-for-field before submitting the upgrade proposal.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoCredentialMigrationEntry {
     pub discovery_domain: String,
@@ -325,7 +325,8 @@ pub struct SsoCredentialMigrationEntry {
     pub issuer: String,
     /// Matches the stored credential's `aud`.
     pub client_id: String,
-    pub sso_name: Option<String>,
+    /// Human-readable SSO label; stamped onto the credential's `sso_name`.
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

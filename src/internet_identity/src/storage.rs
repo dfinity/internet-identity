@@ -990,7 +990,7 @@ impl<M: Memory + Clone> Storage<M> {
                         continue;
                     }
                     credential.sso_domain = Some(entry.discovery_domain.clone());
-                    credential.sso_name = entry.sso_name.clone();
+                    credential.sso_name = entry.name.clone();
                     stamped_any = true;
                 }
                 if stamped_any {

@@ -6,9 +6,9 @@ export const idlFactory = ({ IDL }) => {
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
   const SsoCredentialMigrationEntry = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
     'issuer' : IDL.Text,
     'discovery_domain' : IDL.Text,
-    'sso_name' : IDL.Opt(IDL.Text),
     'client_id' : IDL.Text,
   });
   const DnssecRootAnchor = IDL.Record({
@@ -1206,9 +1206,9 @@ export const init = ({ IDL }) => {
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
   const SsoCredentialMigrationEntry = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
     'issuer' : IDL.Text,
     'discovery_domain' : IDL.Text,
-    'sso_name' : IDL.Opt(IDL.Text),
     'client_id' : IDL.Text,
   });
   const DnssecRootAnchor = IDL.Record({

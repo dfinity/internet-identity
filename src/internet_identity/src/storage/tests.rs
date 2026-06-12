@@ -2056,7 +2056,7 @@ mod migrate_sso_credentials_batch_tests {
             discovery_domain: SSO_DOMAIN.to_string(),
             issuer: SSO_ISS.to_string(),
             client_id: SSO_AUD.to_string(),
-            sso_name: Some(SSO_NAME.to_string()),
+            name: Some(SSO_NAME.to_string()),
         }
     }
 
