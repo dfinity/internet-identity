@@ -864,6 +864,20 @@ pub fn discovered_state_for(
     })
 }
 
+/// Looks up the optional human-readable SSO `name` for a discovery domain
+/// from current `DISCOVERY_TASKS` state. Used to stamp `sso_name` onto a
+/// credential at verification time — verification only succeeds after
+/// discovery completed, so the task's `name_ref` reflects the latest
+/// successfully fetched hop-1 body.
+fn sso_name_for_domain(discovery_domain: &str) -> Option<String> {
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        tasks
+            .iter()
+            .find(|t| t.discovery_domain == discovery_domain)
+            .and_then(|t| t.name_ref.borrow().clone())
+    })
+}
+
 /// Looks up the SSO domain + optional SSO name for an OpenID credential
 /// by its `(iss, aud)` pair. Computed on-demand from current
 /// `DISCOVERY_TASKS` state — that way `get_anchor_info` always reflects
@@ -884,20 +898,6 @@ pub fn discovered_state_for(
 /// frontend — the backend intentionally does not collapse the two: we
 /// want the FE to be able to tell "no name published" apart from "has a
 /// name" for future divergent rendering.
-/// Looks up the optional human-readable SSO `name` for a discovery domain
-/// from current `DISCOVERY_TASKS` state. Used to stamp `sso_name` onto a
-/// credential at verification time — verification only succeeds after
-/// discovery completed, so the task's `name_ref` reflects the latest
-/// successfully fetched hop-1 body.
-fn sso_name_for_domain(discovery_domain: &str) -> Option<String> {
-    DISCOVERY_TASKS.with_borrow(|tasks| {
-        tasks
-            .iter()
-            .find(|t| t.discovery_domain == discovery_domain)
-            .and_then(|t| t.name_ref.borrow().clone())
-    })
-}
-
 pub fn sso_fields_for(iss: &str, aud: &str) -> (Option<String>, Option<String>) {
     DISCOVERY_TASKS.with_borrow(|tasks| {
         tasks

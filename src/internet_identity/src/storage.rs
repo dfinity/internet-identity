@@ -955,11 +955,14 @@ impl<M: Memory + Clone> Storage<M> {
             else {
                 continue;
             };
+            // The aggregated errors are surfaced by the anonymous
+            // `list_sso_credential_migration_errors` endpoint, so they must
+            // not carry `iss` / `sub` — those identify the user at the IdP.
+            // The anchor number is enough to investigate and is not IdP PII.
             if anchor_numbers.is_empty() {
-                let err = format!(
-                    "index entry without anchor: iss={} sub={}",
-                    key.iss, key.sub
-                );
+                // Degenerate "index entry with no anchors" state — no anchor
+                // to name, and we deliberately omit iss/sub.
+                let err = "index entry with no associated anchor".to_string();
                 ic_cdk::println!("WARNING: SSO credential migration: {err}");
                 outcome.errors.push(err);
                 continue;
@@ -970,10 +973,7 @@ impl<M: Memory + Clone> Storage<M> {
                     // Orphan index entry: the anchor holding this credential
                     // is gone. Nothing to stamp; the index inconsistency is
                     // out of scope for this migration, so just report it.
-                    let err = format!(
-                        "anchor {anchor_number} not found for credential: iss={} sub={}",
-                        key.iss, key.sub
-                    );
+                    let err = format!("anchor {anchor_number} not found for migrated credential");
                     ic_cdk::println!("WARNING: SSO credential migration: {err}");
                     outcome.errors.push(err);
                     continue;
@@ -988,6 +988,17 @@ impl<M: Memory + Clone> Storage<M> {
                     // re-running (e.g. with a corrected entry list) is safe.
                     if credential.sso_domain.is_some() {
                         continue;
+                    }
+                    // `sso_domain` and `sso_name` are always written together,
+                    // so a set `sso_name` with an unset `sso_domain` shouldn't
+                    // happen. Log if it does — we're about to overwrite it —
+                    // rather than silently hide the anomaly. No PII: anchor
+                    // number only.
+                    if credential.sso_name.is_some() {
+                        ic_cdk::println!(
+                            "WARNING: SSO credential migration: overwriting sso_name on a \
+                             credential with no sso_domain (anchor {anchor_number})"
+                        );
                     }
                     credential.sso_domain = Some(entry.discovery_domain.clone());
                     credential.sso_name = entry.name.clone();
