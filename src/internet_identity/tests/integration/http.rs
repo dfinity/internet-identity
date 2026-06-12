@@ -131,6 +131,10 @@ fn ii_canister_serves_http_metrics() -> Result<(), RejectResponse> {
         "internet_identity_users_in_registration_mode",
         "internet_identity_buffered_archive_entries",
         "internet_identity_prepare_id_alias_counter",
+        "internet_identity_doh_cache_entries",
+        "internet_identity_doh_cache_in_flight",
+        "internet_identity_doh_cache_max_entries",
+        "internet_identity_doh_cache_inconsistencies",
     ];
     let env = env();
     env.advance_time(Duration::from_secs(300)); // Advance time to see it reflected on the metrics endpoint

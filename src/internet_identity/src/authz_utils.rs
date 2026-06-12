@@ -137,8 +137,7 @@ pub fn check_authorization(
     // calling `state::salt()`, which would trap. An unauthorized
     // caller in that state then falls through to a clean
     // `AuthorizationError` instead of a canister trap.
-    let salt_initialised =
-        state::storage_borrow(|storage| storage.salt().is_some());
+    let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
     if salt_initialised {
         for credential in &anchor.email_recovery {
             let seed = crate::email_recovery::smtp::calculate_email_recovery_seed(

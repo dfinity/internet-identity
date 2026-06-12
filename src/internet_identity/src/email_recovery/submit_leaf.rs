@@ -1,13 +1,17 @@
 //! Second-phase DNSSEC leaf submission, exposed as two canister
-//! methods that share a finalize tail:
+//! methods that each accept the leaf and stamp the verdict on the
+//! pending challenge the FE polls (neither returns the verdict):
 //!
 //! - `email_recovery_submit_dkim_leaf(arg)` — the FE walked a
 //!   fully-signed DNSSEC resolution and submits the
 //!   `(hops, extra_chains)` bundle ([`submit_dkim_leaf`]).
-//! - `email_recovery_submit_dkim_leaf_via_doh(nonce)` — the FE could
-//!   not walk DNSSEC because the DKIM record CNAMEs into an unsigned
-//!   zone, so the canister resolves the key over its own DoH path
-//!   ([`submit_dkim_leaf_via_doh`]).
+//! - `email_recovery_resolve_via_doh(nonce)` — the canister resolves
+//!   the DKIM key over its own DoH path. Used for the pure-DoH (Gmail)
+//!   case and as the fallback when the FE can't walk DNSSEC because the
+//!   DKIM record CNAMEs into an unsigned zone ([`resolve_via_doh`]). The
+//!   FE calls it repeatedly while the status is `ResolvingDoh`: each call
+//!   reads the DoH cache and either finishes (cache `Ready`) or leaves the
+//!   status `ResolvingDoh` to poll again (cache `Pending`).
 //!
 //! On the DNSSEC path, `smtp_request` parsed the DKIM-Signature
 //! header, validated the body hash, and stashed a small
@@ -37,39 +41,46 @@
 //!    bytes (or strict `d=` alignment when no DMARC was cached).
 //! 5. Binds the credential and flips status to `Succeeded`.
 //!
-//! `submit_dkim_leaf_via_doh` (DoH fallback) skips steps 2–3 and
-//! resolves the DKIM/DMARC TXT records over the canister's
-//! allowlist-gated DoH path, then runs the same steps 4–5. See
-//! [`run_doh_fallback`].
+//! `resolve_via_doh` (the DoH path) skips steps 2–3 and reads the
+//! DKIM/DMARC TXT records from the canister's allowlist-gated DoH cache,
+//! then runs the same steps 4–5 once they're [`Ready`](crate::single_flight_cache::Cached).
+//! See [`resolve_dkim_and_dmarc`].
 //!
 //! See design doc §8.4 / §8.5.
 
 use super::pending::{PendingKind, PendingStatus};
+use crate::doh::{DohError, DohRecord};
 use crate::email_recovery::pending;
+use crate::single_flight_cache::Cached;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryError, EmailRecoveryStatus, EmailRecoverySubmitDkimLeafArg,
+    EmailRecoveryError, EmailRecoverySubmitDkimLeafArg,
 };
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DelegationChain, SessionKey, SignedRRset,
 };
 
+/// A resolved DKIM TXT (required) plus DMARC TXT (optional — `None` is the
+/// "no policy published" strict-alignment fallback).
+type DkimAndDmarc = (Vec<u8>, Option<Vec<u8>>);
+
 /// Body of `email_recovery_submit_dkim_leaf(arg)` — the DNSSEC path.
 /// The FE walked a fully-signed DNSSEC resolution for the leaf and
-/// submits the `(hops, extra_chains)` bundle here. Returns the
-/// post-call polling status — `RegistrationSucceeded` for the setup
-/// flow, `RecoveryReady{...}` for the recovery flow, or
-/// `Failed(reason)`. The FE can also poll
-/// `email_recovery_status(nonce)` for the same answer; returning it
-/// here saves the FE one round-trip on the happy path.
+/// submits the `(hops, extra_chains)` bundle here. **Accept-only:**
+/// returns `Ok(())` once the leaf is processed and the verdict written
+/// to the pending status, or `Err` for a call-level rejection (unknown
+/// nonce / not in `NeedDkimLeaf`). The verification verdict
+/// (`RegistrationSucceeded` / `RecoveryReady` / `Failed`) is read by
+/// polling `email_recovery_status(nonce)` — the single source of truth,
+/// shared with the asynchronous DoH paths.
 ///
 /// When the leaf's DKIM record CNAMEs into an *unsigned* zone the FE
 /// can't walk DNSSEC at all (the `outlook.com` ->
 /// `outbound.protection.outlook.com` / `live.com` case); it then calls
-/// the sibling `submit_dkim_leaf_via_doh` instead of this method.
+/// the sibling `resolve_via_doh` instead of this method.
 pub async fn submit_dkim_leaf(
     arg: EmailRecoverySubmitDkimLeafArg,
     now_secs: u64,
-) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+) -> Result<(), EmailRecoveryError> {
     let EmailRecoverySubmitDkimLeafArg {
         nonce,
         hops,
@@ -79,74 +90,142 @@ pub async fn submit_dkim_leaf(
     // Snapshot everything we need under one borrow so the rest of
     // the function works against owned data. Includes early
     // rejection of "not a DNSSEC pending entry" / "not in
-    // NeedDkimLeaf state" / etc.
+    // NeedDkimLeaf state" / etc. — these are call-level errors,
+    // returned to the FE; the verification verdict goes on the polled
+    // status instead (single source of truth).
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
         .ok_or(EmailRecoveryError::NonceUnknown)??;
 
     let verification = run_submit(&hops, &extra_chains, &snapshot, now_secs);
-    finalize(&nonce, &snapshot, verification, now_secs).await
+    finalize(&nonce, &snapshot.material, verification, now_secs).await;
+    Ok(())
 }
 
-/// Body of `email_recovery_submit_dkim_leaf_via_doh(nonce)` — the DoH
-/// fallback for the DNSSEC path. The FE calls this (instead of
-/// `submit_dkim_leaf`) when it could not walk a fully-signed DNSSEC
-/// resolution for the leaf because the DKIM record CNAMEs into an
-/// unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
-/// `live.com`, …). It carries no leaf data: the canister resolves the
-/// DKIM key over its own allowlist-gated DoH path, reusing the cached
-/// `partial_verification` crypto material. A domain the operator hasn't
-/// enabled comes back as `DomainNotAllowlisted` rather than leaving the
-/// pending entry stuck in `NeedDkimLeaf` until it expires. Returns the
-/// same post-call polling status as `submit_dkim_leaf`.
-pub async fn submit_dkim_leaf_via_doh(
-    nonce: String,
-    now_secs: u64,
-) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
-    let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
-        .ok_or(EmailRecoveryError::NonceUnknown)??;
+/// Body of `email_recovery_resolve_via_doh(nonce)` — the DoH path. Used
+/// for the pure-DoH (Gmail) case and as the fallback when the FE could not
+/// walk a fully-signed DNSSEC resolution because the DKIM record CNAMEs
+/// into an unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
+/// `live.com`, …). It carries no leaf data: the canister resolves the DKIM
+/// key over its own allowlist-gated DoH cache, reusing the
+/// `partial_verification` crypto material `smtp_request` stashed.
+///
+/// **Polled, idempotent, accept-only.** The FE calls this repeatedly while
+/// the status is `ResolvingDoh`. Each call reads the DoH cache:
+///
+/// - cache [`Pending`](Cached::Pending) — a fetch is in flight; the status
+///   stays `ResolvingDoh` and the call returns `Ok(())` for the FE to poll
+///   again.
+/// - cache [`Ready`](Cached::Ready) — the key is in hand; verify against the
+///   stashed partial and stamp the terminal verdict.
+///
+/// A domain the operator hasn't enabled lands as
+/// `Failed(DomainNotAllowlisted)`. Returns `Ok(())` and the verdict is read
+/// by polling `email_recovery_status`; `Err` is a call-level rejection
+/// (unknown nonce).
+pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailRecoveryError> {
+    let Some(mat) = pending::with_mut(&nonce, now_secs, |c| VerifyMaterial::take_for_doh(c))
+        .ok_or(EmailRecoveryError::NonceUnknown)??
+    else {
+        // Nothing to do — the entry is already terminal (a concurrent poll
+        // finished it) or carries no partial. The FE reads the verdict from
+        // the status; this poll is a silent no-op.
+        return Ok(());
+    };
 
-    let verification = run_doh_fallback(&snapshot).await;
-    finalize(&nonce, &snapshot, verification, now_secs).await
+    // Make sure the status reflects "resolving over DoH" — this flips a
+    // first call that arrived in `NeedDkimLeaf` (the DNSSEC fallback) so the
+    // FE switches from walking DNSSEC to driving this method.
+    pending::with_mut(&nonce, now_secs, |c| {
+        c.status = PendingStatus::ResolvingDoh;
+    });
+
+    let dkim_fqdn = format!("{}._domainkey.{}", mat.selector, mat.signing_domain);
+    let dmarc_fqdn = format!("_dmarc.{}", mat.registered_domain);
+    match resolve_dkim_and_dmarc(&dkim_fqdn, &dmarc_fqdn, &mat.registered_domain) {
+        // A fetch is still in flight — keep polling.
+        Ok(Cached::Pending) => Ok(()),
+        Ok(Cached::Ready((dkim_bytes, dmarc_bytes))) => {
+            let verification = verify_dkim_key_against_partial(
+                &dkim_bytes,
+                dmarc_bytes.as_deref(),
+                &mat,
+                &dkim_fqdn,
+            );
+            finalize_via_doh(nonce, mat, verification, now_secs);
+            Ok(())
+        }
+        Err(e) => {
+            let reason = super::smtp::map_doh_error(e, &mat.registered_domain);
+            finalize_via_doh(nonce, mat, Err(reason), now_secs);
+            Ok(())
+        }
+    }
 }
 
-/// Shared tail of both submit methods: on a failed `verification`,
-/// stamp the pending entry `Failed` and surface the error; on success,
-/// finalize per kind — setup binds the credential, recovery stamps a
-/// delegation seed.
+/// Read the DKIM key (required) and DMARC policy (optional) for `mat` from
+/// the DoH cache, keeping the DKIM-required / DMARC-optional + `NoAnswer`
+/// rule in one place:
+///
+/// - either fetch [`Pending`](Cached::Pending) → the whole resolution is
+///   `Pending` (poll again).
+/// - DKIM `NoAnswer` (no key published) → a verification failure
+///   (`DohError::NoAnswer`).
+/// - DMARC `NoAnswer` → `None`: the valid "no policy published" state (RFC
+///   7489) that drops the verifier to strict `d=` alignment (design §6.3).
+///   Any *other* DMARC failure propagates rather than quietly tightening the
+///   check.
+///
+/// All DNS names come from canister-pinned state (`selector` from the
+/// email's `s=`, `signing_domain` from its `d=`, `registered_domain` from
+/// the claimed address), never the FE, and the fetch is allowlist-gated on
+/// `registered_domain`.
+fn resolve_dkim_and_dmarc(
+    dkim_fqdn: &str,
+    dmarc_fqdn: &str,
+    registered_domain: &str,
+) -> Result<Cached<DkimAndDmarc>, DohError> {
+    let dkim = match crate::doh::fetch_txt(dkim_fqdn, registered_domain)? {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(DohRecord::Txt(bytes)) => bytes,
+        Cached::Ready(DohRecord::NoAnswer) => return Err(DohError::NoAnswer),
+    };
+    let dmarc = match crate::doh::fetch_txt(dmarc_fqdn, registered_domain)? {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(DohRecord::Txt(bytes)) => Some(bytes),
+        Cached::Ready(DohRecord::NoAnswer) => None,
+    };
+    Ok(Cached::Ready((dkim, dmarc)))
+}
+
+/// Tail of the DNSSEC submit path: stamp the verdict onto the pending entry
+/// the FE polls (it returns nothing — the status is the source of truth). On
+/// a failed `verification` → `Failed`; on success, per kind — setup binds the
+/// credential, recovery stamps a delegation seed. (The DoH paths use
+/// [`finalize_via_doh`], which detaches the recovery leg.)
 async fn finalize(
     nonce: &str,
-    snapshot: &Snapshot,
+    mat: &VerifyMaterial,
     verification: Result<(), EmailRecoveryError>,
     now_secs: u64,
-) -> Result<EmailRecoveryStatus, EmailRecoveryError> {
+) {
     if let Err(e) = verification {
-        let cloned = e.clone();
         pending::with_mut(nonce, now_secs, |c| {
-            c.status = PendingStatus::Failed(cloned);
+            c.status = PendingStatus::Failed(e);
             c.partial_verification = None;
         });
-        return Err(e);
+        return;
     }
 
-    match &snapshot.kind {
+    match &mat.kind {
         SnapshotKind::Register { anchor } => {
-            match super::smtp::bind_credential(*anchor, &snapshot.claimed_address, now_secs) {
-                Ok(()) => {
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.status = PendingStatus::Succeeded;
-                        c.partial_verification = None;
-                    });
-                    Ok(EmailRecoveryStatus::RegistrationSucceeded)
-                }
-                Err(e) => {
-                    let cloned = e.clone();
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.status = PendingStatus::Failed(cloned);
-                        c.partial_verification = None;
-                    });
-                    Err(e)
-                }
-            }
+            let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+            pending::with_mut(nonce, now_secs, |c| {
+                c.partial_verification = None;
+                c.status = match result {
+                    Ok(()) => PendingStatus::Succeeded,
+                    Err(e) => PendingStatus::Failed(e),
+                };
+            });
         }
         SnapshotKind::Recovery { session_pk } => {
             // Build a transient `PendingSnapshot` shape that
@@ -155,67 +234,107 @@ async fn finalize(
             // anchor via the reverse-address index and adds the
             // canister signature.
             let smtp_snapshot = super::smtp::recovery_snapshot(
-                snapshot.claimed_address.clone(),
-                snapshot.registered_domain.clone(),
+                mat.claimed_address.clone(),
+                mat.registered_domain.clone(),
                 session_pk.clone(),
             );
             match super::smtp::stamp_recovery_delegation(&smtp_snapshot, session_pk).await {
-                Ok(outcome) => {
-                    let user_key = serde_bytes::ByteBuf::from(outcome.user_key.clone());
-                    let expiration = outcome.expiration;
-                    let anchor_number = outcome.anchor_number;
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.recovery_outcome = Some(outcome);
-                        c.status = PendingStatus::Succeeded;
-                        c.partial_verification = None;
-                    });
-                    Ok(EmailRecoveryStatus::RecoveryReady {
-                        user_key,
-                        expiration,
-                        anchor_number,
-                    })
-                }
-                Err(e) => {
-                    let cloned = e.clone();
-                    pending::with_mut(nonce, now_secs, |c| {
-                        c.status = PendingStatus::Failed(cloned);
-                        c.partial_verification = None;
-                    });
-                    Err(e)
-                }
-            }
+                Ok(outcome) => pending::with_mut(nonce, now_secs, |c| {
+                    c.recovery_outcome = Some(outcome);
+                    c.status = PendingStatus::Succeeded;
+                    c.partial_verification = None;
+                }),
+                Err(e) => pending::with_mut(nonce, now_secs, |c| {
+                    c.status = PendingStatus::Failed(e);
+                    c.partial_verification = None;
+                }),
+            };
         }
     }
 }
 
+/// Everything the signature verification + finalize need, derived from the
+/// `partial_verification` record and the challenge identity — independent of
+/// how the DKIM key is obtained (DNSSEC hop walk or DoH cache). The DNSSEC
+/// path wraps this in [`Snapshot`] alongside its chain material; the DoH path
+/// uses it directly.
 #[derive(Clone, Debug)]
-struct Snapshot {
+struct VerifyMaterial {
     kind: SnapshotKind,
     claimed_address: String,
     registered_domain: String,
-    expected_selector: String,
-    cached_root_dnskey: crate::dnssec::SignedRRset,
-    cached_zones: crate::dnssec::ZoneKeysMap,
-    cached_dmarc_txt: Option<Vec<u8>>,
-    headers_digest: [u8; 32],
-    signature: Vec<u8>,
+    /// Parsed `s=` (selector) from the email's DKIM-Signature header. The
+    /// `<selector>._domainkey.<d>` owner-name to resolve.
+    selector: String,
     signing_domain: String,
     /// Parsed `i=` (AUID) from the email's DKIM-Signature header.
     /// Needed at submit time to check `i=` alignment with `d=` once
     /// the DKIM record's `t=s` flag is known. See design §5.4.
     signing_auid: String,
     algorithm: crate::dkim::Algorithm,
+    headers_digest: [u8; 32],
+    signature: Vec<u8>,
     from_address_lc: String,
+}
+
+/// DNSSEC-path snapshot: the partial-derived [`VerifyMaterial`] plus the
+/// cached DNSSEC chain material the hop walk re-validates against.
+#[derive(Clone, Debug)]
+struct Snapshot {
+    material: VerifyMaterial,
+    cached_root_dnskey: crate::dnssec::SignedRRset,
+    cached_zones: crate::dnssec::ZoneKeysMap,
+    cached_dmarc_txt: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug)]
 enum SnapshotKind {
-    Register {
-        anchor: AnchorNumber,
-    },
-    Recovery {
-        session_pk: SessionKey,
-    },
+    Register { anchor: AnchorNumber },
+    Recovery { session_pk: SessionKey },
+}
+
+impl VerifyMaterial {
+    fn kind_from(c: &super::pending::PendingChallenge) -> SnapshotKind {
+        match &c.kind {
+            PendingKind::Register { anchor } => SnapshotKind::Register { anchor: *anchor },
+            PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
+                session_pk: session_pk.clone(),
+            },
+        }
+    }
+
+    /// Build the verify material for the DoH path. Accepts a challenge whose
+    /// email has arrived (`NeedDkimLeaf` — the DNSSEC fallback first call —
+    /// or `ResolvingDoh`) and carries a stashed partial. Returns:
+    ///
+    /// - `Ok(Some(mat))` — proceed.
+    /// - `Ok(None)` — nothing to do: the entry is already terminal or carries
+    ///   no partial (a concurrent poll finished it). The caller no-ops.
+    /// - `Err(_)` — call-level rejection.
+    fn take_for_doh(
+        c: &super::pending::PendingChallenge,
+    ) -> Result<Option<VerifyMaterial>, EmailRecoveryError> {
+        match &c.status {
+            PendingStatus::NeedDkimLeaf { .. } | PendingStatus::ResolvingDoh => {}
+            // Email hasn't arrived yet, or it's already terminal.
+            _ => return Ok(None),
+        }
+        let Some(partial) = c.partial_verification.as_ref() else {
+            return Ok(None);
+        };
+        Ok(Some(VerifyMaterial {
+            kind: Self::kind_from(c),
+            claimed_address: c.claimed_address.clone(),
+            registered_domain: c.registered_domain.clone(),
+            selector: partial.selector.clone(),
+            signing_domain: partial.signing_domain.clone(),
+            signing_auid: partial.signing_auid.clone(),
+            algorithm: partial.algorithm,
+            headers_digest: partial.headers_digest,
+            signature: partial.signature.clone(),
+            from_address_lc: partial.from_address_lc.clone(),
+        }))
+    }
 }
 
 impl Snapshot {
@@ -228,10 +347,9 @@ impl Snapshot {
         // Must be in the NeedDkimLeaf state — anything else means
         // either the email hasn't arrived yet, the entry is on the
         // DoH path, or it's already terminal.
-        let expected_selector = match &c.status {
-            PendingStatus::NeedDkimLeaf { selector } => selector.clone(),
-            _ => return Err(EmailRecoveryError::NoDkimLeafExpected),
-        };
+        if !matches!(c.status, PendingStatus::NeedDkimLeaf { .. }) {
+            return Err(EmailRecoveryError::NoDkimLeafExpected);
+        }
         let cached_root_dnskey = c
             .cached_root_dnskey
             .as_ref()
@@ -241,26 +359,22 @@ impl Snapshot {
             .partial_verification
             .as_ref()
             .ok_or(EmailRecoveryError::NoDkimLeafExpected)?;
-        let kind = match &c.kind {
-            PendingKind::Register { anchor } => SnapshotKind::Register { anchor: *anchor },
-            PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
-                session_pk: session_pk.clone(),
-            },
-        };
         Ok(Snapshot {
-            kind,
-            claimed_address: c.claimed_address.clone(),
-            registered_domain: c.registered_domain.clone(),
-            expected_selector,
+            material: VerifyMaterial {
+                kind: VerifyMaterial::kind_from(c),
+                claimed_address: c.claimed_address.clone(),
+                registered_domain: c.registered_domain.clone(),
+                selector: partial.selector.clone(),
+                signing_domain: partial.signing_domain.clone(),
+                signing_auid: partial.signing_auid.clone(),
+                algorithm: partial.algorithm,
+                headers_digest: partial.headers_digest,
+                signature: partial.signature.clone(),
+                from_address_lc: partial.from_address_lc.clone(),
+            },
             cached_root_dnskey,
             cached_zones: c.cached_zones.clone(),
             cached_dmarc_txt: c.cached_dmarc_txt.clone(),
-            headers_digest: partial.headers_digest,
-            signature: partial.signature.clone(),
-            signing_domain: partial.signing_domain.clone(),
-            signing_auid: partial.signing_auid.clone(),
-            algorithm: partial.algorithm,
-            from_address_lc: partial.from_address_lc.clone(),
         })
     }
 }
@@ -276,7 +390,7 @@ fn run_submit(
     // A genuine DNSSEC submission always carries at least the final
     // TXT hop. An empty `hops` set is malformed input on this path —
     // the FE that can't walk DNSSEC must call
-    // `submit_dkim_leaf_via_doh` instead. Reject it with the dedicated
+    // `resolve_via_doh` instead. Reject it with the dedicated
     // `EmptyDkimLeafHops` so the malformed-request case is unambiguous
     // (distinct from a non-empty chain that failed to validate, which
     // is `DkimLeafMismatch`), rather than relying on the hop walk below.
@@ -326,7 +440,7 @@ fn run_submit(
         hops.iter().cloned().map(Into::into).collect();
     let expected_fqdn = format!(
         "{}._domainkey.{}.",
-        snapshot.expected_selector, snapshot.registered_domain
+        snapshot.material.selector, snapshot.material.registered_domain
     );
     let expected_wire = crate::dnssec::wire::encode_dns_name_lowercase(&expected_fqdn)
         .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
@@ -351,57 +465,73 @@ fn run_submit(
     verify_dkim_key_against_partial(
         &txt,
         snapshot.cached_dmarc_txt.as_deref(),
-        snapshot,
+        &snapshot.material,
         &leaf_name,
     )
 }
 
-/// DoH fallback for the DNSSEC path: invoked from
-/// `submit_dkim_leaf_via_doh` when the FE could not walk a fully-signed
-/// DNSSEC resolution for the leaf (the DKIM record CNAMEs into an
-/// unsigned zone — `outlook.com` -> `outbound.protection.outlook.com`,
-/// `live.com`, …).
+/// Apply a DoH-path verdict to the pending entry the FE polls. Mirrors
+/// [`finalize`], but sets the status instead of returning it (the FE polls),
+/// and the recovery leg — whose delegation stamping is async — is detached so
+/// the polling call returns immediately.
 ///
-/// Rather than leave the pending entry stuck in `NeedDkimLeaf` until it
-/// expires, we resolve the DKIM public key over the canister's own DoH
-/// path and verify the signature the same way the synchronous DoH path
-/// (`smtp::verify_setup_email_doh`) does — except the email body is long
-/// gone (dropped after `bh=` validated at `smtp_request` time), so we
-/// reuse the cached `partial_verification` crypto material instead of
-/// re-parsing the message.
-///
-/// All DNS names handed to `fetch_txt` come from canister-pinned state
-/// (`expected_selector` from the email's `s=` tag, `signing_domain` from
-/// its `d=`, `registered_domain` from the claimed address), never the FE.
-/// The fetch is allowlist-gated on `registered_domain`: a domain the
-/// operator hasn't enabled returns `DomainNotAllowed`/`NotConfigured`,
-/// which [`super::smtp::map_doh_error`] folds into
-/// `DomainNotAllowlisted` — the FE turns that into the unsupported-domain
-/// view.
-async fn run_doh_fallback(snapshot: &Snapshot) -> Result<(), EmailRecoveryError> {
-    // DKIM key lives at `<selector>._domainkey.<d>`; the allowlist gate
-    // and the in-domain check both key off the registered domain.
-    let dkim_fqdn = format!(
-        "{}._domainkey.{}",
-        snapshot.expected_selector, snapshot.signing_domain
-    );
-    let dmarc_fqdn = format!("_dmarc.{}", snapshot.registered_domain);
-
-    let dkim_bytes = crate::doh::fetch_txt(&dkim_fqdn, &snapshot.registered_domain)
-        .await
-        .map_err(|e| super::smtp::map_doh_error(e, &snapshot.registered_domain))?;
-
-    // DMARC: a quorum reporting "no record" is a valid DNS state and
-    // drops us to strict `d=` alignment; any other failure must
-    // propagate rather than quietly tighten the check. Mirrors the
-    // handling in `smtp::verify_setup_email_doh`.
-    let dmarc_bytes = match crate::doh::fetch_txt(&dmarc_fqdn, &snapshot.registered_domain).await {
-        Ok(bytes) => Some(bytes),
-        Err(crate::doh::DohError::NoAnswer) => None,
-        Err(e) => return Err(super::smtp::map_doh_error(e, &snapshot.registered_domain)),
-    };
-
-    verify_dkim_key_against_partial(&dkim_bytes, dmarc_bytes.as_deref(), snapshot, &dkim_fqdn)
+/// **Idempotency.** `resolve_via_doh` is polled, so two calls can both observe
+/// a `Ready` cache. We clear `partial_verification` *before* the success path
+/// does any `.await` (the recovery stamp is detached): a concurrent or
+/// follow-up poll then sees no partial in [`VerifyMaterial::take_for_doh`] and
+/// no-ops, so the credential is bound / delegation stamped exactly once.
+fn finalize_via_doh(
+    nonce: String,
+    mat: VerifyMaterial,
+    verification: Result<(), EmailRecoveryError>,
+    now_secs: u64,
+) {
+    match verification {
+        Err(e) => {
+            pending::with_mut(&nonce, now_secs, |c| {
+                c.status = PendingStatus::Failed(e);
+                c.partial_verification = None;
+            });
+        }
+        Ok(()) => match &mat.kind {
+            SnapshotKind::Register { anchor } => {
+                let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+                pending::with_mut(&nonce, now_secs, |c| {
+                    c.partial_verification = None;
+                    c.status = match result {
+                        Ok(()) => PendingStatus::Succeeded,
+                        Err(e) => PendingStatus::Failed(e),
+                    };
+                });
+            }
+            SnapshotKind::Recovery { session_pk } => {
+                // Clear the partial up front so a concurrent/follow-up poll
+                // can't also reach the stamp leg while this `.await` is in
+                // flight (the success is set inside the spawned task).
+                pending::with_mut(&nonce, now_secs, |c| c.partial_verification = None);
+                let smtp_snapshot = super::smtp::recovery_snapshot(
+                    mat.claimed_address.clone(),
+                    mat.registered_domain.clone(),
+                    session_pk.clone(),
+                );
+                let session_pk = session_pk.clone();
+                ic_cdk::spawn(async move {
+                    match super::smtp::stamp_recovery_delegation(&smtp_snapshot, &session_pk).await
+                    {
+                        Ok(outcome) => pending::with_mut(&nonce, now_secs, |c| {
+                            c.recovery_outcome = Some(outcome);
+                            c.status = PendingStatus::Succeeded;
+                            c.partial_verification = None;
+                        }),
+                        Err(e) => pending::with_mut(&nonce, now_secs, |c| {
+                            c.status = PendingStatus::Failed(e);
+                            c.partial_verification = None;
+                        }),
+                    };
+                });
+            }
+        },
+    }
 }
 
 /// Steps 4–6 of leaf verification, shared by the DNSSEC hop-walk path
@@ -414,7 +544,7 @@ async fn run_doh_fallback(snapshot: &Snapshot) -> Result<(), EmailRecoveryError>
 fn verify_dkim_key_against_partial(
     dkim_txt: &[u8],
     dmarc_txt: Option<&[u8]>,
-    snapshot: &Snapshot,
+    mat: &VerifyMaterial,
     context: &str,
 ) -> Result<(), EmailRecoveryError> {
     // Step 4: parse the DKIM TXT, get the public key + key type.
@@ -438,8 +568,8 @@ fn verify_dkim_key_against_partial(
     // diagnostic; we discard it here because this path collapses
     // every failure into a single `EmailRecoveryError`.
     if let Err((reason, _trail)) = crate::dkim::enforce_dns_record_tag_contract(
-        &snapshot.signing_auid,
-        &snapshot.signing_domain,
+        &mat.signing_auid,
+        &mat.signing_domain,
         &dns_record,
     ) {
         return Err(EmailRecoveryError::EmailVerificationFailed(format!(
@@ -459,11 +589,11 @@ fn verify_dkim_key_against_partial(
     // digest IS the correct input — we can call it directly.
     use crate::dkim::VerifyOutcome;
     let outcome = crate::dkim::verify_signature_prehashed(
-        snapshot.algorithm,
+        mat.algorithm,
         dns_record.key_type,
         &dns_record.public_key,
-        &snapshot.headers_digest,
-        &snapshot.signature,
+        &mat.headers_digest,
+        &mat.signature,
     );
     match outcome {
         VerifyOutcome::Valid => {}
@@ -500,7 +630,7 @@ fn verify_dkim_key_against_partial(
     // satisfied. We re-check explicitly here against the DMARC
     // record (cached at prepare time on the DNSSEC path, or
     // freshly DoH-fetched on the fallback path).
-    let from_domain = snapshot
+    let from_domain = mat
         .from_address_lc
         .rsplit_once('@')
         .map(|(_, d)| d.to_string())
@@ -512,18 +642,18 @@ fn verify_dkim_key_against_partial(
         let dmarc = crate::dmarc::parse_dmarc_txt(dmarc_str).map_err(|e| {
             EmailRecoveryError::EmailVerificationFailed(format!("DMARC parse: {e}"))
         })?;
-        if !crate::dmarc::aligns(&snapshot.signing_domain, &from_domain, dmarc.adkim) {
+        if !crate::dmarc::aligns(&mat.signing_domain, &from_domain, dmarc.adkim) {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "DKIM d={} does not align with From={} under adkim={:?}",
-                snapshot.signing_domain, from_domain, dmarc.adkim
+                mat.signing_domain, from_domain, dmarc.adkim
             )));
         }
     } else {
         // No DMARC published — strict equality.
-        if !snapshot.signing_domain.eq_ignore_ascii_case(&from_domain) {
+        if !mat.signing_domain.eq_ignore_ascii_case(&from_domain) {
             return Err(EmailRecoveryError::EmailVerificationFailed(format!(
                 "no DMARC published; DKIM d={} must equal From={}",
-                snapshot.signing_domain, from_domain
+                mat.signing_domain, from_domain
             )));
         }
     }
@@ -531,9 +661,9 @@ fn verify_dkim_key_against_partial(
     // From: matches the claimed address. smtp.rs already confirmed
     // this when caching `from_address_lc` on the partial verification
     // record, but pin again as defense-in-depth.
-    if !snapshot
+    if !mat
         .from_address_lc
-        .eq_ignore_ascii_case(&snapshot.claimed_address)
+        .eq_ignore_ascii_case(&mat.claimed_address)
     {
         return Err(EmailRecoveryError::AddressMismatch);
     }
