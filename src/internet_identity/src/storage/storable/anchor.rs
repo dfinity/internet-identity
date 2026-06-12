@@ -28,6 +28,12 @@ pub struct StorableAnchor {
     /// pattern as `passkey_credentials` / `recovery_keys` above.
     #[n(5)]
     pub email_recovery: Option<Vec<StorableEmailRecoveryCredential>>,
+    /// Monotonically-increasing counter used to scope session
+    /// delegations. Bumping it invalidates all outstanding
+    /// session-scoped delegations for this anchor. `None` for
+    /// anchors serialised before this field was added; reads as 0.
+    #[n(6)]
+    pub session_delegation_epoch: Option<u32>,
 }
 
 impl Storable for StorableAnchor {

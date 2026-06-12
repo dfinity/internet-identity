@@ -77,6 +77,7 @@ mod tests {
             metadata: None,
             name: None,
             created_at: None,
+            session_delegation_epoch: None,
         };
         if let Some(addr) = address {
             a.email_recovery.push(EmailRecoveryCredential {

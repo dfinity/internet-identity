@@ -372,6 +372,98 @@ pub fn get_accounts(
     .map(|(x,)| x)
 }
 
+pub fn get_default_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+) -> Result<Result<AccountInfo, GetDefaultAccountError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_default_account",
+        (identity_number, origin),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn set_default_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> Result<Result<AccountInfo, SetDefaultAccountError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "set_default_account",
+        (identity_number, origin, account_number),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_session_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    scope: SessionScope,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareSessionDelegation, SessionDelegationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_session_delegation",
+        (anchor_number, scope, session_key, max_ttl),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_session_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    scope: SessionScope,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<Result<SignedDelegation, SessionDelegationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_session_delegation",
+        (anchor_number, scope, session_key, expiration),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn invalidate_session_delegations(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+) -> Result<Result<(), SessionDelegationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "invalidate_session_delegations",
+        (anchor_number,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn update_account(
     env: &PocketIc,
     canister_id: CanisterId,

@@ -233,6 +233,7 @@ fn should_prevent_mutation_when_invariants_are_violated() {
         metadata: None,
         name: None,
         created_at: None,
+        session_delegation_epoch: None,
     };
 
     device1.alias = "new alias".to_string();
@@ -254,6 +255,7 @@ fn should_prevent_addition_when_invariants_are_violated() {
         metadata: None,
         name: None,
         created_at: None,
+        session_delegation_epoch: None,
     };
 
     let result = anchor.add_device(sample_device());
@@ -275,6 +277,7 @@ fn should_allow_removal_when_invariants_are_violated() {
         metadata: None,
         name: None,
         created_at: None,
+        session_delegation_epoch: None,
     };
 
     anchor.remove_device(&device1.pubkey).unwrap();

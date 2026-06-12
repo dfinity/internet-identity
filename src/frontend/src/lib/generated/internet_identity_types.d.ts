@@ -1299,6 +1299,10 @@ export interface PrepareIdAliasRequest {
    */
   'identity_number' : IdentityNumber,
 }
+export interface PrepareSessionDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+}
 /**
  * The prepared id alias contains two (still unsigned) credentials in JWT format,
  * certifying the id alias for the issuer resp. the relying party.
@@ -1383,7 +1387,11 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+export type SessionDelegationError = { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type SessionKey = PublicKey;
+export type SessionScope = { 'account_management' : null };
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
   } |
@@ -1789,6 +1797,11 @@ export interface _SERVICE {
       { 'Err' : GetIdAliasError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  'get_session_delegation' : ActorMethod<
+    [UserNumber, SessionScope, SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : SessionDelegationError }
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -1856,6 +1869,11 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
+  'invalidate_session_delegations' : ActorMethod<
+    [UserNumber],
+    { 'Ok' : null } |
+      { 'Err' : SessionDelegationError }
+  >,
   'list_available_attributes' : ActorMethod<
     [ListAvailableAttributesRequest],
     { 'Ok' : ListAvailableAttributesResponse } |
@@ -1960,6 +1978,11 @@ export interface _SERVICE {
     [PrepareIdAliasRequest],
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
+  >,
+  'prepare_session_delegation' : ActorMethod<
+    [UserNumber, SessionScope, SessionKey, [] | [bigint]],
+    { 'Ok' : PrepareSessionDelegation } |
+      { 'Err' : SessionDelegationError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
