@@ -53,12 +53,11 @@
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
     /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
     diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
-    submitDkimLeaf: (
-      arg: EmailRecoverySubmitDkimLeafArg,
-    ) => Promise<EmailRecoveryStatus>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf_via_doh`. */
-    submitDkimLeafViaDoh: (nonce: string) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
+     *  rejects on a call-level error, else resolves void (poll for verdict). */
+    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    resolveViaDoh: (nonce: string) => Promise<void>;
     /** Called once on `RegistrationSucceeded`. The host is expected to
      *  show a success toast and close the dialog. */
     onSuccess: (address: string) => void;
@@ -69,7 +68,7 @@
     status,
     diagnostics,
     submitDkimLeaf,
-    submitDkimLeafViaDoh,
+    resolveViaDoh,
     onSuccess,
   }: Props = $props();
 
@@ -193,7 +192,7 @@
       domain,
       status,
       submitDkimLeaf,
-      submitDkimLeafViaDoh,
+      resolveViaDoh,
       diagnostics,
       funnel: setupEmailRecoveryFunnel,
       events: {

@@ -18,5 +18,5 @@
 <p
   class="text-text-tertiary mb-7 max-w-[360px] self-center text-center text-[15px] leading-[22px]"
 >
-  {$t`Use a passkey, Face ID, or a popular provider`}
+  {$t`Set up your private, passwordless identity.`}
 </p>
