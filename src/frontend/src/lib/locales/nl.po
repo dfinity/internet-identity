@@ -97,6 +97,9 @@ msgstr "<0>Naadloze passkey-integratie:</0> We blijven passkeys omarmen als de t
 msgid "A 24-word phrase you write down and keep offline."
 msgstr "Een zin van 24 woorden die u opschrijft en offline bewaart."
 
+msgid "A few things could be going on:"
+msgstr "Er zijn mogelijk een paar oorzaken:"
+
 msgid "About"
 msgstr "Over"
 
@@ -139,9 +142,6 @@ msgstr "Voeg toegangsmethode toe"
 msgid "Add another account"
 msgstr "Voeg een ander account toe"
 
-msgid "Add another identity"
-msgstr "Voeg een andere identiteit toe"
-
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Voeg een andere methode toe of log in via herstel om te verwijderen"
 
@@ -153,6 +153,9 @@ msgstr "Voeg een andere passkey toe"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Voeg een andere manier toe om in te loggen met een passkey of account van derden voor veilige toegang."
+
+msgid "Add identity"
+msgstr "Identiteit toevoegen"
 
 msgid "Add new"
 msgstr "Voeg nieuw toe"
@@ -174,6 +177,12 @@ msgstr "Toegang tot deze informatie toestaan"
 
 msgid "Allowing access"
 msgstr "Toegang verlenen"
+
+msgid "Already connected"
+msgstr "Al gekoppeld"
+
+msgid "Already have an identity?"
+msgstr "Heeft u al een identiteit?"
 
 msgid "Already signed-in"
 msgstr "Al ingelogd"
@@ -253,9 +262,6 @@ msgstr "Kies een account"
 msgid "choose language to continue"
 msgstr "kies taal om door te gaan"
 
-msgid "Choose method"
-msgstr "Kies methode"
-
 msgid "Choose method to continue"
 msgstr "Kies methode om door te gaan"
 
@@ -310,6 +316,9 @@ msgstr "Bevestigingscode"
 msgid "Confirming..."
 msgstr "Bevestigen..."
 
+msgid "Connected"
+msgstr "Gekoppeld"
+
 msgid "Connection closed"
 msgstr "Verbinding gesloten"
 
@@ -322,6 +331,9 @@ msgstr "Doorgaan op een ander apparaat"
 msgid "Continue on your new device"
 msgstr "Doorgaan op uw nieuwe apparaat"
 
+msgid "Continue to {dappName}"
+msgstr "Doorgaan naar {dappName}"
+
 msgid "Continue with {name}"
 msgstr "Doorgaan met {name}"
 
@@ -331,8 +343,14 @@ msgstr "Doorgaan met passkey"
 msgid "Continue with SSO"
 msgstr "Doorgaan met SSO"
 
+msgid "Copied"
+msgstr "Gekopieerd"
+
 msgid "Copied to clipboard"
 msgstr "Gekopieerd naar klembord"
+
+msgid "Copy error details"
+msgstr "Foutdetails kopiëren"
 
 msgid "Copy install command: {command}"
 msgstr "Installatieopdracht kopiëren: {command}"
@@ -352,6 +370,9 @@ msgstr "Account aanmaken"
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
 msgstr "Maak een identiteit aan met een passkey, via biometrie of een beveiligingssleutel. Uw gegevens verlaten nooit uw apparaat."
 
+msgid "Create another identity"
+msgstr "Een andere identiteit aanmaken"
+
 msgid "Create identity"
 msgstr "Identiteit aanmaken"
 
@@ -360,6 +381,12 @@ msgstr "Nieuwe identiteit aanmaken"
 
 msgid "Create passkey"
 msgstr "Passkey aanmaken"
+
+msgid "Create your Identity"
+msgstr "Maak uw Identiteit aan"
+
+msgid "Create your private, passwordless identity."
+msgstr "Maak uw privé, wachtwoordloze identiteit aan."
 
 msgid "Created {0}"
 msgstr "Gemaakt {0}"
@@ -387,6 +414,9 @@ msgstr "Momenteel ingelogd met dit account"
 
 msgid "Currently signed in with this passkey"
 msgstr "Momenteel ingelogd met deze passkey"
+
+msgid "Currently signed in with this recovery email"
+msgstr "Momenteel ingelogd met dit herstel-e-mailadres"
 
 msgid "Currently signed in with this recovery phrase"
 msgstr "Momenteel ingelogd met deze herstelzin"
@@ -421,6 +451,9 @@ msgstr "Bewerk {name}"
 msgid "Edit account"
 msgstr "Account bewerken"
 
+msgid "Edit identities"
+msgstr "Identiteiten bewerken"
+
 msgid "Email address"
 msgstr "E-mailadres"
 
@@ -453,6 +486,9 @@ msgstr "Voer herstelzin in"
 
 msgid "Enter your company domain"
 msgstr "Voer uw bedrijfsdomein in"
+
+msgid "Enter your identity number."
+msgstr "Voer uw identiteitsnummer in."
 
 msgid "Error"
 msgstr "Fout"
@@ -590,6 +626,7 @@ msgstr "Identiteit verwijderd"
 msgid "Identity upgraded."
 msgstr "Identiteit geüpgraded."
 
+
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Als u <0>{domain}</0> beheert, kost het inschakelen van DNSSEC bij uw domeinregistrar doorgaans slechts een paar klikken. Zodra dit is doorgevoerd, werkt dit adres automatisch. Er is geen verdere actie van ons vereist."
 
@@ -683,6 +720,9 @@ msgstr "Het wordt niet verwijderd van uw apparaat of wachtwoordbeheerder."
 msgid "Keep it secret"
 msgstr "Houd het geheim"
 
+msgid "Keep your access and recovery methods up to date."
+msgstr "Houd uw toegangs- en herstelmethoden up-to-date."
+
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
 msgstr "Opgeslagen op een fysieke sleutel. Verifieer op ondersteunde apparaten via NFC of USB."
 
@@ -700,6 +740,9 @@ msgstr "Ontdek hoe u links in uw browser kunt openen"
 
 msgid "Legacy"
 msgstr "Legacy"
+
+msgid "Legacy identity"
+msgstr "Verouderde identiteit"
 
 msgid "Let command-line tools on this device sign in to apps using your identity."
 msgstr "Sta opdrachtregelprogramma's op dit apparaat toe om in te loggen bij apps met uw identiteit."
@@ -749,6 +792,9 @@ msgstr "Via uw dashboard beheert u uw identiteiten, apps en websites. Met Pro-fu
 msgid "Manage your identity"
 msgstr "Uw identiteit beheren"
 
+msgid "Manage your Identity"
+msgstr "Beheer uw Identiteit"
+
 msgid "Manage your Internet Identity"
 msgstr "Beheer uw Internet Identity"
 
@@ -785,6 +831,9 @@ msgstr "Geef uw identiteit een naam"
 msgid "Name:"
 msgstr "Naam:"
 
+msgid "New to Internet Identity?"
+msgstr "Nieuw bij Internet Identity?"
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
 
@@ -802,6 +851,9 @@ msgstr "Nee. Uw Face ID of vingerafdruk wordt alleen gebruikt om uw passkey aan 
 
 msgid "Not activated"
 msgstr "Niet geactiveerd"
+
+msgid "Not connected yet"
+msgstr "Nog niet gekoppeld"
 
 msgid "Not upgraded"
 msgstr "Niet geüpgraded"
@@ -1043,6 +1095,9 @@ msgstr "Sessie verlopen"
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
+msgid "Set up a new identity."
+msgstr "Stel een nieuwe identiteit in."
+
 msgid "Set up recovery email"
 msgstr "Herstel-e-mailadres instellen"
 
@@ -1067,20 +1122,35 @@ msgstr "Log opnieuw in om verder te gaan waar u gebleven was."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Log in door een ondertekende e-mail vanuit uw inbox te versturen."
 
-msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
-msgstr "Log in of maak een identiteit aan om toegang te krijgen tot apps zonder wachtwoorden of het delen van persoonlijke gegevens."
-
 msgid "Sign in there."
 msgstr "Log daar in."
 
-msgid "Sign in to manage your identity"
-msgstr "Log in om uw identiteit te beheren"
+msgid "Sign in to Internet Identity"
+msgstr "Inloggen bij Internet Identity"
 
 msgid "Sign in using familiar methods"
 msgstr "Inloggen met vertrouwde methoden"
 
+msgid "Sign in with {name}"
+msgstr "Inloggen met {name}"
+
+msgid "Sign in with a passkey or familiar provider."
+msgstr "Log in met een passkey of een bekende provider."
+
 msgid "Sign in with another identity"
 msgstr "Inloggen met een andere identiteit"
+
+msgid "Sign in with another method before changing this email"
+msgstr "Log in met een andere methode voordat u dit e-mailadres wijzigt"
+
+msgid "Sign in with another method before removing this email"
+msgstr "Log in met een andere methode voordat u dit e-mailadres verwijdert"
+
+msgid "Sign in with passkey"
+msgstr "Inloggen met passkey"
+
+msgid "Sign in with SSO"
+msgstr "Inloggen met SSO"
 
 msgid "Sign in with your {displayName} account from any device."
 msgstr "Log in met uw {displayName}-account vanaf elk apparaat."
@@ -1099,6 +1169,18 @@ msgstr "Uitloggen van dit apparaat"
 
 msgid "Sign out to remove"
 msgstr "Log uit om te verwijderen"
+
+msgid "Sign up"
+msgstr "Aanmelden"
+
+msgid "Sign up with {name}"
+msgstr "Aanmelden met {name}"
+
+msgid "Sign up with passkey"
+msgstr "Aanmelden met passkey"
+
+msgid "Sign up with SSO"
+msgstr "Aanmelden met SSO"
 
 msgid "Sign-in"
 msgstr "Inloggen"
@@ -1152,9 +1234,6 @@ msgstr "SSO-aanmelding voor {domainInput} is mislukt. Probeer het opnieuw."
 msgid "Start over"
 msgstr "Opnieuw beginnen"
 
-msgid "Still have an identity number?"
-msgstr "Heeft u nog een identiteitsnummer?"
-
 msgid "Still using an identity number?"
 msgstr "Gebruikt u nog een identiteitsnummer?"
 
@@ -1197,6 +1276,7 @@ msgstr "Toegangsmethode succesvol gewisseld"
 msgid "Support"
 msgstr "Ondersteuning"
 
+
 msgid "Switch"
 msgstr "Wisselen"
 
@@ -1205,6 +1285,9 @@ msgstr "Toegangsmethode wisselen"
 
 msgid "Switch identity"
 msgstr "Identiteit wisselen"
+
+msgid "Switch method"
+msgstr "Methode wijzigen"
 
 msgid "Switch to another method before removing"
 msgstr "Schakel over naar een andere methode voor het verwijderen"
@@ -1248,6 +1331,9 @@ msgstr "De CLI krijgt een eigen account, los van uw andere apps."
 msgid "The CLI sign-in couldn't be completed. Check the CLI for details."
 msgstr "De CLI-aanmelding kon niet worden voltooid. Controleer de CLI voor details."
 
+msgid "The DNSSEC zone must use a current algorithm — RSA/SHA-256, RSA/SHA-512, ECDSA P-256, or Ed25519. The deprecated SHA-1 algorithms aren't supported."
+msgstr "De DNSSEC-zone moet een huidig algoritme gebruiken — RSA/SHA-256, RSA/SHA-512, ECDSA P-256 of Ed25519. De verouderde SHA-1-algoritmen worden niet ondersteund."
+
 msgid "The email needs to come from the address above directly. Aliases and forwarders won't work."
 msgstr "De e-mail moet rechtstreeks afkomstig zijn van het bovenstaande adres. Aliassen en doorstuurregels werken niet."
 
@@ -1263,6 +1349,15 @@ msgstr "De zin is correct ingevoerd, maar hoort bij een ander product dan Intern
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Er was een probleem bij het verbinden met de applicatie. Probeer een andere browser; als het probleem aanhoudt, neem dan contact op met de ontwikkelaar."
 
+msgid "This {providerName} account is already connected to an Internet Identity."
+msgstr "Dit {providerName}-account is al gekoppeld aan een Internet Identity."
+
+msgid "This {providerName} account isn't connected to an Internet Identity yet."
+msgstr "Dit {providerName}-account is nog niet gekoppeld aan een Internet Identity."
+
+msgid "This account is already attached to your identity. Your active access method will be switched to it."
+msgstr "Dit account is al gekoppeld aan uw identiteit. Uw actieve toegangsmethode wordt hierop overgeschakeld."
+
 msgid "This app has moved to the new Internet Identity"
 msgstr "Deze app is overgegaan naar de nieuwe Internet Identity"
 
@@ -1277,6 +1372,9 @@ msgstr "Dit is nu de standaardmethode die voortaan op dit apparaat wordt gebruik
 
 msgid "This is the access method you're currently signed in with."
 msgstr "Dit is de toegangsmethode waarmee u momenteel bent ingelogd."
+
+msgid "This is the recovery method you're currently signed in with."
+msgstr "Dit is de herstelmethode waarmee u momenteel bent ingelogd."
 
 msgid "This legacy passkey is no longer usable and should be removed."
 msgstr "Deze verouderde passkey is niet meer bruikbaar en moet worden verwijderd."
@@ -1308,11 +1406,8 @@ msgstr "Om e-mail van een domein te kunnen accepteren hebben we DNSSEC op het ho
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Om te bevestigen dat u het bent, voert u onderstaande code in op uw <0>bestaande apparaat</0>."
 
-msgid "to continue with <0>{application}</0>"
-msgstr "om verder te gaan met <0>{application}</0>"
-
-msgid "to continue with this app"
-msgstr "om verder te gaan met deze app"
+msgid "to continue to {dappName}"
+msgstr "om door te gaan naar {dappName}"
 
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Maak een passkey aan om uw identiteit te beveiligen en toekomstig inloggen te vereenvoudigen."
@@ -1395,9 +1490,6 @@ msgstr "Upgrade"
 msgid "Upgrade again"
 msgstr "Upgrade opnieuw"
 
-msgid "Upgrade completed successfully"
-msgstr "Upgrade succesvol voltooid"
-
 msgid "Upgrade identity"
 msgstr "Identiteit upgraden"
 
@@ -1412,6 +1504,9 @@ msgstr "Identiteit aan het upgraden..."
 
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Gebruik een apparaat dat uw identiteit al bevat om de URL te scannen of te openen. Dit koppelt uw identiteit aan dit apparaat."
+
+msgid "Use a passkey, Face ID, or a popular provider"
+msgstr "Gebruik een passkey, Face ID of een populaire provider"
 
 msgid "Use existing identity"
 msgstr "Bestaande identiteit gebruiken"
@@ -1458,6 +1553,9 @@ msgstr "Wachten op uw nieuwe apparaat"
 msgid "Waiting to receive…"
 msgstr "Wachten op ontvangst…"
 
+msgid "Want to create a new identity?"
+msgstr "Wilt u een nieuwe identiteit aanmaken?"
+
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "We kunnen e-mail van <0>{domain}</0> nog niet verifiëren. Probeer een ander adres. Gmail, iCloud, Outlook, Fastmail en Proton werken allemaal."
 
@@ -1487,6 +1585,9 @@ msgstr "Hoe heet u?"
 
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you (without ever sharing your personal info or a password)."
 msgstr "Wanneer u een passkey aanmaakt, genereert uw apparaat twee bijpassende sleutels. Een blijft veilig op uw apparaat, en de andere gaat naar de app of service. Ze werken samen om te bevestigen dat u het bent (zonder ooit uw persoonlijke gegevens of een wachtwoord te delen)."
+
+msgid "Why am I seeing this?"
+msgstr "Waarom zie ik dit?"
 
 msgid "Why isn't this supported?"
 msgstr "Waarom wordt dit niet ondersteund?"
@@ -1563,6 +1664,12 @@ msgstr "U kunt deze pagina sluiten."
 msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
 msgstr "U hoeft uw identiteitsnummer niet meer te onthouden en kunt in plaats daarvan uw vingerafdruk, gezicht of schermvergrendeling gebruiken."
 
+msgid "You signed up before with a different access method."
+msgstr "U heeft zich eerder aangemeld met een andere toegangsmethode."
+
+msgid "You unlinked this {providerName} account from your identity."
+msgstr "U heeft dit {providerName}-account losgekoppeld van uw identiteit."
+
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "U staat op het punt uw herstelzin te zien, die Internet Identity niet opslaat en die dus niet kan worden opgehaald als deze verloren gaat, dus bewaar deze veilig offline."
 
@@ -1586,6 +1693,9 @@ msgstr "U bent ingelogd"
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "U logt in als <0>{name}</0>."
+
+msgid "You've never used this {providerName} account with Internet Identity."
+msgstr "U heeft dit {providerName}-account nooit gebruikt met Internet Identity."
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Uw passkeys en herstelzin zijn niet beïnvloed. U kunt op elk moment opnieuw een herstel-e-mailadres toevoegen."
