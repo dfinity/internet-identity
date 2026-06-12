@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  CallbackPopupClosedError,
   createRedirectURL,
   findConfig,
   issuerMatches,
@@ -11,7 +12,6 @@ import {
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
-import { CallbackPopupClosedError } from "../../routes/(new-styling)/callback/utils";
 
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
