@@ -317,6 +317,8 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
         aud: "example-aud".into(),
         last_usage_timestamp: None,
         metadata: HashMap::default(),
+        sso_domain: None,
+        sso_name: None,
     };
 
     // Check if OpenID credential can be added

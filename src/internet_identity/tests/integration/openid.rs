@@ -10,6 +10,7 @@ use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
     OpenIdCredentialAddError, OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
+    SsoCredentialMigrationEntry,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{PocketIc, RejectResponse};
@@ -314,6 +315,66 @@ fn can_remove_google_account() -> Result<(), RejectResponse> {
             _ => panic!("We should get a NoSuchAnchor error here!"),
         },
     }
+}
+
+/// Verifies that the `sso_credential_migration` upgrade arg backfills the
+/// `sso_domain` / `sso_name` fields of stored credentials via the batched
+/// timer migration (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
+#[test]
+fn should_backfill_sso_fields_via_credential_migration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_canister(&env);
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+
+    sync_time(&env, test_time);
+
+    let _ = api::openid_credential_add(
+        &env,
+        canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )?;
+
+    // The credential was written by a direct provider, so it carries no SSO
+    // stamp — the exact shape pre-migration SSO credentials are stored in.
+    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
+        .openid_credentials
+        .expect("Could not fetch credentials!");
+    assert_eq!(credentials[0].sso_domain, None);
+    assert_eq!(credentials[0].sso_name, None);
+
+    // Upgrade with a migration entry matching the stored credential's
+    // `(iss, aud)`.
+    let arg = InternetIdentityInit {
+        sso_credential_migration: Some(vec![SsoCredentialMigrationEntry {
+            discovery_domain: "acme.com".into(),
+            issuer: claims.iss.clone(),
+            client_id: claims.aud.clone(),
+            sso_name: Some("Acme Corp".into()),
+        }]),
+        ..Default::default()
+    };
+    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(arg))
+        .expect("Failed to upgrade canister");
+
+    // Let the interval timer drive the batch migration to completion.
+    for _ in 0..5 {
+        env.advance_time(Duration::from_secs(1));
+        env.tick();
+    }
+
+    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
+        .openid_credentials
+        .expect("Could not fetch credentials!");
+    assert_eq!(credentials[0].sso_domain, Some("acme.com".to_string()));
+    assert_eq!(credentials[0].sso_name, Some("Acme Corp".to_string()));
+
+    Ok(())
 }
 
 /// Verifies that valid JWT delegations are issued based on added credential.

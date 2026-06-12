@@ -206,6 +206,9 @@ impl OpenIdProvider for Provider {
             aud: self.client_id.clone(),
             last_usage_timestamp: None,
             metadata,
+            // Direct providers (Google / Microsoft / Apple) aren't SSO.
+            sso_domain: None,
+            sso_name: None,
         })
     }
 }
@@ -432,12 +435,12 @@ impl OpenIdProvider for DiscoverableProvider {
             })?;
 
         // Return credential with metadata. SSO-specific labels
-        // (`sso_domain`, `sso_name`) are NOT stored here; they're looked
-        // up on-demand from current `DISCOVERY_TASKS` state when a
-        // credential is returned via the API (see
-        // `openid::generic::sso_fields_for`). Computing them at query
-        // time means the FE always sees the current SSO `name` if the
-        // domain's `/.well-known/ii-openid-configuration` is updated.
+        // (`sso_domain`, `sso_name`) are stamped onto the credential here so
+        // they survive in stable storage independently of the in-memory
+        // `DISCOVERY_TASKS` state. The stored credential is rewritten from a
+        // fresh verification on every sign-in (`update_openid_credential`),
+        // so the stamp tracks the domain's current hop-1 `name` at sign-in
+        // granularity.
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
@@ -458,6 +461,8 @@ impl OpenIdProvider for DiscoverableProvider {
             aud: client_id,
             last_usage_timestamp: None,
             metadata,
+            sso_domain: Some(self.discovery_domain.clone()),
+            sso_name: sso_name_for_domain(&self.discovery_domain),
         })
     }
 }
@@ -879,6 +884,20 @@ pub fn discovered_state_for(
 /// frontend — the backend intentionally does not collapse the two: we
 /// want the FE to be able to tell "no name published" apart from "has a
 /// name" for future divergent rendering.
+/// Looks up the optional human-readable SSO `name` for a discovery domain
+/// from current `DISCOVERY_TASKS` state. Used to stamp `sso_name` onto a
+/// credential at verification time — verification only succeeds after
+/// discovery completed, so the task's `name_ref` reflects the latest
+/// successfully fetched hop-1 body.
+fn sso_name_for_domain(discovery_domain: &str) -> Option<String> {
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        tasks
+            .iter()
+            .find(|t| t.discovery_domain == discovery_domain)
+            .and_then(|t| t.name_ref.borrow().clone())
+    })
+}
+
 pub fn sso_fields_for(iss: &str, aud: &str) -> (Option<String>, Option<String>) {
     DISCOVERY_TASKS.with_borrow(|tasks| {
         tasks
@@ -1264,6 +1283,8 @@ fn should_return_credential() {
             ),
             ("name".into(), MetadataEntryV2::String(claims.name.unwrap())),
         ]),
+        sso_domain: None,
+        sso_name: None,
     };
 
     assert_eq!(provider.verify(&jwt, &salt), Ok(credential));
@@ -1569,4 +1590,37 @@ fn should_build_no_seed_jwks_from_empty_set() {
     let (keys, errors) = build_seed_jwks(&[]);
     assert!(keys.is_empty());
     assert!(errors.is_empty());
+}
+
+#[test]
+fn should_return_sso_name_for_domain() {
+    use internet_identity_interface::internet_identity::types::DiscoverableOidcConfig;
+
+    crate::openid::setup_oidc(vec![DiscoverableOidcConfig {
+        discovery_domain: "named-sso.example".to_string(),
+    }]);
+    set_discovered_state_for_test("named-sso.example", "https://idp.example", "client-id");
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        let task = tasks
+            .iter()
+            .find(|t| t.discovery_domain == "named-sso.example")
+            .unwrap();
+        task.name_ref.replace(Some("Named SSO".to_string()));
+    });
+
+    assert_eq!(
+        sso_name_for_domain("named-sso.example"),
+        Some("Named SSO".to_string())
+    );
+    // A registered domain without a published hop-1 `name`.
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        let task = tasks
+            .iter()
+            .find(|t| t.discovery_domain == "named-sso.example")
+            .unwrap();
+        task.name_ref.replace(None);
+    });
+    assert_eq!(sso_name_for_domain("named-sso.example"), None);
+    // An unregistered domain.
+    assert_eq!(sso_name_for_domain("unknown-sso.example"), None);
 }

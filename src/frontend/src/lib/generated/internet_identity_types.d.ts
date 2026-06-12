@@ -950,6 +950,17 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
+   * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
+   * OpenID credentials. When set, a batched timer-driven migration stamps
+   * every stored credential whose (iss, aud) matches an entry and whose
+   * `sso_domain` is not set yet. Idempotent — already-stamped credentials
+   * are skipped, so re-submitting (e.g. with a corrected list) is safe.
+   * When unset, no backfill runs. The deployer builds the list from the
+   * running canister's `discovered_oidc_configs` query before
+   * submitting the upgrade proposal.
+   */
+  'sso_credential_migration' : [] | [Array<SsoCredentialMigrationEntry>],
+  /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.
    */
@@ -1478,6 +1489,23 @@ export interface SmtpRequest {
 export interface SmtpRequestError { 'code' : bigint, 'message' : string }
 export type SmtpResponse = { 'Ok' : {} } |
   { 'Err' : SmtpRequestError };
+/**
+ * One entry of the `sso_credential_migration` backfill. Maps the
+ * (iss, aud) pair of stored SSO credentials to the discovery domain (and
+ * optional human-readable name) they were registered through.
+ */
+export interface SsoCredentialMigrationEntry {
+  /**
+   * Matches the stored credential's `iss`.
+   */
+  'issuer' : string,
+  'discovery_domain' : string,
+  'sso_name' : [] | [string],
+  /**
+   * Matches the stored credential's `aud`.
+   */
+  'client_id' : string,
+}
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
