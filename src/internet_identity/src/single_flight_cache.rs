@@ -58,9 +58,8 @@
 //! next poll — fail-safe.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::future::Future;
-use std::hash::Hash;
 use std::pin::Pin;
 use std::thread::LocalKey;
 
@@ -167,8 +166,10 @@ type FillFn<K, V, E> = Box<dyn Fn(K) -> BoxFuture<V, E>>;
 /// In-memory single-flight cache keyed by `K`, holding values of type `V`
 /// whose fill may fail with `E`. See the module docs.
 pub struct SingleFlightCache<K, V, E> {
-    entries: HashMap<K, Entry<V>>,
-    in_flight: HashMap<K, InFlight>,
+    /// `BTreeMap` for deterministic iteration: with tied `lru_stamp`s the
+    /// eviction victim must not depend on hash order.
+    entries: BTreeMap<K, Entry<V>>,
+    in_flight: BTreeMap<K, InFlight>,
     /// The shared fill, set in the constructor.
     fill: FillFn<K, V, E>,
     next_fill_id: u64,
@@ -189,8 +190,8 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
         Fut: Future<Output = Result<V, E>> + 'static,
     {
         Self {
-            entries: HashMap::new(),
-            in_flight: HashMap::new(),
+            entries: BTreeMap::new(),
+            in_flight: BTreeMap::new(),
             fill: Box::new(move |k| Box::pin(fill(k))),
             next_fill_id: 0,
             access_clock: 0,
@@ -203,13 +204,12 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
     }
 }
 
-impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
+impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
     /// Classify an incoming request for `key`, claiming the in-flight marker
-    /// for a `StartFill`. Drops a fully-dead entry first.
+    /// for a `StartFill`. Sweeps every dead entry first (the requested key's
+    /// removal is what correctness needs; the rest is a free tidy-up).
     fn lookup(&mut self, key: &K, now: u64) -> Lookup<V> {
-        if self.entries.get(key).is_some_and(|e| !e.is_alive(now)) {
-            self.entries.remove(key);
-        }
+        self.sweep_expired(now);
 
         let inflight_fresh = self
             .in_flight
@@ -342,18 +342,52 @@ impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
     }
 
     fn touch(&mut self, key: &K) {
-        self.access_clock = self.access_clock.wrapping_add(1);
-        let stamp = self.access_clock;
+        let stamp = self.next_stamp();
         if let Some(e) = self.entries.get_mut(key) {
             e.lru_stamp = stamp;
         }
     }
 
+    /// Advance the LRU access clock and return the new stamp. On overflow
+    /// the clock can't simply wrap: the next entry would get the *lowest*
+    /// stamp and be evicted as if least-recently-used. Instead, renumber
+    /// every entry's stamp to its recency rank (order-preserving), which
+    /// resets the clock with full headroom.
+    fn next_stamp(&mut self) -> u64 {
+        if let Some(next) = self.access_clock.checked_add(1) {
+            self.access_clock = next;
+            return next;
+        }
+        let mut ranked: Vec<(K, u64)> = self
+            .entries
+            .iter()
+            .map(|(k, e)| (k.clone(), e.lru_stamp))
+            .collect();
+        ranked.sort_by_key(|(_, stamp)| *stamp);
+        for (rank, (key, _)) in ranked.iter().enumerate() {
+            if let Some(e) = self.entries.get_mut(key) {
+                e.lru_stamp = rank as u64 + 1;
+            }
+        }
+        self.access_clock = ranked.len() as u64 + 1;
+        self.access_clock
+    }
+
     fn upsert(&mut self, key: &K, mut entry: Entry<V>) {
-        self.access_clock = self.access_clock.wrapping_add(1);
-        entry.lru_stamp = self.access_clock;
+        entry.lru_stamp = self.next_stamp();
         if !self.entries.contains_key(key) && self.entries.len() >= self.max_entries {
-            self.evict_lru();
+            if self.entries.len() > self.max_entries {
+                // The eviction below restores the bound on every insert, so
+                // over-cap means a cache bug; log it (and the loop self-heals).
+                ic_cdk::println!(
+                    "ERROR: single-flight cache holds {} entries, over its cap of {}",
+                    self.entries.len(),
+                    self.max_entries
+                );
+            }
+            while self.entries.len() >= self.max_entries {
+                self.evict_lru();
+            }
         }
         self.entries.insert(key.clone(), entry);
     }
@@ -371,14 +405,6 @@ impl<K: Eq + Hash + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
 
     fn sweep_expired(&mut self, now: u64) {
         self.entries.retain(|_, e| e.is_alive(now));
-    }
-
-    #[cfg(test)]
-    fn servable_value(&self, key: &K, now: u64) -> Option<V> {
-        self.entries
-            .get(key)
-            .filter(|e| e.is_alive(now))
-            .and_then(|e| e.value.clone())
     }
 }
 
@@ -418,12 +444,12 @@ pub fn get<K, V, E>(
     key: K,
 ) -> Cached<V>
 where
-    K: Eq + Hash + Clone + 'static,
+    K: Ord + Clone + 'static,
     V: Clone + 'static,
     E: 'static,
 {
     let now = now();
-    let outcome = cache.with(|c| c.borrow_mut().lookup(&key, now));
+    let outcome = cache.with_borrow_mut(|c| c.lookup(&key, now));
     match outcome {
         Lookup::Ready(v) => Cached::Ready(v),
         Lookup::Pending => Cached::Pending,
@@ -443,15 +469,15 @@ fn spawn_fill<K, V, E>(
     key: K,
     token: FillToken,
 ) where
-    K: Eq + Hash + Clone + 'static,
+    K: Ord + Clone + 'static,
     V: Clone + 'static,
     E: 'static,
 {
-    let fill_fut = cache.with(|c| (c.borrow().fill)(key.clone()));
+    let fill_fut = cache.with_borrow(|c| (c.fill)(key.clone()));
     detach(async move {
         let result = fill_fut.await;
         let now = now();
-        cache.with(|c| c.borrow_mut().complete_fill(&key, token, result, now));
+        cache.with_borrow_mut(|c| c.complete_fill(&key, token, result, now));
     });
 }
 
@@ -667,7 +693,7 @@ mod tests {
         let _cc = expect_fill(c.lookup(&"k", 101)); // A abandoned, C takes over
         c.complete_fill(&"k", a, Ok("A"), 0); // A's late completion
         assert!(
-            c.servable_value(&"k", 0).is_none(),
+            c.entries.get("k").and_then(|e| e.value).is_none(),
             "A's stale completion must not land after takeover"
         );
     }
@@ -689,6 +715,66 @@ mod tests {
         assert!(c.entries.contains_key("a"));
         assert!(c.entries.contains_key("c"));
         assert!(!c.entries.contains_key("b"), "b was least-recently-used");
+    }
+
+    #[test]
+    fn lru_clock_overflow_renumbers_preserving_recency() {
+        // At u64::MAX the access clock can't wrap: the next entry would get
+        // the lowest stamp and be evicted as if least-recently-used. The
+        // overflow must instead renumber stamps by recency rank — same
+        // order, fresh headroom — so the *oldest* entry stays the victim.
+        let mut c = cache(CacheConfig {
+            fresh_for: 10_000,
+            max_entries: 2,
+            ..base_config()
+        });
+        for (k, t) in [("a", 0u64), ("b", 1)] {
+            let tok = expect_fill(c.lookup(&k, t));
+            c.complete_fill(&k, tok, Ok("v"), t);
+        }
+        c.access_clock = u64::MAX; // force the next stamp to overflow
+        assert!(matches!(c.lookup(&"a", 2), Lookup::Ready(_))); // touch "a" across the overflow
+        assert!(
+            c.access_clock < u64::MAX,
+            "overflow renumbers and resets the clock"
+        );
+        let tok = expect_fill(c.lookup(&"c", 3));
+        c.complete_fill(&"c", tok, Ok("v"), 3);
+        assert!(c.entries.contains_key("a"), "recently touched survives");
+        assert!(c.entries.contains_key("c"), "new entry survives");
+        assert!(!c.entries.contains_key("b"), "least-recently-used evicted");
+    }
+
+    #[test]
+    fn upsert_restores_a_broken_size_bound() {
+        // `entries.len() > max_entries` would be a cache bug; `upsert`
+        // self-heals by evicting down to the bound (and logs). Break the
+        // invariant by hand to exercise that path.
+        let mut c = cache(CacheConfig {
+            fresh_for: 10_000,
+            max_entries: 2,
+            ..base_config()
+        });
+        for k in ["a", "b", "c"] {
+            let stamp = c.next_stamp();
+            c.entries.insert(
+                k,
+                Entry {
+                    value: Some("v"),
+                    fresh_until: 10_000,
+                    evict_at: 10_000,
+                    retry_at: 0,
+                    failures: 0,
+                    lru_stamp: stamp,
+                },
+            );
+        }
+        assert_eq!(c.entries.len(), 3, "bound broken by hand");
+        let tok = expect_fill(c.lookup(&"d", 0));
+        c.complete_fill(&"d", tok, Ok("v"), 0);
+        assert_eq!(c.entries.len(), 2, "evicted down to the bound");
+        assert!(c.entries.contains_key("d"));
+        assert!(c.entries.contains_key("c"), "most recent survivor kept");
     }
 
     #[test]
@@ -793,7 +879,7 @@ mod tests {
     }
 
     fn reset_e2e(fill_result: Result<i32, &'static str>) {
-        E2E.with(|c| *c.borrow_mut() = build_e2e());
+        E2E.with_borrow_mut(|c| *c = build_e2e());
         FILL_COUNT.with(|c| c.set(0));
         FILL_RESULT.with(|r| r.set(fill_result));
         set_test_now(0);
