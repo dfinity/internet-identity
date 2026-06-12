@@ -85,9 +85,6 @@ msgstr "<0>Integracje z Google, Apple i Microsoft:</0> Chociaż klucze dostępu 
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Dowiedz się więcej</0> o kluczach dostępu"
 
-msgid "<0>Never</0> enter a code from another source."
-msgstr "<0>Nigdy</0> nie wprowadzaj kodu z innego źródła."
-
 msgid "<0>No more identity numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
 msgstr "<0>Koniec z numerami tożsamości:</0> Jak wyjaśniono powyżej, identyfikowalne klucze dostępu oznaczają, że nie musisz już pamiętać ani przechowywać numeru tożsamości. Logowanie jest teraz prostsze i bardziej usprawnione."
 
@@ -129,6 +126,9 @@ msgstr "Aktywowano"
 
 msgid "Active"
 msgstr "Aktywny"
+
+msgid "Add a new identity"
+msgstr "Dodaj nową tożsamość"
 
 msgid "Add a passkey"
 msgstr "Dodaj klucz dostępu"
@@ -211,6 +211,9 @@ msgstr "Uwierzytelnianie zakończone sukcesem"
 msgid "Authorize new device"
 msgstr "Autoryzuj nowe urządzenie"
 
+msgid "Back"
+msgstr "Wstecz"
+
 msgid "Back to sign-in options"
 msgstr "Powrót do opcji logowania"
 
@@ -219,6 +222,9 @@ msgstr "Zanim kontynuujesz"
 
 msgid "Body"
 msgstr "Treść"
+
+msgid "Both are on the <0>{host}</0> domain."
+msgstr "Obydwa są w domenie <0>{host}</0>."
 
 msgid "Browser opened"
 msgstr "Przeglądarka otwarta"
@@ -313,6 +319,9 @@ msgstr "Potwierdź swoje logowanie"
 msgid "Confirmation code"
 msgstr "Kod potwierdzający"
 
+msgid "Confirmed"
+msgstr "Potwierdzono"
+
 msgid "Confirming..."
 msgstr "Potwierdzanie..."
 
@@ -367,11 +376,11 @@ msgstr "Nie udało się załadować ustawień SSO z {domainInput}. Poproś admin
 msgid "Create account"
 msgstr "Utwórz konto"
 
+msgid "Create an Identity"
+msgstr "Utwórz tożsamość"
+
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
 msgstr "Utwórz tożsamość za pomocą klucza dostępu, używając biometrii lub klucza bezpieczeństwa. Twoje dane nigdy nie opuszczają Twojego urządzenia."
-
-msgid "Create another identity"
-msgstr "Utwórz kolejną tożsamość"
 
 msgid "Create identity"
 msgstr "Utwórz tożsamość"
@@ -379,14 +388,14 @@ msgstr "Utwórz tożsamość"
 msgid "Create new identity"
 msgstr "Utwórz nową tożsamość"
 
+msgid "Create one in seconds."
+msgstr "Utwórz ją w kilka sekund."
+
 msgid "Create passkey"
 msgstr "Utwórz klucz dostępu"
 
 msgid "Create your Identity"
 msgstr "Utwórz swoją Tożsamość"
-
-msgid "Create your private, passwordless identity."
-msgstr "Utwórz swoją prywatną tożsamość bez hasła."
 
 msgid "Created {0}"
 msgstr "Utworzono {0}"
@@ -484,6 +493,9 @@ msgstr "Wpisz każde słowo we właściwej kolejności:"
 msgid "Enter recovery phrase"
 msgstr "Wpisz frazę odzyskiwania"
 
+msgid "Enter the code"
+msgstr "Wprowadź kod"
+
 msgid "Enter your company domain"
 msgstr "Wprowadź domenę swojej firmy"
 
@@ -569,6 +581,12 @@ msgstr "Ukryty adres e-mail"
 msgid "Hide all"
 msgstr "Ukryj wszystko"
 
+msgid "Hold for a few seconds. Release to cancel."
+msgstr "Przytrzymaj przez kilka sekund. Zwolnij, aby anulować."
+
+msgid "Hold to confirm"
+msgstr "Przytrzymaj, aby potwierdzić"
+
 msgid "Home"
 msgstr "Strona główna"
 
@@ -626,6 +644,8 @@ msgstr "Tożsamość usunięta"
 msgid "Identity upgraded."
 msgstr "Tożsamość zaktualizowana."
 
+msgid "If this keeps happening, copy these details and include them in a <0>support request</0>."
+msgstr "Jeśli problem nie ustępuje, skopiuj te informacje i dołącz je do <0>zgłoszenia pomocy technicznej</0>."
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Jeśli administrujesz domeną <0>{domain}</0>, włączenie DNSSEC u rejestratora domeny zazwyczaj zajmuje kilka kliknięć. Po rozpropagowaniu ten adres będzie działał automatycznie. Nie jest potrzebne żadne dalsze działanie z naszej strony."
@@ -831,9 +851,6 @@ msgstr "Nazwij swoją tożsamość"
 msgid "Name:"
 msgstr "Nazwa:"
 
-msgid "New to Internet Identity?"
-msgstr "Nowy/a w Internet Identity?"
-
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Nie są udostępniane żadne dane Google, Microsoft ani Apple dotyczące aplikacji, w których logujesz się za pomocą Internet Identity."
 
@@ -870,9 +887,6 @@ msgstr "Jedno lub więcej słów jest nieprawidłowych lub w złej kolejności."
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Włącz to tylko dla oficjalnego <0>ICP CLI</0>. Jeśli nie masz pewności, zainstaluj je ponownie z <1>oficjalnego źródła</1>."
 
-msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
-msgstr "Kod z tego urządzenia podawaj tylko, jeśli zainicjowałeś/aś ten proces <0>samodzielnie</0>."
-
 msgid "Open in browser"
 msgstr "Otwórz w przeglądarce"
 
@@ -881,6 +895,12 @@ msgstr "Otwórz w przeglądarce, aby kontynuować"
 
 msgid "Open in mail app"
 msgstr "Otwórz w aplikacji pocztowej"
+
+msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
+msgstr "Otwórz Internet Identity w nowej karcie, aby zarządzać metodami dostępu i opcjami odzyskiwania."
+
+msgid "Open manage"
+msgstr "Otwórz zarządzanie"
 
 msgid "Open menu"
 msgstr "Otwórz menu"
@@ -932,6 +952,9 @@ msgstr "Wybierz poniżej metodę odzyskiwania, aby zalogować się ponownie."
 
 msgid "Pick something recognizable, like your name"
 msgstr "Wybierz coś rozpoznawalnego, na przykład swoje imię"
+
+msgid "Please confirm"
+msgstr "Potwierdź"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Wróć do swojego <0>istniejącego urządzenia</0> i wybierz <1>Zacznij od nowa</1>, aby spróbować ponownie."
@@ -1095,14 +1118,14 @@ msgstr "Sesja wygasła"
 msgid "Set as default sign-in"
 msgstr "Ustaw jako domyślne logowanie"
 
-msgid "Set up a new identity."
-msgstr "Skonfiguruj nową tożsamość."
-
 msgid "Set up recovery email"
 msgstr "Skonfiguruj e-mail do odzyskiwania"
 
 msgid "Set up recovery phrase"
 msgstr "Skonfiguruj frazę odzyskiwania"
+
+msgid "Set up your private, passwordless identity."
+msgstr "Skonfiguruj swoją prywatną tożsamość bez hasła."
 
 msgid "Settings"
 msgstr "Ustawienia"
@@ -1133,9 +1156,6 @@ msgstr "Loguj się za pomocą znanych metod"
 
 msgid "Sign in with {name}"
 msgstr "Zaloguj się przez {name}"
-
-msgid "Sign in with a passkey or familiar provider."
-msgstr "Zaloguj się za pomocą klucza dostępu lub znajomego dostawcy."
 
 msgid "Sign in with another identity"
 msgstr "Zaloguj się z inną tożsamością"
@@ -1234,6 +1254,9 @@ msgstr "Logowanie SSO dla {domainInput} nie powiodło się. Spróbuj ponownie."
 msgid "Start over"
 msgstr "Zacznij od nowa"
 
+msgid "Step 2 of 2"
+msgstr "Krok 2 z 2"
+
 msgid "Still using an identity number?"
 msgstr "Nadal używasz numeru tożsamości?"
 
@@ -1275,7 +1298,6 @@ msgstr "Pomyślnie zmieniono metodę dostępu"
 
 msgid "Support"
 msgstr "Pomoc"
-
 
 msgid "Switch"
 msgstr "Przełącz"
@@ -1349,11 +1371,11 @@ msgstr "Fraza została wprowadzona poprawnie, ale należy do produktu innego ni�
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Wystąpił problem z połączeniem z aplikacją. Spróbuj użyć innej przeglądarki; jeśli problem się utrzyma, skontaktuj się z deweloperem."
 
-msgid "This {providerName} account is already connected to an Internet Identity."
-msgstr "To konto {providerName} jest już połączone z Internet Identity."
+msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
+msgstr "To konto {resolvedProviderName} jest już połączone z Internet Identity."
 
-msgid "This {providerName} account isn't connected to an Internet Identity yet."
-msgstr "To konto {providerName} nie jest jeszcze połączone z Internet Identity."
+msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
+msgstr "To konto {resolvedProviderName} nie jest jeszcze połączone z Internet Identity."
 
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "To konto jest już powiązane z Twoją tożsamością. Twoja aktywna metoda dostępu zostanie na nie przełączona."
@@ -1426,6 +1448,9 @@ msgstr "Spróbuj ponownie"
 
 msgid "Type each word in the correct order:"
 msgstr "Wpisz każde słowo we właściwej kolejności:"
+
+msgid "Type the 6-digit code shown on the new device."
+msgstr "Wpisz 6-cyfrowy kod wyświetlony na nowym urządzeniu."
 
 msgid "Type the characters exactly as shown below"
 msgstr "Wpisz znaki dokładnie tak, jak pokazano poniżej"
@@ -1505,8 +1530,11 @@ msgstr "Aktualizowanie tożsamości..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Użyj urządzenia, które już posiada Twoją tożsamość, aby zeskanować lub otworzyć adres URL. Spowoduje to powiązanie Twojej tożsamości z tym urządzeniem."
 
-msgid "Use a passkey, Face ID, or a popular provider"
-msgstr "Użyj klucza dostępu, Face ID lub popularnego dostawcy"
+msgid "Use a different method"
+msgstr "Użyj innej metody"
+
+msgid "Use a passkey or familiar provider."
+msgstr "Użyj klucza dostępu lub znajomego dostawcy."
 
 msgid "Use existing identity"
 msgstr "Użyj istniejącej tożsamości"
@@ -1553,8 +1581,8 @@ msgstr "Oczekiwanie na Twoje nowe urządzenie"
 msgid "Waiting to receive…"
 msgstr "Oczekiwanie na odbiór…"
 
-msgid "Want to create a new identity?"
-msgstr "Chcesz utworzyć nową tożsamość?"
+msgid "Want a new identity?"
+msgstr "Chcesz nową tożsamość?"
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "Nie możemy jeszcze zweryfikować poczty z <0>{domain}</0>. Wypróbuj inny adres. Gmail, iCloud, Outlook, Fastmail i Proton wszystkie działają."
@@ -1655,6 +1683,9 @@ msgstr "Możesz zresetować swoją frazę odzyskiwania w dowolnym momencie. Zape
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "Możesz jej teraz użyć do odzyskiwania, ale sprawdź, czy zapisałeś/aś ją poprawnie, aby móc na niej polegać później."
 
+msgid "You control both devices."
+msgstr "Kontrolujesz oba urządzenia."
+
 msgid "You have reached the maximum number of passkeys"
 msgstr "Osiągnąłeś maksymalną liczbę kluczy dostępu"
 
@@ -1667,14 +1698,14 @@ msgstr "Nie musisz już pamiętać swojego numeru tożsamości i zamiast tego mo
 msgid "You signed up before with a different access method."
 msgstr "Wcześniej zarejestrowano się przy użyciu innej metody dostępu."
 
-msgid "You unlinked this {providerName} account from your identity."
-msgstr "Usunięto powiązanie konta {providerName} z Twoją tożsamością."
+msgid "You unlinked this {resolvedProviderName} account from your identity."
+msgstr "Odłączono konto {resolvedProviderName} od Twojej tożsamości."
+
+msgid "You're about to authorize a new device."
+msgstr "Zamierzasz autoryzować nowe urządzenie."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "Zobaczysz swoją frazę odzyskiwania, której Internet Identity nie przechowuje i której nie można odzyskać w przypadku zgubienia, więc przechowuj ją bezpiecznie offline."
-
-msgid "You're about to sign in on a <0>new device</0>."
-msgstr "Zalogujesz się na <0>nowym urządzeniu</0>."
 
 msgid "You're about to sign in."
 msgstr "Logowanie..."
@@ -1694,8 +1725,8 @@ msgstr "Jesteś zalogowany"
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Logujesz się jako <0>{name}</0>."
 
-msgid "You've never used this {providerName} account with Internet Identity."
-msgstr "Nigdy nie korzystałeś/aś z tego konta {providerName} w Internet Identity."
+msgid "You've never used this {resolvedProviderName} account with Internet Identity."
+msgstr "Nigdy nie używałeś/używałaś tego konta {resolvedProviderName} z Internet Identity."
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Twoje klucze dostępu i fraza odzyskiwania nie są zmienione. Możesz ponownie dodać e-mail do odzyskiwania w dowolnym momencie."
