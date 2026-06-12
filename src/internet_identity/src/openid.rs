@@ -86,6 +86,16 @@ pub struct OpenIdCredential {
     pub aud: Aud,
     pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: HashMap<String, MetadataEntryV2>,
+    /// SSO discovery domain this credential was verified through, stamped at
+    /// verification time. `None` for direct-provider credentials (Google /
+    /// Microsoft / Apple); also `None` for SSO credentials stored before the
+    /// field existed until the `sso_credential_migration` backfill stamps
+    /// them (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
+    pub sso_domain: Option<String>,
+    /// Human-readable SSO label from the domain's hop-1
+    /// `ii-openid-configuration`. May be `None` even for SSO credentials —
+    /// domains aren't required to publish a `name`.
+    pub sso_name: Option<String>,
 }
 
 impl OpenIdCredential {
@@ -650,6 +660,8 @@ impl ExampleProvider {
                 .unwrap_or_else(|| "example-aud".into()),
             last_usage_timestamp: None,
             metadata: HashMap::new(),
+            sso_domain: None,
+            sso_name: None,
         }
     }
 }
@@ -905,6 +917,8 @@ impl ExamplePlaceholderProvider {
                 "tid".into(),
                 MetadataEntryV2::String("9188040d-6c67-4c5b-b112-36a304b66dad".into()),
             )]),
+            sso_domain: None,
+            sso_name: None,
         }
     }
 }
