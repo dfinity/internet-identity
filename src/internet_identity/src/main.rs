@@ -14,6 +14,7 @@ use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 
+use ic_cdk_timers::TimerId;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -35,8 +36,11 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
+use storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -79,6 +83,103 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
+
+// ---- SSO credential migration (temporary, see PR-M of
+// `docs/ongoing/openid-sso-prod-readiness.md` §8.6) ----
+//
+// Stored `OpenIdCredential`s grew `sso_domain` / `sso_name` fields. New
+// credentials are stamped at verification time, but existing SSO credentials
+// in stable storage must be backfilled from the `sso_credential_migration`
+// upgrade arg. Backfilling all credentials synchronously in `post_upgrade`
+// would blow the instruction limit on II's production canister, so we batch
+// the work via an interval timer using the same convention as the prior
+// OpenID credential key migration (#3784) and anchor migration (#3713).
+
+/// How long to wait between migration batches.
+const SSO_CREDENTIAL_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
+
+/// Maximum number of credential index keys to examine per batch (= per
+/// ingress message). Matches the 2 000-per-batch convention used for
+/// previous migrations.
+const SSO_CREDENTIAL_MIGRATION_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    // TODO: Remove these after the data migration is complete.
+    static SSO_CREDENTIAL_MIGRATION_ENTRIES: RefCell<Vec<SsoCredentialMigrationEntry>> = const { RefCell::new(Vec::new()) };
+    static SSO_CREDENTIAL_MIGRATION_CURSOR: RefCell<Option<StorableOpenIdCredentialKey>> = const { RefCell::new(None) };
+    static SSO_CREDENTIAL_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static SSO_CREDENTIAL_MIGRATION_STAMPED: RefCell<u64> = const { RefCell::new(0) };
+    static SSO_CREDENTIAL_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static SSO_CREDENTIAL_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Temporary hidden endpoint: returns any per-entry errors encountered
+/// during the SSO credential migration.
+#[update(hidden = true)]
+fn list_sso_credential_migration_errors() -> Vec<String> {
+    SSO_CREDENTIAL_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
+}
+
+/// Temporary hidden endpoint: returns `(stamped_credentials, is_done)` so
+/// monitoring can track migration progress.
+#[query(hidden = true)]
+fn sso_credential_migration_status() -> (u64, bool) {
+    (
+        SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow(|c| *c),
+        SSO_CREDENTIAL_MIGRATION_DONE.with_borrow(|d| *d),
+    )
+}
+
+/// Process one batch of the SSO credential migration. Bound to the interval
+/// timer set up in [`init_sso_credential_migration_timer`]; clears the timer
+/// once the migration signals completion.
+fn run_sso_credential_migration_batch() {
+    if SSO_CREDENTIAL_MIGRATION_DONE.with_borrow(|done| *done) {
+        return;
+    }
+
+    let entries = SSO_CREDENTIAL_MIGRATION_ENTRIES.with_borrow(|entries| entries.clone());
+    let cursor = SSO_CREDENTIAL_MIGRATION_CURSOR.with_borrow(|cursor| cursor.clone());
+    let outcome = state::storage_borrow_mut(|storage| {
+        storage.migrate_sso_credentials_batch(&entries, cursor, SSO_CREDENTIAL_MIGRATION_BATCH_SIZE)
+    });
+
+    SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow_mut(|count| {
+        *count = count.saturating_add(outcome.stamped);
+    });
+    if !outcome.errors.is_empty() {
+        SSO_CREDENTIAL_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
+    }
+    if let Some(next_cursor) = outcome.next_cursor {
+        SSO_CREDENTIAL_MIGRATION_CURSOR.replace(Some(next_cursor));
+    }
+
+    if outcome.is_done {
+        SSO_CREDENTIAL_MIGRATION_DONE.replace(true);
+        SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+            if let Some(timer_id) = id_slot.take() {
+                ic_cdk_timers::clear_timer(timer_id);
+            }
+        });
+        let stamped = SSO_CREDENTIAL_MIGRATION_STAMPED.with_borrow(|c| *c);
+        ic_cdk::println!("SSO credential migration COMPLETED ({stamped} credentials stamped).");
+    }
+}
+
+/// Start the interval timer driving [`run_sso_credential_migration_batch`].
+/// Safe to call from both `init` (the first batch will immediately see an
+/// empty entry list or index and mark the migration done) and `post_upgrade`.
+fn init_sso_credential_migration_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        SSO_CREDENTIAL_MIGRATION_BATCH_BACKOFF_SECONDS,
+        run_sso_credential_migration_batch,
+    );
+    SSO_CREDENTIAL_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
 
 #[update]
 async fn init_salt() {
@@ -589,6 +690,9 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_discoverable_domains: persistent_state.sso_discoverable_domains.clone(),
+        // One-shot upgrade arg driving the SSO credential backfill; not
+        // persisted as config, so there is nothing to report back here.
+        sso_credential_migration: None,
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -656,6 +760,13 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(oidc_configs) = persisted_oidc_configs {
         openid::setup_oidc(oidc_configs);
     }
+
+    // Kick off the SSO credential batch migration. Examines at most
+    // `SSO_CREDENTIAL_MIGRATION_BATCH_SIZE` index keys per tick so each batch
+    // fits in one ingress message; timer self-clears once the migration
+    // signals done (immediately, when no `sso_credential_migration` arg was
+    // supplied).
+    init_sso_credential_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -711,6 +822,12 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.sso_discoverable_domains = Some(sso_discoverable_domains);
             })
+        }
+        if let Some(entries) = arg.sso_credential_migration {
+            // One-shot arg, not persisted: the entries only need to live
+            // until the batch migration kicked off in `initialize()` has
+            // walked the credential index once.
+            SSO_CREDENTIAL_MIGRATION_ENTRIES.replace(entries);
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {
             state::persistent_state_mut(|persistent_state| {
@@ -1617,7 +1734,6 @@ mod email_recovery_api {
         crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
         Ok(())
     }
-
 }
 
 mod attribute_sharing {
