@@ -179,6 +179,37 @@ pub struct SingleFlightCache<K, V, E> {
     max_entries: usize,
     backoff: RetryBackoff,
     abandon_fill_after: u64,
+    /// Count of observed internal-invariant violations (e.g. size over cap,
+    /// a key that `lookup` saw missing under `touch`). Always zero on a
+    /// correct cache; a non-zero value is a bug signal, surfaced both in the
+    /// canister log (each occurrence) and via [`CacheStats`] (the running
+    /// total) so the inconsistency is visible from outside, not just in logs.
+    inconsistencies: u64,
+}
+
+/// A point-in-time snapshot of cache state for external observability — the
+/// shape behind the canister's cache metrics. Every field is derived from the
+/// live maps at the `now` passed to [`SingleFlightCache::stats`]; nothing here
+/// mutates the cache.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CacheStats {
+    /// Live (not-yet-evicted) entries, including value-less failure markers.
+    pub entries: usize,
+    /// Entries currently within their freshness window.
+    pub fresh_entries: usize,
+    /// Entries holding a servable value (fresh or stale) — i.e. excluding
+    /// value-less cold-failure markers.
+    pub valued_entries: usize,
+    /// Entries parked in *failure* backoff — a failed fill whose `retry_at`
+    /// is still in the future. Excludes a fresh success (whose `retry_at`
+    /// also sits in the future as its no-refill-yet marker).
+    pub backing_off_entries: usize,
+    /// In-flight fills (the single-flight markers).
+    pub in_flight: usize,
+    /// Configured hard cap on entries.
+    pub max_entries: usize,
+    /// Running total of observed internal-invariant violations. Expected 0.
+    pub inconsistencies: u64,
 }
 
 impl<K, V, E> SingleFlightCache<K, V, E> {
@@ -200,6 +231,7 @@ impl<K, V, E> SingleFlightCache<K, V, E> {
             max_entries: config.max_entries.max(1),
             backoff: config.backoff,
             abandon_fill_after: config.abandon_fill_after,
+            inconsistencies: 0,
         }
     }
 }
@@ -341,10 +373,24 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         FillToken { fill_id }
     }
 
+    /// Record an observed internal-invariant violation: bump the running
+    /// total (surfaced via [`stats`](Self::stats)) and print-log it. Every
+    /// "can't happen on a correct cache" branch routes through here, so an
+    /// inconsistency is both counted for metrics and traceable in the log.
+    fn note_inconsistency(&mut self, detail: &str) {
+        self.inconsistencies = self.inconsistencies.saturating_add(1);
+        ic_cdk::println!("ERROR: single-flight cache invariant violated: {detail}");
+    }
+
     fn touch(&mut self, key: &K) {
         let stamp = self.next_stamp();
         if let Some(e) = self.entries.get_mut(key) {
             e.lru_stamp = stamp;
+        } else {
+            // `lookup` only touches a key it just found alive; a miss here
+            // means the entry vanished between the two accesses — impossible
+            // single-threaded, so a genuine inconsistency if ever seen.
+            self.note_inconsistency("touch: entry missing for a key lookup had just resolved");
         }
     }
 
@@ -367,6 +413,10 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         for (rank, (key, _)) in ranked.iter().enumerate() {
             if let Some(e) = self.entries.get_mut(key) {
                 e.lru_stamp = rank as u64 + 1;
+            } else {
+                // `ranked` was just collected from `self.entries` with no
+                // intervening mutation, so every key must still be present.
+                self.note_inconsistency("next_stamp: key vanished mid-renumber");
             }
         }
         self.access_clock = ranked.len() as u64 + 1;
@@ -378,12 +428,12 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
         if !self.entries.contains_key(key) && self.entries.len() >= self.max_entries {
             if self.entries.len() > self.max_entries {
                 // The eviction below restores the bound on every insert, so
-                // over-cap means a cache bug; log it (and the loop self-heals).
-                ic_cdk::println!(
-                    "ERROR: single-flight cache holds {} entries, over its cap of {}",
+                // over-cap means a cache bug; record it (the loop self-heals).
+                self.note_inconsistency(&format!(
+                    "size {} exceeds cap {}",
                     self.entries.len(),
                     self.max_entries
-                );
+                ));
             }
             while self.entries.len() >= self.max_entries {
                 self.evict_lru();
@@ -393,18 +443,57 @@ impl<K: Ord + Clone, V: Clone, E> SingleFlightCache<K, V, E> {
     }
 
     fn evict_lru(&mut self) {
-        if let Some(victim) = self
+        let victim = self
             .entries
             .iter()
             .min_by_key(|(_, e)| e.lru_stamp)
-            .map(|(k, _)| k.clone())
-        {
-            self.entries.remove(&victim);
+            .map(|(k, _)| k.clone());
+        match victim {
+            Some(victim) => {
+                self.entries.remove(&victim);
+            }
+            // Only ever called from `upsert` once `entries.len() >=
+            // max_entries >= 1`, so the map is non-empty — an empty map here
+            // would leave the size bound unrestored.
+            None => self.note_inconsistency("evict_lru: nothing to evict over the size cap"),
         }
     }
 
     fn sweep_expired(&mut self, now: u64) {
         self.entries.retain(|_, e| e.is_alive(now));
+    }
+
+    /// Snapshot cache state at `now` for external observability. Read-only:
+    /// counts live entries by category and reports the in-flight count, the
+    /// configured cap, and the running inconsistency total. Dead-but-not-yet-
+    /// swept entries are excluded so the snapshot matches what `get` would
+    /// actually serve.
+    fn stats(&self, now: u64) -> CacheStats {
+        let mut stats = CacheStats {
+            in_flight: self.in_flight.len(),
+            max_entries: self.max_entries,
+            inconsistencies: self.inconsistencies,
+            ..CacheStats::default()
+        };
+        for e in self.entries.values() {
+            if !e.is_alive(now) {
+                continue;
+            }
+            stats.entries += 1;
+            if e.is_fresh(now) {
+                stats.fresh_entries += 1;
+            }
+            if e.value.is_some() {
+                stats.valued_entries += 1;
+            }
+            // `retry_at` doubles as the no-refill-yet marker for a fresh
+            // success, so "backing off" means specifically a *failed* fill
+            // still parked (`failures > 0` and not yet retryable).
+            if e.failures > 0 && e.is_throttled(now) {
+                stats.backing_off_entries += 1;
+            }
+        }
+        stats
     }
 }
 
@@ -460,6 +549,18 @@ where
             value.map_or(Cached::Pending, Cached::Ready)
         }
     }
+}
+
+/// Snapshot the cache's state for external observability (metrics). Read-only
+/// and non-blocking; uses the cache's own clock, like [`get`].
+pub fn stats<K, V, E>(cache: &'static LocalKey<RefCell<SingleFlightCache<K, V, E>>>) -> CacheStats
+where
+    K: Ord + Clone + 'static,
+    V: Clone + 'static,
+    E: 'static,
+{
+    let now = now();
+    cache.with_borrow(|c| c.stats(now))
 }
 
 /// Build the fill future for `key` and detach it; on completion store the
@@ -775,6 +876,94 @@ mod tests {
         assert_eq!(c.entries.len(), 2, "evicted down to the bound");
         assert!(c.entries.contains_key("d"));
         assert!(c.entries.contains_key("c"), "most recent survivor kept");
+        assert_eq!(
+            c.inconsistencies, 1,
+            "the over-cap state is recorded as an inconsistency"
+        );
+        assert_eq!(c.stats(0).inconsistencies, 1, "and surfaced via stats");
+    }
+
+    #[test]
+    fn upsert_drives_overflow_renumber_and_eviction_together() {
+        // The overflow concern lives in `upsert`: an insert can trigger the
+        // clock renumber *and* an eviction in the same call. The new entry
+        // must get the highest stamp (post-renumber) so the true LRU — not
+        // the just-inserted entry — is the eviction victim.
+        let mut c = cache(CacheConfig {
+            fresh_for: 10_000,
+            max_entries: 2,
+            ..base_config()
+        });
+        // "a" then "b": b is more recent. Fill them.
+        for k in ["a", "b"] {
+            let tok = expect_fill(c.lookup(&k, 0));
+            c.complete_fill(&k, tok, Ok("v"), 0);
+        }
+        c.access_clock = u64::MAX; // next stamp (for the "c" insert) overflows
+        let tok = expect_fill(c.lookup(&"c", 0));
+        c.complete_fill(&"c", tok, Ok("v"), 0); // upsert "c": renumber + evict in one call
+        assert_eq!(c.entries.len(), 2, "still at the cap");
+        assert!(
+            c.entries.contains_key("c"),
+            "new entry survives the overflow"
+        );
+        assert!(c.entries.contains_key("b"), "more-recent entry survives");
+        assert!(!c.entries.contains_key("a"), "least-recently-used evicted");
+        assert_eq!(c.inconsistencies, 0, "overflow handling is not a bug path");
+    }
+
+    #[test]
+    fn stats_reports_live_entry_categories() {
+        // Snapshot at T=120. fresh_for=100, stale_for=100 → an entry filled at
+        // 0 is stale (fresh_until 100, evict_at 200); one filled at 120 is
+        // fresh. Build one stale-valued, one fresh-valued, one cold-failure
+        // (value-less, still parked) entry, plus one in-flight claim.
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 100,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"stale", 0));
+        c.complete_fill(&"stale", t, Ok("v"), 0); // stale (not fresh) at 120
+        let t = expect_fill(c.lookup(&"cold", 100));
+        c.complete_fill(&"cold", t, Err(()), 100); // value-less, retry_at 160 → parked at 120
+        let t = expect_fill(c.lookup(&"fresh", 120));
+        c.complete_fill(&"fresh", t, Ok("v"), 120); // fresh at 120
+        let _claim = expect_fill(c.lookup(&"inflight", 120)); // claimed, never completed
+
+        let s = c.stats(120);
+        assert_eq!(s.entries, 3, "stale, cold, fresh are all still alive");
+        assert_eq!(
+            s.fresh_entries, 1,
+            "only 'fresh' is within its freshness window"
+        );
+        assert_eq!(
+            s.valued_entries, 2,
+            "stale + fresh hold values; cold doesn't"
+        );
+        assert_eq!(
+            s.backing_off_entries, 1,
+            "the cold-failure marker is parked"
+        );
+        assert_eq!(s.in_flight, 1, "the claimed-but-unfilled key");
+        assert_eq!(s.max_entries, usize::MAX);
+        assert_eq!(s.inconsistencies, 0);
+    }
+
+    #[test]
+    fn stats_excludes_dead_but_unswept_entries() {
+        // A dead entry that hasn't been swept yet must not show in the
+        // snapshot — stats reflects what `get` would serve, not raw map size.
+        let mut c = cache(CacheConfig {
+            fresh_for: 100,
+            stale_for: 0,
+            ..base_config()
+        });
+        let t = expect_fill(c.lookup(&"k", 0));
+        c.complete_fill(&"k", t, Ok("v"), 0); // evict_at = 100
+        assert_eq!(c.stats(50).entries, 1, "alive at 50");
+        assert_eq!(c.stats(200).entries, 0, "dead at 200, excluded from stats");
+        assert!(c.entries.contains_key("k"), "still in the map (unswept)");
     }
 
     #[test]

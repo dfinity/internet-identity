@@ -49,7 +49,7 @@ use cache::{new_doh_cache, DohCache};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
-use crate::single_flight_cache::{get, Cached};
+use crate::single_flight_cache::{get, stats, CacheStats, Cached};
 
 #[allow(unused_imports)]
 pub use cache::DohRecord;
@@ -212,6 +212,12 @@ pub fn fetch_txt(name: &str, registered_domain: &str) -> Result<Cached<DohRecord
     // concurrent arrivals see it in flight and also get `Pending` (no second
     // fan-out). A `Ready` answer is served straight from the cache.
     Ok(get(&DOH_CACHE, name.to_string()))
+}
+
+/// Snapshot of the DoH cache state, for the canister metrics endpoint. See
+/// [`CacheStats`].
+pub fn cache_stats() -> CacheStats {
+    stats(&DOH_CACHE)
 }
 
 /// Whether a queried FQDN sits inside `registered_domain` (case-
