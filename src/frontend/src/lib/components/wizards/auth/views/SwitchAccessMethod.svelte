@@ -3,6 +3,9 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import { ArrowRightIcon, RepeatIcon, UserIcon } from "@lucide/svelte";
+  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
+  import { getMetadataString, findConfig } from "$lib/utils/openID";
+  import type { MethodTag } from "$lib/flows/authFlow.svelte";
 
   export type AccessMethod =
     | { type: "passkey" }
@@ -10,14 +13,94 @@
     | { type: "sso"; name: string };
 
   interface Props {
-    userName: string;
-    userEmail?: string;
-    fromMethod: AccessMethod;
-    toMethod: AccessMethod;
+    // Snapshot of the previously-signed-in identity captured BEFORE the
+    // new sign-in mutated the live store. Reading from
+    // `lastUsedIdentitiesStore` here would race the store update and
+    // show the new method as the "from" side of the switch.
+    previousIdentity: LastUsedIdentity;
+    newMethod: MethodTag;
+    providerIssuer?: string;
+    providerName?: string;
     onSwitch: () => void;
+    onCancel?: () => void;
   }
 
-  let { userName, userEmail, fromMethod, toMethod, onSwitch }: Props = $props();
+  let {
+    previousIdentity,
+    newMethod,
+    providerIssuer,
+    providerName,
+    onSwitch,
+    onCancel,
+  }: Props = $props();
+
+  const previousEmail: string | undefined = $derived.by(() => {
+    if (
+      "openid" in previousIdentity.authMethod &&
+      previousIdentity.authMethod.openid.metadata !== undefined
+    ) {
+      return getMetadataString(
+        previousIdentity.authMethod.openid.metadata,
+        "email",
+      );
+    }
+    if ("sso" in previousIdentity.authMethod) {
+      return previousIdentity.authMethod.sso.email;
+    }
+    return undefined;
+  });
+
+  const fromMethod: AccessMethod = $derived.by(() => {
+    const m = previousIdentity.authMethod;
+    if ("passkey" in m) return { type: "passkey" };
+    if ("openid" in m) {
+      // findConfig handles template issuers (e.g. Microsoft's
+      // `.../{tenantid}/v2.0`) that bare equality misses, so the
+      // provider logo renders even when the stored `iss` is concrete.
+      const config = findConfig(
+        m.openid.iss,
+        undefined,
+        m.openid.metadata ?? [],
+      );
+      return {
+        type: "openid",
+        logo: config?.logo ?? "",
+        name: config?.name ?? m.openid.iss,
+      };
+    }
+    if ("sso" in m) {
+      return { type: "sso", name: m.sso.name ?? m.sso.domain };
+    }
+    return m satisfies never;
+  });
+
+  const toMethod: AccessMethod = $derived.by(() => {
+    if (newMethod === "passkey") return { type: "passkey" };
+    if (newMethod === "openid") {
+      const config =
+        providerIssuer === undefined
+          ? undefined
+          : findConfig(providerIssuer, undefined, []);
+      return {
+        type: "openid",
+        logo: config?.logo ?? "",
+        name: config?.name ?? providerName ?? providerIssuer ?? "",
+      };
+    }
+    if (newMethod === "sso") {
+      return { type: "sso", name: providerName ?? "" };
+    }
+    return newMethod satisfies never;
+  });
+
+  const userName: string = $derived(
+    previousIdentity.name ??
+      previousEmail ??
+      `${previousIdentity.identityNumber}`,
+  );
+  const userEmail: string | undefined = $derived(
+    previousIdentity.name !== undefined ? previousEmail : undefined,
+  );
 
   const methodLabel = (m: AccessMethod): string =>
     m.type === "passkey" ? $t`Passkey` : m.name;
@@ -76,9 +159,11 @@
       {/if}
     </div>
     <span
-      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold"
+      class="bg-bg-primary border-border-secondary text-text-tertiary mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold"
     >
-      {methodLabel(fromMethod)} → {methodLabel(toMethod)}
+      {methodLabel(fromMethod)}
+      <ArrowRightIcon class="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+      {methodLabel(toMethod)}
     </span>
   </div>
 
@@ -86,4 +171,13 @@
     <RepeatIcon class="size-4" aria-hidden="true" />
     {$t`Switch method`}
   </button>
+
+  {#if onCancel !== undefined}
+    <button
+      onclick={onCancel}
+      class="text-text-tertiary hover:text-text-primary mt-3 self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`Use a different method`}
+    </button>
+  {/if}
 </div>
