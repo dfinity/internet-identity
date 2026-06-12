@@ -5,6 +5,7 @@ import type {
 import { backendCanisterConfig } from "$lib/globals";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
+import { z } from "zod";
 const BROADCAST_CHANNEL = "redirect_callback";
 const REDIRECT_CALLBACK_PATH = "/callback";
 
@@ -16,30 +17,46 @@ export class CallbackPopupClosedError extends Error {}
  * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
  * Mirrors what the OAuth callback fragment used to carry: either the token
  * or the IdP's RFC 6749 error report, plus the CSRF `state` in both cases.
+ *
+ * The canister serializes an absent `error_description` as JSON `null`
+ * rather than omitting the key, so the schema accepts `null` and normalizes
+ * it to `undefined`.
  */
-export type CallbackPayload =
-  | { id_token: string; state: string }
-  | { error: string; error_description?: string; state: string };
+const CallbackPayloadSchema = z.union([
+  z.object({ id_token: z.string(), state: z.string() }),
+  z.object({
+    error: z.string(),
+    error_description: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
+    state: z.string(),
+  }),
+]);
+export type CallbackPayload = z.infer<typeof CallbackPayloadSchema>;
 
 /**
- * Read a string property off an unknown-shaped value without type casts.
- * Returns `undefined` when the property is absent or not a string.
+ * Lenient per-field view of the payload for {@link extractIdTokenFromCallback},
+ * which must read `state` for its CSRF check even on an otherwise-malformed
+ * payload. Each field independently falls back to `undefined` when absent or
+ * not a string, and a non-object input falls back to an empty record, so
+ * `.parse` never throws.
  */
-const getStringProp = (value: object, key: string): string | undefined => {
-  const prop: unknown = Reflect.get(value, key);
-  return typeof prop === "string" ? prop : undefined;
-};
+const CallbackFieldsSchema = z
+  .object({
+    state: z.string().optional().catch(undefined),
+    id_token: z.string().optional().catch(undefined),
+    error: z.string().optional().catch(undefined),
+    error_description: z.string().nullish().catch(undefined),
+  })
+  .catch({});
 
 /**
  * Whether a value posted on the callback channel (or parsed from the
  * sessionStorage entry) is a {@link CallbackPayload}.
  */
 const isCallbackPayload = (value: unknown): boolean =>
-  typeof value === "object" &&
-  value !== null &&
-  getStringProp(value, "state") !== undefined &&
-  (getStringProp(value, "id_token") !== undefined ||
-    getStringProp(value, "error") !== undefined);
+  CallbackPayloadSchema.safeParse(value).success;
 
 /**
  * Open a popup that round-trips through an OAuth provider and resolves with
@@ -298,19 +315,14 @@ export const extractIdTokenFromCallback = (
   callback: unknown,
   expectedState: string,
 ): string => {
-  const payload =
-    typeof callback === "object" && callback !== null ? callback : {};
-  if (getStringProp(payload, "state") !== expectedState) {
+  const { state, id_token, error, error_description } =
+    CallbackFieldsSchema.parse(callback);
+  if (state !== expectedState) {
     throw new Error("Invalid state");
   }
-  const error = getStringProp(payload, "error");
   if (error !== undefined) {
-    throw new OAuthProviderError(
-      error,
-      getStringProp(payload, "error_description"),
-    );
+    throw new OAuthProviderError(error, error_description ?? undefined);
   }
-  const id_token = getStringProp(payload, "id_token");
   if (id_token === undefined) {
     throw new Error("No token received");
   }

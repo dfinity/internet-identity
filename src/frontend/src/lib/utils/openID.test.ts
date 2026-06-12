@@ -375,6 +375,24 @@ describe("extractIdTokenFromCallback", () => {
     expect(err.errorDescription).toBeUndefined();
   });
 
+  it("normalizes a null error_description to undefined", () => {
+    // The canister serializes an absent error_description as JSON null
+    // rather than omitting the key, so the parsed payload carries null.
+    let thrown: unknown;
+    try {
+      extractIdTokenFromCallback(
+        { state: STATE, error: "access_denied", error_description: null },
+        STATE,
+      );
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(OAuthProviderError);
+    const err = thrown as OAuthProviderError;
+    expect(err.error).toBe("access_denied");
+    expect(err.errorDescription).toBeUndefined();
+  });
+
   it("checks state before surfacing a provider error", () => {
     // Guards against a forged callback: an attacker who can inject a
     // payload with a legitimate-looking provider error shouldn't be
