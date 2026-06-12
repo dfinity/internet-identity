@@ -246,7 +246,7 @@ describe("AuthFlow — method-switch disambiguation", () => {
     expect(flow.pendingMethodSwitch).toBeUndefined();
   });
 
-  it("cancelMethodSwitch restores the previous identity in the store", () => {
+  it("cancelMethodSwitch does not touch the store (writes are deferred)", () => {
     const restoreSpy = lastUsedIdentitiesStoreValue.restoreIdentity;
     restoreSpy.mockClear();
     flow.requestMethodSwitch({
@@ -255,8 +255,7 @@ describe("AuthFlow — method-switch disambiguation", () => {
       signedInIdentityNumber: BigInt(99),
     });
     flow.cancelMethodSwitch();
-    expect(restoreSpy).toHaveBeenCalledTimes(1);
-    expect(restoreSpy).toHaveBeenCalledWith(previousIdentity);
+    expect(restoreSpy).not.toHaveBeenCalled();
   });
 
   it("cancelMethodSwitch without a pending switch does not touch the store", () => {

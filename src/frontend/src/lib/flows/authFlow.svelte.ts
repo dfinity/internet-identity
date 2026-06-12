@@ -51,6 +51,14 @@ export type AuthMode = "signin" | "signup" | "both";
 
 export type MethodTag = "passkey" | "openid" | "sso";
 
+// Subset of LastUsedIdentity that the sign-in paths produce ahead of
+// the user committing to it — matches the shape `addLastUsedIdentity`
+// accepts (timestamp is stamped by the store on commit).
+export type PendingLastUsedEntry = Pick<
+  LastUsedIdentity,
+  "identityNumber" | "name" | "authMethod" | "createdAtMillis"
+>;
+
 export class AuthFlow {
   #options: Required<AuthFlowOptions>;
   #view = $state<
@@ -81,6 +89,7 @@ export class AuthFlow {
     previousIdentity: LastUsedIdentity;
     newMethod: MethodTag;
     signedInIdentityNumber: bigint;
+    pendingLastUsedEntry?: PendingLastUsedEntry;
     providerIssuer?: string;
     providerDomain?: string;
     providerName?: string;
@@ -139,6 +148,7 @@ export class AuthFlow {
     previousIdentity: LastUsedIdentity;
     newMethod: MethodTag;
     signedInIdentityNumber: bigint;
+    pendingLastUsedEntry?: PendingLastUsedEntry;
     providerIssuer?: string;
     providerDomain?: string;
     providerName?: string;
@@ -158,15 +168,6 @@ export class AuthFlow {
   };
 
   cancelMethodSwitch = (): void => {
-    // The new auth completed BEFORE the dialog opened, so the store
-    // already recorded the new method as last-used. Without restoring
-    // the snapshot the /manage card would keep displaying the new
-    // method even though the user backed out of the switch.
-    if (this.#pendingMethodSwitch !== undefined) {
-      lastUsedIdentitiesStore.restoreIdentity(
-        this.#pendingMethodSwitch.previousIdentity,
-      );
-    }
     this.#pendingMethodSwitch = undefined;
     this.#view = "chooseMethod";
   };
@@ -246,6 +247,7 @@ export class AuthFlow {
   ): Promise<
     | {
         identityNumber: bigint;
+        pendingLastUsedEntry?: PendingLastUsedEntry;
         type: "signIn";
       }
     | {
@@ -263,23 +265,30 @@ export class AuthFlow {
       authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
     });
     if (result.type === "signIn") {
-      if (this.#options.trackLastUsed) {
-        const { email } = decodeJWT(result.jwt);
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber: result.identityNumber,
-          name: result.info.name[0],
-          authMethod: {
-            sso: {
-              domain,
-              name: ssoName,
-              email,
-              loginHint: result.loginHint,
+      const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
+        .trackLastUsed
+        ? {
+            identityNumber: result.identityNumber,
+            name: result.info.name[0],
+            authMethod: {
+              sso: {
+                domain,
+                name: ssoName,
+                email: decodeJWT(result.jwt).email,
+                loginHint: result.loginHint,
+              },
             },
-          },
-          createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
-        });
-      }
+            createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+          }
+        : undefined;
       if (mode === "signup") {
+        // The openIdAlreadyLinked dialog asks the user whether to sign
+        // in with the already-linked identity. Commit eagerly here —
+        // matches the existing UX: the auth succeeded, the identity is
+        // tracked, and `cancelOpenIdDisambiguation` does not revert.
+        if (lastUsedEntry !== undefined) {
+          lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
+        }
         this.#ssoJwt = result.jwt;
         this.#ssoDomain = domain;
         this.#ssoName = ssoName;
@@ -287,7 +296,11 @@ export class AuthFlow {
         this.#view = "openIdAlreadyLinked";
         return undefined;
       }
-      return { identityNumber: result.identityNumber, type: "signIn" };
+      return {
+        identityNumber: result.identityNumber,
+        pendingLastUsedEntry: lastUsedEntry,
+        type: "signIn",
+      };
     }
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
@@ -317,7 +330,10 @@ export class AuthFlow {
     );
   };
 
-  continueWithExistingPasskey = async (): Promise<bigint> => {
+  continueWithExistingPasskey = async (): Promise<{
+    identityNumber: bigint;
+    pendingLastUsedEntry?: PendingLastUsedEntry;
+  }> => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
     const { identity, identityNumber, credentialId } =
       await authenticateWithPasskey({
@@ -328,15 +344,15 @@ export class AuthFlow {
     await authenticationStore.set({ identity, identityNumber, authMethod });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-    if (this.#options.trackLastUsed) {
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod,
-        createdAtMillis: info.created_at.map(nanosToMillis)[0],
-      });
-    }
-    return identityNumber;
+    const pendingLastUsedEntry = this.#options.trackLastUsed
+      ? {
+          identityNumber,
+          name: info.name[0],
+          authMethod,
+          createdAtMillis: info.created_at.map(nanosToMillis)[0],
+        }
+      : undefined;
+    return { identityNumber, pendingLastUsedEntry };
   };
 
   setupNewPasskey = (): void => {
@@ -380,6 +396,7 @@ export class AuthFlow {
         identityNumber: bigint;
         name?: string;
         email?: string;
+        pendingLastUsedEntry?: PendingLastUsedEntry;
         type: "signIn";
       }
     | {
@@ -400,25 +417,33 @@ export class AuthFlow {
       existingJwt,
     );
     if (result.type === "signIn") {
-      if (this.#options.trackLastUsed) {
-        const authnMethod = result.info.openid_credentials[0]?.find(
-          (method) => method.iss === result.iss,
-        );
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber: result.identityNumber,
-          name: result.info.name[0],
-          authMethod: {
-            openid: {
-              iss: result.iss,
-              sub: result.sub,
-              loginHint: result.loginHint,
-              metadata: authnMethod?.metadata,
-            },
-          },
-          createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
-        });
-      }
+      const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
+        .trackLastUsed
+        ? (() => {
+            const authnMethod = result.info.openid_credentials[0]?.find(
+              (method) => method.iss === result.iss,
+            );
+            return {
+              identityNumber: result.identityNumber,
+              name: result.info.name[0],
+              authMethod: {
+                openid: {
+                  iss: result.iss,
+                  sub: result.sub,
+                  loginHint: result.loginHint,
+                  metadata: authnMethod?.metadata,
+                },
+              },
+              createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+            };
+          })()
+        : undefined;
       if (mode === "signup") {
+        // See `continueWithSso`: the openIdAlreadyLinked path commits
+        // eagerly to preserve the existing UX of that disambiguation.
+        if (lastUsedEntry !== undefined) {
+          lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
+        }
         this.#jwt = result.jwt;
         this.#configIssuer = config.issuer;
         this.#pendingOpenIdSignIn = result.identityNumber;
@@ -430,6 +455,7 @@ export class AuthFlow {
         identityNumber: result.identityNumber,
         name: result.info.name[0] ?? jwtName,
         email,
+        pendingLastUsedEntry: lastUsedEntry,
         type: "signIn",
       };
     }

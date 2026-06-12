@@ -4,7 +4,7 @@
     type AuthMode,
     type MethodTag,
   } from "$lib/flows/authFlow.svelte";
-  import { type Snippet, untrack, onDestroy } from "svelte";
+  import { type Snippet, untrack } from "svelte";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
   import Dialog, { isInsideDialog } from "$lib/components/ui/Dialog.svelte";
@@ -23,6 +23,7 @@
     lastUsedIdentitiesStore,
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
+  import type { PendingLastUsedEntry } from "$lib/flows/authFlow.svelte";
   import { get } from "svelte/store";
   import IdentityNotConnected from "$lib/components/wizards/auth/views/IdentityNotConnected.svelte";
   import IdentityAlreadyLinked from "$lib/components/wizards/auth/views/IdentityAlreadyLinked.svelte";
@@ -73,6 +74,7 @@
     signedInIdentityNumber: bigint,
     newMethod: MethodTag,
     previousSnapshot: LastUsedIdentity | undefined,
+    pendingLastUsedEntry: PendingLastUsedEntry | undefined,
     providerInfo?: {
       providerIssuer?: string;
       providerDomain?: string;
@@ -85,9 +87,19 @@
       previousIdentity: previousSnapshot,
       newMethod,
       signedInIdentityNumber,
+      pendingLastUsedEntry,
       ...providerInfo,
     });
     return true;
+  };
+
+  // Commits the deferred last-used entry once the user has cleared
+  // (or skipped) the method-switch disambiguation. Mirrors the commit
+  // step that `authFlow.confirmMethodSwitch` runs on the dialog path.
+  const commitLastUsedEntry = (entry: PendingLastUsedEntry | undefined) => {
+    if (entry !== undefined) {
+      lastUsedIdentitiesStore.addLastUsedIdentity(entry);
+    }
   };
 
   // In signup mode the toggle's "Already have an identity? Sign in" CTA
@@ -129,18 +141,6 @@
     authFlow.chooseMethod();
   };
 
-  // When AuthWizard is nested inside a parent Dialog (e.g. /manage's
-  // re-auth dialog), the parent's X button closes the dialog and
-  // unmounts us without ever calling reset(). Treat unmount with a
-  // pending method switch as an implicit cancel so the store revert
-  // still runs — unless the switch was actually confirmed and we're
-  // mid-onSignIn (parent dialog closing triggered the unmount).
-  onDestroy(() => {
-    if (authFlow.pendingMethodSwitch !== undefined && !methodSwitchConfirmed) {
-      authFlow.cancelMethodSwitch();
-    }
-  });
-
   // Sub-view cancel — clears the active sub-view but preserves mode and
   // elevation. Fires when the user closes a sub-view dialog (e.g. OIDC
   // disambiguation, method-switch confirmation) while the wizard sits
@@ -168,16 +168,19 @@
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
-      const identityNumber = await authFlow.continueWithExistingPasskey();
+      const { identityNumber, pendingLastUsedEntry } =
+        await authFlow.continueWithExistingPasskey();
       if (
         maybeRequestMethodSwitch(
           identityNumber,
           "passkey",
           preSnapshot[identityNumber.toString()],
+          pendingLastUsedEntry,
         )
       ) {
         return;
       }
+      commitLastUsedEntry(pendingLastUsedEntry);
       await onSignIn(identityNumber);
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
@@ -225,11 +228,13 @@
             result.identityNumber,
             "openid",
             preSnapshot[result.identityNumber.toString()],
+            result.pendingLastUsedEntry,
             { providerIssuer: config.issuer, providerName: config.name },
           )
         ) {
           return;
         }
+        commitLastUsedEntry(result.pendingLastUsedEntry);
         await onSignIn(result.identityNumber);
         return;
       }
@@ -268,6 +273,7 @@
             authResult.identityNumber,
             "sso",
             preSnapshot[authResult.identityNumber.toString()],
+            authResult.pendingLastUsedEntry,
             {
               providerDomain: ssoResult.domain,
               providerName: ssoResult.name ?? ssoResult.domain,
@@ -276,6 +282,7 @@
         ) {
           return;
         }
+        commitLastUsedEntry(authResult.pendingLastUsedEntry);
         await onSignIn(authResult.identityNumber);
         return;
       }
@@ -344,23 +351,21 @@
     void goto("/recovery");
   };
 
-  // Tracks whether the active pending method switch was confirmed (so
-  // the onDestroy cleanup doesn't misread the unmount as a cancel).
-  let methodSwitchConfirmed = false;
-
   const handleConfirmMethodSwitch = async (): Promise<void> => {
     const pending = authFlow.pendingMethodSwitch;
     if (pending === undefined) return;
     try {
       isAuthenticating = true;
-      methodSwitchConfirmed = true;
+      // Commit the deferred last-used entry BEFORE onSignIn navigates —
+      // receiving routes read lastUsedIdentities on mount, so a post-
+      // navigation write would lose the race.
+      commitLastUsedEntry(pending.pendingLastUsedEntry);
       // Keep the SwitchAccessMethod view visible until onSignIn closes
       // the parent dialog — otherwise the picker briefly flashes back
       // in between the state reset and the dialog teardown.
       await onSignIn(pending.signedInIdentityNumber);
       authFlow.confirmMethodSwitch();
     } catch (error) {
-      methodSwitchConfirmed = false;
       onError(error);
     } finally {
       isAuthenticating = false;
