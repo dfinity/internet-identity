@@ -80,6 +80,9 @@ export class AuthFlow {
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
+  // SSO discovery domain for a 1-click OpenID/SSO flow whose JWT is redeemed
+  // through `continueWithOpenId`; `undefined` for a direct provider.
+  #openIdDiscoveryDomain = $state<string>();
   #ssoJwt = $state<string>();
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
@@ -200,6 +203,7 @@ export class AuthFlow {
     this.#pendingOpenIdSignIn = undefined;
     this.#jwt = undefined;
     this.#configIssuer = undefined;
+    this.#openIdDiscoveryDomain = undefined;
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
@@ -211,6 +215,7 @@ export class AuthFlow {
     this.#pendingOpenIdSignIn = undefined;
     this.#jwt = undefined;
     this.#configIssuer = undefined;
+    this.#openIdDiscoveryDomain = undefined;
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
@@ -395,6 +400,7 @@ export class AuthFlow {
     config: OpenIdConfig,
     existingJwt?: string,
     mode: AuthMode = this.#mode,
+    discoveryDomain?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -419,6 +425,7 @@ export class AuthFlow {
         configURL: config.fedcm_uri?.[0],
       },
       existingJwt,
+      discoveryDomain,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -450,6 +457,7 @@ export class AuthFlow {
         }
         this.#jwt = result.jwt;
         this.#configIssuer = config.issuer;
+        this.#openIdDiscoveryDomain = discoveryDomain;
         this.#pendingOpenIdSignIn = result.identityNumber;
         this.#view = "openIdAlreadyLinked";
         return undefined;
@@ -465,6 +473,7 @@ export class AuthFlow {
     }
     this.#jwt = result.jwt;
     this.#configIssuer = config.issuer;
+    this.#openIdDiscoveryDomain = discoveryDomain;
     if (mode === "signin") {
       this.#view = "openIdNotConnected";
       return undefined;
@@ -569,7 +578,12 @@ export class AuthFlow {
     }
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
     await this.#startRegistration();
-    return this.#registerWithOpenId(this.#jwt, name, this.#configIssuer);
+    return this.#registerWithOpenId(
+      this.#jwt,
+      name,
+      this.#configIssuer,
+      this.#openIdDiscoveryDomain,
+    );
   };
 
   #solveCaptcha = (image: string, attempt = 0): Promise<void> =>
@@ -699,8 +713,13 @@ export class AuthFlow {
     jwt: string,
     name: string,
     configIssuer: string,
+    discoveryDomain?: string,
   ): Promise<bigint> => {
-    const result = await this.#openIdRegistrationCommit(jwt, name);
+    const result = await this.#openIdRegistrationCommit(
+      jwt,
+      name,
+      discoveryDomain,
+    );
     if (this.#options.trackLastUsed) {
       const { name: jwtName, email, ...restJWTClaims } = result.decodedJwt;
       const metadata: MetadataMapV2 = [];
