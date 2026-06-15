@@ -51,7 +51,7 @@ mod submit_leaf;
 pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};
 pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
-pub use submit_leaf::submit_dkim_leaf;
+pub use submit_leaf::{resolve_via_doh, submit_dkim_leaf};
 
 /// Wrapper around `pending::status_of` so the canister method in
 /// `main.rs` doesn't need to know which submodule the heap state

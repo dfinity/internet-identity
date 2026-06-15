@@ -4,59 +4,20 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
-  import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-
-  type NewProvider =
-    | { type: "passkey" }
-    | { type: "openid"; logo: string; name: string }
-    | { type: "sso"; name: string };
-
-  interface OpenIdNotConnectedArgs {
-    providerName: string;
-    providerLogo?: string;
-    userName?: string;
-    userEmail?: string;
-    resume: () => Promise<void>;
-    cancel: () => void;
-  }
-
-  interface OpenIdAlreadyLinkedArgs {
-    providerName: string;
-    providerLogo?: string;
-    userName?: string;
-    userEmail?: string;
-    signIn: () => Promise<void>;
-    cancel: () => void;
-  }
-
-  interface MethodSwitchArgs {
-    previous: LastUsedIdentity;
-    newProvider: NewProvider;
-    proceed: () => Promise<void>;
-  }
+  import type { AuthMode } from "$lib/flows/authFlow.svelte";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
-    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
-    onOpenIdNotConnected?: (args: OpenIdNotConnectedArgs) => void;
-    onOpenIdAlreadyLinked?: (args: OpenIdAlreadyLinkedArgs) => void;
-    onMethodSwitch?: (args: MethodSwitchArgs) => void;
-    onSwitchMode?: () => void;
-    mode?: "signin" | "signup" | "both";
+    mode?: AuthMode;
   }
 
-  const {
+  let {
     onSignIn,
     onSignUp,
-    onUpgrade,
     onError,
-    onOpenIdNotConnected,
-    onOpenIdAlreadyLinked,
-    onMethodSwitch,
-    onSwitchMode,
-    mode = "both",
+    mode = $bindable("both"),
   }: Props = $props();
 
   const dapps = getDapps();
@@ -68,21 +29,12 @@
   );
 </script>
 
-<AuthWizard
-  {onSignIn}
-  {onSignUp}
-  {onUpgrade}
-  {onError}
-  {onOpenIdNotConnected}
-  {onOpenIdAlreadyLinked}
-  {onMethodSwitch}
-  {onSwitchMode}
-  {mode}
-  withinDialog
->
+<AuthWizard {onSignIn} {onSignUp} {onError} bind:mode>
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-    {$t`Sign in to Internet Identity`}
+    {mode === "signup"
+      ? $t`Create an Identity`
+      : $t`Sign in to Internet Identity`}
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
     {$t`to continue to ${dappName}`}

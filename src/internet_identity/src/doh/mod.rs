@@ -17,6 +17,11 @@
 //!   or returning forged bytes never breaks the verifier.
 //! - **In-flight dedup.** Multiple concurrent verification requests
 //!   for the same domain share one outcall fan-out, not five each.
+//! - **Resilient.** A fetched record is served for a short window past
+//!   its TTL while a refresh is attempted, and a failed refresh keeps
+//!   serving the last-good record (stale-while-revalidate /
+//!   stale-if-error), so a transient outage doesn't fail an in-progress
+//!   recovery. See [`cache`] for the exact knobs.
 //! - **Heap cache.** Fast and cheap. Keys are re-fetchable, so an
 //!   upgrade rebuilding the cache from scratch is fine.
 //!
@@ -40,22 +45,40 @@ mod types;
 
 use std::cell::RefCell;
 
-use cache::{CacheLookup, DohCache};
+use cache::{new_doh_cache, DohCache};
 use parser::build_txt_query;
 use quorum::{decide_quorum, Outcome};
 
+use crate::single_flight_cache::{get, stats, CacheStats, Cached};
+
+#[allow(unused_imports)]
+pub use cache::DohRecord;
 #[allow(unused_imports)]
 pub use parser::{parse_txt_response, ParseError};
 #[allow(unused_imports)]
 pub use types::{DohError, DohProvider, PROVIDERS};
 
-use types::{DEFAULT_CACHE_AGE_SECS, MAX_CACHE_AGE_SECS};
-
 thread_local! {
     /// Per-canister DoH cache. Heap-only — losing it on upgrade is
     /// fine, the next `smtp_request` for an affected domain just
     /// re-fetches.
-    static DOH_CACHE: RefCell<DohCache> = RefCell::new(DohCache::default());
+    static DOH_CACHE: RefCell<DohCache> = RefCell::new(new_doh_cache(doh_fill));
+}
+
+/// The cache's shared fill for one FQDN: the five-provider fan-out reduced to
+/// a single cacheable verdict. A TXT record and a definitive `NoAnswer` are
+/// both cacheable *answers* (shared, served for the TTL); only transient
+/// failures stay `Err`, which is what the cache debounces. The query is
+/// rebuilt from the key here; the caller ([`fetch_txt`]) already validated
+/// the name before the value was ever requested.
+async fn doh_fill(name: String) -> Result<DohRecord, DohError> {
+    let query = build_txt_query(&name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
+    let outcomes = fetch_all(&query).await;
+    match decide_quorum(&outcomes) {
+        Ok(bytes) => Ok(DohRecord::Txt(bytes)),
+        Err(DohError::NoAnswer) => Ok(DohRecord::NoAnswer),
+        Err(transient) => Err(transient),
+    }
 }
 
 // =====================================================================
@@ -138,25 +161,26 @@ fn status_to_outcome(status: u16, body: Vec<u8>) -> Outcome {
     }
 }
 
-/// Public entry point. Returns the TXT bytes for `name` if at least
-/// the quorum threshold of providers agree.
+/// Public entry point. Reads the cached DoH answer for `name`, returning
+/// [`Cached::Ready`] with the [`DohRecord`] (TXT bytes or a definitive
+/// `NoAnswer`) when one is servable, or [`Cached::Pending`] while a detached
+/// fetch is in flight — spawning that fetch if one isn't already running. The
+/// caller polls again for a `Pending` result; a transient quorum/network
+/// failure reads as `Pending` (the cache backs off) until it resolves or the
+/// caller's own deadline ends it.
+///
+/// `Err` is reserved for the synchronous gate — the lookup is rejected before
+/// the cache is touched (no outcall): `NotConfigured`, `DomainNotAllowed`,
+/// `NameOutsideRegisteredDomain`, `InvalidName`.
 ///
 /// `name` is the full FQDN (e.g., `selector1._domainkey.gmail.com`);
 /// `registered_domain` (e.g., `gmail.com`) is what the allowlist gate
 /// checks. The caller — the DKIM/DMARC code — already extracts the
 /// registered domain when validating From-header alignment, so we
 /// don't re-implement that here.
-///
-/// The function never panics on misconfiguration: if `DohConfig` is
-/// absent, returns [`DohError::NotConfigured`] without touching the
-/// network.
-pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, DohError> {
-    let config = match crate::state::persistent_state(|p| p.doh_config.clone()) {
-        Some(c) => c,
-        None => {
-            return Err(DohError::NotConfigured);
-        }
-    };
+pub fn fetch_txt(name: &str, registered_domain: &str) -> Result<Cached<DohRecord>, DohError> {
+    let config =
+        crate::state::persistent_state(|p| p.doh_config.clone()).ok_or(DohError::NotConfigured)?;
     if !config
         .allowed_domains
         .iter()
@@ -177,58 +201,23 @@ pub async fn fetch_txt(name: &str, registered_domain: &str) -> Result<Vec<u8>, D
             registered_domain: registered_domain.to_string(),
         });
     }
-    let max_age = config
-        .max_cache_age_secs
-        .unwrap_or(DEFAULT_CACHE_AGE_SECS)
-        .min(MAX_CACHE_AGE_SECS);
+    // Validate the query early so an InvalidName failure short-circuits
+    // before we touch the cache or claim a fill (the fill rebuilds it).
+    if let Err(e) = build_txt_query(name) {
+        return Err(DohError::InvalidName(format!("{e:?}")));
+    }
 
-    // Build the query early so an InvalidName failure short-circuits
-    // before we touch the cache or claim a Fetch token.
-    let query = build_txt_query(name).map_err(|e| DohError::InvalidName(format!("{e:?}")))?;
+    // Dedup-aware read via the single-flight cache. The first arrival for a
+    // cold or stale name spawns the five-provider fan-out and gets `Pending`;
+    // concurrent arrivals see it in flight and also get `Pending` (no second
+    // fan-out). A `Ready` answer is served straight from the cache.
+    Ok(get(&DOH_CACHE, name.to_string()))
+}
 
-    // Dedup-aware fetch. The first arrival for a cold name owns the
-    // five-provider fan-out; concurrent arrivals observe the in-flight
-    // marker and poll the cache until it publishes. Each waiter yields a
-    // round from its OWN call context (`yield_round`) and re-checks — it
-    // must NOT block on a future the fetcher wakes, because waking
-    // another call's task runs it to completion in the fetcher's call
-    // context and mis-routes its reply (`ic0.msg_reply ... already
-    // replied`). The cache borrow is released before each await: the
-    // canister is single-threaded and a borrow held across a yield would
-    // trap.
-    let mut waits = 0u32;
-    let token = loop {
-        let now = now_secs();
-        match DOH_CACHE.with(|c| c.borrow_mut().lookup(name, now)) {
-            CacheLookup::Hit(bytes) => return Ok(bytes),
-            CacheLookup::Fetch(token) => break token,
-            CacheLookup::Wait => {
-                if waits >= MAX_DEDUP_WAIT_POLLS {
-                    // The in-flight fetch is taking implausibly long (or
-                    // its owner trapped before the staleness window let
-                    // someone take over). Fail transiently rather than
-                    // poll forever; a retry — or the post-staleness
-                    // takeover — resolves it.
-                    return Err(DohError::AllProvidersFailed);
-                }
-                waits += 1;
-                yield_round().await;
-            }
-        }
-    };
-
-    // We own the fetch: fan out to every provider in parallel, decide,
-    // then publish (writes the value entry on success, clears our
-    // in-flight marker either way).
-    let outcomes = fetch_all(&query).await;
-    let result = decide_quorum(&outcomes);
-    let now = now_secs();
-    let expires_at = now.saturating_add(max_age);
-    DOH_CACHE.with(|c| {
-        c.borrow_mut()
-            .publish(name, token, result.clone(), expires_at, now)
-    });
-    result
+/// Snapshot of the DoH cache state, for the canister metrics endpoint. See
+/// [`CacheStats`].
+pub fn cache_stats() -> CacheStats {
+    stats(&DOH_CACHE)
 }
 
 /// Whether a queried FQDN sits inside `registered_domain` (case-
@@ -254,51 +243,6 @@ fn name_within_domain(name: &str, registered_domain: &str) -> bool {
     let dot_idx = n.len() - d.len() - 1;
     suffix.eq_ignore_ascii_case(d) && n.as_bytes()[dot_idx] == b'.'
 }
-
-#[cfg(not(test))]
-fn now_secs() -> u64 {
-    ic_cdk::api::time() / 1_000_000_000
-}
-
-/// Test-time clock. The canister-time accessor traps outside a real
-/// canister, so under `cfg(test)` we read from a thread-local the test
-/// can advance.
-#[cfg(test)]
-fn now_secs() -> u64 {
-    test_support::TEST_NOW_SECS.with(|t| *t.borrow())
-}
-
-/// Upper bound on how many times a dedup waiter polls the cache before
-/// giving up. Each poll yields one consensus round via [`yield_round`],
-/// so this is ~100 rounds of patience — far more than a healthy fan-out
-/// needs — and bounds the wait so a wedged fetch can't pin a waiter
-/// indefinitely. The post-staleness takeover (see
-/// [`cache::PENDING_STALE_AFTER_SECS`]) is the real recovery path; this
-/// is just a backstop against an unbounded poll loop.
-const MAX_DEDUP_WAIT_POLLS: u32 = 100;
-
-/// Yield one consensus round, resuming in the caller's OWN call context.
-///
-/// A dedup waiter uses this to let the in-flight fetch make progress and
-/// then re-check the cache, *without* being driven by the fetcher's
-/// wake. A timer is no good — its callback can't reply to the waiter's
-/// ingress call — and completing inside another call's context
-/// mis-routes the reply. Awaiting a cheap management-canister round-trip
-/// is the idiomatic way (already used elsewhere in this canister) to
-/// give up a round and come back in our own context; the random bytes
-/// are unused.
-#[cfg(not(test))]
-async fn yield_round() {
-    let _ =
-        ic_cdk::call::<(), (Vec<u8>,)>(candid::Principal::management_canister(), "raw_rand", ())
-            .await;
-}
-
-/// Host-test stand-in: unit tests drive `fetch_txt` sequentially with a
-/// mocked fan-out, so the dedup `Wait` path is never exercised and there
-/// is nothing to yield to.
-#[cfg(test)]
-async fn yield_round() {}
 
 // =====================================================================
 // Production outcall path (cfg(not(test)) only).
@@ -420,15 +364,16 @@ pub(super) mod test_support {
     use std::collections::HashMap;
 
     thread_local! {
-        pub(super) static TEST_NOW_SECS: RefCell<u64> = const { RefCell::new(1_700_000_000) };
         pub(super) static MOCK_RESPONSES: RefCell<
             HashMap<&'static str, Outcome>,
         > = RefCell::new(HashMap::new());
         pub(super) static MOCK_CALL_COUNT: RefCell<usize> = const { RefCell::new(0) };
     }
 
+    /// Drive the cache's clock (the cache owns the time source now — see
+    /// `single_flight_cache::now`).
     pub(super) fn set_now(t: u64) {
-        TEST_NOW_SECS.with(|c| *c.borrow_mut() = t);
+        crate::single_flight_cache::set_test_now(t);
     }
 
     pub(super) fn set_mock(responses: &[(&'static str, Outcome)]) {
@@ -449,7 +394,7 @@ pub(super) mod test_support {
     /// state. Call this at the top of every test that asserts on
     /// `call_count`.
     pub(super) fn reset_cache() {
-        DOH_CACHE.with(|c| *c.borrow_mut() = DohCache::default());
+        DOH_CACHE.with(|c| *c.borrow_mut() = new_doh_cache(doh_fill));
         MOCK_CALL_COUNT.with(|c| *c.borrow_mut() = 0);
     }
 
@@ -473,34 +418,26 @@ pub(super) mod test_support {
 mod tests {
     use super::test_support::*;
     use super::*;
+    use crate::single_flight_cache::run_detached;
     use crate::state::{persistent_state_mut, PersistentState};
     use internet_identity_interface::internet_identity::types::DohConfig;
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::sync::Arc;
-    use std::task::{Context, Poll, Wake, Waker};
 
-    /// Minimal block-on. The async futures in these tests complete in
-    /// a single poll (the mock fetcher is synchronous, the cache path
-    /// is synchronous, and we don't exercise the dedup `Wait` arm
-    /// here). Pulling in `futures::executor` would force the
-    /// `executor` + `std` features and bloat the wasm build, so we
-    /// poll by hand.
-    struct NoopWaker;
-    impl Wake for NoopWaker {
-        fn wake(self: Arc<Self>) {}
-    }
-    fn block_on<F: Future>(mut f: F) -> F::Output {
-        // SAFETY: `f` is on the stack and we don't move it out.
-        let mut f = unsafe { Pin::new_unchecked(&mut f) };
-        let waker = Waker::from(Arc::new(NoopWaker));
-        let mut cx = Context::from_waker(&waker);
-        match f.as_mut().poll(&mut cx) {
-            Poll::Ready(out) => out,
-            // No I/O drives these futures from outside; if a single
-            // poll returns Pending in test, the test setup is wrong.
-            Poll::Pending => panic!("test future returned Pending — test setup is incorrect"),
+    /// Drive `fetch_txt` to a settled result: a cold key returns `Pending`
+    /// and spawns the (synchronous, mock) fetch, so we run the detached fills
+    /// and read it back. A cached hit returns `Ready` straight away; a
+    /// transient failure that's backing off stays `Pending`.
+    fn fetch(name: &str, registered_domain: &str) -> Result<Cached<DohRecord>, DohError> {
+        let first = fetch_txt(name, registered_domain)?;
+        if matches!(first, Cached::Pending) {
+            run_detached();
+            return fetch_txt(name, registered_domain);
         }
+        Ok(first)
+    }
+
+    /// `Ready(Txt(bytes))` shorthand for the common success assertion.
+    fn ready_txt(bytes: &[u8]) -> Result<Cached<DohRecord>, DohError> {
+        Ok(Cached::Ready(DohRecord::Txt(bytes.to_vec())))
     }
 
     fn install_config(domains: &[&str], max_age: Option<u64>) {
@@ -529,23 +466,30 @@ mod tests {
         Outcome::NoAnswer
     }
 
-    fn agreeing_dkim() -> Vec<(&'static str, Outcome)> {
-        // Three provider responses agree, two disagree — quorum (3-of-
-        // 5) hits.
+    /// A mock where three providers agree on `bytes` and two fail — quorum
+    /// (3-of-5) hits on `bytes`. Lets a test publish a *different* record on a
+    /// refresh so it can tell the refreshed value apart from the stale one.
+    fn agreeing(bytes: &'static [u8]) -> Vec<(&'static str, Outcome)> {
         vec![
-            (PROVIDERS[0].url, ok(b"v=DKIM1; k=rsa; p=...")),
-            (PROVIDERS[1].url, ok(b"v=DKIM1; k=rsa; p=...")),
-            (PROVIDERS[2].url, ok(b"v=DKIM1; k=rsa; p=...")),
+            (PROVIDERS[0].url, ok(bytes)),
+            (PROVIDERS[1].url, ok(bytes)),
+            (PROVIDERS[2].url, ok(bytes)),
             (PROVIDERS[3].url, fail("network down")),
             (PROVIDERS[4].url, fail("403")),
         ]
+    }
+
+    fn agreeing_dkim() -> Vec<(&'static str, Outcome)> {
+        // Three provider responses agree, two disagree — quorum (3-of-
+        // 5) hits.
+        agreeing(b"v=DKIM1; k=rsa; p=...")
     }
 
     #[test]
     fn returns_not_configured_without_doh_config() {
         clear_config();
         reset_cache();
-        let r = block_on(fetch_txt("selector._domainkey.example.com", "example.com"));
+        let r = fetch("selector._domainkey.example.com", "example.com");
         assert_eq!(r, Err(DohError::NotConfigured));
     }
 
@@ -553,7 +497,7 @@ mod tests {
     fn rejects_unallowed_domain() {
         install_config(&["gmail.com"], None);
         reset_cache();
-        let r = block_on(fetch_txt("selector._domainkey.evil.com", "evil.com"));
+        let r = fetch("selector._domainkey.evil.com", "evil.com");
         assert_eq!(r, Err(DohError::DomainNotAllowed));
     }
 
@@ -562,8 +506,8 @@ mod tests {
         install_config(&["GMAIL.com"], None);
         reset_cache();
         set_mock(&agreeing_dkim());
-        let r = block_on(fetch_txt("selector._domainkey.gmail.com", "gmail.com"));
-        assert!(r.is_ok(), "expected Ok, got {r:?}");
+        let r = fetch("selector._domainkey.gmail.com", "gmail.com");
+        assert_eq!(r, ready_txt(b"v=DKIM1; k=rsa; p=..."));
     }
 
     #[test]
@@ -573,14 +517,14 @@ mod tests {
         set_mock(&agreeing_dkim());
         set_now(1_000);
 
-        let r1 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(r1, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        let r1 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r1, ready_txt(b"v=DKIM1; k=rsa; p=..."));
         assert_eq!(call_count(), 1, "first call should hit the network");
 
         // Second call within TTL: cache hit, no outcall.
         set_now(1_500);
-        let r2 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        let r2 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r2, ready_txt(b"v=DKIM1; k=rsa; p=..."));
         assert_eq!(call_count(), 1, "second call should be cache-served");
     }
 
@@ -588,20 +532,88 @@ mod tests {
     fn refetches_after_ttl_expires() {
         install_config(&["example.com"], Some(60));
         reset_cache();
-        set_mock(&agreeing_dkim());
+        set_mock(&agreeing(b"old key"));
         set_now(1_000);
 
-        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
+        let r1 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r1, ready_txt(b"old key"));
         assert_eq!(call_count(), 1);
 
-        // Advance past the TTL — the cache should be cold again.
+        // The record rotates while the entry is cached.
+        set_mock(&agreeing(b"new key"));
+
+        // Past the TTL the value is stale, not gone: the fetch serves the
+        // stale value immediately (stale-while-revalidate) and spawns exactly
+        // one background refresh — it never blocks the caller on a fresh
+        // outcall. The stale value also stays cached for stale-if-error.
         set_now(1_000 + 60 + 1);
-        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(call_count(), 2, "should re-fetch after TTL");
+        let stale = fetch_txt("x._domainkey.example.com", "example.com").unwrap();
+        assert_eq!(stale, Cached::Ready(DohRecord::Txt(b"old key".to_vec())));
+        assert_eq!(
+            call_count(),
+            1,
+            "stale serve must not fan out synchronously"
+        );
+
+        // Draining the background refresh is the re-fetch: one fan-out, and it
+        // picks up the rotated record.
+        run_detached();
+        assert_eq!(
+            call_count(),
+            2,
+            "stale serve triggers exactly one background re-fetch"
+        );
+        let r3 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r3, ready_txt(b"new key"));
+        assert_eq!(
+            call_count(),
+            2,
+            "refreshed value is fresh, served without another outcall"
+        );
     }
 
     #[test]
-    fn quorum_failure_is_not_cached() {
+    fn serves_stale_through_a_transient_refresh_failure() {
+        // stale-if-error at the DoH layer: once a record is cached, a refresh
+        // that hits a transient quorum failure keeps serving the last-good
+        // value (and debounces the re-fetch) rather than failing an
+        // in-progress recovery — the whole point of the stale window.
+        install_config(&["example.com"], Some(60));
+        reset_cache();
+        set_mock(&agreeing(b"good key"));
+        set_now(1_000);
+
+        let r1 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r1, ready_txt(b"good key"));
+        assert_eq!(call_count(), 1);
+
+        // The next refresh can't reach quorum (five distinct answers).
+        set_mock(&[
+            (PROVIDERS[0].url, ok(b"a")),
+            (PROVIDERS[1].url, ok(b"b")),
+            (PROVIDERS[2].url, ok(b"c")),
+            (PROVIDERS[3].url, ok(b"d")),
+            (PROVIDERS[4].url, ok(b"e")),
+        ]);
+
+        // Past the TTL but inside the 30-min stale window: the stale value is
+        // served immediately and exactly one background refresh is spawned.
+        set_now(1_000 + 60 + 1);
+        let stale = fetch_txt("x._domainkey.example.com", "example.com").unwrap();
+        assert_eq!(stale, Cached::Ready(DohRecord::Txt(b"good key".to_vec())));
+        run_detached(); // the refresh fails transiently → backoff parked
+        assert_eq!(call_count(), 2);
+
+        // The failed refresh did not poison the entry: it still serves the
+        // last-good value, and the transient failure is debounced (no second
+        // fan-out while backing off).
+        let still = fetch_txt("x._domainkey.example.com", "example.com").unwrap();
+        assert_eq!(still, Cached::Ready(DohRecord::Txt(b"good key".to_vec())));
+        assert_eq!(call_count(), 2, "transient refresh failure is debounced");
+    }
+
+    #[test]
+    fn quorum_failure_is_debounced_then_retryable() {
         install_config(&["example.com"], Some(3600));
         reset_cache();
         // Five distinct answers — biggest bucket is 1, well short of
@@ -615,32 +627,25 @@ mod tests {
         ]);
         set_now(1_000);
 
-        let r1 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert!(matches!(r1, Err(DohError::QuorumFailed { .. })));
+        // A cold transient failure leaves nothing servable, so the fetch
+        // reads `Pending` (poll again later), not an error.
+        let r1 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r1, Ok(Cached::Pending));
 
-        // Failure must NOT poison the cache: a follow-up call (with
-        // different mock) should re-fetch and now succeed.
+        // The transient failure is debounced: an immediate retry does NOT
+        // re-fan-out — it's still backing off and stays `Pending`.
         set_mock(&agreeing_dkim());
         set_now(1_001);
-        let r2 = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        let r2 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r2, Ok(Cached::Pending));
+        assert_eq!(call_count(), 1, "transient failure is debounced");
+
+        // But it's not poisoned: past the backoff a follow-up re-fetches
+        // and now succeeds.
+        set_now(1_000 + cache::DOH_RETRY_BASE_SECS + 1);
+        let r3 = fetch("x._domainkey.example.com", "example.com");
+        assert_eq!(r3, ready_txt(b"v=DKIM1; k=rsa; p=..."));
         assert_eq!(call_count(), 2);
-    }
-
-    #[test]
-    fn max_cache_age_is_capped() {
-        // Asking for 999_999s caps at MAX_CACHE_AGE_SECS (24h).
-        install_config(&["example.com"], Some(999_999));
-        reset_cache();
-        set_mock(&agreeing_dkim());
-        set_now(0);
-
-        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-
-        // Day after the cap (24h+1s): cache must have expired.
-        set_now(types::MAX_CACHE_AGE_SECS + 1);
-        let _ = block_on(fetch_txt("x._domainkey.example.com", "example.com"));
-        assert_eq!(call_count(), 2, "cache must respect MAX_CACHE_AGE_SECS");
     }
 
     #[test]
@@ -649,7 +654,7 @@ mod tests {
         reset_cache();
         // Allowlisted registered_domain, but `name` doesn't sit inside
         // it — should fail closed without an outcall.
-        let r = block_on(fetch_txt("selector._domainkey.evil.com", "gmail.com"));
+        let r = fetch("selector._domainkey.evil.com", "gmail.com");
         match r {
             Err(DohError::NameOutsideRegisteredDomain {
                 name,
@@ -667,7 +672,7 @@ mod tests {
     fn label_anchored_suffix_blocks_evilexample_com() {
         install_config(&["example.com"], None);
         reset_cache();
-        let r = block_on(fetch_txt("evilexample.com", "example.com"));
+        let r = fetch("evilexample.com", "example.com");
         assert!(matches!(
             r,
             Err(DohError::NameOutsideRegisteredDomain { .. })
@@ -702,15 +707,18 @@ mod tests {
             (PROVIDERS[3].url, fail("network down")),
             (PROVIDERS[4].url, fail("timeout")),
         ]);
-        let r = block_on(fetch_txt("_dmarc.example.com", "example.com"));
-        assert_eq!(r, Err(DohError::NoAnswer));
+        let r = fetch("_dmarc.example.com", "example.com");
+        assert_eq!(r, Ok(Cached::Ready(DohRecord::NoAnswer)));
     }
 
     #[test]
-    fn no_answer_result_is_not_cached() {
-        // Surfacing NoAnswer must NOT poison the cache: a follow-up
-        // call with a different mock (record was just published) re-
-        // fetches and now gets the real bytes.
+    fn no_answer_is_cached_as_definitive_negative() {
+        // A quorum `NoAnswer` is a definitive verdict, cached like any
+        // answer (not debounced, not re-fetched per call): a follow-up
+        // within the TTL is served from cache even though a record was
+        // since published, and only after the TTL do we re-fetch and
+        // pick it up. `fetch_txt` surfaces it as `Ready(NoAnswer)` — a
+        // servable value, not a failure.
         install_config(&["example.com"], Some(3600));
         reset_cache();
         set_mock(&[
@@ -721,13 +729,38 @@ mod tests {
             (PROVIDERS[4].url, no_answer()),
         ]);
         set_now(1_000);
-        let r1 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
-        assert_eq!(r1, Err(DohError::NoAnswer));
+        let r1 = fetch("_dmarc.example.com", "example.com");
+        assert_eq!(r1, Ok(Cached::Ready(DohRecord::NoAnswer)));
+        assert_eq!(call_count(), 1);
 
+        // Within the TTL: cache-served, no second fan-out.
         set_mock(&agreeing_dkim());
         set_now(1_001);
-        let r2 = block_on(fetch_txt("_dmarc.example.com", "example.com"));
-        assert_eq!(r2, Ok(b"v=DKIM1; k=rsa; p=...".to_vec()));
+        let r2 = fetch("_dmarc.example.com", "example.com");
+        assert_eq!(r2, Ok(Cached::Ready(DohRecord::NoAnswer)));
+        assert_eq!(call_count(), 1, "NoAnswer is cached, not re-fetched");
+
+        // Past the TTL the NoAnswer is stale, not gone: it is still served
+        // immediately (stale-while-revalidate) while exactly one background
+        // refresh runs.
+        set_now(1_000 + 3600 + 1);
+        let stale = fetch_txt("_dmarc.example.com", "example.com").unwrap();
+        assert_eq!(stale, Cached::Ready(DohRecord::NoAnswer));
+        assert_eq!(
+            call_count(),
+            1,
+            "stale NoAnswer serve must not fan out synchronously"
+        );
+
+        // Draining the background refresh picks up the now-published record.
+        run_detached();
+        assert_eq!(
+            call_count(),
+            2,
+            "stale serve triggers exactly one background re-fetch"
+        );
+        let r3 = fetch("_dmarc.example.com", "example.com");
+        assert_eq!(r3, ready_txt(b"v=DKIM1; k=rsa; p=..."));
         assert_eq!(call_count(), 2);
     }
 
@@ -740,7 +773,7 @@ mod tests {
         // is mutated).
         let oversize = "a".repeat(64);
         let name = format!("{oversize}.example.com");
-        let r = block_on(fetch_txt(&name, "example.com"));
+        let r = fetch(&name, "example.com");
         assert!(matches!(r, Err(DohError::InvalidName(_))));
         assert_eq!(call_count(), 0);
     }

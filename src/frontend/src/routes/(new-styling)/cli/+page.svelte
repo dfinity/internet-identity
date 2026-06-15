@@ -229,10 +229,6 @@
       });
       return Promise.resolve();
     },
-    onUpgrade: (identityNumber: bigint): Promise<void> => {
-      lastUsedIdentitiesStore.selectIdentity(identityNumber);
-      return Promise.resolve();
-    },
     onError: handleError,
   };
 </script>

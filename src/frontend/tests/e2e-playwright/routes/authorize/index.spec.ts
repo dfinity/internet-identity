@@ -6,6 +6,7 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   addVirtualAuthenticator,
+  holdToConfirm,
 } from "../../utils";
 import { test } from "../../fixtures";
 import { SSO_OPENID_PORT } from "../../fixtures/sso";
@@ -109,6 +110,7 @@ test("Authorize by signing in from another device", async ({
       await otherDevicePage
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
+      await holdToConfirm(otherDevicePage);
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);
@@ -133,6 +135,12 @@ test("Authorize by signing in from another device", async ({
       await otherDevicePage
         .getByRole("heading", { level: 1, name: "Continue on your new device" })
         .waitFor({ state: "hidden" });
+
+      // After the wizard completes, the access page strips the ?activate=
+      // query via `goto`, which fires the layout's afterNavigate and resets
+      // isMobileSidebarOpen. Waiting for the settled URL avoids a race where
+      // the menu click would be undone by that reset.
+      await otherDevicePage.waitForURL(II_URL + "/manage/access");
 
       // Navigate to access methods
       const menuButton = otherDevicePage.getByRole("button", {

@@ -3,13 +3,20 @@ import { redirect } from "@sveltejs/kit";
 import { get } from "svelte/store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { throwCanisterError } from "$lib/utils/utils";
+import { receiveAuthFromOpener } from "$lib/utils/auth-handoff";
 
 export const load: LayoutLoad = async ({ url }) => {
-  // Go back to / if not authenticated with currently selected identity
-  const authentication = get(authenticationStore);
+  let authentication = get(authenticationStore);
+
   if (authentication === undefined) {
-    // Add original target URL as next search param,
-    // if it's not the default target URL (/manage).
+    const handoff = await receiveAuthFromOpener({ timeoutMs: 2000 });
+    if (handoff !== null) {
+      await authenticationStore.set(handoff);
+      authentication = get(authenticationStore);
+    }
+  }
+
+  if (authentication === undefined) {
     const next = url.pathname + url.search;
     const location = new URL("/login", url.origin);
     if (next !== "/manage") {

@@ -25,10 +25,10 @@
    */
 
   import EnterAddress from "./views/EnterAddress.svelte";
-  import SendConfirmationEmail from "./views/SendConfirmationEmail.svelte";
-  import FailedView from "./views/FailedView.svelte";
-  import UnsupportedDomain from "./views/UnsupportedDomain.svelte";
-  import { buildDiagnosticsBlob } from "./diagnostics";
+  import SendConfirmationEmail from "$lib/components/wizards/emailRecovery/shared/views/SendConfirmationEmail.svelte";
+  import FailedView from "$lib/components/wizards/emailRecovery/shared/views/FailedView.svelte";
+  import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
+  import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
   import type {
     EmailRecoveryChallenge,
     EmailRecoveryDiagnostics,
@@ -38,11 +38,7 @@
     EmailRecoverySubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
-  import {
-    assembleSkeleton,
-    assembleDkimResolution,
-    type Path,
-  } from "$lib/utils/dnssec";
+  import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
   import {
     setupEmailRecoveryFunnel,
@@ -57,17 +53,24 @@
     status: (nonce: string) => Promise<EmailRecoveryStatus>;
     /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
     diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
-    submitDkimLeaf: (
-      arg: EmailRecoverySubmitDkimLeafArg,
-    ) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
+     *  rejects on a call-level error, else resolves void (poll for verdict). */
+    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    resolveViaDoh: (nonce: string) => Promise<void>;
     /** Called once on `RegistrationSucceeded`. The host is expected to
      *  show a success toast and close the dialog. */
     onSuccess: (address: string) => void;
   }
 
-  const { prepare, status, diagnostics, submitDkimLeaf, onSuccess }: Props =
-    $props();
+  const {
+    prepare,
+    status,
+    diagnostics,
+    submitDkimLeaf,
+    resolveViaDoh,
+    onSuccess,
+  }: Props = $props();
 
   type Stage =
     | { kind: "enter"; initialError?: string }
@@ -123,77 +126,6 @@
   onDestroy(() => {
     setupEmailRecoveryFunnel.close();
   });
-
-  /**
-   * Map a terminal `EmailRecoveryStatus` (`Failed` or `Expired`) to
-   * the variant-name string used as the `reason` property on the
-   * Plausible `*-failed` event. Falls back to `unknown` so a partial
-   * candid-shape change doesn't drop the event entirely.
-   */
-  const failureReason = (variant: EmailRecoveryStatus): string => {
-    if ("Failed" in variant) {
-      const reason = variant.Failed as Record<string, unknown>;
-      return Object.keys(reason)[0] ?? "unknown";
-    }
-    if ("Expired" in variant) {
-      return "Expired";
-    }
-    return "unknown";
-  };
-
-  const friendlyError = (variant: EmailRecoveryStatus): string => {
-    if ("Failed" in variant) {
-      const reason = variant.Failed;
-      if ("DomainNotAllowlisted" in reason) {
-        // This shouldn't surface here normally — `handleAddressSubmitted`
-        // routes the synchronous form to the unsupported view — but
-        // keep the copy in case a delayed status flip carries it.
-        return `Internet Identity can't verify mail from ${reason.DomainNotAllowlisted} yet. Try a different email or use a recovery phrase.`;
-      }
-      if ("DomainNotSupported" in reason) {
-        return reason.DomainNotSupported;
-      }
-      if ("AddressMismatch" in reason) {
-        return "The email came from a different address than the one we have on file.";
-      }
-      if ("SubjectNotSigned" in reason) {
-        return "Your email provider didn't sign the Subject header. Try a different provider.";
-      }
-      if ("DkimLeafMismatch" in reason) {
-        return "Your email provider rotated its DKIM keys mid-flow. Please retry.";
-      }
-      if ("NoDkimLeafExpected" in reason) {
-        return "Internal error: the DKIM leaf was submitted at the wrong moment. Please retry.";
-      }
-      if ("AddressAlreadyRegistered" in reason) {
-        return "This email is already used to recover a different identity.";
-      }
-      if ("EmailVerificationFailed" in reason) {
-        return `Your email didn't verify (${reason.EmailVerificationFailed}). Make sure you sent it from the address you typed, no forwarding, no aliases.`;
-      }
-      if ("InternalCanisterError" in reason) {
-        return `Something went wrong on our end: ${reason.InternalCanisterError}`;
-      }
-      return Object.keys(reason)[0];
-    }
-    if ("Expired" in variant) {
-      return "This recovery link timed out. Please try again.";
-    }
-    return "Unexpected status from the canister.";
-  };
-
-  // Best-effort fetch of the canister's strictly-public diagnostics for
-  // this challenge, formatted into a copyable blob (incl. the gateway
-  // `message_id`). The pending entry is sticky on `Failed`, so this read
-  // lands while it's still present; on any hiccup we fall back to
-  // FE-only fields so the user always gets something to share.
-  const collectDiagnostics = async (nonce: string): Promise<string> => {
-    try {
-      return buildDiagnosticsBlob((await diagnostics(nonce))[0]);
-    } catch {
-      return buildDiagnosticsBlob(undefined);
-    }
-  };
 
   const handleAddressSubmitted = async (address: string) => {
     setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.AddressSubmitted);
@@ -255,165 +187,41 @@
   const runPoll = async (nonce: string, domain: string, address: string) => {
     if (polling) return;
     polling = true;
-    let intervalMs = 1_000;
-    let dkimLeafSubmitted = false;
-    try {
-      while (
-        polling &&
-        (stage.kind === "sending" || stage.kind === "waiting")
-      ) {
-        const result = await status(nonce);
-        if ("RegistrationSucceeded" in result) {
-          setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Succeeded);
-          setupEmailRecoveryFunnel.close();
-          polling = false;
-          onSuccess(address);
-          return;
-        }
-        if ("Failed" in result || "Expired" in result) {
-          // A DomainNotAllowlisted / DomainNotSupported verdict (e.g.
-          // a DoH-fallback leaf submission for a domain the operator
-          // hasn't enabled) gets the dedicated unsupported-domain
-          // view, matching the prepare-time routing — not the generic
-          // failure screen.
-          if (
-            "Failed" in result &&
-            ("DomainNotAllowlisted" in result.Failed ||
-              "DomainNotSupported" in result.Failed)
-          ) {
-            setupEmailRecoveryFunnel.trigger(
-              SetupEmailRecoveryEvents.UnsupportedDomain,
-              { reason: failureReason(result) },
-            );
-            setupEmailRecoveryFunnel.close();
-            stage = { kind: "unsupported", domain };
-            return;
-          }
-          setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Failed, {
-            reason: failureReason(result),
-          });
-          setupEmailRecoveryFunnel.close();
-          const diagnosticsBlob = await collectDiagnostics(nonce);
-          stage = {
-            kind: "failed",
-            reason: friendlyError(result),
-            diagnostics: diagnosticsBlob,
-          };
-          return;
-        }
-        if ("NeedDkimLeaf" in result && !dkimLeafSubmitted) {
-          dkimLeafSubmitted = true;
-          setupEmailRecoveryFunnel.trigger(
-            SetupEmailRecoveryEvents.NeedDkimLeaf,
-          );
-          // Email arrived; the canister has the selector. Try to walk
-          // the missing DKIM leaf via DNSSEC. When the record CNAMEs
-          // into an unsigned zone (outlook.com ->
-          // outbound.protection.outlook.com) the walk yields
-          // `undefined`; we then submit an empty hop set, which asks
-          // the canister to resolve the key over its own DoH path
-          // instead. That either completes the flow (allowlisted
-          // domain) or throws DomainNotAllowlisted, which we route to
-          // the unsupported-domain view rather than poll to Expired.
-          const selector = result.NeedDkimLeaf.selector;
-          try {
-            const walked = await assembleDkimResolution(domain, selector);
-            const submission = await submitDkimLeaf(
-              walked !== undefined
-                ? { nonce, hops: walked.hops, extra_chains: walked.extraChains }
-                : { nonce, hops: [], extra_chains: [] },
-            );
-            setupEmailRecoveryFunnel.trigger(
-              SetupEmailRecoveryEvents.DkimLeafSubmitted,
-            );
-            // Handle every terminal variant the status type can carry,
-            // not just the one the canister returns today — the FE must
-            // stay correct if the backend's `Ok` arm changes.
-            if ("RegistrationSucceeded" in submission) {
-              setupEmailRecoveryFunnel.trigger(
-                SetupEmailRecoveryEvents.Succeeded,
-              );
-              setupEmailRecoveryFunnel.close();
-              polling = false;
-              onSuccess(address);
-              return;
-            }
-            if ("Failed" in submission || "Expired" in submission) {
-              if (
-                "Failed" in submission &&
-                ("DomainNotAllowlisted" in submission.Failed ||
-                  "DomainNotSupported" in submission.Failed)
-              ) {
-                setupEmailRecoveryFunnel.trigger(
-                  SetupEmailRecoveryEvents.UnsupportedDomain,
-                  { reason: failureReason(submission) },
-                );
-                setupEmailRecoveryFunnel.close();
-                polling = false;
-                stage = { kind: "unsupported", domain };
-                return;
-              }
-              setupEmailRecoveryFunnel.trigger(
-                SetupEmailRecoveryEvents.Failed,
-                {
-                  reason: failureReason(submission),
-                },
-              );
-              setupEmailRecoveryFunnel.close();
-              const diagnosticsBlob = await collectDiagnostics(nonce);
-              polling = false;
-              stage = {
-                kind: "failed",
-                reason: friendlyError(submission),
-                diagnostics: diagnosticsBlob,
-              };
-              return;
-            }
-            // Pending / NeedDkimLeaf from a submit: non-terminal, fall
-            // through and let the polling loop carry the flow forward.
-          } catch (e) {
-            // A non-canister error (transport failure, dropped
-            // response, an unexpected throw in the leaf walk) leaves
-            // the canister state unknown, and our single submit attempt
-            // is already spent (`dkimLeafSubmitted`), so the poll loop
-            // would never re-submit and the entry would hang at
-            // NeedDkimLeaf until the 30-minute Expired. Surface a
-            // retryable failure instead of staying silent.
-            if (!isCanisterError<EmailRecoveryError>(e)) {
-              setupEmailRecoveryFunnel.trigger(
-                SetupEmailRecoveryEvents.Failed,
-                {
-                  reason: "SubmitFailed",
-                },
-              );
-              setupEmailRecoveryFunnel.close();
-              const diagnosticsBlob = await collectDiagnostics(nonce);
-              polling = false;
-              stage = {
-                kind: "failed",
-                reason:
-                  "We couldn't reach Internet Identity to verify your email. Please try again.",
-                diagnostics: diagnosticsBlob,
-              };
-              return;
-            }
-            // A canister `Err` means the canister has already moved the
-            // pending entry to a terminal state, so we let the polling
-            // loop's Failed/Expired branch surface the authoritative
-            // reason on its next tick — it routes
-            // DomainNotAllowlisted/DomainNotSupported to the
-            // unsupported-domain view and every other reason to the
-            // failed view (with diagnostics). Nothing is swallowed.
-          }
-        }
-        // Pending or NeedDkimLeaf-but-already-submitted: back off
-        // from 1 → 5 s.
-        await new Promise((r) => setTimeout(r, intervalMs));
-        intervalMs = Math.min(5_000, intervalMs * 1.5);
-      }
-    } finally {
-      polling = false;
-    }
+    await runEmailRecoveryPoll({
+      nonce,
+      domain,
+      status,
+      submitDkimLeaf,
+      resolveViaDoh,
+      diagnostics,
+      funnel: setupEmailRecoveryFunnel,
+      events: {
+        needDkimLeaf: SetupEmailRecoveryEvents.NeedDkimLeaf,
+        dkimLeafSubmitted: SetupEmailRecoveryEvents.DkimLeafSubmitted,
+        failed: SetupEmailRecoveryEvents.Failed,
+        unsupportedDomain: SetupEmailRecoveryEvents.UnsupportedDomain,
+      },
+      // Setup completes on `RegistrationSucceeded`: bind done, hand back
+      // to the host to toast + close the dialog.
+      handleSuccess: (result) => {
+        if (!("RegistrationSucceeded" in result)) return false;
+        setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Succeeded);
+        setupEmailRecoveryFunnel.close();
+        onSuccess(address);
+        return true;
+      },
+      isActive: () =>
+        polling && (stage.kind === "sending" || stage.kind === "waiting"),
+      setPolling: (active) => {
+        polling = active;
+      },
+      toUnsupported: (d) => {
+        stage = { kind: "unsupported", domain: d };
+      },
+      toFailed: (reason, diagnostics) => {
+        stage = { kind: "failed", reason, diagnostics };
+      },
+    });
   };
 
   const handleRetry = () => {
