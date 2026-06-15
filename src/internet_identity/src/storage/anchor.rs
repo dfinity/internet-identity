@@ -36,7 +36,6 @@ pub struct Anchor {
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
-    pub(crate) session_delegation_epoch: Option<u32>,
 }
 
 impl Device {
@@ -179,7 +178,6 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             name,
             created_at,
             anchor_number,
-            session_delegation_epoch,
         } = anchor;
 
         let openid_credentials = openid_credentials.into_iter().map(Into::into).collect();
@@ -427,7 +425,6 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 passkey_credentials,
                 recovery_keys,
                 email_recovery,
-                session_delegation_epoch,
             },
         )
     }
@@ -442,7 +439,6 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             passkey_credentials,
             recovery_keys,
             email_recovery,
-            session_delegation_epoch,
         } = storable_anchor;
 
         let name = name.clone();
@@ -551,7 +547,6 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             email_recovery,
             devices,
             metadata,
-            session_delegation_epoch,
         }
     }
 }
@@ -579,7 +574,6 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 devices,
                 metadata,
                 created_at,
-                session_delegation_epoch: None,
             };
         };
 
@@ -605,7 +599,6 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             metadata,
             name,
             created_at,
-            session_delegation_epoch: storable_anchor.session_delegation_epoch,
         }
     }
 }
@@ -622,17 +615,7 @@ impl Anchor {
             email_recovery: vec![],
             metadata: None,
             name: None,
-            session_delegation_epoch: None,
         }
-    }
-
-    pub fn session_delegation_epoch(&self) -> u32 {
-        self.session_delegation_epoch.unwrap_or(0)
-    }
-
-    pub fn bump_session_delegation_epoch(&mut self) {
-        let current = self.session_delegation_epoch();
-        self.session_delegation_epoch = Some(current.wrapping_add(1));
     }
 
     pub fn anchor_number(&self) -> AnchorNumber {

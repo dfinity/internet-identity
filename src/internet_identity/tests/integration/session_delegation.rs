@@ -1,13 +1,11 @@
-use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2::{
     create_account, get_accounts, get_default_account, get_session_delegation,
-    invalidate_session_delegations, prepare_session_delegation, set_default_account,
+    prepare_session_delegation, set_default_account,
 };
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, GetAccountsError, GetDefaultAccountError, IdentityInfoError,
-    SessionDelegationError, SessionScope,
 };
 use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
@@ -28,17 +26,10 @@ fn mint_session_delegation(
     internet_identity_interface::internet_identity::types::PrepareSessionDelegation,
     candid::Principal,
 ) {
-    let prepared = prepare_session_delegation(
-        env,
-        canister_id,
-        principal_1(),
-        anchor,
-        SessionScope::AccountManagement,
-        session_key(),
-        None,
-    )
-    .expect("prepare_session_delegation call rejected")
-    .expect("prepare_session_delegation returned Err");
+    let prepared =
+        prepare_session_delegation(env, canister_id, principal_1(), anchor, session_key(), None)
+            .expect("prepare_session_delegation call rejected")
+            .expect("prepare_session_delegation returned Err");
 
     let session_principal = candid::Principal::self_authenticating(&prepared.user_key);
 
@@ -47,7 +38,6 @@ fn mint_session_delegation(
         canister_id,
         principal_1(),
         anchor,
-        SessionScope::AccountManagement,
         session_key(),
         prepared.expiration,
     )
@@ -181,156 +171,6 @@ fn session_delegation_default_deny() -> Result<(), RejectResponse> {
 }
 
 #[test]
-fn invalidate_session_delegations_revokes_access() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
-
-    let (_, session_principal) = mint_session_delegation(&env, canister_id, anchor);
-
-    create_account(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.to_string(),
-        "Alpha".to_string(),
-    )
-    .unwrap()
-    .unwrap();
-
-    get_accounts(
-        &env,
-        canister_id,
-        session_principal,
-        anchor,
-        ORIGIN.to_string(),
-    )
-    .unwrap()
-    .expect("session call should succeed before invalidation");
-
-    invalidate_session_delegations(&env, canister_id, principal_1(), anchor)
-        .unwrap()
-        .unwrap();
-
-    let err = get_accounts(
-        &env,
-        canister_id,
-        session_principal,
-        anchor,
-        ORIGIN.to_string(),
-    )
-    .unwrap()
-    .unwrap_err();
-    assert!(
-        matches!(err, GetAccountsError::Unauthorized(_)),
-        "session call must be rejected after explicit invalidation, got: {err:?}"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn device_removal_bumps_epoch_and_revokes_session() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
-
-    api::add(&env, canister_id, principal_1(), anchor, &device_data_2()).unwrap();
-
-    let (_, session_principal) = mint_session_delegation(&env, canister_id, anchor);
-
-    create_account(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ORIGIN.to_string(),
-        "Alpha".to_string(),
-    )
-    .unwrap()
-    .unwrap();
-
-    get_accounts(
-        &env,
-        canister_id,
-        session_principal,
-        anchor,
-        ORIGIN.to_string(),
-    )
-    .unwrap()
-    .expect("session call should succeed before device removal");
-
-    api::remove(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        &ByteBuf::from(PUBKEY_2),
-    )
-    .unwrap();
-
-    let err = get_accounts(
-        &env,
-        canister_id,
-        session_principal,
-        anchor,
-        ORIGIN.to_string(),
-    )
-    .unwrap()
-    .unwrap_err();
-    assert!(
-        matches!(err, GetAccountsError::Unauthorized(_)),
-        "session call must be rejected after device removal, got: {err:?}"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn prepare_then_invalidate_then_get_returns_no_such_delegation() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
-
-    let prepared = prepare_session_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        SessionScope::AccountManagement,
-        session_key(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
-
-    invalidate_session_delegations(&env, canister_id, principal_1(), anchor)
-        .unwrap()
-        .unwrap();
-
-    let err = get_session_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        SessionScope::AccountManagement,
-        session_key(),
-        prepared.expiration,
-    )
-    .unwrap()
-    .unwrap_err();
-
-    assert_eq!(
-        err,
-        SessionDelegationError::NoSuchDelegation,
-        "get_session_delegation after invalidation must return NoSuchDelegation"
-    );
-
-    Ok(())
-}
-
-#[test]
 fn ttl_clamp_over_max() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -343,7 +183,6 @@ fn ttl_clamp_over_max() -> Result<(), RejectResponse> {
         canister_id,
         principal_1(),
         anchor,
-        SessionScope::AccountManagement,
         session_key(),
         Some(ninety_days_ns),
     )
@@ -372,7 +211,6 @@ fn ttl_default_is_seven_days() -> Result<(), RejectResponse> {
         canister_id,
         principal_1(),
         anchor,
-        SessionScope::AccountManagement,
         session_key(),
         None,
     )
@@ -393,7 +231,7 @@ fn ttl_default_is_seven_days() -> Result<(), RejectResponse> {
 }
 
 #[test]
-fn epoch_survives_upgrade_and_revocation_survives_second_upgrade() -> Result<(), RejectResponse> {
+fn session_survives_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let anchor = flows::register_anchor(&env, canister_id);
@@ -421,33 +259,13 @@ fn epoch_survives_upgrade_and_revocation_survives_second_upgrade() -> Result<(),
         ORIGIN.to_string(),
     )
     .unwrap()
-    .expect("session call must succeed after upgrade: epoch should have survived");
-
-    invalidate_session_delegations(&env, canister_id, principal_1(), anchor)
-        .unwrap()
-        .unwrap();
-
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    let err = get_accounts(
-        &env,
-        canister_id,
-        session_principal,
-        anchor,
-        ORIGIN.to_string(),
-    )
-    .unwrap()
-    .unwrap_err();
-    assert!(
-        matches!(err, GetAccountsError::Unauthorized(_)),
-        "bumped epoch must survive second upgrade; session call must be rejected, got: {err:?}"
-    );
+    .expect("session call must succeed after upgrade: derived principal is stable");
 
     Ok(())
 }
 
 #[test]
-fn scope_isolation_across_anchors() -> Result<(), RejectResponse> {
+fn session_isolation_across_anchors() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 

@@ -34,7 +34,7 @@ const prepareMock = vi.fn().mockResolvedValue({
 
 const getDelegationMock = vi
   .fn()
-  .mockImplementation((_anchor, _scope, sessionKey, expiration) =>
+  .mockImplementation((_anchor, sessionKey, expiration) =>
     Promise.resolve(
       makeSignedDelegation(new Uint8Array(sessionKey), expiration),
     ),
@@ -54,15 +54,14 @@ describe("mintSessionDelegation", () => {
         expiration: EXPIRATION_NS,
       },
     });
-    getDelegationMock.mockImplementation(
-      (_anchor, _scope, sessionKey, expiration) =>
-        Promise.resolve(
-          makeSignedDelegation(new Uint8Array(sessionKey), expiration),
-        ),
+    getDelegationMock.mockImplementation((_anchor, sessionKey, expiration) =>
+      Promise.resolve(
+        makeSignedDelegation(new Uint8Array(sessionKey), expiration),
+      ),
     );
   });
 
-  it("returns a record with scope, key pair, chain JSON, and expiry", async () => {
+  it("returns a record with key pair, chain JSON, and expiry", async () => {
     const { mintSessionDelegation } =
       await import("$lib/utils/authentication/sessionDelegation");
 
@@ -72,7 +71,6 @@ describe("mintSessionDelegation", () => {
     });
 
     expect(record.identityNumber).toBe(BigInt(123));
-    expect(record.scope).toBe("account_management");
     expect(typeof record.chainJson).toBe("string");
     expect(record.keyPair.privateKey).toBeDefined();
     expect(record.keyPair.publicKey).toBeDefined();
@@ -91,7 +89,7 @@ describe("mintSessionDelegation", () => {
     expect(record.keyPair.publicKey.extractable).toBe(true);
   });
 
-  it("calls prepare_session_delegation with account_management scope", async () => {
+  it("calls prepare_session_delegation with the identity number, session key, and default max_ttl", async () => {
     const { mintSessionDelegation } =
       await import("$lib/utils/authentication/sessionDelegation");
 
@@ -102,7 +100,6 @@ describe("mintSessionDelegation", () => {
 
     expect(prepareMock).toHaveBeenCalledWith(
       BigInt(55),
-      { account_management: null },
       expect.any(Uint8Array),
       [],
     );

@@ -14,7 +14,6 @@ export interface SessionDelegationRecord {
   identityNumber: bigint;
   keyPair: CryptoKeyPair;
   chainJson: string;
-  scope: "account_management";
   expiresAtMillis: number;
 }
 
@@ -31,21 +30,11 @@ export const mintSessionDelegation = async ({
   const sessionKey = new Uint8Array(sessionIdentity.getPublicKey().toDer());
 
   const { user_key, expiration } = await actor
-    .prepare_session_delegation(
-      identityNumber,
-      { account_management: null },
-      sessionKey,
-      [],
-    )
+    .prepare_session_delegation(identityNumber, sessionKey, [])
     .then(throwCanisterError);
 
   const signedDelegation = await actor
-    .get_session_delegation(
-      identityNumber,
-      { account_management: null },
-      sessionKey,
-      expiration,
-    )
+    .get_session_delegation(identityNumber, sessionKey, expiration)
     .then(throwCanisterError);
 
   const transformedDelegation = transformSignedDelegation(signedDelegation);
@@ -60,7 +49,6 @@ export const mintSessionDelegation = async ({
     identityNumber,
     keyPair: sessionIdentity.getKeyPair(),
     chainJson: JSON.stringify(chain.toJSON()),
-    scope: "account_management",
     expiresAtMillis,
   };
 };

@@ -13,7 +13,7 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use session_delegation::{check_authorization_with_scope, CallerCapability};
+use session_delegation::{check_session_authorization, CallerCapability};
 
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
@@ -235,7 +235,6 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 
         let operation =
             anchor_management::replace_device(anchor_number, anchor, device_key, device_data);
-        anchor.bump_session_delegation_epoch();
         Ok::<_, String>(((), operation))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -245,7 +244,6 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         let operation = anchor_management::remove_device(anchor_number, anchor, device_key);
-        anchor.bump_session_delegation_epoch();
         Ok::<_, String>(((), operation))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -382,10 +380,7 @@ fn get_accounts(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
-    match check_authorization_with_scope(
-        anchor_number,
-        internet_identity_interface::internet_identity::types::SessionScope::AccountManagement,
-    ) {
+    match check_session_authorization(anchor_number) {
         Ok(_) => Ok(
             account_management::get_accounts_for_origin(anchor_number, &origin)
                 .iter()
@@ -436,11 +431,8 @@ fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    check_authorization_with_scope(
-        anchor_number,
-        internet_identity_interface::internet_identity::types::SessionScope::AccountManagement,
-    )
-    .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
+    check_session_authorization(anchor_number)
+        .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
 
     let default_account_info =
         account_management::get_default_account_for_origin(anchor_number, origin)?;
@@ -468,11 +460,8 @@ fn set_default_account(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    match check_authorization_with_scope(
-        anchor_number,
-        internet_identity_interface::internet_identity::types::SessionScope::AccountManagement,
-    ) {
-        Ok(CallerCapability::FullAuth(mut anchor, authorization_key)) => {
+    match check_session_authorization(anchor_number) {
+        Ok(CallerCapability::FullAuth(mut anchor, authorization_key, _)) => {
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             state::storage_borrow_mut(|storage| storage.write(*anchor)).map_err(|err| {
                 SetDefaultAccountError::InternalCanisterError(format!(
@@ -490,7 +479,7 @@ fn set_default_account(
             );
             Ok(result)
         }
-        Ok(CallerCapability::SessionScoped) => {
+        Ok(CallerCapability::SessionScoped(_)) => {
             let result = account_management::set_default_account_for_origin(
                 anchor_number,
                 origin,
@@ -553,34 +542,25 @@ fn get_account_delegation(
 #[update]
 async fn prepare_session_delegation(
     anchor_number: AnchorNumber,
-    scope: internet_identity_interface::internet_identity::types::SessionScope,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<
     internet_identity_interface::internet_identity::types::PrepareSessionDelegation,
     internet_identity_interface::internet_identity::types::SessionDelegationError,
 > {
-    session_delegation::prepare_session_delegation(anchor_number, scope, session_key, max_ttl).await
+    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl).await
 }
 
 #[query]
 fn get_session_delegation(
     anchor_number: AnchorNumber,
-    scope: internet_identity_interface::internet_identity::types::SessionScope,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<
     SignedDelegation,
     internet_identity_interface::internet_identity::types::SessionDelegationError,
 > {
-    session_delegation::get_session_delegation(anchor_number, scope, session_key, expiration)
-}
-
-#[update]
-fn invalidate_session_delegations(
-    anchor_number: AnchorNumber,
-) -> Result<(), internet_identity_interface::internet_identity::types::SessionDelegationError> {
-    session_delegation::invalidate_session_delegations(anchor_number)
+    session_delegation::get_session_delegation(anchor_number, session_key, expiration)
 }
 
 #[query]
@@ -1312,18 +1292,14 @@ mod openid_api {
         openid_credential_key: OpenIdCredentialKey,
     ) -> Result<(), OpenIdCredentialRemoveError> {
         anchor_operation_with_authz_check(identity_number, |anchor| {
-            let result = remove_openid_credential(anchor, &openid_credential_key)
+            remove_openid_credential(anchor, &openid_credential_key)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
                     AnchorError::OpenIdCredentialNotFound => {
                         OpenIdCredentialRemoveError::OpenIdCredentialNotFound
                     }
                     err => OpenIdCredentialRemoveError::InternalCanisterError(err.to_string()),
-                });
-            if result.is_ok() {
-                anchor.bump_session_delegation_epoch();
-            }
-            result
+                })
         })
     }
 
@@ -1678,8 +1654,6 @@ mod email_recovery_api {
                     EmailRecoveryError::AddressNotRegistered
                 }
             })?;
-
-        anchor.bump_session_delegation_epoch();
 
         crate::state::storage_borrow_mut(|storage| storage.write(anchor))
             .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;

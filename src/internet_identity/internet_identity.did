@@ -1010,8 +1010,6 @@ type PrepareAccountDelegation = record {
     expiration : Timestamp;
 };
 
-type SessionScope = variant { account_management };
-
 type SessionDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
@@ -1646,21 +1644,15 @@ service : (opt InternetIdentityInit) -> {
 
     prepare_session_delegation : (
         anchor_number : UserNumber,
-        scope : SessionScope,
         session_key : SessionKey,
         max_ttl : opt nat64
     ) -> (variant { Ok : PrepareSessionDelegation; Err : SessionDelegationError });
 
     get_session_delegation : (
         anchor_number : UserNumber,
-        scope : SessionScope,
         session_key : SessionKey,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : SessionDelegationError }) query;
-
-    invalidate_session_delegations : (
-        anchor_number : UserNumber
-    ) -> (variant { Ok; Err : SessionDelegationError });
 
     get_default_account : (
         anchor_number : UserNumber,

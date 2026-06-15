@@ -145,7 +145,6 @@ describe("actorForAccountManagement — IDB resolution", () => {
         identityNumber: IDENTITY_NUMBER,
         keyPair,
         chainJson,
-        scope: "account_management",
         expiresAtMillis: FAR_FUTURE,
       },
       TEST_STORE,
@@ -167,7 +166,6 @@ describe("actorForAccountManagement — IDB resolution", () => {
         identityNumber: IDENTITY_NUMBER,
         keyPair,
         chainJson,
-        scope: "account_management",
         expiresAtMillis: NEAR_EXPIRY,
       },
       TEST_STORE,
@@ -192,7 +190,6 @@ describe("actorForAccountManagement — IDB resolution", () => {
         identityNumber: IDENTITY_NUMBER,
         keyPair,
         chainJson: "not valid json at all }{",
-        scope: "account_management",
         expiresAtMillis: FAR_FUTURE,
       },
       TEST_STORE,
@@ -221,12 +218,7 @@ describe("actorForAccountManagement — IDB resolution", () => {
       get_session_delegation: vi
         .fn()
         .mockImplementation(
-          (
-            _anchor: unknown,
-            _scope: unknown,
-            sessionKey: number[],
-            expiration: bigint,
-          ) =>
+          (_anchor: unknown, sessionKey: number[], expiration: bigint) =>
             Promise.resolve({
               Ok: {
                 delegation: {
@@ -261,7 +253,6 @@ describe("purge", () => {
         identityNumber: IDENTITY_NUMBER,
         keyPair,
         chainJson,
-        scope: "account_management",
         expiresAtMillis: FAR_FUTURE,
       },
       TEST_STORE,
@@ -304,7 +295,6 @@ describe("mintAndStore — failure is swallowed", () => {
       identityNumber: IDENTITY_NUMBER,
       keyPair,
       chainJson,
-      scope: "account_management" as const,
       expiresAtMillis: FAR_FUTURE,
     };
     await idbSet(IDENTITY_NUMBER.toString(), existingRecord, TEST_STORE);

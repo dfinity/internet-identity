@@ -1391,7 +1391,6 @@ export type SessionDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type SessionKey = PublicKey;
-export type SessionScope = { 'account_management' : null };
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
   } |
@@ -1798,7 +1797,7 @@ export interface _SERVICE {
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
-    [UserNumber, SessionScope, SessionKey, Timestamp],
+    [UserNumber, SessionKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : SessionDelegationError }
   >,
@@ -1869,11 +1868,6 @@ export interface _SERVICE {
    * ================
    */
   'init_salt' : ActorMethod<[], undefined>,
-  'invalidate_session_delegations' : ActorMethod<
-    [UserNumber],
-    { 'Ok' : null } |
-      { 'Err' : SessionDelegationError }
-  >,
   'list_available_attributes' : ActorMethod<
     [ListAvailableAttributesRequest],
     { 'Ok' : ListAvailableAttributesResponse } |
@@ -1980,7 +1974,7 @@ export interface _SERVICE {
       { 'Err' : PrepareIdAliasError }
   >,
   'prepare_session_delegation' : ActorMethod<
-    [UserNumber, SessionScope, SessionKey, [] | [bigint]],
+    [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
   >,

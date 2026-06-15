@@ -413,7 +413,6 @@ pub fn prepare_session_delegation(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: AnchorNumber,
-    scope: SessionScope,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<Result<PrepareSessionDelegation, SessionDelegationError>, RejectResponse> {
@@ -423,7 +422,7 @@ pub fn prepare_session_delegation(
         RawEffectivePrincipal::None,
         sender,
         "prepare_session_delegation",
-        (anchor_number, scope, session_key, max_ttl),
+        (anchor_number, session_key, max_ttl),
     )
     .map(|(x,)| x)
 }
@@ -433,7 +432,6 @@ pub fn get_session_delegation(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: AnchorNumber,
-    scope: SessionScope,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<Result<SignedDelegation, SessionDelegationError>, RejectResponse> {
@@ -442,24 +440,7 @@ pub fn get_session_delegation(
         canister_id,
         sender,
         "get_session_delegation",
-        (anchor_number, scope, session_key, expiration),
-    )
-    .map(|(x,)| x)
-}
-
-pub fn invalidate_session_delegations(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    sender: Principal,
-    anchor_number: AnchorNumber,
-) -> Result<Result<(), SessionDelegationError>, RejectResponse> {
-    call_candid_as(
-        env,
-        canister_id,
-        RawEffectivePrincipal::None,
-        sender,
-        "invalidate_session_delegations",
-        (anchor_number,),
+        (anchor_number, session_key, expiration),
     )
     .map(|(x,)| x)
 }

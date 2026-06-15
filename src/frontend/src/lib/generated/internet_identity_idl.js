@@ -512,7 +512,6 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
-  const SessionScope = IDL.Variant({ 'account_management' : IDL.Null });
   const SessionDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -1022,7 +1021,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_session_delegation' : IDL.Func(
-        [UserNumber, SessionScope, SessionKey, Timestamp],
+        [UserNumber, SessionKey, Timestamp],
         [
           IDL.Variant({
             'Ok' : SignedDelegation,
@@ -1073,11 +1072,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
-    'invalidate_session_delegations' : IDL.Func(
-        [UserNumber],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SessionDelegationError })],
-        [],
-      ),
     'list_available_attributes' : IDL.Func(
         [ListAvailableAttributesRequest],
         [
@@ -1186,7 +1180,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'prepare_session_delegation' : IDL.Func(
-        [UserNumber, SessionScope, SessionKey, IDL.Opt(IDL.Nat64)],
+        [UserNumber, SessionKey, IDL.Opt(IDL.Nat64)],
         [
           IDL.Variant({
             'Ok' : PrepareSessionDelegation,

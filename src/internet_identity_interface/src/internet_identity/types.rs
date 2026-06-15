@@ -548,12 +548,6 @@ pub enum CheckMaxAccountError {
     AccountLimitReached,
 }
 
-#[derive(Clone, Copy, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum SessionScope {
-    #[serde(rename = "account_management")]
-    AccountManagement,
-}
-
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PrepareSessionDelegation {
     pub user_key: UserKey,

@@ -1245,7 +1245,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 1: Valid recovery phrase (happy case)
@@ -1288,7 +1287,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 2: Valid passkey with origin (happy case)
@@ -1331,7 +1329,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 3: Valid passkey without origin (special case)
@@ -1374,7 +1371,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 4: Recovery passkey with origin (special case)
@@ -1417,7 +1413,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 5: Recovery passkey without origin (special case)
@@ -1460,7 +1455,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 6: Legacy pin-flow with BrowserStorageKey and Authentication purpose (special case)
@@ -1503,7 +1497,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 7: Legacy pin-flow with BrowserStorageKey and Recovery purpose (special case)
@@ -1546,7 +1539,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 8: Multiple devices of different types
@@ -1617,7 +1609,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 9: Anchor with OpenID credentials
@@ -1636,7 +1627,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 10: Anchor with name
@@ -1655,7 +1645,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: Some("My Test Anchor".to_string()),
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 11: Passkey with KeyType::Unknown (should be handled correctly)
@@ -1698,7 +1687,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 12: Device metadata is not preserved
@@ -1748,7 +1736,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 13: Identity metadata is not preserved
@@ -1774,7 +1761,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None, // Identity metadata not preserved in stable memory
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 14: Device protection is preserved for recovery phrases.
@@ -1817,7 +1803,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 15: Device protection is preserved for passkeys.
@@ -1863,7 +1848,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 16: Fallthrough case - unusual combination that doesn't match other patterns
@@ -1908,7 +1892,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 17: Recovery phrase alias defaults to "Recovery Key"
@@ -1951,7 +1934,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 18: Passkey key_type defaults to CrossPlatform (Platform -> CrossPlatform)
@@ -1994,7 +1976,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
         // Test case 19: Passkey key_type defaults to CrossPlatform (Unknown -> CrossPlatform)
@@ -2037,7 +2018,6 @@ fn test_anchor_storage_migration_round_trip() {
                 metadata: None,
                 name: None,
                 created_at: Some(now),
-                session_delegation_epoch: None,
             },
         ),
     ];

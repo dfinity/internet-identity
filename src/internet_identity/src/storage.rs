@@ -735,7 +735,6 @@ impl<M: Memory + Clone> Storage<M> {
             // The following fields do not require merging.
             created_at_ns: _,
             name: _,
-            session_delegation_epoch: _,
         }) = previous_anchor_maybe
         {
             (
