@@ -323,6 +323,9 @@ type InternetIdentityInit = record {
     backend_canister_id : opt principal;
     // Backend origin, needed to sync configuration with frontend.
     backend_origin : opt text;
+    // Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+    // off (DoH-only); `opt true` re-enables it.
+    enable_dnssec_email_recovery : opt bool;
     // DNSSEC verification configuration. Trust anchors used by any feature
     // that verifies DNS records against the IANA-rooted DNSSEC chain
     // (currently the email-recovery DKIM/DMARC flow). See

@@ -294,6 +294,10 @@ pub struct InternetIdentityInit {
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+    /// off (DoH-only); `Some(true)` re-enables it. Omitting it on upgrade
+    /// keeps the stored value.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC trust anchors for any feature that verifies DNS records
     /// against the IANA-rooted DNSSEC chain (currently the email-recovery
     /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).

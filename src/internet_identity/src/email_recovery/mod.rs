@@ -96,6 +96,13 @@ pub fn recovery_seed_for_nonce(nonce: &str, now_secs: u64) -> Option<ic_certific
 #[allow(unused_imports)]
 pub use pending::{PendingChallenge, PendingKind, PendingStatus};
 
+/// Whether the legacy DNSSEC email-recovery path is enabled. Off by
+/// default — the canister runs DoH-only and `prepare_*` ignores any
+/// client-supplied `dns_proof`.
+pub fn dnssec_email_recovery_enabled() -> bool {
+    crate::state::persistent_state(|p| p.enable_dnssec_email_recovery.unwrap_or(false))
+}
+
 /// Verbose human-readable token prefix. Every legitimate token the
 /// canister hands out begins with this exact byte sequence; the FE
 /// surfaces this prefix prominently in the wizard so a phisher who

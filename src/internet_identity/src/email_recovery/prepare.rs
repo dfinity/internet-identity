@@ -101,6 +101,10 @@ async fn prepare_common(
     let registered_domain = registered_domain_of(&address)
         .ok_or_else(|| EmailRecoveryError::DomainNotSupported(address.clone()))?;
 
+    // Deploy flag off (the default) => DoH-only: drop any client-supplied
+    // proof so the picker below falls through to the DoH path.
+    let dns_proof = dns_proof.filter(|_| super::dnssec_email_recovery_enabled());
+
     // Path picker. The FE never decides the path — it sends whatever
     // it could gather, and we choose:
     //
@@ -394,6 +398,46 @@ mod tests {
         }
     }
 
+    /// An input carrying a structurally-present but content-bogus DNSSEC
+    /// bundle. With the flag off the bundle is dropped before any
+    /// validation runs, so its contents don't matter; with the flag on it
+    /// reaches `verify_dnssec_skeleton` and fails there.
+    fn dnssec_input(addr: &str) -> EmailRecoveryDnsInput {
+        use internet_identity_interface::internet_identity::types::dnssec::{
+            DnsProofBundle, Rrsig, SignedRRset,
+        };
+        use serde_bytes::ByteBuf;
+        let empty_rrset = SignedRRset {
+            name: ByteBuf::new(),
+            rtype: 0,
+            rdata: vec![],
+            ttl: 0,
+            rrsig: Rrsig {
+                type_covered: 0,
+                algorithm: 0,
+                labels: 0,
+                original_ttl: 0,
+                expiration: 0,
+                inception: 0,
+                key_tag: 0,
+                signer_name: ByteBuf::new(),
+                signature: ByteBuf::new(),
+            },
+        };
+        EmailRecoveryDnsInput {
+            address: addr.to_string(),
+            dns_proof: Some(DnsProofBundle {
+                root_dnskey: empty_rrset,
+                chains: vec![],
+                hops: vec![],
+            }),
+        }
+    }
+
+    fn set_dnssec_flag(enabled: bool) {
+        crate::state::persistent_state_mut(|p| p.enable_dnssec_email_recovery = Some(enabled));
+    }
+
     fn block_on<F: std::future::Future>(mut f: F) -> F::Output {
         use std::future::Future;
         use std::pin::Pin;
@@ -432,6 +476,53 @@ mod tests {
             result,
             Err(EmailRecoveryError::DomainNotAllowlisted(_))
         ));
+    }
+
+    #[test]
+    fn flag_off_drops_proof_and_takes_doh_path() {
+        // Flag off (the deploy default): a present `dns_proof` is ignored
+        // and the allowlist gate decides. A non-allowlisted domain is
+        // rejected with DomainNotAllowlisted — never reaching the DNSSEC
+        // verifier (which, on this bogus bundle, would fail differently).
+        super::super::pending::reset_for_tests();
+        set_dnssec_flag(false);
+        install_doh_allowlist(&["gmail.com"]);
+        let result = block_on(prepare_add(1, dnssec_input("alice@example.com"), 100));
+        match result {
+            Err(EmailRecoveryError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
+            other => panic!("expected DomainNotAllowlisted, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn flag_off_with_proof_succeeds_via_doh_when_allowlisted() {
+        // Strongest form: a proof is present *and* the domain is
+        // allowlisted. The flag being off means we take the DoH path and
+        // succeed, proving the bogus proof was never validated.
+        super::super::pending::reset_for_tests();
+        super::super::rng::tests::seed_for_tests([9u8; 32]);
+        set_dnssec_flag(false);
+        install_doh_allowlist(&["gmail.com"]);
+        let result = block_on(prepare_add(1, dnssec_input("alice@gmail.com"), 100));
+        assert!(result.is_ok(), "expected DoH success, got {result:?}");
+    }
+
+    #[test]
+    fn flag_on_routes_proof_to_dnssec_path() {
+        // Flag on re-enables the DNSSEC path: a present proof reaches
+        // `verify_dnssec_skeleton`. With no trust anchors configured it
+        // fails there with the dedicated message — distinct from the DoH
+        // allowlist rejection, proving the DNSSEC branch was taken.
+        super::super::pending::reset_for_tests();
+        set_dnssec_flag(true);
+        crate::state::persistent_state_mut(|p| p.dnssec_config = None);
+        let result = block_on(prepare_add(1, dnssec_input("alice@example.com"), 100));
+        match result {
+            Err(EmailRecoveryError::DomainNotSupported(msg)) => {
+                assert!(msg.contains("trust anchors"), "unexpected message: {msg}")
+            }
+            other => panic!("expected DomainNotSupported (DNSSEC path), got {other:?}"),
+        }
     }
 
     #[test]

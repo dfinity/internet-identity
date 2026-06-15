@@ -86,6 +86,24 @@ fn setup_canister(env: &PocketIc) -> candid::Principal {
     install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
 }
 
+/// Like [`setup_canister`] but also flips on the deploy flag that
+/// enables the legacy DNSSEC email-recovery path. The DNSSEC-path tests
+/// need it on; production (and [`setup_canister`]) default to off so the
+/// canister runs DoH-only.
+fn setup_canister_dnssec_enabled(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
 /// Create an identity and return `(identity_number, principal)`. The
 /// principal is needed for any caller-authenticated method calls
 /// (`prepare_add`, `credential_remove`).
@@ -422,12 +440,13 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
     use serde_bytes::ByteBuf;
 
     let env = env();
-    let canister_id = setup_canister(&env);
+    // DNSSEC path enabled, but no trust anchors configured.
+    let canister_id = setup_canister_dnssec_enabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     // A minimal-but-shape-valid bundle. The canister rejects before
     // it even validates because no trust anchors are configured for
-    // this canister (we only set `doh_config` in `setup_canister`).
+    // this canister (we only set `doh_config`, not `dnssec_config`).
     let stub_rrsig = Rrsig {
         type_covered: 16,
         algorithm: 8,
@@ -497,13 +516,13 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
     };
     use serde_bytes::ByteBuf;
 
-    // Even when the registered domain *is* on the DoH allowlist,
-    // supplying a `dns_proof` puts us on the DNSSEC path. This test
-    // confirms that by sending a malformed DNSSEC bundle and
-    // checking we get a DNSSEC error rather than the call falling
+    // With the DNSSEC path enabled, even when the registered domain *is*
+    // on the DoH allowlist, supplying a `dns_proof` puts us on the DNSSEC
+    // path. This test confirms that by sending a malformed DNSSEC bundle
+    // and checking we get a DNSSEC error rather than the call falling
     // through to the DoH happy path.
     let env = env();
-    let canister_id = setup_canister(&env);
+    let canister_id = setup_canister_dnssec_enabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     let stub_rrsig = Rrsig {
@@ -613,6 +632,7 @@ fn full_setup_flow_via_dnssec_path() {
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
         ..Default::default()
     };
     let canister_id = install_ii_canister_with_arg_and_cycles(
@@ -768,6 +788,7 @@ fn dnssec_flow_until_need_dkim_leaf(
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
         ..Default::default()
     };
     let canister_id = install_ii_canister_with_arg_and_cycles(
