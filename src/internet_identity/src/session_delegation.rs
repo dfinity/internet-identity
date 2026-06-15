@@ -1,6 +1,5 @@
-use crate::authz_utils::{check_authorization, AuthorizationError};
+use crate::authz_utils::check_authorization;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
-use crate::storage::anchor::Anchor;
 use crate::{state, update_root_hash};
 use candid::Principal;
 use ic_canister_sig_creation::{
@@ -39,38 +38,9 @@ pub(crate) fn session_delegation_seed(anchor_number: AnchorNumber) -> Hash {
     hasher.finalize().into()
 }
 
-fn expected_session_principal(anchor_number: AnchorNumber) -> Principal {
+pub(crate) fn expected_session_principal(anchor_number: AnchorNumber) -> Principal {
     let seed = session_delegation_seed(anchor_number);
     Principal::self_authenticating(der_encode_canister_sig_key(seed.to_vec()))
-}
-
-/// Outcome of [`check_session_authorization`]. The wrapped `Sealed` token has a
-/// private field, so a `CallerCapability` can only be built inside this module —
-/// making this function the only way to obtain scoped authorization.
-pub enum CallerCapability {
-    FullAuth(Box<Anchor>, AuthorizationKey, Sealed),
-    SessionScoped(Sealed),
-}
-
-pub struct Sealed(#[allow(dead_code)] ());
-
-pub fn check_session_authorization(
-    anchor_number: AnchorNumber,
-) -> Result<CallerCapability, AuthorizationError> {
-    if let Ok((anchor, key)) = check_authorization(anchor_number) {
-        return Ok(CallerCapability::FullAuth(
-            Box::new(anchor),
-            key,
-            Sealed(()),
-        ));
-    }
-
-    let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
-    if salt_initialised && caller() == expected_session_principal(anchor_number) {
-        return Ok(CallerCapability::SessionScoped(Sealed(())));
-    }
-
-    Err(AuthorizationError::from(caller()))
 }
 
 pub async fn prepare_session_delegation(
