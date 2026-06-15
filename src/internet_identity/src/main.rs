@@ -460,39 +460,22 @@ fn set_default_account(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    match check_session_authorization(anchor_number) {
-        Ok(CallerCapability::FullAuth(mut anchor, authorization_key, _)) => {
-            anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-            state::storage_borrow_mut(|storage| storage.write(*anchor)).map_err(|err| {
-                SetDefaultAccountError::InternalCanisterError(format!(
-                    "Identity: {anchor_number}, Error: {err}"
-                ))
-            })?;
-            let result = account_management::set_default_account_for_origin(
-                anchor_number,
-                origin,
-                account_number,
-            )?;
-            anchor_management::post_operation_bookkeeping(
-                anchor_number,
-                Operation::SetDefaultAccount,
-            );
-            Ok(result)
-        }
-        Ok(CallerCapability::SessionScoped(_)) => {
-            let result = account_management::set_default_account_for_origin(
-                anchor_number,
-                origin,
-                account_number,
-            )?;
-            anchor_management::post_operation_bookkeeping(
-                anchor_number,
-                Operation::SetDefaultAccount,
-            );
-            Ok(result)
-        }
-        Err(err) => Err(SetDefaultAccountError::Unauthorized(err.principal)),
+    let capability = check_session_authorization(anchor_number)
+        .map_err(|err| SetDefaultAccountError::Unauthorized(err.principal))?;
+
+    if let CallerCapability::FullAuth(mut anchor, authorization_key, _) = capability {
+        anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
+        state::storage_borrow_mut(|storage| storage.write(*anchor)).map_err(|err| {
+            SetDefaultAccountError::InternalCanisterError(format!(
+                "Identity: {anchor_number}, Error: {err}"
+            ))
+        })?;
     }
+
+    let result =
+        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
+    anchor_management::post_operation_bookkeeping(anchor_number, Operation::SetDefaultAccount);
+    Ok(result)
 }
 
 #[update]
