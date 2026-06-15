@@ -6,6 +6,7 @@ import {
   throwCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
+import { MAX_POLL_ATTEMPTS, pollDelay } from "$lib/utils/openidPoll";
 import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 
@@ -13,10 +14,12 @@ export const authenticateWithJWT = async ({
   canisterId,
   session,
   jwt,
+  discoveryDomain,
 }: {
   canisterId: Principal;
   session: Session;
   jwt: string;
+  discoveryDomain?: string;
 }): Promise<{
   identity: DelegationIdentity;
   identityNumber: bigint;
@@ -26,24 +29,52 @@ export const authenticateWithJWT = async ({
     canisterId,
   });
   const sessionKey = new Uint8Array(session.identity.getPublicKey().toDer());
-  const {
-    anchor_number: identityNumber,
-    expiration,
-    user_key,
-  } = await actor
-    .openid_prepare_delegation(jwt, session.salt, sessionKey)
-    .then(throwCanisterError);
-  const signedDelegation = await actor
-    .openid_get_delegation(jwt, session.salt, sessionKey, expiration)
-    .then(throwCanisterError);
-  const transformedDelegation = transformSignedDelegation(signedDelegation);
-  const delegationChain = DelegationChain.fromDelegations(
-    [transformedDelegation],
-    new Uint8Array(user_key),
-  );
-  const identity = DelegationIdentity.fromDelegation(
-    session.identity,
-    delegationChain,
-  );
-  return { identity, identityNumber };
+  const domain: [] | [string] =
+    discoveryDomain !== undefined ? [discoveryDomain] : [];
+
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    // `prepare` (update) drives the SSO discovery/JWKS fetch; `get` (query)
+    // reads the cached result. Either reports `Pending` while the cache is
+    // cold — re-call `prepare` to keep the fetch moving, then retry.
+    const prepared = await actor.openid_prepare_delegation(
+      jwt,
+      session.salt,
+      sessionKey,
+      domain,
+    );
+    if ("Err" in prepared && "Pending" in prepared.Err) {
+      await pollDelay();
+      continue;
+    }
+    const {
+      anchor_number: identityNumber,
+      expiration,
+      user_key,
+    } = await throwCanisterError(prepared);
+
+    const delegation = await actor.openid_get_delegation(
+      jwt,
+      session.salt,
+      sessionKey,
+      expiration,
+      domain,
+    );
+    if ("Err" in delegation && "Pending" in delegation.Err) {
+      await pollDelay();
+      continue;
+    }
+    const signedDelegation = await throwCanisterError(delegation);
+    const transformedDelegation = transformSignedDelegation(signedDelegation);
+    const delegationChain = DelegationChain.fromDelegations(
+      [transformedDelegation],
+      new Uint8Array(user_key),
+    );
+    const identity = DelegationIdentity.fromDelegation(
+      session.identity,
+      delegationChain,
+    );
+    return { identity, identityNumber };
+  }
+
+  throw new Error("Timed out waiting for SSO discovery to complete");
 };

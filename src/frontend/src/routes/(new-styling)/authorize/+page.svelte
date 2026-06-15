@@ -43,7 +43,6 @@
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
-  import { anonymousActor } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
   const { data }: PageProps = $props();
@@ -131,17 +130,14 @@
   };
 
   /**
-   * 1-click SSO equivalent of {@link initiateOpenId}: register the
-   * discovery domain with the canister, run two-hop discovery, then
-   * redirect through the same OpenID-redirect machinery as the direct
-   * flow. Distinct from the wizard `SignInWithSso` path only in that it
-   * has nothing to debounce or validate UI-side — the URL has already
-   * committed to a domain that's on the allowlist (gated in `+page.ts`).
+   * 1-click SSO equivalent of {@link initiateOpenId}: resolve the discovery
+   * domain via the canister, then redirect through the same OpenID-redirect
+   * machinery as the direct flow. Distinct from the wizard `SignInWithSso`
+   * path only in that it has nothing to debounce or validate UI-side — the URL
+   * has already committed to a domain that's on the allowlist (gated in
+   * `+page.ts`).
    */
   const initiateSso = async (domain: string) => {
-    await anonymousActor.add_discoverable_oidc_config({
-      discovery_domain: domain,
-    });
     const result = await discoverSsoConfig(domain);
     // Stash the SSO discovery domain so `resumeOpenId` knows the
     // returning JWT belongs to a 1-click SSO flow rather than a 1-click

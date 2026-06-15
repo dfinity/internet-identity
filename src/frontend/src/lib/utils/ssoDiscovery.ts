@@ -1,167 +1,78 @@
 /**
- * Two-hop SSO discovery chain for organization-based sign-in.
+ * SSO discovery for organization-based sign-in.
  *
- * 1. Fetch `https://{domain}/.well-known/ii-openid-configuration`
- *    → returns `{ client_id, openid_configuration }`
- * 2. Fetch the standard OIDC discovery document from the `openid_configuration`
- *    URL → returns `authorization_endpoint`, `scopes_supported`, etc.
- *
- * Security — trust model:
- * - The caller must call `add_discoverable_oidc_config({ discovery_domain })`
- *   on the backend BEFORE invoking `discoverSsoConfig`. That call traps on
- *   the backend's canary allowlist (returned by
- *   `openid::generic::allowed_discovery_domains()`) for any domain an II
- *   admin hasn't approved, so by the time this module runs, the domain
- *   has been explicitly blessed by II.
- * - This module doesn't carry its own domain allowlist — the check lives
- *   on the canister, not in frontend code that the user's device could
- *   bypass.
- * - Once the first hop succeeds, whatever the domain owner publishes at
- *   `/.well-known/ii-openid-configuration` determines the IdP for the second
- *   hop. We don't maintain a second-hop allowlist — the org knows their own
- *   IdP better than II does, and an attacker who can tamper with a trusted
- *   domain's `.well-known` has already broken something more fundamental
- *   (the canary-allowed domain itself).
- *
- * Security — checks we still enforce:
- * - Domain input validated (DNS format, length limits) unless the host
- *   is loopback (`localhost` / `127.0.0.1`, with optional port), which
- *   is what makes e2e tests against `localhost:11107` work without
- *   widening the regex.
- * - All three URLs (ii-openid-configuration, provider discovery, auth
- *   endpoint) must be HTTPS — the only exception is loopback hosts,
- *   which can use HTTP since there's no real network in play. The
- *   canister's own `sso_discoverable_domains` allowlist remains the
- *   trust boundary; this module is only consulted after the backend
- *   has accepted the domain.
- * - Provider `issuer` hostname must match `openid_configuration` hostname
- *   exactly or as a true subdomain (prevents a tampered provider-discovery
- *   doc from bouncing auth off-host AFTER we've committed to a provider).
- * - Provider `authorization_endpoint` hostname must match the same.
- *
- * Throttling:
- * - Successful responses cached for 4 hours per hop.
- * - Exponential backoff (2s, 4s, 8s) for retryable errors, up to 3 attempts.
- * - Request timeout: 15s per hop. The abort timer is cleared in a `finally`
- *   so network errors don't leak armed timers.
- * - Caller can pass an `AbortSignal` to cancel an in-flight discovery (used
- *   by the input-debounce in `SignInWithSso.svelte` to drop a stale lookup
- *   the moment the user types a different domain).
+ * The canister resolves an organization domain to its OIDC configuration and
+ * caches the result; this module validates the domain, drives that resolution
+ * through `discover_sso` / `discover_sso_query`, and shapes it for the auth UI.
  */
+import { anonymousActor } from "$lib/globals";
+import type { SsoDiscovery } from "$lib/generated/internet_identity_types";
+import { MAX_POLL_ATTEMPTS, pollDelay } from "$lib/utils/openidPoll";
 
-import { z } from "zod";
-
-/**
- * Subset of fields from a standard OIDC discovery document we use. The
- * schema is the single source of truth; the exported type is derived from
- * it so anything reading from this module can't accidentally skip
- * validation.
- */
-const OidcDiscoveryDocumentSchema = z.object({
-  issuer: z.string().min(1),
-  authorization_endpoint: z.string().min(1),
-  scopes_supported: z.array(z.string()).optional(),
-});
-export type OidcDiscoveryDocument = z.infer<typeof OidcDiscoveryDocumentSchema>;
-
-/** Result of the two-hop SSO discovery chain. */
+/** Resolved SSO configuration for a domain. */
 export interface SsoDiscoveryResult {
   /**
-   * The organization domain the user typed on the SSO screen — i.e. the
-   * host of hop-1's `/.well-known/ii-openid-configuration`. Carried through
+   * The organization domain the user typed on the SSO screen. Carried through
    * so downstream code can label the resulting credential by the SSO
    * provenance rather than by the underlying IdP's issuer.
    */
   domain: string;
   clientId: string;
   /**
-   * Human-readable name for the SSO, as published by the domain at hop-1
-   * in the optional `name` field. Used by the consent UI to render
-   * `sso:<domain>:<key>` attribute rows with a friendly prefix
-   * (e.g. "DFINITY email:"); falls back to `domain` when absent.
+   * Human-readable name for the SSO, if the domain publishes one. Used by the
+   * consent UI to render `sso:<domain>:<key>` attribute rows with a friendly
+   * prefix (e.g. "DFINITY email:"); falls back to `domain` when absent.
    */
   name?: string;
-  discovery: OidcDiscoveryDocument;
+  discovery: {
+    issuer: string;
+    authorization_endpoint: string;
+    scopes_supported?: string[];
+  };
 }
 
-/** Response shape of `https://{domain}/.well-known/ii-openid-configuration`.
- *
- * `name` is optional: legacy / minimal deployments don't publish one
- * and the FE falls back to the bare discovery domain for labelling. */
-const IIOpenIdConfigurationSchema = z.object({
-  client_id: z.string().min(1),
-  openid_configuration: z.string().min(1),
-  name: z.string().min(1).optional(),
-});
-type IIOpenIdConfiguration = z.infer<typeof IIOpenIdConfigurationSchema>;
-
 /**
- * Raised when hop 1 (`/.well-known/ii-openid-configuration` on the user's
- * domain) fails. Covers misconfiguration (`http-error`, `invalid-response`)
- * and transient failures (`network`, `timeout`).
- *
- * Surfaced to the UI so we can show a single user-friendly message
- * instead of leaking raw `fetch` / JSON parse errors.
+ * Raised when a domain's SSO configuration can't be resolved: the canister
+ * rejected the domain (`rejected`) or the resolution didn't complete in time
+ * (`timeout`). `detail` carries the canister's message for `rejected`.
  */
 export class DomainNotConfiguredError extends Error {
   constructor(
-    public readonly reason:
-      | "http-error"
-      | "invalid-response"
-      | "network"
-      | "timeout",
-    public readonly httpStatus?: number,
+    public readonly reason: "rejected" | "timeout",
     public readonly detail?: string,
   ) {
     super(
       detail !== undefined
-        ? `SSO discovery hop 1 failed (${reason}): ${detail}`
-        : `SSO discovery hop 1 failed (${reason})`,
+        ? `SSO discovery failed (${reason}): ${detail}`
+        : `SSO discovery failed (${reason})`,
     );
     this.name = "DomainNotConfiguredError";
   }
 }
 
-const II_CONFIG_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const PROVIDER_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const FETCH_TIMEOUT_MS = 15_000;
-const MAX_RETRIES = 3;
-const BASE_BACKOFF_MS = 2000;
-
-// Domain validation constants
 const MAX_DOMAIN_LENGTH = 253;
 const MAX_LABEL_LENGTH = 63;
 const DOMAIN_REGEX =
   /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
 
-interface IIConfigCacheEntry {
-  config: IIOpenIdConfiguration;
-  fetchedAt: number;
-}
-
-interface ProviderCacheEntry {
-  document: OidcDiscoveryDocument;
-  fetchedAt: number;
-}
-
-const iiConfigCache = new Map<string, IIConfigCacheEntry>();
-const providerCache = new Map<string, ProviderCacheEntry>();
+/**
+ * `localhost` / `127.0.0.1`, optionally followed by `:<port>`. IPv6 loopback
+ * (`[::1]`, etc.) is intentionally not handled — the canister doesn't recognise
+ * it either, and the e2e setup uses the hostname form.
+ */
+const isLoopbackHost = (host: string): boolean => {
+  const bare = host.split(":", 1)[0]?.toLowerCase() ?? host;
+  return bare === "localhost" || bare === "127.0.0.1";
+};
 
 /**
- * True if `hostname` is exactly `expected` or a proper subdomain of it.
- * Using `endsWith(expected)` alone would incorrectly accept
- * `evilaccounts.google.com` when `expected` is `accounts.google.com`.
- */
-const hostnameMatchesAllowed = (hostname: string, expected: string): boolean =>
-  hostname === expected || hostname.endsWith(`.${expected}`);
-
-/** Validate domain input format (DNS name).
+ * Validate domain input format (DNS name). Loopback hosts (`localhost` and
+ * `127.0.0.1`, with or without a port) skip the DNS-format check so e2e tests
+ * can use `localhost:11107` without widening the regex. The canister's
+ * `sso_discoverable_domains` allowlist is the actual trust gate.
  *
- * Loopback hosts (`localhost` and `127.0.0.1`, with or without a port)
- * skip the DNS-format check so e2e tests can register `localhost:11107`
- * without us having to widen the regex for every caller. Production
- * domains still go through the strict DNS validation path; the canister
- * `sso_discoverable_domains` allowlist remains the actual trust gate. */
+ * @throws {Error} when `domain` is not a valid DNS name.
+ */
 export const validateDomain = (domain: string): string => {
   const trimmed = domain.trim().toLowerCase();
   if (trimmed.length === 0) {
@@ -190,274 +101,26 @@ export const validateDomain = (domain: string): string => {
   return trimmed;
 };
 
-/**
- * `localhost` / `127.0.0.1`, optionally followed by `:<port>`. IPv6
- * loopback (`[::1]`, etc.) is intentionally not handled — the backend
- * doesn't recognise it either, and the e2e setup uses the hostname
- * form. Mirrors the backend's `scheme_for_allowlisted_host` loopback
- * check.
- */
-const isLoopbackHost = (host: string): boolean => {
-  const bare = host.split(":", 1)[0]?.toLowerCase() ?? host;
-  return bare === "localhost" || bare === "127.0.0.1";
-};
+const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => ({
+  domain: discovery.discovery_domain,
+  clientId: discovery.client_id,
+  name: discovery.name[0],
+  discovery: {
+    issuer: discovery.issuer,
+    authorization_endpoint: discovery.authorization_endpoint,
+    scopes_supported: discovery.scopes,
+  },
+});
 
 /**
- * Scheme to use when fetching from `host`. Loopback gets `http` (the
- * e2e provider can't serve TLS); everything else gets `https`. There's
- * no admin-list gate here — the trust boundary is the canister's
- * `add_discoverable_oidc_config` call, which has already happened by
- * the time we reach this function.
- */
-const schemeForHost = (host: string): "http" | "https" =>
-  isLoopbackHost(host) ? "http" : "https";
-
-/**
- * `https` is always accepted; `http` is accepted only for loopback
- * hosts.
- */
-const validateProviderUrl = (url: string): URL => {
-  const parsed = new URL(url);
-  if (parsed.protocol === "https:") {
-    return parsed;
-  }
-  if (parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)) {
-    return parsed;
-  }
-  throw new Error(
-    `Provider URL must use HTTPS: ${parsed.protocol}//${parsed.hostname}`,
-  );
-};
-
-/** Zod parse with a prefixed error message for easier user-visible output. */
-const parseOrThrow = <T>(
-  schema: z.ZodSchema<T>,
-  data: unknown,
-  context: string,
-): T => {
-  const result = schema.safeParse(data);
-  if (result.success) {
-    return result.data;
-  }
-  const first = result.error.issues[0];
-  const path =
-    first !== undefined && first.path.length > 0
-      ? first.path.join(".")
-      : "(root)";
-  throw new Error(`${context}: ${first?.message ?? "invalid"} at ${path}`);
-};
-
-/** Validate the `ii-openid-configuration` response structure. */
-const validateIIConfig = (data: unknown): IIOpenIdConfiguration => {
-  const parsed = parseOrThrow(
-    IIOpenIdConfigurationSchema,
-    data,
-    "ii-openid-configuration",
-  );
-  validateProviderUrl(parsed.openid_configuration);
-  return parsed;
-};
-
-/**
- * Variant of the issuer/auth-endpoint scheme check that mirrors
- * {@link validateProviderUrl}: HTTPS always passes; HTTP passes only
- * for loopback hosts.
- */
-const requireHttpsOrLoopback = (url: URL, label: string): void => {
-  if (url.protocol === "https:") return;
-  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return;
-  throw new Error(`Provider ${label} must use HTTPS: ${url.toString()}`);
-};
-
-/** Validate an OIDC discovery document from the provider. */
-const validateProviderDiscovery = (
-  data: unknown,
-  expectedHostname: string,
-): OidcDiscoveryDocument => {
-  const doc = parseOrThrow(
-    OidcDiscoveryDocumentSchema,
-    data,
-    "Provider discovery",
-  );
-
-  // Issuer hostname must match the expected provider host exactly or as a
-  // true subdomain — this blocks look-alike attacks.
-  const issuerUrl = new URL(doc.issuer);
-  requireHttpsOrLoopback(issuerUrl, "issuer");
-  if (!hostnameMatchesAllowed(issuerUrl.hostname, expectedHostname)) {
-    throw new Error(
-      `Provider issuer hostname mismatch: expected ${expectedHostname} or a subdomain, got ${issuerUrl.hostname}`,
-    );
-  }
-
-  // The authorization_endpoint is what we'll actually redirect the user to,
-  // so constrain it to the same host as the issuer — HTTPS alone isn't
-  // enough, a tampered discovery response could otherwise bounce auth to an
-  // attacker-controlled host.
-  const authUrl = new URL(doc.authorization_endpoint);
-  requireHttpsOrLoopback(authUrl, "authorization endpoint");
-  if (!hostnameMatchesAllowed(authUrl.hostname, expectedHostname)) {
-    throw new Error(
-      `Provider authorization endpoint hostname mismatch: expected ${expectedHostname} or a subdomain, got ${authUrl.hostname}`,
-    );
-  }
-
-  // zod already validated scopes_supported as `string[]` (or undefined).
-  return doc;
-};
-
-/**
- * Classify a raw error from hop 1 (`/.well-known/ii-openid-configuration`)
- * into a {@link DomainNotConfiguredError} variant so the UI can surface a
- * single friendly message.
+ * Resolve a domain's SSO configuration. Validates the domain, asks the canister
+ * to resolve it (`discover_sso`, which drives the fetch), then polls
+ * `discover_sso_query` until the result is ready. An optional `signal` cancels
+ * the poll (the input debounce drops a stale lookup when the user keeps typing).
  *
- * - `Fetch failed: <status> ...` from our {@link fetchWithRetry} → http-error
- *   with the parsed status.
- * - `AbortError` from the per-hop timeout → timeout.
- * - `SyntaxError` from `response.json()` → invalid-response (HTML served at
- *   200 is the most common cause, e.g. a CMS that SPA-routes every path).
- * - Anything else (network failures, CORS, DNS) → network.
- */
-const wrapHopOneError = (error: unknown): DomainNotConfiguredError => {
-  // Duck-type (not `instanceof Error`): jsdom errors thrown from
-  // `Response.json()` come from a separate realm, so `instanceof Error`
-  // against the main-realm `Error` returns false even for genuine
-  // SyntaxError instances. Reading `name`/`message` works across realms.
-  const name = errorName(error);
-  const message = errorMessage(error);
-  if (message !== undefined) {
-    const match = message.match(/^Fetch failed: (\d{3})\b/);
-    if (match !== null) {
-      return new DomainNotConfiguredError("http-error", parseInt(match[1], 10));
-    }
-  }
-  if (name === "AbortError") {
-    return new DomainNotConfiguredError("timeout");
-  }
-  if (name === "SyntaxError") {
-    return new DomainNotConfiguredError("invalid-response");
-  }
-  return new DomainNotConfiguredError("network");
-};
-
-const errorName = (e: unknown): string | undefined =>
-  typeof e === "object" &&
-  e !== null &&
-  typeof (e as { name?: unknown }).name === "string"
-    ? (e as { name: string }).name
-    : undefined;
-
-const errorMessage = (e: unknown): string | undefined =>
-  typeof e === "object" &&
-  e !== null &&
-  typeof (e as { message?: unknown }).message === "string"
-    ? (e as { message: string }).message
-    : undefined;
-
-/**
- * Whether a failed HTTP response is transient enough that a retry might
- * succeed. Intentionally narrow: only server-time statuses (`408`,
- * `429`, `5xx`) are retried. Deterministic 4xx (`400`, `401`, `403`,
- * `404`, ...) fail fast — retrying a domain's `/.well-known/ii-openid-
- * configuration` that returns `404` three times just buys the user
- * 2s + 4s + 8s of waiting for the same answer.
- */
-const isTransientHttpStatus = (status: number): boolean =>
-  status === 408 || status === 429 || status >= 500;
-
-/** Fetch JSON with timeout, retries on transient errors, and exponential backoff. */
-const fetchWithRetry = async (
-  url: string,
-  timeoutMs: number,
-  externalSignal?: AbortSignal,
-): Promise<unknown> => {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    if (externalSignal?.aborted === true) {
-      throw new DOMException("Aborted", "AbortError");
-    }
-    if (attempt > 0) {
-      const delay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
-      await sleep(delay, externalSignal);
-    }
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    // Bridge external abort → this attempt's controller so an in-flight
-    // `fetch` is cancelled the moment the caller signals.
-    const onExternalAbort = () => controller.abort();
-    externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
-    // Default: treat unknown / network errors as transient and retry.
-    // The try block overrides this with the HTTP-status classification
-    // when the response itself was received.
-    let retryable = true;
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      if (response.ok) {
-        return await response.json();
-      }
-      lastError = new Error(
-        `Fetch failed: ${response.status} ${response.statusText}`,
-      );
-      retryable = isTransientHttpStatus(response.status);
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        // Either the per-attempt timeout or the caller aborted us. In
-        // both cases there's no point retrying — surface immediately.
-        throw error;
-      }
-      // Network errors (TypeError from `fetch`) and other unknowns: leave
-      // `retryable = true` as initialised.
-      lastError = error;
-    } finally {
-      // Clear the abort timer and listener on every exit path so a late
-      // abort can't fire after the attempt is already done.
-      clearTimeout(timeoutId);
-      externalSignal?.removeEventListener("abort", onExternalAbort);
-    }
-    // Break out of the retry loop on deterministic failures (4xx other
-    // than 408 / 429) so the UI can surface them without backoff delay.
-    if (!retryable) throw lastError;
-  }
-  throw lastError;
-};
-
-/** Backoff sleep that resolves after `ms` or rejects with AbortError if the
- *  caller's signal fires first — so a stale lookup doesn't keep waiting
- *  through the full backoff window after the user has moved on. */
-const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (signal?.aborted === true) {
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException("Aborted", "AbortError"));
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-
-/**
- * Perform the two-hop SSO discovery chain for a given domain.
- *
- * The caller must have already confirmed the domain is registered in
- * `oidc_configs` — this function does no allowlist check of its own.
- *
- * @param domain - The organization domain (e.g., `dfinity.org`)
- * @param signal - Optional `AbortSignal` to cancel an in-flight discovery.
- *   When fired, in-flight `fetch`es are aborted and the function rejects
- *   with an `AbortError`.
- * @returns The `client_id` and OIDC discovery document
- * @throws {Error} On invalid `domain` input.
- * @throws {DomainNotConfiguredError} On any hop-1 failure
- *   (`http-error`, `invalid-response`, `network`, `timeout`).
- * @throws {Error} On hop-2 fetch failures (`Fetch failed: <status>`,
- *   `AbortError`) or provider-discovery validation failures (HTTPS, hostname
- *   match, schema).
+ * @throws {Error} when `domain` is invalid, or the lookup is aborted.
+ * @throws {DomainNotConfiguredError} when the canister rejects the domain or
+ *   the resolution times out.
  */
 export const discoverSsoConfig = async (
   domain: string,
@@ -465,100 +128,29 @@ export const discoverSsoConfig = async (
 ): Promise<SsoDiscoveryResult> => {
   const validatedDomain = validateDomain(domain);
 
-  // Serve from cache if both hops are still fresh.
-  const cachedIIConfig = iiConfigCache.get(validatedDomain);
-  if (
-    cachedIIConfig !== undefined &&
-    Date.now() - cachedIIConfig.fetchedAt < II_CONFIG_CACHE_TTL_MS
-  ) {
-    const cachedProvider = providerCache.get(
-      cachedIIConfig.config.openid_configuration,
-    );
-    if (
-      cachedProvider !== undefined &&
-      Date.now() - cachedProvider.fetchedAt < PROVIDER_CACHE_TTL_MS
-    ) {
-      return {
-        domain: validatedDomain,
-        clientId: cachedIIConfig.config.client_id,
-        name: cachedIIConfig.config.name,
-        discovery: cachedProvider.document,
-      };
+  const initial = await anonymousActor.discover_sso(validatedDomain);
+  if ("Err" in initial) {
+    throw new DomainNotConfiguredError("rejected", initial.Err);
+  }
+  const [ready] = initial.Ok;
+  if (ready !== undefined) {
+    return toResult(ready);
+  }
+
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    if (signal?.aborted === true) {
+      throw new Error("SSO discovery aborted");
+    }
+    await pollDelay();
+    const polled = await anonymousActor.discover_sso_query(validatedDomain);
+    if ("Err" in polled) {
+      throw new DomainNotConfiguredError("rejected", polled.Err);
+    }
+    const [resolved] = polled.Ok;
+    if (resolved !== undefined) {
+      return toResult(resolved);
     }
   }
 
-  // Hop 1: fetch /.well-known/ii-openid-configuration from the org domain.
-  // Raw fetch / JSON / validation errors are converted to
-  // DomainNotConfiguredError so the UI can show one friendly message
-  // regardless of how exactly the domain misbehaves. Caller-side aborts
-  // are passed through unwrapped so the UI can ignore them silently —
-  // wrapping them as "timeout" would be a lie.
-  const iiConfigUrl = `${schemeForHost(validatedDomain)}://${validatedDomain}/.well-known/ii-openid-configuration`;
-  let iiConfigData: unknown;
-  try {
-    iiConfigData = await fetchWithRetry(iiConfigUrl, FETCH_TIMEOUT_MS, signal);
-  } catch (error) {
-    if (signal?.aborted === true) throw error;
-    throw wrapHopOneError(error);
-  }
-  let iiConfig: IIOpenIdConfiguration;
-  try {
-    iiConfig = validateIIConfig(iiConfigData);
-  } catch (error) {
-    // Response decoded but doesn't match the expected shape — from the
-    // user's perspective the domain still isn't correctly configured.
-    throw new DomainNotConfiguredError(
-      "invalid-response",
-      undefined,
-      error instanceof Error ? error.message : undefined,
-    );
-  }
-
-  iiConfigCache.set(validatedDomain, {
-    config: iiConfig,
-    fetchedAt: Date.now(),
-  });
-
-  // Hop 2: fetch the provider's standard OIDC discovery document.
-  const cachedProviderDoc = providerCache.get(iiConfig.openid_configuration);
-  if (
-    cachedProviderDoc !== undefined &&
-    Date.now() - cachedProviderDoc.fetchedAt < PROVIDER_CACHE_TTL_MS
-  ) {
-    return {
-      domain: validatedDomain,
-      clientId: iiConfig.client_id,
-      name: iiConfig.name,
-      discovery: cachedProviderDoc.document,
-    };
-  }
-
-  const providerUrl = new URL(iiConfig.openid_configuration);
-  const providerData = await fetchWithRetry(
-    iiConfig.openid_configuration,
-    FETCH_TIMEOUT_MS,
-    signal,
-  );
-  const providerDoc = validateProviderDiscovery(
-    providerData,
-    providerUrl.hostname,
-  );
-
-  providerCache.set(iiConfig.openid_configuration, {
-    document: providerDoc,
-    fetchedAt: Date.now(),
-  });
-
-  return {
-    domain: validatedDomain,
-    clientId: iiConfig.client_id,
-    name: iiConfig.name,
-    discovery: providerDoc,
-  };
-};
-
-/** Clear all SSO discovery caches (for testing). */
-export const clearSsoDiscoveryCache = (): void => {
-  iiConfigCache.clear();
-  providerCache.clear();
+  throw new DomainNotConfiguredError("timeout");
 };
