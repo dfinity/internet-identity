@@ -365,6 +365,35 @@ pub fn config(
     call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ()).map(|(x,)| x)
 }
 
+pub fn discover_sso(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+) -> Result<Result<Option<types::SsoDiscovery>, String>, RejectResponse> {
+    call_candid(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        "discover_sso",
+        (domain,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn discover_sso_query(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+) -> Result<Result<Option<types::SsoDiscovery>, String>, RejectResponse> {
+    query_candid(
+        env,
+        canister_id,
+        "discover_sso_query",
+        (domain,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn openid_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
