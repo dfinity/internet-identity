@@ -250,14 +250,19 @@ pub struct ValidatedOpenIDRegFinishArg {
 fn validate_identity_data<M: Memory + Clone>(
     storage: &Storage<M>,
     arg: &CreateIdentityData,
+    verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<ValidatedCreateIdentityData, IdRegFinishError> {
     match &arg {
         CreateIdentityData::PubkeyAuthn(arg) => {
             Ok(ValidatedCreateIdentityData::PubkeyAuthn(arg.clone()))
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
-            let (credential, openid_config_iss) =
-                create_openid_credential_and_config(openid_registration_data)?;
+            // Verified above, before the storage borrow.
+            let (credential, openid_config_iss) = verified_openid.ok_or_else(|| {
+                IdRegFinishError::InvalidAuthnMethod(
+                    "missing verified OpenID credential".to_string(),
+                )
+            })?;
 
             check_openid_credential_is_unique(storage, &credential.key())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
@@ -342,8 +347,17 @@ fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber,
             .map_err(IdRegFinishError::InvalidAuthnMethod)?;
     }
 
+    // Verify an OpenID credential before taking the storage borrow below:
+    // verification reads the SSO discovery / JWKS caches (and the configured
+    // providers' JWKs from stable storage), which would conflict with the
+    // `storage_borrow_mut` it would otherwise run inside.
+    let verified_openid = match &arg {
+        CreateIdentityData::OpenID(data) => Some(create_openid_credential_and_config(data)?),
+        CreateIdentityData::PubkeyAuthn(_) => None,
+    };
+
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
-        let arg = validate_identity_data(storage, arg)?;
+        let arg = validate_identity_data(storage, arg, verified_openid)?;
 
         let allocation = storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
             let operation = apply_identity_data(identity, arg)?;
