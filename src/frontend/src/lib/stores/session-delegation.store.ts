@@ -20,7 +20,7 @@ const SESSION_DELEGATION_STORE = createStore("ii-session-delegations", "keys");
 
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
-export const mintAndStore = async ({
+export const mintSession = async ({
   identityNumber,
   actor,
 }: {
@@ -35,11 +35,16 @@ export const mintAndStore = async ({
   }
 };
 
-export const purge = async (identityNumber: bigint): Promise<void> => {
+export const purgeSession = async (identityNumber: bigint): Promise<void> => {
   await idbDel(identityNumber.toString(), SESSION_DELEGATION_STORE);
 };
 
-export const actorForAccountManagement = async (
+// Resolves an actor authorized as the given identity. Prefers the live
+// authenticated actor (covers the immediate-post-ceremony race where
+// mintSession is fire-and-forget and the IDB write may not have landed yet)
+// and falls back to a stored session delegation; returns undefined if
+// neither source has an actor for this identity.
+export const actorForIdentity = async (
   identityNumber: bigint,
 ): Promise<ActorSubclass<_SERVICE> | undefined> => {
   const authenticated = get(authenticationStore);
@@ -65,7 +70,7 @@ export const actorForAccountManagement = async (
   }
 
   if (record.expiresAtMillis - EXPIRY_MARGIN_MS <= Date.now()) {
-    void purge(identityNumber);
+    void purgeSession(identityNumber);
     return undefined;
   }
 
@@ -83,7 +88,7 @@ export const actorForAccountManagement = async (
       canisterId,
     });
   } catch {
-    void purge(identityNumber);
+    void purgeSession(identityNumber);
     return undefined;
   }
 };

@@ -42,7 +42,7 @@ import {
 } from "$lib/utils/openID";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 import { nanosToMillis } from "$lib/utils/time";
-import { mintAndStore } from "$lib/stores/session-delegation.store";
+import { mintSession } from "$lib/stores/session-delegation.store";
 
 interface AuthFlowOptions {
   trackLastUsed?: boolean;
@@ -343,7 +343,7 @@ export class AuthFlow {
       });
     const authMethod = { passkey: { credentialId } };
     await authenticationStore.set({ identity, identityNumber, authMethod });
-    void mintAndStore({ identityNumber, actor: get(authenticatedStore).actor });
+    void mintSession({ identityNumber, actor: get(authenticatedStore).actor });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
     const pendingLastUsedEntry = this.#options.trackLastUsed
@@ -533,7 +533,7 @@ export class AuthFlow {
         identityNumber,
         authMethod: { openid: { iss, sub } },
       });
-      void mintAndStore({
+      void mintSession({
         identityNumber,
         actor: get(authenticatedStore).actor,
       });
@@ -632,7 +632,7 @@ export class AuthFlow {
         identityNumber,
         authMethod: { passkey: { credentialId } },
       });
-      void mintAndStore({
+      void mintSession({
         identityNumber,
         actor: get(authenticatedStore).actor,
       });
@@ -801,7 +801,7 @@ export class AuthFlow {
         identityNumber,
         authMethod: { openid: { iss, sub } },
       });
-      void mintAndStore({
+      void mintSession({
         identityNumber,
         actor: get(authenticatedStore).actor,
       });

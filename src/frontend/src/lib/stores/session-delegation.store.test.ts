@@ -89,7 +89,7 @@ vi.mock("$lib/stores/authentication.store", () => ({
   },
 }));
 
-describe("actorForAccountManagement — authenticated store precedence", () => {
+describe("actorForIdentity — authenticated store precedence", () => {
   it("returns the authenticated actor when the authenticated store has a matching identity number", async () => {
     const mockActor = makeMockActor();
     const { authenticationStore } =
@@ -101,10 +101,10 @@ describe("actorForAccountManagement — authenticated store precedence", () => {
       return () => {};
     });
 
-    const { actorForAccountManagement } =
+    const { actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
 
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBe(mockActor);
   });
 
@@ -119,19 +119,19 @@ describe("actorForAccountManagement — authenticated store precedence", () => {
       return () => {};
     });
 
-    const { actorForAccountManagement } =
+    const { actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
 
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBeUndefined();
   });
 });
 
-describe("actorForAccountManagement — IDB resolution", () => {
+describe("actorForIdentity — IDB resolution", () => {
   it("returns undefined when no record exists in IDB", async () => {
-    const { actorForAccountManagement } =
+    const { actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBeUndefined();
   });
 
@@ -150,9 +150,9 @@ describe("actorForAccountManagement — IDB resolution", () => {
       TEST_STORE,
     );
 
-    const { actorForAccountManagement } =
+    const { actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBeDefined();
   });
 
@@ -171,9 +171,9 @@ describe("actorForAccountManagement — IDB resolution", () => {
       TEST_STORE,
     );
 
-    const { actorForAccountManagement } =
+    const { actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBeUndefined();
 
     await vi.runAllTimersAsync();
@@ -195,9 +195,9 @@ describe("actorForAccountManagement — IDB resolution", () => {
       TEST_STORE,
     );
 
-    const { actorForAccountManagement } =
+    const { actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBeUndefined();
 
     await vi.runAllTimersAsync();
@@ -205,7 +205,7 @@ describe("actorForAccountManagement — IDB resolution", () => {
     expect(remaining).toBeUndefined();
   });
 
-  it("round-trips mintAndStore → actorForAccountManagement with non-extractable keys", async () => {
+  it("round-trips mintSession → actorForIdentity with non-extractable keys", async () => {
     const expirationNs = BigInt(FAR_FUTURE) * BigInt(1_000_000);
 
     const mintActor = {
@@ -232,17 +232,17 @@ describe("actorForAccountManagement — IDB resolution", () => {
         ),
     } as unknown as ActorSubclass<_SERVICE>;
 
-    const { mintAndStore, actorForAccountManagement } =
+    const { mintSession, actorForIdentity } =
       await import("$lib/stores/session-delegation.store");
 
-    await mintAndStore({ identityNumber: IDENTITY_NUMBER, actor: mintActor });
+    await mintSession({ identityNumber: IDENTITY_NUMBER, actor: mintActor });
 
-    const result = await actorForAccountManagement(IDENTITY_NUMBER);
+    const result = await actorForIdentity(IDENTITY_NUMBER);
     expect(result).toBeDefined();
   });
 });
 
-describe("purge", () => {
+describe("purgeSession", () => {
   it("removes the record from IDB", async () => {
     const keyPair = await makeKeyPair();
     const chainJson = await makeChainJson();
@@ -258,20 +258,22 @@ describe("purge", () => {
       TEST_STORE,
     );
 
-    const { purge } = await import("$lib/stores/session-delegation.store");
-    await purge(IDENTITY_NUMBER);
+    const { purgeSession } =
+      await import("$lib/stores/session-delegation.store");
+    await purgeSession(IDENTITY_NUMBER);
 
     const remaining = await idbGet(IDENTITY_NUMBER.toString(), TEST_STORE);
     expect(remaining).toBeUndefined();
   });
 
   it("does not throw when the record does not exist", async () => {
-    const { purge } = await import("$lib/stores/session-delegation.store");
-    await expect(purge(IDENTITY_NUMBER)).resolves.toBeUndefined();
+    const { purgeSession } =
+      await import("$lib/stores/session-delegation.store");
+    await expect(purgeSession(IDENTITY_NUMBER)).resolves.toBeUndefined();
   });
 });
 
-describe("mintAndStore — failure is swallowed", () => {
+describe("mintSession — failure is swallowed", () => {
   it("does not throw when mintSessionDelegation rejects", async () => {
     const sdModule =
       await import("$lib/utils/authentication/sessionDelegation");
@@ -279,12 +281,12 @@ describe("mintAndStore — failure is swallowed", () => {
       new Error("backend not deployed"),
     );
 
-    const { mintAndStore } =
+    const { mintSession } =
       await import("$lib/stores/session-delegation.store");
     const actor = makeMockActor();
 
     await expect(
-      mintAndStore({ identityNumber: IDENTITY_NUMBER, actor }),
+      mintSession({ identityNumber: IDENTITY_NUMBER, actor }),
     ).resolves.toBeUndefined();
   });
 
@@ -305,11 +307,11 @@ describe("mintAndStore — failure is swallowed", () => {
       new Error("NoSuchDelegation"),
     );
 
-    const { mintAndStore } =
+    const { mintSession } =
       await import("$lib/stores/session-delegation.store");
     const actor = makeMockActor();
 
-    await mintAndStore({ identityNumber: IDENTITY_NUMBER, actor });
+    await mintSession({ identityNumber: IDENTITY_NUMBER, actor });
 
     const remaining = await idbGet(IDENTITY_NUMBER.toString(), TEST_STORE);
     expect(remaining).toEqual(existingRecord);

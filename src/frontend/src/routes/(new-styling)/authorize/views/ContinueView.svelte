@@ -19,8 +19,8 @@
     isAuthenticatedStore,
   } from "$lib/stores/authentication.store";
   import {
-    actorForAccountManagement,
-    purge,
+    actorForIdentity,
+    purgeSession,
   } from "$lib/stores/session-delegation.store";
   import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
@@ -102,9 +102,7 @@
     isAuthenticatingDefault = true;
     try {
       if (defaultAccountNumber === null) {
-        const sessionActor = await actorForAccountManagement(
-          selectedIdentityNumber,
-        );
+        const sessionActor = await actorForIdentity(selectedIdentityNumber);
         if (sessionActor !== undefined) {
           try {
             const account = await sessionActor
@@ -116,7 +114,7 @@
               isCanisterError<SessionDelegationError>(err) &&
               err.type === "Unauthorized"
             ) {
-              void purge(selectedIdentityNumber);
+              void purgeSession(selectedIdentityNumber);
             } else {
               throw err;
             }
@@ -179,9 +177,7 @@
 
   const handleEnableMultipleAccounts = async () => {
     try {
-      const sessionActor = await actorForAccountManagement(
-        selectedIdentityNumber,
-      );
+      const sessionActor = await actorForIdentity(selectedIdentityNumber);
       if (sessionActor !== undefined) {
         try {
           await loadAccountsViaActor(sessionActor, selectedIdentityNumber);
@@ -191,7 +187,7 @@
             isCanisterError<SessionDelegationError>(err) &&
             err.type === "Unauthorized"
           ) {
-            void purge(selectedIdentityNumber);
+            void purgeSession(selectedIdentityNumber);
           } else {
             throw err;
           }
@@ -286,9 +282,7 @@
       }
 
       if (defaultChanged) {
-        const sessionActor = await actorForAccountManagement(
-          selectedIdentityNumber,
-        );
+        const sessionActor = await actorForIdentity(selectedIdentityNumber);
         if (sessionActor !== undefined) {
           try {
             accounts[index] = await sessionActor
@@ -305,7 +299,7 @@
               isCanisterError<SessionDelegationError>(err) &&
               err.type === "Unauthorized"
             ) {
-              void purge(selectedIdentityNumber);
+              void purgeSession(selectedIdentityNumber);
             } else {
               throw err;
             }
