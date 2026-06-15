@@ -2177,14 +2177,12 @@ mod tests {
         const SUB: &str = "sso-user-789";
 
         fn setup_sso_provider() {
+            // SSO-ness now lives on the credential's stamped `sso_domain`
+            // (post-migration); registering the domain is only needed so the
+            // `discovered_oidc_configs` listing can enumerate it.
             crate::openid::setup_oidc(vec![DiscoverableOidcConfig {
                 discovery_domain: SSO_DOMAIN.to_string(),
             }]);
-            crate::openid::generic::set_discovered_state_for_test(
-                SSO_DOMAIN,
-                SSO_ISSUER,
-                SSO_CLIENT_ID,
-            );
         }
 
         fn sso_credential_with(metadata: HashMap<String, MetadataEntryV2>) -> OpenIdCredential {
@@ -2194,7 +2192,9 @@ mod tests {
                 aud: SSO_CLIENT_ID.to_string(),
                 last_usage_timestamp: None,
                 metadata,
-                sso_domain: None,
+                // Stamped SSO credential — `discovery_domain()` /
+                // `matched_attribute_scope()` read this directly.
+                sso_domain: Some(SSO_DOMAIN.to_string()),
                 sso_name: None,
             }
         }

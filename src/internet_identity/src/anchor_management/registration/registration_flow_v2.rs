@@ -199,18 +199,31 @@ pub fn identity_registration_finish(
 fn create_openid_credential_and_config(
     openid_registration_data: &OpenIDRegFinishArg,
 ) -> Result<(openid::OpenIdCredential, String), IdRegFinishError> {
-    let OpenIDRegFinishArg { jwt, salt, name: _ } = openid_registration_data;
+    let OpenIDRegFinishArg {
+        jwt,
+        salt,
+        name: _,
+        discovery_domain,
+    } = openid_registration_data;
 
-    let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
-        // `with_provider` only yields providers whose discovery has completed, so
-        // `issuer()` is always Some — surface an explicit error if that ever breaks.
-        let issuer = provider.issuer().ok_or_else(|| {
-            openid::OpenIDJWTVerificationError::GenericError(
-                "Selected provider has no issuer after discovery filter".to_string(),
-            )
-        })?;
-        Ok((provider.verify(jwt, salt)?, issuer))
-    })?;
+    // Registration runs in an update, so a cold SSO cache spawns the discovery
+    // / JWKS fills and surfaces `Pending` — the frontend retries the call.
+    let openid_credential = match openid::verify_jwt(
+        jwt,
+        salt,
+        discovery_domain.as_deref(),
+        openid::VerifyMode::Update,
+    )? {
+        openid::Cached::Ready(credential) => credential,
+        openid::Cached::Pending => return Err(openid::OpenIDJWTVerificationError::Pending.into()),
+    };
+
+    // Config issuer for the authorization key / operation log: the configured
+    // provider's (template) issuer, or the concrete JWT issuer for SSO
+    // credentials (which carry their own `sso_domain` for scope routing).
+    let openid_config_iss = openid_credential
+        .config_issuer()
+        .unwrap_or_else(|| openid_credential.iss.clone());
 
     Ok((openid_credential, openid_config_iss))
 }

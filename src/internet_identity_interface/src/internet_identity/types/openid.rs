@@ -35,6 +35,10 @@ pub enum OpenIdCredentialAddError {
     OpenIdCredentialAlreadyRegistered,
     InternalCanisterError(String),
     JwtExpired,
+    /// SSO discovery / JWKS for this domain isn't cached yet; the canister
+    /// kicked off the fetch. Retry the call shortly. Never returned for
+    /// configured providers (Google / Microsoft / Apple).
+    Pending,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -57,6 +61,11 @@ pub enum OpenIdDelegationError {
     NoSuchDelegation,
     JwtVerificationFailed,
     JwtExpired,
+    /// SSO discovery / JWKS for this domain isn't cached yet. `prepare` kicks
+    /// off the fetch; poll `get` until the delegation is ready, re-calling
+    /// `prepare` if `get` reports `Pending`. Never returned for configured
+    /// providers.
+    Pending,
 }
 
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);

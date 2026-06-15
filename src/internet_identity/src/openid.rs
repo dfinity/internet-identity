@@ -15,18 +15,19 @@ use internet_identity_interface::internet_identity::types::openid::{
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, DiscoverableOidcConfig, IdRegFinishError, MetadataEntryV2,
     OidcConfig, OpenIdConfig, OpenIdEmailVerificationScheme, PublicKey, SessionKey,
-    SignedDelegation, Timestamp, UserKey,
+    SignedDelegation, SsoDiscovery, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
-pub(crate) mod generic;
+mod configured;
+mod jwks;
+mod provider;
+mod sso;
+mod verify;
 
-// Re-export the SSO-metadata lookup so the storage-layer
-// `OpenIdCredential → OpenIdCredentialData` conversion can call it
-// without making the whole `generic` module public.
-pub use generic::sso_fields_for;
+pub use crate::single_flight_cache::Cached;
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -35,10 +36,26 @@ pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
 
+/// Whether a verification / discovery call runs in an update (it may spawn the
+/// outcall fills the SSO caches need) or a query (it may only peek the caches,
+/// since a query cannot make outcalls). For configured providers the mode is
+/// irrelevant — their JWKs are read synchronously from stable storage.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum VerifyMode {
+    Update,
+    Query,
+}
+
 #[derive(PartialEq, Eq, CandidType, Deserialize, Clone, Debug)]
 pub enum OpenIDJWTVerificationError {
     GenericError(String),
     JWTExpired,
+    /// SSO discovery or JWKS for this sign-in isn't cached yet. The fill is
+    /// in flight (an update kicked it off); retry shortly. Configured providers
+    /// never produce this — their JWKs are always synchronously available — but
+    /// the frontend treats every provider kind uniformly and is prepared to
+    /// retry on it (see the redemption poll loop).
+    Pending,
 }
 
 // Implementation of From trait to convert OpenIDJWTVerificationError to OpenIdCredentialAddError
@@ -46,6 +63,7 @@ impl From<OpenIDJWTVerificationError> for OpenIdCredentialAddError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
             OpenIDJWTVerificationError::JWTExpired => OpenIdCredentialAddError::JwtExpired,
+            OpenIDJWTVerificationError::Pending => OpenIdCredentialAddError::Pending,
             OpenIDJWTVerificationError::GenericError(_) => {
                 OpenIdCredentialAddError::JwtVerificationFailed
             }
@@ -58,6 +76,7 @@ impl From<OpenIDJWTVerificationError> for OpenIdDelegationError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
             OpenIDJWTVerificationError::JWTExpired => OpenIdDelegationError::JwtExpired,
+            OpenIDJWTVerificationError::Pending => OpenIdDelegationError::Pending,
             OpenIDJWTVerificationError::GenericError(_) => {
                 OpenIdDelegationError::JwtVerificationFailed
             }
@@ -71,6 +90,9 @@ impl From<OpenIDJWTVerificationError> for IdRegFinishError {
         match error {
             OpenIDJWTVerificationError::JWTExpired => {
                 IdRegFinishError::InvalidAuthnMethod("JWT expired".to_string())
+            }
+            OpenIDJWTVerificationError::Pending => {
+                IdRegFinishError::InvalidAuthnMethod("OIDC discovery in progress".to_string())
             }
             OpenIDJWTVerificationError::GenericError(msg) => {
                 IdRegFinishError::InvalidAuthnMethod(format!("JWT verification failed: {msg}"))
@@ -88,9 +110,7 @@ pub struct OpenIdCredential {
     pub metadata: HashMap<String, MetadataEntryV2>,
     /// SSO discovery domain this credential was verified through, stamped at
     /// verification time. `None` for direct-provider credentials (Google /
-    /// Microsoft / Apple); also `None` for SSO credentials stored before the
-    /// field existed until the `sso_credential_migration` backfill stamps
-    /// them (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
+    /// Microsoft / Apple).
     pub sso_domain: Option<String>,
     /// Human-readable SSO label from the domain's hop-1
     /// `ii-openid-configuration`. May be `None` even for SSO credentials —
@@ -157,77 +177,40 @@ impl OpenIdCredential {
         })
     }
 
-    /// Helper method to find the matching provider for this credential and execute a callback with it
-    fn with_provider<F, R>(&self, f: F) -> Option<R>
-    where
-        F: FnOnce(&dyn OpenIdProvider) -> Option<R>,
-    {
-        PROVIDERS.with_borrow(|providers| {
-            providers
-                .iter()
-                .find(|provider| {
-                    // Skip providers whose discovery is still pending.
-                    let Some(template) = provider.issuer() else {
-                        return false;
-                    };
-                    let Some(provider_aud) = provider.client_id() else {
-                        return false;
-                    };
-                    let issuer_placeholders = get_issuer_placeholders(&template);
-                    let mut issuer_claims: Vec<(String, String)> = vec![];
-                    for key in issuer_placeholders {
-                        if let Some(MetadataEntryV2::String(value)) = self.metadata.get(&key) {
-                            issuer_claims.push((key, value.to_string()));
-                        } else {
-                            return false;
-                        }
-                    }
-                    let effective_issuer = replace_issuer_placeholders(&template, &issuer_claims);
-                    effective_issuer == self.iss && provider_aud == self.aud
-                })
-                .and_then(|provider| f(provider.as_ref()))
-        })
-    }
-
-    /// Find current config for stored credential
+    /// Find current config issuer for stored credential. Returns the configured
+    /// provider's (template) issuer, or `None` for SSO credentials (which are
+    /// addressable via `sso:<domain>`, not `openid:<issuer>`) and for
+    /// credentials matching no configured provider.
     pub fn config_issuer(&self) -> Option<String> {
-        self.with_provider(|provider| provider.issuer())
+        if self.sso_domain.is_some() {
+            return None;
+        }
+        configured::config_issuer_for(self)
     }
 
-    /// Returns the `discovery_domain` of the SSO provider that currently
-    /// matches this credential, if any. `None` for credentials matched to a
-    /// hardcoded (non-discoverable) `Provider` — those are addressable via
-    /// the `openid:<issuer>` attribute scope instead.
-    ///
-    /// Used to route attribute requests to the `sso:<domain>` scope with
-    /// exclusive semantics: a credential with `Some(domain)` here is
-    /// reachable via `sso:<domain>` only, never via `openid:<issuer>`.
+    /// Returns the `discovery_domain` of the SSO provider this credential was
+    /// verified through, if any. Read straight off the stamped field — no
+    /// provider lookup needed (the `sso_credential_migration` backfill stamped
+    /// every existing SSO credential).
     pub fn discovery_domain(&self) -> Option<String> {
-        self.with_provider(|provider| provider.discovery_domain())
+        self.sso_domain.clone()
     }
 
-    /// Returns the single `AttributeScope` this credential is addressable
-    /// under, computed with one provider lookup. This is the source of truth
-    /// for scope exclusivity:
+    /// The single `AttributeScope` this credential is addressable under — the
+    /// source of truth for scope exclusivity:
     ///
-    /// - `Some(Sso { domain })`     for credentials matched to a `DiscoverableProvider`
-    /// - `Some(OpenId { issuer })`  for credentials matched to a hardcoded provider
-    /// - `None`                     when no provider currently matches (discovery
-    ///   pending or provider unregistered) — credential is unreachable.
-    ///
-    /// Prefer this over calling `discovery_domain()` + `config_issuer()`
-    /// separately, which would perform two `with_provider` scans per
-    /// credential in hot paths.
+    /// - `Some(Sso { domain })`     for SSO credentials (stamped `sso_domain`),
+    /// - `Some(OpenId { issuer })`  for configured-provider credentials,
+    /// - `None`                     when no configured provider matches and the
+    ///   credential isn't SSO — credential is unreachable.
     pub fn matched_attribute_scope(&self) -> Option<AttributeScope> {
-        self.with_provider(|provider| match provider.discovery_domain() {
-            Some(domain) => Some(AttributeScope::Sso { domain }),
-            None => provider
-                .issuer()
-                .map(|issuer| AttributeScope::OpenId { issuer }),
-        })
+        if let Some(domain) = self.sso_domain.clone() {
+            return Some(AttributeScope::Sso { domain });
+        }
+        configured::config_issuer_for(self).map(|issuer| AttributeScope::OpenId { issuer })
     }
 
-    fn read_attribute_as_string(&self, attribute_name: &str) -> Option<String> {
+    pub(super) fn read_metadata_string(&self, attribute_name: &str) -> Option<String> {
         let MetadataEntryV2::String(value) = self.metadata.get(attribute_name)? else {
             return None;
         };
@@ -236,15 +219,15 @@ impl OpenIdCredential {
     }
 
     pub fn get_name(&self) -> Option<String> {
-        self.read_attribute_as_string("name")
+        self.read_metadata_string("name")
     }
 
     pub fn get_email(&self) -> Option<String> {
-        self.read_attribute_as_string("email")
+        self.read_metadata_string("email")
     }
 
     fn get_google_verified_email(&self) -> Option<String> {
-        let email_verified = self.read_attribute_as_string("email_verified")?;
+        let email_verified = self.read_metadata_string("email_verified")?;
 
         if !email_verified.eq_ignore_ascii_case("true") {
             return None;
@@ -261,7 +244,7 @@ impl OpenIdCredential {
         // See https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference#payload-claims
         const MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
-        let tid = self.read_attribute_as_string("tid")?;
+        let tid = self.read_metadata_string("tid")?;
 
         if tid != MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID {
             return None;
@@ -270,58 +253,19 @@ impl OpenIdCredential {
         self.get_email()
     }
 
-    /// Return the verified email for this credential, if available
+    /// Return the verified email for this credential, if available. Direct
+    /// providers opt into a hardcoded scheme; SSO credentials never do.
     pub fn get_verified_email(&self) -> Option<String> {
-        self.with_provider(|provider| {
-            use OpenIdEmailVerificationScheme::*;
-
-            let verification_scheme = provider.email_verification_scheme()?;
-
-            match verification_scheme {
-                Unknown => None,
-                Google => self.get_google_verified_email(),
-                Microsoft => self.get_microsoft_verified_email(),
-            }
-        })
+        if self.sso_domain.is_some() {
+            return None;
+        }
+        use OpenIdEmailVerificationScheme::*;
+        match configured::email_scheme_for(self)? {
+            Unknown => None,
+            Google => self.get_google_verified_email(),
+            Microsoft => self.get_microsoft_verified_email(),
+        }
     }
-}
-
-pub trait OpenIdProvider {
-    /// Issuer template for this provider. `None` means discovery is still pending —
-    /// matching and verification skip such providers. May contain placeholders like
-    /// `{tid}` that are filled from JWT claims before comparison.
-    fn issuer(&self) -> Option<String>;
-
-    /// Client id (the expected JWT `aud`) for this provider. `None` means discovery
-    /// is still pending.
-    fn client_id(&self) -> Option<String>;
-
-    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme>;
-
-    /// SSO discovery domain for this provider, if any. Returns `Some(domain)` only
-    /// for providers created from a `DiscoverableOidcConfig` (the two-hop SSO
-    /// discovery flow). All other providers (Google, Microsoft, hardcoded
-    /// generic OIDC) inherit the default `None`.
-    ///
-    /// Credentials whose matched provider reports `Some(domain)` are reachable
-    /// via the `sso:<domain>` attribute scope and are *not* reachable via
-    /// `openid:<issuer>` — see `OpenIdCredential::discovery_domain` and
-    /// `Anchor::prepare_openid_attributes` / `prepare_sso_attributes`.
-    fn discovery_domain(&self) -> Option<String> {
-        None
-    }
-
-    /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
-    ///
-    /// # Arguments
-    ///
-    /// * `jwt`: The JWT returned by the OpenID authentication flow with the OpenID provider
-    /// * `salt`: The random salt that was used to bind the nonce to the caller principal
-    fn verify(
-        &self,
-        jwt: &str,
-        salt: &[u8; 32],
-    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError>;
 }
 
 #[derive(Deserialize)]
@@ -359,44 +303,38 @@ impl AudClaim {
 }
 
 thread_local! {
-    static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
     static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = const { RefCell::new(vec![]) };
 }
 
+/// Install the configured (hardcoded) OpenID providers from init args.
 pub fn setup(configs: Vec<OpenIdConfig>) {
-    PROVIDERS.with_borrow_mut(|providers| {
-        for config in configs {
-            providers.push(Box::new(generic::Provider::create(config)));
-        }
-    });
+    configured::setup(configs);
 }
 
+/// Replay the persisted discoverable-SSO domain registry at post-upgrade. SSO
+/// discovery itself is now on demand (no timers) — this only restores the list
+/// of registered domains so `discovered_oidc_configs` can enumerate them.
 pub fn setup_oidc(configs: Vec<DiscoverableOidcConfig>) {
     for config in configs {
         add_oidc_config_internal(config);
     }
-    #[cfg(not(test))]
-    generic::init_discovery_timers();
 }
 
 pub fn add_oidc_config(config: DiscoverableOidcConfig) {
-    if !generic::is_allowed_discovery_domain(&config.discovery_domain) {
+    if !sso::is_allowed_discovery_domain(&config.discovery_domain) {
         ic_cdk::trap(&format!(
             "discovery_domain '{}' is not on the canary allowlist",
             config.discovery_domain
         ));
     }
 
-    // Canonicalize the domain to lowercase. DNS hostnames are
-    // case-insensitive and `is_allowed_discovery_domain` already accepts
-    // case-insensitively via `eq_ignore_ascii_case`. Storing a canonical form
-    // keeps `OIDC_CONFIGS`, `DISCOVERY_TASKS`, `DiscoverableProvider`, and
-    // downstream attribute-scope matching (`sso:<domain>`) all in sync.
+    // Canonicalize the domain to lowercase. DNS hostnames are case-insensitive
+    // and the allowlist accepts case-insensitively; storing a canonical form
+    // keeps the registry and downstream `sso:<domain>` matching in sync.
     let config = DiscoverableOidcConfig {
         discovery_domain: config.discovery_domain.to_ascii_lowercase(),
     };
 
-    // Skip if already registered
     let already_exists = OIDC_CONFIGS.with_borrow(|stored| {
         stored
             .iter()
@@ -413,38 +351,36 @@ pub fn add_oidc_config(config: DiscoverableOidcConfig) {
         let configs = persistent_state.oidc_configs.get_or_insert_with(Vec::new);
         configs.push(config);
     });
-
-    #[cfg(not(test))]
-    generic::init_discovery_timers();
 }
 
 fn add_oidc_config_internal(config: DiscoverableOidcConfig) {
-    // Canonicalize so `OIDC_CONFIGS`, `DISCOVERY_TASKS` (in `DiscoverableProvider`),
-    // and downstream `sso:<domain>` scope matching stay in sync. `add_oidc_config`
-    // already canonicalizes, but `setup_oidc` replays persisted configs at
-    // post-upgrade time which may contain values from before this change.
     let config = DiscoverableOidcConfig {
         discovery_domain: config.discovery_domain.to_ascii_lowercase(),
     };
     OIDC_CONFIGS.with_borrow_mut(|stored| {
-        stored.push(config.clone());
-    });
-    PROVIDERS.with_borrow_mut(|providers| {
-        providers.push(Box::new(generic::DiscoverableProvider::create(config)));
+        stored.push(config);
     });
 }
 
+/// List the registered discoverable-SSO domains with whatever discovery state
+/// is currently cached (peek-only — a query can't drive a fill). Domains not
+/// yet warmed by a sign-in or `discover_sso` call report `None` fields.
 pub fn get_discovered_oidc_configs() -> Vec<OidcConfig> {
     OIDC_CONFIGS.with_borrow(|configs| {
         configs
             .iter()
             .map(|config| {
-                let (client_id, openid_configuration, issuer) =
-                    generic::discovered_state_for(&config.discovery_domain);
+                let domain = &config.discovery_domain;
+                let (client_id, issuer) = match sso::discover(domain, VerifyMode::Query) {
+                    Ok(Cached::Ready(cfg)) => (Some(cfg.client_id), Some(cfg.issuer)),
+                    _ => (None, None),
+                };
                 OidcConfig {
-                    discovery_domain: config.discovery_domain.clone(),
+                    discovery_domain: domain.clone(),
                     client_id,
-                    openid_configuration,
+                    // Superseded by `discover_sso`; the legacy listing no longer
+                    // surfaces the hop-1 `openid_configuration` URL.
+                    openid_configuration: None,
                     issuer,
                 }
             })
@@ -452,16 +388,43 @@ pub fn get_discovered_oidc_configs() -> Vec<OidcConfig> {
     })
 }
 
-pub fn with_provider<F, R>(jwt: &str, callback: F) -> Result<R, OpenIDJWTVerificationError>
-where
-    F: FnOnce(&dyn OpenIdProvider) -> Result<R, OpenIDJWTVerificationError>,
-{
+/// Resolve an SSO domain's full configuration for the sign-in initiation flow.
+/// `mode` decides whether a cold cache spawns the discovery fill (`Update`) or
+/// only peeks (`Query`). Returns `Ok(None)` while discovery is still in flight
+/// (the frontend polls), `Err` for a disallowed domain.
+pub fn discover_sso(domain: &str, mode: VerifyMode) -> Result<Option<SsoDiscovery>, String> {
+    match sso::discover(domain, mode)? {
+        Cached::Pending => Ok(None),
+        Cached::Ready(cfg) => Ok(Some(SsoDiscovery {
+            discovery_domain: domain.to_ascii_lowercase(),
+            client_id: cfg.client_id,
+            issuer: cfg.issuer,
+            authorization_endpoint: cfg.authorization_endpoint,
+            scopes: cfg.scopes,
+            name: cfg.name,
+        })),
+    }
+}
+
+/// Verify a JWT and bind the nonce to the caller via the salt, returning the
+/// resulting credential. `discovery_domain` selects the provider kind: `None`
+/// resolves a configured provider by `(iss, aud)`; `Some(domain)` resolves an
+/// SSO provider via the on-demand discovery cache.
+///
+/// `Ok(Cached::Pending)` means SSO discovery or JWKS isn't cached yet — in an
+/// `Update` the fill has been kicked off; the caller signals the frontend to
+/// retry. A configured provider never yields `Pending`.
+pub fn verify_jwt(
+    jwt: &str,
+    salt: &[u8; 32],
+    discovery_domain: Option<&str>,
+    mode: VerifyMode,
+) -> Result<Cached<OpenIdCredential>, OpenIDJWTVerificationError> {
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .map_err(|_| {
             OpenIDJWTVerificationError::GenericError("Failed to decode JWT".to_string())
         })?;
-
     let PartialClaims { iss, aud } =
         serde_json::from_slice(validation_item.claims()).map_err(|_| {
             OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string())
@@ -472,44 +435,23 @@ where
         ));
     }
 
-    PROVIDERS.with_borrow(|providers| {
-        providers
-            .iter()
-            .find(|provider| {
-                // Skip providers whose discovery is still pending.
-                let Some(template) = provider.issuer() else {
-                    return false;
-                };
-                let Some(provider_aud) = provider.client_id() else {
-                    return false;
-                };
-                let issuer_placeholders = get_issuer_placeholders(&template);
-                let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
-                let effective_issuer = replace_issuer_placeholders(&template, &issuer_claims);
-                effective_issuer == iss && aud.matches(&provider_aud)
-            })
-            .ok_or_else(|| {
-                // If any provider is still waiting on discovery, surface a "pending" error
-                // rather than the generic "unsupported issuer" so the frontend can retry.
-                let has_pending = providers
-                    .iter()
-                    .any(|p| p.issuer().is_none() || p.client_id().is_none());
-                if has_pending {
-                    OpenIDJWTVerificationError::GenericError(
-                        "OIDC provider discovery is still in progress, please try again shortly"
-                            .to_string(),
-                    )
-                } else {
-                    OpenIDJWTVerificationError::GenericError(format!("Unsupported issuer: {}", iss))
-                }
-            })
-            .and_then(|provider| callback(provider.as_ref()))
-    })
+    let resolved =
+        match provider::resolve(&iss, &aud, validation_item.claims(), discovery_domain, mode)? {
+            Cached::Pending => return Ok(Cached::Pending),
+            Cached::Ready(resolved) => resolved,
+        };
+
+    let keys = match jwks::read_jwks(&resolved.jwk_source, mode) {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(keys) => keys,
+    };
+
+    verify::verify_and_build(jwt, &resolved.descriptor, &keys, salt).map(Cached::Ready)
 }
 
 /// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
 /// the Microsoft issuer uri is dynamic based on placeholders, this method returns them e.g. `["tid"]`.
-pub fn get_issuer_placeholders(template: &str) -> Vec<String> {
+pub(super) fn get_issuer_placeholders(template: &str) -> Vec<String> {
     let mut keys: Vec<String> = vec![];
     let mut remaining = template;
 
@@ -532,7 +474,7 @@ pub fn get_issuer_placeholders(template: &str) -> Vec<String> {
 }
 
 /// Either get all claims for the given keys or nothing.
-pub fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, String)> {
+pub(super) fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, String)> {
     let Ok(claims) = serde_json::from_slice::<serde_json::Value>(claims_bytes) else {
         return vec![]; // If claims cannot be decoded, return empty vector
     };
@@ -550,7 +492,10 @@ pub fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, St
 /// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
 /// the Microsoft issuer uri is dynamic based on the `tid` claim, this method makes sure to
 /// replace the placeholders like e.g. `tid` in the issuer uri with the corresponding claims.
-pub fn replace_issuer_placeholders(template: &str, claims: &Vec<(String, String)>) -> String {
+pub(super) fn replace_issuer_placeholders(
+    template: &str,
+    claims: &Vec<(String, String)>,
+) -> String {
     let mut result = template.to_string();
     for (key, value) in claims {
         result = result.replace(&format!("{{{key}}}"), value);
@@ -607,340 +552,143 @@ fn salt() -> [u8; 32] {
 }
 
 #[cfg(test)]
-struct ExampleProvider {
-    issuer: Option<String>,
-    client_id: Option<String>,
-}
+mod tests {
+    use super::*;
+    use internet_identity_interface::internet_identity::types::OpenIdConfig;
 
-#[cfg(test)]
-impl Default for ExampleProvider {
-    fn default() -> Self {
-        Self {
-            issuer: Some("https://example.com".into()),
-            client_id: Some("example-aud".into()),
+    const TEST_AUD: &str =
+        "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com";
+
+    fn google_config() -> OpenIdConfig {
+        OpenIdConfig {
+            name: "Google".to_string(),
+            logo: String::new(),
+            issuer: "https://accounts.google.com".to_string(),
+            client_id: TEST_AUD.into(),
+            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
+            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+            auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+            fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+            email_verification: None,
+            seed_jwks: None,
         }
     }
-}
 
-#[cfg(test)]
-impl OpenIdProvider for ExampleProvider {
-    fn issuer(&self) -> Option<String> {
-        self.issuer.clone()
-    }
-
-    fn client_id(&self) -> Option<String> {
-        self.client_id.clone()
-    }
-
-    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
-        None
-    }
-
-    fn verify(
-        &self,
-        _: &str,
-        _: &[u8; 32],
-    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
-        Ok(self.credential())
-    }
-}
-
-#[cfg(test)]
-impl ExampleProvider {
-    fn credential(&self) -> OpenIdCredential {
-        OpenIdCredential {
-            iss: self
-                .issuer
-                .clone()
-                .unwrap_or_else(|| "https://example.com".into()),
-            sub: "example-sub".into(),
-            aud: self
-                .client_id
-                .clone()
-                .unwrap_or_else(|| "example-aud".into()),
-            last_usage_timestamp: None,
-            metadata: HashMap::new(),
-            sso_domain: None,
-            sso_name: None,
+    fn test_certs() -> Vec<identity_jose::jwk::Jwk> {
+        #[derive(serde::Deserialize)]
+        struct Certs {
+            keys: Vec<identity_jose::jwk::Jwk>,
         }
+        serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#)
+            .unwrap()
+            .keys
     }
-}
 
-// Example JWT with {"iss":"https://example.com","aud":"example-aud"}.
-#[cfg(test)]
-const EXAMPLE_JWT: &str = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwiYXVkIjoiZXhhbXBsZS1hdWQifQ.SBeD7pV65F98wStsBuC_VRn-yjLoyf6iojJl9Y__wN0";
+    // Real Google-signed JWT (matches `test_certs`); nonce bound to the fixed
+    // test caller + `test_salt()`. Expired in real time, valid against the
+    // verify module's test clock.
+    const VALID_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRkMTI1ZDVmNDYyZmJjNjAxNGFlZGFiODFkZGYzYmNlZGFiNzA4NDciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0NTQzMTk5NDYxOS1jYmJmZ3RuN28wcHAwZHBmY2cybDY2YmM0cmNnN3FidS5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjQ1NDMxOTk0NjE5LWNiYmZndG43bzBwcDBkcGZjZzJsNjZiYzRyY2c3cWJ1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwic3ViIjoiMTE1MTYwNzE2MzM4ODEzMDA2OTAyIiwiaGQiOiJkZmluaXR5Lm9yZyIsImVtYWlsIjoidGhvbWFzLmdsYWRkaW5lc0BkZmluaXR5Lm9yZyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6ImV0aURhTEdjUmRtNS1yY3FlMFpRVWVNZ3BmcDR2OVRPT1lVUGJoUng3bkkiLCJuYmYiOjE3MzY3OTM4MDIsIm5hbWUiOiJUaG9tYXMgR2xhZGRpbmVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lTTWxja0M1RjZxaGlOWnpfREZtWGp5OTY4LXlPaEhPTjR4TGhRdXVNSDNuQlBXQT1zOTYtYyIsImdpdmVuX25hbWUiOiJUaG9tYXMiLCJmYW1pbHlfbmFtZSI6IkdsYWRkaW5lcyIsImlhdCI6MTczNjc5NDEwMiwiZXhwIjoxNzM2Nzk3NzAyLCJqdGkiOiIwMWM1NmYyMGM1MzFkNDhhYjU0ZDMwY2I4ZmRiNzU0MmM0ZjdmNjg4In0.f47b0HNskm-85sT5XtoRzORnfobK2nzVFG8jTH6eS_qAyu0ojNDqVsBtGN4A7HdjDDCOIMSu-R5e413xuGJIWLadKrLwXmguRFo3SzLrXeja-A-rP-axJsb5QUJZx1mwYd1vUNzLB9bQojU3Na6Hdvq09bMtTwaYdCn8Q9v3RErN-5VUxELmSbSXbf10A-IsS7jtzPjxHV6ueq687Ppeww6Q7AGGFB4t9H8qcDbI1unSdugX3-MfMWJLzVHbVxDgfAcLem1c2iAspvv_D5aPLeJF5HLRR2zg-Jil1BFTOoEPAAPFr1MEsvDMWSTt5jLyuMrnS4jiMGudGGPV4DDDww";
 
-#[test]
-fn should_return_credential() {
-    let provider = ExampleProvider::default();
-    let credential = provider.credential();
-    PROVIDERS.replace(vec![Box::new(provider)]);
-
-    assert_eq!(
-        with_provider(EXAMPLE_JWT, |provider| provider
-            .verify(EXAMPLE_JWT, &[0u8; 32])),
-        Ok(credential)
-    );
-}
-
-#[test]
-fn should_return_error_unsupported_issuer() {
-    PROVIDERS.replace(vec![]);
-
-    assert_eq!(
-        with_provider(EXAMPLE_JWT, |provider| provider
-            .verify(EXAMPLE_JWT, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError(
-            "Unsupported issuer: https://example.com".to_string()
-        ))
-    );
-}
-
-#[test]
-fn should_skip_provider_when_discovery_pending() {
-    // Provider with no discovered issuer/client_id — must be skipped and the
-    // surface error should be the "discovery in progress" message.
-    let pending = ExampleProvider {
-        issuer: None,
-        client_id: None,
-    };
-    PROVIDERS.replace(vec![Box::new(pending)]);
-
-    assert_eq!(
-        with_provider(EXAMPLE_JWT, |provider| provider
-            .verify(EXAMPLE_JWT, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError(
-            "OIDC provider discovery is still in progress, please try again shortly".to_string()
-        ))
-    );
-}
-
-#[test]
-fn should_disambiguate_providers_by_aud() {
-    // Two providers sharing the same iss but different aud — only the one whose
-    // client_id matches the JWT's aud claim should verify.
-    let matching = ExampleProvider {
-        issuer: Some("https://example.com".into()),
-        client_id: Some("example-aud".into()),
-    };
-    let expected = matching.credential();
-    let other = ExampleProvider {
-        issuer: Some("https://example.com".into()),
-        client_id: Some("other-aud".into()),
-    };
-    PROVIDERS.replace(vec![Box::new(other), Box::new(matching)]);
-
-    let returned = with_provider(EXAMPLE_JWT, |provider| {
-        provider.verify(EXAMPLE_JWT, &[0u8; 32])
-    })
-    .expect("expected matching provider");
-    assert_eq!(returned.aud, expected.aud);
-}
-
-#[test]
-fn should_return_error_when_encoding_invalid() {
-    let invalid_jwt = "invalid-jwt";
-
-    assert_eq!(
-        with_provider(invalid_jwt, |provider| provider
-            .verify(invalid_jwt, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError(
-            "Failed to decode JWT".to_string()
-        ))
-    );
-}
-
-#[test]
-fn should_return_error_when_claims_invalid() {
-    let jwt_without_issuer = "eyJhbGciOiJIUzI1NiJ9.e30.ZRrHA1JJJW8opsbCGfG_HACGpVUMN_a9IV7pAx_Zmeo";
-
-    assert_eq!(
-        with_provider(jwt_without_issuer, |provider| provider
-            .verify(jwt_without_issuer, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError(
-            "Unable to decode claims".to_string()
-        ))
-    );
-}
-
-#[test]
-fn should_replace_placeholders_in_issuer() {
-    let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
-
-    let issuer_placeholders = get_issuer_placeholders(issuer);
-    assert_eq!(issuer_placeholders, vec!["tid"]);
-
-    let issuer_claims = get_all_claims(
-        r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad" }"#.as_bytes(),
-        issuer_placeholders,
-    );
-    assert_eq!(
-        issuer_claims,
-        vec![(
-            "tid".to_string(),
-            "9188040d-6c67-4c5b-b112-36a304b66dad".to_string()
-        )]
-    );
-
-    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
-    assert_eq!(
-        effective_issuer,
-        "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
-    );
-}
-
-#[test]
-fn should_ignore_placeholders_in_issuer_that_dont_have_claim() {
-    let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
-
-    let issuer_placeholders = get_issuer_placeholders(issuer);
-    assert_eq!(issuer_placeholders, vec!["tid"]);
-
-    let issuer_claims = get_all_claims(
-        r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
-        issuer_placeholders,
-    );
-    assert!(issuer_claims.is_empty());
-
-    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
-    assert_eq!(
-        effective_issuer,
-        "https://login.microsoftonline.com/{tid}/v2.0"
-    );
-}
-
-#[test]
-fn should_ignore_unclosed_placeholders_in_issuer() {
-    let issuer = "https://login.microsoftonline.com/{tid/v2.0";
-
-    let issuer_placeholders = get_issuer_placeholders(issuer);
-    assert!(issuer_placeholders.is_empty());
-
-    let issuer_claims = get_all_claims(
-        r#"{ "tid": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
-        issuer_placeholders,
-    );
-    assert!(issuer_claims.is_empty());
-
-    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
-    assert_eq!(
-        effective_issuer,
-        "https://login.microsoftonline.com/{tid/v2.0"
-    );
-}
-
-#[test]
-fn should_retain_issuer_without_placeholders_as_is() {
-    let issuer = "https://accounts.google.com";
-
-    let issuer_placeholders = get_issuer_placeholders(issuer);
-    assert!(issuer_placeholders.is_empty());
-
-    let issuer_claims = get_all_claims(
-        r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
-        issuer_placeholders,
-    );
-    assert!(issuer_claims.is_empty());
-
-    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
-    assert_eq!(effective_issuer, issuer);
-}
-
-#[test]
-fn should_replace_multiple_placeholders_in_issuer() {
-    let issuer = "https://login.microsoftonline.com/{tid}/{sub}/v2.0";
-
-    let issuer_placeholders = get_issuer_placeholders(issuer);
-    assert_eq!(issuer_placeholders, vec!["tid", "sub"]);
-
-    let issuer_claims = get_all_claims(
-        r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad", "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
-        issuer_placeholders,
-    );
-    assert_eq!(
-        issuer_claims,
-        vec![
-            (
-                "tid".to_string(),
-                "9188040d-6c67-4c5b-b112-36a304b66dad".to_string(),
-            ),
-            (
-                "sub".to_string(),
-                "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c".to_string()
-            )
+    fn test_salt() -> [u8; 32] {
+        [
+            143, 79, 158, 224, 218, 125, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83,
+            81, 139, 161, 18, 224, 243, 4, 129, 26, 123, 229, 242, 200, 189,
         ]
-    );
-
-    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
-    assert_eq!(
-        effective_issuer,
-        "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c/v2.0"
-    );
-}
-
-#[cfg(test)]
-struct ExamplePlaceholderProvider;
-
-#[cfg(test)]
-impl OpenIdProvider for ExamplePlaceholderProvider {
-    fn issuer(&self) -> Option<String> {
-        Some("https://login.microsoftonline.com/{tid}/v2.0".into())
     }
 
-    fn client_id(&self) -> Option<String> {
-        Some("example-aud".into())
-    }
+    #[test]
+    fn should_verify_configured_provider() {
+        configured::clear_for_test();
+        configured::setup_for_test(google_config(), test_certs());
 
-    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
-        None
-    }
-
-    fn verify(
-        &self,
-        _: &str,
-        _: &[u8; 32],
-    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
-        Ok(self.credential())
-    }
-}
-
-#[cfg(test)]
-impl ExamplePlaceholderProvider {
-    fn credential(&self) -> OpenIdCredential {
-        OpenIdCredential {
-            iss: "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
-                .into(),
-            sub: "example-sub".into(),
-            aud: "example-aud".into(),
-            last_usage_timestamp: None,
-            metadata: HashMap::from([(
-                "tid".into(),
-                MetadataEntryV2::String("9188040d-6c67-4c5b-b112-36a304b66dad".into()),
-            )]),
-            sso_domain: None,
-            sso_name: None,
+        let result = verify_jwt(VALID_JWT, &test_salt(), None, VerifyMode::Update);
+        match result {
+            Ok(Cached::Ready(credential)) => {
+                assert_eq!(credential.iss, "https://accounts.google.com");
+                assert_eq!(credential.aud, TEST_AUD);
+                assert_eq!(credential.sso_domain, None);
+            }
+            other => panic!("expected Ready credential, got {other:?}"),
         }
     }
-}
 
-#[test]
-fn find_config_issuer_from_credential() {
-    let provider = ExampleProvider::default();
-    let placeholder_provider = ExamplePlaceholderProvider {};
-    let config_issuer = provider.issuer();
-    let placeholder_config_issuer = placeholder_provider.issuer();
-    PROVIDERS.replace(vec![Box::new(provider), Box::new(placeholder_provider)]);
+    #[test]
+    fn should_reject_unsupported_issuer() {
+        configured::clear_for_test();
+        // No providers registered → unsupported issuer.
+        assert_eq!(
+            verify_jwt(VALID_JWT, &test_salt(), None, VerifyMode::Update),
+            Err(OpenIDJWTVerificationError::GenericError(
+                "Unsupported issuer: https://accounts.google.com".to_string()
+            ))
+        );
+    }
 
-    assert_eq!(
-        ExampleProvider::default().credential().config_issuer(),
-        config_issuer
-    );
-    assert_eq!(
-        ExamplePlaceholderProvider.credential().config_issuer(),
-        placeholder_config_issuer
-    );
+    #[test]
+    fn should_reject_invalid_encoding() {
+        configured::clear_for_test();
+        configured::setup_for_test(google_config(), test_certs());
+        assert_eq!(
+            verify_jwt("invalid-jwt", &test_salt(), None, VerifyMode::Update),
+            Err(OpenIDJWTVerificationError::GenericError(
+                "Failed to decode JWT".to_string()
+            ))
+        );
+    }
 
-    let mut unknown_credential = ExampleProvider::default().credential();
-    unknown_credential.iss = "https://example.com/unknown".to_string();
-    assert_eq!(unknown_credential.config_issuer(), None);
+    #[test]
+    fn should_replace_placeholders_in_issuer() {
+        let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
+        let issuer_placeholders = get_issuer_placeholders(issuer);
+        assert_eq!(issuer_placeholders, vec!["tid"]);
+
+        let issuer_claims = get_all_claims(
+            r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad" }"#.as_bytes(),
+            issuer_placeholders,
+        );
+        assert_eq!(
+            issuer_claims,
+            vec![(
+                "tid".to_string(),
+                "9188040d-6c67-4c5b-b112-36a304b66dad".to_string()
+            )]
+        );
+
+        let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
+        assert_eq!(
+            effective_issuer,
+            "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+        );
+    }
+
+    #[test]
+    fn should_ignore_placeholders_in_issuer_that_dont_have_claim() {
+        let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
+        let issuer_placeholders = get_issuer_placeholders(issuer);
+
+        let issuer_claims = get_all_claims(
+            r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
+            issuer_placeholders,
+        );
+        assert!(issuer_claims.is_empty());
+
+        let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
+        assert_eq!(
+            effective_issuer,
+            "https://login.microsoftonline.com/{tid}/v2.0"
+        );
+    }
+
+    #[test]
+    fn should_ignore_unclosed_placeholders_in_issuer() {
+        let issuer = "https://login.microsoftonline.com/{tid/v2.0";
+        let issuer_placeholders = get_issuer_placeholders(issuer);
+        assert!(issuer_placeholders.is_empty());
+
+        let effective_issuer = replace_issuer_placeholders(issuer, &vec![]);
+        assert_eq!(
+            effective_issuer,
+            "https://login.microsoftonline.com/{tid/v2.0"
+        );
+    }
 }

@@ -483,6 +483,19 @@ type OidcConfig = record {
     issuer : opt text;
 };
 
+// Fully resolved SSO discovery result for the sign-in initiation flow,
+// returned by `discover_sso` / `discover_sso_query`. The two-hop discovery
+// the frontend used to perform itself now runs canister-side, on demand and
+// cached.
+type SsoDiscovery = record {
+    discovery_domain : text;
+    client_id : text;
+    issuer : text;
+    authorization_endpoint : text;
+    scopes : vec text;
+    name : opt text;
+};
+
 type OpenIdCredentialKey = record { Iss; Sub; Aud };
 
 type AnalyticsConfig = variant {
@@ -518,6 +531,10 @@ type OpenIdCredentialAddError = variant {
     OpenIdCredentialAlreadyRegistered;
     InternalCanisterError : text;
     JwtExpired;
+    // SSO discovery / JWKS for this domain isn't cached yet; the canister
+    // kicked off the fetch. Retry the call shortly. Never returned for
+    // configured providers (Google / Microsoft / Apple).
+    Pending;
 };
 
 type OpenIdCredentialRemoveError = variant {
@@ -531,6 +548,10 @@ type OpenIdDelegationError = variant {
     JwtVerificationFailed;
     NoSuchDelegation;
     JwtExpired;
+    // SSO discovery / JWKS for this domain isn't cached yet. `prepare` kicks
+    // off the fetch; poll `get` until ready, re-calling `prepare` when `get`
+    // reports `Pending`. Never returned for configured providers.
+    Pending;
 };
 
 type OpenIdPrepareDelegationResponse = record {
@@ -850,6 +871,9 @@ type OpenIDRegFinishArg = record {
     jwt : JWT;
     salt : Salt;
     name : text;
+    // SSO discovery domain the JWT was obtained through, or null for a direct
+    // provider (Google / Microsoft / Apple). Selects the JWK source.
+    discovery_domain : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -1547,10 +1571,22 @@ service : (opt InternetIdentityInit) -> {
     // OpenID credentials protocol
     // ===========================
     openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
-    openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
+    // The trailing `opt text` is the SSO discovery domain (null for a direct
+    // provider). For SSO sign-ins a cold discovery/JWKS cache returns the
+    // `Pending` error variant; the caller retries (and for delegations, polls
+    // `openid_get_delegation`, re-calling `openid_prepare_delegation` on a
+    // `Pending` poll result).
+    openid_credential_add : (IdentityNumber, JWT, Salt, opt text) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
-    openid_prepare_delegation : (JWT, Salt, SessionKey) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
-    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
+    openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
+    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
+
+    // SSO discovery for the sign-in initiation flow. `discover_sso` (update)
+    // kicks off the on-demand two-hop discovery fetch and returns the resolved
+    // config, or null while the fetch is still in flight. `discover_sso_query`
+    // is the read-only counterpart that returns the cached result if present.
+    discover_sso : (text) -> (variant { Ok : opt SsoDiscovery; Err : text });
+    discover_sso_query : (text) -> (variant { Ok : opt SsoDiscovery; Err : text }) query;
 
     // Email-recovery protocol
     // =======================

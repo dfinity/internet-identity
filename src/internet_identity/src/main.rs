@@ -1329,8 +1329,9 @@ mod openid_api {
     fn openid_identity_registration_finish(
         arg: OpenIDRegFinishArg,
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
-        openid::with_provider(&arg.jwt, |provider| provider.verify(&arg.jwt, &arg.salt))?;
-
+        // JWT verification (and the SSO discovery/JWKS cache fills it may
+        // trigger) happens inside the registration flow's
+        // `create_openid_credential_and_config`.
         registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
         )
@@ -1341,10 +1342,20 @@ mod openid_api {
         identity_number: IdentityNumber,
         jwt: String,
         salt: [u8; 32],
+        discovery_domain: Option<String>,
     ) -> Result<(), OpenIdCredentialAddError> {
         anchor_operation_with_authz_check(identity_number, |anchor| {
-            let openid_credential =
-                openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))?;
+            let openid_credential = match openid::verify_jwt(
+                &jwt,
+                &salt,
+                discovery_domain.as_deref(),
+                openid::VerifyMode::Update,
+            )? {
+                openid::Cached::Ready(credential) => credential,
+                // SSO discovery/JWKS not cached yet; the fill is in flight.
+                // The frontend retries the call.
+                openid::Cached::Pending => return Err(OpenIdCredentialAddError::Pending),
+            };
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
@@ -1378,10 +1389,20 @@ mod openid_api {
         jwt: String,
         salt: [u8; 32],
         session_key: SessionKey,
+        discovery_domain: Option<String>,
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
-        let openid_credential =
-            openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+        // Update context: a cold SSO cache spawns the discovery/JWKS fills here
+        // and reads `Pending`; the frontend polls `openid_get_delegation` and
+        // re-calls this until the delegation is ready.
+        let openid_credential = match openid::verify_jwt(
+            &jwt,
+            &salt,
+            discovery_domain.as_deref(),
+            openid::VerifyMode::Update,
+        )? {
+            openid::Cached::Ready(credential) => credential,
+            openid::Cached::Pending => return Err(OpenIdDelegationError::Pending),
+        };
 
         let anchor_number = state::storage_borrow(|storage| {
             storage.lookup_anchor_with_openid_credential(&openid_credential.key())
@@ -1423,10 +1444,21 @@ mod openid_api {
         salt: [u8; 32],
         session_key: SessionKey,
         expiration: Timestamp,
+        discovery_domain: Option<String>,
     ) -> Result<SignedDelegation, OpenIdDelegationError> {
-        let openid_credential =
-            openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+        // Query context: the SSO caches are read-only here (a query can't spawn
+        // an outcall fill). A `Pending` means discovery/JWKS isn't cached yet —
+        // the frontend re-calls `openid_prepare_delegation` (an update, which
+        // *can* fill) and then polls this again.
+        let openid_credential = match openid::verify_jwt(
+            &jwt,
+            &salt,
+            discovery_domain.as_deref(),
+            openid::VerifyMode::Query,
+        )? {
+            openid::Cached::Ready(credential) => credential,
+            openid::Cached::Pending => return Err(OpenIdDelegationError::Pending),
+        };
 
         match state::storage_borrow(|storage| {
             storage.lookup_anchor_with_openid_credential(&openid_credential.key())
@@ -1436,6 +1468,29 @@ mod openid_api {
             }
             None => Err(OpenIdDelegationError::NoSuchAnchor),
         }
+    }
+
+    /// Resolve an SSO discovery domain's configuration for the sign-in
+    /// initiation flow. Update context: a cold cache spawns the two-hop
+    /// discovery fill and returns `Ok(None)`; the frontend polls
+    /// `discover_sso_query` until it returns `Ok(Some(_))`.
+    #[update]
+    fn discover_sso(
+        domain: String,
+    ) -> Result<Option<internet_identity_interface::internet_identity::types::SsoDiscovery>, String>
+    {
+        openid::discover_sso(&domain, openid::VerifyMode::Update)
+    }
+
+    /// Read-only counterpart to `discover_sso`: returns the cached discovery
+    /// result for `domain`, or `Ok(None)` if it isn't cached yet (the frontend
+    /// should call `discover_sso` to drive the fetch).
+    #[query]
+    fn discover_sso_query(
+        domain: String,
+    ) -> Result<Option<internet_identity_interface::internet_identity::types::SsoDiscovery>, String>
+    {
+        openid::discover_sso(&domain, openid::VerifyMode::Query)
     }
 }
 

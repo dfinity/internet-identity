@@ -472,6 +472,22 @@ pub struct OidcConfig {
     pub issuer: Option<String>,
 }
 
+/// Fully resolved SSO discovery result returned by `discover_sso` /
+/// `discover_sso_query`. Carries everything the frontend needs to build the
+/// authorization request — the two-hop discovery the frontend used to perform
+/// itself now happens canister-side, fetched on demand and cached.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SsoDiscovery {
+    pub discovery_domain: String,
+    pub client_id: String,
+    pub issuer: String,
+    pub authorization_endpoint: String,
+    pub scopes: Vec<String>,
+    /// Human-readable SSO label, if the domain published one in its
+    /// `ii-openid-configuration`.
+    pub name: Option<String>,
+}
+
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),
