@@ -246,6 +246,21 @@ type CaptchaConfig = record {
     };
 };
 
+// One entry of the `sso_credential_migration` backfill. Maps the
+// (iss, aud) pair of stored SSO credentials to the discovery domain (and
+// optional human-readable name) they were registered through. Field names
+// match the `discovered_oidc_configs` query output so the deployer can
+// transcribe its result field-for-field.
+type SsoCredentialMigrationEntry = record {
+    discovery_domain : text;
+    // Matches the stored credential's `iss`.
+    issuer : text;
+    // Matches the stored credential's `aud`.
+    client_id : text;
+    // Human-readable SSO label; stamped onto the credential's `sso_name`.
+    name : opt text;
+};
+
 // Init arguments of II which can be supplied on install and upgrade.
 //
 // Each field is wrapped is `opt` to indicate whether the field should
@@ -286,6 +301,15 @@ type InternetIdentityInit = record {
     // (production) or `beta.dfinity.org` (everything else), keyed off
     // `is_production`.
     sso_discoverable_domains : opt vec text;
+    // One-shot backfill of the `sso_domain` / `sso_name` fields on stored
+    // OpenID credentials. When set, a batched timer-driven migration stamps
+    // every stored credential whose (iss, aud) matches an entry and whose
+    // `sso_domain` is not set yet. Idempotent — already-stamped credentials
+    // are skipped, so re-submitting (e.g. with a corrected list) is safe.
+    // When unset, no backfill runs. The deployer builds the list from the
+    // running canister's `discovered_oidc_configs` query before
+    // submitting the upgrade proposal.
+    sso_credential_migration : opt vec SsoCredentialMigrationEntry;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
     // Configuration to show dapps explorer or not
@@ -549,7 +573,7 @@ type EmailRecoverySubmitDkimLeafArg = record {
     // leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
     // `selector1._domainkey.outlook.com` is a signed CNAME into the
     // unsigned `outbound.protection.outlook.com`) — it must NOT submit
-    // an empty vec here; it calls `email_recovery_submit_dkim_leaf_via_doh`
+    // an empty vec here; it drives `email_recovery_resolve_via_doh`
     // instead, which resolves the key over the canister's DoH path.
     hops : vec SignedRRset;
     // Delegation chains for signed zones touched by `hops` that
@@ -558,11 +582,11 @@ type EmailRecoverySubmitDkimLeafArg = record {
     extra_chains : vec DelegationChain;
 };
 
-// Argument to email_recovery_submit_dkim_leaf_via_doh. Wrapped in a
-// record (like EmailRecoverySubmitDkimLeafArg) so the method can grow
-// fields without a breaking interface change; nonce is the lookup key
-// and is always required.
-type EmailRecoverySubmitDkimLeafViaDohArg = record {
+// Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
+// EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+// breaking interface change; nonce is the lookup key and is always
+// required.
+type EmailRecoveryResolveViaDohArg = record {
     nonce : text;
 };
 
@@ -615,7 +639,6 @@ type DnsProofBundle = record {
 // `doh_reason` analytics property — no string parsing.
 type DohFailureReason = variant {
     AllProvidersFailed;
-    DedupWaitTimeout;
     QuorumFailed : record { agreeing : nat32; total : nat32 };
     ResponseMalformed : text;
 };
@@ -630,8 +653,8 @@ type EmailRecoveryError = variant {
     EmailVerificationFailed : text;
     DkimLeafMismatch;
     // email_recovery_submit_dkim_leaf was called with an empty `hops`
-    // vector; an FE that can't walk DNSSEC must call
-    // email_recovery_submit_dkim_leaf_via_doh instead.
+    // vector; an FE that can't walk DNSSEC must drive
+    // email_recovery_resolve_via_doh instead.
     EmptyDkimLeafHops;
     NoDkimLeafExpected;
     AddressMismatch;
@@ -643,6 +666,7 @@ type EmailRecoveryError = variant {
 
 type EmailRecoveryStatus = variant {
     Pending;
+    ResolvingDoh;
     NeedDkimLeaf : record { selector : text };
     RegistrationSucceeded;
     RecoveryReady : record {
@@ -1555,13 +1579,13 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
-    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
-    // DoH-fallback sibling of email_recovery_submit_dkim_leaf, called
-    // with just the nonce when the FE can't walk a fully-signed DNSSEC
-    // resolution for the leaf (the DKIM record CNAMEs into an unsigned
-    // zone). The canister resolves the DKIM key over its own
-    // allowlist-gated DoH path.
-    email_recovery_submit_dkim_leaf_via_doh : (EmailRecoverySubmitDkimLeafViaDohArg) -> (variant { Ok : EmailRecoveryStatus; Err : EmailRecoveryError });
+    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok; Err : EmailRecoveryError });
+    // Resolves the DKIM key over the canister's own allowlist-gated DoH
+    // path, called with just the nonce. Used for the pure-DoH (Gmail)
+    // case and as the fallback when the FE can't walk a fully-signed
+    // DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
+    // Polled: the FE calls it repeatedly while the status is ResolvingDoh.
+    email_recovery_resolve_via_doh : (EmailRecoveryResolveViaDohArg) -> (variant { Ok; Err : EmailRecoveryError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 

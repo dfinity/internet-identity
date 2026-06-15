@@ -94,15 +94,19 @@
   const emailRecoveryDiagnostics = (nonce: string) =>
     anonymousActor.email_recovery_diagnostics(nonce);
 
-  const submitEmailDkimLeaf = (arg: EmailRecoverySubmitDkimLeafArg) =>
-    anonymousActor
-      .email_recovery_submit_dkim_leaf(arg)
-      .then(throwCanisterError);
+  const submitEmailDkimLeaf = async (
+    arg: EmailRecoverySubmitDkimLeafArg,
+  ): Promise<void> => {
+    await throwCanisterError(
+      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+    );
+  };
 
-  const submitEmailDkimLeafViaDoh = (nonce: string) =>
-    anonymousActor
-      .email_recovery_submit_dkim_leaf_via_doh({ nonce })
-      .then(throwCanisterError);
+  const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
+    await throwCanisterError(
+      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
+    );
+  };
 
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
     anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
@@ -325,7 +329,7 @@
       status={emailRecoveryStatus}
       diagnostics={emailRecoveryDiagnostics}
       submitDkimLeaf={submitEmailDkimLeaf}
-      submitDkimLeafViaDoh={submitEmailDkimLeafViaDoh}
+      resolveViaDoh={resolveEmailViaDoh}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
     />
