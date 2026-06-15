@@ -130,58 +130,6 @@ fn fresh_identity(env: &PocketIc, canister_id: candid::Principal) -> (u64, candi
     (identity_number, authn_method.principal())
 }
 
-/// A structurally-valid but cryptographically-bogus DNSSEC bundle. Used
-/// by the disabled-flag tests, which only need a `dns_proof` to be
-/// *present* on the input — with the flag off it is dropped before any
-/// validation, so its contents never matter.
-fn stub_dns_proof() -> internet_identity_interface::internet_identity::types::dnssec::DnsProofBundle
-{
-    use internet_identity_interface::internet_identity::types::dnssec::{
-        DelegationChain, DelegationLink, DnsProofBundle, Rrsig, SignedRRset,
-    };
-
-    let stub_rrsig = Rrsig {
-        type_covered: 16,
-        algorithm: 8,
-        labels: 2,
-        original_ttl: 3600,
-        expiration: 4_000_000_000,
-        inception: 0,
-        key_tag: 1,
-        signer_name: ByteBuf::from(vec![0u8]),
-        signature: ByteBuf::from(vec![0u8; 256]),
-    };
-    let stub_rrset = SignedRRset {
-        name: ByteBuf::from(b"\x07example\x03com\x00".to_vec()),
-        rtype: 16,
-        rdata: vec![ByteBuf::from(b"\x09v=DKIM1;k=rsa;p=AAAA".to_vec())],
-        ttl: 3600,
-        rrsig: stub_rrsig.clone(),
-    };
-    DnsProofBundle {
-        hops: vec![stub_rrset.clone()],
-        root_dnskey: stub_rrset,
-        chains: vec![DelegationChain {
-            links: vec![DelegationLink {
-                child_ds: SignedRRset {
-                    name: ByteBuf::from(b"\x03com\x00".to_vec()),
-                    rtype: 43,
-                    rdata: vec![ByteBuf::from(vec![0u8; 36])],
-                    ttl: 3600,
-                    rrsig: stub_rrsig.clone(),
-                },
-                child_dnskey: SignedRRset {
-                    name: ByteBuf::from(b"\x03com\x00".to_vec()),
-                    rtype: 48,
-                    rdata: vec![ByteBuf::from(vec![0u8; 64])],
-                    ttl: 3600,
-                    rrsig: stub_rrsig,
-                },
-            }],
-        }],
-    }
-}
-
 // ===================================================================
 // Smaller, no-DKIM-needed tests
 // ===================================================================
@@ -665,9 +613,20 @@ fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
     let canister_id = setup_canister_dnssec_disabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
     let input = EmailRecoveryDnsInput {
         address: "alice@example.com".into(),
-        dns_proof: Some(stub_dns_proof()),
+        dns_proof: Some(proof),
     };
     let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
         .expect("call failed")
@@ -691,9 +650,20 @@ fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
     // Dummy session key — the call is rejected at the allowlist gate long
     // before the key is used.
     let session_key = ByteBuf::from(vec![0u8; 32]);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
     let input = EmailRecoveryDnsInput {
         address: "alice@example.com".into(),
-        dns_proof: Some(stub_dns_proof()),
+        dns_proof: Some(proof),
     };
     let err = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
         .expect("call failed")
@@ -713,9 +683,20 @@ fn register_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
     let canister_id = setup_canister_dnssec_disabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
-        dns_proof: Some(stub_dns_proof()),
+        dns_proof: Some(proof),
     };
     let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
         .expect("call failed")
@@ -736,9 +717,20 @@ fn recovery_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
     let canister_id = setup_canister_dnssec_disabled(&env);
 
     let session_key = ByteBuf::from(vec![0u8; 32]);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
     let input = EmailRecoveryDnsInput {
         address: TEST_ADDRESS.into(),
-        dns_proof: Some(stub_dns_proof()),
+        dns_proof: Some(proof),
     };
     let challenge = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
         .expect("call failed")
