@@ -29,6 +29,7 @@
   import IdentityAlreadyLinked from "$lib/components/wizards/auth/views/IdentityAlreadyLinked.svelte";
   import SwitchAccessMethod from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
   import { goto } from "$app/navigation";
+  import { shouldRequestMethodSwitch } from "$lib/components/wizards/auth/AuthWizard.switch";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
@@ -63,13 +64,6 @@
   let isAuthenticating = $state(false);
   let pendingSsoRegistration = false;
 
-  const methodType = (m: LastUsedIdentity["authMethod"]): MethodTag => {
-    if ("passkey" in m) return "passkey";
-    if ("openid" in m) return "openid";
-    if ("sso" in m) return "sso";
-    return m satisfies never;
-  };
-
   const maybeRequestMethodSwitch = (
     signedInIdentityNumber: bigint,
     newMethod: MethodTag,
@@ -82,7 +76,9 @@
     },
   ): boolean => {
     if (previousSnapshot === undefined) return false;
-    if (methodType(previousSnapshot.authMethod) === newMethod) return false;
+    if (!shouldRequestMethodSwitch(newMethod, previousSnapshot, providerInfo)) {
+      return false;
+    }
     authFlow.requestMethodSwitch({
       previousIdentity: previousSnapshot,
       newMethod,
