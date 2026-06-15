@@ -104,6 +104,23 @@ fn setup_canister_dnssec_enabled(env: &PocketIc) -> candid::Principal {
     install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
 }
 
+/// Like [`setup_canister`] but explicitly sets the DNSSEC deploy flag to
+/// `false`. Behaviourally identical to the default, but makes the disabled
+/// state a test relies on explicit at the call site.
+fn setup_canister_dnssec_disabled(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(false),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
 /// Create an identity and return `(identity_number, principal)`. The
 /// principal is needed for any caller-authenticated method calls
 /// (`prepare_add`, `credential_remove`).
@@ -639,13 +656,13 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
 
 #[test]
 fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
-    // Setup (register) flow with the DNSSEC path disabled (the default):
-    // even when the caller supplies a DNSSEC proof, the canister drops it
-    // and falls through to the DoH allowlist. `example.com` is not on the
-    // allowlist (`setup_canister` only allows `test.example.com`), so the
-    // call fails with `DomainNotAllowlisted`.
+    // Setup (register) flow with the DNSSEC path disabled: even when the
+    // caller supplies a DNSSEC proof, the canister drops it and falls
+    // through to the DoH allowlist. `example.com` is not on the allowlist
+    // (only `test.example.com` is), so the call fails with
+    // `DomainNotAllowlisted`.
     let env = env();
-    let canister_id = setup_canister(&env);
+    let canister_id = setup_canister_dnssec_disabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     let input = EmailRecoveryDnsInput {
@@ -663,13 +680,13 @@ fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
 
 #[test]
 fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
-    // Recovery (prepare_delegation) flow, same scenario: DNSSEC disabled
-    // (default) + a supplied proof that gets dropped + a non-allowlisted
-    // domain → `DomainNotAllowlisted`. The allowlist gate runs before any
+    // Recovery (prepare_delegation) flow, same scenario: DNSSEC disabled +
+    // a supplied proof that gets dropped + a non-allowlisted domain →
+    // `DomainNotAllowlisted`. The allowlist gate runs before any
     // address→anchor resolution, so an unbound address still surfaces the
     // allowlist rejection.
     let env = env();
-    let canister_id = setup_canister(&env);
+    let canister_id = setup_canister_dnssec_disabled(&env);
 
     // Dummy session key — the call is rejected at the allowlist gate long
     // before the key is used.
@@ -685,6 +702,52 @@ fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
         EmailRecoveryError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
         other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
     }
+}
+
+#[test]
+fn register_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+    // Setup (register) flow with DNSSEC disabled and an allowlisted
+    // domain: the supplied proof is dropped and the DoH path accepts the
+    // allowlisted domain, so prepare_add issues a challenge.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(stub_dns_proof()),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect("prepare_add should succeed via DoH");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
+    );
+}
+
+#[test]
+fn recovery_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+    // Recovery (prepare_delegation) flow, same scenario: the proof is
+    // dropped and the allowlisted domain is accepted on the DoH path, so
+    // prepare_delegation issues a challenge.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+
+    let session_key = ByteBuf::from(vec![0u8; 32]);
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(stub_dns_proof()),
+    };
+    let challenge = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
+        .expect("call failed")
+        .expect("prepare_delegation should succeed via DoH");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
+    );
 }
 
 #[test]
