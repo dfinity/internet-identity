@@ -117,10 +117,14 @@ mod tests {
         Storage::new((0, 10000), VectorMemory::default())
     }
 
+    fn setup_with_salt(salt: [u8; 32]) {
+        storage_replace(new_storage());
+        storage_borrow_mut(|s| s.update_salt(salt));
+    }
+
     #[test]
     fn seed_determinism() {
-        storage_replace(new_storage());
-        storage_borrow_mut(|s| s.update_salt([1u8; 32]));
+        setup_with_salt([1u8; 32]);
 
         let s1 = session_delegation_seed(42);
         let s2 = session_delegation_seed(42);
@@ -129,8 +133,7 @@ mod tests {
 
     #[test]
     fn seed_differs_by_anchor() {
-        storage_replace(new_storage());
-        storage_borrow_mut(|s| s.update_salt([1u8; 32]));
+        setup_with_salt([1u8; 32]);
 
         let s1 = session_delegation_seed(1);
         let s2 = session_delegation_seed(2);
@@ -139,12 +142,10 @@ mod tests {
 
     #[test]
     fn seed_differs_by_salt() {
-        storage_replace(new_storage());
-        storage_borrow_mut(|s| s.update_salt([1u8; 32]));
+        setup_with_salt([1u8; 32]);
         let s1 = session_delegation_seed(42);
 
-        storage_replace(new_storage());
-        storage_borrow_mut(|s| s.update_salt([2u8; 32]));
+        setup_with_salt([2u8; 32]);
         let s2 = session_delegation_seed(42);
 
         assert_ne!(s1, s2);
@@ -175,8 +176,7 @@ mod tests {
 
     #[test]
     fn cross_namespace_seeds_are_distinct() {
-        storage_replace(new_storage());
-        storage_borrow_mut(|s| s.update_salt([1u8; 32]));
+        setup_with_salt([1u8; 32]);
 
         let anchor_number: u64 = 42;
         let origin = "https://example.com".to_string();

@@ -47,13 +47,31 @@ fn mint_session_delegation(
     (prepared, session_principal)
 }
 
-#[test]
-fn session_delegation_happy_path() -> Result<(), RejectResponse> {
+fn fresh_anchor() -> (
+    pocket_ic::PocketIc,
+    ic_cdk::api::management_canister::main::CanisterId,
+    u64,
+) {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let anchor = flows::register_anchor(&env, canister_id);
+    (env, canister_id, anchor)
+}
 
+fn fresh_session() -> (
+    pocket_ic::PocketIc,
+    ic_cdk::api::management_canister::main::CanisterId,
+    u64,
+    candid::Principal,
+) {
+    let (env, canister_id, anchor) = fresh_anchor();
     let (_, session_principal) = mint_session_delegation(&env, canister_id, anchor);
+    (env, canister_id, anchor, session_principal)
+}
+
+#[test]
+fn session_delegation_happy_path() -> Result<(), RejectResponse> {
+    let (env, canister_id, anchor, session_principal) = fresh_session();
 
     create_account(
         &env,
@@ -105,11 +123,7 @@ fn session_delegation_happy_path() -> Result<(), RejectResponse> {
 
 #[test]
 fn session_delegation_default_deny() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
-
-    let (_, session_principal) = mint_session_delegation(&env, canister_id, anchor);
+    let (env, canister_id, anchor, session_principal) = fresh_session();
 
     let create_err = create_account(
         &env,
@@ -172,9 +186,7 @@ fn session_delegation_default_deny() -> Result<(), RejectResponse> {
 
 #[test]
 fn ttl_clamp_over_max() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
+    let (env, canister_id, anchor) = fresh_anchor();
 
     let ninety_days_ns = 90 * 24 * 3600 * 1_000_000_000u64;
 
@@ -202,9 +214,7 @@ fn ttl_clamp_over_max() -> Result<(), RejectResponse> {
 
 #[test]
 fn ttl_default_is_seven_days() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
+    let (env, canister_id, anchor) = fresh_anchor();
 
     let prepared = prepare_session_delegation(
         &env,
@@ -232,9 +242,7 @@ fn ttl_default_is_seven_days() -> Result<(), RejectResponse> {
 
 #[test]
 fn session_survives_upgrade() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let anchor = flows::register_anchor(&env, canister_id);
+    let (env, canister_id, anchor, session_principal) = fresh_session();
 
     create_account(
         &env,
@@ -246,8 +254,6 @@ fn session_survives_upgrade() -> Result<(), RejectResponse> {
     )
     .unwrap()
     .unwrap();
-
-    let (_, session_principal) = mint_session_delegation(&env, canister_id, anchor);
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
@@ -266,11 +272,7 @@ fn session_survives_upgrade() -> Result<(), RejectResponse> {
 
 #[test]
 fn session_isolation_across_anchors() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-
-    let anchor_a = flows::register_anchor(&env, canister_id);
-
+    let (env, canister_id, anchor_a) = fresh_anchor();
     let anchor_b = flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
 
     create_account(

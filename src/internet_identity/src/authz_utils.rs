@@ -22,7 +22,6 @@ pub enum CallerCapability {
 
 pub struct Sealed(#[allow(dead_code)] ());
 
-
 #[derive(Debug)]
 pub enum IdentityUpdateError {
     Unauthorized(Principal),
