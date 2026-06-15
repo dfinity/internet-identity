@@ -247,10 +247,8 @@ type CaptchaConfig = record {
 };
 
 // One entry of the `sso_credential_migration` backfill. Maps the
-// (iss, aud) pair of stored SSO credentials to the discovery domain (and
-// optional human-readable name) they were registered through. Field names
-// match the `discovered_oidc_configs` query output so the deployer can
-// transcribe its result field-for-field.
+// (iss, aud) pair of a stored SSO credential to the discovery domain and
+// optional human-readable name it resolves to.
 type SsoCredentialMigrationEntry = record {
     discovery_domain : text;
     // Matches the stored credential's `iss`.
@@ -295,20 +293,17 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
-    // Allowlist of domains that may be registered as discoverable SSO
-    // providers via `add_discoverable_oidc_config`. When set, fully replaces
-    // the built-in defaults. When unset, falls back to `dfinity.org`
-    // (production) or `beta.dfinity.org` (everything else), keyed off
-    // `is_production`.
+    // Allowlist of domains that may be used as discoverable SSO providers.
+    // When set, fully replaces the built-in defaults. When unset, falls back
+    // to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
+    // keyed off `is_production`.
     sso_discoverable_domains : opt vec text;
     // One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     // OpenID credentials. When set, a batched timer-driven migration stamps
     // every stored credential whose (iss, aud) matches an entry and whose
     // `sso_domain` is not set yet. Idempotent — already-stamped credentials
     // are skipped, so re-submitting (e.g. with a corrected list) is safe.
-    // When unset, no backfill runs. The deployer builds the list from the
-    // running canister's `discovered_oidc_configs` query before
-    // submitting the upgrade proposal.
+    // When unset, no backfill runs.
     sso_credential_migration : opt vec SsoCredentialMigrationEntry;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
@@ -466,27 +461,9 @@ type OpenIdConfig = record {
     seed_jwks : opt vec vec record { text; text };
 };
 
-// SSO provider config that uses two-hop discovery.
-// The backend fetches https://{discovery_domain}/.well-known/ii-openid-configuration
-// for { client_id, openid_configuration } and then fetches the standard OIDC
-// discovery at openid_configuration for { issuer, jwks_uri }.
-type DiscoverableOidcConfig = record {
-    discovery_domain : text;
-};
-
-// Resolved SSO provider state.
-// All fields other than discovery_domain are None until discovery completes.
-type OidcConfig = record {
-    discovery_domain : text;
-    client_id : opt text;
-    openid_configuration : opt text;
-    issuer : opt text;
-};
-
 // Fully resolved SSO discovery result for the sign-in initiation flow,
-// returned by `discover_sso` / `discover_sso_query`. The two-hop discovery
-// the frontend used to perform itself now runs canister-side, on demand and
-// cached.
+// returned by `discover_sso` / `discover_sso_query`. The canister resolves it
+// from the domain's two-hop discovery documents, on demand and cached.
 type SsoDiscovery = record {
     discovery_domain : text;
     client_id : text;
@@ -513,10 +490,8 @@ type OpenIdCredential = record {
     aud : Aud;
     last_usage_timestamp : opt Timestamp;
     metadata : MetadataMapV2;
-    // SSO discovery domain, looked up by `(iss, aud)` against the
-    // canister's registered discoverable OIDC configs. `None` for
-    // direct-provider credentials (Google / Apple / Microsoft) and for
-    // SSO credentials whose provider is no longer registered.
+    // SSO discovery domain this credential was verified through. `None` for
+    // direct-provider credentials (Google / Apple / Microsoft).
     sso_domain : opt text;
     // Human-readable SSO name from the domain's
     // `/.well-known/ii-openid-configuration`. `None` when the domain
@@ -1235,10 +1210,10 @@ type PrepareAttributeRequest = record {
     // or `sso:<domain>` (e.g. `sso:dfinity.org:email`).
     //
     // Each linked credential is addressable via exactly one scope:
-    // credentials obtained through a `DiscoverableOidcConfig` (two-hop SSO
-    // discovery) are reachable only via `sso:<domain>`; credentials from
-    // hardcoded OIDC providers (Google, Microsoft, …) are reachable only via
-    // `openid:<issuer>`. Under `sso:` only `email` and `name` are supported;
+    // credentials obtained through SSO two-hop discovery are reachable only
+    // via `sso:<domain>`; credentials from hardcoded OIDC providers (Google,
+    // Microsoft, …) are reachable only via `openid:<issuer>`. Under `sso:`
+    // only `email` and `name` are supported;
     // under `openid:` `email`, `name`, and `verified_email` are supported.
     attribute_keys : vec text;
 };
@@ -1633,11 +1608,6 @@ service : (opt InternetIdentityInit) -> {
     // HTTP Gateway protocol
     // =====================
     http_request : (request : HttpRequest) -> (HttpResponse) query;
-
-    // OIDC Discovery
-    // ===============
-    discovered_oidc_configs : () -> (vec OidcConfig) query;
-    add_discoverable_oidc_config : (DiscoverableOidcConfig) -> ();
 
     // Internal Methods
     // ================

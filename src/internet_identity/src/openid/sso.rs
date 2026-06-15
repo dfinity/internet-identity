@@ -11,12 +11,10 @@
 //! jwks_uri ─[JWKS cache]──────▶ keys
 //! ```
 //!
-//! Design: SSO readiness doc §5. The discovery domain is still gated by the
-//! canary allowlist; lifting the allowlist is a follow-up (doc Problem 5).
+//! The discovery domain is gated by the canary allowlist.
 
 use super::verify::{Descriptor, Stamp};
 use super::OpenIDJWTVerificationError;
-use super::VerifyMode;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
 use identity_jose::jwk::Jwk;
 use std::cell::RefCell;
@@ -24,13 +22,13 @@ use std::cell::RefCell;
 #[cfg(not(test))]
 use crate::state;
 
-/// Entry lifetime for both caches (doc §5.2.2): discovery metadata and JWKS
-/// change infrequently, so an hour balances freshness against outcall volume.
+/// Entry lifetime for both caches: discovery metadata and JWKS change
+/// infrequently, so an hour balances freshness against outcall volume.
 const FRESH_FOR_SECONDS: u64 = 60 * 60;
 /// Stale-if-error window: serve the last-good value through a transient fill
 /// failure for up to this long past freshness before failing the caller.
 const STALE_FOR_SECONDS: u64 = 60 * 60;
-/// LRU cap per cache (doc §5.2.2: start at 100 entries).
+/// LRU cap per cache.
 const MAX_ENTRIES: usize = 100;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
@@ -85,23 +83,51 @@ fn new_jwks_cache() -> JwksCache {
 // Lookup paths.
 // ---------------------------------------------------------------------------
 
-/// Resolve an SSO discovery domain into a verify descriptor + the `jwks_uri`
-/// for the JWK read. Consults the discovery cache (spawning the fill in
-/// `Update` mode, peeking in `Query` mode) and cross-checks the JWT's issuer
-/// against the discovered issuer.
-///
-/// - `Ok(Cached::Ready(..))` — discovery resolved and the issuer matches,
-/// - `Ok(Cached::Pending)` — discovery still in flight (retry),
-/// - `Err(..)` — domain not allowed, or the JWT issuer doesn't match.
+/// Canonicalize and allowlist-check a discovery domain. `Err` for a domain not
+/// on the canary allowlist.
+fn allowed_domain(domain: &str) -> Result<String, String> {
+    let domain = domain.to_ascii_lowercase();
+    if !is_allowed_discovery_domain(&domain) {
+        return Err(format!("SSO discovery domain not allowed: {domain}"));
+    }
+    Ok(domain)
+}
+
+/// Drive the on-demand fetches for `domain` forward: ensure the discovery fill
+/// is running, and once discovery has resolved, ensure the JWKS fill for its
+/// `jwks_uri` is running too. Only an update may call this — it can spawn the
+/// outcalls the fills make. Reads ([`discover`], [`read_jwks`]) stay peek-only,
+/// so a query never needs this and never spawns. A no-op for a disallowed
+/// domain (the read will surface the error).
+pub(super) fn prefetch(domain: &str) {
+    let Ok(domain) = allowed_domain(domain) else {
+        return;
+    };
+    if let Cached::Ready(cfg) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
+        single_flight_cache::get(&JWKS_CACHE, cfg.jwks_uri);
+    }
+}
+
+/// Read the cached discovery result for `domain`. Peek-only (never spawns), so
+/// it's safe from a query; `Ok(Pending)` means no cached value yet — an update
+/// must [`prefetch`] to drive the fetch. `Err` for a disallowed domain.
+pub(super) fn discover(domain: &str) -> Result<Cached<DiscoveredConfig>, String> {
+    Ok(single_flight_cache::peek(
+        &DISCOVERY_CACHE,
+        &allowed_domain(domain)?,
+    ))
+}
+
+/// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
+/// discovery result, cross-checking the JWT's issuer against the discovered
+/// issuer. Peek-only.
 pub(super) fn resolve(
     domain: &str,
     jwt_iss: &str,
-    mode: VerifyMode,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    let cfg = match discover(domain, mode) {
-        Ok(Cached::Pending) => return Ok(Cached::Pending),
-        Ok(Cached::Ready(cfg)) => cfg,
-        Err(err) => return Err(OpenIDJWTVerificationError::GenericError(err)),
+    let cfg = match discover(domain).map_err(OpenIDJWTVerificationError::GenericError)? {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(cfg) => cfg,
     };
     if cfg.issuer != jwt_iss {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
@@ -120,32 +146,13 @@ pub(super) fn resolve(
     Ok(Cached::Ready((descriptor, cfg.jwks_uri)))
 }
 
-/// Resolve a discovery domain to its full configuration, used by the
-/// `discover_sso` / `discover_sso_query` endpoints. Gated by the allowlist;
-/// `Err` for a disallowed domain, `Ok(Pending)` while the two-hop fill runs.
-pub(super) fn discover(domain: &str, mode: VerifyMode) -> Result<Cached<DiscoveredConfig>, String> {
-    let domain = domain.to_ascii_lowercase();
-    if !is_allowed_discovery_domain(&domain) {
-        return Err(format!("SSO discovery domain not allowed: {domain}"));
-    }
-    Ok(match mode {
-        VerifyMode::Update => single_flight_cache::get(&DISCOVERY_CACHE, domain),
-        VerifyMode::Query => single_flight_cache::peek(&DISCOVERY_CACHE, &domain),
-    })
-}
-
-/// Read SSO JWKs for `jwks_uri`, spawning the fill on a cold cache.
-pub(super) fn get_jwks(jwks_uri: &str) -> Cached<Vec<Jwk>> {
-    single_flight_cache::get(&JWKS_CACHE, jwks_uri.to_string())
-}
-
-/// Read SSO JWKs for `jwks_uri` without spawning — query path.
-pub(super) fn peek_jwks(jwks_uri: &str) -> Cached<Vec<Jwk>> {
+/// Read the cached SSO JWKs for `jwks_uri`. Peek-only.
+pub(super) fn read_jwks(jwks_uri: &str) -> Cached<Vec<Jwk>> {
     single_flight_cache::peek(&JWKS_CACHE, &jwks_uri.to_string())
 }
 
 // ---------------------------------------------------------------------------
-// Allowlist (canary gate; removal is a follow-up — doc Problem 5).
+// Allowlist (canary gate).
 // ---------------------------------------------------------------------------
 
 pub fn allowed_discovery_domains() -> Vec<String> {
@@ -210,9 +217,9 @@ struct DiscoveryDocument {
 }
 
 /// The discovery cache fill: hop 1 (`ii-openid-configuration`) then hop 2 (the
-/// standard OIDC discovery document), with the same host self-assertion checks
-/// the FE used to perform. Errors are surfaced as `Err` (the cache backs off
-/// and serves stale-if-error).
+/// standard OIDC discovery document), with host self-assertion checks between
+/// them. Errors are surfaced as `Err` (the cache backs off and serves
+/// stale-if-error).
 #[cfg(not(test))]
 async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     // Hop 1: fetch /.well-known/ii-openid-configuration. Default to https; an
@@ -473,45 +480,43 @@ mod tests {
     #[test]
     fn discover_rejects_disallowed_domain() {
         reset();
-        assert!(discover("not-allowed.com", VerifyMode::Update).is_err());
+        assert!(discover("not-allowed.com").is_err());
     }
 
     #[test]
-    fn discover_is_pending_then_ready() {
+    fn prefetch_then_discover_resolves() {
         reset();
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        // Cold cache: spawns the fill, reads Pending.
-        assert_eq!(
-            discover("example.org", VerifyMode::Update),
-            Ok(Cached::Pending)
-        );
+        // Reading without prefetching stays Pending — no fill was spawned.
+        assert_eq!(discover("example.org"), Ok(Cached::Pending));
+        // Prefetch spawns the discovery fill; the read is still Pending until
+        // the detached fill runs.
+        prefetch("example.org");
+        assert_eq!(discover("example.org"), Ok(Cached::Pending));
         run_detached();
-        // Now Ready.
-        match discover("example.org", VerifyMode::Update) {
+        match discover("example.org") {
             Ok(Cached::Ready(cfg)) => assert_eq!(cfg.issuer, "https://idp.example.org"),
             other => panic!("expected Ready, got {other:?}"),
         }
     }
 
     #[test]
-    fn query_mode_never_spawns() {
+    fn reads_never_spawn() {
         reset();
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        // Query mode peeks only — cold cache stays Pending even after draining
-        // detached tasks, because none was spawned.
-        assert_eq!(
-            discover("example.org", VerifyMode::Query),
+        // discover/resolve are peek-only: without a prefetch they stay Pending
+        // even after draining detached tasks, because none was spawned.
+        assert_eq!(discover("example.org"), Ok(Cached::Pending));
+        assert!(matches!(
+            resolve("example.org", "https://idp.example.org"),
             Ok(Cached::Pending)
-        );
+        ));
         run_detached();
-        assert_eq!(
-            discover("example.org", VerifyMode::Query),
-            Ok(Cached::Pending)
-        );
+        assert_eq!(discover("example.org"), Ok(Cached::Pending));
     }
 
     #[test]
@@ -520,17 +525,12 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        let _ = discover("example.org", VerifyMode::Update);
+        prefetch("example.org");
         run_detached();
         // Wrong issuer is rejected.
-        assert!(resolve(
-            "example.org",
-            "https://evil.example.org",
-            VerifyMode::Update
-        )
-        .is_err());
+        assert!(resolve("example.org", "https://evil.example.org").is_err());
         // Matching issuer resolves to a descriptor + jwks_uri.
-        match resolve("example.org", "https://idp.example.org", VerifyMode::Update) {
+        match resolve("example.org", "https://idp.example.org") {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {
                 assert_eq!(jwks_uri, "https://idp.example.org/jwks");
                 assert!(matches!(descriptor.stamp, Stamp::Sso { .. }));

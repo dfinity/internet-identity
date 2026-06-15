@@ -13,13 +13,13 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, DiscoverableOidcConfig, IdRegFinishError, MetadataEntryV2,
-    OidcConfig, OpenIdConfig, OpenIdEmailVerificationScheme, PublicKey, SessionKey,
-    SignedDelegation, SsoDiscovery, Timestamp, UserKey,
+    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
+    OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, SsoDiscovery,
+    Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::{cell::RefCell, collections::HashMap};
+use std::collections::HashMap;
 
 mod configured;
 mod jwks;
@@ -36,25 +36,13 @@ pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
 
-/// Whether a verification / discovery call runs in an update (it may spawn the
-/// outcall fills the SSO caches need) or a query (it may only peek the caches,
-/// since a query cannot make outcalls). For configured providers the mode is
-/// irrelevant — their JWKs are read synchronously from stable storage.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum VerifyMode {
-    Update,
-    Query,
-}
-
 #[derive(PartialEq, Eq, CandidType, Deserialize, Clone, Debug)]
 pub enum OpenIDJWTVerificationError {
     GenericError(String),
     JWTExpired,
-    /// SSO discovery or JWKS for this sign-in isn't cached yet. The fill is
-    /// in flight (an update kicked it off); retry shortly. Configured providers
-    /// never produce this — their JWKs are always synchronously available — but
-    /// the frontend treats every provider kind uniformly and is prepared to
-    /// retry on it (see the redemption poll loop).
+    /// SSO discovery or JWKS for this sign-in isn't cached yet; an update call
+    /// kicks off the fetch and the caller retries. Configured providers never
+    /// produce this — their JWKs are always synchronously available.
     Pending,
 }
 
@@ -188,10 +176,7 @@ impl OpenIdCredential {
         configured::config_issuer_for(self)
     }
 
-    /// Returns the `discovery_domain` of the SSO provider this credential was
-    /// verified through, if any. Read straight off the stamped field — no
-    /// provider lookup needed (the `sso_credential_migration` backfill stamped
-    /// every existing SSO credential).
+    /// The SSO discovery domain this credential was verified through, if any.
     pub fn discovery_domain(&self) -> Option<String> {
         self.sso_domain.clone()
     }
@@ -302,124 +287,44 @@ impl AudClaim {
     }
 }
 
-thread_local! {
-    static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = const { RefCell::new(vec![]) };
-}
-
 /// Install the configured (hardcoded) OpenID providers from init args.
 pub fn setup(configs: Vec<OpenIdConfig>) {
     configured::setup(configs);
 }
 
-/// Replay the persisted discoverable-SSO domain registry at post-upgrade. SSO
-/// discovery itself is now on demand (no timers) — this only restores the list
-/// of registered domains so `discovered_oidc_configs` can enumerate them.
-pub fn setup_oidc(configs: Vec<DiscoverableOidcConfig>) {
-    for config in configs {
-        add_oidc_config_internal(config);
+/// Drive the on-demand SSO discovery / JWKS fetches for `domain` forward. Only
+/// an update may call this — it spawns the outcalls the fills make. A no-op for
+/// `None` (a configured provider needs no fetch) and for a disallowed domain.
+/// After calling this, [`verify_jwt`] / [`discover_sso`] read the result once
+/// the cache is warm.
+pub fn prefetch_sso(domain: Option<&str>) {
+    if let Some(domain) = domain {
+        sso::prefetch(domain);
     }
 }
 
-pub fn add_oidc_config(config: DiscoverableOidcConfig) {
-    if !sso::is_allowed_discovery_domain(&config.discovery_domain) {
-        ic_cdk::trap(&format!(
-            "discovery_domain '{}' is not on the canary allowlist",
-            config.discovery_domain
-        ));
-    }
-
-    // Canonicalize the domain to lowercase. DNS hostnames are case-insensitive
-    // and the allowlist accepts case-insensitively; storing a canonical form
-    // keeps the registry and downstream `sso:<domain>` matching in sync.
-    let config = DiscoverableOidcConfig {
-        discovery_domain: config.discovery_domain.to_ascii_lowercase(),
-    };
-
-    let already_exists = OIDC_CONFIGS.with_borrow(|stored| {
-        stored
-            .iter()
-            .any(|c| c.discovery_domain == config.discovery_domain)
-    });
-    if already_exists {
-        return;
-    }
-
-    add_oidc_config_internal(config.clone());
-
-    // Persist to state so it survives upgrades
-    state::persistent_state_mut(|persistent_state| {
-        let configs = persistent_state.oidc_configs.get_or_insert_with(Vec::new);
-        configs.push(config);
-    });
-}
-
-fn add_oidc_config_internal(config: DiscoverableOidcConfig) {
-    let config = DiscoverableOidcConfig {
-        discovery_domain: config.discovery_domain.to_ascii_lowercase(),
-    };
-    OIDC_CONFIGS.with_borrow_mut(|stored| {
-        stored.push(config);
-    });
-}
-
-/// List the registered discoverable-SSO domains with whatever discovery state
-/// is currently cached (peek-only — a query can't drive a fill). Domains not
-/// yet warmed by a sign-in or `discover_sso` call report `None` fields.
-pub fn get_discovered_oidc_configs() -> Vec<OidcConfig> {
-    OIDC_CONFIGS.with_borrow(|configs| {
-        configs
-            .iter()
-            .map(|config| {
-                let domain = &config.discovery_domain;
-                let (client_id, issuer) = match sso::discover(domain, VerifyMode::Query) {
-                    Ok(Cached::Ready(cfg)) => (Some(cfg.client_id), Some(cfg.issuer)),
-                    _ => (None, None),
-                };
-                OidcConfig {
-                    discovery_domain: domain.clone(),
-                    client_id,
-                    // Superseded by `discover_sso`; the legacy listing no longer
-                    // surfaces the hop-1 `openid_configuration` URL.
-                    openid_configuration: None,
-                    issuer,
-                }
-            })
-            .collect()
-    })
-}
-
-/// Resolve an SSO domain's full configuration for the sign-in initiation flow.
-/// `mode` decides whether a cold cache spawns the discovery fill (`Update`) or
-/// only peeks (`Query`). Returns `Ok(None)` while discovery is still in flight
-/// (the frontend polls), `Err` for a disallowed domain.
-pub fn discover_sso(domain: &str, mode: VerifyMode) -> Result<Option<SsoDiscovery>, String> {
-    match sso::discover(domain, mode)? {
-        Cached::Pending => Ok(None),
-        Cached::Ready(cfg) => Ok(Some(SsoDiscovery {
+/// Read an SSO domain's resolved configuration for the sign-in initiation flow.
+/// Returns `Ok(None)` until the cache is warm (call [`prefetch_sso`] from an
+/// update to drive the fetch), `Err` for a disallowed domain.
+pub fn discover_sso(domain: &str) -> Result<Option<SsoDiscovery>, String> {
+    Ok(match sso::discover(domain)? {
+        Cached::Pending => None,
+        Cached::Ready(cfg) => Some(SsoDiscovery {
             discovery_domain: domain.to_ascii_lowercase(),
             client_id: cfg.client_id,
             issuer: cfg.issuer,
             authorization_endpoint: cfg.authorization_endpoint,
             scopes: cfg.scopes,
             name: cfg.name,
-        })),
-    }
+        }),
+    })
 }
 
-/// Verify a JWT and bind the nonce to the caller via the salt, returning the
-/// resulting credential. `discovery_domain` selects the provider kind: `None`
-/// resolves a configured provider by `(iss, aud)`; `Some(domain)` resolves an
-/// SSO provider via the on-demand discovery cache.
-///
-/// `Ok(Cached::Pending)` means SSO discovery or JWKS isn't cached yet — in an
-/// `Update` the fill has been kicked off; the caller signals the frontend to
-/// retry. A configured provider never yields `Pending`.
-pub fn verify_jwt(
+/// Decode a JWT's issuer, audience, and raw claims bytes. Rejects an empty
+/// audience.
+fn decode_iss_aud_claims(
     jwt: &str,
-    salt: &[u8; 32],
-    discovery_domain: Option<&str>,
-    mode: VerifyMode,
-) -> Result<Cached<OpenIdCredential>, OpenIDJWTVerificationError> {
+) -> Result<(String, AudClaim, Vec<u8>), OpenIDJWTVerificationError> {
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .map_err(|_| {
@@ -434,14 +339,31 @@ pub fn verify_jwt(
             "JWT has empty aud claim".to_string(),
         ));
     }
+    Ok((iss, aud, validation_item.claims().to_vec()))
+}
 
-    let resolved =
-        match provider::resolve(&iss, &aud, validation_item.claims(), discovery_domain, mode)? {
-            Cached::Pending => return Ok(Cached::Pending),
-            Cached::Ready(resolved) => resolved,
-        };
+/// Verify a JWT and bind the nonce to the caller via the salt, returning the
+/// resulting credential. `discovery_domain` selects the provider kind: `None`
+/// resolves a configured provider by `(iss, aud)`; `Some(domain)` resolves an
+/// SSO provider from the discovery cache.
+///
+/// Reads the SSO caches without spawning, so it's safe from both updates and
+/// queries. `Ok(Cached::Pending)` means SSO discovery or JWKS isn't cached yet;
+/// an update must call [`prefetch_sso`] to drive the fetch, then retry. A
+/// configured provider never yields `Pending`.
+pub fn verify_jwt(
+    jwt: &str,
+    salt: &[u8; 32],
+    discovery_domain: Option<&str>,
+) -> Result<Cached<OpenIdCredential>, OpenIDJWTVerificationError> {
+    let (iss, aud, claims) = decode_iss_aud_claims(jwt)?;
 
-    let keys = match jwks::read_jwks(&resolved.jwk_source, mode) {
+    let resolved = match provider::resolve(&iss, &aud, &claims, discovery_domain)? {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(resolved) => resolved,
+    };
+
+    let keys = match jwks::read_jwks(&resolved.jwk_source) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(keys) => keys,
     };
@@ -601,7 +523,7 @@ mod tests {
         configured::clear_for_test();
         configured::setup_for_test(google_config(), test_certs());
 
-        let result = verify_jwt(VALID_JWT, &test_salt(), None, VerifyMode::Update);
+        let result = verify_jwt(VALID_JWT, &test_salt(), None);
         match result {
             Ok(Cached::Ready(credential)) => {
                 assert_eq!(credential.iss, "https://accounts.google.com");
@@ -617,7 +539,7 @@ mod tests {
         configured::clear_for_test();
         // No providers registered → unsupported issuer.
         assert_eq!(
-            verify_jwt(VALID_JWT, &test_salt(), None, VerifyMode::Update),
+            verify_jwt(VALID_JWT, &test_salt(), None),
             Err(OpenIDJWTVerificationError::GenericError(
                 "Unsupported issuer: https://accounts.google.com".to_string()
             ))
@@ -629,7 +551,7 @@ mod tests {
         configured::clear_for_test();
         configured::setup_for_test(google_config(), test_certs());
         assert_eq!(
-            verify_jwt("invalid-jwt", &test_salt(), None, VerifyMode::Update),
+            verify_jwt("invalid-jwt", &test_salt(), None),
             Err(OpenIDJWTVerificationError::GenericError(
                 "Failed to decode JWT".to_string()
             ))

@@ -314,10 +314,8 @@ pub struct InternetIdentityInit {
 
 /// One entry of the `sso_credential_migration` backfill (see
 /// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
-/// pair of stored SSO credentials to the discovery domain (and optional
-/// human-readable name) they were registered through. Field names match the
-/// `discovered_oidc_configs` query output so the deployer can transcribe its
-/// result field-for-field before submitting the upgrade proposal.
+/// pair of a stored SSO credential to the discovery domain and optional
+/// human-readable name it resolves to.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoCredentialMigrationEntry {
     pub discovery_domain: String,
@@ -461,21 +459,10 @@ pub struct DiscoverableOidcConfig {
     pub discovery_domain: String,
 }
 
-/// Resolved SSO provider state returned by the `discovered_oidc_configs` query.
-/// Any field other than `discovery_domain` is `None` until the two-hop discovery
-/// completes for that domain.
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct OidcConfig {
-    pub discovery_domain: String,
-    pub client_id: Option<String>,
-    pub openid_configuration: Option<String>,
-    pub issuer: Option<String>,
-}
-
 /// Fully resolved SSO discovery result returned by `discover_sso` /
 /// `discover_sso_query`. Carries everything the frontend needs to build the
-/// authorization request — the two-hop discovery the frontend used to perform
-/// itself now happens canister-side, fetched on demand and cached.
+/// authorization request: the canister resolves it from the domain's two-hop
+/// discovery documents.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoDiscovery {
     pub discovery_domain: String,

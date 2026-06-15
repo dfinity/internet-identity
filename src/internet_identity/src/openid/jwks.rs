@@ -1,49 +1,43 @@
-//! The JWK seam: the single place the two JWK sources of truth diverge.
+//! The JWK seam: where a provider's JWKs come from.
 //!
-//! Everything in [`super::verify`] is identical for configured and SSO
-//! providers. The *only* difference is where the JWKs come from, and that
-//! difference lives here as [`JwkSource`]:
+//! [`super::verify`] runs identically for configured and SSO providers; the one
+//! input that differs is the JWK set, sourced per [`JwkSource`]:
 //!
 //! - [`JwkSource::Configured`] — stable storage (memory id 24), seeded at
-//!   install and timer-refreshed. Always synchronously `Ready`.
+//!   install and refreshed on a timer. Always synchronously `Ready`.
 //! - [`JwkSource::Sso`] — the on-demand single-flight JWKS cache, keyed by
-//!   `jwks_uri`. May be `Pending` on a cold cache.
+//!   `jwks_uri`. `Pending` until the cache is warm.
 //!
-//! This module also owns the shared JWKS fetch + deterministic transform, used
-//! by both sources (the configured timer and the SSO cache fill).
+//! This module also owns the JWKS fetch + deterministic transform used by both
+//! the configured refresh timer and the SSO cache fill.
 
-use super::{configured, sso, VerifyMode};
+use super::{configured, sso};
 use crate::single_flight_cache::Cached;
 use identity_jose::jwk::Jwk;
 
-/// Which of the two JWK sources of truth backs a given provider. No trait
-/// object — a plain two-arm enum, matched in exactly one place ([`read_jwks`]).
+/// Which JWK source backs a given provider, matched in exactly one place
+/// ([`read_jwks`]).
 pub(super) enum JwkSource {
-    /// Configured provider: JWKs persisted in stable storage under this issuer.
+    /// Configured provider: JWKs in stable storage under this issuer.
     Configured(String),
-    /// SSO provider: JWKs fetched on demand into the single-flight cache under
-    /// this `jwks_uri`.
+    /// SSO provider: JWKs in the on-demand cache under this `jwks_uri`.
     Sso(String),
 }
 
-/// Read the JWKs for a source.
-///
-/// In [`VerifyMode::Update`] a cold SSO cache spawns the outcall fill and reads
-/// `Pending`; in [`VerifyMode::Query`] it only peeks (a query cannot spawn an
-/// outcall), so `Pending` means "retry through the update path". The configured
-/// arm is a stable-storage read, always `Ready`, regardless of mode.
-pub(super) fn read_jwks(source: &JwkSource, mode: VerifyMode) -> Cached<Vec<Jwk>> {
+/// Read the JWKs for a source. Peek-only, so it's safe from a query; the SSO
+/// arm reads the cache without spawning a fill (an update drives the fill via
+/// [`sso::prefetch`]), and reports `Pending` until the cache is warm. The
+/// configured arm is a stable-storage read, always `Ready`.
+pub(super) fn read_jwks(source: &JwkSource) -> Cached<Vec<Jwk>> {
     match source {
         JwkSource::Configured(issuer) => Cached::Ready(configured::read_stable_jwks(issuer)),
-        JwkSource::Sso(jwks_uri) => match mode {
-            VerifyMode::Update => sso::get_jwks(jwks_uri),
-            VerifyMode::Query => sso::peek_jwks(jwks_uri),
-        },
+        JwkSource::Sso(jwks_uri) => sso::read_jwks(jwks_uri),
     }
 }
 
 // ---------------------------------------------------------------------------
-// Shared JWKS fetch + transform (configured timer and SSO cache fill alike).
+// JWKS fetch + transform, shared by the configured refresh timer and the SSO
+// cache fill.
 // ---------------------------------------------------------------------------
 
 #[cfg(not(test))]

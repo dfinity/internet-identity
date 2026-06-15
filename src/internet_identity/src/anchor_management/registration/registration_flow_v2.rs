@@ -206,21 +206,18 @@ fn create_openid_credential_and_config(
         discovery_domain,
     } = openid_registration_data;
 
-    // Registration runs in an update, so a cold SSO cache spawns the discovery
-    // / JWKS fills and surfaces `Pending` — the frontend retries the call.
-    let openid_credential = match openid::verify_jwt(
-        jwt,
-        salt,
-        discovery_domain.as_deref(),
-        openid::VerifyMode::Update,
-    )? {
+    // Registration runs in an update: drive the SSO discovery/JWKS fetches (if
+    // any), then read the result. A cold cache surfaces `Pending` and the
+    // frontend retries the call.
+    openid::prefetch_sso(discovery_domain.as_deref());
+    let openid_credential = match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
         openid::Cached::Ready(credential) => credential,
         openid::Cached::Pending => return Err(openid::OpenIDJWTVerificationError::Pending.into()),
     };
 
     // Config issuer for the authorization key / operation log: the configured
-    // provider's (template) issuer, or the concrete JWT issuer for SSO
-    // credentials (which carry their own `sso_domain` for scope routing).
+    // provider's (template) issuer, or the concrete JWT issuer for an SSO
+    // credential, which carries its own `sso_domain` for scope routing.
     let openid_config_iss = openid_credential
         .config_issuer()
         .unwrap_or_else(|| openid_credential.iss.clone());

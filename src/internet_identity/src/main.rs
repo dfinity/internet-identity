@@ -662,16 +662,6 @@ fn whoami() -> Principal {
 }
 
 #[query]
-fn discovered_oidc_configs() -> Vec<OidcConfig> {
-    openid::get_discovered_oidc_configs()
-}
-
-#[update]
-fn add_discoverable_oidc_config(config: DiscoverableOidcConfig) {
-    openid::add_oidc_config(config);
-}
-
-#[query]
 fn config() -> InternetIdentityInit {
     let archive_config = match state::archive_state() {
         ArchiveState::NotConfigured => None,
@@ -752,14 +742,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     update_root_hash();
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
-    }
-    // Re-populate in-memory SSO provider state from persistent storage.
-    // `OIDC_CONFIGS` is a thread-local Vec that is lost across upgrades, so we
-    // need to replay the persisted domains here. SSO providers cannot be
-    // registered via init args — only via `add_discoverable_oidc_config`.
-    let persisted_oidc_configs = state::persistent_state(|s| s.oidc_configs.clone());
-    if let Some(oidc_configs) = persisted_oidc_configs {
-        openid::setup_oidc(oidc_configs);
     }
 
     // Kick off the SSO credential batch migration. Examines at most
@@ -1344,18 +1326,15 @@ mod openid_api {
         salt: [u8; 32],
         discovery_domain: Option<String>,
     ) -> Result<(), OpenIdCredentialAddError> {
+        openid::prefetch_sso(discovery_domain.as_deref());
         anchor_operation_with_authz_check(identity_number, |anchor| {
-            let openid_credential = match openid::verify_jwt(
-                &jwt,
-                &salt,
-                discovery_domain.as_deref(),
-                openid::VerifyMode::Update,
-            )? {
-                openid::Cached::Ready(credential) => credential,
-                // SSO discovery/JWKS not cached yet; the fill is in flight.
-                // The frontend retries the call.
-                openid::Cached::Pending => return Err(OpenIdCredentialAddError::Pending),
-            };
+            let openid_credential =
+                match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref())? {
+                    openid::Cached::Ready(credential) => credential,
+                    // SSO discovery/JWKS not cached yet; the fetch is in flight.
+                    // The frontend retries the call.
+                    openid::Cached::Pending => return Err(OpenIdCredentialAddError::Pending),
+                };
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
@@ -1391,15 +1370,13 @@ mod openid_api {
         session_key: SessionKey,
         discovery_domain: Option<String>,
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
-        // Update context: a cold SSO cache spawns the discovery/JWKS fills here
-        // and reads `Pending`; the frontend polls `openid_get_delegation` and
-        // re-calls this until the delegation is ready.
-        let openid_credential = match openid::verify_jwt(
-            &jwt,
-            &salt,
-            discovery_domain.as_deref(),
-            openid::VerifyMode::Update,
-        )? {
+        // Drive the SSO discovery/JWKS fetches (if any) on this update, then
+        // read the result. A cold cache reads `Pending`; the frontend polls
+        // `openid_get_delegation` and re-calls this until the delegation is
+        // ready.
+        openid::prefetch_sso(discovery_domain.as_deref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref())?
+        {
             openid::Cached::Ready(credential) => credential,
             openid::Cached::Pending => return Err(OpenIdDelegationError::Pending),
         };
@@ -1446,16 +1423,12 @@ mod openid_api {
         expiration: Timestamp,
         discovery_domain: Option<String>,
     ) -> Result<SignedDelegation, OpenIdDelegationError> {
-        // Query context: the SSO caches are read-only here (a query can't spawn
-        // an outcall fill). A `Pending` means discovery/JWKS isn't cached yet —
-        // the frontend re-calls `openid_prepare_delegation` (an update, which
-        // *can* fill) and then polls this again.
-        let openid_credential = match openid::verify_jwt(
-            &jwt,
-            &salt,
-            discovery_domain.as_deref(),
-            openid::VerifyMode::Query,
-        )? {
+        // A query can't drive the SSO fetches, so `verify_jwt` only reads the
+        // caches. A `Pending` means discovery/JWKS isn't cached yet — the
+        // frontend re-calls `openid_prepare_delegation` (an update, which drives
+        // the fetch) and polls this again.
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref())?
+        {
             openid::Cached::Ready(credential) => credential,
             openid::Cached::Pending => return Err(OpenIdDelegationError::Pending),
         };
@@ -1471,26 +1444,26 @@ mod openid_api {
     }
 
     /// Resolve an SSO discovery domain's configuration for the sign-in
-    /// initiation flow. Update context: a cold cache spawns the two-hop
-    /// discovery fill and returns `Ok(None)`; the frontend polls
-    /// `discover_sso_query` until it returns `Ok(Some(_))`.
+    /// initiation flow, driving the two-hop discovery fetch. Returns `Ok(None)`
+    /// while the fetch is in flight; the frontend polls `discover_sso_query`
+    /// until it returns `Ok(Some(_))`.
     #[update]
     fn discover_sso(
         domain: String,
     ) -> Result<Option<internet_identity_interface::internet_identity::types::SsoDiscovery>, String>
     {
-        openid::discover_sso(&domain, openid::VerifyMode::Update)
+        openid::prefetch_sso(Some(&domain));
+        openid::discover_sso(&domain)
     }
 
-    /// Read-only counterpart to `discover_sso`: returns the cached discovery
-    /// result for `domain`, or `Ok(None)` if it isn't cached yet (the frontend
-    /// should call `discover_sso` to drive the fetch).
+    /// Read the cached discovery result for `domain` without driving the fetch,
+    /// returning `Ok(None)` if it isn't cached yet.
     #[query]
     fn discover_sso_query(
         domain: String,
     ) -> Result<Option<internet_identity_interface::internet_identity::types::SsoDiscovery>, String>
     {
-        openid::discover_sso(&domain, openid::VerifyMode::Query)
+        openid::discover_sso(&domain)
     }
 }
 

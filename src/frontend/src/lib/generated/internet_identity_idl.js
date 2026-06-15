@@ -133,7 +133,6 @@ export const idlFactory = ({ IDL }) => {
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
-  const DiscoverableOidcConfig = IDL.Record({ 'discovery_domain' : IDL.Text });
   const Timestamp = IDL.Nat64;
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -271,11 +270,13 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Principal,
     'failed' : IDL.Text,
   });
-  const OidcConfig = IDL.Record({
-    'openid_configuration' : IDL.Opt(IDL.Text),
-    'issuer' : IDL.Opt(IDL.Text),
+  const SsoDiscovery = IDL.Record({
+    'scopes' : IDL.Vec(IDL.Text),
+    'name' : IDL.Opt(IDL.Text),
+    'authorization_endpoint' : IDL.Text,
+    'issuer' : IDL.Text,
     'discovery_domain' : IDL.Text,
-    'client_id' : IDL.Opt(IDL.Text),
+    'client_id' : IDL.Text,
   });
   const Rrsig = IDL.Record({
     'algorithm' : IDL.Nat8,
@@ -615,6 +616,7 @@ export const idlFactory = ({ IDL }) => {
     'JwtExpired' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'JwtVerificationFailed' : IDL.Null,
+    'Pending' : IDL.Null,
   });
   const OpenIdCredentialKey = IDL.Tuple(Iss, Sub, Aud);
   const OpenIdCredentialRemoveError = IDL.Variant({
@@ -627,11 +629,13 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchAnchor' : IDL.Null,
     'JwtExpired' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
+    'Pending' : IDL.Null,
   });
   const OpenIDRegFinishArg = IDL.Record({
     'jwt' : JWT,
     'name' : IDL.Text,
     'salt' : Salt,
+    'discovery_domain' : IDL.Opt(IDL.Text),
   });
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,
@@ -766,7 +770,6 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
-    'add_discoverable_oidc_config' : IDL.Func([DiscoverableOidcConfig], [], []),
     'add_tentative_device' : IDL.Func(
         [UserNumber, DeviceData],
         [AddTentativeDeviceResponse],
@@ -880,7 +883,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
-    'discovered_oidc_configs' : IDL.Func([], [IDL.Vec(OidcConfig)], ['query']),
+    'discover_sso' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Opt(SsoDiscovery), 'Err' : IDL.Text })],
+        [],
+      ),
+    'discover_sso_query' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Opt(SsoDiscovery), 'Err' : IDL.Text })],
+        ['query'],
+      ),
     'email_recovery_credential_prepare_add' : IDL.Func(
         [IdentityNumber, EmailRecoveryDnsInput],
         [
@@ -1075,7 +1087,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'openid_credential_add' : IDL.Func(
-        [IdentityNumber, JWT, Salt],
+        [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
         [],
       ),
@@ -1085,7 +1097,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'openid_get_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey, Timestamp],
+        [JWT, Salt, SessionKey, Timestamp, IDL.Opt(IDL.Text)],
         [
           IDL.Variant({
             'Ok' : SignedDelegation,
@@ -1100,7 +1112,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'openid_prepare_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey],
+        [JWT, Salt, SessionKey, IDL.Opt(IDL.Text)],
         [
           IDL.Variant({
             'Ok' : OpenIdPrepareDelegationResponse,

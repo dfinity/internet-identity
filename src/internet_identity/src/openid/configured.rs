@@ -1,14 +1,12 @@
 //! Configured (hardcoded) OpenID providers: Google, Microsoft, Apple.
 //!
-//! These are a fixed, data-only registry (`CONFIG_REGISTRY`) installed from the
-//! canister's init args — no trait objects, no dynamic dispatch. Their JWKs are
-//! the **first** of the two JWK sources of truth: persisted in stable storage
-//! (memory id 24, keyed by issuer) and refreshed by a periodic timer, seeded at
-//! install time (see PR #3959). This source is always synchronously readable,
-//! so the configured path never returns `Pending`.
-//!
-//! The SSO providers are the *other* source ([`super::sso`]); the only place the
-//! two diverge is the JWK read ([`super::jwks`]).
+//! A fixed registry (`CONFIG_REGISTRY`) of provider data installed from the
+//! canister's init args. Their JWKs are persisted in stable storage (memory id
+//! 24, keyed by issuer), seeded at install time and refreshed by a periodic
+//! timer, so they're always synchronously readable and the configured path
+//! never returns `Pending`. SSO providers source their JWKs differently (see
+//! [`super::sso`]); the JWK read ([`super::jwks`]) is the only place the two
+//! diverge.
 
 use super::verify::{Descriptor, Stamp};
 use super::OpenIdCredential;

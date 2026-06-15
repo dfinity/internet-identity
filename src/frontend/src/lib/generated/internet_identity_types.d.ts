@@ -470,13 +470,6 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
-/**
- * SSO provider config that uses two-hop discovery.
- * The backend fetches https://{discovery_domain}/.well-known/ii-openid-configuration
- * for { client_id, openid_configuration } and then fetches the standard OIDC
- * discovery at openid_configuration for { issuer, jwks_uri }.
- */
-export interface DiscoverableOidcConfig { 'discovery_domain' : string }
 export interface DnsProofBundle {
   'root_dnskey' : SignedRRset,
   /**
@@ -955,9 +948,7 @@ export interface InternetIdentityInit {
    * every stored credential whose (iss, aud) matches an entry and whose
    * `sso_domain` is not set yet. Idempotent — already-stamped credentials
    * are skipped, so re-submitting (e.g. with a corrected list) is safe.
-   * When unset, no backfill runs. The deployer builds the list from the
-   * running canister's `discovered_oidc_configs` query before
-   * submitting the upgrade proposal.
+   * When unset, no backfill runs.
    */
   'sso_credential_migration' : [] | [Array<SsoCredentialMigrationEntry>],
   /**
@@ -995,11 +986,10 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
-   * Allowlist of domains that may be registered as discoverable SSO
-   * providers via `add_discoverable_oidc_config`. When set, fully replaces
-   * the built-in defaults. When unset, falls back to `dfinity.org`
-   * (production) or `beta.dfinity.org` (everything else), keyed off
-   * `is_production`.
+   * Allowlist of domains that may be used as discoverable SSO providers.
+   * When set, fully replaces the built-in defaults. When unset, falls back
+   * to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
+   * keyed off `is_production`.
    */
   'sso_discoverable_domains' : [] | [Array<string>],
   /**
@@ -1117,20 +1107,15 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
-/**
- * Resolved SSO provider state.
- * All fields other than discovery_domain are None until discovery completes.
- */
-export interface OidcConfig {
-  'openid_configuration' : [] | [string],
-  'issuer' : [] | [string],
-  'discovery_domain' : string,
-  'client_id' : [] | [string],
-}
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
   'salt' : Salt,
+  /**
+   * SSO discovery domain the JWT was obtained through, or null for a direct
+   * provider (Google / Microsoft / Apple). Selects the JWK source.
+   */
+  'discovery_domain' : [] | [string],
 }
 export interface OpenIdConfig {
   'auth_uri' : string,
@@ -1159,10 +1144,8 @@ export interface OpenIdCredential {
   'sub' : Sub,
   'metadata' : MetadataMapV2,
   /**
-   * SSO discovery domain, looked up by `(iss, aud)` against the
-   * canister's registered discoverable OIDC configs. `None` for
-   * direct-provider credentials (Google / Apple / Microsoft) and for
-   * SSO credentials whose provider is no longer registered.
+   * SSO discovery domain this credential was verified through. `None` for
+   * direct-provider credentials (Google / Apple / Microsoft).
    */
   'sso_domain' : [] | [string],
   /**
@@ -1180,7 +1163,15 @@ export type OpenIdCredentialAddError = {
   { 'InternalCanisterError' : string } |
   { 'JwtExpired' : null } |
   { 'Unauthorized' : Principal } |
-  { 'JwtVerificationFailed' : null };
+  { 'JwtVerificationFailed' : null } |
+  {
+    /**
+     * SSO discovery / JWKS for this domain isn't cached yet; the canister
+     * kicked off the fetch. Retry the call shortly. Never returned for
+     * configured providers (Google / Microsoft / Apple).
+     */
+    'Pending' : null
+  };
 export type OpenIdCredentialKey = [Iss, Sub, Aud];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
@@ -1188,7 +1179,15 @@ export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
 export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
   { 'JwtExpired' : null } |
-  { 'JwtVerificationFailed' : null };
+  { 'JwtVerificationFailed' : null } |
+  {
+    /**
+     * SSO discovery / JWKS for this domain isn't cached yet. `prepare` kicks
+     * off the fetch; poll `get` until ready, re-calling `prepare` when `get`
+     * reports `Pending`. Never returned for configured providers.
+     */
+    'Pending' : null
+  };
 export type OpenIdEmailVerification = { 'Google' : null } |
   { 'Unknown' : null } |
   { 'Microsoft' : null };
@@ -1216,10 +1215,10 @@ export interface PrepareAttributeRequest {
    * or `sso:<domain>` (e.g. `sso:dfinity.org:email`).
    * 
    * Each linked credential is addressable via exactly one scope:
-   * credentials obtained through a `DiscoverableOidcConfig` (two-hop SSO
-   * discovery) are reachable only via `sso:<domain>`; credentials from
-   * hardcoded OIDC providers (Google, Microsoft, …) are reachable only via
-   * `openid:<issuer>`. Under `sso:` only `email` and `name` are supported;
+   * credentials obtained through SSO two-hop discovery are reachable only
+   * via `sso:<domain>`; credentials from hardcoded OIDC providers (Google,
+   * Microsoft, …) are reachable only via `openid:<issuer>`. Under `sso:`
+   * only `email` and `name` are supported;
    * under `openid:` `email`, `name`, and `verified_email` are supported.
    */
   'attribute_keys' : Array<string>,
@@ -1491,10 +1490,8 @@ export type SmtpResponse = { 'Ok' : {} } |
   { 'Err' : SmtpRequestError };
 /**
  * One entry of the `sso_credential_migration` backfill. Maps the
- * (iss, aud) pair of stored SSO credentials to the discovery domain (and
- * optional human-readable name) they were registered through. Field names
- * match the `discovered_oidc_configs` query output so the deployer can
- * transcribe its result field-for-field.
+ * (iss, aud) pair of a stored SSO credential to the discovery domain and
+ * optional human-readable name it resolves to.
  */
 export interface SsoCredentialMigrationEntry {
   /**
@@ -1509,6 +1506,19 @@ export interface SsoCredentialMigrationEntry {
   /**
    * Matches the stored credential's `aud`.
    */
+  'client_id' : string,
+}
+/**
+ * Fully resolved SSO discovery result for the sign-in initiation flow,
+ * returned by `discover_sso` / `discover_sso_query`. The canister resolves it
+ * from the domain's two-hop discovery documents, on demand and cached.
+ */
+export interface SsoDiscovery {
+  'scopes' : Array<string>,
+  'name' : [] | [string],
+  'authorization_endpoint' : string,
+  'issuer' : string,
+  'discovery_domain' : string,
   'client_id' : string,
 }
 export interface StreamingCallbackHttpResponse {
@@ -1579,10 +1589,6 @@ export interface WebAuthnCredential {
 export interface _SERVICE {
   'acknowledge_entries' : ActorMethod<[bigint], undefined>,
   'add' : ActorMethod<[UserNumber, DeviceData], undefined>,
-  'add_discoverable_oidc_config' : ActorMethod<
-    [DiscoverableOidcConfig],
-    undefined
-  >,
   'add_tentative_device' : ActorMethod<
     [UserNumber, DeviceData],
     AddTentativeDeviceResponse
@@ -1714,10 +1720,21 @@ export interface _SERVICE {
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
-   * OIDC Discovery
-   * ===============
+   * SSO discovery for the sign-in initiation flow. `discover_sso` (update)
+   * kicks off the on-demand two-hop discovery fetch and returns the resolved
+   * config, or null while the fetch is still in flight. `discover_sso_query`
+   * is the read-only counterpart that returns the cached result if present.
    */
-  'discovered_oidc_configs' : ActorMethod<[], Array<OidcConfig>>,
+  'discover_sso' : ActorMethod<
+    [string],
+    { 'Ok' : [] | [SsoDiscovery] } |
+      { 'Err' : string }
+  >,
+  'discover_sso_query' : ActorMethod<
+    [string],
+    { 'Ok' : [] | [SsoDiscovery] } |
+      { 'Err' : string }
+  >,
   /**
    * Email-recovery protocol
    * =======================
@@ -1918,8 +1935,15 @@ export interface _SERVICE {
     [Uint8Array | number[]],
     [] | [DeviceKeyWithAnchor]
   >,
+  /**
+   * The trailing `opt text` is the SSO discovery domain (null for a direct
+   * provider). For SSO sign-ins a cold discovery/JWKS cache returns the
+   * `Pending` error variant; the caller retries (and for delegations, polls
+   * `openid_get_delegation`, re-calling `openid_prepare_delegation` on a
+   * `Pending` poll result).
+   */
   'openid_credential_add' : ActorMethod<
-    [IdentityNumber, JWT, Salt],
+    [IdentityNumber, JWT, Salt, [] | [string]],
     { 'Ok' : null } |
       { 'Err' : OpenIdCredentialAddError }
   >,
@@ -1929,7 +1953,7 @@ export interface _SERVICE {
       { 'Err' : OpenIdCredentialRemoveError }
   >,
   'openid_get_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey, Timestamp],
+    [JWT, Salt, SessionKey, Timestamp, [] | [string]],
     { 'Ok' : SignedDelegation } |
       { 'Err' : OpenIdDelegationError }
   >,
@@ -1943,7 +1967,7 @@ export interface _SERVICE {
       { 'Err' : IdRegFinishError }
   >,
   'openid_prepare_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey],
+    [JWT, Salt, SessionKey, [] | [string]],
     { 'Ok' : OpenIdPrepareDelegationResponse } |
       { 'Err' : OpenIdDelegationError }
   >,

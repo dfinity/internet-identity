@@ -2169,21 +2169,11 @@ mod tests {
     /// holds — after the call, the provider behaves as if discovery had run.
     mod sso_attributes_tests {
         use super::*;
-        use internet_identity_interface::internet_identity::types::DiscoverableOidcConfig;
 
         const SSO_DOMAIN: &str = "test-sso.example";
         const SSO_ISSUER: &str = "https://idp.example/issuer";
         const SSO_CLIENT_ID: &str = "sso-client-id";
         const SUB: &str = "sso-user-789";
-
-        fn setup_sso_provider() {
-            // SSO-ness now lives on the credential's stamped `sso_domain`
-            // (post-migration); registering the domain is only needed so the
-            // `discovered_oidc_configs` listing can enumerate it.
-            crate::openid::setup_oidc(vec![DiscoverableOidcConfig {
-                discovery_domain: SSO_DOMAIN.to_string(),
-            }]);
-        }
 
         fn sso_credential_with(metadata: HashMap<String, MetadataEntryV2>) -> OpenIdCredential {
             OpenIdCredential {
@@ -2233,7 +2223,6 @@ mod tests {
         // Sanity: discovery_domain() returns Some for SSO-matched credentials.
         #[test]
         fn credential_reports_discovery_domain() {
-            setup_sso_provider();
             let credential = sso_credential_with(email_and_name_metadata());
             pretty_assert_eq!(credential.discovery_domain(), Some(SSO_DOMAIN.to_string()),);
         }
@@ -2243,7 +2232,6 @@ mod tests {
         // `with_provider` lookup).
         #[test]
         fn matched_attribute_scope_is_sso_for_discoverable_credential() {
-            setup_sso_provider();
             let credential = sso_credential_with(email_and_name_metadata());
             pretty_assert_eq!(
                 credential.matched_attribute_scope(),
@@ -2259,7 +2247,6 @@ mod tests {
         // covers the defense-in-depth filter inside the extraction step.)
         #[test]
         fn prepare_openid_skips_sso_credential() {
-            setup_sso_provider();
             let anchor =
                 anchor_with_openid_credentials(vec![
                     sso_credential_with(email_and_name_metadata()),
@@ -2297,7 +2284,6 @@ mod tests {
         // expand the legacy path's surface area.
         #[test]
         fn list_available_attributes_lists_sso_credential() {
-            setup_sso_provider();
             let anchor =
                 anchor_with_openid_credentials(vec![
                     sso_credential_with(email_and_name_metadata()),
@@ -2327,7 +2313,6 @@ mod tests {
             use internet_identity_interface::internet_identity::types::attributes::{
                 PrepareIcrc3AttributeError, ValidatedAttributeSpec,
             };
-            setup_sso_provider();
             let anchor =
                 anchor_with_openid_credentials(vec![
                     sso_credential_with(email_and_name_metadata()),
@@ -2375,7 +2360,6 @@ mod tests {
             use internet_identity_interface::internet_identity::types::attributes::{
                 PrepareIcrc3AttributeError, ValidatedAttributeSpec,
             };
-            setup_sso_provider();
             let anchor =
                 anchor_with_openid_credentials(vec![
                     sso_credential_with(email_and_name_metadata()),
