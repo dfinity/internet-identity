@@ -306,7 +306,7 @@ write_install_args() {
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
 
   cat > "$II_ARGS_FILE" <<EOF
-(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_discoverable_domains = opt vec { $sso_vec }; dnssec_config = $dnssec_config })
+(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_discoverable_domains = opt vec { $sso_vec }; enable_dnssec_email_recovery = opt true; dnssec_config = $dnssec_config })
 EOF
 
   # FE args depend on the II canister ID, which we only know after create_canisters.

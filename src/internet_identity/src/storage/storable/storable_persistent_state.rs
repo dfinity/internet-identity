@@ -43,6 +43,7 @@ pub struct StorablePersistentState {
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
     dummy_auth: Option<DummyAuthConfig>,
+    enable_dnssec_email_recovery: Option<bool>,
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
 }
@@ -92,6 +93,7 @@ impl From<PersistentState> for StorablePersistentState {
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
+            enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
         }
@@ -119,6 +121,7 @@ impl From<StorablePersistentState> for PersistentState {
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
+            enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
         }
@@ -174,6 +177,7 @@ mod tests {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
         };
@@ -205,6 +209,7 @@ mod tests {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
         };

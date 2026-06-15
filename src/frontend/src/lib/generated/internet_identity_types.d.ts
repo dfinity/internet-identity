@@ -1020,6 +1020,11 @@ export interface InternetIdentityInit {
    */
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
   /**
+   * Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+   * off (DoH-only); `opt true` re-enables it.
+   */
+  'enable_dnssec_email_recovery' : [] | [boolean],
+  /**
    * Configuration for Related Origins Requests.
    * If present, list of origins from where registration is allowed.
    */
