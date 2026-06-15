@@ -101,45 +101,44 @@ async fn prepare_common(
     let registered_domain = registered_domain_of(&address)
         .ok_or_else(|| EmailRecoveryError::DomainNotSupported(address.clone()))?;
 
-    // Deploy flag off (the default) => DoH-only: drop any client-supplied
-    // proof so the picker below falls through to the DoH path.
-    let dns_proof = dns_proof.filter(|_| super::dnssec_email_recovery_enabled());
-
     // Path picker. The FE never decides the path — it sends whatever
     // it could gather, and we choose:
     //
-    // - DNSSEC path: if `dns_proof` is supplied, validate the
-    //   *skeleton chain* synchronously and cache the deepest-zone
-    //   DNSKEY for later leaf admission. If the bundle also carries a
-    //   DMARC leaf, validate it and cache the TXT bytes.
-    // - DoH path: fall through to the allowlist check; `smtp_request`
-    //   resolves the DKIM TXT via `crate::doh::fetch_txt` at email
-    //   arrival.
-    // - Neither: reject — the FE will surface a "we can't accept
-    //   email from this domain" error.
-    let (cached_root_dnskey, cached_zones, cached_dmarc_txt) = if let Some(proof) = dns_proof {
-        let extracted = verify_dnssec_skeleton(proof, &registered_domain, now_secs)?;
-        (
-            Some(extracted.root_dnskey),
-            extracted.zones,
-            extracted.dmarc,
-        )
-    } else {
-        // No DNSSEC bundle → DoH allowlist gate.
-        let allowlisted = state::persistent_state(|p| {
-            p.doh_config
-                .as_ref()
-                .map(|c| {
-                    c.allowed_domains
-                        .iter()
-                        .any(|d| d.eq_ignore_ascii_case(&registered_domain))
-                })
-                .unwrap_or(false)
-        });
-        if !allowlisted {
-            return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
+    // - DNSSEC path: taken only when the deploy flag enables it *and* a
+    //   `dns_proof` is supplied. Validates the *skeleton chain*
+    //   synchronously and caches the deepest-zone DNSKEY for later leaf
+    //   admission; a bundled DMARC leaf is validated and its TXT cached.
+    // - DoH path: the default. With the flag off any supplied proof is
+    //   ignored and we fall through to the allowlist check; `smtp_request`
+    //   resolves the DKIM TXT via `crate::doh::fetch_txt` at email arrival.
+    // - Non-allowlisted domain on the DoH path → reject; the FE surfaces a
+    //   "we can't accept email from this domain" error.
+    let (cached_root_dnskey, cached_zones, cached_dmarc_txt) = match dns_proof {
+        Some(proof) if super::dnssec_email_recovery_enabled() => {
+            let extracted = verify_dnssec_skeleton(proof, &registered_domain, now_secs)?;
+            (
+                Some(extracted.root_dnskey),
+                extracted.zones,
+                extracted.dmarc,
+            )
         }
-        (None, crate::dnssec::ZoneKeysMap::new(), None)
+        _ => {
+            // DoH allowlist gate.
+            let allowlisted = state::persistent_state(|p| {
+                p.doh_config
+                    .as_ref()
+                    .map(|c| {
+                        c.allowed_domains
+                            .iter()
+                            .any(|d| d.eq_ignore_ascii_case(&registered_domain))
+                    })
+                    .unwrap_or(false)
+            });
+            if !allowlisted {
+                return Err(EmailRecoveryError::DomainNotAllowlisted(registered_domain));
+            }
+            (None, crate::dnssec::ZoneKeysMap::new(), None)
+        }
     };
 
     // Now we can mutate state. The async raw_rand fetch happens at
