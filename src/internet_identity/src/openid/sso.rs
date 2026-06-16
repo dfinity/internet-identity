@@ -17,7 +17,6 @@ use super::verify::{Descriptor, Stamp};
 use super::OpenIDJWTVerificationError;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
 use identity_jose::jwk::Jwk;
-use internet_identity_interface::internet_identity::types::SsoDiscoveryError;
 use std::cell::RefCell;
 
 #[cfg(not(test))]
@@ -84,45 +83,39 @@ fn new_jwks_cache() -> JwksCache {
 // Lookup paths.
 // ---------------------------------------------------------------------------
 
-/// Canonicalize and allowlist-check a discovery domain.
-fn allowed_domain(domain: &str) -> Result<String, SsoDiscoveryError> {
-    let domain = domain.to_ascii_lowercase();
-    if !is_allowed_discovery_domain(&domain) {
-        return Err(SsoDiscoveryError::DomainNotAllowed);
-    }
-    Ok(domain)
-}
-
 /// Drive the on-demand fetches for `domain` forward: ensure the discovery fill
 /// is running, and once discovery has resolved, ensure the JWKS fill for its
 /// `jwks_uri` is running too. Only an update may call this — it can spawn the
-/// outcalls the fills make. Reads ([`discover`], [`read_jwks`]) stay peek-only,
-/// so a query never needs this and never spawns. `Err` for a disallowed domain.
-pub(super) fn prefetch(domain: &str) -> Result<(), SsoDiscoveryError> {
-    let domain = allowed_domain(domain)?;
+/// outcalls the fills make. Reads ([`peek_discovery`], [`read_jwks`]) stay
+/// peek-only, so a query never needs this and never spawns. A no-op for a
+/// disallowed domain.
+pub(super) fn prefetch(domain: &str) {
+    let domain = domain.to_ascii_lowercase();
+    if !is_allowed_discovery_domain(&domain) {
+        return;
+    }
     if let Cached::Ready(cfg) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
         single_flight_cache::get(&JWKS_CACHE, cfg.jwks_uri);
     }
-    Ok(())
 }
 
 /// Drive the discovery fetch for `domain` (the discovery cache only — JWKS is a
 /// verify-time concern). For the sign-in initiation poll, where the frontend
-/// hits this from a query response that read no value yet.
-pub(super) fn drive_discovery(domain: &str) -> Result<(), SsoDiscoveryError> {
-    let domain = allowed_domain(domain)?;
-    single_flight_cache::get(&DISCOVERY_CACHE, domain);
-    Ok(())
+/// hits this from a query that read no value yet. A no-op for a disallowed
+/// domain.
+pub(super) fn drive_discovery(domain: &str) {
+    let domain = domain.to_ascii_lowercase();
+    if is_allowed_discovery_domain(&domain) {
+        single_flight_cache::get(&DISCOVERY_CACHE, domain);
+    }
 }
 
-/// Read the cached discovery result for `domain`. Peek-only (never spawns), so
-/// it's safe from a query; `Ok(Pending)` means no cached value yet — an update
-/// must [`prefetch`] to drive the fetch. `Err` for a disallowed domain.
-pub(super) fn discover(domain: &str) -> Result<Cached<DiscoveredConfig>, SsoDiscoveryError> {
-    Ok(single_flight_cache::peek(
-        &DISCOVERY_CACHE,
-        &allowed_domain(domain)?,
-    ))
+/// Read the cached discovery result for `domain`, peek-only (never spawns) so
+/// it's safe from a query. `Pending` means no cached value yet; the caller
+/// gates on [`is_allowed_discovery_domain`] separately where it needs to tell a
+/// disallowed domain apart from a cold one.
+pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
+    single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
 }
 
 /// Resolve an SSO domain into a verify descriptor + `jwks_uri` from the cached
@@ -132,11 +125,12 @@ pub(super) fn resolve(
     domain: &str,
     jwt_iss: &str,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    let cfg = match discover(domain).map_err(|SsoDiscoveryError::DomainNotAllowed| {
-        OpenIDJWTVerificationError::GenericError(format!(
+    if !is_allowed_discovery_domain(domain) {
+        return Err(OpenIDJWTVerificationError::GenericError(format!(
             "SSO discovery domain not allowed: {domain}"
-        ))
-    })? {
+        )));
+    }
+    let cfg = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(cfg) => cfg,
     };
@@ -489,26 +483,29 @@ mod tests {
     }
 
     #[test]
-    fn discover_rejects_disallowed_domain() {
+    fn resolve_rejects_disallowed_domain() {
         reset();
-        assert!(discover("not-allowed.com").is_err());
+        assert!(!is_allowed_discovery_domain("not-allowed.com"));
+        assert!(is_allowed_discovery_domain("example.org"));
+        // The verify path rejects a disallowed domain.
+        assert!(resolve("not-allowed.com", "https://idp.example.org").is_err());
     }
 
     #[test]
-    fn prefetch_then_discover_resolves() {
+    fn prefetch_then_peek_resolves() {
         reset();
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
         // Reading without prefetching stays Pending — no fill was spawned.
-        assert_eq!(discover("example.org"), Ok(Cached::Pending));
+        assert_eq!(peek_discovery("example.org"), Cached::Pending);
         // Prefetch spawns the discovery fill; the read is still Pending until
         // the detached fill runs.
-        prefetch("example.org").unwrap();
-        assert_eq!(discover("example.org"), Ok(Cached::Pending));
+        prefetch("example.org");
+        assert_eq!(peek_discovery("example.org"), Cached::Pending);
         run_detached();
-        match discover("example.org") {
-            Ok(Cached::Ready(cfg)) => assert_eq!(cfg.issuer, "https://idp.example.org"),
+        match peek_discovery("example.org") {
+            Cached::Ready(cfg) => assert_eq!(cfg.issuer, "https://idp.example.org"),
             other => panic!("expected Ready, got {other:?}"),
         }
     }
@@ -519,15 +516,15 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        // discover/resolve are peek-only: without a prefetch they stay Pending
-        // even after draining detached tasks, because none was spawned.
-        assert_eq!(discover("example.org"), Ok(Cached::Pending));
+        // peek_discovery/resolve are peek-only: without a prefetch they stay
+        // Pending even after draining detached tasks, because none was spawned.
+        assert_eq!(peek_discovery("example.org"), Cached::Pending);
         assert!(matches!(
             resolve("example.org", "https://idp.example.org"),
             Ok(Cached::Pending)
         ));
         run_detached();
-        assert_eq!(discover("example.org"), Ok(Cached::Pending));
+        assert_eq!(peek_discovery("example.org"), Cached::Pending);
     }
 
     #[test]
@@ -536,7 +533,7 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        prefetch("example.org").unwrap();
+        prefetch("example.org");
         run_detached();
         // Wrong issuer is rejected.
         assert!(resolve("example.org", "https://evil.example.org").is_err());

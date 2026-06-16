@@ -473,11 +473,13 @@ type SsoDiscovery = record {
     name : opt text;
 };
 
-// Error from `discover_sso` / `get_sso_discovery`. A failed discovery fetch
-// isn't an error here — it reads as "not resolved yet" — so the only error is
-// a domain that isn't on the canister's allowlist.
-type SsoDiscoveryError = variant {
-    DomainNotAllowed;
+// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
+// fetch isn't a distinct state — it reads as `Pending` and the frontend times
+// out — so the states are resolved, in flight, or not allowed.
+type SsoDiscoveryState = variant {
+    Resolved : SsoDiscovery;
+    Pending;
+    NotAllowed;
 };
 
 type OpenIdCredentialKey = record { Iss; Sub; Aud };
@@ -1564,11 +1566,11 @@ service : (opt InternetIdentityInit) -> {
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
 
     // SSO discovery for the sign-in initiation flow. The frontend polls
-    // `get_sso_discovery` (query) and, while it reads no value yet, drives the
+    // `get_sso_discovery` (query) and, while it reads `Pending`, drives the
     // on-demand two-hop discovery fetch with `discover_sso` (update); once the
-    // fetch completes the query returns the resolved config.
-    discover_sso : (text) -> (variant { Ok; Err : SsoDiscoveryError });
-    get_sso_discovery : (text) -> (variant { Ok : opt SsoDiscovery; Err : SsoDiscoveryError }) query;
+    // fetch completes the query returns `Resolved` with the config.
+    discover_sso : (text) -> ();
+    get_sso_discovery : (text) -> (SsoDiscoveryState) query;
 
     // Email-recovery protocol
     // =======================

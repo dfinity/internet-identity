@@ -1444,24 +1444,19 @@ mod openid_api {
     }
 
     /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
-    /// this when `get_sso_discovery` (query) reads no value yet, then keeps
-    /// polling the query until it returns the resolved config.
+    /// this when `get_sso_discovery` reads `Pending`, then keeps polling the
+    /// query until it returns `Resolved`.
     #[update]
-    fn discover_sso(
-        domain: String,
-    ) -> Result<(), internet_identity_interface::internet_identity::types::SsoDiscoveryError> {
+    fn discover_sso(domain: String) {
         openid::discover_sso(&domain)
     }
 
-    /// Read the resolved SSO configuration for `domain`, or `Ok(None)` if the
-    /// discovery fetch hasn't completed yet.
+    /// Read the state of `domain`'s SSO discovery: `Resolved` with the config,
+    /// `Pending` while the fetch is in flight, or `NotAllowed`.
     #[query]
     fn get_sso_discovery(
         domain: String,
-    ) -> Result<
-        Option<internet_identity_interface::internet_identity::types::SsoDiscovery>,
-        internet_identity_interface::internet_identity::types::SsoDiscoveryError,
-    > {
+    ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryState {
         openid::get_sso_discovery(&domain)
     }
 }

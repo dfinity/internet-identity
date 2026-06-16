@@ -369,7 +369,7 @@ pub fn discover_sso(
     env: &PocketIc,
     canister_id: CanisterId,
     domain: &str,
-) -> Result<Result<(), types::SsoDiscoveryError>, RejectResponse> {
+) -> Result<(), RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -377,14 +377,13 @@ pub fn discover_sso(
         "discover_sso",
         (domain,),
     )
-    .map(|(x,)| x)
 }
 
 pub fn get_sso_discovery(
     env: &PocketIc,
     canister_id: CanisterId,
     domain: &str,
-) -> Result<Result<Option<types::SsoDiscovery>, types::SsoDiscoveryError>, RejectResponse> {
+) -> Result<types::SsoDiscoveryState, RejectResponse> {
     query_candid(env, canister_id, "get_sso_discovery", (domain,)).map(|(x,)| x)
 }
 

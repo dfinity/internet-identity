@@ -110,13 +110,13 @@ const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => ({
 
 /**
  * Resolve a domain's SSO configuration. Validates the domain, then polls
- * `get_sso_discovery` (query); while it reads no value, drives the fetch with
- * `discover_sso` (update). An optional `signal` cancels the poll (the input
- * debounce drops a stale lookup when the user keeps typing).
+ * `get_sso_discovery` (query) for the state; on `Pending` it drives the fetch
+ * with `discover_sso` (update) and polls again. An optional `signal` cancels
+ * the poll (the input debounce drops a stale lookup when the user keeps typing).
  *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
- * @throws {DomainNotConfiguredError} when the canister rejects the domain or
- *   the resolution times out.
+ * @throws {DomainNotConfiguredError} when the domain isn't allowed
+ *   (`NotAllowed`) or the resolution times out.
  */
 export const discoverSsoConfig = async (
   domain: string,
@@ -128,20 +128,16 @@ export const discoverSsoConfig = async (
     if (signal?.aborted === true) {
       throw new Error("SSO discovery aborted");
     }
-    // Read first via the cheap query.
-    const read = await anonymousActor.get_sso_discovery(validatedDomain);
-    if ("Err" in read) {
+    // Read the discovery state via the cheap query.
+    const state = await anonymousActor.get_sso_discovery(validatedDomain);
+    if ("Resolved" in state) {
+      return toResult(state.Resolved);
+    }
+    if ("NotAllowed" in state) {
       throw new DomainNotConfiguredError("rejected");
     }
-    const [resolved] = read.Ok;
-    if (resolved !== undefined) {
-      return toResult(resolved);
-    }
-    // No value yet — drive the fetch with an update, then poll again.
-    const driven = await anonymousActor.discover_sso(validatedDomain);
-    if ("Err" in driven) {
-      throw new DomainNotConfiguredError("rejected");
-    }
+    // Pending — drive the fetch with an update, then poll again.
+    await anonymousActor.discover_sso(validatedDomain);
     await pollDelay();
   }
 

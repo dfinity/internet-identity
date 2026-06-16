@@ -1,48 +1,42 @@
 //! Tests for the `discover_sso` (update, drives) / `get_sso_discovery` (query,
-//! reads) allowlist gate.
+//! reads state) allowlist gate.
 
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
-use internet_identity_interface::internet_identity::types::InternetIdentityInit;
+use internet_identity_interface::internet_identity::types::{
+    InternetIdentityInit, SsoDiscoveryState,
+};
 
 /// On a non-production install only `beta.dfinity.org` is allowed by default;
-/// other domains (including the production domain) are rejected by both the
-/// drive (update) and the read (query) before any discovery fetch is started.
+/// the query reports `NotAllowed` for other domains (including the production
+/// domain) and `Pending` for the allowed one.
 #[test]
-fn sso_discovery_rejects_disallowed_domain() {
+fn sso_discovery_gates_on_allowlist() {
     let env = env();
     let canister_id =
         install_ii_canister_with_arg_and_cycles(&env, II_WASM.clone(), None, 10_000_000_000_000);
 
-    // An arbitrary domain is rejected.
-    assert!(api::discover_sso(&env, canister_id, "evil.example.com")
-        .unwrap()
-        .is_err());
-    assert!(
-        api::get_sso_discovery(&env, canister_id, "evil.example.com")
-            .unwrap()
-            .is_err()
-    );
-
-    // The production domain is rejected on a non-production canister.
-    assert!(api::discover_sso(&env, canister_id, "dfinity.org")
-        .unwrap()
-        .is_err());
-
-    // The default non-production domain is allowed: the drive kicks off the
-    // fetch (Ok) and the query reads no value yet (Ok(None)) — neither errors.
+    // Arbitrary and production domains are not allowed on a non-production canister.
     assert_eq!(
-        api::discover_sso(&env, canister_id, "beta.dfinity.org").unwrap(),
-        Ok(())
+        api::get_sso_discovery(&env, canister_id, "evil.example.com").unwrap(),
+        SsoDiscoveryState::NotAllowed
     );
-    assert!(matches!(
+    assert_eq!(
+        api::get_sso_discovery(&env, canister_id, "dfinity.org").unwrap(),
+        SsoDiscoveryState::NotAllowed
+    );
+
+    // The default non-production domain is allowed and reads `Pending` until
+    // warm; driving it is accepted (a no-op until the fetch lands).
+    assert_eq!(
         api::get_sso_discovery(&env, canister_id, "beta.dfinity.org").unwrap(),
-        Ok(None)
-    ));
+        SsoDiscoveryState::Pending
+    );
+    api::discover_sso(&env, canister_id, "beta.dfinity.org").unwrap();
 }
 
 /// An explicit `sso_discoverable_domains` allowlist replaces the built-in
-/// defaults, for both the drive and the read.
+/// defaults.
 #[test]
 fn sso_discovery_honours_explicit_allowlist() {
     let env = env();
@@ -57,18 +51,13 @@ fn sso_discovery_honours_explicit_allowlist() {
         10_000_000_000_000,
     );
 
-    // The allowlisted domain is accepted; the query reads `None` until warm.
     assert_eq!(
-        api::discover_sso(&env, canister_id, "example.com").unwrap(),
-        Ok(())
-    );
-    assert!(matches!(
         api::get_sso_discovery(&env, canister_id, "example.com").unwrap(),
-        Ok(None)
-    ));
-
+        SsoDiscoveryState::Pending
+    );
     // The default domain is no longer allowed once an explicit list is set.
-    assert!(api::discover_sso(&env, canister_id, "beta.dfinity.org")
-        .unwrap()
-        .is_err());
+    assert_eq!(
+        api::get_sso_discovery(&env, canister_id, "beta.dfinity.org").unwrap(),
+        SsoDiscoveryState::NotAllowed
+    );
 }

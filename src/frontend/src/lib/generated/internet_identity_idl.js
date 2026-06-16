@@ -270,7 +270,6 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Principal,
     'failed' : IDL.Text,
   });
-  const SsoDiscoveryError = IDL.Variant({ 'DomainNotAllowed' : IDL.Null });
   const Rrsig = IDL.Record({
     'algorithm' : IDL.Nat8,
     'signature' : IDL.Vec(IDL.Nat8),
@@ -518,6 +517,11 @@ export const idlFactory = ({ IDL }) => {
     'issuer' : IDL.Text,
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Text,
+  });
+  const SsoDiscoveryState = IDL.Variant({
+    'NotAllowed' : IDL.Null,
+    'Resolved' : SsoDiscovery,
+    'Pending' : IDL.Null,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -884,11 +888,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
-    'discover_sso' : IDL.Func(
-        [IDL.Text],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SsoDiscoveryError })],
-        [],
-      ),
+    'discover_sso' : IDL.Func([IDL.Text], [], []),
     'email_recovery_credential_prepare_add' : IDL.Func(
         [IdentityNumber, EmailRecoveryDnsInput],
         [
@@ -1014,16 +1014,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Principal],
         ['query'],
       ),
-    'get_sso_discovery' : IDL.Func(
-        [IDL.Text],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Opt(SsoDiscovery),
-            'Err' : SsoDiscoveryError,
-          }),
-        ],
-        ['query'],
-      ),
+    'get_sso_discovery' : IDL.Func([IDL.Text], [SsoDiscoveryState], ['query']),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'identity_authn_info' : IDL.Func(
         [IdentityNumber],

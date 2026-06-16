@@ -1522,11 +1522,13 @@ export interface SsoDiscovery {
   'client_id' : string,
 }
 /**
- * Error from `discover_sso` / `get_sso_discovery`. A failed discovery fetch
- * isn't an error here — it reads as "not resolved yet" — so the only error is
- * a domain that isn't on the canister's allowlist.
+ * State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
+ * fetch isn't a distinct state — it reads as `Pending` and the frontend times
+ * out — so the states are resolved, in flight, or not allowed.
  */
-export type SsoDiscoveryError = { 'DomainNotAllowed' : null };
+export type SsoDiscoveryState = { 'NotAllowed' : null } |
+  { 'Resolved' : SsoDiscovery } |
+  { 'Pending' : null };
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1727,15 +1729,11 @@ export interface _SERVICE {
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
    * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery` (query) and, while it reads no value yet, drives the
+   * `get_sso_discovery` (query) and, while it reads `Pending`, drives the
    * on-demand two-hop discovery fetch with `discover_sso` (update); once the
-   * fetch completes the query returns the resolved config.
+   * fetch completes the query returns `Resolved` with the config.
    */
-  'discover_sso' : ActorMethod<
-    [string],
-    { 'Ok' : null } |
-      { 'Err' : SsoDiscoveryError }
-  >,
+  'discover_sso' : ActorMethod<[string], undefined>,
   /**
    * Email-recovery protocol
    * =======================
@@ -1840,11 +1838,7 @@ export interface _SERVICE {
       { 'Err' : GetIdAliasError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
-  'get_sso_discovery' : ActorMethod<
-    [string],
-    { 'Ok' : [] | [SsoDiscovery] } |
-      { 'Err' : SsoDiscoveryError }
-  >,
+  'get_sso_discovery' : ActorMethod<[string], SsoDiscoveryState>,
   /**
    * HTTP Gateway protocol
    * =====================

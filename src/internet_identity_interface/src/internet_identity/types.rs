@@ -475,13 +475,18 @@ pub struct SsoDiscovery {
     pub name: Option<String>,
 }
 
-/// Error returned by `discover_sso` / `get_sso_discovery`. A failed discovery
-/// fetch isn't an error here — it reads as "not resolved yet" and the frontend
-/// times out — so the only error is a domain the canister won't discover.
+/// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
+/// fetch isn't a distinct state — it reads as `Pending` and the frontend times
+/// out — so the states are: resolved, in flight, or not allowed.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum SsoDiscoveryError {
+pub enum SsoDiscoveryState {
+    /// Discovery completed; the resolved configuration.
+    Resolved(SsoDiscovery),
+    /// Discovery is in flight (or not yet started) — drive it with
+    /// `discover_sso` and poll again.
+    Pending,
     /// The domain is not on the canister's `sso_discoverable_domains` allowlist.
-    DomainNotAllowed,
+    NotAllowed,
 }
 
 pub enum AuthorizationKey {
