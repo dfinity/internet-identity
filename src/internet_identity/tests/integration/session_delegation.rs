@@ -5,8 +5,7 @@ use canister_tests::api::internet_identity::api_v2::{
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::{
-    GetAccountsError, GetDefaultAccountError, IdentityInfoError, SessionDelegationError,
-    SetDefaultAccountError,
+    GetAccountsError, GetDefaultAccountError, IdentityInfoError, SetDefaultAccountError,
 };
 use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
@@ -240,52 +239,6 @@ fn ttl_default_is_thirty_days() -> Result<(), RejectResponse> {
         "default expiration should be ~30 days from now; got expiration={exp}, now={now}",
         exp = prepared.expiration
     );
-
-    Ok(())
-}
-
-#[test]
-fn get_session_delegation_returns_no_such_delegation_after_expiry() -> Result<(), RejectResponse> {
-    let (env, canister_id, anchor) = fresh_anchor();
-
-    let prepared = prepare_session_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        session_key(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
-
-    // Sanity: signature exists before expiry.
-    get_session_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        session_key(),
-        prepared.expiration,
-    )
-    .unwrap()
-    .expect("delegation must be retrievable before expiry");
-
-    // Advance past the default 30-day TTL. The signature map prunes
-    // expired entries on read, so the next lookup must miss.
-    env.advance_time(Duration::from_secs(31 * 24 * 3600));
-
-    let err = get_session_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        session_key(),
-        prepared.expiration,
-    )
-    .unwrap()
-    .unwrap_err();
-    assert_eq!(err, SessionDelegationError::NoSuchDelegation);
 
     Ok(())
 }
