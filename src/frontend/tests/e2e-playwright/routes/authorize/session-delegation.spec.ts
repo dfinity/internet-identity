@@ -80,7 +80,7 @@ test.describe("session delegation — multiple accounts without re-auth", () => 
 
   test("fresh browser context without IndexedDB requires WebAuthn to load accounts", async ({
     browser,
-    identities,
+    identities: _identities,
   }) => {
     const freshContext = await browser.newContext();
     const freshPage = await freshContext.newPage();
