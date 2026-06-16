@@ -142,6 +142,9 @@ msgstr "Tambahkan metode akses"
 msgid "Add another account"
 msgstr "Tambah akun lain"
 
+msgid "Add another identity"
+msgstr "Tambahkan identitas lain"
+
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Tambahkan metode lain atau masuk melalui pemulihan untuk menghapus"
 
@@ -261,6 +264,9 @@ msgstr "Pilih akun"
 
 msgid "choose language to continue"
 msgstr "pilih bahasa untuk melanjutkan"
+
+msgid "Choose method"
+msgstr "Pilih metode"
 
 msgid "Choose method to continue"
 msgstr "Pilih metode untuk melanjutkan"
@@ -1122,11 +1128,17 @@ msgstr "Masuk kembali untuk melanjutkan dari tempat terakhir Anda tinggalkan."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Masuk dengan mengirim email bertanda tangan dari kotak masuk Anda."
 
+msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
+msgstr "Masuk atau buat identitas untuk mengakses aplikasi tanpa kata sandi atau berbagi data pribadi."
+
 msgid "Sign in there."
 msgstr "Masuk di sana."
 
 msgid "Sign in to Internet Identity"
 msgstr "Masuk ke Internet Identity"
+
+msgid "Sign in to manage your identity"
+msgstr "Masuk untuk mengelola identitas Anda"
 
 msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
@@ -1233,6 +1245,9 @@ msgstr "Proses masuk SSO untuk {domainInput} gagal. Silakan coba lagi."
 
 msgid "Start over"
 msgstr "Mulai ulang"
+
+msgid "Still have an identity number?"
+msgstr "Masih memiliki nomor identitas?"
 
 msgid "Still using an identity number?"
 msgstr "Masih menggunakan nomor identitas?"
@@ -1409,6 +1424,12 @@ msgstr "Untuk mengonfirmasi ini Anda, masukkan kode di bawah ini di <0>perangkat
 msgid "to continue to {dappName}"
 msgstr "untuk melanjutkan ke {dappName}"
 
+msgid "to continue with <0>{application}</0>"
+msgstr "untuk melanjutkan dengan <0>{application}</0>"
+
+msgid "to continue with this app"
+msgstr "untuk melanjutkan dengan aplikasi ini"
+
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Untuk melanjutkan, buat passkey untuk mengamankan identitas Anda dan menyederhanakan proses masuk di masa mendatang."
 
@@ -1489,6 +1510,9 @@ msgstr "Tingkatkan"
 
 msgid "Upgrade again"
 msgstr "Tingkatkan lagi"
+
+msgid "Upgrade completed successfully"
+msgstr "Peningkatan berhasil diselesaikan"
 
 msgid "Upgrade identity"
 msgstr "Tingkatkan identitas"

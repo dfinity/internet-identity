@@ -142,6 +142,9 @@ msgstr "Voeg toegangsmethode toe"
 msgid "Add another account"
 msgstr "Voeg een ander account toe"
 
+msgid "Add another identity"
+msgstr "Voeg een andere identiteit toe"
+
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Voeg een andere methode toe of log in via herstel om te verwijderen"
 
@@ -261,6 +264,9 @@ msgstr "Kies een account"
 
 msgid "choose language to continue"
 msgstr "kies taal om door te gaan"
+
+msgid "Choose method"
+msgstr "Kies methode"
 
 msgid "Choose method to continue"
 msgstr "Kies methode om door te gaan"
@@ -1122,11 +1128,17 @@ msgstr "Log opnieuw in om verder te gaan waar u gebleven was."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Log in door een ondertekende e-mail vanuit uw inbox te versturen."
 
+msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
+msgstr "Meld u aan of maak een identiteit aan om toegang te krijgen tot apps zonder wachtwoorden of het delen van persoonlijke gegevens."
+
 msgid "Sign in there."
 msgstr "Log daar in."
 
 msgid "Sign in to Internet Identity"
 msgstr "Inloggen bij Internet Identity"
+
+msgid "Sign in to manage your identity"
+msgstr "Meld u aan om uw identiteit te beheren"
 
 msgid "Sign in using familiar methods"
 msgstr "Inloggen met vertrouwde methoden"
@@ -1233,6 +1245,9 @@ msgstr "SSO-aanmelding voor {domainInput} is mislukt. Probeer het opnieuw."
 
 msgid "Start over"
 msgstr "Opnieuw beginnen"
+
+msgid "Still have an identity number?"
+msgstr "Heeft u nog een identiteitsnummer?"
 
 msgid "Still using an identity number?"
 msgstr "Gebruikt u nog een identiteitsnummer?"
@@ -1409,6 +1424,12 @@ msgstr "Om te bevestigen dat u het bent, voert u onderstaande code in op uw <0>b
 msgid "to continue to {dappName}"
 msgstr "om door te gaan naar {dappName}"
 
+msgid "to continue with <0>{application}</0>"
+msgstr "om door te gaan met <0>{application}</0>"
+
+msgid "to continue with this app"
+msgstr "om door te gaan met deze app"
+
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Maak een passkey aan om uw identiteit te beveiligen en toekomstig inloggen te vereenvoudigen."
 
@@ -1489,6 +1510,9 @@ msgstr "Upgrade"
 
 msgid "Upgrade again"
 msgstr "Upgrade opnieuw"
+
+msgid "Upgrade completed successfully"
+msgstr "Upgrade succesvol voltooid"
 
 msgid "Upgrade identity"
 msgstr "Identiteit upgraden"
