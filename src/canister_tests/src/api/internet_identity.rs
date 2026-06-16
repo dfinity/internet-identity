@@ -387,6 +387,20 @@ pub fn get_sso_discovery(
     query_candid(env, canister_id, "get_sso_discovery", (domain,)).map(|(x,)| x)
 }
 
+/// Collapse an [`OpenIdResult`](types::OpenIdResult) to a plain `Result` for
+/// the OpenID JWT test helpers. They only ever drive configured providers
+/// (Google / Microsoft / Apple), whose JWKs are always warm, so `Pending` —
+/// the SSO-discovery retry signal — cannot occur; treat it as a test failure.
+fn settled<T, E>(result: types::OpenIdResult<T, E>) -> Result<T, E> {
+    match result {
+        types::OpenIdResult::Ok(value) => Ok(value),
+        types::OpenIdResult::Err(error) => Err(error),
+        types::OpenIdResult::Pending => {
+            panic!("OpenID JWT call returned Pending for a configured provider")
+        }
+    }
+}
+
 pub fn openid_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -406,7 +420,7 @@ pub fn openid_prepare_delegation(
         "openid_prepare_delegation",
         (jwt, salt, session_key),
     )
-    .map(|(x,)| x)
+    .map(|(x,)| settled(x))
 }
 
 pub fn openid_get_delegation(
@@ -425,7 +439,7 @@ pub fn openid_get_delegation(
         "openid_get_delegation",
         (jwt, salt, session_key, expiration),
     )
-    .map(|(x,)| x)
+    .map(|(x,)| settled(x))
 }
 
 pub fn openid_credential_add(
@@ -444,7 +458,7 @@ pub fn openid_credential_add(
         "openid_credential_add",
         (identity_number, jwt, salt),
     )
-    .map(|(x,)| x)
+    .map(|(x,)| settled(x))
 }
 
 pub fn openid_credential_remove(

@@ -40,10 +40,6 @@ pub type Aud = String;
 pub enum OpenIDJWTVerificationError {
     GenericError(String),
     JWTExpired,
-    /// SSO discovery or JWKS for this sign-in isn't cached yet; an update call
-    /// kicks off the fetch and the caller retries. Configured providers never
-    /// produce this — their JWKs are always synchronously available.
-    Pending,
 }
 
 // Implementation of From trait to convert OpenIDJWTVerificationError to OpenIdCredentialAddError
@@ -51,7 +47,6 @@ impl From<OpenIDJWTVerificationError> for OpenIdCredentialAddError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
             OpenIDJWTVerificationError::JWTExpired => OpenIdCredentialAddError::JwtExpired,
-            OpenIDJWTVerificationError::Pending => OpenIdCredentialAddError::Pending,
             OpenIDJWTVerificationError::GenericError(_) => {
                 OpenIdCredentialAddError::JwtVerificationFailed
             }
@@ -64,7 +59,6 @@ impl From<OpenIDJWTVerificationError> for OpenIdDelegationError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
             OpenIDJWTVerificationError::JWTExpired => OpenIdDelegationError::JwtExpired,
-            OpenIDJWTVerificationError::Pending => OpenIdDelegationError::Pending,
             OpenIDJWTVerificationError::GenericError(_) => {
                 OpenIdDelegationError::JwtVerificationFailed
             }
@@ -78,9 +72,6 @@ impl From<OpenIDJWTVerificationError> for IdRegFinishError {
         match error {
             OpenIDJWTVerificationError::JWTExpired => {
                 IdRegFinishError::InvalidAuthnMethod("JWT expired".to_string())
-            }
-            OpenIDJWTVerificationError::Pending => {
-                IdRegFinishError::InvalidAuthnMethod("OIDC discovery in progress".to_string())
             }
             OpenIDJWTVerificationError::GenericError(msg) => {
                 IdRegFinishError::InvalidAuthnMethod(format!("JWT verification failed: {msg}"))

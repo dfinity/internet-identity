@@ -1163,15 +1163,7 @@ export type OpenIdCredentialAddError = {
   { 'InternalCanisterError' : string } |
   { 'JwtExpired' : null } |
   { 'Unauthorized' : Principal } |
-  { 'JwtVerificationFailed' : null } |
-  {
-    /**
-     * SSO discovery / JWKS for this domain isn't cached yet; the canister
-     * kicked off the fetch. Retry the call shortly. Never returned for
-     * configured providers (Google / Microsoft / Apple).
-     */
-    'Pending' : null
-  };
+  { 'JwtVerificationFailed' : null };
 export type OpenIdCredentialKey = [Iss, Sub, Aud];
 export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'OpenIdCredentialNotFound' : null } |
@@ -1179,15 +1171,7 @@ export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
 export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
   { 'JwtExpired' : null } |
-  { 'JwtVerificationFailed' : null } |
-  {
-    /**
-     * SSO discovery / JWKS for this domain isn't cached yet. `prepare` kicks
-     * off the fetch; poll `get` until ready, re-calling `prepare` when `get`
-     * reports `Pending`. Never returned for configured providers.
-     */
-    'Pending' : null
-  };
+  { 'JwtVerificationFailed' : null };
 export type OpenIdEmailVerification = { 'Google' : null } |
   { 'Unknown' : null } |
   { 'Microsoft' : null };
@@ -1937,15 +1921,16 @@ export interface _SERVICE {
   >,
   /**
    * The trailing `opt text` is the SSO discovery domain (null for a direct
-   * provider). For SSO sign-ins a cold discovery/JWKS cache returns the
-   * `Pending` error variant; the caller retries (and for delegations, polls
-   * `openid_get_delegation`, re-calling `openid_prepare_delegation` on a
-   * `Pending` poll result).
+   * provider). For SSO sign-ins a cold discovery/JWKS cache yields the
+   * `Pending` result arm — a retry signal, not an error: the caller re-calls
+   * the method (and for delegations, polls `openid_get_delegation`, re-calling
+   * `openid_prepare_delegation` on a `Pending` poll result).
    */
   'openid_credential_add' : ActorMethod<
     [IdentityNumber, JWT, Salt, [] | [string]],
     { 'Ok' : null } |
-      { 'Err' : OpenIdCredentialAddError }
+      { 'Err' : OpenIdCredentialAddError } |
+      { 'Pending' : null }
   >,
   'openid_credential_remove' : ActorMethod<
     [IdentityNumber, OpenIdCredentialKey],
@@ -1955,7 +1940,8 @@ export interface _SERVICE {
   'openid_get_delegation' : ActorMethod<
     [JWT, Salt, SessionKey, Timestamp, [] | [string]],
     { 'Ok' : SignedDelegation } |
-      { 'Err' : OpenIdDelegationError }
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
   >,
   /**
    * OpenID credentials protocol
@@ -1969,7 +1955,8 @@ export interface _SERVICE {
   'openid_prepare_delegation' : ActorMethod<
     [JWT, Salt, SessionKey, [] | [string]],
     { 'Ok' : OpenIdPrepareDelegationResponse } |
-      { 'Err' : OpenIdDelegationError }
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
   >,
   'prepare_account_delegation' : ActorMethod<
     [

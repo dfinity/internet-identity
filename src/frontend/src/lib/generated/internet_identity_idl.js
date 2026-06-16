@@ -621,7 +621,6 @@ export const idlFactory = ({ IDL }) => {
     'JwtExpired' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'JwtVerificationFailed' : IDL.Null,
-    'Pending' : IDL.Null,
   });
   const OpenIdCredentialKey = IDL.Tuple(Iss, Sub, Aud);
   const OpenIdCredentialRemoveError = IDL.Variant({
@@ -634,7 +633,6 @@ export const idlFactory = ({ IDL }) => {
     'NoSuchAnchor' : IDL.Null,
     'JwtExpired' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
-    'Pending' : IDL.Null,
   });
   const OpenIDRegFinishArg = IDL.Record({
     'jwt' : JWT,
@@ -1085,7 +1083,13 @@ export const idlFactory = ({ IDL }) => {
       ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt, IDL.Opt(IDL.Text)],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : OpenIdCredentialAddError,
+            'Pending' : IDL.Null,
+          }),
+        ],
         [],
       ),
     'openid_credential_remove' : IDL.Func(
@@ -1099,6 +1103,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : SignedDelegation,
             'Err' : OpenIdDelegationError,
+            'Pending' : IDL.Null,
           }),
         ],
         ['query'],
@@ -1114,6 +1119,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : OpenIdPrepareDelegationResponse,
             'Err' : OpenIdDelegationError,
+            'Pending' : IDL.Null,
           }),
         ],
         [],

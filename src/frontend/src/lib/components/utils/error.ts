@@ -168,15 +168,6 @@ export const handleError = (error: unknown) => {
         });
         console.error(error);
         break;
-      case "Pending":
-        // The SSO sign-in flows retry on `Pending` while discovery loads, so
-        // reaching here means a retry budget was exhausted.
-        toaster.error({
-          title: "Sign-in provider is still loading",
-          description: "Please try again in a moment.",
-        });
-        console.error(error);
-        break;
       default: {
         // Should be avoided; reaching here means an error is missing above.
         void (error.type satisfies never);

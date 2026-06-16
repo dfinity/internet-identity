@@ -207,12 +207,17 @@ fn create_openid_credential_and_config(
     } = openid_registration_data;
 
     // Registration runs in an update: drive the SSO discovery/JWKS fetches (if
-    // any), then read the result. A cold cache surfaces `Pending` and the
-    // frontend retries the call.
+    // any), then read the result. A cold cache surfaces `Pending`; in practice
+    // the sign-in attempt that precedes registration has already warmed the
+    // JWKS, so this is a defensive retry signal rather than a path users hit.
     openid::prefetch_sso(discovery_domain.as_deref());
     let openid_credential = match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
         openid::Cached::Ready(credential) => credential,
-        openid::Cached::Pending => return Err(openid::OpenIDJWTVerificationError::Pending.into()),
+        openid::Cached::Pending => {
+            return Err(IdRegFinishError::InvalidAuthnMethod(
+                "OIDC discovery in progress".to_string(),
+            ))
+        }
     };
 
     // Config issuer for the authorization key / operation log: the configured

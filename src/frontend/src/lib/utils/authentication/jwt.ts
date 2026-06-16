@@ -42,7 +42,7 @@ export const authenticateWithJWT = async ({
       sessionKey,
       domain,
     );
-    if ("Err" in prepared && "Pending" in prepared.Err) {
+    if ("Pending" in prepared) {
       await pollDelay();
       continue;
     }
@@ -59,7 +59,7 @@ export const authenticateWithJWT = async ({
       expiration,
       domain,
     );
-    if ("Err" in delegation && "Pending" in delegation.Err) {
+    if ("Pending" in delegation) {
       await pollDelay();
       continue;
     }

@@ -515,10 +515,6 @@ type OpenIdCredentialAddError = variant {
     OpenIdCredentialAlreadyRegistered;
     InternalCanisterError : text;
     JwtExpired;
-    // SSO discovery / JWKS for this domain isn't cached yet; the canister
-    // kicked off the fetch. Retry the call shortly. Never returned for
-    // configured providers (Google / Microsoft / Apple).
-    Pending;
 };
 
 type OpenIdCredentialRemoveError = variant {
@@ -532,10 +528,6 @@ type OpenIdDelegationError = variant {
     JwtVerificationFailed;
     NoSuchDelegation;
     JwtExpired;
-    // SSO discovery / JWKS for this domain isn't cached yet. `prepare` kicks
-    // off the fetch; poll `get` until ready, re-calling `prepare` when `get`
-    // reports `Pending`. Never returned for configured providers.
-    Pending;
 };
 
 type OpenIdPrepareDelegationResponse = record {
@@ -1556,14 +1548,14 @@ service : (opt InternetIdentityInit) -> {
     // ===========================
     openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
     // The trailing `opt text` is the SSO discovery domain (null for a direct
-    // provider). For SSO sign-ins a cold discovery/JWKS cache returns the
-    // `Pending` error variant; the caller retries (and for delegations, polls
-    // `openid_get_delegation`, re-calling `openid_prepare_delegation` on a
-    // `Pending` poll result).
-    openid_credential_add : (IdentityNumber, JWT, Salt, opt text) -> (variant { Ok; Err : OpenIdCredentialAddError });
+    // provider). For SSO sign-ins a cold discovery/JWKS cache yields the
+    // `Pending` result arm — a retry signal, not an error: the caller re-calls
+    // the method (and for delegations, polls `openid_get_delegation`, re-calling
+    // `openid_prepare_delegation` on a `Pending` poll result).
+    openid_credential_add : (IdentityNumber, JWT, Salt, opt text) -> (variant { Ok; Pending; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
-    openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Err : OpenIdDelegationError });
-    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Err : OpenIdDelegationError }) query;
+    openid_prepare_delegation : (JWT, Salt, SessionKey, opt text) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
+    openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
     // SSO discovery for the sign-in initiation flow. The frontend polls
     // `get_sso_discovery` (query) and, while it reads `Pending`, drives the

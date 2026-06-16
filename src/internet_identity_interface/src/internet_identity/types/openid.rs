@@ -32,10 +32,6 @@ pub enum OpenIdCredentialAddError {
     OpenIdCredentialAlreadyRegistered,
     InternalCanisterError(String),
     JwtExpired,
-    /// SSO discovery / JWKS for this domain isn't cached yet; the canister
-    /// kicked off the fetch. Retry the call shortly. Never returned for
-    /// configured providers (Google / Microsoft / Apple).
-    Pending,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -58,11 +54,21 @@ pub enum OpenIdDelegationError {
     NoSuchDelegation,
     JwtVerificationFailed,
     JwtExpired,
-    /// SSO discovery / JWKS for this domain isn't cached yet. `prepare` kicks
-    /// off the fetch; poll `get` until the delegation is ready, re-calling
-    /// `prepare` if `get` reports `Pending`. Never returned for configured
-    /// providers.
+}
+
+/// Result of an OpenID call whose verification may need SSO discovery / JWKS
+/// that isn't cached yet.
+///
+/// `Pending` is a retry signal, not an error: the canister kicked off the
+/// fetch in the background, so the caller should poll the same method again
+/// shortly. It is only ever returned for SSO discovery domains — configured
+/// providers (Google / Microsoft / Apple) keep their keys warm and resolve to
+/// `Ok` or `Err` directly.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OpenIdResult<T, E> {
+    Ok(T),
     Pending,
+    Err(E),
 }
 
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);

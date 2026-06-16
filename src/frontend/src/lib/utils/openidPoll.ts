@@ -13,18 +13,16 @@ export const pollDelay = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
 /**
- * Retry an update call that returns a `{ Pending }` error variant while SSO
- * discovery / JWKS load, returning the first non-`Pending` response. Throws if
- * the cache hasn't warmed within the attempt budget.
+ * Retry an update call that reports the top-level `Pending` arm while SSO
+ * discovery / JWKS load, returning the first settled (`Ok` / `Err`) response.
+ * Throws if the cache hasn't warmed within the attempt budget.
  */
-export const retryWhilePending = async <
-  R extends { Ok: unknown } | { Err: Record<string, unknown> },
->(
-  call: () => Promise<R>,
-): Promise<R> => {
+export const retryWhilePending = async <T, E>(
+  call: () => Promise<{ Ok: T } | { Pending: null } | { Err: E }>,
+): Promise<{ Ok: T } | { Err: E }> => {
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     const response = await call();
-    if ("Err" in response && "Pending" in response.Err) {
+    if ("Pending" in response) {
       await pollDelay();
       continue;
     }

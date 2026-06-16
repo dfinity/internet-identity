@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::attributes::{
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
-    OpenIdPrepareDelegationResponse,
+    OpenIdPrepareDelegationResponse, OpenIdResult,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
@@ -1287,7 +1287,8 @@ mod openid_api {
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
-        OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
+        OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult, SessionKey,
+        Timestamp,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -1325,16 +1326,16 @@ mod openid_api {
         jwt: String,
         salt: [u8; 32],
         discovery_domain: Option<String>,
-    ) -> Result<(), OpenIdCredentialAddError> {
+    ) -> OpenIdResult<(), OpenIdCredentialAddError> {
         openid::prefetch_sso(discovery_domain.as_deref());
-        anchor_operation_with_authz_check(identity_number, |anchor| {
-            let openid_credential =
-                match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref())? {
-                    openid::Cached::Ready(credential) => credential,
-                    // SSO discovery/JWKS not cached yet; the fetch is in flight.
-                    // The frontend retries the call.
-                    openid::Cached::Pending => return Err(OpenIdCredentialAddError::Pending),
-                };
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
+            // frontend retries the call.
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        let outcome = anchor_operation_with_authz_check(identity_number, |anchor| {
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
@@ -1343,7 +1344,11 @@ mod openid_api {
                     }
                     err => OpenIdCredentialAddError::InternalCanisterError(err.to_string()),
                 })
-        })
+        });
+        match outcome {
+            Ok(()) => OpenIdResult::Ok(()),
+            Err(err) => OpenIdResult::Err(err),
+        }
     }
 
     #[update]
@@ -1369,50 +1374,58 @@ mod openid_api {
         salt: [u8; 32],
         session_key: SessionKey,
         discovery_domain: Option<String>,
-    ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
+    ) -> OpenIdResult<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         // Drive the SSO discovery/JWKS fetches (if any) on this update, then
         // read the result. A cold cache reads `Pending`; the frontend polls
         // `openid_get_delegation` and re-calls this until the delegation is
         // ready.
         openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref())?
-        {
-            openid::Cached::Ready(credential) => credential,
-            openid::Cached::Pending => return Err(OpenIdDelegationError::Pending),
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
         };
 
-        let anchor_number = state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-        })
-        .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+        let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
+            let anchor_number = state::storage_borrow(|storage| {
+                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+            })
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        // Update anchor with latest OpenID credential from JWT so latest information is stored,
-        // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
-        let mut anchor = state::anchor(anchor_number);
-        update_openid_credential(&mut anchor, openid_credential.clone())
-            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
-        state::storage_borrow_mut(|storage| storage.write(anchor))
-            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            // Update anchor with latest OpenID credential from JWT so latest information is stored,
+            // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
+            let mut anchor = state::anchor(anchor_number);
+            update_openid_credential(&mut anchor, openid_credential.clone())
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
-        let (user_key, expiration) = openid_credential
-            .prepare_jwt_delegation(session_key, anchor_number)
-            .await;
+            let (user_key, expiration) = openid_credential
+                .prepare_jwt_delegation(session_key, anchor_number)
+                .await;
 
-        // Checking again because the association could've changed during the .await
-        let still_anchor_number = state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-        })
-        .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            // Checking again because the association could've changed during the .await
+            let still_anchor_number = state::storage_borrow(|storage| {
+                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+            })
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        if anchor_number != still_anchor_number {
-            return Err(OpenIdDelegationError::NoSuchAnchor);
+            if anchor_number != still_anchor_number {
+                return Err(OpenIdDelegationError::NoSuchAnchor);
+            }
+
+            Ok(OpenIdPrepareDelegationResponse {
+                user_key,
+                expiration,
+                anchor_number,
+            })
         }
+        .await;
 
-        Ok(OpenIdPrepareDelegationResponse {
-            user_key,
-            expiration,
-            anchor_number,
-        })
+        match prepared {
+            Ok(response) => OpenIdResult::Ok(response),
+            Err(err) => OpenIdResult::Err(err),
+        }
     }
 
     #[query]
@@ -1422,24 +1435,29 @@ mod openid_api {
         session_key: SessionKey,
         expiration: Timestamp,
         discovery_domain: Option<String>,
-    ) -> Result<SignedDelegation, OpenIdDelegationError> {
+    ) -> OpenIdResult<SignedDelegation, OpenIdDelegationError> {
         // A query can't drive the SSO fetches, so `verify_jwt` only reads the
         // caches. A `Pending` means discovery/JWKS isn't cached yet — the
         // frontend re-calls `openid_prepare_delegation` (an update, which drives
         // the fetch) and polls this again.
-        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref())?
-        {
-            openid::Cached::Ready(credential) => credential,
-            openid::Cached::Pending => return Err(OpenIdDelegationError::Pending),
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
         };
 
-        match state::storage_borrow(|storage| {
+        let delegation = match state::storage_borrow(|storage| {
             storage.lookup_anchor_with_openid_credential(&openid_credential.key())
         }) {
             Some(anchor_number) => {
                 openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
             }
             None => Err(OpenIdDelegationError::NoSuchAnchor),
+        };
+
+        match delegation {
+            Ok(signed) => OpenIdResult::Ok(signed),
+            Err(err) => OpenIdResult::Err(err),
         }
     }
 
