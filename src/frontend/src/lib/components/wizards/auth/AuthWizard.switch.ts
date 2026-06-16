@@ -49,5 +49,6 @@ export const shouldRequestMethodSwitch = (
     return prev.sso.domain !== newDomain;
   }
 
-  return prev satisfies never;
+  void (prev satisfies never);
+  return false;
 };
