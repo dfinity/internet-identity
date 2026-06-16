@@ -1110,7 +1110,13 @@ export const idlFactory = ({ IDL }) => {
       ),
     'openid_identity_registration_finish' : IDL.Func(
         [OpenIDRegFinishArg],
-        [IDL.Variant({ 'Ok' : IdRegFinishResult, 'Err' : IdRegFinishError })],
+        [
+          IDL.Variant({
+            'Ok' : IdRegFinishResult,
+            'Err' : IdRegFinishError,
+            'Pending' : IDL.Null,
+          }),
+        ],
         [],
       ),
     'openid_prepare_delegation' : IDL.Func(

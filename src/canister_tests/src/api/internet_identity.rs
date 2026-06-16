@@ -391,7 +391,7 @@ pub fn get_sso_discovery(
 /// the OpenID JWT test helpers. They only ever drive configured providers
 /// (Google / Microsoft / Apple), whose JWKs are always warm, so `Pending` —
 /// the SSO-discovery retry signal — cannot occur; treat it as a test failure.
-fn settled<T, E>(result: types::OpenIdResult<T, E>) -> Result<T, E> {
+pub(crate) fn settled<T, E>(result: types::OpenIdResult<T, E>) -> Result<T, E> {
     match result {
         types::OpenIdResult::Ok(value) => Ok(value),
         types::OpenIdResult::Err(error) => Err(error),

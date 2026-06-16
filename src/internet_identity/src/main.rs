@@ -970,6 +970,7 @@ mod v2_api {
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
         registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::PubkeyAuthn(arg),
+            None,
         )
     }
 
@@ -1311,13 +1312,24 @@ mod openid_api {
     #[update]
     fn openid_identity_registration_finish(
         arg: OpenIDRegFinishArg,
-    ) -> Result<IdRegFinishResult, IdRegFinishError> {
-        // JWT verification (and the SSO discovery/JWKS cache fills it may
-        // trigger) happens inside the registration flow's
-        // `create_openid_credential_and_config`.
-        registration::registration_flow_v2::identity_registration_finish(
+    ) -> OpenIdResult<IdRegFinishResult, IdRegFinishError> {
+        // Verify the JWT (driving the SSO discovery/JWKS fetches it may need)
+        // up front: a cold or evicted cache surfaces as the `Pending` retry arm
+        // instead of a terminal registration error. The verified credential is
+        // then handed to the shared flow so it isn't re-verified.
+        let verified =
+            match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+                Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+                Ok(openid::Cached::Ready(verified)) => verified,
+                Err(err) => return OpenIdResult::Err(err),
+            };
+        match registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
-        )
+            Some(verified),
+        ) {
+            Ok(result) => OpenIdResult::Ok(result),
+            Err(err) => OpenIdResult::Err(err),
+        }
     }
 
     #[update]

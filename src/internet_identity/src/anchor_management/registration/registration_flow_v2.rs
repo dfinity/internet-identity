@@ -155,6 +155,7 @@ pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, 
 
 pub fn identity_registration_finish(
     arg: CreateIdentityData,
+    verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<IdRegFinishResult, IdRegFinishError> {
     let caller = caller();
     let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
@@ -170,7 +171,7 @@ pub fn identity_registration_finish(
 
     let now = time();
 
-    let identity_number = create_identity(&arg, now)?;
+    let identity_number = create_identity(&arg, now, verified_openid)?;
 
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
@@ -196,9 +197,20 @@ pub fn identity_registration_finish(
     Ok(IdRegFinishResult { identity_number })
 }
 
-fn create_openid_credential_and_config(
+/// Verify the OpenID JWT for a registration and pair the credential with its
+/// config issuer.
+///
+/// Returns [`Cached::Pending`](openid::Cached::Pending) when the SSO discovery /
+/// JWKS cache is cold (or has since been evicted) so the caller can surface a
+/// retry rather than a terminal error. Configured providers (Google / Microsoft
+/// / Apple) keep their keys warm and always resolve to `Ready`. This runs
+/// before `create_identity` takes the storage borrow because verification reads
+/// the JWK caches (and the configured providers' JWKs from stable storage),
+/// which would conflict with the `storage_borrow_mut` it would otherwise run
+/// inside.
+pub fn verify_openid_for_registration(
     openid_registration_data: &OpenIDRegFinishArg,
-) -> Result<(openid::OpenIdCredential, String), IdRegFinishError> {
+) -> Result<openid::Cached<(openid::OpenIdCredential, String)>, IdRegFinishError> {
     let OpenIDRegFinishArg {
         jwt,
         salt,
@@ -206,18 +218,10 @@ fn create_openid_credential_and_config(
         discovery_domain,
     } = openid_registration_data;
 
-    // Registration runs in an update: drive the SSO discovery/JWKS fetches (if
-    // any), then read the result. A cold cache surfaces `Pending`; in practice
-    // the sign-in attempt that precedes registration has already warmed the
-    // JWKS, so this is a defensive retry signal rather than a path users hit.
     openid::prefetch_sso(discovery_domain.as_deref());
     let openid_credential = match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
         openid::Cached::Ready(credential) => credential,
-        openid::Cached::Pending => {
-            return Err(IdRegFinishError::InvalidAuthnMethod(
-                "OIDC discovery in progress".to_string(),
-            ))
-        }
+        openid::Cached::Pending => return Ok(openid::Cached::Pending),
     };
 
     // Config issuer for the authorization key / operation log: the configured
@@ -227,7 +231,10 @@ fn create_openid_credential_and_config(
         .config_issuer()
         .unwrap_or_else(|| openid_credential.iss.clone());
 
-    Ok((openid_credential, openid_config_iss))
+    Ok(openid::Cached::Ready((
+        openid_credential,
+        openid_config_iss,
+    )))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -337,7 +344,11 @@ fn apply_identity_data(
     Ok(operation)
 }
 
-fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber, IdRegFinishError> {
+fn create_identity(
+    arg: &CreateIdentityData,
+    now: u64,
+    verified_openid: Option<(openid::OpenIdCredential, String)>,
+) -> Result<IdentityNumber, IdRegFinishError> {
     // Enforce global uniqueness of passkey pubkeys across all anchors.
     if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
         authn_method:
@@ -351,15 +362,6 @@ fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber,
         anchor_management::check_passkey_pubkey_is_not_used(&webauthn.pubkey)
             .map_err(IdRegFinishError::InvalidAuthnMethod)?;
     }
-
-    // Verify an OpenID credential before taking the storage borrow below:
-    // verification reads the SSO discovery / JWKS caches (and the configured
-    // providers' JWKs from stable storage), which would conflict with the
-    // `storage_borrow_mut` it would otherwise run inside.
-    let verified_openid = match &arg {
-        CreateIdentityData::OpenID(data) => Some(create_openid_credential_and_config(data)?),
-        CreateIdentityData::PubkeyAuthn(_) => None,
-    };
 
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
         let arg = validate_identity_data(storage, arg, verified_openid)?;
@@ -418,7 +420,7 @@ mod create_identity_tests {
         );
 
         // Attempt to create identity - this should fail
-        let result = create_identity(&create_identity_data, 111);
+        let result = create_identity(&create_identity_data, 111, None);
 
         // Verify that the creation failed
         assert!(result.is_err());

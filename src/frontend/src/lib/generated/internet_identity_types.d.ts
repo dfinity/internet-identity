@@ -1950,7 +1950,8 @@ export interface _SERVICE {
   'openid_identity_registration_finish' : ActorMethod<
     [OpenIDRegFinishArg],
     { 'Ok' : IdRegFinishResult } |
-      { 'Err' : IdRegFinishError }
+      { 'Err' : IdRegFinishError } |
+      { 'Pending' : null }
   >,
   'openid_prepare_delegation' : ActorMethod<
     [JWT, Salt, SessionKey, [] | [string]],

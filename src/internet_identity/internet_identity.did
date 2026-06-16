@@ -1546,7 +1546,7 @@ service : (opt InternetIdentityInit) -> {
 
     // OpenID credentials protocol
     // ===========================
-    openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
+    openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Pending; Err : IdRegFinishError });
     // The trailing `opt text` is the SSO discovery domain (null for a direct
     // provider). For SSO sign-ins a cold discovery/JWKS cache yields the
     // `Pending` result arm — a retry signal, not an error: the caller re-calls

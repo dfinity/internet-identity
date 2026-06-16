@@ -23,6 +23,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import { retryWhilePending } from "$lib/utils/openidPoll";
 import {
   CheckCaptchaError,
   IdentityAnchorInfo,
@@ -795,15 +796,17 @@ export class AuthFlow {
     decodedJwt: ReturnType<typeof decodeJWT>;
   }> => {
     try {
-      await get(sessionStore)
-        .actor.openid_identity_registration_finish({
+      // An SSO discovery / JWKS cache that's cold (or has since been evicted)
+      // reports `Pending`; retry until it warms instead of failing the signup.
+      await retryWhilePending(() =>
+        get(sessionStore).actor.openid_identity_registration_finish({
           jwt,
           salt: get(sessionStore).salt,
           name,
           discovery_domain:
             discoveryDomain !== undefined ? [discoveryDomain] : [],
-        })
-        .then(throwCanisterError);
+        }),
+      ).then(throwCanisterError);
       const decodedJwt = decodeJWT(jwt);
       const { iss, sub, loginHint } = decodedJwt;
       const { identity, identityNumber } = await authenticateWithJWT({
