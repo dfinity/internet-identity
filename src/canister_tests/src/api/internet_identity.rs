@@ -369,7 +369,7 @@ pub fn discover_sso(
     env: &PocketIc,
     canister_id: CanisterId,
     domain: &str,
-) -> Result<Result<Option<types::SsoDiscovery>, String>, RejectResponse> {
+) -> Result<Result<(), types::SsoDiscoveryError>, RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -380,18 +380,12 @@ pub fn discover_sso(
     .map(|(x,)| x)
 }
 
-pub fn discover_sso_query(
+pub fn get_sso_discovery(
     env: &PocketIc,
     canister_id: CanisterId,
     domain: &str,
-) -> Result<Result<Option<types::SsoDiscovery>, String>, RejectResponse> {
-    query_candid(
-        env,
-        canister_id,
-        "discover_sso_query",
-        (domain,),
-    )
-    .map(|(x,)| x)
+) -> Result<Result<Option<types::SsoDiscovery>, types::SsoDiscoveryError>, RejectResponse> {
+    query_candid(env, canister_id, "get_sso_discovery", (domain,)).map(|(x,)| x)
 }
 
 pub fn openid_prepare_delegation(

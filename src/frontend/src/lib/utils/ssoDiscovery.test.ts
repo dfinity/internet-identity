@@ -10,7 +10,7 @@ import type { SsoDiscovery } from "$lib/generated/internet_identity_types";
 vi.mock("$lib/globals", () => ({
   anonymousActor: {
     discover_sso: vi.fn(),
-    discover_sso_query: vi.fn(),
+    get_sso_discovery: vi.fn(),
   },
 }));
 
@@ -80,11 +80,12 @@ describe("ssoDiscovery", () => {
       await expect(discoverSsoConfig("not a domain")).rejects.toThrow(
         "Invalid domain format",
       );
+      expect(anonymousActor.get_sso_discovery).not.toHaveBeenCalled();
       expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
     });
 
-    it("returns the mapped result when discovery is immediately ready", async () => {
-      vi.mocked(anonymousActor.discover_sso).mockResolvedValue({
+    it("returns the mapped result when the query reads a value immediately", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
         Ok: [DISCOVERY],
       });
 
@@ -101,12 +102,13 @@ describe("ssoDiscovery", () => {
           scopes_supported: ["openid", "profile", "email"],
         },
       });
-      expect(anonymousActor.discover_sso_query).not.toHaveBeenCalled();
+      // The value was already there, so no update was needed to drive a fetch.
+      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
     });
 
-    it("throws DomainNotConfiguredError(rejected) when the canister rejects the domain", async () => {
-      vi.mocked(anonymousActor.discover_sso).mockResolvedValue({
-        Err: "SSO discovery domain not allowed: evil.example",
+    it("throws DomainNotConfiguredError(rejected) when the query rejects the domain", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+        Err: { DomainNotAllowed: null },
       });
 
       const error = await discoverSsoConfig("evil.example").catch(
@@ -118,12 +120,14 @@ describe("ssoDiscovery", () => {
       }
     });
 
-    it("polls the query until discovery resolves", async () => {
+    it("drives the update when the query reads no value, then resolves", async () => {
       vi.useFakeTimers();
-      vi.mocked(anonymousActor.discover_sso).mockResolvedValue({ Ok: [] });
-      vi.mocked(anonymousActor.discover_sso_query)
+      // Query reads nothing twice, then the resolved config.
+      vi.mocked(anonymousActor.get_sso_discovery)
+        .mockResolvedValueOnce({ Ok: [] })
         .mockResolvedValueOnce({ Ok: [] })
         .mockResolvedValueOnce({ Ok: [DISCOVERY] });
+      vi.mocked(anonymousActor.discover_sso).mockResolvedValue({ Ok: null });
 
       const promise = discoverSsoConfig("dfinity.org");
       await vi.advanceTimersByTimeAsync(500);
@@ -131,14 +135,13 @@ describe("ssoDiscovery", () => {
 
       const result = await promise;
       expect(result.domain).toBe("dfinity.org");
-      expect(anonymousActor.discover_sso_query).toHaveBeenCalledTimes(2);
+      // Each not-ready query drove the update.
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(2);
     });
 
     it("stops polling when the abort signal is already aborted", async () => {
-      vi.mocked(anonymousActor.discover_sso).mockResolvedValue({ Ok: [] });
-      vi.mocked(anonymousActor.discover_sso_query).mockResolvedValue({
-        Ok: [],
-      });
+      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({ Ok: [] });
+      vi.mocked(anonymousActor.discover_sso).mockResolvedValue({ Ok: null });
 
       const controller = new AbortController();
       controller.abort();

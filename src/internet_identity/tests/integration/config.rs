@@ -8,6 +8,6 @@ mod enable_dapps_explorer;
 mod is_production;
 mod new_flow_origins;
 mod openid_configs;
-mod sso_discovery;
 mod register_rate_limit;
 mod related_origins;
+mod sso_discovery;

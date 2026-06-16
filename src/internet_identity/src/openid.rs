@@ -15,7 +15,7 @@ use internet_identity_interface::internet_identity::types::openid::{
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
     OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, SsoDiscovery,
-    Timestamp, UserKey,
+    SsoDiscoveryError, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -299,14 +299,21 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
 /// the cache is warm.
 pub fn prefetch_sso(domain: Option<&str>) {
     if let Some(domain) = domain {
-        sso::prefetch(domain);
+        let _ = sso::prefetch(domain);
     }
 }
 
-/// Read an SSO domain's resolved configuration for the sign-in initiation flow.
-/// Returns `Ok(None)` until the cache is warm (call [`prefetch_sso`] from an
-/// update to drive the fetch), `Err` for a disallowed domain.
-pub fn discover_sso(domain: &str) -> Result<Option<SsoDiscovery>, String> {
+/// Drive the SSO discovery fetch for `domain` (the discovery cache only). The
+/// sign-in initiation poll calls this from an update when the query
+/// ([`get_sso_discovery`]) read no value yet. `Err` for a disallowed domain.
+pub fn discover_sso(domain: &str) -> Result<(), SsoDiscoveryError> {
+    sso::drive_discovery(domain)
+}
+
+/// Read an SSO domain's resolved configuration. `Ok(None)` until the discovery
+/// cache is warm (the frontend drives the fetch via [`discover_sso`]), `Err`
+/// for a disallowed domain.
+pub fn get_sso_discovery(domain: &str) -> Result<Option<SsoDiscovery>, SsoDiscoveryError> {
     Ok(match sso::discover(domain)? {
         Cached::Pending => None,
         Cached::Ready(cfg) => Some(SsoDiscovery {

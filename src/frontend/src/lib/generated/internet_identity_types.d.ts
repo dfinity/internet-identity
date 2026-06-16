@@ -1521,6 +1521,12 @@ export interface SsoDiscovery {
   'discovery_domain' : string,
   'client_id' : string,
 }
+/**
+ * Error from `discover_sso` / `get_sso_discovery`. A failed discovery fetch
+ * isn't an error here — it reads as "not resolved yet" — so the only error is
+ * a domain that isn't on the canister's allowlist.
+ */
+export type SsoDiscoveryError = { 'DomainNotAllowed' : null };
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1720,20 +1726,15 @@ export interface _SERVICE {
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
-   * SSO discovery for the sign-in initiation flow. `discover_sso` (update)
-   * kicks off the on-demand two-hop discovery fetch and returns the resolved
-   * config, or null while the fetch is still in flight. `discover_sso_query`
-   * is the read-only counterpart that returns the cached result if present.
+   * SSO discovery for the sign-in initiation flow. The frontend polls
+   * `get_sso_discovery` (query) and, while it reads no value yet, drives the
+   * on-demand two-hop discovery fetch with `discover_sso` (update); once the
+   * fetch completes the query returns the resolved config.
    */
   'discover_sso' : ActorMethod<
     [string],
-    { 'Ok' : [] | [SsoDiscovery] } |
-      { 'Err' : string }
-  >,
-  'discover_sso_query' : ActorMethod<
-    [string],
-    { 'Ok' : [] | [SsoDiscovery] } |
-      { 'Err' : string }
+    { 'Ok' : null } |
+      { 'Err' : SsoDiscoveryError }
   >,
   /**
    * Email-recovery protocol
@@ -1839,6 +1840,11 @@ export interface _SERVICE {
       { 'Err' : GetIdAliasError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  'get_sso_discovery' : ActorMethod<
+    [string],
+    { 'Ok' : [] | [SsoDiscovery] } |
+      { 'Err' : SsoDiscoveryError }
+  >,
   /**
    * HTTP Gateway protocol
    * =====================

@@ -475,6 +475,15 @@ pub struct SsoDiscovery {
     pub name: Option<String>,
 }
 
+/// Error returned by `discover_sso` / `get_sso_discovery`. A failed discovery
+/// fetch isn't an error here — it reads as "not resolved yet" and the frontend
+/// times out — so the only error is a domain the canister won't discover.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SsoDiscoveryError {
+    /// The domain is not on the canister's `sso_discoverable_domains` allowlist.
+    DomainNotAllowed,
+}
+
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
     OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),

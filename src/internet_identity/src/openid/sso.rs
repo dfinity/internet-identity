@@ -17,6 +17,7 @@ use super::verify::{Descriptor, Stamp};
 use super::OpenIDJWTVerificationError;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
 use identity_jose::jwk::Jwk;
+use internet_identity_interface::internet_identity::types::SsoDiscoveryError;
 use std::cell::RefCell;
 
 #[cfg(not(test))]
@@ -83,12 +84,11 @@ fn new_jwks_cache() -> JwksCache {
 // Lookup paths.
 // ---------------------------------------------------------------------------
 
-/// Canonicalize and allowlist-check a discovery domain. `Err` for a domain not
-/// on the canary allowlist.
-fn allowed_domain(domain: &str) -> Result<String, String> {
+/// Canonicalize and allowlist-check a discovery domain.
+fn allowed_domain(domain: &str) -> Result<String, SsoDiscoveryError> {
     let domain = domain.to_ascii_lowercase();
     if !is_allowed_discovery_domain(&domain) {
-        return Err(format!("SSO discovery domain not allowed: {domain}"));
+        return Err(SsoDiscoveryError::DomainNotAllowed);
     }
     Ok(domain)
 }
@@ -97,21 +97,28 @@ fn allowed_domain(domain: &str) -> Result<String, String> {
 /// is running, and once discovery has resolved, ensure the JWKS fill for its
 /// `jwks_uri` is running too. Only an update may call this — it can spawn the
 /// outcalls the fills make. Reads ([`discover`], [`read_jwks`]) stay peek-only,
-/// so a query never needs this and never spawns. A no-op for a disallowed
-/// domain (the read will surface the error).
-pub(super) fn prefetch(domain: &str) {
-    let Ok(domain) = allowed_domain(domain) else {
-        return;
-    };
+/// so a query never needs this and never spawns. `Err` for a disallowed domain.
+pub(super) fn prefetch(domain: &str) -> Result<(), SsoDiscoveryError> {
+    let domain = allowed_domain(domain)?;
     if let Cached::Ready(cfg) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
         single_flight_cache::get(&JWKS_CACHE, cfg.jwks_uri);
     }
+    Ok(())
+}
+
+/// Drive the discovery fetch for `domain` (the discovery cache only — JWKS is a
+/// verify-time concern). For the sign-in initiation poll, where the frontend
+/// hits this from a query response that read no value yet.
+pub(super) fn drive_discovery(domain: &str) -> Result<(), SsoDiscoveryError> {
+    let domain = allowed_domain(domain)?;
+    single_flight_cache::get(&DISCOVERY_CACHE, domain);
+    Ok(())
 }
 
 /// Read the cached discovery result for `domain`. Peek-only (never spawns), so
 /// it's safe from a query; `Ok(Pending)` means no cached value yet — an update
 /// must [`prefetch`] to drive the fetch. `Err` for a disallowed domain.
-pub(super) fn discover(domain: &str) -> Result<Cached<DiscoveredConfig>, String> {
+pub(super) fn discover(domain: &str) -> Result<Cached<DiscoveredConfig>, SsoDiscoveryError> {
     Ok(single_flight_cache::peek(
         &DISCOVERY_CACHE,
         &allowed_domain(domain)?,
@@ -125,7 +132,11 @@ pub(super) fn resolve(
     domain: &str,
     jwt_iss: &str,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    let cfg = match discover(domain).map_err(OpenIDJWTVerificationError::GenericError)? {
+    let cfg = match discover(domain).map_err(|SsoDiscoveryError::DomainNotAllowed| {
+        OpenIDJWTVerificationError::GenericError(format!(
+            "SSO discovery domain not allowed: {domain}"
+        ))
+    })? {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(cfg) => cfg,
     };
@@ -493,7 +504,7 @@ mod tests {
         assert_eq!(discover("example.org"), Ok(Cached::Pending));
         // Prefetch spawns the discovery fill; the read is still Pending until
         // the detached fill runs.
-        prefetch("example.org");
+        prefetch("example.org").unwrap();
         assert_eq!(discover("example.org"), Ok(Cached::Pending));
         run_detached();
         match discover("example.org") {
@@ -525,7 +536,7 @@ mod tests {
         TEST_DISCOVERY.with_borrow_mut(|m| {
             m.insert("example.org".to_string(), sample_config());
         });
-        prefetch("example.org");
+        prefetch("example.org").unwrap();
         run_detached();
         // Wrong issuer is rejected.
         assert!(resolve("example.org", "https://evil.example.org").is_err());

@@ -1443,27 +1443,26 @@ mod openid_api {
         }
     }
 
-    /// Resolve an SSO discovery domain's configuration for the sign-in
-    /// initiation flow, driving the two-hop discovery fetch. Returns `Ok(None)`
-    /// while the fetch is in flight; the frontend polls `discover_sso_query`
-    /// until it returns `Ok(Some(_))`.
+    /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
+    /// this when `get_sso_discovery` (query) reads no value yet, then keeps
+    /// polling the query until it returns the resolved config.
     #[update]
     fn discover_sso(
         domain: String,
-    ) -> Result<Option<internet_identity_interface::internet_identity::types::SsoDiscovery>, String>
-    {
-        openid::prefetch_sso(Some(&domain));
+    ) -> Result<(), internet_identity_interface::internet_identity::types::SsoDiscoveryError> {
         openid::discover_sso(&domain)
     }
 
-    /// Read the cached discovery result for `domain` without driving the fetch,
-    /// returning `Ok(None)` if it isn't cached yet.
+    /// Read the resolved SSO configuration for `domain`, or `Ok(None)` if the
+    /// discovery fetch hasn't completed yet.
     #[query]
-    fn discover_sso_query(
+    fn get_sso_discovery(
         domain: String,
-    ) -> Result<Option<internet_identity_interface::internet_identity::types::SsoDiscovery>, String>
-    {
-        openid::discover_sso(&domain)
+    ) -> Result<
+        Option<internet_identity_interface::internet_identity::types::SsoDiscovery>,
+        internet_identity_interface::internet_identity::types::SsoDiscoveryError,
+    > {
+        openid::get_sso_discovery(&domain)
     }
 }
 

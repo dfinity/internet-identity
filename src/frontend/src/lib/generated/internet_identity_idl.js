@@ -270,14 +270,7 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Principal,
     'failed' : IDL.Text,
   });
-  const SsoDiscovery = IDL.Record({
-    'scopes' : IDL.Vec(IDL.Text),
-    'name' : IDL.Opt(IDL.Text),
-    'authorization_endpoint' : IDL.Text,
-    'issuer' : IDL.Text,
-    'discovery_domain' : IDL.Text,
-    'client_id' : IDL.Text,
-  });
+  const SsoDiscoveryError = IDL.Variant({ 'DomainNotAllowed' : IDL.Null });
   const Rrsig = IDL.Record({
     'algorithm' : IDL.Nat8,
     'signature' : IDL.Vec(IDL.Nat8),
@@ -517,6 +510,14 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
+  });
+  const SsoDiscovery = IDL.Record({
+    'scopes' : IDL.Vec(IDL.Text),
+    'name' : IDL.Opt(IDL.Text),
+    'authorization_endpoint' : IDL.Text,
+    'issuer' : IDL.Text,
+    'discovery_domain' : IDL.Text,
+    'client_id' : IDL.Text,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -885,13 +886,8 @@ export const idlFactory = ({ IDL }) => {
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'discover_sso' : IDL.Func(
         [IDL.Text],
-        [IDL.Variant({ 'Ok' : IDL.Opt(SsoDiscovery), 'Err' : IDL.Text })],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : SsoDiscoveryError })],
         [],
-      ),
-    'discover_sso_query' : IDL.Func(
-        [IDL.Text],
-        [IDL.Variant({ 'Ok' : IDL.Opt(SsoDiscovery), 'Err' : IDL.Text })],
-        ['query'],
       ),
     'email_recovery_credential_prepare_add' : IDL.Func(
         [IdentityNumber, EmailRecoveryDnsInput],
@@ -1016,6 +1012,16 @@ export const idlFactory = ({ IDL }) => {
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
+        ['query'],
+      ),
+    'get_sso_discovery' : IDL.Func(
+        [IDL.Text],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(SsoDiscovery),
+            'Err' : SsoDiscoveryError,
+          }),
+        ],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),

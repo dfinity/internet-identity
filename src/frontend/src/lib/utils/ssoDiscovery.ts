@@ -34,19 +34,15 @@ export interface SsoDiscoveryResult {
 /**
  * Raised when a domain's SSO configuration can't be resolved: the canister
  * rejected the domain (`rejected`) or the resolution didn't complete in time
- * (`timeout`). `detail` carries the canister's message for `rejected`.
+ * (`timeout`).
  */
 export class DomainNotConfiguredError extends Error {
-  constructor(
-    public readonly reason: "rejected" | "timeout",
-    public readonly detail?: string,
-  ) {
-    super(
-      detail !== undefined
-        ? `SSO discovery failed (${reason}): ${detail}`
-        : `SSO discovery failed (${reason})`,
-    );
+  readonly reason: "rejected" | "timeout";
+
+  constructor(reason: "rejected" | "timeout") {
+    super(`SSO discovery failed (${reason})`);
     this.name = "DomainNotConfiguredError";
+    this.reason = reason;
   }
 }
 
@@ -113,10 +109,10 @@ const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => ({
 });
 
 /**
- * Resolve a domain's SSO configuration. Validates the domain, asks the canister
- * to resolve it (`discover_sso`, which drives the fetch), then polls
- * `discover_sso_query` until the result is ready. An optional `signal` cancels
- * the poll (the input debounce drops a stale lookup when the user keeps typing).
+ * Resolve a domain's SSO configuration. Validates the domain, then polls
+ * `get_sso_discovery` (query); while it reads no value, drives the fetch with
+ * `discover_sso` (update). An optional `signal` cancels the poll (the input
+ * debounce drops a stale lookup when the user keeps typing).
  *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
  * @throws {DomainNotConfiguredError} when the canister rejects the domain or
@@ -128,28 +124,25 @@ export const discoverSsoConfig = async (
 ): Promise<SsoDiscoveryResult> => {
   const validatedDomain = validateDomain(domain);
 
-  const initial = await anonymousActor.discover_sso(validatedDomain);
-  if ("Err" in initial) {
-    throw new DomainNotConfiguredError("rejected", initial.Err);
-  }
-  const [ready] = initial.Ok;
-  if (ready !== undefined) {
-    return toResult(ready);
-  }
-
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     if (signal?.aborted === true) {
       throw new Error("SSO discovery aborted");
     }
-    await pollDelay();
-    const polled = await anonymousActor.discover_sso_query(validatedDomain);
-    if ("Err" in polled) {
-      throw new DomainNotConfiguredError("rejected", polled.Err);
+    // Read first via the cheap query.
+    const read = await anonymousActor.get_sso_discovery(validatedDomain);
+    if ("Err" in read) {
+      throw new DomainNotConfiguredError("rejected");
     }
-    const [resolved] = polled.Ok;
+    const [resolved] = read.Ok;
     if (resolved !== undefined) {
       return toResult(resolved);
     }
+    // No value yet — drive the fetch with an update, then poll again.
+    const driven = await anonymousActor.discover_sso(validatedDomain);
+    if ("Err" in driven) {
+      throw new DomainNotConfiguredError("rejected");
+    }
+    await pollDelay();
   }
 
   throw new DomainNotConfiguredError("timeout");
