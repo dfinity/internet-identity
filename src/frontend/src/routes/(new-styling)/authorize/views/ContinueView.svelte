@@ -251,6 +251,9 @@
       const index = accounts.findIndex(
         (acc) => acc.account_number[0] === isEditAccountDialogVisibleForNumber,
       );
+      if (index === -1) {
+        return;
+      }
       const nameChanged =
         account.name !== (accounts[index].name[0] ?? primaryAccountName);
       const defaultChanged =
