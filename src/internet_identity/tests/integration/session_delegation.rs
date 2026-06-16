@@ -216,7 +216,7 @@ fn ttl_clamp_over_max() -> Result<(), RejectResponse> {
 }
 
 #[test]
-fn ttl_default_is_seven_days() -> Result<(), RejectResponse> {
+fn ttl_default_is_thirty_days() -> Result<(), RejectResponse> {
     let (env, canister_id, anchor) = fresh_anchor();
 
     let prepared = prepare_session_delegation(
@@ -230,13 +230,13 @@ fn ttl_default_is_seven_days() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let seven_days_ns = 7u64 * 24 * 3600 * 1_000_000_000;
+    let thirty_days_ns = 30u64 * 24 * 3600 * 1_000_000_000;
     let now = time(&env);
     let tolerance_ns = Duration::from_secs(5).as_nanos() as u64;
     assert!(
-        prepared.expiration >= now + seven_days_ns - tolerance_ns
-            && prepared.expiration <= now + seven_days_ns + tolerance_ns,
-        "default expiration should be ~7 days from now; got expiration={exp}, now={now}",
+        prepared.expiration >= now + thirty_days_ns - tolerance_ns
+            && prepared.expiration <= now + thirty_days_ns + tolerance_ns,
+        "default expiration should be ~30 days from now; got expiration={exp}, now={now}",
         exp = prepared.expiration
     );
 

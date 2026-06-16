@@ -14,7 +14,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 
-pub const DEFAULT_SESSION_DELEGATION_TTL_NS: u64 = 7 * crate::DAY_NS;
+pub const DEFAULT_SESSION_DELEGATION_TTL_NS: u64 = 30 * crate::DAY_NS;
 pub const MAX_SESSION_DELEGATION_TTL_NS: u64 = 30 * crate::DAY_NS;
 
 pub(crate) fn session_delegation_seed(anchor_number: AnchorNumber) -> Hash {
