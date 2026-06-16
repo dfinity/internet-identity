@@ -18,6 +18,11 @@ import {
 
 const SESSION_DELEGATION_STORE = createStore("ii-session-delegations", "keys");
 
+// Treat the last 5 minutes of a delegation's lifetime as already expired:
+// avoids serving a record that's "valid" at the FE check but expires
+// between dispatch and IC validation (network latency + ingress queue
+// + browser clock skew). Cleaner UX to fast-fail to a ceremony than to
+// surface an InvalidDelegation error mid-call.
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
 export const mintSession = async ({
