@@ -721,6 +721,7 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: persistent_state.backend_origin.clone(),
+        enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
     })
@@ -874,6 +875,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(dummy_auth) = arg.dummy_auth {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.dummy_auth = dummy_auth;
+            })
+        }
+        if let Some(enable_dnssec_email_recovery) = arg.enable_dnssec_email_recovery {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.enable_dnssec_email_recovery = Some(enable_dnssec_email_recovery);
             })
         }
         if let Some(dnssec_config) = arg.dnssec_config {
