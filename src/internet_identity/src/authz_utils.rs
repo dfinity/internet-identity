@@ -16,7 +16,7 @@ use std::fmt::{Display, Formatter};
 /// private field, so a `CallerCapability` can only be built inside this module —
 /// making this function the only way to obtain scoped authorization.
 pub enum CallerCapability {
-    FullAuth(Box<Anchor>, AuthorizationKey, Sealed),
+    FullAuth(Sealed),
     SessionScoped(Sealed),
 }
 
@@ -209,12 +209,8 @@ pub fn is_self_authenticating(principal: Principal) -> bool {
 pub fn check_session_authorization(
     anchor_number: AnchorNumber,
 ) -> Result<CallerCapability, AuthorizationError> {
-    if let Ok((anchor, key)) = check_authorization(anchor_number) {
-        return Ok(CallerCapability::FullAuth(
-            Box::new(anchor),
-            key,
-            Sealed(()),
-        ));
+    if check_authorization(anchor_number).is_ok() {
+        return Ok(CallerCapability::FullAuth(Sealed(())));
     }
 
     let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());

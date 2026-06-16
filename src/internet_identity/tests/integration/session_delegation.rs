@@ -5,7 +5,7 @@ use canister_tests::api::internet_identity::api_v2::{
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, GetAccountsError, GetDefaultAccountError, IdentityInfoError,
+    GetAccountsError, GetDefaultAccountError, IdentityInfoError, SetDefaultAccountError,
 };
 use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
@@ -106,18 +106,6 @@ fn session_delegation_happy_path() -> Result<(), RejectResponse> {
     .unwrap();
     assert_eq!(default.origin, ORIGIN);
 
-    let created_account_number: Option<AccountNumber> = accounts[0].account_number;
-    set_default_account(
-        &env,
-        canister_id,
-        session_principal,
-        anchor,
-        ORIGIN.to_string(),
-        created_account_number,
-    )
-    .unwrap()
-    .unwrap();
-
     Ok(())
 }
 
@@ -179,6 +167,21 @@ fn session_delegation_default_deny() -> Result<(), RejectResponse> {
     assert!(
         matches!(info_err, IdentityInfoError::Unauthorized(_)),
         "identity_info must be rejected for session callers, got: {info_err:?}"
+    );
+
+    let set_err = set_default_account(
+        &env,
+        canister_id,
+        session_principal,
+        anchor,
+        ORIGIN.to_string(),
+        None,
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(
+        matches!(set_err, SetDefaultAccountError::Unauthorized(_)),
+        "set_default_account must be rejected for session callers, got: {set_err:?}"
     );
 
     Ok(())

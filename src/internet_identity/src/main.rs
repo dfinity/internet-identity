@@ -5,10 +5,10 @@ use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
+use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
-use authz_utils::{check_session_authorization, CallerCapability};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
@@ -562,17 +562,7 @@ fn set_default_account(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    let capability = check_session_authorization(anchor_number)
-        .map_err(|err| SetDefaultAccountError::Unauthorized(err.principal))?;
-
-    if let CallerCapability::FullAuth(mut anchor, authorization_key, _) = capability {
-        anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-        state::storage_borrow_mut(|storage| storage.write(*anchor)).map_err(|err| {
-            SetDefaultAccountError::InternalCanisterError(format!(
-                "Identity: {anchor_number}, Error: {err}"
-            ))
-        })?;
-    }
+    check_authz_and_record_activity(anchor_number).map_err(SetDefaultAccountError::from)?;
 
     let result =
         account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
