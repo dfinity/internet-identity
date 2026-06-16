@@ -34,8 +34,14 @@ msgstr "{attribute}:"
 msgid "{displayName} account"
 msgstr "{displayName}-account"
 
+msgid "{domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP {0})."
+msgstr "{domainInput} heeft /.well-known/ii-openid-configuration niet gepubliceerd (HTTP {0})."
+
 msgid "{domainInput} took too long to respond. Try again in a moment."
 msgstr "{domainInput} duurde te lang om te reageren. Probeer het over een moment opnieuw."
+
+msgid "{domainInput}'s /.well-known/ii-openid-configuration is malformed."
+msgstr "De /.well-known/ii-openid-configuration van {domainInput} is ongeldig."
 
 msgid "{domainInput}'s SSO app doesn't allow the hybrid OAuth flow II requires. Ask the SSO admin to enable response_type \"id_token code\"."
 msgstr "De SSO-app van {domainInput} staat de hybride OAuth-flow die II nodig heeft niet toe. Vraag de SSO-beheerder om response_type \"id_token code\" in te schakelen."
@@ -79,6 +85,9 @@ msgstr "<0>Integraties met Google, Apple en Microsoft:</0> Hoewel passkeys steed
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Meer informatie</0> over passkeys"
 
+msgid "<0>Never</0> enter a code from another source."
+msgstr "Voer <0>nooit</0> een code van een andere bron in."
+
 msgid "<0>No more identity numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
 msgstr "<0>Geen identiteitsnummers meer:</0> Zoals hierboven uitgelegd, betekenen vindbare passkeys dat u geen identiteitsnummer meer hoeft te onthouden of op te slaan. Inloggen is nu eenvoudiger en overzichtelijker."
 
@@ -120,9 +129,6 @@ msgstr "Geactiveerd"
 
 msgid "Active"
 msgstr "Actief"
-
-msgid "Add a new identity"
-msgstr ""
 
 msgid "Add a passkey"
 msgstr "Voeg een passkey toe"
@@ -205,9 +211,6 @@ msgstr "Authenticatie succesvol"
 msgid "Authorize new device"
 msgstr "Autoriseer nieuw apparaat"
 
-msgid "Back"
-msgstr ""
-
 msgid "Back to sign-in options"
 msgstr "Terug naar inlogopties"
 
@@ -216,9 +219,6 @@ msgstr "Voordat u doorgaat"
 
 msgid "Body"
 msgstr "Berichttekst"
-
-msgid "Both are on the <0>{host}</0> domain."
-msgstr ""
 
 msgid "Browser opened"
 msgstr "Browser geopend"
@@ -313,9 +313,6 @@ msgstr "Bevestig uw inlogpoging"
 msgid "Confirmation code"
 msgstr "Bevestigingscode"
 
-msgid "Confirmed"
-msgstr ""
-
 msgid "Confirming..."
 msgstr "Bevestigen..."
 
@@ -370,11 +367,11 @@ msgstr "SSO-instellingen van {domainInput} konden niet worden geladen. Vraag uw 
 msgid "Create account"
 msgstr "Account aanmaken"
 
-msgid "Create an Identity"
-msgstr ""
-
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
 msgstr "Maak een identiteit aan met een passkey, via biometrie of een beveiligingssleutel. Uw gegevens verlaten nooit uw apparaat."
+
+msgid "Create another identity"
+msgstr "Een andere identiteit aanmaken"
 
 msgid "Create identity"
 msgstr "Identiteit aanmaken"
@@ -382,14 +379,14 @@ msgstr "Identiteit aanmaken"
 msgid "Create new identity"
 msgstr "Nieuwe identiteit aanmaken"
 
-msgid "Create one in seconds."
-msgstr ""
-
 msgid "Create passkey"
 msgstr "Passkey aanmaken"
 
 msgid "Create your Identity"
 msgstr "Maak uw Identiteit aan"
+
+msgid "Create your private, passwordless identity."
+msgstr "Maak uw privé, wachtwoordloze identiteit aan."
 
 msgid "Created {0}"
 msgstr "Gemaakt {0}"
@@ -487,9 +484,6 @@ msgstr "Voer elk woord in de juiste volgorde in:"
 msgid "Enter recovery phrase"
 msgstr "Voer herstelzin in"
 
-msgid "Enter the code"
-msgstr ""
-
 msgid "Enter your company domain"
 msgstr "Voer uw bedrijfsdomein in"
 
@@ -575,12 +569,6 @@ msgstr "Verborgen e-mailadres"
 msgid "Hide all"
 msgstr "Alles verbergen"
 
-msgid "Hold for a few seconds. Release to cancel."
-msgstr ""
-
-msgid "Hold to confirm"
-msgstr ""
-
 msgid "Home"
 msgstr "Home"
 
@@ -638,8 +626,6 @@ msgstr "Identiteit verwijderd"
 msgid "Identity upgraded."
 msgstr "Identiteit geüpgraded."
 
-msgid "If this keeps happening, copy these details and include them in a <0>support request</0>."
-msgstr ""
 
 msgid "If you administer <0>{domain}</0>, enabling DNSSEC at your domain registrar usually takes a few clicks. Once it propagates, this address will work automatically. No further action from us needed."
 msgstr "Als u <0>{domain}</0> beheert, kost het inschakelen van DNSSEC bij uw domeinregistrar doorgaans slechts een paar klikken. Zodra dit is doorgevoerd, werkt dit adres automatisch. Er is geen verdere actie van ons vereist."
@@ -845,6 +831,9 @@ msgstr "Geef uw identiteit een naam"
 msgid "Name:"
 msgstr "Naam:"
 
+msgid "New to Internet Identity?"
+msgstr "Nieuw bij Internet Identity?"
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Er worden geen gegevens gedeeld met Google, Microsoft of Apple over op welke applicaties u inlogt met Internet Identity."
 
@@ -881,6 +870,9 @@ msgstr "Een of meer woorden zijn onjuist of staan verkeerd."
 msgid "Only enable this for the official <0>ICP CLI</0>. If you're unsure, reinstall it from the <1>official source</1>."
 msgstr "Schakel dit alleen in voor de officiële <0>ICP CLI</0>. Als u niet zeker weet, installeer het opnieuw vanaf de <1>officiële bron</1>."
 
+msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
+msgstr "Voer de code van dat apparaat alleen in als u dit proces <0>zelf</0> hebt gestart."
+
 msgid "Open in browser"
 msgstr "Openen in browser"
 
@@ -889,12 +881,6 @@ msgstr "Openen in browser om door te gaan"
 
 msgid "Open in mail app"
 msgstr "Openen in mail-app"
-
-msgid "Open Internet Identity in a new tab to manage your access methods and recovery options."
-msgstr ""
-
-msgid "Open manage"
-msgstr ""
 
 msgid "Open menu"
 msgstr "Menu openen"
@@ -946,9 +932,6 @@ msgstr "Kies hieronder een herstelmethode om opnieuw in te loggen."
 
 msgid "Pick something recognizable, like your name"
 msgstr "Kies iets herkenbaars, zoals uw naam"
-
-msgid "Please confirm"
-msgstr ""
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Ga terug naar uw <0>bestaande apparaat</0> en kies <1>Opnieuw beginnen</1> om het opnieuw te proberen."
@@ -1112,14 +1095,14 @@ msgstr "Sessie verlopen"
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
+msgid "Set up a new identity."
+msgstr "Stel een nieuwe identiteit in."
+
 msgid "Set up recovery email"
 msgstr "Herstel-e-mailadres instellen"
 
 msgid "Set up recovery phrase"
 msgstr "Herstelzin instellen"
-
-msgid "Set up your private, passwordless identity."
-msgstr ""
 
 msgid "Settings"
 msgstr "Instellingen"
@@ -1150,6 +1133,9 @@ msgstr "Inloggen met vertrouwde methoden"
 
 msgid "Sign in with {name}"
 msgstr "Inloggen met {name}"
+
+msgid "Sign in with a passkey or familiar provider."
+msgstr "Log in met een passkey of een bekende provider."
 
 msgid "Sign in with another identity"
 msgstr "Inloggen met een andere identiteit"
@@ -1248,9 +1234,6 @@ msgstr "SSO-aanmelding voor {domainInput} is mislukt. Probeer het opnieuw."
 msgid "Start over"
 msgstr "Opnieuw beginnen"
 
-msgid "Step 2 of 2"
-msgstr ""
-
 msgid "Still using an identity number?"
 msgstr "Gebruikt u nog een identiteitsnummer?"
 
@@ -1292,6 +1275,7 @@ msgstr "Toegangsmethode succesvol gewisseld"
 
 msgid "Support"
 msgstr "Ondersteuning"
+
 
 msgid "Switch"
 msgstr "Wisselen"
@@ -1365,11 +1349,11 @@ msgstr "De zin is correct ingevoerd, maar hoort bij een ander product dan Intern
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Er was een probleem bij het verbinden met de applicatie. Probeer een andere browser; als het probleem aanhoudt, neem dan contact op met de ontwikkelaar."
 
-msgid "This {resolvedProviderName} account is already connected to an Internet Identity."
-msgstr ""
+msgid "This {providerName} account is already connected to an Internet Identity."
+msgstr "Dit {providerName}-account is al gekoppeld aan een Internet Identity."
 
-msgid "This {resolvedProviderName} account isn't connected to an Internet Identity yet."
-msgstr ""
+msgid "This {providerName} account isn't connected to an Internet Identity yet."
+msgstr "Dit {providerName}-account is nog niet gekoppeld aan een Internet Identity."
 
 msgid "This account is already attached to your identity. Your active access method will be switched to it."
 msgstr "Dit account is al gekoppeld aan uw identiteit. Uw actieve toegangsmethode wordt hierop overgeschakeld."
@@ -1442,9 +1426,6 @@ msgstr "Opnieuw proberen"
 
 msgid "Type each word in the correct order:"
 msgstr "Typ elk woord in de juiste volgorde:"
-
-msgid "Type the 6-digit code shown on the new device."
-msgstr ""
 
 msgid "Type the characters exactly as shown below"
 msgstr "Typ de tekens exact zoals hieronder weergegeven"
@@ -1524,11 +1505,8 @@ msgstr "Identiteit aan het upgraden..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Gebruik een apparaat dat uw identiteit al bevat om de URL te scannen of te openen. Dit koppelt uw identiteit aan dit apparaat."
 
-msgid "Use a different method"
-msgstr ""
-
-msgid "Use a passkey or familiar provider."
-msgstr ""
+msgid "Use a passkey, Face ID, or a popular provider"
+msgstr "Gebruik een passkey, Face ID of een populaire provider"
 
 msgid "Use existing identity"
 msgstr "Bestaande identiteit gebruiken"
@@ -1575,8 +1553,8 @@ msgstr "Wachten op uw nieuwe apparaat"
 msgid "Waiting to receive…"
 msgstr "Wachten op ontvangst…"
 
-msgid "Want a new identity?"
-msgstr ""
+msgid "Want to create a new identity?"
+msgstr "Wilt u een nieuwe identiteit aanmaken?"
 
 msgid "We can't verify mail from <0>{domain}</0> yet. Try a different address. Gmail, iCloud, Outlook, Fastmail, and Proton all work."
 msgstr "We kunnen e-mail van <0>{domain}</0> nog niet verifiëren. Probeer een ander adres. Gmail, iCloud, Outlook, Fastmail en Proton werken allemaal."
@@ -1677,9 +1655,6 @@ msgstr "U kunt uw herstelzin op elk moment opnieuw instellen. Dit houdt uw ident
 msgid "You can use it now to recover, but verify you've saved it correctly so you can rely on it later."
 msgstr "U kunt deze nu gebruiken om te herstellen, maar controleer of u hem correct heeft opgeslagen zodat u er later op kunt vertrouwen."
 
-msgid "You control both devices."
-msgstr ""
-
 msgid "You have reached the maximum number of passkeys"
 msgstr "U heeft het maximum aantal passkeys bereikt"
 
@@ -1692,14 +1667,14 @@ msgstr "U hoeft uw identiteitsnummer niet meer te onthouden en kunt in plaats da
 msgid "You signed up before with a different access method."
 msgstr "U heeft zich eerder aangemeld met een andere toegangsmethode."
 
-msgid "You unlinked this {resolvedProviderName} account from your identity."
-msgstr ""
-
-msgid "You're about to authorize a new device."
-msgstr ""
+msgid "You unlinked this {providerName} account from your identity."
+msgstr "U heeft dit {providerName}-account losgekoppeld van uw identiteit."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 msgstr "U staat op het punt uw herstelzin te zien, die Internet Identity niet opslaat en die dus niet kan worden opgehaald als deze verloren gaat, dus bewaar deze veilig offline."
+
+msgid "You're about to sign in on a <0>new device</0>."
+msgstr "U staat op het punt in te loggen op een <0>nieuw apparaat</0>."
 
 msgid "You're about to sign in."
 msgstr "U staat op het punt in te loggen."
@@ -1719,8 +1694,8 @@ msgstr "U bent ingelogd"
 msgid "You're signing in as <0>{name}</0>."
 msgstr "U logt in als <0>{name}</0>."
 
-msgid "You've never used this {resolvedProviderName} account with Internet Identity."
-msgstr ""
+msgid "You've never used this {providerName} account with Internet Identity."
+msgstr "U heeft dit {providerName}-account nooit gebruikt met Internet Identity."
 
 msgid "Your passkeys and recovery phrase are unaffected. You can add a recovery email again at any time."
 msgstr "Uw passkeys en herstelzin zijn niet beïnvloed. U kunt op elk moment opnieuw een herstel-e-mailadres toevoegen."
