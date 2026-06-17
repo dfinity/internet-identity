@@ -266,7 +266,7 @@ msgid "choose language to continue"
 msgstr "выберите язык для продолжения"
 
 msgid "Choose method"
-msgstr "Выберите метод"
+msgstr "Выберите способ"
 
 msgid "Choose method to continue"
 msgstr "Выберите способ входа"
