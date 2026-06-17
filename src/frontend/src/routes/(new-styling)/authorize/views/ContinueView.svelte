@@ -116,14 +116,17 @@
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
   // Re-initialize the flow and re-hydrate per-identity state when the
-  // identity changes. If the toggle is persisted ON for this identity,
-  // auto-load accounts so the UI matches the user's preference without
-  // a manual re-toggle.
+  // identity changes. Read the persisted value into a local so the
+  // effect's only reactive dependency is `selectedIdentityNumber` -- if
+  // we read `isMultipleAccountsEnabled` directly, the user's own toggle
+  // click would re-trigger this effect and overwrite the new value back
+  // from stale localStorage.
   $effect(() => {
     authLastUsedFlow.init([selectedIdentityNumber]);
-    isMultipleAccountsEnabled = readToggle(selectedIdentityNumber);
+    const hydrated = readToggle(selectedIdentityNumber);
+    isMultipleAccountsEnabled = hydrated;
     defaultAccountNumber = null;
-    if (isMultipleAccountsEnabled) {
+    if (hydrated) {
       void handleEnableMultipleAccounts();
     }
   });
