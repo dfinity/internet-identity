@@ -66,7 +66,9 @@
     }
   };
   const requestValid = $derived(
-    $MCP && params.kind === "valid" && callbackMatchesMcpServer(params.callback),
+    $MCP &&
+      params.kind === "valid" &&
+      callbackMatchesMcpServer(params.callback),
   );
 
   const authFlow = new AuthLastUsedFlow();
