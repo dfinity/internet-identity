@@ -4,13 +4,16 @@
 
   interface Props {
     class?: string;
-    centerFade?: { width: string; height: string; hold: string };
+    fadeCenterHold?: string;
   }
-  const { class: className = "", centerFade }: Props = $props();
+  const { class: className = "", fadeCenterHold }: Props = $props();
 
   const maskStyle = $derived(
-    centerFade !== undefined
-      ? `mask-image: radial-gradient(ellipse ${centerFade.width} ${centerFade.height} at center, transparent 0%, transparent ${centerFade.hold}, black 100%); -webkit-mask-image: radial-gradient(ellipse ${centerFade.width} ${centerFade.height} at center, transparent 0%, transparent ${centerFade.hold}, black 100%);`
+    fadeCenterHold !== undefined
+      ? (() => {
+          const grad = `radial-gradient(ellipse closest-side at center, transparent 0%, transparent ${fadeCenterHold}, black 100%)`;
+          return `mask-image: ${grad}; -webkit-mask-image: ${grad};`;
+        })()
       : "",
   );
 
