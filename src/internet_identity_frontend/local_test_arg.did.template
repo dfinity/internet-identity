@@ -15,6 +15,6 @@
       "https://oisy.com";
       "https://oc.app";
     };
-    mcp_server_origin = opt "https://mcp.id.ai";
+    mcp_server_origin = opt "https://mcp.beta.id.ai";
   },
 )
