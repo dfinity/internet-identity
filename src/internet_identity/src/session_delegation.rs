@@ -5,11 +5,11 @@ use candid::Principal;
 use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
-use ic_cdk::{api::time, caller};
+use ic_cdk::api::time;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, Delegation, PrepareSessionDelegation, SessionDelegationError,
-    SessionKey, SignedDelegation, Timestamp,
+    AnchorNumber, Delegation, PrepareSessionDelegation, SessionDelegationError, SessionKey,
+    SignedDelegation, Timestamp,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -48,12 +48,8 @@ pub async fn prepare_session_delegation(
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<PrepareSessionDelegation, SessionDelegationError> {
-    let (_, auth_key) = check_authorization(anchor_number)
+    check_authorization(anchor_number)
         .map_err(|err| SessionDelegationError::Unauthorized(err.principal))?;
-
-    if matches!(auth_key, AuthorizationKey::EmailRecoveryAddress(_)) {
-        return Err(SessionDelegationError::Unauthorized(caller()));
-    }
 
     state::ensure_salt_set().await;
 
