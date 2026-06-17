@@ -2,6 +2,18 @@
   import { PerlinNoise3D } from "$lib/utils/UI/backgrounds/perlinNoise3d";
   import { onMount } from "svelte";
 
+  interface Props {
+    class?: string;
+    centerFade?: { width: string; height: string; hold: string };
+  }
+  const { class: className = "", centerFade }: Props = $props();
+
+  const maskStyle = $derived(
+    centerFade !== undefined
+      ? `mask-image: radial-gradient(ellipse ${centerFade.width} ${centerFade.height} at center, transparent 0%, transparent ${centerFade.hold}, black 100%); -webkit-mask-image: radial-gradient(ellipse ${centerFade.width} ${centerFade.height} at center, transparent 0%, transparent ${centerFade.hold}, black 100%);`
+      : "",
+  );
+
   let canvasEl: HTMLCanvasElement | undefined = $state();
 
   const GAP = 28;
@@ -129,6 +141,10 @@
   });
 </script>
 
-<div class="absolute inset-0 -z-50 w-full select-none" aria-hidden="true">
+<div
+  class={["absolute inset-0 -z-50 w-full select-none", className]}
+  style={maskStyle}
+  aria-hidden="true"
+>
   <canvas bind:this={canvasEl} class="block h-full w-full"></canvas>
 </div>

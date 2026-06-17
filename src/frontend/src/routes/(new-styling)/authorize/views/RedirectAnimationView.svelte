@@ -119,7 +119,9 @@
 </div>
 
 <div class="max-md:hidden">
-  <BreatheSparkleCanvas />
+  <BreatheSparkleCanvas
+    centerFade={{ width: "40rem", height: "30rem", hold: "45%" }}
+  />
 </div>
 
 <style>
