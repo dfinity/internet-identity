@@ -72,7 +72,7 @@ build_frontend_install_arg() {
     }
 
     # All known fields with their defaults (null for missing/new canisters)
-    local -a field_names=(backend_canister_id backend_origin related_origins fetch_root_key analytics_config dummy_auth dev_csp featured_dashboard_apps)
+    local -a field_names=(backend_canister_id backend_origin related_origins fetch_root_key analytics_config dummy_auth dev_csp featured_dashboard_apps mcp_server_origin)
     local -A current_values=(
         [backend_canister_id]="null"
         [backend_origin]="null"
@@ -82,6 +82,7 @@ build_frontend_install_arg() {
         [dummy_auth]="null"
         [dev_csp]="null"
         [featured_dashboard_apps]="null"
+        [mcp_server_origin]="null"
     )
 
     if [ -z "$raw_config" ]; then
