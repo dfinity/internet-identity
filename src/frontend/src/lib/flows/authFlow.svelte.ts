@@ -42,6 +42,7 @@ import {
 } from "$lib/utils/openID";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 import { nanosToMillis } from "$lib/utils/time";
+import { mintSession } from "$lib/stores/session-delegation.store";
 
 interface AuthFlowOptions {
   trackLastUsed?: boolean;
@@ -342,6 +343,7 @@ export class AuthFlow {
       });
     const authMethod = { passkey: { credentialId } };
     await authenticationStore.set({ identity, identityNumber, authMethod });
+    void mintSession({ identityNumber, actor: get(authenticatedStore).actor });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
     const pendingLastUsedEntry = this.#options.trackLastUsed
@@ -531,6 +533,10 @@ export class AuthFlow {
         identityNumber,
         authMethod: { openid: { iss, sub } },
       });
+      void mintSession({
+        identityNumber,
+        actor: get(authenticatedStore).actor,
+      });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
       return {
@@ -625,6 +631,10 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { passkey: { credentialId } },
+      });
+      void mintSession({
+        identityNumber,
+        actor: get(authenticatedStore).actor,
       });
       if (this.#options.trackLastUsed) {
         lastUsedIdentitiesStore.addLastUsedIdentity({
@@ -790,6 +800,10 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { openid: { iss, sub } },
+      });
+      void mintSession({
+        identityNumber,
+        actor: get(authenticatedStore).actor,
       });
       this.#captcha = undefined;
       return { iss, sub, loginHint, identityNumber, decodedJwt };
