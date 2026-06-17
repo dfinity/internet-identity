@@ -120,7 +120,7 @@
 
 <div class="max-md:hidden">
   <BreatheSparkleCanvas
-    centerFade={{ width: "40rem", height: "30rem", hold: "45%" }}
+    centerFade={{ width: "80rem", height: "60rem", hold: "22%" }}
   />
 </div>
 
