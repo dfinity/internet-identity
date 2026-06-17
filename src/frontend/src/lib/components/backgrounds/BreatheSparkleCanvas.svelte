@@ -9,7 +9,9 @@
   const BREATHE_AMP = 0.16;
   const BREATHE_RADIUS_AMP = 0.25;
   const BREATHE_FREQ = 0.7;
-  const BREATHE_SPATIAL = 0.004;
+  const BREATHE_PHASE_NOISE_SCALE = 0.003;
+  const BREATHE_PHASE_TIME_SCALE = 0.08;
+  const BREATHE_PHASE_RANGE = Math.PI * 2;
   const SPARKLE_TIME_SCALE = 0.34;
   const SPARKLE_THRESHOLD = 0.64;
   const SPARKLE_RING_ALPHA = 0.34;
@@ -29,6 +31,8 @@
     const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
     const sparkleNoise = new PerlinNoise3D();
     sparkleNoise.noiseSeed(2);
+    const breatheNoise = new PerlinNoise3D();
+    breatheNoise.noiseSeed(11);
 
     let dots: Dot[] = [];
     let lastW = -1;
@@ -70,11 +74,16 @@
       ctx.clearRect(0, 0, w, h);
 
       const zt = t * SPARKLE_TIME_SCALE;
+      const breatheZ = t * BREATHE_PHASE_TIME_SCALE;
 
       for (const d of dots) {
-        const pulse =
-          0.5 +
-          0.5 * Math.sin(t * BREATHE_FREQ + (d.x + d.y) * BREATHE_SPATIAL);
+        const phase =
+          breatheNoise.get(
+            d.x * BREATHE_PHASE_NOISE_SCALE,
+            d.y * BREATHE_PHASE_NOISE_SCALE,
+            breatheZ,
+          ) * BREATHE_PHASE_RANGE;
+        const pulse = 0.5 + 0.5 * Math.sin(t * BREATHE_FREQ + phase);
         const a = BASE_ALPHA + pulse * BREATHE_AMP;
         const radius = 1 + pulse * BREATHE_RADIUS_AMP;
 
