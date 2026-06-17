@@ -97,3 +97,18 @@ export const actorForIdentity = async (
     return undefined;
   }
 };
+
+// Mint a session on every successful authentication, regardless of which
+// flow performed it. Subscribing here makes auth-store transitions the
+// single trigger: any code path that completes a ceremony and ends in
+// `authenticationStore.set(...)` (authFlow, authLastUsedFlow,
+// migrationFlow, ...) refreshes the session automatically. Catches the
+// "missed mint on re-auth" class of bugs by construction.
+// Fire-and-forget; failure degrades to the status quo.
+authenticationStore.subscribe((authenticated) => {
+  if (authenticated === undefined) return;
+  void mintSession({
+    identityNumber: authenticated.identityNumber,
+    actor: authenticated.actor,
+  });
+});
