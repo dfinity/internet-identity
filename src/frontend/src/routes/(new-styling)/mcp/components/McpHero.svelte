@@ -1,7 +1,7 @@
 <script lang="ts">
   import { GlobeIcon, LockIcon } from "@lucide/svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
-  import McpLogo from "$lib/components/ui/McpLogo.svelte";
+  import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 
@@ -67,7 +67,7 @@
       class="border-border-secondary text-fg-primary bg-bg-primary flex size-15 shrink-0 items-center justify-center rounded-2xl border"
       aria-hidden="true"
     >
-      <McpLogo class="size-6.5" />
+      <McpIcon class="size-6.5" />
     </div>
     <Badge size="sm" class="max-w-24">
       <Ellipsis text={mcpServer} position="middle" />

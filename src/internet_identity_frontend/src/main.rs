@@ -305,6 +305,36 @@ fn get_asset_headers(
 /// frame-src 'self' <related_origins...>:
 ///   Allow framing only from same origin and configured related origins
 ///
+/// Validates that `origin` is a bare http(s) origin (`scheme://host[:port]`)
+/// safe to splice into a CSP `form-action` source list, returning it unchanged
+/// when valid or `None` otherwise. Rejects anything carrying a path, query,
+/// fragment, userinfo, or characters that could break the header or inject
+/// another directive (whitespace, `;`, `,`). This is defence-in-depth around an
+/// operator-set deploy arg, not user input.
+fn sanitize_mcp_origin(origin: &str) -> Option<String> {
+    // Reject characters that would terminate the source / directive or smuggle
+    // a second source. `is_control` also covers CR/LF header-injection bytes.
+    if origin
+        .chars()
+        .any(|c| c.is_whitespace() || c.is_control() || c == ';' || c == ',')
+    {
+        return None;
+    }
+    let rest = origin
+        .strip_prefix("https://")
+        .or_else(|| origin.strip_prefix("http://"))?;
+    // Only `host[:port]` may remain — no path/query/fragment, and no userinfo.
+    if rest.is_empty()
+        || rest.contains('/')
+        || rest.contains('?')
+        || rest.contains('#')
+        || rest.contains('@')
+    {
+        return None;
+    }
+    Some(origin.to_string())
+}
+
 /// upgrade-insecure-requests (production only):
 ///   Automatically upgrade HTTP requests to HTTPS (omitted in dev for localhost)
 fn get_content_security_policy(
@@ -348,7 +378,11 @@ fn get_content_security_policy(
     // server via a top-level form POST, so that origin must be an allowed
     // `form-action` source. It's a single operator-configured origin (a deploy
     // arg), never a wildcard — `form-action` is never broadened to `https:`.
-    let form_action = match mcp_server_origin {
+    // The value is sanitized to a bare origin first: a stray space, `;`, or a
+    // path/query/fragment would otherwise break the header or inject another
+    // directive. An invalid value is dropped (treated as unset), so a
+    // misconfigured arg fails closed rather than weakening the policy.
+    let form_action = match mcp_server_origin.and_then(sanitize_mcp_origin) {
         Some(origin) => format!("'self' http://127.0.0.1:* {origin}"),
         None => "'self' http://127.0.0.1:*".to_string(),
     };
@@ -575,12 +609,7 @@ mod tests {
         );
 
         // With an MCP origin, exactly that origin is appended to form-action.
-        let with = get_content_security_policy(
-            Vec::new(),
-            None,
-            false,
-            Some("https://mcp.id.ai"),
-        );
+        let with = get_content_security_policy(Vec::new(), None, false, Some("https://mcp.id.ai"));
         assert!(
             with.contains("form-action 'self' http://127.0.0.1:* https://mcp.id.ai;"),
             "form-action should append the configured MCP origin, got: {with}"
@@ -591,5 +620,22 @@ mod tests {
             !with.contains("form-action 'self' http://127.0.0.1:* https:;"),
             "form-action must not be broadened to https:, got: {with}"
         );
+
+        // A malformed origin is dropped (treated as unset) rather than spliced
+        // into the header, so it can't break the policy or inject a directive.
+        for bad in [
+            "https://mcp.id.ai/callback",                    // path
+            "https://mcp.id.ai; script-src 'unsafe-inline'", // directive injection
+            "https://mcp.id.ai evil.test",                   // extra source via whitespace
+            "https://user@mcp.id.ai",                        // userinfo
+            "ftp://mcp.id.ai",                               // disallowed scheme
+            "mcp.id.ai",                                     // missing scheme
+        ] {
+            let csp = get_content_security_policy(Vec::new(), None, false, Some(bad));
+            assert!(
+                csp.contains("form-action 'self' http://127.0.0.1:*;"),
+                "malformed MCP origin {bad:?} should be dropped, got: {csp}"
+            );
+        }
     }
 }

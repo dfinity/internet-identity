@@ -33,29 +33,39 @@
   const params = $derived(data.params);
   const status = $derived(data.status);
 
-  // The MCP server is configured as a deploy arg; when unset the flow is
-  // disabled. The delegation is delivered to this origin only.
-  const mcpServerOrigin = getMcpServerOrigin();
-  const mcpServerHost =
-    mcpServerOrigin !== undefined ? new URL(mcpServerOrigin).host : undefined;
+  // The MCP server is configured as a deploy arg; when unset (or misconfigured)
+  // the flow is disabled. The delegation is delivered to this origin only.
+  // Parse it once, defensively: a malformed value is treated as unset so the
+  // route shows the invalid screen rather than throwing during render.
+  const mcpServer = ((): { origin: string; host: string } | undefined => {
+    const raw = getMcpServerOrigin();
+    if (raw === undefined) {
+      return undefined;
+    }
+    try {
+      const url = new URL(raw);
+      return { origin: url.origin, host: url.host };
+    } catch {
+      return undefined;
+    }
+  })();
+  const mcpServerHost = mcpServer?.host;
 
   // The request's callback must point at the configured MCP server origin. This
   // mirrors the `form-action` CSP, which only allows that origin — checking it
   // here lets us show a clean invalid screen instead of a silent CSP block.
-  const originMatches = (
-    callback: string,
-    configuredOrigin: string,
-  ): boolean => {
+  const callbackMatchesMcpServer = (callback: string): boolean => {
+    if (mcpServer === undefined) {
+      return false;
+    }
     try {
-      return new URL(callback).origin === new URL(configuredOrigin).origin;
+      return new URL(callback).origin === mcpServer.origin;
     } catch {
       return false;
     }
   };
   const requestValid = $derived(
-    params.kind === "valid" &&
-      mcpServerOrigin !== undefined &&
-      originMatches(params.callback, mcpServerOrigin),
+    params.kind === "valid" && callbackMatchesMcpServer(params.callback),
   );
 
   const authFlow = new AuthLastUsedFlow();
@@ -162,7 +172,7 @@
   });
 
   const handleAuthorize = async (): Promise<void> => {
-    if (params.kind !== "valid" || mcpServerOrigin === undefined) {
+    if (params.kind !== "valid" || mcpServer === undefined) {
       return;
     }
     const selected = $lastUsedIdentitiesStore.selected;

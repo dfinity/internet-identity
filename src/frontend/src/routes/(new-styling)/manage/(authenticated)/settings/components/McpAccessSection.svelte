@@ -1,7 +1,7 @@
 <script lang="ts">
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
-  import McpLogo from "$lib/components/ui/McpLogo.svelte";
+  import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import {
@@ -46,7 +46,7 @@
     class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
     aria-hidden="true"
   >
-    <McpLogo class="size-5" />
+    <McpIcon class="size-5" />
   </span>
 
   <div class="flex flex-1 flex-col gap-1">
