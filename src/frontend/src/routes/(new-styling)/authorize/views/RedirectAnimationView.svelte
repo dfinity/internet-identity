@@ -9,20 +9,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { waitFor } from "$lib/utils/utils";
-  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
-  import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
-
-  let triggerAnimation =
-    $state<(opts: FlairAnimationOptions) => Promise<void>>();
-  let clearAnimation = $state<() => void>();
-
-  $effect(() => {
-    void triggerAnimation?.(DROP_WAVE_ANIMATION);
-    return () => {
-      clearAnimation?.();
-    };
-  });
+  import BreatheSparkleCanvas from "$lib/components/backgrounds/BreatheSparkleCanvas.svelte";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -132,31 +119,7 @@
 </div>
 
 <div class="max-md:hidden">
-  <FlairCanvas
-    spacing="medium"
-    aspect="ultrawide"
-    dotSize="small"
-    vignette="none"
-    visibility="maskwave"
-    maskWaveRampIn={0.001}
-    maskWaveRampOut={0.5}
-    maskWaveThickness="large"
-    maskWaveMinValue={0}
-    maskWaveSpeedMultiplier={2}
-    maskWavePauseValue={0.25}
-    maskWaveOneWay={true}
-    enableRandomPointSize
-    enableRandomOpacity={false}
-    pointSizeNoiseScale="medium"
-    pointSizeNoiseMultiplier="medium"
-    springOrTween={{
-      type: "spring",
-      stiffness: "medium",
-      dampening: "medium",
-    }}
-    bind:triggerAnimation
-    bind:clearAnimation
-  />
+  <BreatheSparkleCanvas />
 </div>
 
 <style>
