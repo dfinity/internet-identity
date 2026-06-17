@@ -118,9 +118,7 @@
   {/await}
 </div>
 
-<div class="max-md:hidden">
-  <BreatheSparkleCanvas fadeCenterHold="30%" />
-</div>
+<BreatheSparkleCanvas fadeCenterHold="30%" />
 
 <style>
   @keyframes breathe {
