@@ -37,6 +37,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
     let related_origins = args.related_origins.as_ref();
     let dev_csp = args.dev_csp.unwrap_or(false);
+    let mcp_server_origin = args.mcp_server_origin.as_deref();
 
     // Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -84,6 +85,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            mcp_server_origin,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -121,6 +123,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            mcp_server_origin,
                             vec![headers],
                         ),
                         fallback_for: vec![],
@@ -146,6 +149,7 @@ fn get_asset_headers(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
+    mcp_server_origin: Option<&str>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
     let credentials_allowlist = if let Some(related_origins) = related_origins {
@@ -178,7 +182,12 @@ fn get_asset_headers(
         // Comprehensive policy to prevent XSS attacks and data injection
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes, related_origins, dev_csp),
+            get_content_security_policy(
+                integrity_hashes,
+                related_origins,
+                dev_csp,
+                mcp_server_origin,
+            ),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -260,7 +269,7 @@ fn get_asset_headers(
 /// base-uri 'none':
 ///   Prevents injection of <base> tags that could redirect relative URLs
 ///
-/// form-action 'self' http://127.0.0.1:*:
+/// form-action 'self' http://127.0.0.1:* [mcp_server_origin]:
 ///   The CLI authorize flow (`/cli`) delivers the delegation to the CLI's
 ///   loopback callback via a top-level form POST (a top-level navigation
 ///   avoids Chrome's Local Network Access permission prompt that a `fetch`
@@ -271,6 +280,10 @@ fn get_asset_headers(
 ///   isn't allowlistable here; the `/cli` parser only accepts 127.0.0.1 to
 ///   match. `localhost` is also excluded (it can resolve off-loopback) — so a
 ///   form can never post to a remote origin.
+///   The `/mcp` authorize flow form-POSTs to the configured MCP server, so
+///   when `mcp_server_origin` is set that single operator-trusted origin is
+///   appended here. It's never a wildcard and `form-action` is never broadened
+///   to `https:` — only that exact origin is allowed.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -298,6 +311,7 @@ fn get_content_security_policy(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
+    mcp_server_origin: Option<&str>,
 ) -> String {
     let connect_src = if dev_csp {
         // Allow connecting via http for development purposes
@@ -330,13 +344,22 @@ fn get_content_security_policy(
         "'self'".to_string()
     };
 
+    // The `/mcp` authorize flow delivers the delegation to the configured MCP
+    // server via a top-level form POST, so that origin must be an allowed
+    // `form-action` source. It's a single operator-configured origin (a deploy
+    // arg), never a wildcard — `form-action` is never broadened to `https:`.
+    let form_action = match mcp_server_origin {
+        Some(origin) => format!("'self' http://127.0.0.1:* {origin}"),
+        None => "'self' http://127.0.0.1:*".to_string(),
+    };
+
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
          img-src 'self' data: https://*.googleusercontent.com;\
          script-src {script_src};\
          base-uri 'none';\
-         form-action 'self' http://127.0.0.1:*;\
+         form-action {form_action};\
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
@@ -514,7 +537,7 @@ mod tests {
     #[test]
     fn csp_differs_between_dev_and_prod_for_connect_src_and_upgrade_insecure_requests() {
         // Dev CSP: allow http: in connect-src and omit upgrade-insecure-requests
-        let dev_csp = get_content_security_policy(Vec::new(), None, true);
+        let dev_csp = get_content_security_policy(Vec::new(), None, true, None);
 
         assert!(
             dev_csp.contains("connect-src 'self' https: http:"),
@@ -526,7 +549,7 @@ mod tests {
         );
 
         // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
-        let prod_csp = get_content_security_policy(Vec::new(), None, false);
+        let prod_csp = get_content_security_policy(Vec::new(), None, false, None);
 
         assert!(
             prod_csp.contains("connect-src 'self' https:"),
@@ -539,6 +562,34 @@ mod tests {
         assert!(
             prod_csp.contains("upgrade-insecure-requests;"),
             "prod CSP should include upgrade-insecure-requests, got: {prod_csp}"
+        );
+    }
+
+    #[test]
+    fn csp_form_action_includes_configured_mcp_origin_only() {
+        // Without an MCP origin, form-action stays self + loopback only.
+        let without = get_content_security_policy(Vec::new(), None, false, None);
+        assert!(
+            without.contains("form-action 'self' http://127.0.0.1:*;"),
+            "form-action should be self + loopback when no MCP origin, got: {without}"
+        );
+
+        // With an MCP origin, exactly that origin is appended to form-action.
+        let with = get_content_security_policy(
+            Vec::new(),
+            None,
+            false,
+            Some("https://mcp.id.ai"),
+        );
+        assert!(
+            with.contains("form-action 'self' http://127.0.0.1:* https://mcp.id.ai;"),
+            "form-action should append the configured MCP origin, got: {with}"
+        );
+
+        // form-action is never broadened to a bare https: source.
+        assert!(
+            !with.contains("form-action 'self' http://127.0.0.1:* https:;"),
+            "form-action must not be broadened to https:, got: {with}"
         );
     }
 }
