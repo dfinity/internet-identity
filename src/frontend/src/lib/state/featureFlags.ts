@@ -152,6 +152,14 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
   enableOnIdAiDomains("EMAIL_RECOVERY_SETUP"),
 );
 
+/// Show the MCP access card in settings and allow the /mcp delegation flow.
+/// Defaults on for id.ai and beta.id.ai; off everywhere else.
+export const MCP = createFeatureFlagStore(
+  "MCP",
+  false,
+  enableOnIdAiDomains("MCP"),
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
@@ -161,4 +169,5 @@ export default {
   MIN_GUIDED_UPGRADE,
   EMAIL_RECOVERY,
   EMAIL_RECOVERY_SETUP,
+  MCP,
 } as Record<string, FeatureFlagStore>;

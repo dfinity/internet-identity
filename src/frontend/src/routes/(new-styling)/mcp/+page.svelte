@@ -14,6 +14,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { getMcpServerOrigin } from "$lib/globals";
+  import { MCP } from "$lib/state/featureFlags";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
@@ -65,7 +66,7 @@
     }
   };
   const requestValid = $derived(
-    params.kind === "valid" && callbackMatchesMcpServer(params.callback),
+    $MCP && params.kind === "valid" && callbackMatchesMcpServer(params.callback),
   );
 
   const authFlow = new AuthLastUsedFlow();

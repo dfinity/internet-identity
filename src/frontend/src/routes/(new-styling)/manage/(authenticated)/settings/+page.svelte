@@ -2,6 +2,7 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
+  import { MCP } from "$lib/state/featureFlags";
   import CliAccessSection from "./components/CliAccessSection.svelte";
   import McpAccessSection from "./components/McpAccessSection.svelte";
 </script>
@@ -17,5 +18,7 @@
 
 <div class="mt-10 flex max-w-3xl flex-col gap-5">
   <CliAccessSection identityNumber={$authenticatedStore.identityNumber} />
-  <McpAccessSection identityNumber={$authenticatedStore.identityNumber} />
+  {#if $MCP}
+    <McpAccessSection identityNumber={$authenticatedStore.identityNumber} />
+  {/if}
 </div>
