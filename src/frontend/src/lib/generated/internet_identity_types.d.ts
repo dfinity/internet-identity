@@ -1020,6 +1020,11 @@ export interface InternetIdentityInit {
    */
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
   /**
+   * Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+   * off (DoH-only); `opt true` re-enables it.
+   */
+  'enable_dnssec_email_recovery' : [] | [boolean],
+  /**
    * Configuration for Related Origins Requests.
    * If present, list of origins from where registration is allowed.
    */
@@ -1310,6 +1315,10 @@ export interface PrepareIdAliasRequest {
    */
   'identity_number' : IdentityNumber,
 }
+export interface PrepareSessionDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+}
 /**
  * The prepared id alias contains two (still unsigned) credentials in JWT format,
  * certifying the id alias for the issuer resp. the relying party.
@@ -1394,6 +1403,9 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+export type SessionDelegationError = { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type SessionKey = PublicKey;
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
@@ -1822,6 +1834,11 @@ export interface _SERVICE {
       { 'Err' : GetIdAliasError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  'get_session_delegation' : ActorMethod<
+    [UserNumber, SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : SessionDelegationError }
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -1993,6 +2010,11 @@ export interface _SERVICE {
     [PrepareIdAliasRequest],
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
+  >,
+  'prepare_session_delegation' : ActorMethod<
+    [UserNumber, SessionKey, [] | [bigint]],
+    { 'Ok' : PrepareSessionDelegation } |
+      { 'Err' : SessionDelegationError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
