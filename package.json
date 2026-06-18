@@ -35,7 +35,10 @@
     "format": "prettier --write src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
     "format-check": "prettier --check src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
     "extract": "lingui extract --clean",
-    "compile": "echo \"Does nothing, compilation is handled by the Vite plugin\""
+    "compile": "echo \"Does nothing, compilation is handled by the Vite plugin\"",
+    "mcp-status": "node monitoring/mcp-status/cli.js",
+    "mcp-status:serve": "node monitoring/mcp-status/server.js",
+    "mcp-status:test": "node --test monitoring/mcp-status/checks.test.js"
   },
   "devDependencies": {
     "@dfinity/internet-identity-vite-plugins": "*",

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IMCP Status Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --card: #ffffff;
+        --border: #e4e7ec;
+        --text: #1a1d23;
+        --muted: #667085;
+        --pass: #17b26a;
+        --warn: #f79009;
+        --fail: #f04438;
+        --accent: #5b6cff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d0f14;
+          --card: #161a22;
+          --border: #2a2f3a;
+          --text: #e7eaf0;
+          --muted: #98a2b3;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.45;
+      }
+      header {
+        padding: 1.5rem 1.5rem 0.5rem;
+        max-width: 60rem;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin: 0 0 0.25rem;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      main {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 1rem 1.5rem 4rem;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        margin: 1rem 0;
+      }
+      .controls input {
+        padding: 0.45rem 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        background: var(--card);
+        color: var(--text);
+        font-size: 0.85rem;
+        min-width: 14rem;
+      }
+      button {
+        padding: 0.45rem 0.9rem;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: var(--card);
+        color: var(--text);
+      }
+      label.toggle {
+        font-size: 0.85rem;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .overall {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        background: var(--card);
+        margin-bottom: 1.25rem;
+      }
+      .dot {
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 50%;
+        flex: none;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+      }
+      .pass {
+        --c: var(--pass);
+      }
+      .warn {
+        --c: var(--warn);
+      }
+      .fail {
+        --c: var(--fail);
+      }
+      .badge.pass,
+      .badge.warn,
+      .badge.fail {
+        color: var(--c);
+        background: color-mix(in srgb, var(--c) 14%, transparent);
+      }
+      .dot.pass,
+      .dot.warn,
+      .dot.fail {
+        background: var(--c);
+      }
+      section.card {
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        background: var(--card);
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.9rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .card-head h2 {
+        font-size: 1rem;
+        margin: 0;
+      }
+      .check {
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .check:last-child {
+        border-bottom: none;
+      }
+      .check-top {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+      }
+      .check-label {
+        font-weight: 600;
+        font-size: 0.92rem;
+      }
+      .latency {
+        color: var(--muted);
+        font-size: 0.75rem;
+        margin-left: auto;
+      }
+      .target {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin: 0.2rem 0 0.1rem;
+        word-break: break-all;
+      }
+      .detail {
+        font-size: 0.85rem;
+        margin-top: 0.1rem;
+      }
+      .expected {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.15rem;
+      }
+      ul.suggestions {
+        margin: 0;
+        padding: 0.5rem 1.25rem 1rem 2.4rem;
+      }
+      ul.suggestions li {
+        margin: 0.4rem 0;
+        font-size: 0.88rem;
+      }
+      .error {
+        color: var(--fail);
+        padding: 1rem;
+      }
+      .facts {
+        font-size: 0.78rem;
+        color: var(--muted);
+        padding: 0 1.25rem 1rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>IMCP Status Dashboard</h1>
+      <div class="sub">
+        Health of the IC&nbsp;MCP server and its linked Internet Identity
+        instance.
+      </div>
+    </header>
+    <main>
+      <div class="controls">
+        <input id="mcp" placeholder="MCP origin (default mcp.beta.id.ai)" />
+        <input id="ii" placeholder="II origin (default: derived)" />
+        <button id="refresh">Refresh</button>
+        <label class="toggle">
+          <input type="checkbox" id="auto" checked /> auto-refresh (30s)
+        </label>
+        <span class="sub" id="updated"></span>
+      </div>
+      <div id="content"><p class="sub">Loading…</p></div>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (c) =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+
+      const badge = (status) =>
+        `<span class="badge ${status}">${status}</span>`;
+
+      function renderCheck(c) {
+        const latency =
+          c.latencyMs != null ? `<span class="latency">${c.latencyMs} ms</span>` : "";
+        return `<div class="check">
+          <div class="check-top">
+            <span class="dot ${c.status}"></span>
+            <span class="check-label">${esc(c.label)}</span>
+            ${badge(c.status)}
+            ${latency}
+          </div>
+          <div class="target">${esc(c.target)}</div>
+          <div class="detail">${esc(c.detail)}</div>
+          <div class="expected">expected: ${esc(c.expected)}</div>
+        </div>`;
+      }
+
+      function renderSection(s) {
+        return `<section class="card">
+          <div class="card-head">
+            <h2>${esc(s.title)}</h2>
+            ${badge(s.status)}
+          </div>
+          ${s.checks.map(renderCheck).join("")}
+        </section>`;
+      }
+
+      function render(report) {
+        const t = report.targets;
+        const parts = [];
+        parts.push(`<div class="overall">
+          <span class="dot ${report.overall}"></span>
+          <div>
+            <div><strong>Overall: </strong>${badge(report.overall)}</div>
+            <div class="sub">MCP: <code>${esc(t.mcpOrigin)}</code> &nbsp;·&nbsp; II: <code>${esc(t.iiOrigin || "(unresolved)")}</code></div>
+          </div>
+        </div>`);
+        for (const s of report.sections) parts.push(renderSection(s));
+
+        const canister = report.facts?.ii?.canisterId;
+        if (canister) {
+          parts.push(
+            `<div class="facts">II frontend canister: ${esc(canister)}</div>`,
+          );
+        }
+
+        if (report.suggestions?.length) {
+          parts.push(`<section class="card">
+            <div class="card-head"><h2>Suggestions</h2></div>
+            <ul class="suggestions">${report.suggestions
+              .map((s) => `<li>${esc(s)}</li>`)
+              .join("")}</ul>
+          </section>`);
+        }
+        $("content").innerHTML = parts.join("");
+        $("updated").textContent =
+          "updated " + new Date(report.generatedAt).toLocaleTimeString();
+      }
+
+      let inFlight = false;
+      async function load() {
+        if (inFlight) return;
+        inFlight = true;
+        $("refresh").disabled = true;
+        try {
+          const params = new URLSearchParams();
+          if ($("mcp").value.trim()) params.set("mcp", $("mcp").value.trim());
+          if ($("ii").value.trim()) params.set("ii", $("ii").value.trim());
+          const res = await fetch("/api/status?" + params.toString());
+          render(await res.json());
+        } catch (e) {
+          $("content").innerHTML =
+            `<p class="error">Failed to load status: ${esc(e.message)}</p>`;
+        } finally {
+          inFlight = false;
+          $("refresh").disabled = false;
+        }
+      }
+
+      let timer = null;
+      function syncTimer() {
+        if (timer) clearInterval(timer);
+        if ($("auto").checked) timer = setInterval(load, 30_000);
+      }
+
+      $("refresh").addEventListener("click", load);
+      $("auto").addEventListener("change", syncTimer);
+      syncTimer();
+      load();
+    </script>
+  </body>
+</html>
