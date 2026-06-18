@@ -3,11 +3,7 @@ import {
   authenticateWithPasskey,
 } from "$lib/utils/authentication";
 import { canisterId } from "$lib/globals";
-import {
-  authenticationStore,
-  authenticatedStore,
-} from "$lib/stores/authentication.store";
-import { mintSession } from "$lib/stores/session-delegation.store";
+import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   lastUsedIdentitiesStore,
   type LastUsedIdentity,
@@ -62,10 +58,6 @@ export class AuthLastUsedFlow {
           identityNumber,
           authMethod: { passkey: { credentialId } },
         });
-        void mintSession({
-          identityNumber,
-          actor: get(authenticatedStore).actor,
-        });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.ContinueAsPasskey,
@@ -108,10 +100,6 @@ export class AuthLastUsedFlow {
           identity,
           identityNumber,
           authMethod: { openid: { iss, sub } },
-        });
-        void mintSession({
-          identityNumber,
-          actor: get(authenticatedStore).actor,
         });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({
@@ -160,10 +148,6 @@ export class AuthLastUsedFlow {
           identity,
           identityNumber,
           authMethod: { openid: { iss, sub } },
-        });
-        void mintSession({
-          identityNumber,
-          actor: get(authenticatedStore).actor,
         });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({ provider: "SSO" });

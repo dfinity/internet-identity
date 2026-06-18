@@ -2,7 +2,6 @@ import type { LayoutLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
 import { get } from "svelte/store";
 import { authenticationStore } from "$lib/stores/authentication.store";
-import { mintSession } from "$lib/stores/session-delegation.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import { receiveAuthFromOpener } from "$lib/utils/auth-handoff";
 
@@ -14,12 +13,6 @@ export const load: LayoutLoad = async ({ url }) => {
     if (handoff !== null) {
       await authenticationStore.set(handoff);
       authentication = get(authenticationStore);
-      if (authentication !== undefined) {
-        void mintSession({
-          identityNumber: authentication.identityNumber,
-          actor: authentication.actor,
-        });
-      }
     }
   }
 

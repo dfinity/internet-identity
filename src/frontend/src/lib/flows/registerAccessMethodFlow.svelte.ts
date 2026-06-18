@@ -4,11 +4,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { authenticateWithSession } from "$lib/utils/authentication";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
-import {
-  authenticationStore,
-  authenticatedStore,
-} from "$lib/stores/authentication.store";
-import { mintSession } from "$lib/stores/session-delegation.store";
+import { authenticationStore } from "$lib/stores/authentication.store";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
@@ -133,10 +129,6 @@ export class RegisterAccessMethodFlow {
       identity,
       identityNumber: this.#identityNumber,
       authMethod,
-    });
-    void mintSession({
-      identityNumber: this.#identityNumber,
-      actor: get(authenticatedStore).actor,
     });
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: this.#identityNumber,
