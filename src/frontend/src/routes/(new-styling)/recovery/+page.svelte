@@ -38,6 +38,10 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
+  import {
+    mintSession,
+    purgeSession,
+  } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -137,6 +141,13 @@
           },
         },
       });
+      const authForMint = $authenticationStore;
+      if (authForMint !== undefined) {
+        void mintSession({
+          identityNumber: authForMint.identityNumber,
+          actor: authForMint.actor,
+        });
+      }
       await preloadData("/manage/access");
       await goto("/manage/access");
       toaster.success({
@@ -147,6 +158,7 @@
     } catch (error) {
       showEmailRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(success.identityNumber);
       handleError(error);
     }
   };
@@ -169,6 +181,13 @@
           recoveryPhrase: { principal: identity.getPrincipal() },
         },
       });
+      const authForMint = $authenticationStore;
+      if (authForMint !== undefined) {
+        void mintSession({
+          identityNumber: authForMint.identityNumber,
+          actor: authForMint.actor,
+        });
+      }
       // Set name if identity didn't have a name yet (upgrading from II 1.0)
       if (newName !== undefined) {
         await $authenticationStore?.actor
@@ -188,6 +207,7 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(identityNumber);
       handleError(error);
     }
   };

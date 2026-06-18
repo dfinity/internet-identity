@@ -15,6 +15,7 @@ import { convertToValidCredentialData } from "$lib/utils/credential-devices";
 import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import { mintSession } from "$lib/stores/session-delegation.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
 import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
@@ -237,6 +238,10 @@ export class MigrationFlow {
         // This placeholder will be replaced with the newly created passkey
         // anyway once the user has completed the whole migration process.
         authMethod: { passkey: { credentialId: new Uint8Array() } },
+      });
+      void mintSession({
+        identityNumber,
+        actor: get(authenticatedStore).actor,
       });
       upgradeIdentityFunnel.trigger(
         UpgradeIdentityEvents.AuthenticationSuccessful,

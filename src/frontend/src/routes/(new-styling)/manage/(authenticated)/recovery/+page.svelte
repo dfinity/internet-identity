@@ -9,6 +9,7 @@
     authenticationStore,
     authenticatedStore,
   } from "$lib/stores/authentication.store";
+  import { mintSession } from "$lib/stores/session-delegation.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { CreateRecoveryPhraseWizard } from "$lib/components/wizards/createRecoveryPhrase";
   import {
@@ -153,6 +154,10 @@
             principal: seedIdentity.getPrincipal(),
           },
         },
+      });
+      void mintSession({
+        identityNumber: $authenticatedStore.identityNumber,
+        actor: $authenticatedStore.actor,
       });
     }
 
