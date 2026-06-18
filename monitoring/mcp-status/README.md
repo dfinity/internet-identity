@@ -51,6 +51,15 @@ CLI options: `--mcp <origin>`, `--ii <origin>`, `--timeout <ms>`, `--json`,
 code is `0` when healthy and `1` on failures, so it slots straight into cron, a
 CI job, or an uptime check.
 
+### Allowed targets (SSRF guard)
+
+Because `server.js` accepts `?mcp=`/`?ii=` overrides over HTTP, probe targets
+are validated against a host allowlist: only `https` origins on `id.ai` (and its
+sub-domains), plus loopback hosts for local development, may be probed. This
+stops the dashboard from being used to reach arbitrary or internal hosts. To
+monitor a deployment on another domain, extend the allowlist via the
+`MCP_STATUS_ALLOWED_HOSTS` environment variable (comma-separated host suffixes).
+
 ## Why a standalone tool (and not a page in the II frontend)?
 
 The II frontend is a **static, prerendered, `ssr: false` SvelteKit app** served

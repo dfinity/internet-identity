@@ -80,11 +80,20 @@ const main = async () => {
     return;
   }
 
-  const report = await runDashboard({
-    mcpOrigin: typeof opts.mcp === "string" ? opts.mcp : undefined,
-    iiOrigin: typeof opts.ii === "string" ? opts.ii : undefined,
-    timeoutMs: opts.timeout ? Number(opts.timeout) : undefined,
-  });
+  let report;
+  try {
+    report = await runDashboard({
+      mcpOrigin: typeof opts.mcp === "string" ? opts.mcp : undefined,
+      iiOrigin: typeof opts.ii === "string" ? opts.ii : undefined,
+      timeoutMs: opts.timeout ? Number(opts.timeout) : undefined,
+    });
+  } catch (e) {
+    if (e && e.code === "DISALLOWED_ORIGIN") {
+      process.stderr.write(`${e.message}\n`);
+      process.exit(2);
+    }
+    throw e;
+  }
 
   if (opts.json) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

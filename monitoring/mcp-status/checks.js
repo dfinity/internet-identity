@@ -9,7 +9,7 @@
 // point that returns a fully structured, JSON-serialisable report.
 
 import tls from "node:tls";
-import { deriveIiOrigin, resolveConfig } from "./config.js";
+import { deriveIiOrigin, isAllowedOrigin, resolveConfig } from "./config.js";
 
 /**
  * @typedef {"pass" | "warn" | "fail"} Status
@@ -496,6 +496,13 @@ export const discoverIiViaAuthorize = async (mcpOrigin, timeoutMs) => {
     try {
       const target = new URL(location, mcpOrigin);
       if (target.origin !== mcpOrigin) {
+        // Only adopt a discovered origin if it is on the allowlist; otherwise a
+        // monitored server could redirect us into probing an arbitrary host.
+        if (!isAllowedOrigin(target.origin)) {
+          return {
+            detail: `/oauth/authorize redirects to ${target.origin} (not on the allowlist; ignored)`,
+          };
+        }
         return {
           iiOrigin: target.origin,
           detail: `/oauth/authorize redirects to ${target.origin}`,

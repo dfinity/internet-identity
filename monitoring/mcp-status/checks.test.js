@@ -14,7 +14,12 @@ import {
   checkIiHealth,
   buildSuggestions,
 } from "./checks.js";
-import { deriveIiOrigin, normaliseOrigin, resolveConfig } from "./config.js";
+import {
+  deriveIiOrigin,
+  isAllowedOrigin,
+  normaliseOrigin,
+  resolveConfig,
+} from "./config.js";
 
 const byId = (section, id) => section.checks.find((c) => c.id === id);
 
@@ -76,6 +81,26 @@ test("resolveConfig derives the II origin from the MCP origin", () => {
   assert.equal(cfg.mcpOrigin, "https://mcp.beta.id.ai");
   assert.equal(cfg.iiOrigin, "https://beta.id.ai");
   assert.equal(cfg.iiOriginSource, "derived");
+});
+
+test("isAllowedOrigin enforces the host allowlist (SSRF guard)", () => {
+  assert.equal(isAllowedOrigin("https://mcp.beta.id.ai"), true);
+  assert.equal(isAllowedOrigin("https://id.ai"), true);
+  assert.equal(isAllowedOrigin("http://localhost:8080"), true);
+  // Rejected: internal hosts, non-https, look-alike domains, userinfo tricks.
+  assert.equal(isAllowedOrigin("http://169.254.169.254"), false);
+  assert.equal(isAllowedOrigin("https://evil.com"), false);
+  assert.equal(isAllowedOrigin("https://evilid.ai"), false);
+  assert.equal(isAllowedOrigin("https://id.ai.evil.com"), false);
+  assert.equal(isAllowedOrigin("http://mcp.beta.id.ai"), false);
+  assert.equal(isAllowedOrigin("https://mcp.beta.id.ai@evil.com"), false);
+});
+
+test("resolveConfig rejects a disallowed origin", () => {
+  assert.throws(
+    () => resolveConfig({ mcpOrigin: "http://169.254.169.254" }),
+    (e) => e.code === "DISALLOWED_ORIGIN",
+  );
 });
 
 test("checkMcpEndpoints passes for a well-behaved server", async () => {

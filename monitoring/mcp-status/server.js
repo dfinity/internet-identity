@@ -71,7 +71,15 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, { error: "not found" });
   } catch (e) {
-    sendJson(res, 500, { error: String(e?.message ?? e) });
+    // Disallowed origins are a client error with a fixed, safe message; any
+    // other failure is logged server-side and reported generically so that no
+    // stack-trace or internal detail leaks to the client.
+    if (e && e.code === "DISALLOWED_ORIGIN") {
+      sendJson(res, 400, { error: "invalid or disallowed origin" });
+    } else {
+      console.error("mcp-status: request failed:", e);
+      sendJson(res, 500, { error: "internal error" });
+    }
   }
 });
 
