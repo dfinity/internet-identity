@@ -1,3 +1,9 @@
+<!--
+  Calm dot-grid background used as the /authorize redirect "curtain": every
+  dot pulses on a shared sin(t) heartbeat with a Perlin-scattered phase so the
+  field breathes without a directional band, and a second Perlin field drops
+  occasional id.ai-style hollow-ring sparkles over the top.
+-->
 <script lang="ts">
   import { PerlinNoise3D } from "$lib/utils/UI/backgrounds/perlinNoise3d";
   import { onMount } from "svelte";
@@ -43,7 +49,6 @@
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
     const sparkleNoise = new PerlinNoise3D();
     sparkleNoise.noiseSeed(2);
     const breatheNoise = new PerlinNoise3D();
@@ -56,6 +61,9 @@
     const build = () => {
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
+      // Re-read DPR so zoom changes / monitor moves don't leave the canvas
+      // stuck at a stale backing resolution
+      const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
       canvas.width = Math.max(1, Math.floor(w * dpr));
       canvas.height = Math.max(1, Math.floor(h * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -76,15 +84,26 @@
     let raf = 0;
     let start = 0;
 
+    // Pause rAF when the canvas has zero size (hidden ancestor or pre-layout)
+    // so we don't burn a 60fps loop drawing nothing. ResizeObserver fires when
+    // the canvas gets dimensions again, and tick() restarts.
+    const startLoop = () => {
+      if (raf !== 0) return;
+      raf = requestAnimationFrame(tick);
+    };
+    const stopLoop = () => {
+      if (raf === 0) return;
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+
     const tick = (now: number) => {
+      raf = 0;
       if (start === 0) start = now;
       const t = (now - start) / 1000;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      if (w === 0 || h === 0) {
-        raf = requestAnimationFrame(tick);
-        return;
-      }
+      if (w === 0 || h === 0) return;
       if (w !== lastW || h !== lastH) build();
       ctx.clearRect(0, 0, w, h);
 
@@ -128,18 +147,25 @@
         }
       }
 
-      raf = requestAnimationFrame(tick);
+      startLoop();
     };
 
     build();
-    raf = requestAnimationFrame(tick);
+    startLoop();
 
-    const onResize = () => build();
-    window.addEventListener("resize", onResize);
+    const resizeObserver = new ResizeObserver(() => {
+      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+        build();
+        startLoop();
+      } else {
+        stopLoop();
+      }
+    });
+    resizeObserver.observe(canvas);
 
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
+      stopLoop();
+      resizeObserver.disconnect();
     };
   });
 </script>
