@@ -206,7 +206,7 @@
       await mcpAuthorize({
         authenticated,
         publicKey: params.publicKey,
-        app: params.app,
+        mcpServerOrigin: mcpServer.origin,
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
         state: params.state,

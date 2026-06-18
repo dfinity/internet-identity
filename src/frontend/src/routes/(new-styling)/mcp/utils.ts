@@ -12,8 +12,10 @@ interface McpAuthorizeInput {
   authenticated: Authenticated;
   /** base64url-encoded DER session pubkey supplied by the MCP server. */
   publicKey: string;
-  /** Hostname of the app whose account the delegation acts as. */
-  app: string;
+  /** The configured MCP server origin (e.g. "https://mcp.id.ai"). The standing
+   *  delegation acts as the user's account at this origin — it's II config, not
+   *  a request parameter, since the connection is to the MCP server itself. */
+  mcpServerOrigin: string;
   /** Lifetime in minutes. */
   ttlMinutes: number;
   /** Callback URL (on the configured MCP server origin) the delegation chain is
@@ -31,11 +33,11 @@ interface McpAuthorizeInput {
  * redirects the browser back to `/mcp` with a `status` so this page keeps
  * owning the UI.
  *
- * The chain is derived for the app's account: `get_default_account` resolves
- * the user's default account for the app origin, and that account number (which
- * may be the unreserved default or a specific one the user set) is what the
+ * The chain is derived for the user's account at the configured MCP server
+ * origin: `get_default_account` resolves that default account, and its account
+ * number (the unreserved default or a specific one the user set) is what the
  * delegation is bound to — so the MCP server acts as the same account a normal
- * `/authorize` sign-in to the app would use, not the legacy anchor-seed
+ * `/authorize` sign-in to that origin would use, not the legacy anchor-seed
  * principal a blind `null` produces.
  *
  * The canister only ever signs a delegation to a freshly-generated,
@@ -46,7 +48,7 @@ interface McpAuthorizeInput {
 export const mcpAuthorize = async ({
   authenticated,
   publicKey,
-  app,
+  mcpServerOrigin,
   ttlMinutes,
   callback,
   state,
@@ -64,9 +66,10 @@ export const mcpAuthorize = async ({
     throw new Error(accessResult.Err);
   }
 
-  // Remap an app domain on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
-  // the principal matches the one /authorize derives for the same app.
-  const effectiveOrigin = remapToLegacyDomain(`https://${app}`);
+  // The delegation acts as the user's account at the configured MCP server
+  // origin. Remap a gateway origin (*.icp0.io / *.icp.net) to *.ic0.app so the
+  // principal matches the one /authorize derives for that origin.
+  const effectiveOrigin = remapToLegacyDomain(mcpServerOrigin);
   const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
 
   const { account_number } = await actor
