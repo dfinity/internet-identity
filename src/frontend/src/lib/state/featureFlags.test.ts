@@ -20,6 +20,7 @@ const {
   MIN_GUIDED_UPGRADE,
   EMAIL_RECOVERY,
   EMAIL_RECOVERY_SETUP,
+  MCP,
 } = await import("$lib/state/featureFlags");
 
 // `window.location` is read-only, so swap it for a writable stand-in we can
@@ -47,6 +48,7 @@ beforeEach(() => {
   DISCOVERABLE_PASSKEY_FLOW.getFeatureFlag()?.reset();
   EMAIL_RECOVERY.getFeatureFlag()?.reset();
   EMAIL_RECOVERY_SETUP.getFeatureFlag()?.reset();
+  MCP.getFeatureFlag()?.reset();
 });
 
 afterEach(() => {
@@ -137,6 +139,45 @@ test("configured true turns email-recovery flags on off-domain", () => {
 
   expect(get(EMAIL_RECOVERY)).toEqual(true);
   expect(get(EMAIL_RECOVERY_SETUP)).toEqual(true);
+});
+
+test("MCP flag defaults on for id.ai and beta.id.ai", () => {
+  for (const hostname of ["id.ai", "beta.id.ai"]) {
+    setHostname(hostname);
+    MCP.getFeatureFlag()?.reset();
+
+    MCP.initialize();
+
+    expect(get(MCP), hostname).toEqual(true);
+  }
+});
+
+test("MCP flag stays off on other domains when unconfigured", () => {
+  setHostname("example.com");
+
+  MCP.initialize();
+
+  expect(get(MCP)).toEqual(false);
+});
+
+test("configured false keeps MCP flag off even on id.ai", () => {
+  setHostname("id.ai");
+  mockGetConfiguredFeatureFlag.mockReturnValue(false);
+
+  MCP.initialize();
+
+  expect(get(MCP)).toEqual(false);
+});
+
+test("configured true turns MCP flag on off-domain", () => {
+  setHostname("example.com");
+  mockGetConfiguredFeatureFlag.mockImplementation((name) =>
+    name === "MCP" ? true : undefined,
+  );
+
+  MCP.initialize();
+
+  expect(get(MCP)).toEqual(true);
 });
 
 test("the two email-recovery flags resolve independently from config", () => {
