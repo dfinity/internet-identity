@@ -39,8 +39,9 @@ node monitoring/mcp-status/cli.js --mcp https://mcp.id.ai
 node monitoring/mcp-status/cli.js --json
 
 # Live web dashboard at http://localhost:8080 (auto-refreshing)
+# (target is fixed at startup; pass --mcp/--ii to monitor another deployment)
 npm run mcp-status:serve
-node monitoring/mcp-status/server.js --port 8080
+node monitoring/mcp-status/server.js --port 8080 --mcp https://mcp.id.ai
 
 # Unit tests
 npm run mcp-status:test
@@ -53,11 +54,12 @@ CI job, or an uptime check.
 
 ### Allowed targets (SSRF guard)
 
-Because `server.js` accepts `?mcp=`/`?ii=` overrides over HTTP, probe targets
-are validated against a host allowlist: only `https` origins on `id.ai` (and its
-sub-domains), plus loopback hosts for local development, may be probed. This
-stops the dashboard from being used to reach arbitrary or internal hosts. To
-monitor a deployment on another domain, extend the allowlist via the
+The web server probes only the target fixed at startup — it never takes the
+target from an incoming request, so a visitor cannot steer server-side requests
+at arbitrary hosts. As defence in depth, every resolved origin is also validated
+against a host allowlist: only `https` origins on `id.ai` (and its sub-domains),
+plus loopback hosts for local development, may be probed. To monitor a
+deployment on another domain, extend the allowlist via the
 `MCP_STATUS_ALLOWED_HOSTS` environment variable (comma-separated host suffixes).
 
 ## Why a standalone tool (and not a page in the II frontend)?

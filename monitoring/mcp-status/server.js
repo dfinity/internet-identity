@@ -6,11 +6,13 @@
 // dashboard work at all: the MCP server's `/mcp` 401 challenge, its landing
 // page, and the II instance's CSP header are not CORS-readable from a browser.
 //
+// The probe targets are fixed by the operator when the server is started — via
+// the defaults, `--mcp`/`--ii` flags, or the MCP_ORIGIN/II_ORIGIN env vars —
+// and are deliberately NOT taken from the incoming request. A hosted status
+// page must never let a visitor steer server-side requests at arbitrary hosts.
+//
 // Usage:
 //   node monitoring/mcp-status/server.js [--port 8080] [--mcp <origin>] [--ii <origin>]
-//
-// The page also accepts `?mcp=` / `?ii=` query overrides so a single running
-// server can be pointed at different deployments.
 
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -46,6 +48,19 @@ const sendJson = (res, code, body) => {
   res.end(payload);
 };
 
+// Replace control characters (incl. CR/LF) with spaces and cap the length, so
+// that a logged error message can never forge or inject additional log entries.
+// Implemented with a codepoint filter to avoid embedding control-char literals.
+const sanitizeForLog = (value) => {
+  const input = String((value && value.message) || value).slice(0, 300);
+  let out = "";
+  for (const ch of input) {
+    const code = ch.codePointAt(0);
+    out += code < 0x20 || code === 0x7f ? " " : ch;
+  }
+  return out;
+};
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -61,23 +76,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/status") {
-      const report = await runDashboard({
-        mcpOrigin: url.searchParams.get("mcp") ?? defaults.mcpOrigin,
-        iiOrigin: url.searchParams.get("ii") ?? defaults.iiOrigin,
-      });
+      const report = await runDashboard(defaults);
       sendJson(res, report.overall === "fail" ? 503 : 200, report);
       return;
     }
 
     sendJson(res, 404, { error: "not found" });
   } catch (e) {
-    // Disallowed origins are a client error with a fixed, safe message; any
-    // other failure is logged server-side and reported generically so that no
-    // stack-trace or internal detail leaks to the client.
+    // A misconfigured target is a client/operator error with a fixed, safe
+    // message; any other failure is logged (sanitised) server-side and reported
+    // generically so that no stack-trace or internal detail leaks to clients.
     if (e && e.code === "DISALLOWED_ORIGIN") {
       sendJson(res, 400, { error: "invalid or disallowed origin" });
     } else {
-      console.error("mcp-status: request failed:", e);
+      console.error("mcp-status: request failed:", sanitizeForLog(e));
       sendJson(res, 500, { error: "internal error" });
     }
   }

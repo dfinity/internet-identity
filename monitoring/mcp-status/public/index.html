@@ -229,8 +229,6 @@
     </header>
     <main>
       <div class="controls">
-        <input id="mcp" placeholder="MCP origin (default mcp.beta.id.ai)" />
-        <input id="ii" placeholder="II origin (default: derived)" />
         <button id="refresh">Refresh</button>
         <label class="toggle">
           <input type="checkbox" id="auto" checked /> auto-refresh (30s)
@@ -316,10 +314,9 @@
         inFlight = true;
         $("refresh").disabled = true;
         try {
-          const params = new URLSearchParams();
-          if ($("mcp").value.trim()) params.set("mcp", $("mcp").value.trim());
-          if ($("ii").value.trim()) params.set("ii", $("ii").value.trim());
-          const res = await fetch("/api/status?" + params.toString());
+          // Targets are fixed by the server at startup (the server does not
+          // accept per-request targets), so no query parameters are sent.
+          const res = await fetch("/api/status");
           render(await res.json());
         } catch (e) {
           $("content").innerHTML =

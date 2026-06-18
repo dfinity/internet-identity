@@ -5,9 +5,10 @@
 // origin pair can be passed via CLI flags, environment variables, or query
 // string.
 //
-// Because `server.js` exposes the probes over HTTP with `?mcp=`/`?ii=` query
-// overrides, the resolved origins are validated against a host allowlist before
-// any request is made. This prevents the dashboard from being used as a
+// Probe targets are fixed by the operator (CLI flags, env vars, or defaults) —
+// `server.js` never takes them from an incoming request — and on top of that
+// the resolved origins are validated against a host allowlist before any
+// request is made. Together this prevents the dashboard from being used as a
 // server-side request forgery (SSRF) proxy against arbitrary or internal hosts.
 
 /** Default MCP server origin to monitor. */
