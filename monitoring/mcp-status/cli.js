@@ -21,17 +21,25 @@ import { renderText } from "./report.js";
 const parseArgs = (argv) => {
   /** @type {Record<string, string | boolean>} */
   const opts = {};
+  // Consume and return the value following a value-taking flag, erroring if it
+  // is missing or looks like another flag (so typos can't silently fall back).
+  const takeValue = (flag, next) => {
+    if (next === undefined || next.startsWith("-")) {
+      throw new Error(`Missing value for ${flag}`);
+    }
+    return next;
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     switch (arg) {
       case "--mcp":
-        opts.mcp = argv[++i];
+        opts.mcp = takeValue(arg, argv[++i]);
         break;
       case "--ii":
-        opts.ii = argv[++i];
+        opts.ii = takeValue(arg, argv[++i]);
         break;
       case "--timeout":
-        opts.timeout = argv[++i];
+        opts.timeout = takeValue(arg, argv[++i]);
         break;
       case "--json":
         opts.json = true;

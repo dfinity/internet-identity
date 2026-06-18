@@ -22,11 +22,19 @@ import { runDashboard } from "./checks.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+const DEFAULT_PORT = 8080;
 const parsePort = () => {
   const idx = process.argv.indexOf("--port");
-  if (idx !== -1) return Number(process.argv[idx + 1]);
-  if (process.env.PORT) return Number(process.env.PORT);
-  return 8080;
+  const raw = idx !== -1 ? process.argv[idx + 1] : process.env.PORT;
+  if (raw === undefined || raw === "") return DEFAULT_PORT;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    process.stderr.write(
+      `Invalid port value; falling back to ${DEFAULT_PORT}\n`,
+    );
+    return DEFAULT_PORT;
+  }
+  return port;
 };
 const argValue = (flag) => {
   const idx = process.argv.indexOf(flag);

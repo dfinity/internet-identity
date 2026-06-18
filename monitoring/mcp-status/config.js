@@ -2,8 +2,7 @@
 //
 // The dashboard is environment-agnostic: by default it monitors the beta
 // deployment (mcp.beta.id.ai ↔ beta.id.ai) but any allowed MCP origin / II
-// origin pair can be passed via CLI flags, environment variables, or query
-// string.
+// origin pair can be passed via CLI flags or environment variables.
 //
 // Probe targets are fixed by the operator (CLI flags, env vars, or defaults) —
 // `server.js` never takes them from an incoming request — and on top of that
@@ -38,9 +37,11 @@ const allowedHostSuffixes = () => {
 };
 
 /**
- * Whether an origin is allowed to be probed. Only https origins whose hostname
- * is within the allowlist are accepted (plus loopback hosts over http/https for
- * local development). Userinfo, custom ports and non-http schemes are rejected.
+ * Whether an origin is allowed to be probed. Only https origins on the default
+ * port (443) whose hostname is within the allowlist are accepted. Loopback
+ * hosts are additionally allowed over http/https on any port for local
+ * development. Userinfo, non-default ports (for remote hosts) and non-http
+ * schemes are rejected, to keep the SSRF surface minimal.
  *
  * @param {string} origin
  * @returns {boolean}
@@ -58,6 +59,8 @@ export const isAllowedOrigin = (origin) => {
     return url.protocol === "http:" || url.protocol === "https:";
   }
   if (url.protocol !== "https:") return false;
+  // `url.port` is "" for the default port; anything else is a non-default port.
+  if (url.port !== "") return false;
   return allowedHostSuffixes().some(
     (suffix) => host === suffix || host.endsWith(`.${suffix}`),
   );

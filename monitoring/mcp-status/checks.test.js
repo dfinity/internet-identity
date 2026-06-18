@@ -94,6 +94,10 @@ test("isAllowedOrigin enforces the host allowlist (SSRF guard)", () => {
   assert.equal(isAllowedOrigin("https://id.ai.evil.com"), false);
   assert.equal(isAllowedOrigin("http://mcp.beta.id.ai"), false);
   assert.equal(isAllowedOrigin("https://mcp.beta.id.ai@evil.com"), false);
+  // Non-default ports are rejected for remote hosts, allowed for loopback.
+  assert.equal(isAllowedOrigin("https://mcp.beta.id.ai:8443"), false);
+  assert.equal(isAllowedOrigin("https://mcp.beta.id.ai:443"), true);
+  assert.equal(isAllowedOrigin("http://localhost:8137"), true);
 });
 
 test("resolveConfig rejects a disallowed origin", () => {
