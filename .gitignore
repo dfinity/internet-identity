@@ -20,7 +20,7 @@ dist-showcase/
 lib
 !src/frontend/src/lib
 !src/try-ii/src/try-ii-frontend/src/lib
-/.svelte-kit
+.svelte-kit
 
 # Cargo build output
 target/
