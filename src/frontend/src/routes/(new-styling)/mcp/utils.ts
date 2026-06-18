@@ -59,7 +59,10 @@ export const mcpAuthorize = async ({
   // anchor at the configured mcp_server_origin (see the `mcp_*` canister
   // methods), which is exactly the principal the standing delegation below
   // carries. Idempotent.
-  await actor.mcp_set_access(identityNumber, true).then(throwCanisterError);
+  const accessResult = await actor.mcp_set_access(identityNumber, true);
+  if ("Err" in accessResult) {
+    throw new Error(accessResult.Err);
+  }
 
   // Remap an app domain on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
   // the principal matches the one /authorize derives for the same app.

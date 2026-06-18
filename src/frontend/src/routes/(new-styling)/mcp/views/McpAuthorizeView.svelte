@@ -5,15 +5,13 @@
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
-    /** Hostname of the configured MCP server (the app the standing delegation
-     *  acts as, and the relying party for this whole-session grant). */
-    app: string;
-    /** Hostname of the configured MCP server. */
+    /** Hostname of the configured MCP server (the relying party for this
+     *  whole-session grant). */
     mcpServer: string;
     onAuthorize: () => Promise<void>;
   }
 
-  const { app, mcpServer, onAuthorize }: Props = $props();
+  const { mcpServer, onAuthorize }: Props = $props();
 
   let busy = $state(false);
 
@@ -29,7 +27,7 @@
 
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
-    <McpHero {app} {mcpServer} />
+    <McpHero {mcpServer} />
 
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
       {$t`Connect ${mcpServer}`}

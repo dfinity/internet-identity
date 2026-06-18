@@ -240,23 +240,19 @@
 {:else if phase.kind === "wizard" && params.kind === "valid" && mcpServerHost !== undefined}
   <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
     <AuthPanel>
-      <McpHero app={params.app} mcpServer={mcpServerHost} />
+      <McpHero mcpServer={mcpServerHost} />
       <AuthWizard {...wizardSignInHandlers}>
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
           {$t`Choose method`}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
-          {$t`to allow MCP access to ${params.app}`}
+          {$t`to connect ${mcpServerHost}`}
         </p>
       </AuthWizard>
     </AuthPanel>
   </div>
 {:else if phase.kind === "authorize" && params.kind === "valid" && mcpServerHost !== undefined}
-  <McpAuthorizeView
-    app={params.app}
-    mcpServer={mcpServerHost}
-    onAuthorize={handleAuthorize}
-  />
+  <McpAuthorizeView mcpServer={mcpServerHost} onAuthorize={handleAuthorize} />
 {:else if phase.kind === "mcp-disabled"}
   <McpDisabledView />
 {:else if phase.kind === "close"}
