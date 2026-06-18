@@ -1,14 +1,11 @@
 import { expect, type Page } from "@playwright/test";
-import { Principal } from "@icp-sdk/core/principal";
 import { test } from "../fixtures";
-import { addVirtualAuthenticator, authorize, II_URL } from "../utils";
+import { addVirtualAuthenticator, II_URL } from "../utils";
 
-/** The app the MCP delegation acts as, used across the tests. */
+/** A target app passed in the request. It is ignored by the connect flow (the
+ *  delegation acts as the user's account at the configured MCP-server origin),
+ *  but kept to exercise that the param is tolerated. */
 const APP = "nice-name.com";
-
-/** Decodes a hex string (as delegation chains encode public keys) to bytes. */
-const hexToBytes = (hex: string): Uint8Array =>
-  Uint8Array.from(hex.match(/.{1,2}/g) ?? [], (byte) => parseInt(byte, 16));
 
 const signUp = async (page: Page): Promise<void> => {
   const continueWithPasskey = page.getByRole("button", {
@@ -46,19 +43,6 @@ const expirationMillis = (body: unknown): number => {
     throw new Error("delegation expiration missing");
   }
   return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
-};
-
-/** The hex root public key of a delegation chain (the per-account key). */
-const rootPublicKey = (body: unknown): string => {
-  if (
-    typeof body === "object" &&
-    body !== null &&
-    "publicKey" in body &&
-    typeof body.publicKey === "string"
-  ) {
-    return body.publicKey;
-  }
-  throw new Error("delegation chain missing publicKey");
 };
 
 /**
@@ -214,40 +198,9 @@ test("Requested TTL within bounds is honoured", async ({
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-test("MCP acts as the same principal that /authorize gives for that app", async ({
-  page,
-  mcp,
-  identities,
-  signInWithIdentity,
-  isMobile,
-}) => {
-  const identityNumber = identities[0].identityNumber;
-
-  // Principal the app (nice-name.com) sees via the normal /authorize flow — its
-  // default account.
-  const authorizePrincipal = await authorize(page, async (authPage) => {
-    await signInWithIdentity(authPage, identityNumber);
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-
-  // Enable device MCP access for the same identity.
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identityNumber);
-  await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
-
-  // Principal the MCP server is granted: the self-authenticating principal of
-  // the delegation chain's root public key.
-  await mcp.installInterceptor(page);
-  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await page.getByRole("button", { name: "Allow access" }).click();
-  const chain = await mcp.receivedDelegation;
-  const mcpPrincipal = Principal.selfAuthenticating(
-    hexToBytes(rootPublicKey(chain)),
-  ).toText();
-
-  // Same identity + same default account for the app ⇒ same principal.
-  expect(mcpPrincipal).toBe(authorizePrincipal);
-});
+// NOTE: the old "MCP acts as the same principal /authorize gives for that app"
+// test was removed with the connect-model pivot. The browser /mcp flow now
+// issues the standing credential for the user's account at the configured MCP
+// *server* origin (not a per-request app), and per-app delegations are minted
+// server-side by the `mcp_prepare/get_account_delegation` canister methods —
+// principal-derivation parity belongs in a canister test for those (TODO).
