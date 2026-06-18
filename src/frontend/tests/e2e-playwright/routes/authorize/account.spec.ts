@@ -85,8 +85,12 @@ test("Create another account, make it default and authorize with it", async ({
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
     await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    // The multi-accounts toggle persists per-anchor in localStorage from
+    // the previous step, so the multi-accounts list is shown on return
+    // visits. Click the new default ("Test account") explicitly — same
+    // outcome as the plain "Continue" path under toggle-off.
     await authPage
-      .getByRole("button", { name: "Continue", exact: true })
+      .getByRole("button", { name: "Continue with Test account" })
       .click();
   });
   expect(principal).toEqual(primaryPrincipal);

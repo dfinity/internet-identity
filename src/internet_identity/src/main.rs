@@ -5,6 +5,7 @@ use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
+use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
@@ -62,6 +63,7 @@ mod http;
 mod ii_domain;
 
 mod openid;
+mod session_delegation;
 mod single_flight_cache;
 mod state;
 mod stats;
@@ -333,10 +335,9 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
             anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
         }
 
-        Ok::<_, String>((
-            (),
-            anchor_management::replace_device(anchor_number, anchor, device_key, device_data),
-        ))
+        let operation =
+            anchor_management::replace_device(anchor_number, anchor, device_key, device_data);
+        Ok::<_, String>(((), operation))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -344,10 +345,8 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 #[update]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>((
-            (),
-            anchor_management::remove_device(anchor_number, anchor, device_key),
-        ))
+        let operation = anchor_management::remove_device(anchor_number, anchor, device_key);
+        Ok::<_, String>(((), operation))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -483,7 +482,7 @@ fn get_accounts(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
-    match check_authorization(anchor_number) {
+    match check_session_authorization(anchor_number) {
         Ok(_) => Ok(
             account_management::get_accounts_for_origin(anchor_number, &origin)
                 .iter()
@@ -534,7 +533,7 @@ fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    check_authorization(anchor_number)
+    check_session_authorization(anchor_number)
         .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
 
     let default_account_info =
@@ -563,14 +562,12 @@ fn set_default_account(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    anchor_operation_with_authz_check(anchor_number, |_| {
-        let result = account_management::set_default_account_for_origin(
-            anchor_number,
-            origin,
-            account_number,
-        )?;
-        Ok((result, Operation::SetDefaultAccount))
-    })
+    check_authz_and_record_activity(anchor_number).map_err(SetDefaultAccountError::from)?;
+
+    let result =
+        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
+    anchor_management::post_operation_bookkeeping(anchor_number, Operation::SetDefaultAccount);
+    Ok(result)
 }
 
 #[update]
@@ -615,6 +612,30 @@ fn get_account_delegation(
         ),
         Err(err) => Err(err.into()),
     }
+}
+
+#[update]
+async fn prepare_session_delegation(
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<
+    internet_identity_interface::internet_identity::types::PrepareSessionDelegation,
+    internet_identity_interface::internet_identity::types::SessionDelegationError,
+> {
+    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl).await
+}
+
+#[query]
+fn get_session_delegation(
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<
+    SignedDelegation,
+    internet_identity_interface::internet_identity::types::SessionDelegationError,
+> {
+    session_delegation::get_session_delegation(anchor_number, session_key, expiration)
 }
 
 #[query]
@@ -1731,10 +1752,6 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         address: String,
     ) -> Result<(), EmailRecoveryError> {
-        // Inlined auth + write rather than going through
-        // `anchor_operation_with_authz_check` because that helper's
-        // `E: From<IdentityUpdateError>` bound is awkward to satisfy
-        // for an interface-crate error type (orphan rule).
         let (mut anchor, authz_key) = crate::authz_utils::check_authorization(identity_number)
             .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
         crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);

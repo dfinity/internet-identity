@@ -38,6 +38,7 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -147,6 +148,7 @@
     } catch (error) {
       showEmailRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(success.identityNumber);
       handleError(error);
     }
   };
@@ -188,6 +190,7 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(identityNumber);
       handleError(error);
     }
   };

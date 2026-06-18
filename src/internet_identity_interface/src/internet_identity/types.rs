@@ -583,6 +583,19 @@ pub enum CheckMaxAccountError {
     AccountLimitReached,
 }
 
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareSessionDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionDelegationError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
+    NoSuchDelegation,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountNameValidationError {
     NameTooLong,
