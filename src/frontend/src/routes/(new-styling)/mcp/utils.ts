@@ -52,6 +52,15 @@ export const mcpAuthorize = async ({
   state,
 }: McpAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
+
+  // Connecting the MCP server is the opt-in: enable MCP access for this anchor
+  // so II authorizes the server's later on-demand per-app delegation calls. The
+  // backend recovers the anchor from the caller principal it derives for this
+  // anchor at the configured mcp_server_origin (see the `mcp_*` canister
+  // methods), which is exactly the principal the standing delegation below
+  // carries. Idempotent.
+  await actor.mcp_set_access(identityNumber, true).then(throwCanisterError);
+
   // Remap an app domain on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
   // the principal matches the one /authorize derives for the same app.
   const effectiveOrigin = remapToLegacyDomain(`https://${app}`);

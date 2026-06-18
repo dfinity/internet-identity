@@ -89,6 +89,7 @@ export const idlFactory = ({ IDL }) => {
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'mcp_server_origin' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -613,6 +614,10 @@ export const idlFactory = ({ IDL }) => {
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
   });
+  const PrepareAccountDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -643,10 +648,6 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
     'anchor_number' : UserNumber,
-  });
-  const PrepareAccountDelegation = IDL.Record({
-    'user_key' : UserKey,
-    'expiration' : Timestamp,
   });
   const PrepareAttributeRequest = IDL.Record({
     'origin' : FrontendHostname,
@@ -1094,6 +1095,32 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DeviceKeyWithAnchor)],
         ['query'],
       ),
+    'mcp_access_enabled' : IDL.Func([UserNumber], [IDL.Bool], ['query']),
+    'mcp_get_account_delegation' : IDL.Func(
+        [FrontendHostname, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'mcp_prepare_account_delegation' : IDL.Func(
+        [FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareAccountDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'mcp_set_access' : IDL.Func(
+        [UserNumber, IDL.Bool],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
     'openid_credential_add' : IDL.Func(
         [IdentityNumber, JWT, Salt],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : OpenIdCredentialAddError })],
@@ -1307,6 +1334,7 @@ export const init = ({ IDL }) => {
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'mcp_server_origin' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];

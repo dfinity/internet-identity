@@ -3,10 +3,10 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import McpHero from "../components/McpHero.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 
   interface Props {
-    /** Hostname of the app the delegation acts as. */
+    /** Hostname of the configured MCP server (the app the standing delegation
+     *  acts as, and the relying party for this whole-session grant). */
     app: string;
     /** Hostname of the configured MCP server. */
     mcpServer: string;
@@ -25,14 +25,6 @@
       busy = false;
     }
   };
-
-  // Name the app by its catalogue name when known, otherwise by hostname.
-  const dapp = $derived(getDapps().find((a) => a.hasOrigin(`https://${app}`)));
-  const accountScope = $derived(
-    dapp?.name !== undefined
-      ? $t`your ${dapp.name} account`
-      : $t`your account on ${app}`,
-  );
 </script>
 
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
@@ -40,10 +32,10 @@
     <McpHero {app} {mcpServer} />
 
     <h1 class="text-text-primary mt-2 text-2xl font-medium">
-      {$t`Allow MCP access`}
+      {$t`Connect ${mcpServer}`}
     </h1>
     <p class="text-text-tertiary mt-1 text-base text-pretty">
-      {$t`Let ${mcpServer} act as ${accountScope}`}
+      {$t`Let ${mcpServer} act as you across your apps for this session. Access lasts about an hour, then you'll need to reconnect.`}
     </p>
 
     <button
@@ -53,7 +45,7 @@
     >
       {#if busy}
         <ProgressRing class="size-5" />
-        <span>{$t`Allowing access`}</span>
+        <span>{$t`Connecting`}</span>
       {:else}
         <span>{$t`Allow access`}</span>
       {/if}

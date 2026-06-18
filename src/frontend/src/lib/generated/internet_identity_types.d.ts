@@ -547,6 +547,14 @@ export interface EmailRecoveryChallenge {
   'nonce' : string,
   'expires_at' : Timestamp,
 }
+/**
+ * Email-recovery types
+ * ====================
+ * See `docs/ongoing/email-recovery.md` for the full design. Covers
+ * both halves of the flow: setup (binding a recovery email to an
+ * anchor) and recovery (proving control of a previously-bound
+ * address to obtain a signed delegation).
+ */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -765,6 +773,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1045,6 +1057,11 @@ export interface InternetIdentityInit {
    * Configuration for dummy authentication used in e2e tests.
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
+  /**
+   * Origin of the trusted MCP server (no trailing slash). Enables the backend
+   * /mcp delegation path; `null` leaves it disabled.
+   */
+  'mcp_server_origin' : [] | [string],
   /**
    * Rate limit for the `register` call.
    */
@@ -1934,6 +1951,34 @@ export interface _SERVICE {
   'lookup_device_key' : ActorMethod<
     [Uint8Array | number[]],
     [] | [DeviceKeyWithAnchor]
+  >,
+  /**
+   * Whether the anchor currently has MCP access enabled.
+   */
+  'mcp_access_enabled' : ActorMethod<[UserNumber], boolean>,
+  'mcp_get_account_delegation' : ActorMethod<
+    [FrontendHostname, SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AccountDelegationError }
+  >,
+  /**
+   * Called by the MCP server, authorized by caller() == the anchor's principal
+   * at mcp_server_origin. Mints a <=5-minute delegation for the anchor's
+   * default account at target_origin. The anchor is recovered from the caller.
+   */
+  'mcp_prepare_account_delegation' : ActorMethod<
+    [FrontendHostname, SessionKey, [] | [bigint]],
+    { 'Ok' : PrepareAccountDelegation } |
+      { 'Err' : AccountDelegationError }
+  >,
+  /**
+   * Enable/disable the backend /mcp delegation path for an anchor. Enabling
+   * binds the anchor's principal at the configured mcp_server_origin.
+   */
+  'mcp_set_access' : ActorMethod<
+    [UserNumber, boolean],
+    { 'Ok' : null } |
+      { 'Err' : string }
   >,
   'openid_credential_add' : ActorMethod<
     [IdentityNumber, JWT, Salt],
