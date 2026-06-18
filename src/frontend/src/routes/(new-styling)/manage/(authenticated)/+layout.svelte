@@ -23,6 +23,7 @@
     authenticationStore,
   } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -105,11 +106,18 @@
   };
 
   const handleConfirmSignOut = () => {
+    // Rotate the ephemeral session so the signed-out session's key material
+    // doesn't linger in sessionStorage across the reload; sessionStorage
+    // survives window.location.replace.
+    sessionStore.reset();
     window.location.replace("/");
   };
 
   const handleConfirmSignOutAndRemove = () => {
-    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
+    const identityNumber = $authenticatedStore.identityNumber;
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
+    sessionStore.reset();
     window.location.replace("/");
   };
 
@@ -119,6 +127,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
       const identityName =

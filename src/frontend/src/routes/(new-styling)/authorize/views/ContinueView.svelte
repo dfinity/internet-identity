@@ -18,8 +18,15 @@
     authenticationStore,
     isAuthenticatedStore,
   } from "$lib/stores/authentication.store";
-  import { throwCanisterError } from "$lib/utils/utils";
+  import {
+    actorForIdentity,
+    purgeSession,
+  } from "$lib/stores/session-delegation.store";
+  import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
+  import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
+    _SERVICE,
+    SessionDelegationError,
     AccountInfo,
     AccountNumber,
   } from "$lib/generated/internet_identity_types";
@@ -40,12 +47,36 @@
   type PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
 
+  // Browser-local, per-anchor persistence for the multi-accounts toggle.
+  // Per-anchor (not per-dapp) because the toggle is a mental-mode switch:
+  // a user who self-identifies as a multi-accounts user wants the
+  // affordance everywhere, not separately for each dapp.
+  const TOGGLE_STORAGE_PREFIX = "ii:multi-accounts:";
+  const readToggle = (anchor: bigint): boolean => {
+    if (typeof localStorage === "undefined") return false;
+    return (
+      localStorage.getItem(`${TOGGLE_STORAGE_PREFIX}${anchor.toString()}`) ===
+      "1"
+    );
+  };
+  const writeToggle = (anchor: bigint, enabled: boolean): void => {
+    if (typeof localStorage === "undefined") return;
+    const key = `${TOGGLE_STORAGE_PREFIX}${anchor.toString()}`;
+    if (enabled) {
+      localStorage.setItem(key, "1");
+    } else {
+      localStorage.removeItem(key);
+    }
+  };
+
   let defaultAccountNumber = $state<
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
-  let isMultipleAccountsEnabled = $state(false);
+  let isMultipleAccountsEnabled = $state(
+    readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
+  );
   // Clear old accounts data when user toggles switch off
   $effect(() => {
     if (!isMultipleAccountsEnabled) {
@@ -84,19 +115,53 @@
   const selectedIdentityNumber = $derived(
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
-  // Re-initialize the flow and reset state when the identity changes.
+  // Re-initialize the flow and re-hydrate per-identity state when the
+  // identity changes. Read the persisted value into a local so the
+  // effect's only reactive dependency is `selectedIdentityNumber` -- if
+  // we read `isMultipleAccountsEnabled` directly, the user's own toggle
+  // click would re-trigger this effect and overwrite the new value back
+  // from stale localStorage.
   $effect(() => {
     authLastUsedFlow.init([selectedIdentityNumber]);
-    isMultipleAccountsEnabled = false;
+    const hydrated = readToggle(selectedIdentityNumber);
+    isMultipleAccountsEnabled = hydrated;
     defaultAccountNumber = null;
+    if (hydrated) {
+      void handleEnableMultipleAccounts();
+    }
+  });
+
+  // Persist the toggle whenever it (or the identity) changes.
+  $effect(() => {
+    writeToggle(selectedIdentityNumber, isMultipleAccountsEnabled);
   });
 
   const handleContinueDefault = async () => {
+    isAuthenticatingDefault = true;
     try {
+      if (defaultAccountNumber === null) {
+        const sessionActor = await actorForIdentity(selectedIdentityNumber);
+        if (sessionActor !== undefined) {
+          try {
+            const account = await sessionActor
+              .get_default_account(selectedIdentityNumber, effectiveOrigin)
+              .then(throwCanisterError);
+            defaultAccountNumber = account.account_number[0];
+          } catch (err) {
+            if (
+              isCanisterError<SessionDelegationError>(err) &&
+              err.type === "Unauthorized"
+            ) {
+              void purgeSession(selectedIdentityNumber);
+            } else {
+              throw err;
+            }
+          }
+        }
+      }
+
       if (!$isAuthenticatedStore) {
-        isAuthenticatingDefault = true;
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
-        isAuthenticatingDefault = false;
       }
       const { identityNumber, actor } = $authenticationStore!;
       const accountNumberPromise =
@@ -113,33 +178,65 @@
       isAuthenticatingDefault = false;
     }
   };
-  const handleContinueAs = (
+  const handleContinueAs = async (
     accountNumber: AccountNumber | PRIMARY_ACCOUNT_NUMBER,
   ) => {
-    onAuthorize(Promise.resolve(accountNumber));
-  };
-  const handleEnableMultipleAccounts = async () => {
+    isAuthenticatingDefault = true;
     try {
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
+      onAuthorize(Promise.resolve(accountNumber));
+    } catch (error) {
+      handleError(error);
+    } finally {
+      isAuthenticatingDefault = false;
+    }
+  };
+  const loadAccountsViaActor = async (
+    actor: ActorSubclass<_SERVICE>,
+    identityNumber: bigint,
+  ) => {
+    const values = await Promise.all([
+      actor
+        .get_accounts(identityNumber, effectiveOrigin)
+        .then(throwCanisterError),
+      actor
+        .get_default_account(identityNumber, effectiveOrigin)
+        .then(throwCanisterError),
+    ]);
+    accounts = values[0].sort((a, b) => {
+      const aVal = a.last_used[0] ?? BigInt(-1);
+      const bVal = b.last_used[0] ?? BigInt(-1);
+      return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
+    });
+    defaultAccountNumber = values[1].account_number[0];
+  };
+
+  const handleEnableMultipleAccounts = async () => {
+    try {
+      const sessionActor = await actorForIdentity(selectedIdentityNumber);
+      if (sessionActor !== undefined) {
+        try {
+          await loadAccountsViaActor(sessionActor, selectedIdentityNumber);
+          return;
+        } catch (err) {
+          if (
+            isCanisterError<SessionDelegationError>(err) &&
+            err.type === "Unauthorized"
+          ) {
+            void purgeSession(selectedIdentityNumber);
+          } else {
+            throw err;
+          }
+        }
+      }
+
+      if (!$isAuthenticatedStore) {
+        await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+      }
       const { identityNumber, actor } = $authenticationStore!;
-      const values = await Promise.all([
-        actor
-          .get_accounts(identityNumber, effectiveOrigin)
-          .then(throwCanisterError),
-        actor
-          .get_default_account(identityNumber, effectiveOrigin)
-          .then(throwCanisterError),
-      ]);
-      accounts = values[0].sort((a, b) => {
-        // Undefined should come last (new/unused accounts at the bottom),
-        // defined should sort descending (most recently used first).
-        const aVal = a.last_used[0] ?? BigInt(-1);
-        const bVal = b.last_used[0] ?? BigInt(-1);
-        return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
-      });
-      defaultAccountNumber = values[1].account_number[0];
+      await loadAccountsViaActor(actor, identityNumber);
     } catch (error) {
       isMultipleAccountsEnabled = false;
       handleError(error);
@@ -150,7 +247,16 @@
     isDefaultSignIn: boolean;
   }) => {
     try {
-      const { identityNumber, actor } = $authenticationStore!;
+      // create_account is not in the session-delegation scope, so it needs a
+      // full-auth identity even when the screen was loaded ceremony-free.
+      if (!$isAuthenticatedStore) {
+        await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+      }
+      const authenticated = $authenticationStore;
+      if (authenticated === undefined) {
+        return;
+      }
+      const { identityNumber, actor } = authenticated;
       const createdAccount = await actor
         .create_account(identityNumber, effectiveOrigin, account.name)
         .then(throwCanisterError);
@@ -180,38 +286,79 @@
       return;
     }
     try {
-      const { identityNumber, actor } = $authenticationStore!;
       const index = accounts.findIndex(
-        (account) =>
-          account.account_number[0] === isEditAccountDialogVisibleForNumber,
+        (acc) => acc.account_number[0] === isEditAccountDialogVisibleForNumber,
       );
-      // Only update the name when it has changed
-      if (account.name !== (accounts[index].name[0] ?? primaryAccountName)) {
-        accounts[index] = await actor
+      if (index === -1) {
+        return;
+      }
+      const nameChanged =
+        account.name !== (accounts[index].name[0] ?? primaryAccountName);
+      const defaultChanged =
+        account.isDefaultSignIn &&
+        defaultAccountNumber !== accounts[index].account_number[0];
+
+      if (nameChanged) {
+        if (!$isAuthenticatedStore) {
+          await authLastUsedFlow.authenticate(
+            $lastUsedIdentitiesStore.selected!,
+          );
+        }
+        const authenticated = $authenticationStore;
+        if (authenticated === undefined) {
+          return;
+        }
+        accounts[index] = await authenticated.actor
           .update_account(
-            identityNumber,
+            authenticated.identityNumber,
             effectiveOrigin,
             accounts[index].account_number,
             { name: [account.name] },
           )
           .then(throwCanisterError);
 
-        // Updating a primary account could result in number assignment,
-        // so we should sync the default account number state if needed.
         if (isEditAccountDialogVisibleForNumber === defaultAccountNumber) {
           defaultAccountNumber = accounts[index].account_number[0];
         }
       }
-      // Only mark as default if it is set to true and wasn't true already.
-      if (
-        account.isDefaultSignIn &&
-        defaultAccountNumber !== accounts[index].account_number[0]
-      ) {
-        // Account details could theoretically change when it's set as default,
-        // so we make sure to update the state with latest account details.
-        accounts[index] = await actor
+
+      if (defaultChanged) {
+        const sessionActor = await actorForIdentity(selectedIdentityNumber);
+        if (sessionActor !== undefined) {
+          try {
+            accounts[index] = await sessionActor
+              .set_default_account(
+                selectedIdentityNumber,
+                effectiveOrigin,
+                accounts[index].account_number,
+              )
+              .then(throwCanisterError);
+            defaultAccountNumber = accounts[index].account_number[0];
+            return;
+          } catch (err) {
+            if (
+              isCanisterError<SessionDelegationError>(err) &&
+              err.type === "Unauthorized"
+            ) {
+              void purgeSession(selectedIdentityNumber);
+            } else {
+              throw err;
+            }
+          }
+        }
+
+        if (!$isAuthenticatedStore) {
+          await authLastUsedFlow.authenticate(
+            $lastUsedIdentitiesStore.selected!,
+          );
+        }
+        const authenticated = $authenticationStore;
+        if (authenticated === undefined) {
+          return;
+        }
+        accounts[index] = await authenticated.actor
           .set_default_account(
-            identityNumber,
+            authenticated.identityNumber,
             effectiveOrigin,
             accounts[index].account_number,
           )
@@ -225,14 +372,12 @@
     }
   };
 
-  // Keep local last used accounts in sync (we might need them later)
   $effect(() => {
-    if ($authenticationStore === undefined || accounts === undefined) {
+    if (accounts === undefined) {
       return;
     }
-    const { identityNumber } = $authenticationStore;
     lastUsedIdentitiesStore.syncLastUsedAccounts(
-      identityNumber,
+      selectedIdentityNumber,
       effectiveOrigin,
       accounts,
     );
@@ -357,13 +502,9 @@
   </p>
   <div class="grid">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
-    {#if isMultipleAccountsEnabled && $isAuthenticatedStore && accounts !== undefined}
+    {#if isMultipleAccountsEnabled && accounts !== undefined}
       {@render accountList(accounts)}
-    {:else if isMultipleAccountsEnabled && $isAuthenticatedStore}
-      <!-- Display the progress ring if loading accounts takes longer than usual.
-
-           This may happen the first time a user enables multiple accounts,
-           as authentication might require an update call in case OpenID is used. -->
+    {:else if isMultipleAccountsEnabled}
       <div
         class="col-start-1 row-start-1 flex min-h-18 items-center justify-center pb-6"
         in:fade={{ duration: 100, delay: 300 }}
