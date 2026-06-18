@@ -66,7 +66,9 @@
     "name": "Juno",
     "oneLiner": "Build Web3 at Lightning Speed",
     "website": "https://juno.build",
-    "authOrigins": ["https://console.juno.build"],
+    "authOrigins": [
+      "https://console.juno.build"
+    ],
     "logo": "juno_logo.svg"
   },
   {
@@ -85,7 +87,9 @@
   {
     "name": "TAGGR",
     "website": "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io",
-    "authOrigins": ["https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io"],
+    "authOrigins": [
+      "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io"
+    ],
     "logo": "taggr_logo.svg",
     "oneLiner": "Blending forums and blogs - controlled by a DAO"
   },
@@ -190,6 +194,17 @@
     "website": "https://to3ja-iyaaa-aaaai-qapsq-cai.raw.ic0.app/",
     "oneLiner": "3rd Place DSCVR Hackathon",
     "logo": "missionispossible_logo.webp"
+  },
+  {
+    "name": "Mintlab",
+    "oneLiner": "Permissionless ICP NFT wallet, collection directory, and marketplace.",
+    "website": "https://mintlab.website",
+    "authOrigins": [
+      "https://mintlab.website",
+      "https://www.mintlab.website",
+      "https://2u7me-laaaa-aaaas-qgr2q-cai.icp0.io"
+    ],
+    "logo": "mintlab_logo.png"
   },
   {
     "name": "Canlista",
@@ -478,7 +493,7 @@
     "oneLiner": "A community-owned Web3 application that primarily offers taxi, delivery, and courier services."
   },
   {
-    "name": "Konectª",
+    "name": "Konect\u00aa",
     "website": "https://qmtwu-wqaaa-aaaan-qlrya-cai.icp0.io/",
     "logo": "konecta_logo.svg",
     "oneLiner": "A new protocol that gathers notifications and events from all your apps implementing it, and compiles them into a user-specific canister."
@@ -569,7 +584,7 @@
     "name": "Moonshift",
     "website": "https://moonshift.app",
     "logo": "moonshift_logo.png",
-    "oneLiner": "Gamified quest board where projects can create “Shifts” or marketing bounties for their community to collect."
+    "oneLiner": "Gamified quest board where projects can create \u201cShifts\u201d or marketing bounties for their community to collect."
   },
   {
     "name": "PlexiMail",
