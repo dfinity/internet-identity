@@ -465,6 +465,77 @@ pub fn update_account(
     .map(|(x,)| x)
 }
 
+pub fn mcp_set_access(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    enabled: bool,
+) -> Result<Result<(), String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_set_access",
+        (identity_number, enabled),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_access_enabled(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<bool, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_access_enabled",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_prepare_account_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    target_origin: FrontendHostname,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_prepare_account_delegation",
+        (target_origin, session_key, max_ttl),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_get_account_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    target_origin: FrontendHostname,
+    session_key: SessionKey,
+    expiration: u64,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_get_account_delegation",
+        (target_origin, session_key, expiration),
+    )
+    .map(|(x,)| x)
+}
+
 #[derive(Clone)]
 pub struct AccountDelegationParams<'a> {
     pub env: &'a PocketIc,

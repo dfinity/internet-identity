@@ -198,9 +198,8 @@ test("Requested TTL within bounds is honoured", async ({
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-// NOTE: the old "MCP acts as the same principal /authorize gives for that app"
-// test was removed with the connect-model pivot. The browser /mcp flow now
-// issues the standing credential for the user's account at the configured MCP
-// *server* origin (not a per-request app), and per-app delegations are minted
-// server-side by the `mcp_prepare/get_account_delegation` canister methods —
-// principal-derivation parity belongs in a canister test for those (TODO).
+// The browser /mcp flow issues the standing credential for the user's account
+// at the configured MCP *server* origin (not a per-request app); per-app
+// delegations are minted server-side by the `mcp_prepare/get_account_delegation`
+// canister methods. Principal-derivation parity for those is canister logic and
+// is covered by the integration tests (tests/integration/mcp.rs), not here.
