@@ -119,3 +119,8 @@ export const getPrimaryOrigin = () =>
 // `undefined` when the operator didn't configure this flag.
 export const getConfiguredFeatureFlag = (name: string): boolean | undefined =>
   frontendCanisterConfig.feature_flags[0]?.find(([key]) => key === name)?.[1];
+
+// Origin of the trusted MCP server configured via the canister deploy args, or
+// `undefined` when unset (in which case the `/mcp` delegation flow is disabled).
+export const getMcpServerOrigin = (): string | undefined =>
+  frontendCanisterConfig.mcp_server_origin[0];

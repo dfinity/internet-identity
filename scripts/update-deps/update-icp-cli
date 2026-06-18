@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPTS_DIR/../.."
+
+current_icp_cli_release=$(cat .icp-cli-version | tr -d '[:space:]')
+echo "current icp-cli release '$current_icp_cli_release'"
+
+auth_header=()
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  auth_header=(-H "Authorization: Bearer $GITHUB_TOKEN")
+fi
+latest_icp_cli_release=$(curl -sSL "${auth_header[@]}" https://api.github.com/repos/dfinity/icp-cli/releases/latest | jq -r '.tag_name | sub("^v"; "")')
+
+if [ -z "$latest_icp_cli_release" ] || [ "$latest_icp_cli_release" = "null" ]; then
+  echo "expected an icp-cli release, got '$latest_icp_cli_release'" >&2
+  exit 1
+fi
+
+echo "latest icp-cli release '$latest_icp_cli_release'"
+
+if [ "$current_icp_cli_release" != "$latest_icp_cli_release" ]; then
+  echo "icp-cli needs an update"
+  echo "$latest_icp_cli_release" > .icp-cli-version
+  cat .icp-cli-version
+else
+  echo "already up to date"
+fi

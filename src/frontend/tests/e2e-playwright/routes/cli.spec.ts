@@ -446,3 +446,46 @@ test("`--app` links the same principal that /authorize gives for that app", asyn
   // Same identity + same derivation origin (nice-name.com) ⇒ same principal.
   expect(cliPrincipal).toBe(authorizePrincipal);
 });
+
+test("`--app` on a gateway domain links the same principal as its *.ic0.app domain", async ({
+  page,
+  cli,
+  isMobile,
+}) => {
+  // One identity, with device CLI access enabled so app mode isn't gated.
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await enableCliAccessInSettings(page, isMobile);
+
+  // `--app nice-name.ic0.app`: a legacy domain, used as the derivation origin
+  // as-is.
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.ic0.app" }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // `--app nice-name.icp0.io`: the same app on a gateway domain. It must remap
+  // to nice-name.ic0.app, so the same identity links the same principal.
+  // Navigate off /cli first so the second visit is a full load (a fragment-only
+  // change wouldn't re-run `load`).
+  await page.goto(II_URL);
+  await page.goto(
+    await cli.resolveAuthorizeUrl(page, { domain: "nice-name.icp0.io" }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+
+  // Both domains map to the same legacy origin ⇒ identical root principal. If
+  // the gateway domain weren't remapped, these would differ.
+  expect(cli.receivedDelegations.length).toBe(2);
+  expect(rootPublicKey(cli.receivedDelegations[1])).toBe(
+    rootPublicKey(cli.receivedDelegations[0]),
+  );
+});

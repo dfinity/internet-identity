@@ -136,6 +136,10 @@ pub struct PersistentState {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. `None`/`Some(false)`
+    /// => DoH-only; `Some(true)` re-enables it. Read via
+    /// `crate::email_recovery::dnssec_email_recovery_enabled`.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC verification config (trust anchors). Survives upgrades when an
     /// upgrade arg omits it. Consumed by the email-recovery DKIM/DMARC flow
     /// in later PRs and by any future feature that needs DNSSEC-verified
@@ -170,6 +174,7 @@ impl Default for PersistentState {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
         }

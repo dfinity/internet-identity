@@ -19,10 +19,12 @@
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
     sso_discoverable_domains: [],
+    sso_credential_migration: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     captcha_config: [],
     dummy_auth: [],
     register_rate_limit: [],
+    enable_dnssec_email_recovery: [],
     doh_config: [],
     dnssec_config: [],
   });

@@ -5,6 +5,12 @@ export const idlFactory = ({ IDL }) => {
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
     'allowed_domains' : IDL.Vec(IDL.Text),
   });
+  const SsoCredentialMigrationEntry = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
+    'issuer' : IDL.Text,
+    'discovery_domain' : IDL.Text,
+    'client_id' : IDL.Text,
+  });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
     'key_tag' : IDL.Nat16,
@@ -66,6 +72,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
+    'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
@@ -76,6 +83,7 @@ export const idlFactory = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
+    'enable_dnssec_email_recovery' : IDL.Opt(IDL.Bool),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
@@ -306,15 +314,24 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
+  const DohFailureReason = IDL.Variant({
+    'AllProvidersFailed' : IDL.Null,
+    'ResponseMalformed' : IDL.Text,
+    'QuorumFailed' : IDL.Record({
+      'total' : IDL.Nat32,
+      'agreeing' : IDL.Nat32,
+    }),
+  });
   const EmailRecoveryError = IDL.Variant({
     'EmailVerificationFailed' : IDL.Text,
     'DkimLeafMismatch' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'NonceUnknown' : IDL.Null,
-    'DohFetchFailed' : IDL.Text,
+    'DohFetchFailed' : DohFailureReason,
     'NoDkimLeafExpected' : IDL.Null,
     'DomainNotSupported' : IDL.Text,
     'AddressNotRegistered' : IDL.Null,
+    'EmptyDkimLeafHops' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'NonceExpired' : IDL.Null,
     'AddressMismatch' : IDL.Null,
@@ -347,9 +364,11 @@ export const idlFactory = ({ IDL }) => {
     'signature' : IDL.Vec(IDL.Nat8),
     'delegation' : Delegation,
   });
+  const EmailRecoveryResolveViaDohArg = IDL.Record({ 'nonce' : IDL.Text });
   const UserKey = PublicKey;
   const EmailRecoveryStatus = IDL.Variant({
     'Failed' : EmailRecoveryError,
+    'ResolvingDoh' : IDL.Null,
     'NeedDkimLeaf' : IDL.Record({ 'selector' : IDL.Text }),
     'RecoveryReady' : IDL.Record({
       'user_key' : UserKey,
@@ -498,6 +517,11 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
+  });
+  const SessionDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
@@ -674,6 +698,10 @@ export const idlFactory = ({ IDL }) => {
   const PrepareIdAliasError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const PrepareSessionDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
   });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -898,6 +926,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'email_recovery_resolve_via_doh' : IDL.Func(
+        [EmailRecoveryResolveViaDohArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [],
+      ),
     'email_recovery_status' : IDL.Func(
         [IDL.Text],
         [EmailRecoveryStatus],
@@ -905,12 +938,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'email_recovery_submit_dkim_leaf' : IDL.Func(
         [EmailRecoverySubmitDkimLeafArg],
-        [
-          IDL.Variant({
-            'Ok' : EmailRecoveryStatus,
-            'Err' : EmailRecoveryError,
-          }),
-        ],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -986,6 +1014,16 @@ export const idlFactory = ({ IDL }) => {
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
+        ['query'],
+      ),
+    'get_session_delegation' : IDL.Func(
+        [UserNumber, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : SessionDelegationError,
+          }),
+        ],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
@@ -1137,6 +1175,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
         [],
       ),
+    'prepare_session_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareSessionDelegation,
+            'Err' : SessionDelegationError,
+          }),
+        ],
+        [],
+      ),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
@@ -1174,6 +1222,12 @@ export const init = ({ IDL }) => {
   const DohConfig = IDL.Record({
     'max_cache_age_secs' : IDL.Opt(IDL.Nat64),
     'allowed_domains' : IDL.Vec(IDL.Text),
+  });
+  const SsoCredentialMigrationEntry = IDL.Record({
+    'name' : IDL.Opt(IDL.Text),
+    'issuer' : IDL.Text,
+    'discovery_domain' : IDL.Text,
+    'client_id' : IDL.Text,
   });
   const DnssecRootAnchor = IDL.Record({
     'algorithm' : IDL.Nat8,
@@ -1236,6 +1290,7 @@ export const init = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
+    'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
@@ -1246,6 +1301,7 @@ export const init = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
+    'enable_dnssec_email_recovery' : IDL.Opt(IDL.Bool),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
