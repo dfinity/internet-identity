@@ -323,6 +323,9 @@ type InternetIdentityInit = record {
     backend_canister_id : opt principal;
     // Backend origin, needed to sync configuration with frontend.
     backend_origin : opt text;
+    // Origin of the trusted MCP server (no trailing slash). Enables the backend
+    // /mcp delegation path; `null` leaves it disabled.
+    mcp_server_origin : opt text;
     // Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
     // off (DoH-only); `opt true` re-enables it.
     enable_dnssec_email_recovery : opt bool;
@@ -1665,6 +1668,29 @@ service : (opt InternetIdentityInit) -> {
         anchor_number : UserNumber,
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
+        session_key : SessionKey,
+        expiration : Timestamp
+    ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
+
+    // Enable/disable the backend /mcp delegation path for an anchor. Enabling
+    // binds the anchor's principal at the configured mcp_server_origin.
+    mcp_set_access : (anchor_number : UserNumber, enabled : bool)
+        -> (variant { Ok; Err : text });
+
+    // Whether the anchor currently has MCP access enabled.
+    mcp_access_enabled : (anchor_number : UserNumber) -> (bool) query;
+
+    // Called by the MCP server, authorized by caller() == the anchor's principal
+    // at mcp_server_origin. Mints a <=5-minute delegation for the anchor's
+    // default account at target_origin. The anchor is recovered from the caller.
+    mcp_prepare_account_delegation : (
+        target_origin : FrontendHostname,
+        session_key : SessionKey,
+        max_ttl : opt nat64
+    ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
+
+    mcp_get_account_delegation : (
+        target_origin : FrontendHostname,
         session_key : SessionKey,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;

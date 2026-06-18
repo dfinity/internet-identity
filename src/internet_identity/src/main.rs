@@ -61,6 +61,7 @@ mod doh;
 mod email_recovery;
 mod http;
 mod ii_domain;
+mod mcp;
 
 mod openid;
 mod session_delegation;
@@ -614,6 +615,45 @@ fn get_account_delegation(
     }
 }
 
+/// Enable or disable the backend `/mcp` delegation path for `anchor_number`.
+/// Enabling binds the anchor's principal at the configured `mcp_server_origin`
+/// so the MCP server can later fetch per-app delegations as this anchor.
+#[update]
+fn mcp_set_access(anchor_number: AnchorNumber, enabled: bool) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    mcp::set_mcp_access(anchor_number, enabled)
+}
+
+/// Whether `anchor_number` currently has MCP access enabled.
+#[query]
+fn mcp_access_enabled(anchor_number: AnchorNumber) -> bool {
+    if check_session_authorization(anchor_number).is_err() {
+        return false;
+    }
+    mcp::is_mcp_access_enabled(anchor_number)
+}
+
+/// Called by the MCP server (authorized by `caller()` == the anchor's principal
+/// at `mcp_server_origin`): prepare a ≤5-minute delegation for the anchor's
+/// default account at `target_origin`.
+#[update]
+async fn mcp_prepare_account_delegation(
+    target_origin: FrontendHostname,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<PrepareAccountDelegation, AccountDelegationError> {
+    mcp::prepare_account_delegation(target_origin, session_key, max_ttl).await
+}
+
+#[query]
+fn mcp_get_account_delegation(
+    target_origin: FrontendHostname,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, AccountDelegationError> {
+    mcp::get_account_delegation(target_origin, session_key, expiration)
+}
+
 #[update]
 async fn prepare_session_delegation(
     anchor_number: AnchorNumber,
@@ -721,6 +761,7 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: persistent_state.backend_origin.clone(),
+        mcp_server_origin: persistent_state.mcp_server_origin.clone(),
         enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
@@ -825,6 +866,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(backend_origin) = arg.backend_origin {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.backend_origin = Some(backend_origin);
+            })
+        }
+        if let Some(mcp_server_origin) = arg.mcp_server_origin {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.mcp_server_origin = Some(mcp_server_origin);
             })
         }
         if let Some(openid_configs) = arg.openid_configs {

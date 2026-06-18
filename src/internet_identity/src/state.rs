@@ -116,6 +116,10 @@ pub struct PersistentState {
     // `.well-known/ic-domains` asset so the backend is reachable on its
     // custom domain.
     pub backend_origin: Option<String>,
+    // Origin of the trusted MCP server (no trailing slash). When set, anchors
+    // may opt into the backend `/mcp` delegation path for this origin (see
+    // `crate::mcp`).
+    pub mcp_server_origin: Option<String>,
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
@@ -165,6 +169,7 @@ impl Default for PersistentState {
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
             backend_origin: None,
+            mcp_server_origin: None,
             new_flow_origins: None,
             openid_configs: None,
             sso_discoverable_domains: None,

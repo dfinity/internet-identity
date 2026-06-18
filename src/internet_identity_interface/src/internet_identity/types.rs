@@ -300,6 +300,12 @@ pub struct InternetIdentityInit {
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// Origin of the trusted MCP server (e.g. "https://mcp.id.ai", no trailing
+    /// slash). Enables the backend `/mcp` delegation path: when an anchor opts
+    /// in, II binds that anchor's principal at this origin so the MCP server can
+    /// fetch per-app account delegations as that anchor. `None` leaves the path
+    /// disabled.
+    pub mcp_server_origin: Option<String>,
     /// Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
     /// off (DoH-only); `Some(true)` re-enables it. Omitting it on upgrade
     /// keeps the stored value.

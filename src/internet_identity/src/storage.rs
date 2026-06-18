@@ -183,6 +183,7 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
+const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -228,6 +229,15 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
 /// periodic `jwks_uri` fetch, so a provider's keys survive canister upgrades
 /// and are available for JWT verification before the first post-upgrade fetch.
 const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
+
+/// Reverse index for MCP access: maps the principal II derives for an anchor at
+/// the configured `mcp_server_origin` (i.e. that anchor's standing MCP-server
+/// principal) to the anchor. Populated when the anchor enables MCP access; the
+/// `mcp_*_account_delegation` methods use it to authorize a caller (the MCP
+/// server, acting as that principal) and recover its anchor without an
+/// `anchor_number` parameter.
+const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -370,6 +380,11 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_anchor_with_email_recovery_memory:
         StableBTreeMap<StorableEmailRecoveryAddressHash, StorableAnchorNumber, ManagedMemory<M>>,
 
+    lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID`].
+    pub(crate) lookup_anchor_with_mcp_principal_memory:
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+
     /// Memory wrapper used to report the size of the OpenID JWKS cache memory.
     openid_jwks_cache_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Persistent per-provider JWK cache, keyed by the provider's `issuer`.
@@ -460,6 +475,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
+        let lookup_anchor_with_mcp_principal_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
@@ -566,6 +583,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_email_recovery_memory: StableBTreeMap::init(
                 lookup_anchor_with_email_recovery_memory,
+            ),
+            lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_mcp_principal_memory.clone(),
+            ),
+            lookup_anchor_with_mcp_principal_memory: StableBTreeMap::init(
+                lookup_anchor_with_mcp_principal_memory,
             ),
             openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
@@ -1037,6 +1060,24 @@ impl<M: Memory + Clone> Storage<M> {
         let principal = Principal::self_authenticating(pubkey);
         self.lookup_anchor_with_passkey_pubkey_hash_memory
             .get(&principal)
+    }
+
+    /// Recover the anchor that enabled MCP access for the given MCP-server
+    /// principal (the caller of the `mcp_*_account_delegation` methods).
+    pub fn lookup_anchor_with_mcp_principal(&self, principal: Principal) -> Option<AnchorNumber> {
+        self.lookup_anchor_with_mcp_principal_memory.get(&principal)
+    }
+
+    /// Record (enable) MCP access: bind an anchor's MCP-server principal to it.
+    pub fn set_anchor_mcp_principal(&mut self, principal: Principal, anchor_number: AnchorNumber) {
+        self.lookup_anchor_with_mcp_principal_memory
+            .insert(principal, anchor_number);
+    }
+
+    /// Forget (disable) an anchor's MCP-server principal.
+    pub fn remove_anchor_mcp_principal(&mut self, principal: Principal) {
+        self.lookup_anchor_with_mcp_principal_memory
+            .remove(&principal);
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to
