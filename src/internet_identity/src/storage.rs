@@ -2282,6 +2282,10 @@ impl<M: Memory + Clone> Storage<M> {
                 "openid_jwks_cache".to_string(),
                 self.openid_jwks_cache_memory_wrapper.size(),
             ),
+            (
+                "lookup_anchor_with_mcp_principal_memory".to_string(),
+                self.lookup_anchor_with_mcp_principal_memory_wrapper.size(),
+            ),
         ])
     }
 }
