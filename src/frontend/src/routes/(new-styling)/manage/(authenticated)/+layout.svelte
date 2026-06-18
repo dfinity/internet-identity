@@ -106,6 +106,10 @@
   };
 
   const handleConfirmSignOut = () => {
+    // Rotate the ephemeral session so the signed-out session's key material
+    // doesn't linger in sessionStorage across the reload; sessionStorage
+    // survives window.location.replace.
+    sessionStore.reset();
     window.location.replace("/");
   };
 
@@ -113,6 +117,7 @@
     const identityNumber = $authenticatedStore.identityNumber;
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
     void purgeSession(identityNumber);
+    sessionStore.reset();
     window.location.replace("/");
   };
 
