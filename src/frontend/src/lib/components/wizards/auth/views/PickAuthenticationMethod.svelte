@@ -93,7 +93,7 @@
       description={$t`Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue.`}
     />
   {/if}
-  <div class="flex flex-col items-stretch gap-2">
+  <div class="flex flex-col items-stretch gap-3">
     <button
       class="btn btn-primary btn-xl h-14"
       onclick={setupOrUseExistingPasskey}
@@ -112,7 +112,7 @@
           manual
         >
           <button
-            class="border-border-secondary text-fg-primary bg-bg-primary hover:not-disabled:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex h-16 w-full flex-col items-center justify-center gap-1.5 rounded-md border text-xs font-semibold outline-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2"
+            class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
             onclick={() => handleContinueWithOpenId(provider)}
             disabled={authenticatingProviderId !== undefined}
             aria-label={providerLabel(name)}
@@ -120,10 +120,12 @@
             {#if authenticatingProviderId === key}
               <ProgressRing />
             {:else}
-              <div class="size-5">
-                <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
-                {@html provider.logo}
-              </div>
+              {#if provider.logo}
+                <div class="size-5">
+                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- provider.logo is a trusted SVG string sourced from the backend canister's openid_configs -->
+                  {@html provider.logo}
+                </div>
+              {/if}
               <span>{name}</span>
             {/if}
           </button>
@@ -140,7 +142,7 @@
         exists.
       -->
       <button
-        class="border-border-secondary text-fg-primary bg-bg-primary hover:not-disabled:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary flex h-16 w-full flex-col items-center justify-center gap-1.5 rounded-md border text-xs font-semibold outline-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2"
+        class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
         onclick={signInWithSso}
         disabled={authenticatingProviderId !== undefined}
         aria-label={ssoLabel}
@@ -151,12 +153,7 @@
     </div>
   </div>
   {#if showLostAccess}
-    <div
-      class={[
-        "flex flex-row items-center justify-between gap-4",
-        !withinDialog && "border-border-secondary border-b pb-3",
-      ]}
-    >
+    <div class="flex flex-row items-center justify-between gap-4">
       <p class="text-text-tertiary text-sm">
         {$t`Lost access to your identity?`}
       </p>
@@ -169,12 +166,15 @@
       </a>
     </div>
   {/if}
+  {#if showLostAccess && showSwitchMode && !withinDialog}
+    <div class="border-border-secondary border-t" aria-hidden="true"></div>
+  {/if}
   {#if showSwitchMode}
     <div
       class={[
         "flex flex-row items-center gap-3",
         withinDialog
-          ? "bg-bg-secondary dark:bg-bg-primary border-border-secondary -mx-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:-mb-8 sm:px-6"
+          ? "bg-bg-secondary dark:bg-bg-primary border-border-secondary -mx-4 -mb-4 border-t p-4 sm:-mx-6 sm:-mb-8 sm:rounded-b-2xl sm:p-6"
           : "py-2",
       ]}
     >
@@ -182,14 +182,14 @@
         <div class="text-text-primary text-sm font-semibold">
           {switchModeTitle ??
             (mode === "signin"
-              ? $t`New to Internet Identity?`
+              ? $t`Want a new identity?`
               : $t`Already have an identity?`)}
         </div>
         {#if switchModeTitle === undefined}
-          <div class="text-text-tertiary mt-0.5 text-xs">
+          <div class="text-text-tertiary mt-1 text-xs">
             {mode === "signin"
-              ? $t`Create your private, passwordless identity.`
-              : $t`Sign in with a passkey or familiar provider.`}
+              ? $t`Create one in seconds.`
+              : $t`Use a passkey or familiar provider.`}
           </div>
         {/if}
       </div>

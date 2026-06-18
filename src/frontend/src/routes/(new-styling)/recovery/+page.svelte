@@ -4,8 +4,8 @@
   import {
     ArrowRightIcon,
     BookOpenIcon,
+    BriefcaseMedicalIcon,
     HashIcon,
-    HeartPulseIcon,
     MailIcon,
   } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
@@ -25,6 +25,7 @@
   import type {
     EmailRecoveryDnsInput,
     EmailRecoveryGetDelegationArgs,
+    EmailRecoverySubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -37,6 +38,7 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -93,12 +95,19 @@
   const emailRecoveryDiagnostics = (nonce: string) =>
     anonymousActor.email_recovery_diagnostics(nonce);
 
-  const submitEmailDkimLeaf = (
-    arg: import("$lib/generated/internet_identity_types").EmailRecoverySubmitDkimLeafArg,
-  ) =>
-    anonymousActor
-      .email_recovery_submit_dkim_leaf(arg)
-      .then(throwCanisterError);
+  const submitEmailDkimLeaf = async (
+    arg: EmailRecoverySubmitDkimLeafArg,
+  ): Promise<void> => {
+    await throwCanisterError(
+      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+    );
+  };
+
+  const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
+    await throwCanisterError(
+      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
+    );
+  };
 
   const getEmailDelegation = (args: EmailRecoveryGetDelegationArgs) =>
     anonymousActor.email_recovery_get_delegation(args).then(throwCanisterError);
@@ -139,6 +148,7 @@
     } catch (error) {
       showEmailRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(success.identityNumber);
       handleError(error);
     }
   };
@@ -180,6 +190,7 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(identityNumber);
       handleError(error);
     }
   };
@@ -208,7 +219,7 @@
     <AuthPanel class="sm:max-w-100">
       <div class="mt-auto flex flex-col sm:my-auto">
         <FeaturedIcon size="lg" class="mb-4">
-          <HeartPulseIcon class="size-5" />
+          <BriefcaseMedicalIcon class="size-5" />
         </FeaturedIcon>
         <h1 class="text-text-primary mb-3 text-2xl font-medium">
           {$t`Recover your identity`}
@@ -321,6 +332,7 @@
       status={emailRecoveryStatus}
       diagnostics={emailRecoveryDiagnostics}
       submitDkimLeaf={submitEmailDkimLeaf}
+      resolveViaDoh={resolveEmailViaDoh}
       getDelegation={getEmailDelegation}
       onSignedIn={handleEmailRecoverySignIn}
     />

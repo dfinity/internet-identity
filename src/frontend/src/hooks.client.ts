@@ -1,6 +1,7 @@
 import type { ClientInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import { mintSession } from "$lib/stores/session-delegation.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { initGlobals, canisterId, agentOptions } from "$lib/globals";
 import { localeStore } from "$lib/stores/locale.store";
@@ -58,4 +59,18 @@ export const init: ClientInit = async () => {
   });
 
   authenticationStore.init({ canisterId, agentOptions });
+
+  // Side effect: mint a session on every successful authentication,
+  // regardless of which flow performed it. Done here (after init) so the
+  // subscriber attaches once the store is ready, and so any auth flow
+  // that ends in `authenticationStore.set(...)` -- authFlow,
+  // authLastUsedFlow, migrationFlow, ... -- refreshes the session
+  // automatically. Fire-and-forget; failure degrades to the status quo.
+  authenticationStore.subscribe((authenticated) => {
+    if (authenticated === undefined) return;
+    void mintSession({
+      identityNumber: authenticated.identityNumber,
+      actor: authenticated.actor,
+    });
+  });
 };

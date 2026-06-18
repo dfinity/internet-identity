@@ -21,6 +21,21 @@ pub struct StorableOpenIdCredential {
     pub last_usage_timestamp: Option<Timestamp>,
     #[n(4)]
     pub metadata: HashMap<String, StorableMetadataEntryV2>,
+    /// SSO discovery domain this credential was created through, stamped at
+    /// verification time. `None` for direct-provider credentials (Google /
+    /// Microsoft / Apple) and for SSO credentials written before this field
+    /// existed — the latter are backfilled by the `sso_credential_migration`
+    /// upgrade arg (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
+    /// `Option` so credentials written under the previous schema decode
+    /// cleanly — same pattern as the optional fields on `StorableAnchor`.
+    #[n(5)]
+    pub sso_domain: Option<String>,
+    /// Human-readable SSO label from the domain's hop-1
+    /// `ii-openid-configuration`, stamped alongside `sso_domain`. May be
+    /// `None` even for SSO credentials — domains aren't required to publish
+    /// a `name`.
+    #[n(6)]
+    pub sso_name: Option<String>,
 }
 
 impl StorableOpenIdCredential {
@@ -59,6 +74,8 @@ impl From<StorableOpenIdCredential> for OpenIdCredential {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
+            sso_domain: value.sso_domain,
+            sso_name: value.sso_name,
         }
     }
 }
@@ -75,6 +92,84 @@ impl From<OpenIdCredential> for StorableOpenIdCredential {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
+            sso_domain: value.sso_domain,
+            sso_name: value.sso_name,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn credential(
+        sso_domain: Option<String>,
+        sso_name: Option<String>,
+    ) -> StorableOpenIdCredential {
+        StorableOpenIdCredential {
+            iss: "https://auth.acme.com".to_string(),
+            sub: "user123".to_string(),
+            aud: "client456".to_string(),
+            last_usage_timestamp: Some(42),
+            metadata: HashMap::new(),
+            sso_domain,
+            sso_name,
+        }
+    }
+
+    #[test]
+    fn should_roundtrip_through_storable() {
+        let credential = credential(Some("acme.com".to_string()), Some("Acme Corp".to_string()));
+        let decoded = StorableOpenIdCredential::from_bytes(credential.to_bytes());
+        assert_eq!(decoded.iss, credential.iss);
+        assert_eq!(decoded.sub, credential.sub);
+        assert_eq!(decoded.aud, credential.aud);
+        assert_eq!(
+            decoded.last_usage_timestamp,
+            credential.last_usage_timestamp
+        );
+        assert_eq!(decoded.sso_domain, Some("acme.com".to_string()));
+        assert_eq!(decoded.sso_name, Some("Acme Corp".to_string()));
+    }
+
+    /// Credentials written before the `sso_domain` / `sso_name` fields
+    /// existed are CBOR maps without keys 5 and 6 — they must decode with
+    /// both fields `None`.
+    #[test]
+    fn should_decode_credential_without_sso_fields() {
+        // Encode the pre-`sso_domain` shape: a CBOR map with keys 0..=4 only.
+        let mut buffer = Vec::new();
+        let mut encoder = minicbor::Encoder::new(&mut buffer);
+        encoder.map(5).unwrap();
+        encoder.u8(0).unwrap().str("https://auth.acme.com").unwrap();
+        encoder.u8(1).unwrap().str("user123").unwrap();
+        encoder.u8(2).unwrap().str("client456").unwrap();
+        encoder.u8(3).unwrap().u64(42).unwrap();
+        encoder.u8(4).unwrap().map(0).unwrap();
+
+        let decoded = StorableOpenIdCredential::from_bytes(Cow::Borrowed(&buffer));
+        assert_eq!(decoded.iss, "https://auth.acme.com");
+        assert_eq!(decoded.sub, "user123");
+        assert_eq!(decoded.aud, "client456");
+        assert_eq!(decoded.last_usage_timestamp, Some(42));
+        assert_eq!(decoded.sso_domain, None);
+        assert_eq!(decoded.sso_name, None);
+    }
+
+    /// Rollback safety: bytes written by the new encoder (with keys 5 and 6
+    /// present) must remain decodable when the unknown keys are skipped —
+    /// minicbor's `#[cbor(map)]` derive ignores unknown map keys, which is
+    /// what a rolled-back (pre-`sso_domain`) wasm relies on. Cheaply
+    /// approximated here by decoding new-encoder bytes and checking the
+    /// pre-existing fields survive untouched.
+    #[test]
+    fn should_keep_preexisting_fields_when_sso_fields_present() {
+        let credential = credential(Some("acme.com".to_string()), None);
+        let decoded = StorableOpenIdCredential::from_bytes(credential.to_bytes());
+        assert_eq!(decoded.iss, credential.iss);
+        assert_eq!(decoded.sub, credential.sub);
+        assert_eq!(decoded.aud, credential.aud);
+        assert_eq!(decoded.sso_domain, Some("acme.com".to_string()));
+        assert_eq!(decoded.sso_name, None);
     }
 }

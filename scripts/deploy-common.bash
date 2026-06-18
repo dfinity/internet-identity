@@ -603,6 +603,7 @@ prompt_fe_extra_args() {
     local dev_csp_default="null"
     local dummy_auth_default="null"
     local analytics_default="null"
+    local mcp_server_origin_default="null"
 
     if [ -n "$raw_config" ]; then
         local parsed
@@ -611,6 +612,7 @@ prompt_fe_extra_args() {
         parsed=$(_parse_candid_field "dev_csp" "$raw_config");          [ -n "$parsed" ] && dev_csp_default="$parsed"
         parsed=$(_parse_candid_field "dummy_auth" "$raw_config");       [ -n "$parsed" ] && dummy_auth_default="$parsed"
         parsed=$(_parse_candid_field "analytics_config" "$raw_config"); [ -n "$parsed" ] && analytics_default="$parsed"
+        parsed=$(_parse_candid_field "mcp_server_origin" "$raw_config"); [ -n "$parsed" ] && mcp_server_origin_default="$parsed"
     else
         echo "  Warning: could not fetch current config; defaults are derived from the staging quad, NOT live values." >&2
         echo "           Hitting Enter through will OVERWRITE any custom-domain backend_origin / related_origins on chain." >&2
@@ -624,6 +626,7 @@ prompt_fe_extra_args() {
     DEV_CSP_ARG=$(prompt_default         "dev_csp (opt bool)"                          "$dev_csp_default")
     DUMMY_AUTH_ARG=$(prompt_default      "dummy_auth (opt opt DummyAuthConfig)"        "$dummy_auth_default")
     ANALYTICS_ARG=$(prompt_default       "analytics_config (opt opt AnalyticsConfig)"  "$analytics_default")
+    MCP_SERVER_ORIGIN_ARG=$(prompt_default "mcp_server_origin (opt text)"              "$mcp_server_origin_default")
 }
 
 # -------------------------
@@ -676,6 +679,7 @@ build_fe_install_arg() {
     dev_csp = $DEV_CSP_ARG;
     dummy_auth = $DUMMY_AUTH_ARG;
     analytics_config = $ANALYTICS_ARG;
+    mcp_server_origin = $MCP_SERVER_ORIGIN_ARG;
   }
 )
 EOF
@@ -1022,9 +1026,7 @@ encode_install_arg_bin() {
 # -------------------------
 # Routes the install/upgrade through the proxy canister at PROXY_CANISTER_ID,
 # which is the legacy staging wallet reinstalled with the icp-cli proxy
-# WASM (see
-# https://cli.internetcomputer.org/0.2/migration/from-dfx/#replacing-the-dfx-wallet-canister).
-# The proxy keeps the wallet's canister ID — and therefore its
+# WASM. The proxy keeps the wallet's canister ID — and therefore its
 # controllership of the staging canisters — but now exposes the `proxy`
 # method icp-cli's `--proxy` expects.
 #

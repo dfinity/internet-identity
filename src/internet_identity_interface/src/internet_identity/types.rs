@@ -243,6 +243,12 @@ pub struct InternetIdentityFrontendArgs {
     /// own init callback, and `?feature_flag_*` URL params take precedence.
     /// Names that don't match a known frontend flag are ignored by the frontend.
     pub feature_flags: Option<Vec<(String, bool)>>,
+    /// Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
+    /// slash). The `/mcp` delegation flow delivers the delegation to this origin
+    /// (and only this origin — it's added to the `form-action` CSP and the
+    /// `/mcp` page rejects callbacks on any other origin). When unset, the
+    /// `/mcp` flow is disabled.
+    pub mcp_server_origin: Option<String>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -280,12 +286,24 @@ pub struct InternetIdentityInit {
     /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
     /// keyed off `is_production`.
     pub sso_discoverable_domains: Option<Vec<String>>,
+    /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
+    /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
+    /// §8.6). When `Some`, a batched timer-driven migration stamps every
+    /// stored credential whose `(iss, aud)` matches an entry and whose
+    /// `sso_domain` is not set yet. Idempotent — already-stamped credentials
+    /// are skipped, so re-submitting (e.g. with a corrected list) is safe.
+    /// When `None`, no backfill runs.
+    pub sso_credential_migration: Option<Vec<SsoCredentialMigrationEntry>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+    /// off (DoH-only); `Some(true)` re-enables it. Omitting it on upgrade
+    /// keeps the stored value.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC trust anchors for any feature that verifies DNS records
     /// against the IANA-rooted DNSSEC chain (currently the email-recovery
     /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).
@@ -302,6 +320,23 @@ pub struct InternetIdentityInit {
     /// `docs/ongoing/email-recovery.md` §7.6). Same set/clear pattern
     /// as `dnssec_config`.
     pub doh_config: Option<Option<DohConfig>>,
+}
+
+/// One entry of the `sso_credential_migration` backfill (see
+/// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
+/// pair of stored SSO credentials to the discovery domain (and optional
+/// human-readable name) they were registered through. Field names match the
+/// `discovered_oidc_configs` query output so the deployer can transcribe its
+/// result field-for-field before submitting the upgrade proposal.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct SsoCredentialMigrationEntry {
+    pub discovery_domain: String,
+    /// Matches the stored credential's `iss`.
+    pub issuer: String,
+    /// Matches the stored credential's `aud`.
+    pub client_id: String,
+    /// Human-readable SSO label; stamped onto the credential's `sso_name`.
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -546,6 +581,19 @@ pub enum AccountDelegationError {
 #[derive(CandidType, Debug, Deserialize)]
 pub enum CheckMaxAccountError {
     AccountLimitReached,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareSessionDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionDelegationError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
+    NoSuchDelegation,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

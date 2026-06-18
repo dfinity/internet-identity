@@ -592,6 +592,8 @@ mod tests {
             aud: "https://audience.example".to_string(),
             last_usage_timestamp: None,
             metadata,
+            sso_domain: None,
+            sso_name: None,
         }];
         anchor
     }
@@ -608,6 +610,8 @@ mod tests {
                 aud: "https://audience.example".to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             })
             .collect();
         anchor
@@ -1052,6 +1056,8 @@ mod tests {
                 aud: "test-client-id".to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             }
         }
 
@@ -1064,6 +1070,8 @@ mod tests {
                 aud: "test-client-id".to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             }
         }
 
@@ -1353,6 +1361,8 @@ mod tests {
                 aud: "test-client-id".to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
             let mut requested = request_verified_email_for(microsoft_scope());
@@ -1389,6 +1399,8 @@ mod tests {
                 aud: "test-client-id".to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
             let mut requested = request_verified_email_for(microsoft_scope());
@@ -1589,6 +1601,8 @@ mod tests {
                 aud: "test-client-id".to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
 
@@ -1680,6 +1694,8 @@ mod tests {
                         MetadataEntryV2::String(MICROSOFT_PERSONAL_TID.to_string()),
                     ),
                 ]),
+                sso_domain: None,
+                sso_name: None,
             }
         }
 
@@ -1763,6 +1779,8 @@ mod tests {
                         MetadataEntryV2::String("Example User".to_string()),
                     ),
                 ]),
+                sso_domain: None,
+                sso_name: None,
             }];
             anchor
         }
@@ -2038,6 +2056,8 @@ mod tests {
                         MetadataEntryV2::String("Example User".to_string()),
                     ),
                 ]),
+                sso_domain: None,
+                sso_name: None,
             }];
             anchor
         }
@@ -2174,6 +2194,8 @@ mod tests {
                 aud: SSO_CLIENT_ID.to_string(),
                 last_usage_timestamp: None,
                 metadata,
+                sso_domain: None,
+                sso_name: None,
             }
         }
 

@@ -581,10 +581,8 @@ prepare_staging_frontend_argument() {
 deploy_staging_backend() {
   echo "Deploying II backend release candidate to staging"
   # Routed through the staging proxy canister (legacy wallet reinstalled
-  # with the icp-cli proxy WASM — see
-  # https://cli.internetcomputer.org/0.2/migration/from-dfx/#replacing-the-dfx-wallet-canister).
-  # staging_icp_arg.bin holds the hex output of `didc encode`, so we
-  # tell icp-cli to read the file as hex.
+  # with the icp-cli proxy WASM). staging_icp_arg.bin holds the hex
+  # output of `didc encode`, so we tell icp-cli to read the file as hex.
   icp canister install "$STAGING_BACKEND_CANISTER_ID" \
     -e ic \
     --proxy "$STAGING_PROXY_CANISTER_ID" \

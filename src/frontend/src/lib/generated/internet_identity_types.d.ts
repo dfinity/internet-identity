@@ -528,6 +528,14 @@ export interface DohConfig {
   'max_cache_age_secs' : [] | [bigint],
   'allowed_domains' : Array<string>,
 }
+/**
+ * Why a DoH resolution failed, as a typed discriminant rather than a
+ * free-form string. The FE reads this directly to segment the
+ * `doh_reason` analytics property — no string parsing.
+ */
+export type DohFailureReason = { 'AllProvidersFailed' : null } |
+  { 'ResponseMalformed' : string } |
+  { 'QuorumFailed' : { 'total' : number, 'agreeing' : number } };
 export interface DummyAuthConfig {
   /**
    * Prompts user for a index value (0 - 255) when set to true,
@@ -566,10 +574,18 @@ export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
   { 'DkimLeafMismatch' : null } |
   { 'InternalCanisterError' : string } |
   { 'NonceUnknown' : null } |
-  { 'DohFetchFailed' : string } |
+  { 'DohFetchFailed' : DohFailureReason } |
   { 'NoDkimLeafExpected' : null } |
   { 'DomainNotSupported' : string } |
   { 'AddressNotRegistered' : null } |
+  {
+    /**
+     * email_recovery_submit_dkim_leaf was called with an empty `hops`
+     * vector; an FE that can't walk DNSSEC must drive
+     * email_recovery_resolve_via_doh instead.
+     */
+    'EmptyDkimLeafHops' : null
+  } |
   { 'Unauthorized' : Principal } |
   { 'NonceExpired' : null } |
   { 'AddressMismatch' : null } |
@@ -581,7 +597,15 @@ export interface EmailRecoveryGetDelegationArgs {
   'expiration' : Timestamp,
   'nonce' : string,
 }
+/**
+ * Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
+ * EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+ * breaking interface change; nonce is the lookup key and is always
+ * required.
+ */
+export interface EmailRecoveryResolveViaDohArg { 'nonce' : string }
 export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
+  { 'ResolvingDoh' : null } |
   { 'NeedDkimLeaf' : { 'selector' : string } } |
   {
     'RecoveryReady' : {
@@ -605,6 +629,13 @@ export interface EmailRecoverySubmitDkimLeafArg {
    * least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
    * canister side. For the Gmail-style direct-TXT case this is a
    * single-element vec.
+   * 
+   * When the FE cannot walk a fully-signed DNSSEC resolution for the
+   * leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
+   * `selector1._domainkey.outlook.com` is a signed CNAME into the
+   * unsigned `outbound.protection.outlook.com`) — it must NOT submit
+   * an empty vec here; it drives `email_recovery_resolve_via_doh`
+   * instead, which resolves the key over the canister's DoH path.
    */
   'hops' : Array<SignedRRset>,
   'nonce' : string,
@@ -919,6 +950,17 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
+   * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
+   * OpenID credentials. When set, a batched timer-driven migration stamps
+   * every stored credential whose (iss, aud) matches an entry and whose
+   * `sso_domain` is not set yet. Idempotent — already-stamped credentials
+   * are skipped, so re-submitting (e.g. with a corrected list) is safe.
+   * When unset, no backfill runs. The deployer builds the list from the
+   * running canister's `discovered_oidc_configs` query before
+   * submitting the upgrade proposal.
+   */
+  'sso_credential_migration' : [] | [Array<SsoCredentialMigrationEntry>],
+  /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.
    */
@@ -977,6 +1019,11 @@ export interface InternetIdentityInit {
    * Configuration for Web Analytics
    */
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
+  /**
+   * Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+   * off (DoH-only); `opt true` re-enables it.
+   */
+  'enable_dnssec_email_recovery' : [] | [boolean],
   /**
    * Configuration for Related Origins Requests.
    * If present, list of origins from where registration is allowed.
@@ -1268,6 +1315,10 @@ export interface PrepareIdAliasRequest {
    */
   'identity_number' : IdentityNumber,
 }
+export interface PrepareSessionDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+}
 /**
  * The prepared id alias contains two (still unsigned) credentials in JWT format,
  * certifying the id alias for the issuer resp. the relying party.
@@ -1352,6 +1403,9 @@ export interface Rrsig {
   'type_covered' : number,
 }
 export type Salt = Uint8Array | number[];
+export type SessionDelegationError = { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type SessionKey = PublicKey;
 export type SetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
@@ -1447,6 +1501,28 @@ export interface SmtpRequest {
 export interface SmtpRequestError { 'code' : bigint, 'message' : string }
 export type SmtpResponse = { 'Ok' : {} } |
   { 'Err' : SmtpRequestError };
+/**
+ * One entry of the `sso_credential_migration` backfill. Maps the
+ * (iss, aud) pair of stored SSO credentials to the discovery domain (and
+ * optional human-readable name) they were registered through. Field names
+ * match the `discovered_oidc_configs` query output so the deployer can
+ * transcribe its result field-for-field.
+ */
+export interface SsoCredentialMigrationEntry {
+  /**
+   * Human-readable SSO label; stamped onto the credential's `sso_name`.
+   */
+  'name' : [] | [string],
+  /**
+   * Matches the stored credential's `iss`.
+   */
+  'issuer' : string,
+  'discovery_domain' : string,
+  /**
+   * Matches the stored credential's `aud`.
+   */
+  'client_id' : string,
+}
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1692,10 +1768,22 @@ export interface _SERVICE {
     { 'Ok' : EmailRecoveryChallenge } |
       { 'Err' : EmailRecoveryError }
   >,
+  /**
+   * Resolves the DKIM key over the canister's own allowlist-gated DoH
+   * path, called with just the nonce. Used for the pure-DoH (Gmail)
+   * case and as the fallback when the FE can't walk a fully-signed
+   * DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
+   * Polled: the FE calls it repeatedly while the status is ResolvingDoh.
+   */
+  'email_recovery_resolve_via_doh' : ActorMethod<
+    [EmailRecoveryResolveViaDohArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailRecoveryError }
+  >,
   'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
   'email_recovery_submit_dkim_leaf' : ActorMethod<
     [EmailRecoverySubmitDkimLeafArg],
-    { 'Ok' : EmailRecoveryStatus } |
+    { 'Ok' : null } |
       { 'Err' : EmailRecoveryError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
@@ -1746,6 +1834,11 @@ export interface _SERVICE {
       { 'Err' : GetIdAliasError }
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
+  'get_session_delegation' : ActorMethod<
+    [UserNumber, SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : SessionDelegationError }
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -1917,6 +2010,11 @@ export interface _SERVICE {
     [PrepareIdAliasRequest],
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
+  >,
+  'prepare_session_delegation' : ActorMethod<
+    [UserNumber, SessionKey, [] | [bigint]],
+    { 'Ok' : PrepareSessionDelegation } |
+      { 'Err' : SessionDelegationError }
   >,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],

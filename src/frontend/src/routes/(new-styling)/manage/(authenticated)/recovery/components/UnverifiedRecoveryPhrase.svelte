@@ -1,8 +1,8 @@
 <script lang="ts">
   import {
+    BookAlertIcon,
+    BookOpenCheckIcon,
     EllipsisVerticalIcon,
-    ShieldIcon,
-    ShieldCheckIcon,
     Trash2Icon,
   } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
@@ -26,12 +26,12 @@
   ]}
 >
   <div class="mb-3 flex h-9 flex-row items-center">
-    <ShieldIcon class="text-fg-warning-primary size-6" />
+    <BookAlertIcon class="text-fg-warning-primary size-6" />
     <Select
       options={[
         {
           label: $t`Verify`,
-          icon: ShieldCheckIcon,
+          icon: BookOpenCheckIcon,
           onClick: onVerify,
         },
         {

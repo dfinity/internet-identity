@@ -264,16 +264,22 @@ impl Storable for BufferedEntryWrapper {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-/// Outcome of one batch of the OpenID credential key migration.
+/// Outcome of one batch of the SSO credential `sso_domain` / `sso_name`
+/// backfill (see `InternetIdentityInit::sso_credential_migration`).
 #[derive(Default, Debug)]
-pub struct MigrationBatchOutcome {
-    /// Number of legacy entries successfully upgraded to the new key format.
-    pub processed: u64,
-    /// `true` when all legacy entries have been drained — caller should stop
-    /// the interval timer.
+pub struct SsoCredentialMigrationBatchOutcome {
+    /// Number of stored credentials stamped with `sso_domain` / `sso_name`
+    /// this batch.
+    pub stamped: u64,
+    /// `true` when the scan has reached the end of the credential index —
+    /// caller should stop the interval timer.
     pub is_done: bool,
     /// Per-entry errors encountered this batch (e.g. orphan index entries).
     pub errors: Vec<String>,
+    /// Last index key examined this batch; pass back as `cursor` of the next
+    /// batch to resume the scan where this one left off. `None` when the
+    /// batch examined no keys.
+    pub next_cursor: Option<StorableOpenIdCredentialKey>,
 }
 
 /// Data type responsible for managing anchor data in stable memory.
@@ -876,103 +882,143 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
-    /// Migrates one batch of OpenID credential keys from the legacy `(iss, sub)`
-    /// (CBOR array) format to the new `(iss, sub, aud)` (CBOR map) format.
+    /// Backfills one batch of the SSO credential `sso_domain` / `sso_name`
+    /// stamps (see `InternetIdentityInit::sso_credential_migration` and
+    /// `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
     ///
-    /// Each batch scans the index for up to `batch_size` keys where
-    /// `is_legacy()` is true, removes them, resolves `aud` from the backing
-    /// anchor's stored `StorableOpenIdCredential`, and re-inserts with the
-    /// complete 3-tuple key. The migration is done once a batch finds fewer
-    /// than `batch_size` legacy entries — i.e. there are no more to process.
+    /// Each batch examines up to `batch_size` keys of the OpenID credential
+    /// index, starting after `cursor` (`None` starts from the beginning).
+    /// For every key whose `(iss, aud)` matches a migration entry, the
+    /// backing anchors' stored credentials are stamped with the entry's
+    /// `discovery_domain` / `sso_name` — but only where `sso_domain` is not
+    /// set yet, which makes the migration idempotent. The bound is on keys
+    /// *examined* (not keys stamped) so each batch does a fixed amount of
+    /// work regardless of how the matching credentials are distributed over
+    /// the index. The migration is done once a batch examines fewer than
+    /// `batch_size` keys — i.e. the scan has reached the end of the index.
     ///
-    /// We walk the index via `.iter()` (as opposed to `pop_first()`) because
-    /// that works regardless of how legacy vs new-format entries happen to
-    /// sort against each other in the stable `BTreeMap`'s byte ordering. That
-    /// matters even though raw legacy (CBOR array) bytes sort strictly before
-    /// any re-inserted new-format (CBOR map) entries in production: as the
-    /// migration progresses, new-format entries accumulate in the map, and
-    /// an iter-based scan can cleanly skip past them while still finding the
-    /// remaining legacy tail.
-    ///
-    /// Follows the batched-migration convention used by prior anchor
-    /// migrations (see [#3713](https://github.com/dfinity/internet-identity/pull/3713)):
+    /// Follows the batched-migration convention used by prior data
+    /// migrations (see [#3784](https://github.com/dfinity/internet-identity/pull/3784)
+    /// and [#3713](https://github.com/dfinity/internet-identity/pull/3713)):
     /// the caller invokes this on an interval timer until `is_done` becomes
-    /// `true`, at which point the timer is cleared.
-    pub fn migrate_openid_credential_keys_batch(
+    /// `true`, at which point the timer is cleared. Unlike #3784, "needs
+    /// stamping" is not visible in the key bytes, so the caller threads the
+    /// scan position through via `cursor` / `next_cursor` instead of
+    /// re-scanning for unmigrated entries each batch.
+    pub fn migrate_sso_credentials_batch(
         &mut self,
+        entries: &[SsoCredentialMigrationEntry],
+        cursor: Option<StorableOpenIdCredentialKey>,
         batch_size: u64,
-    ) -> MigrationBatchOutcome {
-        let mut outcome = MigrationBatchOutcome::default();
+    ) -> SsoCredentialMigrationBatchOutcome {
+        let mut outcome = SsoCredentialMigrationBatchOutcome::default();
 
-        if batch_size == 0 {
+        if batch_size == 0 || entries.is_empty() {
             outcome.is_done = true;
             return outcome;
         }
 
-        // Phase 1: collect up to `batch_size` legacy keys via a read-only scan.
-        // `.take(batch_size)` caps work per batch; iteration order is the map's
-        // byte order, and in production legacy keys sit at the head, so this is
-        // effectively O(batch_size) there.
-        let legacy_keys: Vec<StorableOpenIdCredentialKey> = self
+        // Phase 1: examine up to `batch_size` keys via a read-only scan,
+        // collecting the (key, anchor numbers) pairs that match a migration
+        // entry. Collected first so phase 2 doesn't alias the borrow.
+        // `Bound` is taken by `ic_stable_structures::storable::Bound` here,
+        // so qualify the range bounds explicitly.
+        use std::ops::Bound as RangeBound;
+        let range = match &cursor {
+            Some(cursor) => (RangeBound::Excluded(cursor.clone()), RangeBound::Unbounded),
+            None => (RangeBound::Unbounded, RangeBound::Unbounded),
+        };
+        let mut examined: u64 = 0;
+        let mut matches: Vec<(StorableOpenIdCredentialKey, Vec<AnchorNumber>)> = vec![];
+        for (key, anchor_list) in self
             .lookup_anchor_with_openid_credential_memory
-            .iter()
-            .filter(|(k, _)| k.is_legacy())
-            .map(|(k, _)| k.clone())
+            .range(range)
             .take(batch_size as usize)
-            .collect();
+        {
+            examined += 1;
+            outcome.next_cursor = Some(key.clone());
+            if entries
+                .iter()
+                .any(|entry| entry.issuer == key.iss && entry.client_id == key.aud)
+            {
+                matches.push((key, anchor_list.into()));
+            }
+        }
 
-        let collected = legacy_keys.len() as u64;
-
-        // Phase 2: remove + re-insert each legacy entry in the new format.
-        // Done after iteration ends so we don't alias the borrow.
-        for legacy_key in legacy_keys {
-            let Some(anchor_list) = self
-                .lookup_anchor_with_openid_credential_memory
-                .remove(&legacy_key)
+        // Phase 2: stamp the matching credentials on their backing anchors.
+        for (key, anchor_numbers) in matches {
+            // The migration entry is guaranteed to exist by the phase 1
+            // filter; skip defensively instead of unwrapping.
+            let Some(entry) = entries
+                .iter()
+                .find(|entry| entry.issuer == key.iss && entry.client_id == key.aud)
             else {
-                // Disappeared between phase 1 and 2 (concurrent mutation is
-                // not possible here, but defensively ignore).
                 continue;
             };
-
-            let anchor_numbers: Vec<AnchorNumber> = anchor_list.clone().into();
-            let resolved_aud = anchor_numbers
-                .first()
-                .and_then(|anchor_number| self.stable_anchor_memory.get(anchor_number))
-                .and_then(|storable_anchor| {
-                    storable_anchor
-                        .openid_credentials
-                        .iter()
-                        .find(|c| c.iss == legacy_key.iss && c.sub == legacy_key.sub)
-                        .map(|c| c.aud.clone())
-                });
-
-            match resolved_aud {
-                Some(aud) => {
-                    let new_key = StorableOpenIdCredentialKey {
-                        iss: legacy_key.iss,
-                        sub: legacy_key.sub,
-                        aud,
-                    };
-                    self.lookup_anchor_with_openid_credential_memory
-                        .insert(new_key, anchor_list);
-                    outcome.processed += 1;
-                }
-                None => {
-                    // Orphan index entry: no anchor/credential data to resolve
-                    // `aud` from. Drop it — the credential itself is already
-                    // gone from the anchor, so leaving the index pointer would
-                    // be useless, and re-inserting with empty aud would keep
-                    // `is_legacy()` true forever.
-                    let err = format!("orphan iss={} sub={}", legacy_key.iss, legacy_key.sub);
-                    ic_cdk::println!("WARNING: dropping orphan OpenID index entry: {err}");
+            // The aggregated errors are surfaced by the anonymous
+            // `list_sso_credential_migration_errors` endpoint, so they must
+            // not carry `iss` / `sub` — those identify the user at the IdP.
+            // The anchor number is enough to investigate and is not IdP PII.
+            if anchor_numbers.is_empty() {
+                // Degenerate "index entry with no anchors" state — no anchor
+                // to name, and we deliberately omit iss/sub.
+                let err = "index entry with no associated anchor".to_string();
+                ic_cdk::println!("WARNING: SSO credential migration: {err}");
+                outcome.errors.push(err);
+                continue;
+            }
+            for anchor_number in anchor_numbers {
+                let Some(mut storable_anchor) = self.stable_anchor_memory.get(&anchor_number)
+                else {
+                    // Orphan index entry: the anchor holding this credential
+                    // is gone. Nothing to stamp; the index inconsistency is
+                    // out of scope for this migration, so just report it.
+                    let err = format!("anchor {anchor_number} not found for migrated credential");
+                    ic_cdk::println!("WARNING: SSO credential migration: {err}");
                     outcome.errors.push(err);
+                    continue;
+                };
+                let mut stamped_in_anchor: u64 = 0;
+                for credential in storable_anchor
+                    .openid_credentials
+                    .iter_mut()
+                    .filter(|credential| credential.key() == key)
+                {
+                    // Idempotency: already-stamped credentials are skipped, so
+                    // re-running (e.g. with a corrected entry list) is safe.
+                    if credential.sso_domain.is_some() {
+                        continue;
+                    }
+                    // `sso_domain` and `sso_name` are always written together,
+                    // so a set `sso_name` with an unset `sso_domain` shouldn't
+                    // happen. Log if it does — we're about to overwrite it —
+                    // rather than silently hide the anomaly. No PII: anchor
+                    // number only.
+                    if credential.sso_name.is_some() {
+                        ic_cdk::println!(
+                            "WARNING: SSO credential migration: overwriting sso_name on a \
+                             credential with no sso_domain (anchor {anchor_number})"
+                        );
+                    }
+                    credential.sso_domain = Some(entry.discovery_domain.clone());
+                    credential.sso_name = entry.name.clone();
+                    stamped_in_anchor += 1;
+                }
+                // Count credentials actually stamped, not anchors touched: the
+                // index key is the full `(iss, sub, aud)`, so today the filter
+                // matches at most one credential per anchor, but counting per
+                // credential keeps `stamped` honest if that ever changes. Only
+                // write the anchor back when something changed.
+                if stamped_in_anchor > 0 {
+                    self.stable_anchor_memory
+                        .insert(anchor_number, storable_anchor);
+                    outcome.stamped += stamped_in_anchor;
                 }
             }
         }
 
-        // A short batch means we've scanned past all legacy entries.
-        if collected < batch_size {
+        // A short batch means the scan has reached the end of the index.
+        if examined < batch_size {
             outcome.is_done = true;
         }
 
