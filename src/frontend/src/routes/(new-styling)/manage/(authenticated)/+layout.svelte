@@ -468,9 +468,14 @@
         handleError(error);
       }}
       bind:mode={authDialogMode}
+      passkeyLabel={authDialogMode === "signin"
+        ? $t`Select one of its passkeys`
+        : undefined}
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {authDialogMode === "signup" ? $t`Add a new identity` : $t`Sign in`}
+        {authDialogMode === "signup"
+          ? $t`Add a new identity`
+          : $t`Add existing identity`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
         {$t`Choose method to continue`}

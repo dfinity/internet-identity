@@ -39,6 +39,9 @@
     onSignUp: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     mode?: AuthMode;
+    // Override the primary passkey-button label in the picker. Forwarded
+    // verbatim to PickAuthenticationMethod.
+    passkeyLabel?: string;
     children?: Snippet<[boolean?]>;
   }
 
@@ -47,6 +50,7 @@
     onSignUp,
     onError,
     mode = $bindable("both"),
+    passkeyLabel,
     children,
   }: Props = $props();
 
@@ -458,6 +462,7 @@
       ? undefined
       : () => (isContinueFromAnotherDeviceVisible = true)}
     {mode}
+    {passkeyLabel}
     onSwitchMode={switchModeAvailable ? toggleMode : undefined}
     withinDialog={inDialog || isElevated || inAuthPanel}
   />

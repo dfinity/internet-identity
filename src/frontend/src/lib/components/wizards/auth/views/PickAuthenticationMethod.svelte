@@ -23,6 +23,11 @@
     // Identity?" copy is misleading). When set, the description line is
     // suppressed and the title carries the full prompt on its own.
     switchModeTitle?: string;
+    // Override the primary passkey-button label. Used by surfaces that
+    // need different wording than the default mode-derived copy (e.g.
+    // /manage's "add existing identity" dialog uses "Select one of its
+    // passkeys" instead of "Sign in with passkey").
+    passkeyLabel?: string;
   }
 
   const {
@@ -34,6 +39,7 @@
     onSwitchMode,
     withinDialog = false,
     switchModeTitle,
+    passkeyLabel: passkeyLabelOverride,
   }: Props = $props();
 
   const showLostAccess = $derived(mode !== "signup");
@@ -42,11 +48,12 @@
   );
 
   const passkeyLabel = $derived(
-    mode === "signin"
-      ? $t`Sign in with passkey`
-      : mode === "signup"
-        ? $t`Sign up with passkey`
-        : $t`Continue with passkey`,
+    passkeyLabelOverride ??
+      (mode === "signin"
+        ? $t`Sign in with passkey`
+        : mode === "signup"
+          ? $t`Sign up with passkey`
+          : $t`Continue with passkey`),
   );
   const providerLabel = (name: string) =>
     mode === "signin"
