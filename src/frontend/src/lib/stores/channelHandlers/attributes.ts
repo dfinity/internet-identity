@@ -653,6 +653,7 @@ export const handleIcrc3ConsentAttributes =
           pipelinePromise.then((pipeline) => ({
             groups: pipeline?.groups ?? [],
             effectiveOrigin: pipeline?.origin ?? "",
+            requestedKeys,
           })),
         );
 
@@ -671,12 +672,21 @@ export const handleIcrc3ConsentAttributes =
           omit_scope: boolean;
         }>;
 
-        if (pipeline.groups.length === 0) {
-          // Nothing the dapp requested is available — certify an empty set
+        const emailRequested = requestedKeys.some((key) => {
+          const name = extractAttributeName(key);
+          return name === "email" || name === "verified_email";
+        });
+
+        if (pipeline.groups.length === 0 && !emailRequested) {
+          // Nothing the dapp requested is available and there's no inline
+          // "Verify an email" affordance to surface — certify an empty set
           // and auto-resolve consent so the UI skips the empty picker view.
           attributeSpecs = [];
           attributeConsentStore.setConsent({ attributes: [] });
         } else {
+          // Either there's something to pick, OR the view will surface the
+          // empty-state verify CTA and drive its own refetch loop before
+          // calling setConsent. Either way, wait for the consent decision.
           const consent = await waitForStore(attributeConsentResultStore);
           attributeSpecs = consent.attributes.map((attr) => ({
             key: attr.key,

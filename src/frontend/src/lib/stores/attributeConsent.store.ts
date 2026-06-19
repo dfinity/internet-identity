@@ -18,6 +18,11 @@ export interface AttributeGroup {
 export interface AttributeConsentContext {
   groups: AttributeGroup[];
   effectiveOrigin: string;
+  /** Requested keys from the JSON-RPC params, preserved through the
+   *  pipeline so the empty-state branch in the consent view can decide
+   *  whether to offer an inline "Verify an email" affordance — and after
+   *  a verification, re-resolve groups against the same request shape. */
+  requestedKeys: string[];
 }
 
 export interface AttributeConsent {
