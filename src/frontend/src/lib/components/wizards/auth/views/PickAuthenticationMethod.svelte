@@ -222,12 +222,12 @@
         <div class="text-text-primary text-sm font-semibold">
           {switchModeTitle ??
             (mode === "signin"
-              ? $t`Don't have an identity?`
+              ? $t`Create new identity`
               : $t`Already have an identity?`)}
         </div>
         <div class="text-text-tertiary mt-1 text-xs">
           {mode === "signin"
-            ? $t`Set one up in seconds.`
+            ? $t`Takes a second`
             : $t`Use a passkey or familiar provider.`}
         </div>
       </div>
