@@ -15,8 +15,8 @@ export class CallbackPopupClosedError extends Error {}
  * Payload the canister's POST /callback landing page delivers to the
  * frontend — via `BroadcastChannel` in the popup flow, via the
  * `ii-openid-callback-data` sessionStorage entry in the same-tab flow.
- * Mirrors what the OAuth callback fragment used to carry: either the token
- * or the IdP's RFC 6749 error report, plus the CSRF `state` in both cases.
+ * Carries either the token or the IdP's RFC 6749 error report, plus the
+ * CSRF `state` in both cases.
  *
  * The canister serializes an absent `error_description` as JSON `null`
  * rather than omitting the key, so the schema accepts `null` and normalizes

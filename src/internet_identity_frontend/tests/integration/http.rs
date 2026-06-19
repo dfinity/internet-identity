@@ -493,10 +493,10 @@ fn frontend_canister_translates_form_post_provider_error() -> Result<(), RejectR
     Ok(())
 }
 
-/// Bodies that aren't a translatable callback get a static error page, not
-/// a page with an embedded payload.
+/// Bodies that aren't a translatable callback redirect to the in-SPA error
+/// page rather than embedding any payload.
 #[test]
-fn frontend_canister_rejects_malformed_form_post() -> Result<(), RejectResponse> {
+fn frontend_canister_redirects_malformed_form_post() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id =
         install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
@@ -516,10 +516,15 @@ fn frontend_canister_rejects_malformed_form_post() -> Result<(), RejectResponse>
         };
         let response = canister_tests::api::http_request_update(&env, canister_id, &request)?;
 
-        assert_eq!(response.status_code, 400);
-        let page = std::str::from_utf8(&response.body).expect("Body is not valid UTF-8");
-        assert!(page.contains("Sign-in could not be completed"));
-        assert!(!page.contains("<script>"));
+        assert_eq!(response.status_code, 303);
+        let location = response
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("location"))
+            .map(|(_, value)| value.as_str())
+            .expect("redirect must carry a Location header");
+        assert!(location.starts_with("/callback-error?reason="));
+        assert!(response.body.is_empty());
     }
     Ok(())
 }

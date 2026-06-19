@@ -414,8 +414,8 @@ describe("extractIdTokenFromCallback", () => {
 
   it("throws 'Invalid state' when the payload is not an object", () => {
     // The payload crosses a BroadcastChannel / sessionStorage JSON
-    // round-trip, so any shape can arrive — including the URL string the
-    // legacy fragment-era callback page used to post.
+    // round-trip, so any shape can arrive — including a bare URL string
+    // rather than the expected object.
     expect(() =>
       extractIdTokenFromCallback(
         `https://example.id.ai/callback#state=${STATE}&id_token=abc`,

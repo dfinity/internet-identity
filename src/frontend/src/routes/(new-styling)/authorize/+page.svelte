@@ -252,8 +252,9 @@
         openIdAuthorizeState,
       );
     } catch {
-      // A state mismatch, an IdP error report or a missing token falls
-      // back to the regular flow, matching the fragment-era behavior.
+      // A state mismatch, an IdP error report or a missing token is not
+      // recoverable here; fall back to the regular flow so the user can
+      // start sign-in again.
       return;
     }
     const authFlow = new AuthFlow({ trackLastUsed: false });

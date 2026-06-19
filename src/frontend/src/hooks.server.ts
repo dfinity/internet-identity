@@ -39,6 +39,11 @@ export const handle: Handle = async ({ event, resolve }) => {
           "application/x-www-form-urlencoded",
       },
       body: await event.request.text(),
+      // A malformed body makes the canister respond with a 303 to the in-SPA
+      // error page. Pass that redirect through to the browser rather than
+      // following it here, which would swallow the redirect and return the
+      // error page's HTML as the POST response.
+      redirect: "manual",
     });
     // `fetch` has already decoded the body, so drop the headers describing the
     // now-absent encoding before handing the response back to the browser.

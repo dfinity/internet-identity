@@ -107,6 +107,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            None,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -144,6 +145,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            None,
                             vec![headers],
                         ),
                         fallback_for: vec![],
@@ -167,14 +169,19 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
 
 /// Headers for dynamically rendered responses, built from the retained
 /// [`HeaderConfig`] so they match the headers certified onto static assets.
-/// The caller supplies its own `Content-Security-Policy` among
-/// `additional_headers`, so no inline-script integrity hashes are passed here.
-pub(crate) fn dynamic_response_headers(additional_headers: Vec<HeaderField>) -> Vec<HeaderField> {
+/// Pass `content_security_policy_override` to replace the SPA-wide policy for
+/// a response that needs its own (no inline-script integrity hashes are used
+/// here); pass `None` to inherit the SPA-wide policy.
+pub(crate) fn dynamic_response_headers(
+    content_security_policy_override: Option<String>,
+    additional_headers: Vec<HeaderField>,
+) -> Vec<HeaderField> {
     HEADER_CONFIG.with_borrow(|config| {
         get_asset_headers(
             vec![],
             config.related_origins.as_ref(),
             config.dev_csp,
+            content_security_policy_override,
             additional_headers,
         )
     })
@@ -184,6 +191,7 @@ fn get_asset_headers(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
+    content_security_policy_override: Option<String>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
     let credentials_allowlist = if let Some(related_origins) = related_origins {
@@ -213,10 +221,15 @@ fn get_asset_headers(
         // Reduces risk of drive-by downloads and serves as defense against MIME confusion attacks
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         // Content-Security-Policy (CSP)
-        // Comprehensive policy to prevent XSS attacks and data injection
+        // Comprehensive policy to prevent XSS attacks and data injection. A
+        // caller may override it for a response that needs its own policy
+        // (e.g. the callback landing page pins a single inline-script hash);
+        // otherwise the SPA-wide policy is computed from the integrity hashes.
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes, related_origins, dev_csp),
+            content_security_policy_override.unwrap_or_else(|| {
+                get_content_security_policy(integrity_hashes, related_origins, dev_csp)
+            }),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain

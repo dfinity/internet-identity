@@ -67,7 +67,5 @@ type InternetIdentityFrontendInit = record {
 
 service : (InternetIdentityFrontendInit) -> {
     http_request : (request : HttpRequest) -> (HttpResponse) query;
-    // Handles the OAuth `response_mode=form_post` callback POSTed by the IdP
-    // to /callback, upgraded from `http_request` so the response is certified.
     http_request_update : (request : HttpRequest) -> (HttpResponse);
 };
