@@ -2,7 +2,6 @@
   import type { LayoutProps } from "./$types";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { t } from "$lib/stores/locale.store";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import Header from "$lib/components/layout/Header.svelte";
@@ -14,7 +13,7 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { showIdentitySwitcher } from "./cli-switcher.store";
+  import { showIdentitySwitcher } from "./mcp-switcher.store";
 
   const { children }: LayoutProps = $props();
 
@@ -32,7 +31,7 @@
   let isManageIdentitiesDialogOpen = $state(false);
 
   // Switching identity only *selects* here — unlike the authorize route, it
-  // doesn't sign in. The page's Continue button performs the authentication
+  // doesn't sign in. The page's Allow access button performs the authentication
   // for the selected identity, so the user always makes that explicit choice.
   const handleSelectIdentity = (identityNumber: bigint): Promise<void> => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -63,7 +62,6 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
-    void purgeSession(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -90,7 +88,7 @@
   };
 </script>
 
-<div class="flex min-h-[100dvh] flex-col" data-page="cli-authorize-view">
+<div class="flex min-h-[100dvh] flex-col" data-page="mcp-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header>
     {#if selectedIdentity !== undefined && $showIdentitySwitcher}

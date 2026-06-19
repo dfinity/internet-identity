@@ -61,7 +61,7 @@ jobs:
             rust=${{ steps.update-rust.outcome }} node=${{ steps.update-node.outcome }} didc=${{ steps.update-didc.outcome }} icp-cli=${{ steps.update-icp-cli.outcome }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6.1.0
         with:
           token: ${{ steps.app-token.outputs.token }}
           base: main

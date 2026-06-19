@@ -518,6 +518,11 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const SessionDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -693,6 +698,10 @@ export const idlFactory = ({ IDL }) => {
   const PrepareIdAliasError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const PrepareSessionDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
   });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -1007,6 +1016,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Principal],
         ['query'],
       ),
+    'get_session_delegation' : IDL.Func(
+        [UserNumber, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : SessionDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'identity_authn_info' : IDL.Func(
         [IdentityNumber],
@@ -1154,6 +1173,16 @@ export const idlFactory = ({ IDL }) => {
     'prepare_id_alias' : IDL.Func(
         [PrepareIdAliasRequest],
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
+        [],
+      ),
+    'prepare_session_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareSessionDelegation,
+            'Err' : SessionDelegationError,
+          }),
+        ],
         [],
       ),
     'register' : IDL.Func(

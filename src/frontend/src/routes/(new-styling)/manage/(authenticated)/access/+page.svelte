@@ -23,6 +23,7 @@
   } from "$app/navigation";
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
   import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
   import {
@@ -362,9 +363,9 @@
       }
       // Logout and forget identity if it's the current access method
       if (isCurrentAccessMethod($authenticatedStore, removingAccessMethod)) {
-        lastUsedIdentitiesStore.removeIdentity(
-          $authenticatedStore.identityNumber,
-        );
+        const identityNumber = $authenticatedStore.identityNumber;
+        lastUsedIdentitiesStore.removeIdentity(identityNumber);
+        void purgeSession(identityNumber);
         sessionStore.reset();
         location.replace("/login");
         return;
