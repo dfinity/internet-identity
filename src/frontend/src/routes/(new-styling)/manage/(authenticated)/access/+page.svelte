@@ -87,15 +87,6 @@
   const openIdCredentials = $derived(
     accessMethods.filter((m) => "openid" in m).map(({ openid }) => openid),
   );
-  const existingPasskeyCredentialIds = $derived(
-    accessMethods
-      .filter((m) => "passkey" in m)
-      .flatMap((m) =>
-        "WebAuthn" in m.passkey.authn_method
-          ? [new Uint8Array(m.passkey.authn_method.WebAuthn.credential_id)]
-          : [],
-      ),
-  );
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
       const value = data.identityInfo.authn_methods.find(
@@ -478,7 +469,6 @@
       }}
       {maxPasskeysReached}
       {openIdCredentials}
-      excludePasskeyCredentialIds={existingPasskeyCredentialIds}
       identityName={data.identityInfo.name[0]}
     />
   </Dialog>

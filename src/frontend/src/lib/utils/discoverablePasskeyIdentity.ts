@@ -210,17 +210,10 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     this.#credentialRequestOptions = credentialRequestOptions;
   }
 
-  static async createNew(
-    name: string,
-    excludeCredentialIds?: Uint8Array[],
-  ): Promise<DiscoverablePasskeyIdentity> {
+  static async createNew(name: string): Promise<DiscoverablePasskeyIdentity> {
     const rpId = getRpId();
     const identity = new DiscoverablePasskeyIdentity({
-      credentialCreationOptions: creationOptions(
-        name,
-        rpId,
-        excludeCredentialIds,
-      ),
+      credentialCreationOptions: creationOptions(name, rpId),
     });
     await identity.sign(Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)));
     return identity;
@@ -334,25 +327,10 @@ export const getRpId = () => {
 export const creationOptions = (
   name: string,
   rpId?: string,
-  excludeCredentialIds?: Uint8Array[],
 ): CredentialCreationOptionsWithoutChallenge => ({
   publicKey: {
     // Identify the AAGUID of the passkey provider
     attestation: "direct",
-    // Listing the identity's existing passkey credential ids here tells
-    // the platform "don't silently reuse one of these to create a new
-    // one." Without this, browsers that recognize the active authentic-
-    // ator (e.g. Touch ID just used to sign in) shortcut straight to a
-    // biometric prompt on the current authenticator instead of showing
-    // the picker — so the user can't pick a different device / iCloud
-    // Keychain / security key without explicitly cancelling first.
-    excludeCredentials:
-      excludeCredentialIds !== undefined && excludeCredentialIds.length > 0
-        ? excludeCredentialIds.map((id) => ({
-            id: new Uint8Array(id),
-            type: "public-key" as const,
-          }))
-        : undefined,
     authenticatorSelection: {
       // For maximum compatibility with various passkey provider,
       // should not be set to either platform or cross-platform.
