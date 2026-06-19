@@ -40,6 +40,13 @@
     onError: (error: unknown) => void;
     mode?: AuthMode;
     children?: Snippet<[boolean?]>;
+    // Optional copy overrides forwarded to PickAuthenticationMethod, used
+    // by logged-in surfaces (e.g. the "Add existing identity" dialog) where
+    // the default sign-in copy is misleading.
+    passkeyLabel?: string;
+    switchModeTitle?: string;
+    switchModeDescription?: string;
+    switchModeButtonLabel?: string;
   }
 
   let {
@@ -48,6 +55,10 @@
     onError,
     mode = $bindable("both"),
     children,
+    passkeyLabel,
+    switchModeTitle,
+    switchModeDescription,
+    switchModeButtonLabel,
   }: Props = $props();
 
   // Initial mode snapshot — restored when the wizard's own dialog closes
@@ -458,6 +469,10 @@
     {mode}
     onSwitchMode={switchModeAvailable ? toggleMode : undefined}
     withinDialog={inDialog || isElevated || inAuthPanel}
+    {passkeyLabel}
+    {switchModeTitle}
+    {switchModeDescription}
+    {switchModeButtonLabel}
   />
 {/snippet}
 

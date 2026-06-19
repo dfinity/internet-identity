@@ -17,11 +17,20 @@
     mode?: "signin" | "signup" | "both";
     onSwitchMode?: () => void;
     withinDialog?: boolean;
+    // Override the primary passkey button label (used when the picker lives
+    // inside a logged-in surface where the default "Sign in with passkey"
+    // copy is misleading, e.g. "Select one of its passkeys").
+    passkeyLabel?: string;
     // Override the switch-mode CTA title (used when the picker lives
     // inside a logged-in surface where the default "New to Internet
-    // Identity?" copy is misleading). When set, the description line is
-    // suppressed and the title carries the full prompt on its own.
+    // Identity?" copy is misleading). When set without an accompanying
+    // switchModeDescription, the description line is suppressed and the
+    // title carries the full prompt on its own.
     switchModeTitle?: string;
+    // Optional description shown beneath switchModeTitle.
+    switchModeDescription?: string;
+    // Override the switch-mode CTA button label (e.g. "Create").
+    switchModeButtonLabel?: string;
   }
 
   const {
@@ -31,7 +40,10 @@
     mode = "both",
     onSwitchMode,
     withinDialog = false,
+    passkeyLabel: passkeyLabelOverride,
     switchModeTitle,
+    switchModeDescription,
+    switchModeButtonLabel,
   }: Props = $props();
 
   const showLostAccess = $derived(mode !== "signup");
@@ -40,11 +52,12 @@
   );
 
   const passkeyLabel = $derived(
-    mode === "signin"
-      ? $t`Sign in with passkey`
-      : mode === "signup"
-        ? $t`Sign up with passkey`
-        : $t`Continue with passkey`,
+    passkeyLabelOverride ??
+      (mode === "signin"
+        ? $t`Sign in with passkey`
+        : mode === "signup"
+          ? $t`Sign up with passkey`
+          : $t`Continue with passkey`),
   );
   const providerLabel = (name: string) =>
     mode === "signin"
@@ -185,7 +198,11 @@
               ? $t`Want a new identity?`
               : $t`Already have an identity?`)}
         </div>
-        {#if switchModeTitle === undefined}
+        {#if switchModeDescription !== undefined}
+          <div class="text-text-tertiary mt-1 text-xs">
+            {switchModeDescription}
+          </div>
+        {:else if switchModeTitle === undefined}
           <div class="text-text-tertiary mt-1 text-xs">
             {mode === "signin"
               ? $t`Create one in seconds.`
@@ -198,7 +215,8 @@
         disabled={authenticatingProviderId !== undefined}
         class="btn btn-secondary btn-sm shrink-0 gap-2"
       >
-        {mode === "signin" ? $t`Sign up` : $t`Sign in`}
+        {switchModeButtonLabel ??
+          (mode === "signin" ? $t`Sign up` : $t`Sign in`)}
         <ArrowRightIcon class="size-4 rtl:-scale-x-100" />
       </button>
     </div>
