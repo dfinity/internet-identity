@@ -18,11 +18,12 @@
     mode?: "signin" | "signup" | "both";
     onSwitchMode?: () => void;
     withinDialog?: boolean;
-    // Override the switch-mode CTA title (used when the picker lives
-    // inside a logged-in surface where the default "New to Internet
-    // Identity?" copy is misleading). When set, the description line is
-    // suppressed and the title carries the full prompt on its own.
+    // Override the switch-mode CTA title (e.g. "Create a new identity"
+    // instead of the default "Want a new identity?" pull).
     switchModeTitle?: string;
+    // Override the switch-mode CTA button label (e.g. "Create" instead
+    // of the default "Sign up" / "Sign in").
+    switchModeAction?: string;
     // Override the primary passkey-button label. Used by surfaces that
     // need different wording than the default mode-derived copy (e.g.
     // /manage's "add existing identity" dialog uses "Select one of its
@@ -39,6 +40,7 @@
     onSwitchMode,
     withinDialog = false,
     switchModeTitle,
+    switchModeAction,
     passkeyLabel: passkeyLabelOverride,
   }: Props = $props();
 
@@ -208,20 +210,18 @@
               ? $t`Want a new identity?`
               : $t`Already have an identity?`)}
         </div>
-        {#if switchModeTitle === undefined}
-          <div class="text-text-tertiary mt-1 text-xs">
-            {mode === "signin"
-              ? $t`Create one in seconds.`
-              : $t`Use a passkey or familiar provider.`}
-          </div>
-        {/if}
+        <div class="text-text-tertiary mt-1 text-xs">
+          {mode === "signin"
+            ? $t`Create one in seconds.`
+            : $t`Use a passkey or familiar provider.`}
+        </div>
       </div>
       <button
         onclick={onSwitchMode}
         disabled={authenticatingProviderId !== undefined}
         class="btn btn-secondary btn-sm shrink-0 gap-2"
       >
-        {mode === "signin" ? $t`Sign up` : $t`Sign in`}
+        {switchModeAction ?? (mode === "signin" ? $t`Sign up` : $t`Sign in`)}
         <ArrowRightIcon class="size-4 rtl:-scale-x-100" />
       </button>
     </div>

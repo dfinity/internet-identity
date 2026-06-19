@@ -42,6 +42,10 @@
     // Override the primary passkey-button label in the picker. Forwarded
     // verbatim to PickAuthenticationMethod.
     passkeyLabel?: string;
+    // Override the switch-mode CTA title + button action. Forwarded
+    // verbatim to PickAuthenticationMethod.
+    switchModeTitle?: string;
+    switchModeAction?: string;
     children?: Snippet<[boolean?]>;
   }
 
@@ -51,6 +55,8 @@
     onError,
     mode = $bindable("both"),
     passkeyLabel,
+    switchModeTitle,
+    switchModeAction,
     children,
   }: Props = $props();
 
@@ -463,6 +469,8 @@
       : () => (isContinueFromAnotherDeviceVisible = true)}
     {mode}
     {passkeyLabel}
+    {switchModeTitle}
+    {switchModeAction}
     onSwitchMode={switchModeAvailable ? toggleMode : undefined}
     withinDialog={inDialog || isElevated || inAuthPanel}
   />
