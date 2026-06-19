@@ -75,7 +75,7 @@ pub fn openid_identity_registration_finish(
         "openid_identity_registration_finish",
         (openid_arg.clone(),),
     )
-    .map(|(x,)| x)
+    .map(|(x,)| super::settled(x))
 }
 
 pub fn identity_authn_info(
