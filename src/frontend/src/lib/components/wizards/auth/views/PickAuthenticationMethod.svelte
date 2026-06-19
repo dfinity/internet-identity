@@ -226,9 +226,7 @@
               : $t`Already have an identity?`)}
         </div>
         <div class="text-text-tertiary mt-1 text-xs">
-          {mode === "signin"
-            ? $t`Takes a second`
-            : $t`Use a passkey or familiar provider.`}
+          {$t`Use a passkey or familiar provider.`}
         </div>
       </div>
       <button
