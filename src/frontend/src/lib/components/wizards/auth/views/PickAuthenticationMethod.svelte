@@ -11,7 +11,12 @@
   import { ArrowRightIcon } from "@lucide/svelte";
 
   interface Props {
-    setupOrUseExistingPasskey: () => void;
+    // The signin variant in AuthWizard returns a promise that resolves
+    // to `"cancelled"` on WebAuthn cancel; the signup / both variants
+    // are synchronous view transitions. We don't await the result here
+    // (Svelte onclick fires it as a handler), but the type has to
+    // accommodate both shapes so callers don't trip the prop checker.
+    setupOrUseExistingPasskey: () => void | Promise<void | "cancelled">;
     continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
     signInWithSso: () => void;
     continueOnAnotherDevice?: () => void;
