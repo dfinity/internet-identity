@@ -152,5 +152,32 @@ describe("ssoDiscovery", () => {
         discoverSsoConfig("dfinity.org", controller.signal),
       ).rejects.toThrow("aborted");
     });
+
+    it("aborting mid-sleep stops the poll without firing another update", async () => {
+      vi.useFakeTimers();
+      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+        Pending: null,
+      });
+      vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);
+
+      const controller = new AbortController();
+      const settled = discoverSsoConfig("dfinity.org", controller.signal).catch(
+        (e: unknown) => e,
+      );
+
+      // First iteration: query reads Pending → one update → parked in the sleep.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(1);
+
+      // Abort during the 500ms sleep: it resolves early and the loop-top check
+      // throws before a second query/update can fire.
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+
+      const error = await settled;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("aborted");
+      expect(anonymousActor.discover_sso).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -9,8 +9,27 @@
 export const POLL_INTERVAL_MS = 500;
 export const MAX_POLL_ATTEMPTS = 60;
 
-export const pollDelay = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+/**
+ * Sleep one poll interval. Resolves early when `signal` aborts so the caller's
+ * next abort check runs without waiting out the full delay (and, in turn,
+ * without firing another canister call for an already-cancelled lookup).
+ */
+export const pollDelay = (signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    if (signal?.aborted === true) {
+      resolve();
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, POLL_INTERVAL_MS);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 
 /**
  * Retry an update call that reports the top-level `Pending` arm while SSO

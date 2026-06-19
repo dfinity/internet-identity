@@ -136,9 +136,16 @@ export const discoverSsoConfig = async (
     if ("NotAllowed" in state) {
       throw new DomainNotConfiguredError("rejected");
     }
-    // Pending — drive the fetch with an update, then poll again.
+    // Re-check before the update: the query above may have spanned an abort,
+    // and we don't want to drive a fetch for a lookup the user already dropped.
+    if (signal?.aborted === true) {
+      throw new Error("SSO discovery aborted");
+    }
+    // Pending — drive the fetch with an update, then poll again. The sleep is
+    // abortable so a mid-delay abort skips straight to the next iteration's
+    // check instead of firing another query.
     await anonymousActor.discover_sso(validatedDomain);
-    await pollDelay();
+    await pollDelay(signal);
   }
 
   throw new DomainNotConfiguredError("timeout");
