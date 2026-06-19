@@ -108,6 +108,12 @@ const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => ({
   },
 });
 
+// Wrap the abort check in a function so each call returns a fresh `boolean`.
+// Reading `signal?.aborted` inline narrows it to `false` for the rest of the
+// iteration, and TypeScript doesn't re-widen across the `await`s — so a second
+// inline check on the same `signal` is flagged as always-false (TS2367).
+const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
+
 /**
  * Resolve a domain's SSO configuration. Validates the domain, then polls
  * `get_sso_discovery` (query) for the state; on `Pending` it drives the fetch
@@ -125,7 +131,7 @@ export const discoverSsoConfig = async (
   const validatedDomain = validateDomain(domain);
 
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-    if (signal?.aborted === true) {
+    if (isAborted(signal)) {
       throw new Error("SSO discovery aborted");
     }
     // Read the discovery state via the cheap query.
@@ -138,7 +144,7 @@ export const discoverSsoConfig = async (
     }
     // Re-check before the update: the query above may have spanned an abort,
     // and we don't want to drive a fetch for a lookup the user already dropped.
-    if (signal?.aborted === true) {
+    if (isAborted(signal)) {
       throw new Error("SSO discovery aborted");
     }
     // Pending — drive the fetch with an update, then poll again. The sleep is
