@@ -29,7 +29,10 @@
   import IdentityAlreadyLinked from "$lib/components/wizards/auth/views/IdentityAlreadyLinked.svelte";
   import SwitchAccessMethod from "$lib/components/wizards/auth/views/SwitchAccessMethod.svelte";
   import { goto } from "$app/navigation";
-  import { shouldRequestMethodSwitch } from "$lib/components/wizards/auth/AuthWizard.switch";
+  import {
+    shouldRequestMethodSwitch,
+    type MethodDescriptor,
+  } from "$lib/components/wizards/auth/AuthWizard.switch";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
@@ -64,6 +67,21 @@
   let isAuthenticating = $state(false);
   let pendingSsoRegistration = false;
 
+  const methodDescriptor = (
+    newMethod: MethodTag,
+    providerIssuer: string | undefined,
+    providerDomain: string | undefined,
+  ): MethodDescriptor | undefined => {
+    if (newMethod === "passkey") return { passkey: {} };
+    if (newMethod === "openid")
+      return providerIssuer === undefined
+        ? undefined
+        : { openid: { iss: providerIssuer } };
+    return providerDomain === undefined
+      ? undefined
+      : { sso: { domain: providerDomain } };
+  };
+
   const maybeRequestMethodSwitch = (
     signedInIdentityNumber: bigint,
     newMethod: MethodTag,
@@ -76,7 +94,13 @@
     },
   ): boolean => {
     if (previousSnapshot === undefined) return false;
-    if (!shouldRequestMethodSwitch(newMethod, previousSnapshot, providerInfo)) {
+    const next = methodDescriptor(
+      newMethod,
+      providerInfo?.providerIssuer,
+      providerInfo?.providerDomain,
+    );
+    if (next === undefined) return false;
+    if (!shouldRequestMethodSwitch(previousSnapshot.authMethod, next)) {
       return false;
     }
     authFlow.requestMethodSwitch({

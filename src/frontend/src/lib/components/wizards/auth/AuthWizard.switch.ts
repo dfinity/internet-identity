@@ -1,11 +1,17 @@
-import type { MethodTag } from "$lib/flows/authFlow.svelte";
 import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
 
-export type ProviderInfo = {
-  providerIssuer?: string;
-  providerDomain?: string;
-  providerName?: string;
-};
+type AuthMethod = LastUsedIdentity["authMethod"];
+
+/**
+ * Comparison-only projection of an auth method — the fields that decide
+ * whether two credentials represent the "same" or "different" sign-in
+ * path from the wizard's perspective. Used for the new (in-flight) side,
+ * which doesn't yet have a `sub` / `loginHint` / metadata.
+ */
+export type MethodDescriptor =
+  | { passkey: Record<string, never> }
+  | { openid: { iss: string } }
+  | { sso: { domain: string } };
 
 /**
  * Returns true when the wizard should show the SwitchAccessMethod
@@ -19,36 +25,19 @@ export type ProviderInfo = {
  * Does NOT fire when:
  * - There is no previous snapshot (first-time user)
  * - Same passkey family (only one passkey "thing" from the wizard's perspective)
- * - Same openid family, same or unknown issuer
- * - Same sso family, same or unknown domain
+ * - Same openid family, same issuer
+ * - Same sso family, same domain
  */
 export const shouldRequestMethodSwitch = (
-  newMethod: MethodTag,
-  previousSnapshot: LastUsedIdentity | undefined,
-  providerInfo?: ProviderInfo,
+  previous: AuthMethod | undefined,
+  next: MethodDescriptor,
 ): boolean => {
-  if (previousSnapshot === undefined) return false;
-
-  const prev = previousSnapshot.authMethod;
-
-  if ("passkey" in prev) {
-    return newMethod !== "passkey";
-  }
-
-  if ("openid" in prev) {
-    if (newMethod !== "openid") return true;
-    const newIssuer = providerInfo?.providerIssuer;
-    if (newIssuer === undefined) return false;
-    return prev.openid.iss !== newIssuer;
-  }
-
-  if ("sso" in prev) {
-    if (newMethod !== "sso") return true;
-    const newDomain = providerInfo?.providerDomain;
-    if (newDomain === undefined) return false;
-    return prev.sso.domain !== newDomain;
-  }
-
-  void (prev satisfies never);
+  if (previous === undefined) return false;
+  if ("passkey" in previous) return !("passkey" in next);
+  if ("openid" in previous)
+    return !("openid" in next) || previous.openid.iss !== next.openid.iss;
+  if ("sso" in previous)
+    return !("sso" in next) || previous.sso.domain !== next.sso.domain;
+  previous satisfies never;
   return false;
 };
