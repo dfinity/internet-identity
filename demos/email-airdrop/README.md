@@ -75,16 +75,16 @@ or `POST` a raw message to the webhook (both go through the same logic).
 
 One `persistent actor` (`main.mo`):
 
-| Concern            | How it's handled |
-| ------------------ | ---------------- |
+| Concern            | How it's handled                                                                                                                                                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Participants       | `OrderedMap<Text, Participant>` keyed by lower-cased sender address. Stores `attempts`, `lastAttemptAt`, `lastRewardedAt`, `rewardedAddress`, `onWaitlist`, `lastOutcome`. Persists across upgrades (orthogonal persistence). |
-| Waitlist           | `Deque<Pending>` (FIFO) + a length counter. |
-| ICP address        | Scanned out of the subject as a 64-hex token and validated via its **CRC32 account-identifier checksum** before use. |
-| Reward             | ICP ledger legacy `transfer` of `REWARD_E8S` to the 32-byte account identifier. |
-| "While funds last" | If `transfer` returns `InsufficientFunds`, the sender is **waitlisted** instead. (The ledger is the source of truth, so this is race-safe even under concurrent requests.) |
-| Top-ups            | A recurring `Timer` drains the waitlist (FIFO) whenever it can; `triggerWaitlist` lets an operator drain it immediately after topping up. |
-| Dedup              | `lastRewardedAt != null` ⇒ already participated; `onWaitlist` ⇒ already queued (no double-enqueue). |
-| Webhook auth       | A shared `WEBHOOK_SECRET` in the query string guards `http_request_update` and `submitEmail`. |
+| Waitlist           | `Deque<Pending>` (FIFO) + a length counter.                                                                                                                                                                                   |
+| ICP address        | Scanned out of the subject as a 64-hex token and validated via its **CRC32 account-identifier checksum** before use.                                                                                                          |
+| Reward             | ICP ledger legacy `transfer` of `REWARD_E8S` to the 32-byte account identifier.                                                                                                                                               |
+| "While funds last" | If `transfer` returns `InsufficientFunds`, the sender is **waitlisted** instead. (The ledger is the source of truth, so this is race-safe even under concurrent requests.)                                                    |
+| Top-ups            | A recurring `Timer` drains the waitlist (FIFO) whenever it can; `triggerWaitlist` lets an operator drain it immediately after topping up.                                                                                     |
+| Dedup              | `lastRewardedAt != null` ⇒ already participated; `onWaitlist` ⇒ already queued (no double-enqueue).                                                                                                                           |
+| Webhook auth       | A shared `WEBHOOK_SECRET` in the query string guards `http_request_update` and `submitEmail`.                                                                                                                                 |
 
 ### Candid interface
 
@@ -106,14 +106,14 @@ service : {
 
 Edit the constants at the top of `main.mo` before deploying:
 
-| Constant | Meaning |
-| -------- | ------- |
-| `LEDGER_ID` | ICP ledger canister id (mainnet default: `ryjl3-tyaaa-aaaaa-aaaba-cai`). |
-| `AIRDROP_EMAIL` / `APP_URL` | Shown on the landing page; `APP_URL` must appear in the body. |
-| `REQUIRED_BODY_PHRASE` | The phrase that must appear in the body. |
-| `WEBHOOK_SECRET` | **Change this.** Guards the webhook and `submitEmail`. |
-| `REWARD_E8S` / `FEE_E8S` | Reward (default 1 ICP) and ledger fee, in e8s. |
-| `WAITLIST_INTERVAL_SECONDS` | How often the waitlist is retried. |
+| Constant                    | Meaning                                                                  |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `LEDGER_ID`                 | ICP ledger canister id (mainnet default: `ryjl3-tyaaa-aaaaa-aaaba-cai`). |
+| `AIRDROP_EMAIL` / `APP_URL` | Shown on the landing page; `APP_URL` must appear in the body.            |
+| `REQUIRED_BODY_PHRASE`      | The phrase that must appear in the body.                                 |
+| `WEBHOOK_SECRET`            | **Change this.** Guards the webhook and `submitEmail`.                   |
+| `REWARD_E8S` / `FEE_E8S`    | Reward (default 1 ICP) and ledger fee, in e8s.                           |
+| `WAITLIST_INTERVAL_SECONDS` | How often the waitlist is retried.                                       |
 
 In production, prefer passing these as **init args** (or a controller-only
 `configure` method) rather than baking them into the Wasm.
