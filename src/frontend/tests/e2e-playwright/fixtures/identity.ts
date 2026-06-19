@@ -332,6 +332,7 @@ export class IdentityWizard {
     await addIdentity.click();
     await continueWithPasskey
       .or(signInWithPasskey)
+      .or(selectPasskey)
       .or(signUpWithPasskey)
       .first()
       .waitFor();
