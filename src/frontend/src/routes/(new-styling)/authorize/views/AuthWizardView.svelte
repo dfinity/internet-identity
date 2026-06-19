@@ -29,7 +29,14 @@
   );
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} {onError} bind:mode>
+<AuthWizard
+  {onSignIn}
+  {onSignUp}
+  {onError}
+  bind:mode
+  switchModeTitle={mode === "signin" ? $t`Create a new identity` : undefined}
+  switchModeAction={mode === "signin" ? $t`Create` : undefined}
+>
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {mode === "signup"

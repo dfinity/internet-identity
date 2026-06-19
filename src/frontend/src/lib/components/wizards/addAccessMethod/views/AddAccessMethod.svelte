@@ -171,13 +171,18 @@
       </button>
     </div>
   </div>
-  <button
-    onclick={continueOnAnotherDevice}
-    disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
-    class="text-text-primary self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-  >
-    {$t`Authorize on another device`}
-  </button>
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-tertiary text-sm">
+      {$t`Have a passkey on another device?`}
+    </p>
+    <button
+      onclick={continueOnAnotherDevice}
+      disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`Authorize`}
+    </button>
+  </div>
 </div>
 
 <style>

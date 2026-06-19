@@ -370,6 +370,12 @@
                   handleError(error);
                 }}
                 bind:mode={authDialogMode}
+                switchModeTitle={authDialogMode === "signin"
+                  ? $t`Create a new identity`
+                  : undefined}
+                switchModeAction={authDialogMode === "signin"
+                  ? $t`Create`
+                  : undefined}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
