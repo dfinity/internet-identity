@@ -22,17 +22,47 @@ use std::cell::RefCell;
 #[cfg(not(test))]
 use crate::state;
 
+// Cache sizing. II runs on a system subnet (HTTP outcalls cost no cycles) and
+// ingress flooding is handled by the boundary nodes, so these caches don't need
+// to rate-limit outcalls or account for cycles. Their one DDoS-relevant job is
+// to keep canister state *bounded and fairly evicted* — especially once the
+// discovery allowlist is removed and `domain` / `jwks_uri` become caller-
+// controlled and unbounded. Each cache's worst-case memory is
+// `max_entries * per-entry-cap`, so the two caches are sized independently (a
+// `DiscoveredConfig` is ~an order of magnitude smaller than a JWKS) and every
+// fill is bounded in bytes (see `DISCOVERY_MAX_RESPONSE_BYTES` and
+// `jwks::JWKS_MAX_RESPONSE_BYTES`).
+
 /// Entry lifetime for both caches: discovery metadata and JWKS change
 /// infrequently, so an hour balances freshness against outcall volume.
 const FRESH_FOR_SECONDS: u64 = 60 * 60;
 /// Stale-if-error window: serve the last-good value through a transient fill
 /// failure for up to this long past freshness before failing the caller.
 const STALE_FOR_SECONDS: u64 = 60 * 60;
-/// LRU cap per cache.
-const MAX_ENTRIES: usize = 100;
+/// LRU cap for the discovery cache (keyed by discovery domain). With `scopes`
+/// capped a `DiscoveredConfig` is ~1-2 KB, so 10k entries is ~10-20 MB — wide
+/// headroom so a flood of distinct domains can't evict the providers real users
+/// rely on.
+const DISCOVERY_MAX_ENTRIES: usize = 10_000;
+/// LRU cap for the JWKS cache (keyed by `jwks_uri`). Each entry is bounded by
+/// `jwks::JWKS_MAX_RESPONSE_BYTES` (32 KiB), so 2k entries is ~64 MB worst case.
+const JWKS_MAX_ENTRIES: usize = 2_000;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
+
+/// Response-size cap for the two discovery hops (`ii-openid-configuration` and
+/// the OIDC discovery document). Both are small JSON docs; 16 KiB bounds the
+/// fill's transient buffer against a hostile endpoint without rejecting any
+/// real one.
+#[cfg(not(test))]
+const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 16 * 1024;
+/// Cap on the number of `scopes_supported` stored per discovery entry. `scopes`
+/// is the only unbounded field in `DiscoveredConfig`; capping it keeps an entry
+/// ~1-2 KB so the 10k discovery budget stays cheap. II only needs
+/// `openid`/`email`/`profile`, so extra advertised scopes are irrelevant.
+#[cfg(not(test))]
+const DISCOVERY_MAX_SCOPES: usize = 32;
 
 /// Default scopes requested when a provider's discovery document doesn't
 /// advertise `scopes_supported`.
@@ -61,22 +91,22 @@ thread_local! {
     static JWKS_CACHE: RefCell<JwksCache> = RefCell::new(new_jwks_cache());
 }
 
-fn cache_config() -> CacheConfig {
+fn cache_config(max_entries: usize) -> CacheConfig {
     CacheConfig {
         fresh_for: FRESH_FOR_SECONDS,
         stale_for: STALE_FOR_SECONDS,
-        max_entries: MAX_ENTRIES,
+        max_entries,
         backoff: RetryBackoff::new(RETRY_BASE_SECONDS, RETRY_MULTIPLIER),
         abandon_fill_after: ABANDON_FILL_AFTER_SECONDS,
     }
 }
 
 fn new_discovery_cache() -> DiscoveryCache {
-    SingleFlightCache::new(discovery_fill, cache_config())
+    SingleFlightCache::new(discovery_fill, cache_config(DISCOVERY_MAX_ENTRIES))
 }
 
 fn new_jwks_cache() -> JwksCache {
-    SingleFlightCache::new(jwks_fill, cache_config())
+    SingleFlightCache::new(jwks_fill, cache_config(JWKS_MAX_ENTRIES))
 }
 
 // ---------------------------------------------------------------------------
@@ -250,10 +280,13 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
     validate_discovery_url(&doc.authorization_endpoint)?;
 
-    let scopes = doc
+    let mut scopes = doc
         .scopes_supported
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_SCOPES.iter().map(|s| (*s).to_string()).collect());
+    // Bound the only unbounded field stored per discovery entry, so a hostile
+    // discovery document can't inflate a cached `DiscoveredConfig`.
+    scopes.truncate(DISCOVERY_MAX_SCOPES);
 
     Ok(DiscoveredConfig {
         issuer: doc.issuer,
@@ -316,7 +349,7 @@ async fn http_get_json(url: String) -> Result<Vec<u8>, String> {
         url,
         method: HttpMethod::GET,
         body: None,
-        max_response_bytes: None,
+        max_response_bytes: Some(DISCOVERY_MAX_RESPONSE_BYTES),
         transform: None,
         headers: vec![
             HttpHeader {

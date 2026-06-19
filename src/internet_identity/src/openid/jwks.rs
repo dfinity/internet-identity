@@ -43,6 +43,22 @@ pub(super) fn read_jwks(source: &JwkSource) -> Cached<Vec<Jwk>> {
 #[cfg(not(test))]
 const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 
+/// Response-size cap for a JWKS fetch. Real OIDC key sets run to several KB and
+/// often embed `x5c` certificate chains — Microsoft's is ~14.5 KB — so 32 KiB
+/// leaves headroom (including key-rotation overlap) while still bounding the
+/// fill's transient buffer and, together with the per-entry LRU, the SSO JWKS
+/// cache's memory. Deliberately broad: this fetch is shared with the configured
+/// Google/Microsoft refresh, which must not be rejected.
+#[cfg(not(test))]
+const JWKS_MAX_RESPONSE_BYTES: u64 = 32 * 1024;
+
+/// Cap on the number of keys kept from a JWKS. Verification matches by `kid` and
+/// real providers publish well under this (Microsoft ~8); keys beyond the cap
+/// are dropped. Bounds both the stored key set and the verify-time scan, so a
+/// provider serving an absurd number of keys only degrades its own SSO entry.
+#[cfg(not(test))]
+const JWKS_MAX_KEYS: usize = 20;
+
 #[cfg(not(test))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct Certs {
@@ -60,7 +76,7 @@ pub(super) async fn fetch_jwks(jwks_uri: String) -> Result<Vec<Jwk>, String> {
         url: jwks_uri,
         method: HttpMethod::GET,
         body: None,
-        max_response_bytes: None,
+        max_response_bytes: Some(JWKS_MAX_RESPONSE_BYTES),
         transform: None,
         headers: vec![
             HttpHeader {
@@ -80,7 +96,13 @@ pub(super) async fn fetch_jwks(jwks_uri: String) -> Result<Vec<Jwk>, String> {
 
     serde_json::from_slice::<Certs>(response.body.as_slice())
         .map_err(|_| "Invalid JSON".into())
-        .map(|res| res.keys)
+        .map(|res| {
+            // Bound the stored key set; verification matches by `kid` and real
+            // providers publish far fewer than this.
+            let mut keys = res.keys;
+            keys.truncate(JWKS_MAX_KEYS);
+            keys
+        })
 }
 
 // OpenID APIs occasionally return responses with keys and their properties in random order,
