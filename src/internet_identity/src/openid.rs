@@ -20,7 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::ffi::os_str::Display;
+use std::fmt::Display;
 
 mod configured;
 mod jwks;
