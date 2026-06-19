@@ -24,7 +24,7 @@
 //!   follow-up).
 
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
-use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce};
+use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce_with_prefix};
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
@@ -47,7 +47,13 @@ pub async fn prepare_add(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
-    prepare_common(dns_input, now_secs, PendingKind::Register { anchor }).await
+    prepare_common(
+        dns_input,
+        now_secs,
+        PendingKind::Register { anchor },
+        super::NONCE_PREFIX,
+    )
+    .await
 }
 
 /// Body of `email_recovery_prepare_delegation(dns_input, session_pk)`.
@@ -74,7 +80,13 @@ pub async fn prepare_delegation(
             super::MAX_SESSION_KEY_BYTES,
         )));
     }
-    prepare_common(dns_input, now_secs, PendingKind::Recover { session_pk }).await
+    prepare_common(
+        dns_input,
+        now_secs,
+        PendingKind::Recover { session_pk },
+        super::NONCE_PREFIX,
+    )
+    .await
 }
 
 /// Shared input-validation + nonce-issuing core. `kind`
@@ -84,10 +96,11 @@ pub async fn prepare_delegation(
 /// render the user-facing label, and the canister accepts mail at
 /// any of the configured `related_origins` aliases (see
 /// [`super::mailbox_domains`]).
-async fn prepare_common(
+pub(super) async fn prepare_common(
     dns_input: EmailRecoveryDnsInput,
     now_secs: u64,
     kind: PendingKind,
+    nonce_prefix: &str,
 ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
     let EmailRecoveryDnsInput { address, dns_proof } = dns_input;
 
@@ -153,7 +166,7 @@ async fn prepare_common(
     let mut attempts = 0;
     let nonce = loop {
         attempts += 1;
-        let candidate = format_nonce(&draw_nonce_bytes());
+        let candidate = format_nonce_with_prefix(nonce_prefix, &draw_nonce_bytes());
         let collision = super::pending::with_mut(&candidate, now_secs, |_| ()).is_some();
         if !collision {
             break candidate;

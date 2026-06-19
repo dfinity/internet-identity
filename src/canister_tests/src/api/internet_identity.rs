@@ -772,6 +772,48 @@ pub fn email_recovery_credential_remove(
     .map(|(x,)| x)
 }
 
+pub fn verified_email_prepare_add(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    dns_input: types::email_recovery::EmailRecoveryDnsInput,
+) -> Result<
+    Result<
+        types::email_recovery::EmailRecoveryChallenge,
+        types::email_recovery::EmailRecoveryError,
+    >,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "verified_email_prepare_add",
+        (identity_number, dns_input),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn verified_email_remove(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    address: &str,
+) -> Result<Result<(), types::email_recovery::EmailRecoveryError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "verified_email_remove",
+        (identity_number, address),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn smtp_request(
     env: &PocketIc,
     canister_id: CanisterId,

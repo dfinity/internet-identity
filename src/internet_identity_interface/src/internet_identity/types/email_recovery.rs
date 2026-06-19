@@ -66,6 +66,25 @@ pub struct EmailRecoveryCredential {
     pub last_used: Option<Timestamp>,
 }
 
+/// One verified email, owned by a single anchor.
+///
+/// Verified emails are a **parallel** anchor primitive to
+/// `EmailRecoveryCredential`. They share the verification primitive
+/// (DKIM/DMARC/DNSSEC/DoH) but live in their own anchor field
+/// (`Anchor.verified_emails`), use their own `II-Verify-` Subject
+/// prefix, and are intended as attribute sources for dapps (see
+/// Phase 2 of `docs/design/verified-email-attributes.md`). Adding
+/// an entry here does not affect the recovery email and vice versa.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
+pub struct VerifiedEmail {
+    /// Lowercased canonical form, same normalisation as
+    /// `EmailRecoveryCredential::address`.
+    pub address: String,
+    /// Nanoseconds since the Unix epoch. The moment the inbound
+    /// challenge-email completed DKIM/DMARC verification.
+    pub verified_at: Timestamp,
+}
+
 /// Identifier the canister hands to the FE when it issues a challenge.
 ///
 /// The same `nonce` the FE displays to the user (and the user types

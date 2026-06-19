@@ -48,14 +48,14 @@ use std::time::Duration;
 // Fixtures
 // ===================================================================
 
-const TEST_DOMAIN: &str = "test.example.com";
-const TEST_ADDRESS: &str = "alice@test.example.com";
+pub(crate) const TEST_DOMAIN: &str = "test.example.com";
+pub(crate) const TEST_ADDRESS: &str = "alice@test.example.com";
 // A second address in the *same* domain as `TEST_ADDRESS`, so two
 // concurrent verifications resolve the same DKIM FQDN and exercise the
 // in-flight cache dedup path. Used by the concurrency reproduction test.
 const TEST_ADDRESS_2: &str = "bob@test.example.com";
-const TEST_SELECTOR: &str = "test1";
-const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
+pub(crate) const TEST_SELECTOR: &str = "test1";
+pub(crate) const TEST_BODY: &[u8] = b"Hello world.\r\nThis is a recovery email.\r\n";
 
 fn dns_input() -> EmailRecoveryDnsInput {
     EmailRecoveryDnsInput {
@@ -73,7 +73,7 @@ fn dns_input() -> EmailRecoveryDnsInput {
 /// entry so `mailbox_domains()` accepts `register@id.ai` /
 /// `recover@id.ai` envelopes (recipient acceptance reads from
 /// `related_origins`; see `email_recovery::mailbox_domains`).
-fn setup_canister(env: &PocketIc) -> candid::Principal {
+pub(crate) fn setup_canister(env: &PocketIc) -> candid::Principal {
     let args = InternetIdentityInit {
         doh_config: Some(Some(DohConfig {
             allowed_domains: vec![TEST_DOMAIN.into()],
@@ -124,7 +124,10 @@ fn setup_canister_dnssec_disabled(env: &PocketIc) -> candid::Principal {
 /// Create an identity and return `(identity_number, principal)`. The
 /// principal is needed for any caller-authenticated method calls
 /// (`prepare_add`, `credential_remove`).
-fn fresh_identity(env: &PocketIc, canister_id: candid::Principal) -> (u64, candid::Principal) {
+pub(crate) fn fresh_identity(
+    env: &PocketIc,
+    canister_id: candid::Principal,
+) -> (u64, candid::Principal) {
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(env, canister_id, &authn_method);
     (identity_number, authn_method.principal())
@@ -1707,7 +1710,7 @@ fn answer_doh_outcalls(env: &PocketIc, dkim_txt: &[u8], max_ticks: u32) {
 /// provider outcalls the cache spawns. The DKIM key resolves on one poll and
 /// DMARC on the next, so several rounds run; capped so a wedge fails the test
 /// instead of hanging.
-fn drive_doh_resolution(
+pub(crate) fn drive_doh_resolution(
     env: &PocketIc,
     canister_id: candid::Principal,
     nonce: &str,
@@ -1781,16 +1784,16 @@ fn fake_dkim_dns_response(txt: &[u8]) -> Vec<u8> {
 // Args structs
 // ===================================================================
 
-struct SignedEmailParams<'a> {
-    from: &'a str,
-    to: &'a str,
-    subject: &'a str,
-    body: &'a [u8],
-    timestamp: u64,
+pub(crate) struct SignedEmailParams<'a> {
+    pub from: &'a str,
+    pub to: &'a str,
+    pub subject: &'a str,
+    pub body: &'a [u8],
+    pub timestamp: u64,
 }
 
-struct SignedEmail {
-    request: SmtpRequest,
+pub(crate) struct SignedEmail {
+    pub request: SmtpRequest,
 }
 
 // ===================================================================
@@ -1802,7 +1805,7 @@ struct SignedEmail {
 // integration test isn't fragile against module reorganisation in
 // the canister code.
 
-mod dkim_signer {
+pub(crate) mod dkim_signer {
     use rsa::pkcs8::EncodePublicKey;
     use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
     use sha2::{Digest, Sha256};

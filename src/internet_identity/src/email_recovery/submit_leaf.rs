@@ -227,6 +227,16 @@ async fn finalize(
                 };
             });
         }
+        SnapshotKind::VerifyEmail { anchor } => {
+            let result = super::smtp::bind_verified_email(*anchor, &mat.claimed_address, now_secs);
+            pending::with_mut(nonce, now_secs, |c| {
+                c.partial_verification = None;
+                c.status = match result {
+                    Ok(()) => PendingStatus::Succeeded,
+                    Err(e) => PendingStatus::Failed(e),
+                };
+            });
+        }
         SnapshotKind::Recovery { session_pk } => {
             // Build a transient `PendingSnapshot` shape that
             // `stamp_recovery_delegation` already accepts (the DoH
@@ -289,8 +299,18 @@ struct Snapshot {
 
 #[derive(Clone, Debug)]
 enum SnapshotKind {
-    Register { anchor: AnchorNumber },
-    Recovery { session_pk: SessionKey },
+    Register {
+        anchor: AnchorNumber,
+    },
+    Recovery {
+        session_pk: SessionKey,
+    },
+    /// Verified-email flow — on success the verified `From:` is
+    /// appended to `Anchor.verified_emails` instead of being bound
+    /// as a recovery credential.
+    VerifyEmail {
+        anchor: AnchorNumber,
+    },
 }
 
 impl VerifyMaterial {
@@ -300,6 +320,7 @@ impl VerifyMaterial {
             PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
                 session_pk: session_pk.clone(),
             },
+            PendingKind::VerifyEmail { anchor } => SnapshotKind::VerifyEmail { anchor: *anchor },
         }
     }
 
@@ -496,6 +517,17 @@ fn finalize_via_doh(
         Ok(()) => match &mat.kind {
             SnapshotKind::Register { anchor } => {
                 let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+                pending::with_mut(&nonce, now_secs, |c| {
+                    c.partial_verification = None;
+                    c.status = match result {
+                        Ok(()) => PendingStatus::Succeeded,
+                        Err(e) => PendingStatus::Failed(e),
+                    };
+                });
+            }
+            SnapshotKind::VerifyEmail { anchor } => {
+                let result =
+                    super::smtp::bind_verified_email(*anchor, &mat.claimed_address, now_secs);
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.partial_verification = None;
                     c.status = match result {

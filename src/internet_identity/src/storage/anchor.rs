@@ -6,10 +6,13 @@ use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
+use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
-use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
+use internet_identity_interface::internet_identity::types::email_recovery::{
+    EmailRecoveryCredential, VerifiedEmail,
+};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
@@ -33,6 +36,9 @@ pub struct Anchor {
     /// is a `Vec` so the data model can carry multiple in the future
     /// without another schema bump.
     pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
+    /// Verified emails — a parallel anchor primitive to
+    /// `email_recovery`. Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
+    pub(crate) verified_emails: Vec<VerifiedEmail>,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
@@ -169,6 +175,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             devices,
             openid_credentials,
             email_recovery,
+            verified_emails,
             metadata,
             name,
             created_at,
@@ -180,6 +187,12 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             email_recovery
                 .into_iter()
                 .map(StorableEmailRecoveryCredential::from)
+                .collect(),
+        );
+        let verified_emails = Some(
+            verified_emails
+                .into_iter()
+                .map(StorableVerifiedEmail::from)
                 .collect(),
         );
 
@@ -420,6 +433,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 passkey_credentials,
                 recovery_keys,
                 email_recovery,
+                verified_emails,
             },
         )
     }
@@ -434,6 +448,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             passkey_credentials,
             recovery_keys,
             email_recovery,
+            verified_emails,
         } = storable_anchor;
 
         let name = name.clone();
@@ -446,6 +461,11 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             .unwrap_or_default()
             .into_iter()
             .map(EmailRecoveryCredential::from)
+            .collect();
+        let verified_emails = verified_emails
+            .unwrap_or_default()
+            .into_iter()
+            .map(VerifiedEmail::from)
             .collect();
 
         let mut devices = passkey_credentials
@@ -540,6 +560,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             created_at,
             openid_credentials,
             email_recovery,
+            verified_emails,
             devices,
             metadata,
         }
@@ -565,6 +586,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 name: None,
                 openid_credentials: vec![],
                 email_recovery: vec![],
+                verified_emails: vec![],
                 anchor_number,
                 devices,
                 metadata,
@@ -585,12 +607,19 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             .into_iter()
             .map(EmailRecoveryCredential::from)
             .collect();
+        let verified_emails = storable_anchor
+            .verified_emails
+            .unwrap_or_default()
+            .into_iter()
+            .map(VerifiedEmail::from)
+            .collect();
 
         Anchor {
             anchor_number,
             devices,
             openid_credentials,
             email_recovery,
+            verified_emails,
             metadata,
             name,
             created_at,
@@ -608,6 +637,7 @@ impl Anchor {
             devices: vec![],
             openid_credentials: vec![],
             email_recovery: vec![],
+            verified_emails: vec![],
             metadata: None,
             name: None,
         }

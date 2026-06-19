@@ -548,6 +548,10 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethod),
     'recovery_authn_methods' : IDL.Vec(AuthnMethod),
   });
+  const VerifiedEmail = IDL.Record({
+    'address' : IDL.Text,
+    'verified_at' : Timestamp,
+  });
   const EmailRecoveryCredential = IDL.Record({
     'created_at' : Timestamp,
     'address' : IDL.Text,
@@ -560,6 +564,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
+    'verified_emails' : IDL.Opt(IDL.Vec(VerifiedEmail)),
     'metadata' : MetadataMapV2,
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
@@ -1230,6 +1235,21 @@ export const idlFactory = ({ IDL }) => {
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : UpdateAccountError })],
+        [],
+      ),
+    'verified_email_prepare_add' : IDL.Func(
+        [IdentityNumber, EmailRecoveryDnsInput],
+        [
+          IDL.Variant({
+            'Ok' : EmailRecoveryChallenge,
+            'Err' : EmailRecoveryError,
+          }),
+        ],
+        [],
+      ),
+    'verified_email_remove' : IDL.Func(
+        [IdentityNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
         [],
       ),
     'verify_tentative_device' : IDL.Func(

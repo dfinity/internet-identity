@@ -856,6 +856,13 @@ export interface IdentityAuthnInfo {
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   /**
+   * Verified emails bound to this anchor (absent when none is
+   * configured). Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR; the FE
+   * shows a "limit reached" notice in the wizard when adding
+   * beyond the cap.
+   */
+  'verified_emails' : [] | [Array<VerifiedEmail>],
+  /**
    * Authentication method independent metadata
    */
   'metadata' : MetadataMapV2,
@@ -1556,6 +1563,14 @@ export type UserNumber = bigint;
  */
 export type VerificationPath = { 'Doh' : null } |
   { 'Dnssec' : null };
+/**
+ * A verified email address bound to an anchor. Parallel to
+ * `EmailRecoveryCredential` but used as an attribute source (and
+ * surfaced in the smart-routing UI) rather than a recovery
+ * credential. The `verified_at` timestamp is when DKIM/DMARC
+ * verification completed successfully.
+ */
+export interface VerifiedEmail { 'address' : string, 'verified_at' : Timestamp }
 export type VerifyTentativeDeviceResponse = {
     /**
      * Device registration mode is off, either due to timeout or because it was never enabled.
@@ -2074,6 +2089,29 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
     { 'Ok' : AccountInfo } |
       { 'Err' : UpdateAccountError }
+  >,
+  /**
+   * Verified emails
+   * ===============
+   * Parallel to the recovery flow but the verified address is
+   * stored on `Anchor::verified_emails` rather than
+   * `Anchor::email_recovery`. Reuses the same SMTP gateway, DKIM
+   * verifier and DMARC alignment, but issues nonces with the
+   * `II-Verify-` prefix so an inbound challenge can never be
+   * cross-applied between the two flows. Polling status / submit-
+   * dkim-leaf / resolve-via-doh / diagnostics are shared with
+   * recovery — the FE keys them by the same nonce. Capped at
+   * MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
+   */
+  'verified_email_prepare_add' : ActorMethod<
+    [IdentityNumber, EmailRecoveryDnsInput],
+    { 'Ok' : EmailRecoveryChallenge } |
+      { 'Err' : EmailRecoveryError }
+  >,
+  'verified_email_remove' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : EmailRecoveryError }
   >,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],

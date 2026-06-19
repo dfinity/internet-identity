@@ -180,6 +180,13 @@ pub enum PendingKind {
     /// cached `session_pk` is what the eventual delegation will be
     /// bound to.
     Recover { session_pk: SessionKey },
+    /// Verified-email flow — caller is authenticated; a
+    /// `StorableVerifiedEmail` will be written to this anchor on
+    /// success. Parallel to `Register`, but lives in its own anchor
+    /// field and uses the `II-Verify-` Subject prefix so an inbound
+    /// challenge email can never be cross-applied between the two
+    /// flows.
+    VerifyEmail { anchor: AnchorNumber },
 }
 
 /// Status the FE polls. The terminal variants (`Succeeded`,
@@ -272,6 +279,14 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
                 },
                 PendingStatus::Succeeded => match (&c.kind, &c.recovery_outcome) {
                     (PendingKind::Register { .. }, _) => EmailRecoveryStatus::RegistrationSucceeded,
+                    // VerifyEmail reuses `RegistrationSucceeded`: the
+                    // FE knows which prepare-add it kicked off (the
+                    // nonce maps 1:1 to a single wizard session) and
+                    // doesn't need a separate variant. Keeps the
+                    // candid surface lean.
+                    (PendingKind::VerifyEmail { .. }, _) => {
+                        EmailRecoveryStatus::RegistrationSucceeded
+                    }
                     (PendingKind::Recover { .. }, Some(outcome)) => {
                         EmailRecoveryStatus::RecoveryReady {
                             user_key: serde_bytes::ByteBuf::from(outcome.user_key.clone()),

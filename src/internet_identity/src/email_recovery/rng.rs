@@ -63,15 +63,23 @@ pub fn draw_nonce_bytes() -> [u8; super::NONCE_SUFFIX_BYTES] {
     bytes
 }
 
-/// Compose the user-visible nonce from random bytes.
+/// Compose the user-visible nonce from random bytes with the
+/// recovery prefix.
 ///
 /// Format: `II-Recovery-{hex}` where `{hex}` is the random suffix
 /// hex-encoded (lowercase, no separator). 16 hex chars total — fits
 /// on a single line and copy-pastes cleanly into a mail-client
 /// `Subject:` field.
 pub fn format_nonce(suffix: &[u8; super::NONCE_SUFFIX_BYTES]) -> String {
-    let mut out = String::with_capacity(super::NONCE_PREFIX.len() + suffix.len() * 2);
-    out.push_str(super::NONCE_PREFIX);
+    format_nonce_with_prefix(super::NONCE_PREFIX, suffix)
+}
+
+/// Like [`format_nonce`] but the prefix is supplied explicitly.
+/// Used by the verified-email flow to issue `II-Verify-…` tokens
+/// while keeping the same suffix-entropy and formatting rules.
+pub fn format_nonce_with_prefix(prefix: &str, suffix: &[u8; super::NONCE_SUFFIX_BYTES]) -> String {
+    let mut out = String::with_capacity(prefix.len() + suffix.len() * 2);
+    out.push_str(prefix);
     for b in suffix {
         out.push_str(&format!("{b:02x}"));
     }

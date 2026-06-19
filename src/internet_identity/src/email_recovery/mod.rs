@@ -47,6 +47,7 @@ mod remove;
 mod rng;
 pub(crate) mod smtp;
 mod submit_leaf;
+pub mod verified_emails;
 
 pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};
@@ -109,6 +110,23 @@ pub fn dnssec_email_recovery_enabled() -> bool {
 /// hands the user a different-looking string (no `II-Recovery-`,
 /// truncated, etc.) is immediately obvious.
 pub const NONCE_PREFIX: &str = "II-Recovery-";
+
+/// Like [`NONCE_PREFIX`] but for the **verified-email** wizard.
+/// Differs from `NONCE_PREFIX` by a single token so an inbound
+/// challenge email can never be cross-applied between the recovery
+/// flow and the verified-email flow: `find_nonce_in` walks both
+/// prefixes when scanning a Subject and the pending entry's
+/// `PendingKind` ensures the match resolves to the right flow.
+pub const VERIFIED_EMAIL_NONCE_PREFIX: &str = "II-Verify-";
+
+/// Hard cap on the number of verified emails one anchor can hold.
+/// Surfaced to the FE wizard so the panel can show a "limit
+/// reached" notice instead of round-tripping. Picked tight (5)
+/// because verified emails are attribute sources for dapps — most
+/// users will have at most one or two; 5 leaves clear headroom for
+/// work/personal/alias combinations without inviting credential
+/// stuffing.
+pub const MAX_VERIFIED_EMAILS_PER_ANCHOR: usize = 5;
 
 /// Byte length of the random suffix appended after [`NONCE_PREFIX`].
 /// 8 bytes → 16 hex chars → ~64 bits of entropy. The challenge map

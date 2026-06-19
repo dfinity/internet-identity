@@ -1033,6 +1033,13 @@ mod v2_api {
             Some(stored_email_recovery)
         };
 
+        let stored_verified_emails = state::anchor(identity_number).verified_emails.clone();
+        let verified_emails = if stored_verified_emails.is_empty() {
+            None
+        } else {
+            Some(stored_verified_emails)
+        };
+
         let identity_info = IdentityInfo {
             authn_methods: anchor_info
                 .devices
@@ -1047,6 +1054,7 @@ mod v2_api {
             name: anchor_info.name,
             created_at: anchor_info.created_at,
             email_recovery,
+            verified_emails,
         };
         Ok(identity_info)
     }
@@ -1826,6 +1834,62 @@ mod email_recovery_api {
                     EmailRecoveryError::AddressNotRegistered
                 }
             })?;
+
+        crate::state::storage_borrow_mut(|storage| storage.write(anchor))
+            .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;
+
+        crate::anchor_management::post_operation_bookkeeping(identity_number, operation);
+        Ok(())
+    }
+
+    /// Authenticated. Parallel to
+    /// `email_recovery_credential_prepare_add` but kicks off the
+    /// verified-email flow: the nonce is issued with the
+    /// `II-Verify-` prefix and the pending entry carries
+    /// `PendingKind::VerifyEmail { anchor }`. On success the SMTP
+    /// path writes a `StorableVerifiedEmail` onto
+    /// `anchor.verified_emails`. Capped at
+    /// `MAX_VERIFIED_EMAILS_PER_ANCHOR` per anchor; the cap is
+    /// checked here before issuing the nonce so the FE wizard can
+    /// surface "limit reached" without round-tripping.
+    ///
+    /// **Security:** caller must be the anchor controller — enforced
+    /// by `check_authorization(identity_number)`. Resource exposure
+    /// is bounded by the same pending-map cap + TTL as the recovery
+    /// flow; the prefix split prevents an inbound challenge from
+    /// being cross-applied between flows.
+    #[update]
+    async fn verified_email_prepare_add(
+        identity_number: IdentityNumber,
+        dns_input: EmailRecoveryDnsInput,
+    ) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+        check_authorization(identity_number)
+            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_recovery::verified_emails::prepare_add(identity_number, dns_input, now_secs).await
+    }
+
+    /// Authenticated. Drops a previously-verified address from
+    /// `anchor.verified_emails`. Parallel to
+    /// `email_recovery_credential_remove`; emits
+    /// `Operation::RemoveVerifiedEmail` for the archive stream.
+    #[update]
+    fn verified_email_remove(
+        identity_number: IdentityNumber,
+        address: String,
+    ) -> Result<(), EmailRecoveryError> {
+        let (mut anchor, authz_key) = crate::authz_utils::check_authorization(identity_number)
+            .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
+        crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);
+
+        let operation = email_recovery::verified_emails::remove(&mut anchor, &address).map_err(
+            |err| match err {
+                crate::email_recovery::RemoveError::NotRegistered => {
+                    EmailRecoveryError::AddressNotRegistered
+                }
+            },
+        )?;
 
         crate::state::storage_borrow_mut(|storage| storage.write(anchor))
             .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;

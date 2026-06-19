@@ -279,6 +279,13 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
             (PendingKind::Register { anchor }, RecipientFlow::Setup) => {
                 SnapshotKind::Setup { anchor: *anchor }
             }
+            // VerifyEmail rides the Setup recipient: the magic email
+            // is addressed to `register@id.ai` (same as Register).
+            // The Subject prefix (`II-Verify-…`) and the `PendingKind`
+            // are what disambiguate the two flows from here on.
+            (PendingKind::VerifyEmail { anchor }, RecipientFlow::Setup) => {
+                SnapshotKind::VerifyEmail { anchor: *anchor }
+            }
             (PendingKind::Recover { session_pk }, RecipientFlow::Recovery) => {
                 SnapshotKind::Recovery {
                     session_pk: session_pk.clone(),
@@ -397,6 +404,12 @@ enum SnapshotKind {
     /// the reverse address index. The cached `session_pk` is what
     /// the eventual delegation will be stamped for.
     Recovery { session_pk: SessionKey },
+    /// Verified-email snapshot. The anchor was supplied by the
+    /// (authenticated) caller at prepare time and is pinned. On
+    /// success the verified `From:` is appended to
+    /// `Anchor.verified_emails` rather than bound as a recovery
+    /// credential.
+    VerifyEmail { anchor: AnchorNumber },
 }
 
 /// Recipient-half of the dispatch — paired with the entry's
@@ -433,8 +446,19 @@ fn extract_nonce_from_subject(
 /// Same logic as `extract_nonce_from_subject` but takes the raw
 /// header value — extracted into its own function so the unit
 /// tests can drive it without a full `SmtpMessage`.
+///
+/// Scans for either the recovery prefix (`II-Recovery-…`) or the
+/// verified-email prefix (`II-Verify-…`). Whichever prefix matches
+/// first wins; the returned nonce keeps that prefix and the pending
+/// map's `PendingKind` ultimately determines the flow. A forged
+/// prefix without a matching pending entry simply drops at the
+/// lookup step.
 fn find_nonce_in(haystack: &str) -> Option<String> {
-    let prefix = super::NONCE_PREFIX;
+    find_nonce_with_prefix(haystack, super::NONCE_PREFIX)
+        .or_else(|| find_nonce_with_prefix(haystack, super::VERIFIED_EMAIL_NONCE_PREFIX))
+}
+
+fn find_nonce_with_prefix(haystack: &str, prefix: &str) -> Option<String> {
     // Case-insensitive search: the user might paste the prefix in
     // a different case from the canister's canonical form (some
     // mail clients title-case Subject content). We match on the
@@ -742,6 +766,51 @@ pub(super) fn bind_credential(
         }
         other => EmailRecoveryError::InternalCanisterError(format!("write anchor: {other:?}")),
     })?;
+    Ok(())
+}
+
+/// Verified-email counterpart to [`bind_credential`]: append a fresh
+/// [`internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail`]
+/// onto the anchor's `verified_emails` list.
+///
+/// Unlike `bind_credential` this does *not* touch the recovery
+/// reverse-address index — verified emails aren't queryable by
+/// address, only via the owning anchor. Duplicates (same lowercased
+/// address already present on this anchor) are accepted as no-ops:
+/// the inbound email already proved control, and refreshing
+/// `verified_at` is also a legitimate side effect of running the
+/// wizard again.
+pub(super) fn bind_verified_email(
+    anchor: AnchorNumber,
+    claimed_address: &str,
+    now_secs: u64,
+) -> Result<(), EmailRecoveryError> {
+    use internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail;
+
+    let mut a = state::anchor(anchor);
+    let now_ns = now_secs.saturating_mul(1_000_000_000);
+
+    // Refresh in place if the address is already verified on this
+    // anchor; otherwise append a fresh entry.
+    if let Some(existing) = a
+        .verified_emails
+        .iter_mut()
+        .find(|e| e.address.eq_ignore_ascii_case(claimed_address))
+    {
+        existing.verified_at = now_ns;
+    } else {
+        if a.verified_emails.len() >= super::MAX_VERIFIED_EMAILS_PER_ANCHOR {
+            return Err(EmailRecoveryError::InternalCanisterError(
+                "verified email cap reached".into(),
+            ));
+        }
+        a.verified_emails.push(VerifiedEmail {
+            address: claimed_address.to_string(),
+            verified_at: now_ns,
+        });
+    }
+    state::storage_borrow_mut(|storage| storage.write(a))
+        .map_err(|e| EmailRecoveryError::InternalCanisterError(format!("write anchor: {e:?}")))?;
     Ok(())
 }
 

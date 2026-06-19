@@ -74,6 +74,7 @@ mod tests {
             devices: vec![],
             openid_credentials: vec![],
             email_recovery: vec![],
+            verified_emails: vec![],
             metadata: None,
             name: None,
             created_at: None,

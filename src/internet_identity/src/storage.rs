@@ -753,6 +753,7 @@ impl<M: Memory + Clone> Storage<M> {
             // The following fields do not require merging.
             created_at_ns: _,
             name: _,
+            verified_emails: _,
         }) = previous_anchor_maybe
         {
             (
@@ -765,6 +766,9 @@ impl<M: Memory + Clone> Storage<M> {
             // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
             (vec![], vec![], vec![], vec![])
         };
+        // `storable_anchor.verified_emails` is not synced through any
+        // reverse-lookup index — verified emails are addressable only
+        // via the owning anchor.
 
         // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
         self.sync_anchor_with_openid_credential_index(

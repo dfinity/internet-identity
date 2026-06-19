@@ -558,6 +558,16 @@ type EmailRecoveryCredential = record {
     last_used : opt Timestamp;
 };
 
+// A verified email address bound to an anchor. Parallel to
+// `EmailRecoveryCredential` but used as an attribute source (and
+// surfaced in the smart-routing UI) rather than a recovery
+// credential. The `verified_at` timestamp is when DKIM/DMARC
+// verification completed successfully.
+type VerifiedEmail = record {
+    address : text;
+    verified_at : Timestamp;
+};
+
 type EmailRecoveryChallenge = record {
     nonce : text;
     expires_at : Timestamp;
@@ -952,6 +962,11 @@ type IdentityInfo = record {
     // the first one — but exposing it as a `vec` lets future
     // multi-credential support land without a candid schema bump.
     email_recovery : opt vec EmailRecoveryCredential;
+    // Verified emails bound to this anchor (absent when none is
+    // configured). Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR; the FE
+    // shows a "limit reached" notice in the wizard when adding
+    // beyond the cap.
+    verified_emails : opt vec VerifiedEmail;
 };
 
 type IdentityInfoError = variant {
@@ -1609,6 +1624,20 @@ service : (opt InternetIdentityInit) -> {
     email_recovery_resolve_via_doh : (EmailRecoveryResolveViaDohArg) -> (variant { Ok; Err : EmailRecoveryError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
+
+    // Verified emails
+    // ===============
+    // Parallel to the recovery flow but the verified address is
+    // stored on `Anchor::verified_emails` rather than
+    // `Anchor::email_recovery`. Reuses the same SMTP gateway, DKIM
+    // verifier and DMARC alignment, but issues nonces with the
+    // `II-Verify-` prefix so an inbound challenge can never be
+    // cross-applied between the two flows. Polling status / submit-
+    // dkim-leaf / resolve-via-doh / diagnostics are shared with
+    // recovery — the FE keys them by the same nonce. Capped at
+    // MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
+    verified_email_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    verified_email_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
 
     // SMTP gateway protocol
     // =====================
