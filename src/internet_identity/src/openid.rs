@@ -283,6 +283,17 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
     configured::setup(configs);
 }
 
+/// Canonicalize an untrusted SSO discovery domain received as a canister-call
+/// argument: trim surrounding whitespace and lowercase ASCII. Domains are
+/// case-insensitive (DNS), but the value is stamped onto the credential as
+/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing,
+/// so it must be canonical the moment it crosses the trust boundary. Endpoints
+/// taking a `discovery_domain` run this before any further use, matching the
+/// `sso_discoverable_domains` config setter and the `get_sso_discovery` reply.
+pub fn canonical_discovery_domain(domain: Option<String>) -> Option<String> {
+    domain.map(|domain| domain.trim().to_ascii_lowercase())
+}
+
 /// Drive the on-demand SSO discovery / JWKS fetches for `domain` forward. Only
 /// an update may call this — it spawns the outcalls the fills make. A no-op for
 /// `None` (a configured provider needs no fetch) and for a disallowed domain.
@@ -533,6 +544,23 @@ mod tests {
             }
             other => panic!("expected Ready credential, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn canonical_discovery_domain_trims_and_lowercases() {
+        // Untrusted canister-call args: a mixed-case / padded domain that
+        // passes the case-insensitive allowlist gate must be canonicalized so
+        // the stamped `sso:<domain>` scope matches the allowlisted value.
+        assert_eq!(
+            canonical_discovery_domain(Some("  Example.ORG  ".to_string())),
+            Some("example.org".to_string())
+        );
+        assert_eq!(
+            canonical_discovery_domain(Some("example.org".to_string())),
+            Some("example.org".to_string())
+        );
+        // A configured provider supplies no domain.
+        assert_eq!(canonical_discovery_domain(None), None);
     }
 
     #[test]

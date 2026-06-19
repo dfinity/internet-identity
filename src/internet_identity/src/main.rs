@@ -1338,8 +1338,11 @@ mod openid_api {
 
     #[update]
     fn openid_identity_registration_finish(
-        arg: OpenIDRegFinishArg,
+        mut arg: OpenIDRegFinishArg,
     ) -> OpenIdResult<IdRegFinishResult, IdRegFinishError> {
+        // Canonicalize the untrusted discovery domain at the boundary so both
+        // verification and the credential stored from `arg` see the same value.
+        arg.discovery_domain = openid::canonical_discovery_domain(arg.discovery_domain);
         // Verify the JWT (driving the SSO discovery/JWKS fetches it may need)
         // up front: a cold or evicted cache surfaces as the `Pending` retry arm
         // instead of a terminal registration error. The verified credential is
@@ -1366,6 +1369,7 @@ mod openid_api {
         salt: [u8; 32],
         discovery_domain: Option<String>,
     ) -> OpenIdResult<(), OpenIdCredentialAddError> {
+        let discovery_domain = openid::canonical_discovery_domain(discovery_domain);
         openid::prefetch_sso(discovery_domain.as_deref());
         let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
@@ -1418,6 +1422,7 @@ mod openid_api {
         // read the result. A cold cache reads `Pending`; the frontend polls
         // `openid_get_delegation` and re-calls this until the delegation is
         // ready.
+        let discovery_domain = openid::canonical_discovery_domain(discovery_domain);
         openid::prefetch_sso(discovery_domain.as_deref());
         let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
@@ -1479,6 +1484,7 @@ mod openid_api {
         // caches. A `Pending` means discovery/JWKS isn't cached yet — the
         // frontend re-calls `openid_prepare_delegation` (an update, which drives
         // the fetch) and polls this again.
+        let discovery_domain = openid::canonical_discovery_domain(discovery_domain);
         let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
             Ok(openid::Cached::Ready(credential)) => credential,
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
