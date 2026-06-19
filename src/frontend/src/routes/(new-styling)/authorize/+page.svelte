@@ -41,7 +41,10 @@
     DirectOpenIdEvents,
     directOpenIdFunnel,
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
-  import { createRedirectURL } from "$lib/utils/openID";
+  import {
+    createRedirectURL,
+    extractIdTokenFromCallback,
+  } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
@@ -161,22 +164,37 @@
 
   /** Process the OpenID callback and authorize. */
   const resumeOpenId = async () => {
-    const searchParams = new URLSearchParams(window.location.hash.slice(1));
+    // The canister's POST /callback landing page stashes the payload here
+    // before navigating to `/authorize?flow=openid-resume` in the same-tab
+    // flow. Single-use: remove it before anything else can throw.
+    const storedPayload = sessionStorage.getItem("ii-openid-callback-data");
+    sessionStorage.removeItem("ii-openid-callback-data");
     window.history.replaceState(
       undefined,
       "",
       window.location.origin + "/authorize",
     );
-    const redirectState = searchParams.get("state");
-    const jwt = searchParams.get("id_token");
     const openIdAuthorizeState = sessionStorage.getItem(
       "ii-openid-authorize-state",
     );
-    if (
-      openIdAuthorizeState === null ||
-      redirectState !== openIdAuthorizeState ||
-      jwt === null
-    ) {
+    // The callback landing page routes on this marker (present = resume
+    // in-app, absent = deliver to the opener); popups inherit a copy of
+    // sessionStorage in Chrome, so a stale marker would misroute a later
+    // popup sign-in from this tab.
+    sessionStorage.removeItem("ii-openid-authorize-state");
+    if (storedPayload === null || openIdAuthorizeState === null) {
+      return;
+    }
+    let jwt: string;
+    try {
+      jwt = extractIdTokenFromCallback(
+        JSON.parse(storedPayload),
+        openIdAuthorizeState,
+      );
+    } catch {
+      // A state mismatch, an IdP error report or a missing token is not
+      // recoverable here; fall back to the regular flow so the user can
+      // start sign-in again.
       return;
     }
     const authFlow = new AuthFlow({ trackLastUsed: false });
