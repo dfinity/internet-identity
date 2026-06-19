@@ -175,13 +175,23 @@
     <p class="text-text-tertiary text-sm">
       {$t`Have a passkey on another device?`}
     </p>
-    <button
-      onclick={continueOnAnotherDevice}
-      disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
-      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-    >
-      {$t`Authorize`}
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        onclick={continueOnAnotherDevice}
+        disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
+        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+      >
+        {$t`URL`}
+      </button>
+      <span class="text-text-tertiary text-sm" aria-hidden="true">|</span>
+      <button
+        onclick={continueOnAnotherDevice}
+        disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
+        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+      >
+        {$t`Scan QR`}
+      </button>
+    </div>
   </div>
 </div>
 

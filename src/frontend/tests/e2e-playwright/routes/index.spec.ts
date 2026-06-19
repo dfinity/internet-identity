@@ -59,9 +59,10 @@ test.describe("First visit", () => {
       await newDevicePage.goto(II_URL);
       // No existing passkeys on the new device. The cancel→QR auto
       // transition was removed; reach the cross-device flow via the
-      // explicit "Authorize on another device" link below Recover.
+      // explicit "Scan QR" CTA on the "Have a passkey on another
+      // device?" row.
       await newDevicePage
-        .getByRole("button", { name: "Authorize", exact: true })
+        .getByRole("button", { name: "Scan QR", exact: true })
         .click();
       await newDevicePage
         .getByRole("heading", {

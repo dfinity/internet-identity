@@ -74,10 +74,10 @@ test("Authorize by signing in from another device", async ({
     const principal = await authorize(page, async (authPage) => {
       // Switch to current device and start "Continue from another device" flow to get link.
       // The cancel→QR auto-transition was removed; use the explicit
-      // "Authorize on another device" row below Recover instead.
+      // "Scan QR" CTA on the "Have a passkey on another device?" row.
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Authorize", exact: true })
+        .getByRole("button", { name: "Scan QR", exact: true })
         .click();
       await authPage
         .getByRole("heading", {
