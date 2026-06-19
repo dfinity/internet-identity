@@ -943,6 +943,14 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
+   * Deploy flag opening the SSO discovery domain gate to any domain. When
+   * `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
+   * which domains may be discovered as SSO providers. Does not relax the
+   * strict-`https` requirement: serving discovery over plain `http` still
+   * requires the host to be on the explicit `sso_discoverable_domains` list.
+   */
+  'sso_allow_any_domain' : [] | [boolean],
+  /**
    * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
    * OpenID credentials. When set, a batched timer-driven migration stamps
    * every stored credential whose (iss, aud) matches an entry and whose

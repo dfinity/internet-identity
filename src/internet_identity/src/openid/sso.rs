@@ -224,10 +224,33 @@ pub fn allowed_discovery_domains() -> Vec<String> {
     }
 }
 
-pub fn is_allowed_discovery_domain(domain: &str) -> bool {
+/// Deploy flag: when set, the SSO discovery domain gate accepts *any* domain
+/// (see `InternetIdentityInit::sso_allow_any_domain`). Deliberately does not
+/// feed the `https`-relaxation gate ([`is_allowlisted_host`]), which always
+/// consults the explicit allowlist so opening the domain gate never lets an
+/// arbitrary host serve discovery over plain HTTP.
+fn sso_allow_any_domain() -> bool {
+    #[cfg(not(test))]
+    {
+        state::persistent_state(|ps| ps.sso_allow_any_domain).unwrap_or(false)
+    }
+    #[cfg(test)]
+    {
+        tests::TEST_ALLOW_ANY.with_borrow(|b| *b)
+    }
+}
+
+/// True if `domain` is on the configured/default SSO allowlist
+/// (case-insensitive). The explicit list only — independent of the
+/// `sso_allow_any_domain` deploy flag.
+fn is_explicitly_allowlisted(domain: &str) -> bool {
     allowed_discovery_domains()
         .iter()
         .any(|allowed| allowed.eq_ignore_ascii_case(domain))
+}
+
+pub fn is_allowed_discovery_domain(domain: &str) -> bool {
+    sso_allow_any_domain() || is_explicitly_allowlisted(domain)
 }
 
 /// True if `host` (the `host:port` portion of a URL) matches an allowlist
@@ -235,9 +258,11 @@ pub fn is_allowed_discovery_domain(domain: &str) -> bool {
 /// explicitly blessed by an II admin MAY publish its discovery endpoints over
 /// plain HTTP, which is what makes e2e tests against `http://localhost:11107`
 /// work without weakening prod's strict-HTTPS posture for unblessed hosts.
+/// Consults the explicit allowlist only — the `sso_allow_any_domain` deploy
+/// flag opens the domain gate but never relaxes the `https` requirement.
 #[cfg(not(test))]
 fn is_allowlisted_host(host: &str) -> bool {
-    is_allowed_discovery_domain(host)
+    is_explicitly_allowlisted(host)
 }
 
 // ---------------------------------------------------------------------------
@@ -506,6 +531,7 @@ mod tests {
 
     thread_local! {
         pub(super) static TEST_ALLOWED: RefCell<Vec<String>> = const { RefCell::new(vec![]) };
+        pub(super) static TEST_ALLOW_ANY: RefCell<bool> = const { RefCell::new(false) };
         pub(super) static TEST_DISCOVERY: RefCell<HashMap<String, DiscoveredConfig>> = RefCell::new(HashMap::new());
         pub(super) static TEST_JWKS: RefCell<HashMap<String, Vec<Jwk>>> = RefCell::new(HashMap::new());
     }
@@ -513,6 +539,7 @@ mod tests {
     fn reset() {
         set_test_now(1_700_000_000);
         TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.org".to_string()]);
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
         TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
         TEST_JWKS.with_borrow_mut(|m| m.clear());
         DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
@@ -546,6 +573,21 @@ mod tests {
             &test_aud_claim()
         )
         .is_err());
+    }
+
+    #[test]
+    fn allow_any_domain_opens_the_gate() {
+        reset();
+        // Off by default: a domain off the explicit allowlist is rejected.
+        assert!(!is_allowed_discovery_domain("not-allowed.com"));
+        // Flag on: every domain passes the discovery gate.
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        assert!(is_allowed_discovery_domain("not-allowed.com"));
+        assert!(is_allowed_discovery_domain("example.org"));
+        // The explicit allowlist is unchanged — the `https`-relaxation gate
+        // still consults it, so the flag does not bless arbitrary http hosts.
+        assert!(is_explicitly_allowlisted("example.org"));
+        assert!(!is_explicitly_allowlisted("not-allowed.com"));
     }
 
     #[test]
