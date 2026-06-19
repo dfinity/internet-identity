@@ -16,9 +16,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
 export class AddAccessMethodFlow {
-  #view = $state<"chooseMethod" | "addPasskey" | "signInWithSso">(
-    "chooseMethod",
-  );
+  #view = $state<"chooseMethod" | "signInWithSso">("chooseMethod");
   #isSystemOverlayVisible = $state(false);
 
   get view() {
@@ -112,10 +110,6 @@ export class AddAccessMethodFlow {
       .authn_method_add(identityNumber, authnMethodData)
       .then(throwCanisterError);
     return authnMethodData;
-  };
-
-  continueWithPasskey = () => {
-    this.#view = "addPasskey";
   };
 
   signInWithSso = () => {

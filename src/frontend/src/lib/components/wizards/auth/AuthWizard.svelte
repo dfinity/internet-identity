@@ -204,8 +204,7 @@
       await onSignIn(identityNumber);
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        isContinueFromAnotherDeviceVisible = true;
-        return;
+        return "cancelled";
       }
       onError(error);
     } finally {
@@ -455,6 +454,9 @@
         : authFlow.setupOrUseExistingPasskey}
     continueWithOpenId={handleContinueWithOpenId}
     signInWithSso={authFlow.signInWithSso}
+    continueOnAnotherDevice={mode === "signup"
+      ? undefined
+      : () => (isContinueFromAnotherDeviceVisible = true)}
     {mode}
     onSwitchMode={switchModeAvailable ? toggleMode : undefined}
     withinDialog={inDialog || isElevated || inAuthPanel}

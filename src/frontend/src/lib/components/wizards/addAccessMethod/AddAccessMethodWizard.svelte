@@ -7,7 +7,6 @@
     OpenIdConfig,
   } from "$lib/generated/internet_identity_types";
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
-  import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { isOpenIdCancelError } from "$lib/utils/openID";
@@ -19,7 +18,6 @@
     onPasskeyRegistered: (credential: AuthnMethodData) => void;
     onOtherDeviceRegistered: () => void;
     onError: (error: unknown) => void;
-    isUsingPasskeys?: boolean;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
     identityName?: string;
@@ -30,7 +28,6 @@
     onPasskeyRegistered,
     onOtherDeviceRegistered,
     onError,
-    isUsingPasskeys,
     openIdCredentials,
     maxPasskeysReached,
     identityName,
@@ -84,17 +81,12 @@
   />
 {:else if addAccessMethodFlow.view === "chooseMethod"}
   <AddAccessMethod
-    continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
+    createPasskey={handleCreatePasskey}
+    continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
     linkOpenIdAccount={handleContinueWithOpenId}
     signInWithSso={addAccessMethodFlow.signInWithSso}
     {maxPasskeysReached}
     {openIdCredentials}
-  />
-{:else if addAccessMethodFlow.view === "addPasskey"}
-  <AddPasskey
-    createPasskey={handleCreatePasskey}
-    continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
-    {isUsingPasskeys}
   />
 {:else if addAccessMethodFlow.view === "signInWithSso"}
   <SignInWithSso
