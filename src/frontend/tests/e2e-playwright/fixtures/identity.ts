@@ -222,9 +222,16 @@ export class IdentityWizard {
     }
     // mode="signin" picker — goes straight to the existing-passkey
     // WebAuthn flow; no intermediate Use existing / Create new dialog.
-    await this.#page
-      .getByRole("button", { name: "Sign in with passkey" })
-      .click();
+    // The button label varies by surface: /authorize landing keeps the
+    // default "Sign in with passkey", while / and /manage / /authorize
+    // header dialogs override to "Select one of its passkeys".
+    const selectPasskey = this.#page.getByRole("button", {
+      name: "Select one of its passkeys",
+    });
+    const signInWithPasskey = this.#page.getByRole("button", {
+      name: "Sign in with passkey",
+    });
+    await selectPasskey.or(signInWithPasskey).first().click();
   }
 
   async signUp(name: string): Promise<void> {
@@ -244,7 +251,7 @@ export class IdentityWizard {
       // Switch to sign-up via the picker's toggle CTA, which surfaces
       // the dedicated sign-up dialog with mode="signup" labels.
       const signUpToggle = this.#page.getByRole("button", {
-        name: "Sign up",
+        name: "Create",
         exact: true,
       });
       if (await signUpToggle.isVisible()) {
@@ -295,6 +302,9 @@ export class IdentityWizard {
     const signInWithPasskey = this.#page.getByRole("button", {
       name: "Sign in with passkey",
     });
+    const selectPasskey = this.#page.getByRole("button", {
+      name: "Select one of its passkeys",
+    });
     const signUpWithPasskey = this.#page.getByRole("button", {
       name: "Sign up with passkey",
     });
@@ -302,6 +312,7 @@ export class IdentityWizard {
       .or(addIdentity)
       .or(continueWithPasskey)
       .or(signInWithPasskey)
+      .or(selectPasskey)
       .or(signUpWithPasskey)
       .first()
       .waitFor();
@@ -309,6 +320,7 @@ export class IdentityWizard {
     if (
       (await continueWithPasskey.isVisible()) ||
       (await signInWithPasskey.isVisible()) ||
+      (await selectPasskey.isVisible()) ||
       (await signUpWithPasskey.isVisible())
     ) {
       return;

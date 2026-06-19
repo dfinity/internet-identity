@@ -15,7 +15,7 @@ const signUp = async (page: Page): Promise<void> => {
     name: "Continue with passkey",
   });
   const signUpToggle = page.getByRole("button", {
-    name: "Sign up",
+    name: "Create",
     exact: true,
   });
   await continueWithPasskey.or(signUpToggle).first().waitFor();

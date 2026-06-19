@@ -116,7 +116,7 @@ test.describe("multiple identities", () => {
       // Sign-in dialog renders the mode="signin" picker; clicking it
       // goes straight to existing-passkey WebAuthn.
       await authPage
-        .getByRole("button", { name: "Sign in with passkey" })
+        .getByRole("button", { name: "Select one of its passkeys" })
         .click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })

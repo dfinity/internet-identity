@@ -1,0 +1,1 @@
+export { default as component } from "../../../../src/routes/(new-styling)/cli/+layout.svelte";

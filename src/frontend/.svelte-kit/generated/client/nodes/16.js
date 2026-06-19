@@ -1,0 +1,1 @@
+export { default as component } from "../../../../src/routes/(new-styling)/manage/(authenticated)/recovery/+page.svelte";

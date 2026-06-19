@@ -16,9 +16,7 @@ const DEFAULT_USER_NAME = "John Doe";
 test("Authorize by registering a new passkey", async ({ page }) => {
   await authorize(page, async (authPage) => {
     await addVirtualAuthenticator(authPage);
-    await authPage
-      .getByRole("button", { name: "Sign up", exact: true })
-      .click();
+    await authPage.getByRole("button", { name: "Create", exact: true }).click();
     await authPage
       .getByRole("button", { name: "Sign up with passkey" })
       .click();
@@ -74,10 +72,12 @@ test("Authorize by signing in from another device", async ({
     );
 
     const principal = await authorize(page, async (authPage) => {
-      // Switch to current device and start "Continue from another device" flow to get link
+      // Switch to current device and start "Continue from another device" flow to get link.
+      // The cancel→QR auto-transition was removed; use the explicit
+      // "Authorize on another device" row below Recover instead.
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign in with passkey" })
+        .getByRole("button", { name: "Authorize", exact: true })
         .click();
       await authPage
         .getByRole("heading", {
@@ -267,7 +267,7 @@ test("Authorize with ICRC-29", async ({ page }) => {
     async (authPage) => {
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
         .getByRole("button", { name: "Sign up with passkey" })
@@ -292,7 +292,7 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
         .getByRole("button", { name: "Sign up with passkey" })

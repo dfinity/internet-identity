@@ -132,7 +132,7 @@ test.describe("Sign out confirmation", () => {
     // No identities left — should see the inline auth picker (the
     // homepage's empty state renders it in sign-in mode).
     await expect(
-      page.getByRole("button", { name: "Sign in with passkey" }),
+      page.getByRole("button", { name: "Select one of its passkeys" }),
     ).toBeVisible();
   });
 });

@@ -20,7 +20,7 @@ test.describe("AuthWizardView heading and subtitle", () => {
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
         .getByRole("button", { name: "Sign up with passkey" })
@@ -38,11 +38,11 @@ test.describe("AuthWizardView heading and subtitle", () => {
   }) => {
     await authorize(page, async (authPage) => {
       await expect(
-        authPage.getByRole("button", { name: "Sign up", exact: true }),
+        authPage.getByRole("button", { name: "Create", exact: true }),
       ).toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await expect(authPage.getByRole("dialog")).toBeVisible();
 
@@ -63,7 +63,7 @@ test.describe("AuthWizardView heading and subtitle", () => {
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
         .getByRole("button", { name: "Sign up with passkey" })
@@ -151,7 +151,7 @@ test.describe("IdentityNotConnectedDialog at /authorize", () => {
 
       await addVirtualAuthenticator(authPage);
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
         .getByRole("button", { name: "Sign up with passkey" })
@@ -305,7 +305,7 @@ test.describe("IdentityAlreadyLinkedDialog at /authorize (sign-up path)", () => 
 
     await authorize(page, async (authPage) => {
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
       await expect(authPage.getByRole("dialog")).toBeVisible();
 
@@ -364,7 +364,7 @@ test.describe("IdentityAlreadyLinkedDialog at /authorize (sign-up path)", () => 
 
     await authorize(page, async (authPage) => {
       await authPage
-        .getByRole("button", { name: "Sign up", exact: true })
+        .getByRole("button", { name: "Create", exact: true })
         .click();
 
       await authPage.context().clearCookies();
