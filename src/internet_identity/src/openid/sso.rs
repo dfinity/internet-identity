@@ -298,8 +298,9 @@ struct DiscoveryDocument {
 #[cfg(not(test))]
 async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     // Hop 1: fetch /.well-known/ii-openid-configuration. Default to https; an
-    // allowlisted loopback host (the e2e provider, which can't serve TLS) may
-    // use http. The allowlist is the trust gate.
+    // explicitly allowlisted loopback host (the e2e provider, which can't serve
+    // TLS) may use http. The explicit allowlist is the trust gate — the
+    // `sso_allow_any_domain` flag opens the domain gate but never picks http.
     let hop1_scheme = scheme_for_allowlisted_host(&domain);
     let hop1_url = format!("{hop1_scheme}://{domain}/.well-known/ii-openid-configuration");
     let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
@@ -480,12 +481,18 @@ fn host_with_port(url: &url::Url) -> Option<String> {
     })
 }
 
-/// Scheme for the hop-1 URL of an allowlisted domain: loopback (the e2e test
-/// provider) gets `http`, everything else `https`.
-#[cfg(not(test))]
+/// Scheme for the hop-1 URL. A loopback host (the e2e test provider, which
+/// can't serve TLS) gets `http`, but *only* when it's explicitly allowlisted;
+/// every other host gets `https`. Crucially, a loopback host that is reachable
+/// only because the `sso_allow_any_domain` flag opened the domain gate is *not*
+/// explicitly allowlisted, so it still gets `https`. This is what keeps the
+/// flag from becoming a plain-HTTP SSRF footgun: opening the domain gate must
+/// never let an un-allowlisted caller trigger an `http://` outcall to
+/// `localhost`/`127.0.0.1`. Consults the same explicit-allowlist gate as the
+/// hop-2 `https`-relaxation check ([`is_allowlisted_host`]).
 fn scheme_for_allowlisted_host(host: &str) -> &'static str {
     let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    if matches!(bare.as_str(), "localhost" | "127.0.0.1") {
+    if matches!(bare.as_str(), "localhost" | "127.0.0.1") && is_explicitly_allowlisted(host) {
         "http"
     } else {
         "https"
@@ -588,6 +595,28 @@ mod tests {
         // still consults it, so the flag does not bless arbitrary http hosts.
         assert!(is_explicitly_allowlisted("example.org"));
         assert!(!is_explicitly_allowlisted("not-allowed.com"));
+    }
+
+    #[test]
+    fn allow_any_domain_does_not_relax_https_for_loopback() {
+        reset();
+        // e2e setup: the loopback provider is explicitly allowlisted, so hop-1
+        // is allowed to use plain http (it can't serve TLS).
+        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["localhost:11107".to_string()]);
+        assert_eq!(scheme_for_allowlisted_host("localhost:11107"), "http");
+
+        // Flag on opens the *domain* gate for everything, loopback included...
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        assert!(is_allowed_discovery_domain("localhost"));
+        assert!(is_allowed_discovery_domain("127.0.0.1:8080"));
+        // ...but a loopback host reachable only via the flag (not on the
+        // explicit allowlist) still gets https: the flag must never trigger a
+        // plain-http outcall to localhost/127.0.0.1.
+        assert_eq!(scheme_for_allowlisted_host("localhost"), "https");
+        assert_eq!(scheme_for_allowlisted_host("localhost:9999"), "https");
+        assert_eq!(scheme_for_allowlisted_host("127.0.0.1:8080"), "https");
+        // Non-loopback hosts are always https regardless.
+        assert_eq!(scheme_for_allowlisted_host("evil.example.com"), "https");
     }
 
     #[test]
