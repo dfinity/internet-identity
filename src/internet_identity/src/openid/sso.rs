@@ -15,6 +15,7 @@
 
 use super::verify::{Descriptor, Stamp};
 use super::OpenIDJWTVerificationError;
+use crate::openid::AudClaim;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
 use identity_jose::jwk::Jwk;
 use std::cell::RefCell;
@@ -160,6 +161,7 @@ pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
 pub(super) fn resolve(
     domain: &str,
     jwt_iss: &str,
+    jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
     if !is_allowed_discovery_domain(domain) {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
@@ -170,6 +172,13 @@ pub(super) fn resolve(
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(cfg) => cfg,
     };
+    if !jwt_aud.matches(&cfg.client_id) {
+        return Err(OpenIDJWTVerificationError::GenericError(format!(
+            "JWT audience '{jwt_aud}' does not match discovered client_id '{}' for domain '{domain}'",
+            cfg.client_id
+        )));
+    }
+
     if cfg.issuer != jwt_iss {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "JWT issuer '{jwt_iss}' does not match discovered issuer '{}' for domain '{domain}'",
@@ -521,13 +530,22 @@ mod tests {
         }
     }
 
+    fn test_aud_claim() -> AudClaim {
+        AudClaim::Single(sample_config().client_id)
+    }
+
     #[test]
     fn resolve_rejects_disallowed_domain() {
         reset();
         assert!(!is_allowed_discovery_domain("not-allowed.com"));
         assert!(is_allowed_discovery_domain("example.org"));
         // The verify path rejects a disallowed domain.
-        assert!(resolve("not-allowed.com", "https://idp.example.org").is_err());
+        assert!(resolve(
+            "not-allowed.com",
+            "https://idp.example.org",
+            &test_aud_claim()
+        )
+        .is_err());
     }
 
     #[test]
@@ -559,8 +577,8 @@ mod tests {
         // Pending even after draining detached tasks, because none was spawned.
         assert_eq!(peek_discovery("example.org"), Cached::Pending);
         assert!(matches!(
-            resolve("example.org", "https://idp.example.org"),
-            Ok(Cached::Pending)
+            resolve("example.org", "https://idp.example.org", &test_aud_claim()),
+            Ok(Cached::Pending),
         ));
         run_detached();
         assert_eq!(peek_discovery("example.org"), Cached::Pending);
@@ -575,9 +593,12 @@ mod tests {
         prefetch("example.org");
         run_detached();
         // Wrong issuer is rejected.
-        assert!(resolve("example.org", "https://evil.example.org").is_err());
+        assert!(
+            resolve("example.org", "https://evil.example.org").is_err(),
+            &test_aud_claim()
+        );
         // Matching issuer resolves to a descriptor + jwks_uri.
-        match resolve("example.org", "https://idp.example.org") {
+        match resolve("example.org", "https://idp.example.org", &test_aud_claim()) {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {
                 assert_eq!(jwks_uri, "https://idp.example.org/jwks");
                 assert!(matches!(descriptor.stamp, Stamp::Sso { .. }));

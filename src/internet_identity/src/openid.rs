@@ -20,6 +20,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::ffi::os_str::Display;
 
 mod configured;
 mod jwks;
@@ -258,6 +259,15 @@ struct PartialClaims {
 pub(super) enum AudClaim {
     Single(String),
     Multiple(Vec<String>),
+}
+
+impl Display for AudClaim {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AudClaim::Single(s) => write!(f, "{}", s),
+            AudClaim::Multiple(v) => write!(f, "[{}]", v.join(", ")),
+        }
+    }
 }
 
 impl AudClaim {

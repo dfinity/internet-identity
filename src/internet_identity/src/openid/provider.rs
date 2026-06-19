@@ -26,7 +26,7 @@ pub(super) fn resolve(
     discovery_domain: Option<&str>,
 ) -> Result<Cached<Resolved>, OpenIDJWTVerificationError> {
     match discovery_domain {
-        Some(domain) => Ok(match sso::resolve(domain, iss)? {
+        Some(domain) => Ok(match sso::resolve(domain, iss, aud)? {
             Cached::Pending => Cached::Pending,
             Cached::Ready((descriptor, jwks_uri)) => Cached::Ready(Resolved {
                 descriptor,
