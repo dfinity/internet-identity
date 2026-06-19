@@ -21,6 +21,11 @@
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
     identityName?: string;
+    // Credential ids of the identity's existing passkeys. Listed as
+    // `excludeCredentials` on the create call so the OS shows the full
+    // authenticator picker instead of silently reusing the just-used
+    // Touch ID.
+    excludePasskeyCredentialIds?: Uint8Array[];
   }
 
   const {
@@ -31,6 +36,7 @@
     openIdCredentials,
     maxPasskeysReached,
     identityName,
+    excludePasskeyCredentialIds,
   }: Props = $props();
 
   const addAccessMethodFlow = new AddAccessMethodFlow();
@@ -60,7 +66,10 @@
   const handleCreatePasskey = async () => {
     try {
       onPasskeyRegistered(
-        await addAccessMethodFlow.createPasskey(identityName),
+        await addAccessMethodFlow.createPasskey(
+          identityName,
+          excludePasskeyCredentialIds,
+        ),
       );
     } catch (error) {
       if (isWebAuthnCancelError(error)) {

@@ -83,7 +83,10 @@ export class AddAccessMethodFlow {
     }
   };
 
-  createPasskey = async (name?: string): Promise<AuthnMethodData> => {
+  createPasskey = async (
+    name?: string,
+    excludeCredentialIds?: Uint8Array[],
+  ): Promise<AuthnMethodData> => {
     const { actor, identityNumber } = get(authenticatedStore);
     // TODO: Do not fail if name is not provided, maybe use the identity number as a fallback?
     if (name === undefined) {
@@ -94,7 +97,10 @@ export class AddAccessMethodFlow {
       features.DUMMY_AUTH ||
       frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
-        : await DiscoverablePasskeyIdentity.createNew(name);
+        : await DiscoverablePasskeyIdentity.createNew(
+            name,
+            excludeCredentialIds,
+          );
     const credentialId = passkeyIdentity.getCredentialId();
     if (credentialId === undefined) {
       throw new Error("Credential ID is missing");
