@@ -412,15 +412,34 @@ pub fn openid_prepare_delegation(
     Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
     RejectResponse,
 > {
+    openid_prepare_delegation_with_discovery(env, canister_id, sender, jwt, salt, session_key, None)
+        .map(settled)
+}
+
+/// Like [`openid_prepare_delegation`] but takes the SSO discovery domain and
+/// returns the raw [`OpenIdResult`](types::OpenIdResult) so callers exercising
+/// the SSO path can observe (and poll on) the `Pending` cache-warming arm.
+pub fn openid_prepare_delegation_with_discovery(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    discovery_domain: Option<&str>,
+) -> Result<
+    types::OpenIdResult<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "openid_prepare_delegation",
-        (jwt, salt, session_key),
+        (jwt, salt, session_key, discovery_domain),
     )
-    .map(|(x,)| settled(x))
+    .map(|(x,)| x)
 }
 
 pub fn openid_get_delegation(
@@ -432,14 +451,44 @@ pub fn openid_get_delegation(
     session_key: &types::SessionKey,
     expiration: &types::Timestamp,
 ) -> Result<Result<types::SignedDelegation, types::OpenIdDelegationError>, RejectResponse> {
+    openid_get_delegation_with_discovery(
+        env,
+        canister_id,
+        sender,
+        jwt,
+        salt,
+        session_key,
+        expiration,
+        None,
+    )
+    .map(settled)
+}
+
+/// Like [`openid_get_delegation`] but takes the SSO discovery domain and returns
+/// the raw [`OpenIdResult`](types::OpenIdResult) so SSO-path callers can observe
+/// the `Pending` arm.
+#[allow(clippy::too_many_arguments)]
+pub fn openid_get_delegation_with_discovery(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    expiration: &types::Timestamp,
+    discovery_domain: Option<&str>,
+) -> Result<
+    types::OpenIdResult<types::SignedDelegation, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
     query_candid_as(
         env,
         canister_id,
         sender,
         "openid_get_delegation",
-        (jwt, salt, session_key, expiration),
+        (jwt, salt, session_key, expiration, discovery_domain),
     )
-    .map(|(x,)| settled(x))
+    .map(|(x,)| x)
 }
 
 pub fn openid_credential_add(
@@ -450,15 +499,31 @@ pub fn openid_credential_add(
     jwt: &str,
     salt: &[u8; 32],
 ) -> Result<Result<(), types::OpenIdCredentialAddError>, RejectResponse> {
+    openid_credential_add_with_discovery(env, canister_id, sender, identity_number, jwt, salt, None)
+        .map(settled)
+}
+
+/// Like [`openid_credential_add`] but takes the SSO discovery domain and returns
+/// the raw [`OpenIdResult`](types::OpenIdResult) so SSO-path callers can observe
+/// the `Pending` arm.
+pub fn openid_credential_add_with_discovery(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    jwt: &str,
+    salt: &[u8; 32],
+    discovery_domain: Option<&str>,
+) -> Result<types::OpenIdResult<(), types::OpenIdCredentialAddError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "openid_credential_add",
-        (identity_number, jwt, salt),
+        (identity_number, jwt, salt, discovery_domain),
     )
-    .map(|(x,)| settled(x))
+    .map(|(x,)| x)
 }
 
 pub fn openid_credential_remove(
