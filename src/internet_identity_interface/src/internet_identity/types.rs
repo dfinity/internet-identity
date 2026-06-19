@@ -243,6 +243,12 @@ pub struct InternetIdentityFrontendArgs {
     /// own init callback, and `?feature_flag_*` URL params take precedence.
     /// Names that don't match a known frontend flag are ignored by the frontend.
     pub feature_flags: Option<Vec<(String, bool)>>,
+    /// Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
+    /// slash). The `/mcp` delegation flow delivers the delegation to this origin
+    /// (and only this origin — it's added to the `form-action` CSP and the
+    /// `/mcp` page rejects callbacks on any other origin). When unset, the
+    /// `/mcp` flow is disabled.
+    pub mcp_server_origin: Option<String>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -294,6 +300,10 @@ pub struct InternetIdentityInit {
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+    /// off (DoH-only); `Some(true)` re-enables it. Omitting it on upgrade
+    /// keeps the stored value.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC trust anchors for any feature that verifies DNS records
     /// against the IANA-rooted DNSSEC chain (currently the email-recovery
     /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).
@@ -588,6 +598,19 @@ pub enum AccountDelegationError {
 #[derive(CandidType, Debug, Deserialize)]
 pub enum CheckMaxAccountError {
     AccountLimitReached,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareSessionDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionDelegationError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
+    NoSuchDelegation,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

@@ -16,6 +16,7 @@ mod email_recovery;
 mod http;
 mod openid;
 mod rollback;
+mod session_delegation;
 mod stable_memory;
 mod upgrade;
 mod v2_api;

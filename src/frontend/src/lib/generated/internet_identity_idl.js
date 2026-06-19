@@ -83,6 +83,7 @@ export const idlFactory = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
+    'enable_dnssec_email_recovery' : IDL.Opt(IDL.Bool),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
@@ -510,6 +511,11 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
     'NoSuchCredentials' : IDL.Text,
   });
+  const SessionDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const SsoDiscovery = IDL.Record({
     'scopes' : IDL.Vec(IDL.Text),
     'name' : IDL.Opt(IDL.Text),
@@ -699,6 +705,10 @@ export const idlFactory = ({ IDL }) => {
   const PrepareIdAliasError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const PrepareSessionDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
   });
   const ChallengeResult = IDL.Record({
     'key' : ChallengeKey,
@@ -1012,6 +1022,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Principal],
         ['query'],
       ),
+    'get_session_delegation' : IDL.Func(
+        [UserNumber, SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : SessionDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_sso_discovery' : IDL.Func([IDL.Text], [SsoDiscoveryState], ['query']),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'identity_authn_info' : IDL.Func(
@@ -1176,6 +1196,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
         [],
       ),
+    'prepare_session_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareSessionDelegation,
+            'Err' : SessionDelegationError,
+          }),
+        ],
+        [],
+      ),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],
@@ -1292,6 +1322,7 @@ export const init = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
+    'enable_dnssec_email_recovery' : IDL.Opt(IDL.Bool),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
     'backend_origin' : IDL.Opt(IDL.Text),
