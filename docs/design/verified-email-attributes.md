@@ -11,13 +11,14 @@ Internet Identity has a single "recovery email" slot per anchor, verified throug
 
 This doc proposes adding **verified emails as a new, independent first-class anchor primitive** that lives alongside the existing recovery-email slot. The recovery flow stays untouched; verified emails are a separate bucket the user can populate independently.
 
-Three phases, each shipping as a single release:
+Four phases, each shipping as a single release:
 
-1. **Phase 1 — Verified emails as a first-class anchor primitive.** The user can register multiple verified email addresses on their anchor through a new flow that reuses the existing inbound-DKIM verification primitive. New storage field, new candid surface, new wizard, new settings panel. Existing recovery flow is unchanged.
-2. **Phase 2 — Verified emails as attribute sources.** Verified email entries surface in the existing ICRC-3 attribute system under a new `verified:<H(address)>:email` scope. Dapps requesting `email` against a passkey-only anchor with at least one verified email now receive a value via the consent dialog.
-3. **Phase 3 — Smart-routing + last-used default.** The consent dialog pre-selects the user's last-shared choice (or a smart-routed default for first-time users), and the canister tracks it automatically.
+1. **Phase 1 — Verified emails as a first-class anchor primitive.** The user can register multiple verified email addresses on their anchor through a new flow that reuses the existing inbound-DKIM verification primitive. New storage field, new candid surface, new wizard, and a narrow dashboard panel listing only `verified_emails` entries. Existing recovery flow is unchanged.
+2. **Phase 1.5 — Reach page (unified emails dashboard).** Pure frontend work. The narrow panel from Phase 1 widens into a "Reach" page that surfaces emails from all sources — OIDC, SSO, and `verified_emails` — in one verified list, plus a separate "Unverified emails" section listing OIDC/SSO emails where the IdP didn't vouch for verification. Each unverified row has a "Verify" CTA that opens the Phase 1 wizard pre-filled with that address; on success the entry joins the verified list. No backend changes.
+3. **Phase 2 — Verified emails as attribute sources.** Verified email entries surface in the existing ICRC-3 attribute system under a new `verified:<H(address)>:email` scope. Dapps requesting `email` against a passkey-only anchor with at least one verified email now receive a value via the consent dialog.
+4. **Phase 3 — Smart-routing + last-used default.** The consent dialog pre-selects the user's last-shared choice (or a smart-routed default for first-time users), and the canister tracks it automatically.
 
-Phases ship in order. Phase 1 stands on its own (the user gets value from being able to verify multiple emails regardless of attribute exposure).
+Phases ship in order. Phase 1 stands on its own (users get value from verifying emails). Phase 1.5 is pure FE on top of Phase 1's backend and can ship independently of Phase 2/3.
 
 ## Background
 
@@ -108,9 +109,9 @@ Shared inbound primitives (`smtp_request`, `smtp_request_validate`, `EmailRecove
 
 ### Frontend
 
-**New "Verified emails" panel** on the `/manage` dashboard. Lists the user's verified emails; lets them add and remove. No "set as recovery" radio (that's a recovery-flow concern, separate). No global "don't share" toggle.
+**New "Verified emails" panel** on the `/manage` dashboard — narrow version, ships with Phase 1. Lists only `verified_emails` entries (OIDC/SSO sources are out of scope here; Phase 1.5 widens this panel into the unified "Reach" page). Lets the user add and remove. No "set as recovery" radio (that's a recovery-flow concern, separate). No global "don't share" toggle.
 
-**New email-verification wizard** at a new component path (e.g. `src/frontend/src/lib/components/wizards/emailVerification/`). Parallel to the existing `setupEmailRecovery/` wizard, not a rename of it. The new wizard:
+**New email-verification wizard** at `src/frontend/src/lib/components/wizards/verifiedEmail/`. Parallel to the existing `setupEmailRecovery/` wizard, not a rename of it. The new wizard:
 
 - Reuses the shared `SendConfirmationEmail` dialog (renders whatever nonce the canister returns, including the new `II-Verify-` prefix).
 - Reuses the polling helper (`runEmailRecoveryPoll` — the polling pipeline is purpose-neutral once the pending entry exists).
@@ -129,26 +130,9 @@ Sharing a verified email is always **optional** — every consent surface gives 
 - Lead with what the user gets ("stay in touch with the dapp", "easier account recovery"), not what the dapp is asking for.
 - Make the skip path visible without making it feel like the wrong choice.
 - Never imply the user "must" verify or share — the dapp can ask again on the next authorize flow if the user skips.
-- Match the existing consent dialog's neutral tone for the per-request picker (the user has already chosen to engage at that point — the dialog should be matter-of-fact, not promotional).
+- Match the existing consent dialog's neutral tone for the per-request picker (the user has already chosen to engage at that point — the dialog should be matter-of-fact, not promotional). The existing consent dialog itself stays unchanged; the principles above apply only to the new surfaces (empty-state prompt, settings panel CTAs, wizard success state).
 
-**Proposed copy for the new surfaces** (final wording is an open decision; submit for UX review before shipping):
-
-- **/authorize empty-state inline prompt** (no verified email on file, dapp requests `email`):
-  - Title: "Stay in touch with `<dapp>`"
-  - Body: "Adding a verified email lets `<dapp>` reach you about account events — login alerts, receipts, recovery. You stay in control of what gets shared."
-  - Primary: "Verify an email"
-  - Secondary: "Skip for now"
-
-- **Verified emails settings panel** (dashboard, no verified emails yet):
-  - Title: "Verified emails"
-  - Body: "Verify the emails you'd like to share with apps that ask. Apps never see an email until you confirm in the consent dialog."
-  - Primary: "Add an email"
-
-- **Wizard success state** (after a new verified email lands):
-  - Title: "Email verified"
-  - Body: "You can now share `<address>` with apps that ask. You'll be prompted to confirm every time — nothing is shared until you click."
-
-- **Existing consent dialog** (per-request picker): unchanged. The user is already in the share-or-deny moment; promotional copy would feel manipulative. The "Deny all" link stays one click away.
+Final wording lands with UX review.
 
 ### Verification UX
 
@@ -169,8 +153,64 @@ The only user-visible difference from the recovery flow's dialog is the subject 
 ### Phase 1 open decisions
 
 - [ ] **Cross-promotion (v2 framing).** A user who wants the same address as both their recovery email and a shareable verified email currently has to verify it twice. Worth designing in v2: a "also set as my recovery email" affordance on the new verified-email row, and a "also add as a verified email" affordance on the recovery email management view. Both would skip re-verification since the address is already DKIM-proven in one bucket. Out of scope for v1.
-- [ ] **Wizard directory name.** `emailVerification/` is the working name; could also be `verifiedEmail/` or `addVerifiedEmail/`. Pick before scaffolding the component.
-- [ ] **Final wording for new translation strings.** Panel header, "Add an email" CTA, row remove confirmation, the "Verified email" source label, and the full copy proposed in the "Copy and tone" subsection above (empty-state inline prompt, settings empty state, wizard success state). All of this should land with UX review before shipping. The principles section is the harder commitment; the specific strings are bikeshed-easy to change.
+
+---
+
+## Phase 1.5 — Reach page (unified emails dashboard)
+
+### Concept
+
+The narrow Verified emails panel from Phase 1 widens into a page titled **"Reach"** with the subtitle "How apps can reach you when you sign in." The page presents the user's emails across all sources in two sections:
+
+- **Verified emails** — emails from OIDC credentials where `email_verified: true`, SSO credentials where the IdP vouches for the address, and `verified_emails` entries from Phase 1. Rendered as one unified list, deduped by address.
+- **Unverified emails** — emails from OIDC/SSO credentials where the IdP did not vouch for verification (`email_verified: false`). Each row has a "Verify" CTA that opens the Phase 1 wizard pre-filled with the address; on success, the address joins the Verified list.
+
+This phase is purely frontend work. No new candid, no new storage, no new backend logic. It depends on Phase 1's backend but doesn't gate Phase 2 or Phase 3.
+
+### Verified emails section
+
+- Lists the union of `openid_credentials` (where verified), SSO credentials (where verified), and `verified_emails` entries from Phase 1.
+- **Dedup by address.** Same address in multiple sources (e.g. an OIDC cred + a `verified_emails` entry the user added through DKIM) renders as one row. Source label prefers the IdP name when present; verification date uses whichever source produced it.
+- **Source icon** per row: per-IdP icon (Google, Microsoft, Apple, etc.) for entries backed by an OIDC/SSO credential; a generic envelope icon for entries backed only by `verified_emails`.
+- **Remove button** is only shown on rows backed exclusively by `verified_emails`. Rows backed by an IdP-issued credential don't show Remove — removing such an email means unlinking the IdP, which is a different concern handled elsewhere on `/manage`. Silently hidden, no tooltip.
+- **Cap counter** "N of 5 verified emails" rendered below the list, always visible.
+- **"Add an email"** CTA → mounts the wizard from Phase 1.
+
+### Unverified emails section
+
+- Lists `openid_credentials` and SSO credentials whose `email_verified` claim is false.
+- Per row: address, source label ("Microsoft · Not verified"), source icon, "Verify" CTA.
+- **Section hidden entirely** when there are no unverified entries.
+
+### Verify-from-unverified flow
+
+When the user clicks Verify on an unverified row:
+
+1. The Phase 1 wizard mounts with the address pre-filled and read-only (the user can't accidentally verify a different address than the one they clicked).
+2. Standard `verified_email_prepare_add` → DKIM challenge → poll.
+3. On success, a new `StorableVerifiedEmail` entry lands in `Anchor.verified_emails`.
+4. The dashboard re-fetches. The address now appears in both `openid_credentials` (the unverified IdP cred, untouched) and `verified_emails` (the new II-DKIM entry). Dedup shows one row in the Verified section, sourced from the IdP, with II's verification date.
+
+The original OIDC/SSO credential is not modified — the IdP still thinks the email is unverified. But II has its own proof, so the attribute-resolution downstream of Phase 2 correctly surfaces it:
+
+- `verified:<H(addr)>:verified_email` resolves to the address (Phase 2 reads `verified_emails`).
+- `openid:<issuer>:verified_email` still doesn't resolve (the IdP claim is false).
+- A dapp asking unscoped `verified_email` gets the value via the `verified:` path.
+
+### Phase 1.5 locked decisions
+
+- **Page name:** "Reach" (with subtitle "How apps can reach you when you sign in.").
+- **Dedup rule:** one row per address. When an address is in both `openid_credentials` (or SSO) and `verified_emails`, prefer the IdP source label; the verification date is whichever source produced it most recently.
+- **Source icons:** per-IdP (Google, Microsoft, Apple) for IdP-backed entries; generic envelope for `verified_emails`-only entries.
+- **Remove on IdP-backed rows:** hidden, no tooltip.
+- **Verify CTA on SSO rows:** behaves identically to OIDC — same DKIM wizard, same `verified_email_prepare_add` flow.
+- **Cap counter:** always visible.
+- **Unverified section visibility:** hidden when empty.
+
+### Phase 1.5 open decisions
+
+- [ ] **Counter format.** "2 of 5 verified emails" (mockup wording), "2/5", or something else. Bikeshed-easy.
+- [ ] **Section subtitles.** Mockup uses "Apps can request one of these to reach you. Never shared without your consent." and "Verify one of these so apps can use it to reach you." Final wording with UX review.
 
 ---
 
@@ -265,7 +305,8 @@ Nothing else changes. No new dialog modes, no "Primary" badge, no "remember this
 | Step            | Touches                                                                                                                                                                                                                                                                           |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Phase 1 backend | new `StorableVerifiedEmail` type, new `verified_emails` field on `StorableAnchor`, new `PendingKind::VerifyEmail` variant, SMTP-dispatch arm for the new variant, `find_nonce_in` accepts `II-Verify-` alongside `II-Recovery-`, `verified_email_*` candid + `VerifiedEmail` type |
-| Phase 1 FE      | new email-verification wizard (parallel to `setupEmailRecovery/`), new "Verified emails" settings panel, /authorize empty-state inline flow                                                                                                                                       |
+| Phase 1 FE      | new email-verification wizard (parallel to `setupEmailRecovery/`), narrow "Verified emails" settings panel, /authorize empty-state inline flow                                                                                                                                    |
+| Phase 1.5 FE    | widen the panel into the "Reach" page — unified Verified/Unverified sections sourced from `openid_credentials` + `verified_emails`, dedup, source icons, cap counter, Verify-from-unverified flow                                                                                 |
 | Phase 2         | `AttributeScope::Verified` variant, `list_available_attributes` + `prepare_*` extensions reading from `verified_emails`, FE source label                                                                                                                                          |
 | Phase 3         | one anchor field, resolution logic, `AttributeConsentView` default-selection edit                                                                                                                                                                                                 |
 
@@ -286,8 +327,11 @@ Nothing else changes. No new dialog modes, no "Primary" badge, no "remember this
 **Phase 1:**
 
 - [ ] Cross-promotion v2 design (deferred).
-- [ ] Wizard directory name (`emailVerification/` vs alternatives).
-- [ ] Translation strings: Verified emails panel header, "Add an email" CTA, "Remove" confirmation copy, "Verified email" source label (also used by Phase 2's consent dialog).
+
+**Phase 1.5:**
+
+- [ ] Counter format ("2 of 5 verified emails" vs alternatives).
+- [ ] Section subtitle wording (lands with UX review).
 
 **Phase 2:**
 

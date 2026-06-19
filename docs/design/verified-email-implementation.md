@@ -15,6 +15,9 @@
 
 - **Verified emails are independent from the recovery email.** Existing recovery storage, candid, wizard, and `II-Recovery-` subject prefix are untouched. Verified emails get their own storage, candid, wizard, and `II-Verify-` subject prefix.
 - Cap = 5 verified emails per anchor.
+- Wizard directory: `verifiedEmail/`; top-level component `VerifiedEmailWizard.svelte`. E2E fixture file: `verifiedEmail.ts`.
+- Phase 1 ships a **narrow** dashboard panel listing only `verified_emails` entries. Phase 1.5 widens it into the unified "Reach" page (FE-only follow-up).
+- Phase 1.5 page name: "Reach", subtitle "How apps can reach you when you sign in." Source icons per IdP (Google, Microsoft, Apple, etc.) + generic envelope for `verified_emails`-only entries. Dedup one row per address. Remove button hidden on IdP-backed rows. Cap counter always visible.
 - `StorableVerifiedEmail` carries only `{ address, verified_at }`. No `is_recovery` flag — recovery is a separate concept that lives in `email_recovery`.
 - No migration. The new `verified_emails` field is additive; `minicbor-derive` forward-compatibility handles legacy anchors.
 - Subject prefix: `find_nonce_in` accepts both `II-Recovery-` (existing) and `II-Verify-` (new) so the verified-email flow can issue nonces with the new prefix.
@@ -133,16 +136,18 @@
 
 ### 1.H. Frontend: new email-verification wizard
 
-- [ ] Create `src/frontend/src/lib/components/wizards/emailVerification/EmailVerificationWizard.svelte` — **parallel to**, not a rename of, [setupEmailRecovery/SetupEmailRecoveryWizard.svelte](../../src/frontend/src/lib/components/wizards/setupEmailRecovery/SetupEmailRecoveryWizard.svelte). Reuses:
+- [ ] Create `src/frontend/src/lib/components/wizards/verifiedEmail/VerifiedEmailWizard.svelte` — **parallel to**, not a rename of, [setupEmailRecovery/SetupEmailRecoveryWizard.svelte](../../src/frontend/src/lib/components/wizards/setupEmailRecovery/SetupEmailRecoveryWizard.svelte). Reuses:
   - The shared `SendConfirmationEmail` dialog from [emailRecovery/shared/views/](../../src/frontend/src/lib/components/wizards/emailRecovery/shared/views/) (renders whatever nonce the canister returns; no changes needed).
   - The polling helper `runEmailRecoveryPoll` from [emailRecovery/shared/](../../src/frontend/src/lib/components/wizards/emailRecovery/shared/) (purpose-neutral once the pending entry exists).
 - [ ] Wizard flow: address input → call `verified_email_prepare_add` → show the dialog with the canister-issued nonce (`II-Verify-…`) → poll for status → success/failure view.
 - [ ] **No `markAsRecovery` prop, no recovery branching.** The wizard is exclusively for adding entries to `verified_emails`. If a user wants their address as a recovery email too, they use the existing recovery flow separately.
 
-### 1.I. Frontend: "Verified emails" settings panel
+### 1.I. Frontend: narrow "Verified emails" settings panel
+
+This is the **narrow** version that ships with Phase 1. Phase 1.5 widens it into the unified "Reach" page (sections 1.5.\* below) and renames the component accordingly. Don't duplicate the layout work — build the narrow version as the small list, and Phase 1.5 grows it.
 
 - [ ] New `src/frontend/src/lib/components/settings/VerifiedEmailsPanel.svelte`:
-  - Lists `VerifiedEmail` rows from `list_verified_emails`.
+  - Lists `VerifiedEmail` rows from `list_verified_emails` only (no OIDC/SSO sources — Phase 1.5).
   - Per row: address, `verified_at`, Remove button.
   - "Add an email" button → mounts the new wizard.
   - **No "Used for recovery" radio** (recovery is a separate concept managed in the existing recovery section of the dashboard).
@@ -158,7 +163,7 @@
 ### 1.K. Frontend: e2e tests
 
 - [ ] [src/frontend/tests/e2e-playwright/fixtures/emailRecovery.ts](../../src/frontend/tests/e2e-playwright/fixtures/emailRecovery.ts) — keep this file scoped to the recovery flow. Existing tests should pass unchanged.
-- [ ] **New fixture** `src/frontend/tests/e2e-playwright/fixtures/emailVerification.ts`: helpers for the verified-email flow (waiters, nonce regex `/II-Verify-[0-9a-f]{16}/`, mailbox helpers — likely shares ~80% with the recovery fixture; extract genuinely shared bits into a smaller shared module if it's clean).
+- [ ] **New fixture** `src/frontend/tests/e2e-playwright/fixtures/verifiedEmail.ts`: helpers for the verified-email flow (waiters, nonce regex `/II-Verify-[0-9a-f]{16}/`, mailbox helpers — likely shares ~80% with the recovery fixture; extract genuinely shared bits into a smaller shared module if it's clean).
 - [ ] **New spec** `src/frontend/tests/e2e-playwright/routes/verifiedEmails.spec.ts`:
   - Add a verified email via the new settings panel → entry appears in `list_verified_emails`.
   - Remove a verified email → it disappears.
@@ -169,6 +174,54 @@
 
 - [ ] No changes to existing recovery-related doc comments. They still describe the recovery flow accurately.
 - [ ] Add module-level doc comments to the new `verified_emails/` module explaining the relationship to `email_recovery/` (sibling, shares verification primitive, disambiguated by `PendingKind`).
+
+---
+
+## Phase 1.5 — Reach page (unified emails dashboard)
+
+Pure FE work. No new candid, no new storage, no backend changes. Depends on Phase 1 BE having shipped (the FE needs `list_verified_emails`).
+
+### 1.5.A. Rename / restructure the panel
+
+- [ ] Rename or refactor `src/frontend/src/lib/components/settings/VerifiedEmailsPanel.svelte` into a "Reach" page component (or restructure as a child of the existing settings page — pick whatever matches the existing `/manage` layout best). Page title: "Reach". Subtitle: "How apps can reach you when you sign in." (Final strings land with UX review.)
+- [ ] Inside the page, add a "Verified emails" section header with a short subtitle (mockup uses "Apps can request one of these to reach you. Never shared without your consent.").
+
+### 1.5.B. Verified emails section (unified)
+
+- [ ] Render the list from the union of two sources:
+  - `openid_credentials` entries whose `email_verified` claim is true.
+  - SSO credentials whose IdP vouches for the address (same condition; the credential type already encodes verified status).
+  - `verified_emails` entries from Phase 1.
+- [ ] Dedup by address: if the same address appears in multiple sources, render one row. Source label prefers the IdP name; verification date uses whichever source produced it (most-recent wins on ties).
+- [ ] Source icon per row: per-IdP icon (Google, Microsoft, Apple, and any other configured IdPs); generic envelope for entries backed only by `verified_emails`. Reuse existing icon assets when available — most are already in `src/frontend/src/lib/components/icons/` or similar.
+- [ ] Remove button: only on rows backed exclusively by `verified_emails`. IdP-backed rows silently hide the Remove button (no tooltip).
+- [ ] Cap counter below the list, always visible: "N of 5 verified emails" (final wording TBD).
+- [ ] "Add an email" CTA → mounts the wizard from Phase 1.
+
+### 1.5.C. Unverified emails section
+
+- [ ] New section "Unverified emails" beneath the Verified section. Subtitle (mockup wording): "Verify one of these so apps can use it to reach you."
+- [ ] Lists `openid_credentials` / SSO credentials whose `email_verified` claim is false.
+- [ ] Per row: address, source label ("Microsoft · Not verified"), source icon, "Verify" CTA.
+- [ ] **Hide the section entirely** when no unverified entries exist.
+
+### 1.5.D. Verify-from-unverified flow
+
+- [ ] "Verify" button on an unverified row opens the Phase 1 wizard with the address pre-filled. The address field is **read-only** in this entry mode so the user can't accidentally verify a different address than the one they clicked.
+- [ ] On wizard success: a new `StorableVerifiedEmail` entry lands in `Anchor.verified_emails` via `verified_email_prepare_add` → DKIM challenge → poll. **The original OIDC/SSO credential is not modified.**
+- [ ] After success, refetch the dashboard data. The address now appears in both `openid_credentials` (the unchanged IdP cred, still `email_verified: false`) and `verified_emails` (the new entry). Dedup renders one row in the Verified section, sourced from the IdP, dated as the II verification.
+
+### 1.5.E. Tests
+
+- [ ] FE unit test: dedup produces one row when the same address is in both `openid_credentials` and `verified_emails`.
+- [ ] FE unit test: Remove button visibility — visible on `verified_emails`-only rows, hidden on IdP-backed rows.
+- [ ] FE unit test: Unverified section hides entirely when there are no unverified entries.
+- [ ] E2E test: anchor with an unverified OIDC email → user clicks Verify → wizard opens with the address pre-filled and read-only → completes DKIM → row moves to Verified section after re-fetch.
+- [ ] E2E test: cap counter reflects the actual count.
+
+### 1.5.F. Translation strings
+
+- [ ] All new strings via `$t` calls. Don't edit `.po` files directly. Final wording lands with UX review.
 
 ---
 
@@ -232,6 +285,7 @@
 
 ## Suggested PR breakdown
 
-- `feat(be,fe): verified emails as a new first-class anchor primitive` — Phase 1 end to end.
+- `feat(be,fe): verified emails as a new first-class anchor primitive` — Phase 1 end to end (narrow panel).
+- `feat(fe): Reach dashboard page with unified verified and unverified emails` — Phase 1.5.
 - `feat(be,fe): verified emails as ICRC-3 attribute sources` — Phase 2.
 - `feat(be,fe): last-used default in attribute consent dialog` — Phase 3.
