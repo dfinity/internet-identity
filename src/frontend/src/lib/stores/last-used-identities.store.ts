@@ -33,9 +33,9 @@ export type LastUsedIdentity = {
         };
       }
     | {
-        // SSO credentials are resolved via the two-hop discovery chain
-        // (`add_discoverable_oidc_config` + `discoverSsoConfig`), not via
-        // the static `openid_configs` list — so we only need the discovery
+        // SSO credentials are resolved via canister SSO discovery
+        // (`discoverSsoConfig`), not via the static `openid_configs` list —
+        // so we only need the discovery
         // domain (and the optional friendly name from hop 1) to rebuild
         // the request config at sign-in time. `iss`/`sub` aren't stored
         // because a fresh JWT gives us new ones on every re-auth.

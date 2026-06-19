@@ -155,6 +155,7 @@ pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, 
 
 pub fn identity_registration_finish(
     arg: CreateIdentityData,
+    verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<IdRegFinishResult, IdRegFinishError> {
     let caller = caller();
     let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
@@ -170,7 +171,7 @@ pub fn identity_registration_finish(
 
     let now = time();
 
-    let identity_number = create_identity(&arg, now)?;
+    let identity_number = create_identity(&arg, now, verified_openid)?;
 
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
@@ -196,23 +197,44 @@ pub fn identity_registration_finish(
     Ok(IdRegFinishResult { identity_number })
 }
 
-fn create_openid_credential_and_config(
+/// Verify the OpenID JWT for a registration and pair the credential with its
+/// config issuer.
+///
+/// Returns [`Cached::Pending`](openid::Cached::Pending) when the SSO discovery /
+/// JWKS cache is cold (or has since been evicted) so the caller can surface a
+/// retry rather than a terminal error. Configured providers (Google / Microsoft
+/// / Apple) keep their keys warm and always resolve to `Ready`. This runs
+/// before `create_identity` takes the storage borrow because verification reads
+/// the JWK caches (and the configured providers' JWKs from stable storage),
+/// which would conflict with the `storage_borrow_mut` it would otherwise run
+/// inside.
+pub fn verify_openid_for_registration(
     openid_registration_data: &OpenIDRegFinishArg,
-) -> Result<(openid::OpenIdCredential, String), IdRegFinishError> {
-    let OpenIDRegFinishArg { jwt, salt, name: _ } = openid_registration_data;
+) -> Result<openid::Cached<(openid::OpenIdCredential, String)>, IdRegFinishError> {
+    let OpenIDRegFinishArg {
+        jwt,
+        salt,
+        name: _,
+        discovery_domain,
+    } = openid_registration_data;
 
-    let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
-        // `with_provider` only yields providers whose discovery has completed, so
-        // `issuer()` is always Some — surface an explicit error if that ever breaks.
-        let issuer = provider.issuer().ok_or_else(|| {
-            openid::OpenIDJWTVerificationError::GenericError(
-                "Selected provider has no issuer after discovery filter".to_string(),
-            )
-        })?;
-        Ok((provider.verify(jwt, salt)?, issuer))
-    })?;
+    openid::prefetch_sso(discovery_domain.as_deref());
+    let openid_credential = match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
+        openid::Cached::Ready(credential) => credential,
+        openid::Cached::Pending => return Ok(openid::Cached::Pending),
+    };
 
-    Ok((openid_credential, openid_config_iss))
+    // Config issuer for the authorization key / operation log: the configured
+    // provider's (template) issuer, or the concrete JWT issuer for an SSO
+    // credential, which carries its own `sso_domain` for scope routing.
+    let openid_config_iss = openid_credential
+        .config_issuer()
+        .unwrap_or_else(|| openid_credential.iss.clone());
+
+    Ok(openid::Cached::Ready((
+        openid_credential,
+        openid_config_iss,
+    )))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -240,14 +262,19 @@ pub struct ValidatedOpenIDRegFinishArg {
 fn validate_identity_data<M: Memory + Clone>(
     storage: &Storage<M>,
     arg: &CreateIdentityData,
+    verified_openid: Option<(openid::OpenIdCredential, String)>,
 ) -> Result<ValidatedCreateIdentityData, IdRegFinishError> {
     match &arg {
         CreateIdentityData::PubkeyAuthn(arg) => {
             Ok(ValidatedCreateIdentityData::PubkeyAuthn(arg.clone()))
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
-            let (credential, openid_config_iss) =
-                create_openid_credential_and_config(openid_registration_data)?;
+            // Verified above, before the storage borrow.
+            let (credential, openid_config_iss) = verified_openid.ok_or_else(|| {
+                IdRegFinishError::InvalidAuthnMethod(
+                    "missing verified OpenID credential".to_string(),
+                )
+            })?;
 
             check_openid_credential_is_unique(storage, &credential.key())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
@@ -317,7 +344,11 @@ fn apply_identity_data(
     Ok(operation)
 }
 
-fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber, IdRegFinishError> {
+fn create_identity(
+    arg: &CreateIdentityData,
+    now: u64,
+    verified_openid: Option<(openid::OpenIdCredential, String)>,
+) -> Result<IdentityNumber, IdRegFinishError> {
     // Enforce global uniqueness of passkey pubkeys across all anchors.
     if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
         authn_method:
@@ -333,7 +364,7 @@ fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber,
     }
 
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
-        let arg = validate_identity_data(storage, arg)?;
+        let arg = validate_identity_data(storage, arg, verified_openid)?;
 
         let allocation = storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
             let operation = apply_identity_data(identity, arg)?;
@@ -389,7 +420,7 @@ mod create_identity_tests {
         );
 
         // Attempt to create identity - this should fail
-        let result = create_identity(&create_identity_data, 111);
+        let result = create_identity(&create_identity_data, 111, None);
 
         // Verify that the creation failed
         assert!(result.is_err());

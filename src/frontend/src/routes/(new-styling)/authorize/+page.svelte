@@ -43,7 +43,6 @@
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
-  import { anonymousActor } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
   const { data }: PageProps = $props();
@@ -131,17 +130,14 @@
   };
 
   /**
-   * 1-click SSO equivalent of {@link initiateOpenId}: register the
-   * discovery domain with the canister, run two-hop discovery, then
-   * redirect through the same OpenID-redirect machinery as the direct
-   * flow. Distinct from the wizard `SignInWithSso` path only in that it
-   * has nothing to debounce or validate UI-side — the URL has already
-   * committed to a domain that's on the allowlist (gated in `+page.ts`).
+   * 1-click SSO equivalent of {@link initiateOpenId}: resolve the discovery
+   * domain via the canister, then redirect through the same OpenID-redirect
+   * machinery as the direct flow. Distinct from the wizard `SignInWithSso`
+   * path only in that it has nothing to debounce or validate UI-side — the URL
+   * has already committed to a domain that's on the allowlist (gated in
+   * `+page.ts`).
    */
   const initiateSso = async (domain: string) => {
-    await anonymousActor.add_discoverable_oidc_config({
-      discovery_domain: domain,
-    });
     const result = await discoverSsoConfig(domain);
     // Stash the SSO discovery domain so `resumeOpenId` knows the
     // returning JWT belongs to a 1-click SSO flow rather than a 1-click
@@ -194,13 +190,11 @@
     sessionStorage.removeItem("ii-sso-1-click-domain");
     let config: OpenIdConfig | undefined;
     if (ssoDomain !== null) {
-      // SSO sign-in: there's no matching `openid_configs` entry to look
-      // up because the provider is registered as a `DiscoverableOidcConfig`
-      // on the canister, not a direct `OpenIdConfig`. Build a synthetic
-      // config from the JWT itself — `continueWithOpenId` only needs
-      // `name` (for analytics) and `client_id` / `issuer` here since
-      // the JWT is already in hand and the canister side picks the
-      // matching `DiscoverableProvider` by `(iss, aud)`.
+      // SSO sign-in: there's no matching `openid_configs` entry, so build a
+      // synthetic config from the JWT itself. `continueWithOpenId` only needs
+      // `name` (for analytics) and `client_id` / `issuer` here since the JWT is
+      // already in hand; `ssoDomain` is passed through so the canister verifies
+      // it against the SSO discovery for that domain.
       config = {
         auth_uri: "",
         jwks_uri: "",
@@ -235,7 +229,12 @@
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
     directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
-    const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+    const authFlowResult = await authFlow.continueWithOpenId(
+      config,
+      jwt,
+      undefined,
+      ssoDomain ?? undefined,
+    );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
       await authFlow.completeOpenIdRegistration(
