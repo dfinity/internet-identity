@@ -592,11 +592,9 @@ mod tests {
         });
         prefetch("example.org");
         run_detached();
-        // Wrong issuer is rejected.
-        assert!(
-            resolve("example.org", "https://evil.example.org").is_err(),
-            &test_aud_claim()
-        );
+        // Wrong issuer is rejected (the audience matches, so it's the issuer
+        // cross-check that fails).
+        assert!(resolve("example.org", "https://evil.example.org", &test_aud_claim()).is_err());
         // Matching issuer resolves to a descriptor + jwks_uri.
         match resolve("example.org", "https://idp.example.org", &test_aud_claim()) {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {

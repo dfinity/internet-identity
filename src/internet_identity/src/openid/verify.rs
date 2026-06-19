@@ -158,18 +158,35 @@ pub(super) fn verify_and_build(
         .verify(&JwsVerifierFn::from(verify_signature), cert)
         .map_err(|_| OpenIDJWTVerificationError::GenericError("Invalid signature".to_string()))?;
 
+    // Destructure the verified claims. `aud` is intentionally dropped: it was
+    // only weakly checked (`AudClaim::matches` accepts a single value or any
+    // member of an array), so the canonical `descriptor.client_id` is stored on
+    // the credential instead. `nonce` / `exp` / `iat` were consumed by
+    // `verify_claims` and aren't persisted.
+    let Claims {
+        iss,
+        sub,
+        email,
+        name,
+        email_verified,
+        aud: _,
+        nonce: _,
+        exp: _,
+        iat: _,
+    } = claims;
+
     // Assemble metadata
     let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
-    if let Some(email) = claims.email {
+    if let Some(email) = email {
         metadata.insert("email".into(), MetadataEntryV2::String(email));
     }
-    if let Some(email_verified) = claims.email_verified {
+    if let Some(email_verified) = email_verified {
         metadata.insert(
             "email_verified".into(),
             MetadataEntryV2::String(email_verified.into_string()),
         );
     }
-    if let Some(name) = claims.name {
+    if let Some(name) = name {
         metadata.insert("name".into(), MetadataEntryV2::String(name));
     }
     // Store issuer-specific claims (e.g. Microsoft's `tid`) in the metadata.
@@ -187,8 +204,8 @@ pub(super) fn verify_and_build(
         // should uniquely identify an account, and the Microsoft config issuer
         // is a placeholder string that doesn't identify which tenant a `sub`
         // belongs to. Store the concrete `iss` claim instead.
-        iss: claims.iss,
-        sub: claims.sub,
+        iss,
+        sub,
         // `aud` is verified against `client_id` above; store the canonical value.
         aud: descriptor.client_id.clone(),
         last_usage_timestamp: None,
@@ -262,7 +279,11 @@ fn verify_claims(
     claims: &Claims,
     salt: &[u8; 32],
 ) -> Result<(), OpenIDJWTVerificationError> {
-    let now = time();
+    // JWT `iat` / `exp` are second-granular. Compare validity in whole seconds
+    // rather than converting the claims to nanoseconds: `secs_to_nanos`
+    // multiplies by 1e9, so a malicious far-future `iat` / `exp` would overflow
+    // it, and canister code must stay panic-free.
+    let now_secs = time() / secs_to_nanos(1);
     let mut hasher = Sha256::new();
     hasher.update(salt);
     hasher.update(caller().to_bytes());
@@ -286,13 +307,19 @@ fn verify_claims(
             claims.nonce
         )));
     }
-    if now > secs_to_nanos(claims.exp) {
+    if now_secs > claims.exp {
         return Err(OpenIDJWTVerificationError::JWTExpired);
     }
-    if now > secs_to_nanos(claims.iat + MAX_VALIDITY_WINDOW_SECONDS) {
+    // `checked_add` instead of `iat + window`: a malicious far-future `iat`
+    // would otherwise overflow and panic. An `iat` that large is past any
+    // sane validity window, so treat the overflow as expired.
+    let Some(max_valid_until_secs) = claims.iat.checked_add(MAX_VALIDITY_WINDOW_SECONDS) else {
+        return Err(OpenIDJWTVerificationError::JWTExpired);
+    };
+    if now_secs > max_valid_until_secs {
         return Err(OpenIDJWTVerificationError::JWTExpired);
     }
-    if now < secs_to_nanos(claims.iat) {
+    if now_secs < claims.iat {
         return Err(OpenIDJWTVerificationError::GenericError(
             "JWT is not valid yet".into(),
         ));
@@ -354,9 +381,27 @@ mod tests {
     use identity_jose::jwk::Jwk;
     use std::cell::Cell;
 
+    // `VALID_JWT` was issued at `TEST_IAT_SECONDS` and expires at
+    // `TEST_EXP_SECONDS` (one hour later), with its nonce bound to
+    // `DEFAULT_TEST_PRINCIPAL` + `test_salt()`. The default test clock is pinned
+    // to `iat` so the token verifies.
+    const DEFAULT_TEST_PRINCIPAL: &str =
+        "x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae";
+    const TEST_IAT_SECONDS: u64 = 1_736_794_102;
+    const TEST_EXP_SECONDS: u64 = 1_736_797_702;
+
     thread_local! {
-        pub(super) static TEST_CALLER: Cell<Principal> = Cell::new(Principal::from_text("x4gp4-hxabd-5jt4d-wc6uw-qk4qo-5am4u-mncv3-wz3rt-usgjp-od3c2-oae").unwrap());
-        pub(super) static TEST_TIME: Cell<u64> = const { Cell::new(secs_to_nanos(1_736_794_102)) };
+        pub(super) static TEST_CALLER: Cell<Principal> =
+            Cell::new(Principal::from_text(DEFAULT_TEST_PRINCIPAL).unwrap());
+        pub(super) static TEST_TIME: Cell<u64> = const { Cell::new(secs_to_nanos(TEST_IAT_SECONDS)) };
+    }
+
+    // The clock and caller are thread-locals that some tests mutate. Reset them
+    // to the defaults at the start of every test so the test runner reusing a
+    // thread can't leak a mutated value into the next test.
+    fn reset_test_env() {
+        TEST_CALLER.set(Principal::from_text(DEFAULT_TEST_PRINCIPAL).unwrap());
+        TEST_TIME.set(secs_to_nanos(TEST_IAT_SECONDS));
     }
 
     const TEST_AUD: &str =
@@ -367,7 +412,7 @@ mod tests {
         struct Certs {
             keys: Vec<Jwk>,
         }
-        serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use": "sig","kty": "RSA","alg": "RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#)
+        serde_json::from_str::<Certs>(r#"{"keys":[{"n": "jwstqI4w2drqbTTVRDriFqepwVVI1y05D5TZCmGvgMK5hyOsVW0tBRiY9Jk9HKDRue3vdXiMgarwqZEDOyOA0rpWh-M76eauFhRl9lTXd5gkX0opwh2-dU1j6UsdWmMa5OpVmPtqXl4orYr2_3iAxMOhHZ_vuTeD0KGeAgbeab7_4ijyLeJ-a8UmWPVkglnNb5JmG8To77tSXGcPpBcAFpdI_jftCWr65eL1vmAkPNJgUTgI4sGunzaybf98LSv_w4IEBc3-nY5GfL-mjPRqVCRLUtbhHO_5AYDpqGj6zkKreJ9-KsoQUP6RrAVxkNuOHV9g1G-CHihKsyAifxNN2Q","use":"sig","kty":"RSA","alg":"RS256","kid": "dd125d5f462fbc6014aedab81ddf3bcedab70847","e": "AQAB"}]}"#)
             .unwrap()
             .keys
     }
@@ -394,6 +439,7 @@ mod tests {
 
     #[test]
     fn should_verify_and_build_credential() {
+        reset_test_env();
         let credential = verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt())
             .expect("expected verification to succeed");
         assert_eq!(credential.iss, "https://accounts.google.com");
@@ -409,6 +455,7 @@ mod tests {
 
     #[test]
     fn should_stamp_sso_fields() {
+        reset_test_env();
         // Same shared pipeline, only the descriptor's stamp differs: an SSO
         // descriptor writes `sso_domain` / `sso_name` onto the credential.
         let descriptor = Descriptor {
@@ -427,6 +474,7 @@ mod tests {
 
     #[test]
     fn should_reject_certificate_not_found() {
+        reset_test_env();
         // A non-empty key set that lacks the JWT's `kid` is a hard error,
         // distinct from a pending (not-yet-fetched) JWK source.
         let mut wrong_kid = test_certs();
@@ -439,11 +487,145 @@ mod tests {
 
     #[test]
     fn should_reject_invalid_encoding() {
+        reset_test_env();
         assert_eq!(
             verify_and_build("invalid-jwt", &descriptor(), &test_certs(), &test_salt()),
             Err(OpenIDJWTVerificationError::GenericError(
                 "Unable to decode JWT".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn should_reject_invalid_signature() {
+        reset_test_env();
+        // Flip the first character of the signature segment: the header and
+        // claims still decode and pass every claim check, but the RSA signature
+        // no longer verifies against the key.
+        let (signed, signature) = VALID_JWT.rsplit_once('.').unwrap();
+        let mut chars: Vec<char> = signature.chars().collect();
+        chars[0] = if chars[0] == 'A' { 'B' } else { 'A' };
+        let tampered = format!("{signed}.{}", chars.into_iter().collect::<String>());
+
+        let err =
+            verify_and_build(&tampered, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
+        assert!(
+            matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("Invalid signature"))
+        );
+    }
+
+    #[test]
+    fn should_reject_invalid_issuer() {
+        reset_test_env();
+        let descriptor = Descriptor {
+            issuer: "https://accounts.evil.example".to_string(),
+            client_id: TEST_AUD.to_string(),
+            stamp: Stamp::Direct,
+        };
+        let err =
+            verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt()).unwrap_err();
+        assert!(
+            matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("Invalid issuer"))
+        );
+    }
+
+    #[test]
+    fn should_reject_invalid_audience() {
+        reset_test_env();
+        let descriptor = Descriptor {
+            issuer: "https://accounts.google.com".to_string(),
+            client_id: "wrong-client-id".to_string(),
+            stamp: Stamp::Direct,
+        };
+        let err =
+            verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt()).unwrap_err();
+        assert!(
+            matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("Invalid audience"))
+        );
+    }
+
+    #[test]
+    fn should_reject_invalid_nonce() {
+        reset_test_env();
+        // The nonce is a hash of the salt + caller. A different caller produces
+        // a different expected nonce, so the JWT's nonce — bound to the default
+        // caller — no longer matches.
+        TEST_CALLER.set(Principal::anonymous());
+        let err =
+            verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
+        assert!(
+            matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("Invalid nonce"))
+        );
+    }
+
+    #[test]
+    fn should_reject_expired_jwt() {
+        reset_test_env();
+        // One second past the token's `exp`.
+        TEST_TIME.set(secs_to_nanos(TEST_EXP_SECONDS + 1));
+        let err =
+            verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
+        assert_eq!(err, OpenIDJWTVerificationError::JWTExpired);
+    }
+
+    #[test]
+    fn should_reject_jwt_outside_validity_window() {
+        reset_test_env();
+        // Still before `exp` (iat 1736794102 + 601 < exp 1736797702), but past
+        // `iat + MAX_VALIDITY_WINDOW_SECONDS`: a JWT the provider still considers
+        // valid is rejected once it leaves our own (much shorter) window.
+        TEST_TIME.set(secs_to_nanos(
+            TEST_IAT_SECONDS + MAX_VALIDITY_WINDOW_SECONDS + 1,
+        ));
+        let err =
+            verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
+        assert_eq!(err, OpenIDJWTVerificationError::JWTExpired);
+    }
+
+    #[test]
+    fn should_reject_jwt_issued_in_the_future() {
+        reset_test_env();
+        // One second before the token's `iat`.
+        TEST_TIME.set(secs_to_nanos(TEST_IAT_SECONDS - 1));
+        let err =
+            verify_and_build(VALID_JWT, &descriptor(), &test_certs(), &test_salt()).unwrap_err();
+        assert!(
+            matches!(err, OpenIDJWTVerificationError::GenericError(msg) if msg.contains("not valid yet"))
+        );
+    }
+
+    #[test]
+    fn should_not_overflow_on_far_future_iat() {
+        reset_test_env();
+        // A malicious `iat` near `u64::MAX` previously overflowed
+        // `iat + MAX_VALIDITY_WINDOW_SECONDS` (and `secs_to_nanos`). Drive
+        // `verify_claims` with a matching nonce so it gets past the earlier
+        // checks and reaches the validity-window comparison, and assert it
+        // rejects the JWT instead of panicking on the overflow.
+        let mut hasher = Sha256::new();
+        hasher.update(test_salt());
+        hasher.update(caller().to_bytes());
+        let hash: [u8; 32] = hasher.finalize().into();
+        let nonce = BASE64_URL_SAFE_NO_PAD.encode(hash);
+
+        let result = verify_claims(
+            "https://accounts.google.com",
+            TEST_AUD,
+            &Claims {
+                iss: "https://accounts.google.com".to_string(),
+                sub: "sub".to_string(),
+                aud: AudClaim::Single(TEST_AUD.to_string()),
+                nonce,
+                exp: u64::MAX,
+                iat: u64::MAX,
+                email: None,
+                name: None,
+                email_verified: None,
+            },
+            &test_salt(),
+        );
+        // `iat + window` overflows, which the verifier maps to `JWTExpired`
+        // rather than panicking.
+        assert_eq!(result, Err(OpenIDJWTVerificationError::JWTExpired));
     }
 }

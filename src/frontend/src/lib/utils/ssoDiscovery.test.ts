@@ -42,6 +42,17 @@ describe("ssoDiscovery", () => {
 
     it("accepts loopback hosts with a port", () => {
       expect(validateDomain("localhost:11107")).toBe("localhost:11107");
+      expect(validateDomain("127.0.0.1:11107")).toBe("127.0.0.1:11107");
+      expect(validateDomain("localhost")).toBe("localhost");
+    });
+
+    it("rejects a loopback host carrying a path", () => {
+      // `localhost/evil` is not a bare host, so it falls through to the
+      // DNS-format check (which rejects the slash) instead of being treated
+      // as loopback.
+      expect(() => validateDomain("localhost/evil")).toThrow(
+        "Invalid domain format",
+      );
     });
 
     it("rejects empty strings", () => {

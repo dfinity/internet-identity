@@ -57,8 +57,19 @@ const DOMAIN_REGEX =
  * it either, and the e2e setup uses the hostname form.
  */
 const isLoopbackHost = (host: string): boolean => {
-  const bare = host.split(":", 1)[0]?.toLowerCase() ?? host;
-  return bare === "localhost" || bare === "127.0.0.1";
+  let url: URL;
+  try {
+    // Parse as a URL authority so the optional `:<port>` is split off for us
+    // rather than by hand. Invalid input throws and is treated as non-loopback.
+    url = new URL(`http://${host}`);
+  } catch {
+    return false;
+  }
+  // A bare `host[:port]` has no path/query/fragment; reject e.g. `localhost/x`.
+  if (url.pathname !== "/" || url.search !== "" || url.hash !== "") {
+    return false;
+  }
+  return url.hostname === "localhost" || url.hostname === "127.0.0.1";
 };
 
 /**
