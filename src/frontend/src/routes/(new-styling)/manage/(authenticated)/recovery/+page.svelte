@@ -27,6 +27,7 @@
   import ActiveEmailRecovery from "./components/ActiveEmailRecovery.svelte";
   import RemoveEmailRecovery from "./components/RemoveEmailRecovery.svelte";
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
+  import { VerifiedEmailsPanel } from "$lib/components/settings";
   import type {
     EmailRecoveryDnsInput,
     EmailRecoverySubmitDkimLeafArg,
@@ -67,6 +68,20 @@
    * the next route load to re-fetch.
    */
   let emailRecovery = $derived(data.identityInfo.email_recovery[0]?.[0]);
+
+  /**
+   * Verified emails bound to this anchor. The (authenticated) layout
+   * already fetched `identity_info`, so we just project the new
+   * `verified_emails` field — `[] | [VerifiedEmail[]]` in candid
+   * shape — into a plain array.
+   *
+   * Per-anchor cap mirrors `MAX_VERIFIED_EMAILS_PER_ANCHOR` on the
+   * canister; it's inlined here because the candid API doesn't (yet)
+   * expose it. Keep in sync with
+   * `src/internet_identity/src/email_recovery/mod.rs`.
+   */
+  const VERIFIED_EMAILS_CAPACITY = 5;
+  let verifiedEmails = $derived(data.identityInfo.verified_emails[0] ?? []);
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -436,6 +451,14 @@
       />
     {/if}
   {/if}
+</div>
+
+<!-- Verified emails — separate primitive from the recovery email.
+     Lists addresses dapps can request via the attribute system once
+     Phase 2 ships; for now the panel just manages the bound entries.
+     Phase 1.5 widens this into the unified "Reach" page. -->
+<div class="mt-5 grid max-w-5xl grid-cols-1 gap-5">
+  <VerifiedEmailsPanel {verifiedEmails} capacity={VERIFIED_EMAILS_CAPACITY} />
 </div>
 
 {#if !$EMAIL_RECOVERY_SETUP}

@@ -1,0 +1,244 @@
+<script lang="ts">
+  /**
+   * Setup wizard for binding an email address as a **verified email**
+   * to the currently-authenticated Internet Identity. Parallel to
+   * {@link SetupEmailRecoveryWizard} — both flows ride the same SMTP
+   * gateway, DKIM verifier and DMARC alignment; the only differences
+   * are which canister method binds the entry, which `Anchor` field
+   * it lands on, and the nonce prefix (`II-Verify-` here vs
+   * `II-Recovery-` on the recovery wizard).
+   *
+   * Flow mirrors the recovery setup wizard:
+   *
+   *   1. User types their email address.
+   *   2. Assemble a DNSSEC skeleton bundle, call
+   *      `verified_email_prepare_add`, show the canister-issued nonce
+   *      + recipient mailbox (`register@<related_origin>` — same
+   *      recipient as the recovery setup flow; the `II-Verify-`
+   *      subject prefix is what disambiguates the two on the canister
+   *      side).
+   *   3. User sends the DKIM-signed email; we poll
+   *      `email_recovery_status` (shared with recovery — keyed by
+   *      nonce, not by flow). On the DNSSEC path that yields a
+   *      `NeedDkimLeaf` step; on the DoH path verification finishes
+   *      synchronously and the loop goes straight to terminal.
+   *
+   * On success the wizard hands control back to the host via
+   * `onSuccess(address)`; the host fires a toast and closes the
+   * dialog.
+   */
+
+  import EnterAddress from "./views/EnterAddress.svelte";
+  import SendConfirmationEmail from "$lib/components/wizards/emailRecovery/shared/views/SendConfirmationEmail.svelte";
+  import FailedView from "$lib/components/wizards/emailRecovery/shared/views/FailedView.svelte";
+  import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
+  import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
+  import type {
+    EmailRecoveryChallenge,
+    EmailRecoveryDiagnostics,
+    EmailRecoveryDnsInput,
+    EmailRecoveryError,
+    EmailRecoveryStatus,
+    EmailRecoverySubmitDkimLeafArg,
+    DnsProofBundle,
+  } from "$lib/generated/internet_identity_types";
+  import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
+  import { isCanisterError } from "$lib/utils/utils";
+  import {
+    setupVerifiedEmailFunnel,
+    SetupVerifiedEmailEvents,
+  } from "$lib/utils/analytics/setupVerifiedEmailFunnel";
+  import { onDestroy, onMount } from "svelte";
+
+  interface Props {
+    /** Authenticated wrapper around `verified_email_prepare_add`. */
+    prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
+    /** Anonymous wrapper around `email_recovery_status` (query). Status,
+     *  diagnostics, submit-dkim-leaf and resolve-via-doh are shared with
+     *  the recovery flow — keyed by nonce. */
+    status: (nonce: string) => Promise<EmailRecoveryStatus>;
+    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
+    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
+    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
+    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    resolveViaDoh: (nonce: string) => Promise<void>;
+    /** Address to pre-fill (Phase 1.5 "Verify from unverified" entry). */
+    initialAddress?: string;
+    /** When true, the address input is locked to `initialAddress`. */
+    addressLocked?: boolean;
+    /** Called once on `RegistrationSucceeded`. The host shows a toast
+     *  and closes the dialog. */
+    onSuccess: (address: string) => void;
+  }
+
+  const {
+    prepare,
+    status,
+    diagnostics,
+    submitDkimLeaf,
+    resolveViaDoh,
+    initialAddress,
+    addressLocked = false,
+    onSuccess,
+  }: Props = $props();
+
+  type Stage =
+    | { kind: "enter"; initialError?: string }
+    | {
+        kind: "sending";
+        challenge: EmailRecoveryChallenge;
+        address: string;
+        path: Path;
+      }
+    | {
+        kind: "waiting";
+        challenge: EmailRecoveryChallenge;
+        address: string;
+        path: Path;
+      }
+    | { kind: "unsupported"; domain: string }
+    | { kind: "failed"; reason: string; diagnostics?: string };
+
+  let stage = $state<Stage>({ kind: "enter" });
+
+  let polling = $state(false);
+  onDestroy(() => {
+    polling = false;
+  });
+
+  onMount(() => {
+    setupVerifiedEmailFunnel.init();
+  });
+  onDestroy(() => {
+    setupVerifiedEmailFunnel.close();
+  });
+
+  const handleAddressSubmitted = async (address: string) => {
+    setupVerifiedEmailFunnel.trigger(SetupVerifiedEmailEvents.AddressSubmitted);
+    const domain = address.split("@")[1] ?? "";
+
+    let dnsProof: DnsProofBundle | undefined;
+    try {
+      dnsProof = await assembleSkeleton(domain, true);
+    } catch {
+      dnsProof = undefined;
+    }
+    const path: Path = dnsProof === undefined ? "doh" : "dnssec";
+
+    const input: EmailRecoveryDnsInput = {
+      address,
+      dns_proof: dnsProof === undefined ? [] : [dnsProof],
+    };
+
+    try {
+      const challenge = await prepare(input);
+      setupVerifiedEmailFunnel.trigger(SetupVerifiedEmailEvents.Prepared, {
+        path,
+      });
+      stage = { kind: "sending", challenge, address, path };
+      void runPoll(challenge.nonce, domain, address);
+    } catch (e) {
+      if (isCanisterError<EmailRecoveryError>(e)) {
+        if (
+          e.type === "DomainNotAllowlisted" ||
+          e.type === "DomainNotSupported"
+        ) {
+          setupVerifiedEmailFunnel.trigger(
+            SetupVerifiedEmailEvents.UnsupportedDomain,
+            { reason: e.type },
+          );
+          setupVerifiedEmailFunnel.close();
+          stage = { kind: "unsupported", domain };
+          return;
+        }
+      }
+      throw e;
+    }
+  };
+
+  const runPoll = async (nonce: string, domain: string, address: string) => {
+    if (polling) return;
+    polling = true;
+    await runEmailRecoveryPoll({
+      nonce,
+      domain,
+      status,
+      submitDkimLeaf,
+      resolveViaDoh,
+      diagnostics,
+      funnel: setupVerifiedEmailFunnel,
+      events: {
+        needDkimLeaf: SetupVerifiedEmailEvents.NeedDkimLeaf,
+        dkimLeafSubmitted: SetupVerifiedEmailEvents.DkimLeafSubmitted,
+        failed: SetupVerifiedEmailEvents.Failed,
+        unsupportedDomain: SetupVerifiedEmailEvents.UnsupportedDomain,
+      },
+      handleSuccess: (result) => {
+        if (!("RegistrationSucceeded" in result)) return false;
+        setupVerifiedEmailFunnel.trigger(SetupVerifiedEmailEvents.Succeeded);
+        setupVerifiedEmailFunnel.close();
+        onSuccess(address);
+        return true;
+      },
+      isActive: () =>
+        polling && (stage.kind === "sending" || stage.kind === "waiting"),
+      setPolling: (active) => {
+        polling = active;
+      },
+      toUnsupported: (d) => {
+        stage = { kind: "unsupported", domain: d };
+      },
+      toFailed: (reason, diagnostics) => {
+        stage = { kind: "failed", reason, diagnostics };
+      },
+    });
+  };
+
+  const handleRetry = () => {
+    stage = { kind: "enter" };
+  };
+
+  const handleSent = () => {
+    if (stage.kind !== "sending") return;
+    stage = {
+      kind: "waiting",
+      challenge: stage.challenge,
+      address: stage.address,
+      path: stage.path,
+    };
+  };
+</script>
+
+{#if stage.kind === "enter"}
+  <EnterAddress
+    onSubmit={handleAddressSubmitted}
+    {initialAddress}
+    {addressLocked}
+    initialError={stage.initialError}
+  />
+{:else if stage.kind === "sending"}
+  <SendConfirmationEmail
+    nonce={stage.challenge.nonce}
+    mailbox={`register@${window.location.hostname}`}
+    fromAddress={stage.address}
+    path={stage.path}
+    onSent={handleSent}
+  />
+{:else if stage.kind === "waiting"}
+  <SendConfirmationEmail
+    nonce={stage.challenge.nonce}
+    mailbox={`register@${window.location.hostname}`}
+    fromAddress={stage.address}
+    path={stage.path}
+    sent
+  />
+{:else if stage.kind === "unsupported"}
+  <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />
+{:else}
+  <FailedView
+    reason={stage.reason}
+    diagnostics={stage.diagnostics}
+    onRetry={handleRetry}
+  />
+{/if}
