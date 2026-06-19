@@ -161,6 +161,20 @@
       </button>
     </div>
   </div>
+  {#if continueOnAnotherDevice !== undefined && showLostAccess}
+    <div class="flex flex-row items-center justify-between gap-4">
+      <p class="text-text-tertiary text-sm">
+        {$t`Have a passkey on another device?`}
+      </p>
+      <button
+        onclick={continueOnAnotherDevice}
+        disabled={authenticatingProviderId !== undefined}
+        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+      >
+        {$t`Authorize`}
+      </button>
+    </div>
+  {/if}
   {#if showLostAccess}
     <div class="flex flex-row items-center justify-between gap-4">
       <p class="text-text-tertiary text-sm">
@@ -174,15 +188,6 @@
         {$t`Recover`}
       </a>
     </div>
-  {/if}
-  {#if continueOnAnotherDevice !== undefined && showLostAccess}
-    <button
-      onclick={continueOnAnotherDevice}
-      disabled={authenticatingProviderId !== undefined}
-      class="text-text-primary self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-    >
-      {$t`Authorize on another device`}
-    </button>
   {/if}
   {#if showLostAccess && showSwitchMode && !withinDialog}
     <div class="border-border-secondary border-t" aria-hidden="true"></div>
