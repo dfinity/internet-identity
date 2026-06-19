@@ -27,11 +27,15 @@ use crate::state;
 // to rate-limit outcalls or account for cycles. Their one DDoS-relevant job is
 // to keep canister state *bounded and fairly evicted* — especially once the
 // discovery allowlist is removed and `domain` / `jwks_uri` become caller-
-// controlled and unbounded. Each cache's worst-case memory is
-// `max_entries * per-entry-cap`, so the two caches are sized independently (a
-// `DiscoveredConfig` is ~an order of magnitude smaller than a JWKS) and every
-// fill is bounded in bytes (see `DISCOVERY_MAX_RESPONSE_BYTES` and
-// `jwks::JWKS_MAX_RESPONSE_BYTES`).
+// controlled and unbounded.
+//
+// Discovery and JWKS are a single coupled flow (`domain → discovery cache →
+// jwks_uri → JWKS cache`): a verification needs *both* the domain's discovery
+// entry and its JWKS entry warm. So the two caches share one budget rather than
+// sizing independently — different caps would just leave one cache holding
+// entries the other can't back. The shared cap is bounded by the larger (JWKS)
+// entry (≤ `jwks::JWKS_MAX_RESPONSE_BYTES`, 32 KiB); every fill is also bounded
+// in bytes (see `DISCOVERY_MAX_RESPONSE_BYTES` and `jwks::JWKS_MAX_RESPONSE_BYTES`).
 
 /// Entry lifetime for both caches: discovery metadata and JWKS change
 /// infrequently, so an hour balances freshness against outcall volume.
@@ -39,14 +43,15 @@ const FRESH_FOR_SECONDS: u64 = 60 * 60;
 /// Stale-if-error window: serve the last-good value through a transient fill
 /// failure for up to this long past freshness before failing the caller.
 const STALE_FOR_SECONDS: u64 = 60 * 60;
-/// LRU cap for the discovery cache (keyed by discovery domain). With `scopes`
-/// capped a `DiscoveredConfig` is ~1-2 KB, so 10k entries is ~10-20 MB — wide
-/// headroom so a flood of distinct domains can't evict the providers real users
-/// rely on.
-const DISCOVERY_MAX_ENTRIES: usize = 10_000;
-/// LRU cap for the JWKS cache (keyed by `jwks_uri`). Each entry is bounded by
-/// `jwks::JWKS_MAX_RESPONSE_BYTES` (32 KiB), so 2k entries is ~64 MB worst case.
-const JWKS_MAX_ENTRIES: usize = 2_000;
+/// Shared LRU cap for both SSO caches — they back one coupled flow, so one
+/// budget keeps them coherent (this many domains cached end-to-end,
+/// discovery → keys). Worst-case memory is dominated by the JWKS cache at
+/// `jwks::JWKS_MAX_RESPONSE_BYTES` (32 KiB) per entry: 5k × 32 KiB ≈ 160 MB,
+/// plus ~10 MB of (much smaller) discovery entries ≈ ~170 MB — about 5-6 % of
+/// the ~3 GB Wasm heap, leaving the bulk for core II operations while keeping
+/// wide headroom so a flood of distinct domains can't evict the providers real
+/// users rely on.
+const SSO_CACHE_MAX_ENTRIES: usize = 5_000;
 const RETRY_BASE_SECONDS: u64 = 60;
 const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
@@ -58,9 +63,10 @@ const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 #[cfg(not(test))]
 const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 16 * 1024;
 /// Cap on the number of `scopes_supported` stored per discovery entry. `scopes`
-/// is the only unbounded field in `DiscoveredConfig`; capping it keeps an entry
-/// ~1-2 KB so the 10k discovery budget stays cheap. II only needs
-/// `openid`/`email`/`profile`, so extra advertised scopes are irrelevant.
+/// is the only unbounded field in `DiscoveredConfig`; capping it keeps a
+/// discovery entry ~1-2 KB so its share of the shared budget stays small. II
+/// only needs `openid`/`email`/`profile`, so extra advertised scopes are
+/// irrelevant.
 #[cfg(not(test))]
 const DISCOVERY_MAX_SCOPES: usize = 32;
 
@@ -102,11 +108,11 @@ fn cache_config(max_entries: usize) -> CacheConfig {
 }
 
 fn new_discovery_cache() -> DiscoveryCache {
-    SingleFlightCache::new(discovery_fill, cache_config(DISCOVERY_MAX_ENTRIES))
+    SingleFlightCache::new(discovery_fill, cache_config(SSO_CACHE_MAX_ENTRIES))
 }
 
 fn new_jwks_cache() -> JwksCache {
-    SingleFlightCache::new(jwks_fill, cache_config(JWKS_MAX_ENTRIES))
+    SingleFlightCache::new(jwks_fill, cache_config(SSO_CACHE_MAX_ENTRIES))
 }
 
 // ---------------------------------------------------------------------------
