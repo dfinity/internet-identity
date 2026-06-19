@@ -207,12 +207,12 @@
         <div class="text-text-primary text-sm font-semibold">
           {switchModeTitle ??
             (mode === "signin"
-              ? $t`Want a new identity?`
+              ? $t`Don't have an identity?`
               : $t`Already have an identity?`)}
         </div>
         <div class="text-text-tertiary mt-1 text-xs">
           {mode === "signin"
-            ? $t`Create one in seconds.`
+            ? $t`Set one up in seconds.`
             : $t`Use a passkey or familiar provider.`}
         </div>
       </div>
@@ -221,7 +221,7 @@
         disabled={authenticatingProviderId !== undefined}
         class="btn btn-secondary btn-sm shrink-0 gap-2"
       >
-        {switchModeAction ?? (mode === "signin" ? $t`Sign up` : $t`Sign in`)}
+        {switchModeAction ?? (mode === "signin" ? $t`Create` : $t`Sign in`)}
         <ArrowRightIcon class="size-4 rtl:-scale-x-100" />
       </button>
     </div>

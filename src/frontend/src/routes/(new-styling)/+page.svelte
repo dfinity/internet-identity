@@ -363,12 +363,6 @@
                 passkeyLabel={inlinePickerMode === "signin"
                   ? $t`Select one of its passkeys`
                   : undefined}
-                switchModeTitle={inlinePickerMode === "signin"
-                  ? $t`Create a new identity`
-                  : undefined}
-                switchModeAction={inlinePickerMode === "signin"
-                  ? $t`Create`
-                  : undefined}
               >
                 {#snippet children(presenting)}
                   {#if presenting === true && inlinePickerMode === "signup"}
@@ -417,10 +411,6 @@
       passkeyLabel={authDialogMode === "signin"
         ? $t`Select one of its passkeys`
         : undefined}
-      switchModeTitle={authDialogMode === "signin"
-        ? $t`Create a new identity`
-        : undefined}
-      switchModeAction={authDialogMode === "signin" ? $t`Create` : undefined}
     >
       {#if authDialogMode === "signup"}
         <SignUpHero />
