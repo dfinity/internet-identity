@@ -63,6 +63,11 @@ type InternetIdentityFrontendInit = record {
     // each flag; localStorage, the flag's init callback and ?feature_flag_* URL
     // params still take precedence. Unknown flag names are ignored.
     feature_flags : opt vec record { text; bool };
+    // Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
+    // slash). The /mcp delegation flow delivers the delegation to this origin
+    // only (it's added to the form-action CSP and /mcp rejects callbacks on any
+    // other origin). When unset, the /mcp flow is disabled.
+    mcp_server_origin : opt text;
 };
 
 service : (InternetIdentityFrontendInit) -> {

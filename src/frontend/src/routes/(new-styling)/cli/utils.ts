@@ -1,5 +1,6 @@
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
   fromBase64URL,
   retryFor,
@@ -27,7 +28,12 @@ interface CliAuthorizeInput {
 }
 
 const derivationOrigin = (domain: string | undefined): string =>
-  domain === undefined ? CLI_GENERIC_DERIVATION_ORIGIN : `https://${domain}`;
+  // Remap an app domain on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
+  // the principal matches the one /authorize derives for the same app. The
+  // generic origin is II's own and is never a gateway domain, so it's left be.
+  domain === undefined
+    ? CLI_GENERIC_DERIVATION_ORIGIN
+    : remapToLegacyDomain(`https://${domain}`);
 
 /**
  * Builds a two-hop delegation chain rooted at the user's identity and ending

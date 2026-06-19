@@ -460,20 +460,29 @@ export const extractIssuerTemplateClaims = (configIssuer: string): string[] => {
 
 /**
  * Compare an issuer URL against a config issuer pattern and claims.
- * If the config issuer contains placeholders in curly braces (e.g.,
- * "https://login.microsoftonline.com/{tid}/v2.0"),
- * extract the placeholders, create a new issuer URL with the claims values,
- * and perform a comparison.
- *
- * Otherwise, performs exact comparison.
- *
  * Exported for testing purposes.
  */
 export const issuerMatches = (
   configIssuer: string,
   issuer: string,
   metadata: MetadataMapV2,
-): boolean => buildIssuerFromConfig(configIssuer, metadata) === issuer;
+): boolean => {
+  const built = buildIssuerFromConfig(configIssuer, metadata);
+  if (built !== undefined) {
+    return built === issuer;
+  }
+  // Template expansion is impossible when metadata lacks the placeholder
+  // claim — legacy LastUsedIdentity entries (pre-#3320) and cross-env
+  // localStorage hit this path. Match the template's shape with `[^/]+`
+  // per placeholder so the display lookup still resolves. Not reached when
+  // expansion succeeded but disagreed: that's a genuine mismatch.
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = configIssuer
+    .split(/{[^}]+}/)
+    .map(escapeRegex)
+    .join("[^/]+");
+  return new RegExp(`^${pattern}$`).test(issuer);
+};
 
 /**
  * Find the OpenID configuration that issued a given credential.

@@ -2,6 +2,7 @@
   import type { LayoutProps } from "./$types";
   import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { t } from "$lib/stores/locale.store";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import Header from "$lib/components/layout/Header.svelte";
@@ -62,6 +63,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -148,7 +150,6 @@
               isAuthDialogOpen = false;
               handleError(error);
             }}
-            withinDialog
           >
             <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
               {$t`Sign in`}

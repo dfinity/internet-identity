@@ -190,10 +190,7 @@ impl ZoneKeysMap {
     }
 
     pub fn get(&self, zone: &DnsName) -> Option<&SignedRRset> {
-        self.entries
-            .iter()
-            .find(|(n, _)| n == zone)
-            .map(|(_, k)| k)
+        self.entries.iter().find(|(n, _)| n == zone).map(|(_, k)| k)
     }
 
     pub fn len(&self) -> usize {
@@ -288,9 +285,7 @@ pub enum DnssecError {
 // =========================================================================
 
 mod interface_conversions {
-    use super::{
-        DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset,
-    };
+    use super::{DelegationChain, DelegationLink, DnsName, DnsProofBundle, Rrsig, SignedRRset};
     use internet_identity_interface::internet_identity::types as i_types;
 
     impl From<i_types::SignedRRset> for SignedRRset {

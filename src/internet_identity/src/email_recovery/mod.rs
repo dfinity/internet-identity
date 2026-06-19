@@ -51,7 +51,7 @@ mod submit_leaf;
 pub use prepare::{prepare_add, prepare_delegation};
 pub use remove::{remove_credential, RemoveError};
 pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
-pub use submit_leaf::{submit_dkim_leaf, submit_dkim_leaf_via_doh};
+pub use submit_leaf::{resolve_via_doh, submit_dkim_leaf};
 
 /// Wrapper around `pending::status_of` so the canister method in
 /// `main.rs` doesn't need to know which submodule the heap state
@@ -95,6 +95,13 @@ pub fn recovery_seed_for_nonce(nonce: &str, now_secs: u64) -> Option<ic_certific
 
 #[allow(unused_imports)]
 pub use pending::{PendingChallenge, PendingKind, PendingStatus};
+
+/// Whether the legacy DNSSEC email-recovery path is enabled. Off by
+/// default — the canister runs DoH-only and `prepare_*` ignores any
+/// client-supplied `dns_proof`.
+pub fn dnssec_email_recovery_enabled() -> bool {
+    crate::state::persistent_state(|p| p.enable_dnssec_email_recovery.unwrap_or(false))
+}
 
 /// Verbose human-readable token prefix. Every legitimate token the
 /// canister hands out begins with this exact byte sequence; the FE
