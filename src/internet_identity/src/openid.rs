@@ -286,12 +286,18 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
 /// Canonicalize an untrusted SSO discovery domain received as a canister-call
 /// argument: trim surrounding whitespace and lowercase ASCII. Domains are
 /// case-insensitive (DNS), but the value is stamped onto the credential as
-/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing,
-/// so it must be canonical the moment it crosses the trust boundary. Endpoints
-/// taking a `discovery_domain` run this before any further use, matching the
-/// `sso_discoverable_domains` config setter and the `get_sso_discovery` reply.
-pub fn canonical_discovery_domain(domain: Option<String>) -> Option<String> {
-    domain.map(|domain| domain.trim().to_ascii_lowercase())
+/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing
+/// and the allowlist gate, so it must be canonical the moment it crosses the
+/// trust boundary. Every endpoint taking a `discovery_domain` runs this before
+/// any further use, matching the `sso_discoverable_domains` config setter.
+pub fn canonical_discovery_domain(domain: &str) -> String {
+    domain.trim().to_ascii_lowercase()
+}
+
+/// [`canonical_discovery_domain`] over an optional argument (the JWT endpoints,
+/// where the domain selects an SSO vs configured provider).
+pub fn canonical_discovery_domain_opt(domain: Option<String>) -> Option<String> {
+    domain.map(|domain| canonical_discovery_domain(&domain))
 }
 
 /// Drive the on-demand SSO discovery / JWKS fetches for `domain` forward. Only
@@ -550,17 +556,18 @@ mod tests {
     fn canonical_discovery_domain_trims_and_lowercases() {
         // Untrusted canister-call args: a mixed-case / padded domain that
         // passes the case-insensitive allowlist gate must be canonicalized so
-        // the stamped `sso:<domain>` scope matches the allowlisted value.
+        // the stamped `sso:<domain>` scope matches the allowlisted value, and
+        // so the discovery endpoints (`discover_sso` / `get_sso_discovery`) gate
+        // on the same canonical form as the JWT endpoints.
+        assert_eq!(canonical_discovery_domain("  Example.ORG  "), "example.org");
+        assert_eq!(canonical_discovery_domain("example.org"), "example.org");
+        // Optional wrapper for the JWT endpoints: a configured provider supplies
+        // no domain.
         assert_eq!(
-            canonical_discovery_domain(Some("  Example.ORG  ".to_string())),
+            canonical_discovery_domain_opt(Some("  Example.ORG  ".to_string())),
             Some("example.org".to_string())
         );
-        assert_eq!(
-            canonical_discovery_domain(Some("example.org".to_string())),
-            Some("example.org".to_string())
-        );
-        // A configured provider supplies no domain.
-        assert_eq!(canonical_discovery_domain(None), None);
+        assert_eq!(canonical_discovery_domain_opt(None), None);
     }
 
     #[test]
