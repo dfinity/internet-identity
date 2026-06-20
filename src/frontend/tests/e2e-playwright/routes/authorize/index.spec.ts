@@ -17,9 +17,7 @@ test("Authorize by registering a new passkey", async ({ page }) => {
   await authorize(page, async (authPage) => {
     await addVirtualAuthenticator(authPage);
     await authPage.getByRole("button", { name: "Create", exact: true }).click();
-    await authPage
-      .getByRole("button", { name: "Sign up with passkey" })
-      .click();
+    await authPage.getByRole("button", { name: "Create with passkey" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
@@ -74,15 +72,13 @@ test("Authorize by signing in from another device", async ({
     const principal = await authorize(page, async (authPage) => {
       // Switch to current device and start "Continue from another device" flow to get link.
       // The cancel→QR auto-transition was removed; use the explicit
-      // "Scan QR" CTA on the "Have a passkey on another device?" row.
+      // "URL | QR Code" CTA on the "Add identity from another device" row.
       await addVirtualAuthenticator(authPage);
-      await authPage
-        .getByRole("button", { name: "Scan QR", exact: true })
-        .click();
+      await authPage.getByRole("button", { name: "URL | QR Code" }).click();
       await authPage
         .getByRole("heading", {
           level: 1,
-          name: "Can't find your identity?",
+          name: "Add identity from another device",
         })
         .waitFor();
       const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
@@ -270,7 +266,7 @@ test("Authorize with ICRC-29", async ({ page }) => {
         .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       await authPage.getByRole("button", { name: "Create identity" }).click();
@@ -295,7 +291,7 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
         .getByRole("button", { name: "Create", exact: true })
         .click();
       await authPage
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       await authPage.getByRole("button", { name: "Create identity" }).click();

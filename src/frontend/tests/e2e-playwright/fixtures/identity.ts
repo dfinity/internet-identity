@@ -224,9 +224,9 @@ export class IdentityWizard {
     // WebAuthn flow; no intermediate Use existing / Create new dialog.
     // The button label varies by surface: /authorize landing keeps the
     // default "Sign in with passkey", while / and /manage / /authorize
-    // header dialogs override to "Select one of its passkeys".
+    // header dialogs override to "Select a passkey".
     const selectPasskey = this.#page.getByRole("button", {
-      name: "Select one of its passkeys",
+      name: "Select a passkey",
     });
     const signInWithPasskey = this.#page.getByRole("button", {
       name: "Sign in with passkey",
@@ -258,7 +258,7 @@ export class IdentityWizard {
         await signUpToggle.click();
       }
       await this.#page
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
     }
     // Only the homepage flow navigates to /manage after registration.
@@ -285,7 +285,7 @@ export class IdentityWizard {
    * sits behind an "Add identity" / "Switch identity" CTA on the
    * welcome-back state and on `/authorize` / `/manage`. The picker may
    * be in mode="both" ("Continue with passkey") or in a mode-specific
-   * variant ("Sign in with passkey" / "Sign up with passkey") depending
+   * variant ("Sign in with passkey" / "Create with passkey") depending
    * on which surface rendered it. Callers handle the variants
    * themselves; this method just makes sure a picker is on screen.
    */
@@ -303,10 +303,10 @@ export class IdentityWizard {
       name: "Sign in with passkey",
     });
     const selectPasskey = this.#page.getByRole("button", {
-      name: "Select one of its passkeys",
+      name: "Select a passkey",
     });
     const signUpWithPasskey = this.#page.getByRole("button", {
-      name: "Sign up with passkey",
+      name: "Create with passkey",
     });
     await switchIdentity
       .or(addIdentity)

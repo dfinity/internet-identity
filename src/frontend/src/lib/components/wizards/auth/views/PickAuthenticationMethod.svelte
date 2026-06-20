@@ -29,10 +29,10 @@
     // Override the switch-mode CTA button label (e.g. "Create" instead
     // of the default "Sign up" / "Sign in").
     switchModeAction?: string;
-    // Override the primary passkey-button label. Used by surfaces that
-    // need different wording than the default mode-derived copy (e.g.
-    // /manage's "add existing identity" dialog uses "Select one of its
-    // passkeys" instead of "Sign in with passkey").
+    // Override the primary passkey-button label. The add-identity
+    // "Add existing identity" (signin) surfaces set this to "Select a
+    // passkey" instead of the default mode-derived "Sign in with passkey".
+    // Sign-up surfaces keep the default ("Create with passkey").
     passkeyLabel?: string;
   }
 
@@ -59,20 +59,20 @@
       (mode === "signin"
         ? $t`Sign in with passkey`
         : mode === "signup"
-          ? $t`Sign up with passkey`
+          ? $t`Create with passkey`
           : $t`Continue with passkey`),
   );
   const providerLabel = (name: string) =>
     mode === "signin"
       ? $t`Sign in with ${name}`
       : mode === "signup"
-        ? $t`Sign up with ${name}`
+        ? $t`Create with ${name}`
         : $t`Continue with ${name}`;
   const ssoLabel = $derived(
     mode === "signin"
       ? $t`Sign in with SSO`
       : mode === "signup"
-        ? $t`Sign up with SSO`
+        ? $t`Create with SSO`
         : $t`Continue with SSO`,
   );
 
@@ -171,25 +171,15 @@
   {#if continueOnAnotherDevice !== undefined && showLostAccess}
     <div class="flex flex-row items-center justify-between gap-4">
       <p class="text-text-tertiary text-sm">
-        {$t`Have a passkey on another device?`}
+        {$t`Add identity from another device`}
       </p>
-      <div class="flex items-center gap-2">
-        <button
-          onclick={continueOnAnotherDevice}
-          disabled={authenticatingProviderId !== undefined}
-          class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-        >
-          {$t`URL`}
-        </button>
-        <span class="text-text-tertiary text-sm" aria-hidden="true">|</span>
-        <button
-          onclick={continueOnAnotherDevice}
-          disabled={authenticatingProviderId !== undefined}
-          class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-        >
-          {$t`Scan QR`}
-        </button>
-      </div>
+      <button
+        onclick={continueOnAnotherDevice}
+        disabled={authenticatingProviderId !== undefined}
+        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+      >
+        {$t`URL | QR Code`}
+      </button>
     </div>
   {/if}
   {#if showLostAccess}

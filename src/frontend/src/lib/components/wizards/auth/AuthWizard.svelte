@@ -480,15 +480,10 @@
      wizard's view changes. Prevents remount races between captcha and
      post-captcha views when SvelteKit navigation interleaves with the
      Dialog's onNavigate outro-pause. -->
-{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined && !isContinueFromAnotherDeviceVisible}
+{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined}
   {@render pickerBlock()}
 {:else}
-  {@const dialogOnClose =
-    authFlow.captcha !== undefined
-      ? undefined
-      : isContinueFromAnotherDeviceVisible
-        ? () => (isContinueFromAnotherDeviceVisible = false)
-        : reset}
+  {@const dialogOnClose = authFlow.captcha !== undefined ? undefined : reset}
   <!-- When the wizard is nested inside a parent Dialog, pass through
        and render content directly into the parent — avoids stacking
        two <dialog> elements (Safari renders both visibly, focus and
@@ -498,13 +493,22 @@
   <Dialog onClose={dialogOnClose} passthrough={inDialog}>
     {#if authFlow.captcha !== undefined}
       <SolveCaptcha {...authFlow.captcha} />
-    {:else if isContinueFromAnotherDeviceVisible}
-      <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
     {:else if authFlow.view === "chooseMethod"}
       {@render pickerBlock()}
     {:else}
       {@render activeView()}
     {/if}
+  </Dialog>
+{/if}
+
+<!-- Cross-device pairing is layered on top of the picker as its own
+     modal, leaving the picker mounted underneath. Closing it (X, Escape,
+     or backdrop) only flips this flag back, returning the user to the
+     "Add existing identity" picker rather than tearing down the whole
+     (parent) dialog — which is what a shared passthrough close would do. -->
+{#if isContinueFromAnotherDeviceVisible}
+  <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
+    <ContinueOnAnotherDeviceView onRegistered={handleRegistered} {onError} />
   </Dialog>
 {/if}
 

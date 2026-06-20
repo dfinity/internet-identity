@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Dialog from "$lib/components/ui/Dialog.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { AddAccessMethodFlow } from "$lib/flows/addAccessMethodFlow.svelte.js";
   import type {
@@ -74,12 +75,7 @@
   };
 </script>
 
-{#if isContinueOnAnotherDeviceVisible}
-  <ConfirmAccessMethodWizard
-    onConfirm={handleOtherDeviceRegistered}
-    {onError}
-  />
-{:else if addAccessMethodFlow.view === "chooseMethod"}
+{#if addAccessMethodFlow.view === "chooseMethod"}
   <AddAccessMethod
     createPasskey={handleCreatePasskey}
     continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
@@ -94,6 +90,19 @@
     goBack={addAccessMethodFlow.chooseMethod}
     {openIdCredentials}
   />
+{/if}
+
+<!-- Cross-device pairing is layered on top of the chooser as its own modal,
+     leaving the chooser mounted underneath. Closing it (X / Esc / backdrop)
+     only flips this flag back, returning the user to the "Add access method"
+     chooser rather than tearing down the whole (parent) dialog. -->
+{#if isContinueOnAnotherDeviceVisible}
+  <Dialog onClose={() => (isContinueOnAnotherDeviceVisible = false)}>
+    <ConfirmAccessMethodWizard
+      onConfirm={handleOtherDeviceRegistered}
+      {onError}
+    />
+  </Dialog>
 {/if}
 
 {#if addAccessMethodFlow.isSystemOverlayVisible}

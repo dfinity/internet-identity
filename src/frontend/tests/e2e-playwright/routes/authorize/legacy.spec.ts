@@ -30,7 +30,7 @@ import {
             .getByRole("button", { name: "Create", exact: true })
             .click();
           await authPage
-            .getByRole("button", { name: "Sign up with passkey" })
+            .getByRole("button", { name: "Create with passkey" })
             .click();
           await authPage.getByLabel("Identity name").fill("Test");
           await authPage
