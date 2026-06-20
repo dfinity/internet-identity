@@ -9,8 +9,8 @@ use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
-    OpenIdCredentialAddError, OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
-    SsoCredentialMigrationEntry,
+    OpenIdCredentialAddError, OpenIdCredentialKey, OpenIdDelegationError, OpenIdResult,
+    PublicKeyAuthn, SsoCredentialMigrationEntry,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{PocketIc, RejectResponse};
@@ -86,6 +86,259 @@ fn can_link_google_account_with_seeded_jwks() -> Result<(), RejectResponse> {
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
         1
+    );
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// SSO (discoverable provider) end-to-end tests.
+//
+// Unlike the configured-provider tests above (which pass `discovery_domain =
+// None` and rely on a hardcoded `(iss, aud)` provider), these drive the
+// on-demand SSO path through the canister endpoints WITH a `discovery_domain`.
+// They mock the two discovery hops + the JWKS fetch, so the single-flight
+// discovery/JWKS caches warm from cold (the endpoints return `Pending`) to
+// `Ready`, mirroring what the frontend's retry-while-`Pending` loop does. The
+// Google test JWT/JWKS are reused, routed through SSO discovery whose hop-2
+// issuer is `https://accounts.google.com`.
+// ---------------------------------------------------------------------------
+
+/// Domain on the SSO allowlist for these tests.
+const SSO_DOMAIN: &str = "example.org";
+
+/// The three outcalls the SSO path makes, as `(url, json_body)`. Hosts are
+/// chosen to satisfy the canister's discovery validation: the hop-2 issuer host
+/// matches the hop-1 `openid_configuration` host, and the `authorization_endpoint`
+/// host matches the issuer host.
+fn sso_http_responses() -> Vec<(String, String)> {
+    vec![
+        // Hop 1: II OpenID configuration served at the discovery domain. Its
+        // `client_id` is the JWT's `aud`; `name` becomes the stamped `sso_name`.
+        (
+            format!("https://{SSO_DOMAIN}/.well-known/ii-openid-configuration"),
+            r#"{"client_id":"360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com","openid_configuration":"https://accounts.google.com/.well-known/openid-configuration","name":"Example"}"#.to_string(),
+        ),
+        // Hop 2: the standard OIDC discovery document.
+        (
+            "https://accounts.google.com/.well-known/openid-configuration".to_string(),
+            r#"{"issuer":"https://accounts.google.com","jwks_uri":"https://www.googleapis.com/oauth2/v3/certs","authorization_endpoint":"https://accounts.google.com/o/oauth2/v2/auth","scopes_supported":["openid","email","profile"]}"#.to_string(),
+        ),
+        // JWKS: the single key (matched by `kid`) that signed the Google test JWT.
+        (
+            "https://www.googleapis.com/oauth2/v3/certs".to_string(),
+            r#"{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"763f7c4cd26a1eb2b1b39a88f4434d1f4d9a368b","n":"y8TPCPz2Fp0OhBxsxu6d_7erT9f9XJ7mx7ZJPkkeZRxhdnKtg327D4IGYsC4fLAfpkC8qN58sZGkwRTNs-i7yaoD5_8nupq1tPYvnt38ddVghG9vws-2MvxfPQ9m2uxBEdRHmels8prEYGCH6oFKcuWVsNOt4l_OPoJRl4uiuiwd6trZik2GqDD_M6bn21_w6AD_jmbzN4mh8Od4vkA1Z9lKb3Qesksxdog-LWHsljN8ieiz1NhbG7M-GsIlzu-typJfud3tSJ1QHb-E_dEfoZ1iYK7pMcojb5ylMkaCj5QySRdJESq9ngqVRDjF4nX8DK5RQUS7AkrpHiwqyW0Csw","e":"AQAB"}]}"#.to_string(),
+        ),
+    ]
+}
+
+/// Install II with only the SSO allowlist set (no configured providers), plus
+/// the cycles the discovery/JWKS HTTP outcalls need.
+fn setup_sso_canister(env: &PocketIc) -> Principal {
+    let args = InternetIdentityInit {
+        sso_discoverable_domains: Some(vec![SSO_DOMAIN.to_string()]),
+        canister_creation_cycles_cost: Some(0),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
+/// Tick once and answer every pending SSO discovery/JWKS outcall from
+/// `responses`. Returns how many it answered (0 once the caches are warm and the
+/// canister stops fetching). Panics on an outcall to an unexpected URL.
+fn answer_sso_http(env: &PocketIc, responses: &[(String, String)]) -> usize {
+    env.tick();
+    let mut answered = 0;
+    for req in env.get_canister_http() {
+        let body = responses
+            .iter()
+            .find(|(url, _)| *url == req.url)
+            .unwrap_or_else(|| panic!("unexpected SSO outcall to {}", req.url))
+            .1
+            .clone();
+        env.mock_canister_http_response(MockCanisterHttpResponse {
+            subnet_id: req.subnet_id,
+            request_id: req.request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.into_bytes(),
+            }),
+            additional_responses: vec![],
+        });
+        env.tick();
+        answered += 1;
+    }
+    answered
+}
+
+/// Drive an SSO endpoint call that warms its caches on demand: invoke `call`,
+/// and while it reports `Pending` (cold/in-flight discovery or JWKS), advance
+/// the outcalls and retry — exactly the frontend's retry-while-`Pending` loop.
+fn drive_sso_until_ready<T, E, F>(
+    env: &PocketIc,
+    responses: &[(String, String)],
+    mut call: F,
+) -> Result<T, E>
+where
+    F: FnMut() -> OpenIdResult<T, E>,
+{
+    for _ in 0..30 {
+        match call() {
+            OpenIdResult::Ok(value) => return Ok(value),
+            OpenIdResult::Err(err) => return Err(err),
+            OpenIdResult::Pending => {
+                // Advance the in-flight discovery (hop 1 -> hop 2) and JWKS
+                // fills; several ticks let each sequential outcall surface.
+                for _ in 0..8 {
+                    answer_sso_http(env, responses);
+                }
+            }
+        }
+    }
+    panic!("SSO caches never warmed");
+}
+
+/// Links an SSO account end to end: the cold discovery + JWKS caches warm via
+/// `Pending` retries, and the stored credential carries the discovered
+/// `sso_domain` / `sso_name` stamp.
+#[test]
+fn can_link_sso_account_via_discovery() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_sso_canister(&env);
+    let responses = sso_http_responses();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+    sync_time(&env, test_time);
+
+    drive_sso_until_ready(&env, &responses, || {
+        api::openid_credential_add_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            identity_number,
+            &jwt,
+            &salt,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO credential add failed");
+
+    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
+        .openid_credentials
+        .expect("Could not fetch credentials!");
+    assert_eq!(credentials.len(), 1);
+    assert_eq!(credentials[0].sso_domain, Some(SSO_DOMAIN.to_string()));
+    assert_eq!(credentials[0].sso_name, Some("Example".to_string()));
+
+    Ok(())
+}
+
+/// Regression test for the boundary canonicalization: a mixed-case
+/// `discovery_domain` (the allowlist gate is case-insensitive) must be stored as
+/// the canonical lowercase `sso_domain`, so the `sso:<domain>` scope is stable.
+#[test]
+fn sso_discovery_domain_is_canonicalized() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_sso_canister(&env);
+    let responses = sso_http_responses();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+    sync_time(&env, test_time);
+
+    // Caller supplies a non-canonical (mixed-case, padded) domain.
+    drive_sso_until_ready(&env, &responses, || {
+        api::openid_credential_add_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            identity_number,
+            &jwt,
+            &salt,
+            Some("  Example.ORG  "),
+        )
+        .unwrap()
+    })
+    .expect("SSO credential add failed");
+
+    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
+        .openid_credentials
+        .expect("Could not fetch credentials!");
+    assert_eq!(credentials.len(), 1);
+    // Canonicalized at the boundary despite the mixed-case/padded input.
+    assert_eq!(credentials[0].sso_domain, Some(SSO_DOMAIN.to_string()));
+
+    Ok(())
+}
+
+/// A JWT delegation can be prepared and fetched through the SSO path: the update
+/// (`openid_prepare_delegation`) warms the caches via `Pending`, then the query
+/// (`openid_get_delegation`) reads the warm caches and returns the delegation.
+#[test]
+fn can_get_sso_delegation_via_discovery() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_sso_canister(&env);
+    let responses = sso_http_responses();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+    sync_time(&env, test_time);
+
+    // Link the SSO credential first (also warms the caches).
+    drive_sso_until_ready(&env, &responses, || {
+        api::openid_credential_add_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            identity_number,
+            &jwt,
+            &salt,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO credential add failed");
+
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let prepare_response = drive_sso_until_ready(&env, &responses, || {
+        api::openid_prepare_delegation_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            &jwt,
+            &salt,
+            &pub_session_key,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO prepare delegation failed");
+
+    // The query path can't drive outcalls, but the caches are warm now.
+    let signed_delegation = match api::openid_get_delegation_with_discovery(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+        &prepare_response.expiration,
+        Some(SSO_DOMAIN),
+    )? {
+        OpenIdResult::Ok(signed_delegation) => signed_delegation,
+        other => panic!("expected a signed delegation, got {other:?}"),
+    };
+
+    assert_eq!(
+        signed_delegation.delegation.pubkey, pub_session_key,
+        "delegation should be bound to the requested session key"
     );
 
     Ok(())
