@@ -173,25 +173,15 @@
   </div>
   <div class="flex flex-row items-center justify-between gap-4">
     <p class="text-text-tertiary text-sm">
-      {$t`Have a passkey on another device?`}
+      {$t`Add identity from another device`}
     </p>
-    <div class="flex items-center gap-2">
-      <button
-        onclick={continueOnAnotherDevice}
-        disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
-        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-      >
-        {$t`URL`}
-      </button>
-      <span class="text-text-tertiary text-sm" aria-hidden="true">|</span>
-      <button
-        onclick={continueOnAnotherDevice}
-        disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
-        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-      >
-        {$t`Scan QR`}
-      </button>
-    </div>
+    <button
+      onclick={continueOnAnotherDevice}
+      disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`URL | QR Code`}
+    </button>
   </div>
 </div>
 

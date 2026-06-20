@@ -106,7 +106,7 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   // Create a new identity in II
   await addVirtualAuthenticator(authPage);
   await authPage.getByRole("button", { name: "Create", exact: true }).click();
-  await authPage.getByRole("button", { name: "Sign up with passkey" }).click();
+  await authPage.getByRole("button", { name: "Create with passkey" }).click();
   await authPage.getByLabel("Identity name").fill("John Doe");
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await expect(

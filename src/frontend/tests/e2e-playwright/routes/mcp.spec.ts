@@ -24,7 +24,7 @@ const signUp = async (page: Page): Promise<void> => {
     await page.getByRole("button", { name: "Create new identity" }).click();
   } else {
     await signUpToggle.click();
-    await page.getByRole("button", { name: "Sign up with passkey" }).click();
+    await page.getByRole("button", { name: "Create with passkey" }).click();
   }
   await page.getByLabel("Identity name").fill("Test User");
   await page.getByRole("button", { name: "Create identity" }).click();

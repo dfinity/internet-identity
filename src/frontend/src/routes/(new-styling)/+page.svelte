@@ -361,7 +361,7 @@
                 }}
                 bind:mode={inlinePickerMode}
                 passkeyLabel={inlinePickerMode === "signin"
-                  ? $t`Select one of its passkeys`
+                  ? $t`Select a passkey`
                   : undefined}
               >
                 {#snippet children(presenting)}
@@ -409,7 +409,7 @@
       }}
       bind:mode={authDialogMode}
       passkeyLabel={authDialogMode === "signin"
-        ? $t`Select one of its passkeys`
+        ? $t`Select a passkey`
         : undefined}
     >
       {#if authDialogMode === "signup"}
