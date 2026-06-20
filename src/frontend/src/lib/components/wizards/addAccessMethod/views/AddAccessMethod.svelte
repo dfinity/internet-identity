@@ -173,7 +173,7 @@
   </div>
   <div class="flex flex-row items-center justify-between gap-4">
     <p class="text-text-tertiary text-sm">
-      {$t`Add identity from another device`}
+      {$t`Add this identity to another device`}
     </p>
     <button
       onclick={continueOnAnotherDevice}
