@@ -16,8 +16,8 @@ test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
 
   // Create new identity and authenticate
   await addVirtualAuthenticator(authPage);
-  await authPage.getByRole("button", { name: "Sign up", exact: true }).click();
-  await authPage.getByRole("button", { name: "Sign up with passkey" }).click();
+  await authPage.getByRole("button", { name: "Create", exact: true }).click();
+  await authPage.getByRole("button", { name: "Create with passkey" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();
@@ -50,8 +50,8 @@ test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
 
   // Create new identity and authenticate
   await addVirtualAuthenticator(authPage);
-  await authPage.getByRole("button", { name: "Sign up", exact: true }).click();
-  await authPage.getByRole("button", { name: "Sign up with passkey" }).click();
+  await authPage.getByRole("button", { name: "Create", exact: true }).click();
+  await authPage.getByRole("button", { name: "Create with passkey" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();
@@ -83,8 +83,8 @@ test("Delegation maxTimeToLive: 2 months", async ({ page }) => {
 
   // Create new identity and authenticate
   await addVirtualAuthenticator(authPage);
-  await authPage.getByRole("button", { name: "Sign up", exact: true }).click();
-  await authPage.getByRole("button", { name: "Sign up with passkey" }).click();
+  await authPage.getByRole("button", { name: "Create", exact: true }).click();
+  await authPage.getByRole("button", { name: "Create with passkey" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();

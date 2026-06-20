@@ -19,10 +19,10 @@ authorizeTest.describe("Authorize from chrome extension", () => {
     await addVirtualAuthenticator(authorizePage.page);
     // /authorize renders the picker in mode="signin"; switch to sign-up.
     await authorizePage.page
-      .getByRole("button", { name: "Sign up", exact: true })
+      .getByRole("button", { name: "Create", exact: true })
       .click();
     await authorizePage.page
-      .getByRole("button", { name: "Sign up with passkey" })
+      .getByRole("button", { name: "Create with passkey" })
       .click();
     await authorizePage.page.getByLabel("Identity name").fill("Extension User");
     await authorizePage.page
