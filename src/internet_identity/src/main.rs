@@ -1722,6 +1722,47 @@ mod email_challenge_api {
         // `email_challenge_status` (the single source of truth).
         email_inbound::resolve_via_doh(arg.nonce, now_secs)
     }
+
+    // -----------------------------------------------------------------
+    // Deprecated `email_recovery_*` aliases for the four shared methods
+    // above. Kept so a stale FE bundle in a browser cache — or any FE
+    // build that lands before this canister's renamed methods — can
+    // still drive the inbound-DKIM flow without a "method not found"
+    // mid-verification break. Removal scheduled for a follow-up PR once
+    // every deployed FE has refreshed to the new names. The wire
+    // format is identical to the new methods (Candid is structurally
+    // typed; the renamed return types match the old types' shapes
+    // field-for-field), so old clients deserialize successfully even
+    // though their bindings reference the old type names.
+    // -----------------------------------------------------------------
+
+    #[query]
+    fn email_recovery_status(nonce: String) -> EmailChallengeStatus {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_inbound::pending_status(&nonce, now_secs)
+    }
+
+    #[query]
+    fn email_recovery_diagnostics(nonce: String) -> Option<EmailChallengeDiagnostics> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_inbound::pending_diagnostics(&nonce, now_secs)
+    }
+
+    #[update]
+    async fn email_recovery_submit_dkim_leaf(
+        arg: EmailChallengeSubmitDkimLeafArg,
+    ) -> Result<(), EmailChallengeError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_inbound::submit_dkim_leaf(arg, now_secs).await
+    }
+
+    #[update]
+    fn email_recovery_resolve_via_doh(
+        arg: EmailChallengeResolveViaDohArg,
+    ) -> Result<(), EmailChallengeError> {
+        let now_secs = ic_cdk::api::time() / 1_000_000_000;
+        email_inbound::resolve_via_doh(arg.nonce, now_secs)
+    }
 }
 
 /// Canister handlers for the recovery flow (recovery-as-login). Builds

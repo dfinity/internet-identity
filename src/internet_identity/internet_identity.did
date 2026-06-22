@@ -1640,6 +1640,20 @@ service : (opt InternetIdentityInit) -> {
     // DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
     // Polled: the FE calls it repeatedly while the status is ResolvingDoh.
     email_challenge_resolve_via_doh : (EmailChallengeResolveViaDohArg) -> (variant { Ok; Err : EmailChallengeError });
+    // DEPRECATED legacy aliases for the four `email_challenge_*` methods
+    // above. Kept so a stale FE bundle in a browser cache — or any FE
+    // build that lands before this canister's renamed methods — can
+    // still drive the inbound-DKIM flow without a "method not found"
+    // break mid-verification. Removal scheduled for a follow-up PR
+    // once every deployed FE has refreshed to the new names. The wire
+    // bytes are identical to the new methods (Candid is structurally
+    // typed; the renamed return types match the old types' shapes
+    // field-for-field), so old clients with bindings against the old
+    // type names deserialize successfully.
+    email_recovery_status : (text) -> (EmailChallengeStatus) query;
+    email_recovery_diagnostics : (text) -> (opt EmailChallengeDiagnostics) query;
+    email_recovery_submit_dkim_leaf : (EmailChallengeSubmitDkimLeafArg) -> (variant { Ok; Err : EmailChallengeError });
+    email_recovery_resolve_via_doh : (EmailChallengeResolveViaDohArg) -> (variant { Ok; Err : EmailChallengeError });
     email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailChallengeError }) query;
     email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailChallengeError });
 
