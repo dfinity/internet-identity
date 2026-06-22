@@ -30,6 +30,7 @@
 
   import EnterAddress from "./views/EnterAddress.svelte";
   import SendConfirmationEmail from "$lib/components/wizards/emailRecovery/shared/views/SendConfirmationEmail.svelte";
+  import SuccessView from "$lib/components/wizards/emailRecovery/shared/views/SuccessView.svelte";
   import FailedView from "$lib/components/wizards/emailRecovery/shared/views/FailedView.svelte";
   import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
   import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
@@ -97,6 +98,7 @@
         address: string;
         path: Path;
       }
+    | { kind: "succeeded"; address: string }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string; diagnostics?: string };
 
@@ -178,7 +180,10 @@
         if (!("RegistrationSucceeded" in result)) return false;
         setupVerifiedEmailFunnel.trigger(SetupVerifiedEmailEvents.Succeeded);
         setupVerifiedEmailFunnel.close();
-        onSuccess(address);
+        // Park the wizard on the success step; the host's
+        // `onSuccess` fires once the user dismisses it via Done so
+        // toast + close happen together.
+        stage = { kind: "succeeded", address };
         return true;
       },
       isActive: () =>
@@ -232,6 +237,13 @@
     fromAddress={stage.address}
     path={stage.path}
     sent
+  />
+{:else if stage.kind === "succeeded"}
+  {@const succeededAddress = stage.address}
+  <SuccessView
+    address={succeededAddress}
+    flow="verified"
+    onDone={() => onSuccess(succeededAddress)}
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />

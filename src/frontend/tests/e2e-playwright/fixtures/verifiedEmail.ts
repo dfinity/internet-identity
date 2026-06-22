@@ -55,6 +55,16 @@ class VerifiedEmailWizard {
     return text;
   }
 
+  /** Step 3: the wizard parks on a success card after the canister
+   *  reports `RegistrationSucceeded`. Click Done to fire the host's
+   *  `onSuccess` (toast + close). */
+  async confirmSuccess(): Promise<void> {
+    await expect(
+      this.#view.getByRole("heading", { name: "Email verified" }),
+    ).toBeVisible({ timeout: 30_000 });
+    await this.#view.getByRole("button", { name: "Done" }).click();
+  }
+
   async close(): Promise<void> {
     await this.#view.getByRole("button", { name: "Close" }).click();
   }
@@ -67,14 +77,14 @@ class VerifiedEmailFixtures {
     this.#page = page;
   }
 
-  /** The "Verified emails" panel lives on the same /manage/recovery
+  /** The "Communication" panel lives on the same /manage/recovery
    *  page as the recovery-email card. Assert it's rendered. */
   async assertPanelVisible(): Promise<void> {
     await expect(
-      this.#page.getByRole("heading", { name: "Verified emails" }),
+      this.#page.getByRole("heading", { name: "Communication" }),
     ).toBeVisible();
     await expect(
-      this.#page.getByRole("button", { name: "Verify an email" }),
+      this.#page.getByRole("button", { name: "Add an email" }),
     ).toBeVisible();
   }
 
@@ -85,7 +95,7 @@ class VerifiedEmailFixtures {
   ): Promise<T> {
     await this.#page
       .getByRole("main")
-      .getByRole("button", { name: "Verify an email" })
+      .getByRole("button", { name: "Add an email" })
       .click();
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -103,29 +113,26 @@ class VerifiedEmailFixtures {
     await expect(panel.getByText(address, { exact: true })).toBeHidden();
   }
 
-  /** Click "Remove" in the row's overflow menu and confirm in the
+  /** Click the row's direct trash-icon button and confirm in the
    *  confirmation dialog. */
   async removeAddress(address: string): Promise<void> {
     const panel = this.#panel();
     const row = panel.locator("li").filter({
       has: this.#page.getByText(address, { exact: true }),
     });
-    await row
-      .getByRole("button", { name: `More options for ${address}` })
-      .click();
-    await this.#page.getByRole("menuitem", { name: "Remove" }).click();
+    await row.getByRole("button", { name: `Remove ${address}` }).click();
     const confirm = this.#page.getByRole("dialog");
     await expect(confirm).toBeVisible();
-    await confirm.getByRole("button", { name: "Remove email" }).click();
+    await confirm.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(confirm).toBeHidden();
   }
 
-  /** Locator scoped to the "Verified emails" panel section. The panel
+  /** Locator scoped to the "Communication" panel section. The panel
    *  shares the manage-recovery page with the recovery-email card,
    *  so scoping prevents accidentally matching recovery rows. */
   #panel(): Locator {
     return this.#page.locator("section").filter({
-      has: this.#page.getByRole("heading", { name: "Verified emails" }),
+      has: this.#page.getByRole("heading", { name: "Communication" }),
     });
   }
 }

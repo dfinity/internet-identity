@@ -26,6 +26,7 @@
 
   import EnterAddress from "./views/EnterAddress.svelte";
   import SendConfirmationEmail from "$lib/components/wizards/emailRecovery/shared/views/SendConfirmationEmail.svelte";
+  import SuccessView from "$lib/components/wizards/emailRecovery/shared/views/SuccessView.svelte";
   import FailedView from "$lib/components/wizards/emailRecovery/shared/views/FailedView.svelte";
   import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
   import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
@@ -91,6 +92,7 @@
         address: string;
         path: Path;
       }
+    | { kind: "succeeded"; address: string }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string; diagnostics?: string };
 
@@ -201,13 +203,15 @@
         failed: SetupEmailRecoveryEvents.Failed,
         unsupportedDomain: SetupEmailRecoveryEvents.UnsupportedDomain,
       },
-      // Setup completes on `RegistrationSucceeded`: bind done, hand back
-      // to the host to toast + close the dialog.
+      // Setup completes on `RegistrationSucceeded`: bind done, park
+      // the wizard on the shared SuccessView. The host's
+      // `onSuccess` fires once the user dismisses it via Done so
+      // toast + close happen together.
       handleSuccess: (result) => {
         if (!("RegistrationSucceeded" in result)) return false;
         setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Succeeded);
         setupEmailRecoveryFunnel.close();
-        onSuccess(address);
+        stage = { kind: "succeeded", address };
         return true;
       },
       isActive: () =>
@@ -263,6 +267,13 @@
     fromAddress={stage.address}
     path={stage.path}
     sent
+  />
+{:else if stage.kind === "succeeded"}
+  {@const succeededAddress = stage.address}
+  <SuccessView
+    address={succeededAddress}
+    flow="recovery"
+    onDone={() => onSuccess(succeededAddress)}
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />

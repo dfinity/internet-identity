@@ -13,16 +13,11 @@
    * the existing recovery card and remain a distinct concept.
    */
 
-  import {
-    EllipsisVerticalIcon,
-    MailCheckIcon,
-    Trash2Icon,
-  } from "@lucide/svelte";
+  import { MailIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { anonymousActor } from "$lib/globals";
   import { invalidateAll } from "$app/navigation";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import Select from "$lib/components/ui/Select.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { VerifiedEmailWizard } from "$lib/components/wizards/verifiedEmail";
   import RemoveVerifiedEmail from "./RemoveVerifiedEmail.svelte";
@@ -122,101 +117,122 @@
 </script>
 
 <section
-  class="bg-bg-primary border-border-secondary flex flex-col rounded-2xl border p-6 not-dark:shadow-sm"
+  class="bg-bg-primary border-border-secondary flex flex-col gap-6 rounded-2xl border p-6 not-dark:shadow-sm"
 >
-  <div class="mb-3 flex flex-row items-center">
-    <MailCheckIcon class="text-fg-tertiary size-6" />
-    <span
-      class="text-text-tertiary ms-auto text-xs"
-      aria-label={$t`${verifiedEmails.length} of ${capacity} verified emails`}
-    >
-      {verifiedEmails.length}/{capacity}
-    </span>
-  </div>
-  <h2 class="text-text-primary mb-1 text-base font-semibold">
-    {$t`Verified emails`}
-  </h2>
-  <div class="text-text-tertiary mb-5 text-sm">
-    <Trans>
-      Apps can request one of these to reach you. Never shared without your
-      consent.
-    </Trans>
-  </div>
-
-  {#if verifiedEmails.length === 0}
-    <div
-      class="border-border-tertiary text-text-tertiary mb-5 flex flex-col gap-2 rounded-xl border border-dashed p-4 text-sm"
-    >
-      <Trans>
-        Verify an email so apps can reach you when you sign in — Internet
-        Identity never shares it without asking.
-      </Trans>
-    </div>
-  {:else}
-    <ul class="border-border-tertiary mb-5 flex flex-col border-y">
-      {#each verifiedEmails as entry (entry.address)}
-        {@const verifiedAt = new Date(nanosToMillis(entry.verified_at))}
-        <li
-          class="border-border-tertiary flex flex-row items-center gap-3 py-3 not-last:border-b"
-        >
-          <div class="flex flex-1 flex-col gap-0.5 overflow-hidden">
-            <div class="text-text-primary truncate text-sm font-medium">
-              {entry.address}
-            </div>
-            <Tooltip
-              label={$formatDate(verifiedAt, {
-                timeStyle: "short",
-                dateStyle: "medium",
-              })}
-              direction="up"
-              align="start"
-            >
-              <span class="text-text-tertiary text-xs">
-                {$t`Verified`}
-                {$formatRelative(verifiedAt, { style: "long" })}
-              </span>
-            </Tooltip>
-          </div>
-          <Select
-            options={[
-              {
-                label: $t`Remove`,
-                icon: Trash2Icon,
-                onClick: () => {
-                  removingAddress = entry.address;
-                },
-              },
-            ]}
-            align="end"
-          >
-            <button
-              class="btn btn-tertiary btn-sm btn-icon"
-              aria-label={$t`More options for ${entry.address}`}
-            >
-              <EllipsisVerticalIcon class="size-5" />
-            </button>
-          </Select>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  <button
-    class="btn btn-primary btn-sm self-start"
-    onclick={() => (showAddWizard = true)}
-    disabled={isFull}
-    aria-label={$t`Verify an email`}
-  >
-    {$t`Verify an email`}
-  </button>
-  {#if isFull}
-    <p class="text-text-tertiary mt-3 text-xs">
-      <Trans>
-        You've reached the limit of {capacity} verified emails. Remove one before
-        adding another.
-      </Trans>
+  <header class="flex flex-col gap-2">
+    <h1
+      class="text-text-primary text-3xl font-medium tracking-tight"
+    >{$t`Communication`}</h1>
+    <p class="text-text-tertiary text-base">
+      <Trans>How apps can reach you when you sign in.</Trans>
     </p>
-  {/if}
+  </header>
+
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-row items-start justify-between gap-4">
+      <div class="flex flex-col gap-1">
+        <div class="flex flex-row items-center gap-3">
+          <h2
+            class="text-text-primary text-base font-semibold"
+          >{$t`Email addresses`}</h2>
+          <span
+            class="border-border-tertiary text-text-secondary inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium"
+            aria-label={$t`${verifiedEmails.length} of ${capacity} verified emails`}
+          >
+            {verifiedEmails.length}
+          </span>
+        </div>
+        <p class="text-text-tertiary text-sm">
+          <Trans>Only verified emails can be used to reach you.</Trans>
+        </p>
+      </div>
+      <button
+        class="btn btn-primary btn-sm shrink-0"
+        onclick={() => (showAddWizard = true)}
+        disabled={isFull}
+        aria-label={$t`Add an email`}
+      >
+        <PlusIcon class="size-4" aria-hidden="true" />
+        <span>{$t`Add an email`}</span>
+      </button>
+    </div>
+
+    {#if verifiedEmails.length === 0}
+      <div
+        class="flex flex-col items-center gap-3 px-6 py-7 text-center"
+      >
+        <span
+          class="bg-bg-secondary border-border-secondary text-fg-primary flex size-10 items-center justify-center rounded-full border"
+        >
+          <MailIcon class="size-5" aria-hidden="true" />
+        </span>
+        <p class="text-text-tertiary max-w-xs text-sm">
+          <Trans>
+            No emails yet. Verify one so apps can use it to reach you.
+          </Trans>
+        </p>
+      </div>
+    {:else}
+      <ul class="flex flex-col gap-2">
+        {#each verifiedEmails as entry (entry.address)}
+          {@const verifiedAt = new Date(nanosToMillis(entry.verified_at))}
+          <li
+            class="border-border-secondary flex flex-row items-center gap-3 rounded-xl border px-4 py-3"
+          >
+            <div class="flex flex-1 flex-col gap-1 overflow-hidden">
+              <div class="flex flex-row items-center gap-2.5">
+                <span
+                  class="text-text-primary min-w-0 truncate text-sm font-semibold"
+                >
+                  {entry.address}
+                </span>
+                <span
+                  class="border-color-success-600 bg-bg-success-primary text-text-success-primary inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
+                >
+                  <span
+                    class="bg-fg-success-primary size-1.5 rounded-full"
+                    aria-hidden="true"
+                  ></span>
+                  {$t`Verified`}
+                </span>
+              </div>
+              <Tooltip
+                label={$formatDate(verifiedAt, {
+                  timeStyle: "short",
+                  dateStyle: "medium",
+                })}
+                direction="up"
+                align="start"
+              >
+                <span class="text-text-tertiary text-sm">
+                  {$t`Verified`}
+                  {$formatRelative(verifiedAt, { style: "long" })}
+                </span>
+              </Tooltip>
+            </div>
+            <button
+              class="btn btn-tertiary btn-sm btn-icon shrink-0"
+              onclick={() => {
+                removingAddress = entry.address;
+              }}
+              aria-label={$t`Remove ${entry.address}`}
+            >
+              <Trash2Icon class="size-4" aria-hidden="true" />
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if isFull}
+      <p class="text-text-tertiary text-xs">
+        <Trans>
+          You've reached the limit of {capacity} verified emails. Remove one before
+          adding another.
+        </Trans>
+      </p>
+    {/if}
+  </div>
 </section>
 
 {#if showAddWizard}

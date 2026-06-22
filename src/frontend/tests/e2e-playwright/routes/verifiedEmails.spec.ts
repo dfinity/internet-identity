@@ -42,7 +42,7 @@ test.describe("Verified emails — wizard surface", () => {
 
     await page
       .getByRole("main")
-      .getByRole("button", { name: "Verify an email" })
+      .getByRole("button", { name: "Add an email" })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -83,10 +83,10 @@ test.describe("Verified emails — real DNSSEC + DKIM flow", () => {
         to: "register@id.ai",
         subject: nonce,
       });
-      // Wizard closes when the polling status flips to
-      // RegistrationSucceeded (reused for verified-email completion);
-      // the host fires its toast and reloads the layout data so the
-      // new row paints.
+      // Once the polling status flips to RegistrationSucceeded the
+      // wizard parks on the shared success step; clicking Done fires
+      // the host's `onSuccess` (toast + close + invalidateAll).
+      await wizard.confirmSuccess();
     });
 
     const dialog = page.getByRole("dialog");

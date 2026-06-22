@@ -1,6 +1,6 @@
 <script lang="ts">
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { TriangleAlertIcon } from "@lucide/svelte";
+  import { Trash2Icon } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -25,54 +25,38 @@
   };
 </script>
 
-<div class="flex flex-1 flex-col">
-  <div class="mb-8 flex flex-col">
-    <FeaturedIcon variant="warning" size="lg" class="mb-3">
-      <TriangleAlertIcon class="size-6" />
-    </FeaturedIcon>
-    <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Remove verified email?`}
-    </h1>
-    <div
-      class={[
-        "flex flex-col gap-4",
-        "[&_p]:text-text-tertiary [&_p]:text-base [&_p]:font-medium",
-      ]}
-    >
-      <p>
-        <Trans>
-          Apps will no longer be able to request
-          <strong class="text-text-primary break-all">{address}</strong>
-          from this identity.
-        </Trans>
-      </p>
-      <p>
-        <Trans>
-          You can verify this address again at any time. Your sign-in methods
-          are unaffected.
-        </Trans>
-      </p>
-    </div>
-  </div>
-  <div class="mt-auto flex flex-col items-stretch gap-3">
+<div class="flex flex-1 flex-col gap-2">
+  <FeaturedIcon variant="info" size="lg" class="mb-3">
+    <Trash2Icon class="size-5" />
+  </FeaturedIcon>
+  <h1 class="text-text-primary text-xl font-medium">
+    {$t`Remove this email?`}
+  </h1>
+  <p class="text-text-secondary mb-6 text-sm">
+    <Trans>
+      <strong class="text-text-primary break-all">{address}</strong> will no longer
+      be available for apps to reach you. You can verify it again later.
+    </Trans>
+  </p>
+  <div class="mt-auto flex flex-row items-stretch gap-3">
     <button
-      class="btn btn-primary btn-lg btn-danger"
+      class="btn btn-tertiary btn-lg flex-1"
+      onclick={onCancel}
+      disabled={isRemoving}
+    >
+      {$t`Cancel`}
+    </button>
+    <button
+      class="btn btn-primary btn-lg btn-danger flex-1"
       onclick={handleRemove}
       disabled={isRemoving}
     >
       {#if isRemoving}
         <ProgressRing />
-        <span>{$t`Removing email...`}</span>
+        <span>{$t`Removing…`}</span>
       {:else}
-        <span>{$t`Remove email`}</span>
+        <span>{$t`Remove`}</span>
       {/if}
-    </button>
-    <button
-      class="btn btn-tertiary btn-lg"
-      onclick={onCancel}
-      disabled={isRemoving}
-    >
-      {$t`Cancel`}
     </button>
   </div>
 </div>
