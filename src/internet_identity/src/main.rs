@@ -1723,18 +1723,26 @@ mod email_challenge_api {
         email_inbound::resolve_via_doh(arg.nonce, now_secs)
     }
 
-    // -----------------------------------------------------------------
-    // Deprecated `email_recovery_*` aliases for the four shared methods
-    // above. Kept so a stale FE bundle in a browser cache — or any FE
-    // build that lands before this canister's renamed methods — can
-    // still drive the inbound-DKIM flow without a "method not found"
-    // mid-verification break. Removal scheduled for a follow-up PR once
-    // every deployed FE has refreshed to the new names. The wire
-    // format is identical to the new methods (Candid is structurally
-    // typed; the renamed return types match the old types' shapes
-    // field-for-field), so old clients deserialize successfully even
-    // though their bindings reference the old type names.
-    // -----------------------------------------------------------------
+    // =================================================================
+    // DEPRECATED — remove in a follow-up PR
+    // =================================================================
+    // Legacy aliases for the four `email_challenge_*` methods above.
+    // Kept so a stale FE bundle in a browser cache — or any FE build
+    // that lands before this canister's renamed methods — can still
+    // drive the inbound-DKIM flow without a "method not found" break
+    // mid-verification. The wire bytes are identical to the new
+    // methods (Candid is structurally typed; the renamed return types
+    // match the old types' shapes field-for-field), so old clients
+    // with bindings against the old type names deserialize
+    // successfully.
+    //
+    // **All four wrappers below must be removed together in a single
+    // follow-up `chore(be): remove deprecated email_recovery_* method
+    // aliases` PR**, once every deployed FE has refreshed to the
+    // `email_challenge_*` names. See TASKS.md for the tracked
+    // follow-up. The .did file has a matching DEPRECATED section
+    // immediately after `verified_email_remove` — drop both together.
+    // =================================================================
 
     #[query]
     fn email_recovery_status(nonce: String) -> EmailChallengeStatus {
