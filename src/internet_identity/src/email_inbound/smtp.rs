@@ -57,8 +57,7 @@
 //! "verification failed" answers, and feeding those back would let
 //! it probe the canister for which nonces exist.
 
-use super::pending::{PartialVerification, PendingKind, PendingStatus};
-use crate::email_recovery::pending;
+use super::pending::{self, PartialVerification, PendingKind, PendingStatus};
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     DohFailureReason, EmailRecoveryCredential, EmailRecoveryError,

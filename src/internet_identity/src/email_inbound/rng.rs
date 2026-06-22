@@ -87,13 +87,13 @@ pub fn format_nonce_with_prefix(prefix: &str, suffix: &[u8; super::NONCE_SUFFIX_
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// Bypass `ensure_seeded()` for unit tests — those run on the
     /// host, which has no `raw_rand`. Seeds the PRNG with a fixed
     /// value so test output is deterministic.
-    pub(in crate::email_recovery) fn seed_for_tests(seed: [u8; 32]) {
+    pub(crate) fn seed_for_tests(seed: [u8; 32]) {
         EMAIL_RECOVERY_RNG.with(|cell| {
             *cell.borrow_mut() = Some(ChaCha20Rng::from_seed(seed));
         });

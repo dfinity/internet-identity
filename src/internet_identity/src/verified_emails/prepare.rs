@@ -2,7 +2,7 @@
 //!
 //! Authenticated entry point. Mirrors `email_recovery::prepare::prepare_add`
 //! but parks a `PendingKind::VerifyEmail { anchor }` and issues the
-//! nonce with the [`super::super::VERIFIED_EMAIL_NONCE_PREFIX`]
+//! nonce with the [`crate::email_inbound::VERIFIED_EMAIL_NONCE_PREFIX`]
 //! (`II-Verify-`) prefix so an inbound challenge email cannot be
 //! cross-applied between the recovery and verified-email flows.
 //!
@@ -13,7 +13,10 @@
 //! reject up front if the anchor already holds the maximum number
 //! of verified addresses.
 
-use crate::email_recovery::pending::PendingKind;
+use crate::email_inbound::{
+    prepare::prepare_common, PendingKind, MAX_VERIFIED_EMAILS_PER_ANCHOR,
+    VERIFIED_EMAIL_NONCE_PREFIX,
+};
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
     EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
@@ -39,18 +42,17 @@ pub async fn prepare_add(
     // having to send a magic email first. Compared inclusively
     // because we're about to add one more.
     let current = state::anchor(anchor).verified_emails.len();
-    if current >= super::super::MAX_VERIFIED_EMAILS_PER_ANCHOR {
+    if current >= MAX_VERIFIED_EMAILS_PER_ANCHOR {
         return Err(EmailRecoveryError::InternalCanisterError(format!(
-            "anchor already holds {current} verified emails — limit is {}",
-            super::super::MAX_VERIFIED_EMAILS_PER_ANCHOR,
+            "anchor already holds {current} verified emails — limit is {MAX_VERIFIED_EMAILS_PER_ANCHOR}",
         )));
     }
 
-    super::super::prepare::prepare_common(
+    prepare_common(
         dns_input,
         now_secs,
         PendingKind::VerifyEmail { anchor },
-        super::super::VERIFIED_EMAIL_NONCE_PREFIX,
+        VERIFIED_EMAIL_NONCE_PREFIX,
     )
     .await
 }

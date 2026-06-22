@@ -17,9 +17,19 @@
 //! success, but if it does (network blip), this loud-fail surfaces
 //! the bug instead of silently masking it.
 
-use crate::email_recovery::RemoveError;
 use crate::storage::anchor::Anchor;
 use internet_identity_interface::archive::types::Operation;
+
+/// Why a `verified_email_remove` call failed. The verified-email flow
+/// defines its own error rather than sharing `email_recovery::RemoveError`
+/// so the two anchor primitives stay structurally independent — see
+/// the module rustdoc on [`crate::verified_emails`].
+#[derive(Debug, Eq, PartialEq)]
+pub enum RemoveError {
+    /// No entry on the anchor's `verified_emails` list matched the
+    /// supplied address.
+    NotRegistered,
+}
 
 /// Detach the verified email at `address` from `anchor`. Returns
 /// the archive `Operation` on success.

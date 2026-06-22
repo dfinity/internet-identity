@@ -58,6 +58,7 @@ mod dkim;
 mod dmarc;
 mod dnssec;
 mod doh;
+mod email_inbound;
 mod email_recovery;
 mod http;
 mod ii_domain;
@@ -70,6 +71,7 @@ mod stats;
 mod storage;
 mod utils;
 mod vc_mvp;
+mod verified_emails;
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -1867,7 +1869,7 @@ mod email_recovery_api {
             .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        email_recovery::verified_emails::prepare_add(identity_number, dns_input, now_secs).await
+        crate::verified_emails::prepare_add(identity_number, dns_input, now_secs).await
     }
 
     /// Authenticated. Drops a previously-verified address from
@@ -1883,13 +1885,12 @@ mod email_recovery_api {
             .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
         crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);
 
-        let operation = email_recovery::verified_emails::remove(&mut anchor, &address).map_err(
-            |err| match err {
-                crate::email_recovery::RemoveError::NotRegistered => {
+        let operation =
+            crate::verified_emails::remove(&mut anchor, &address).map_err(|err| match err {
+                crate::verified_emails::RemoveError::NotRegistered => {
                     EmailRecoveryError::AddressNotRegistered
                 }
-            },
-        )?;
+            })?;
 
         crate::state::storage_borrow_mut(|storage| storage.write(anchor))
             .map_err(|err| EmailRecoveryError::InternalCanisterError(format!("{err:?}")))?;
