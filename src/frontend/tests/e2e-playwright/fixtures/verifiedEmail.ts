@@ -15,6 +15,7 @@
  */
 
 import { test as base, expect, Locator, Page } from "@playwright/test";
+import { II_URL } from "../utils";
 
 class VerifiedEmailWizard {
   readonly #view: Locator;
@@ -77,8 +78,15 @@ class VerifiedEmailFixtures {
     this.#page = page;
   }
 
-  /** The "Communication" panel lives on the same /manage/recovery
-   *  page as the recovery-email card. Assert it's rendered. */
+  /** Navigate to the /manage/communication page where the
+   *  verified-emails panel now lives (sibling of /manage/recovery
+   *  after the Communication-page split). */
+  async goto(): Promise<void> {
+    await this.#page.goto(II_URL + "/manage/communication");
+  }
+
+  /** The "Communication" page sits on its own top-level route under
+   *  /manage; assert the panel rendered. */
   async assertPanelVisible(): Promise<void> {
     await expect(
       this.#page.getByRole("heading", { name: "Communication" }),

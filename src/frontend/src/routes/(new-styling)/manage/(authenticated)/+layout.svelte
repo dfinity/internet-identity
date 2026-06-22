@@ -4,6 +4,7 @@
     ChevronDownIcon,
     HouseIcon,
     KeyRoundIcon,
+    MailIcon,
     MenuIcon,
     XIcon,
     LifeBuoyIcon,
@@ -322,6 +323,15 @@
           >
             <KeyRoundIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Access`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/communication"
+            current={page.url.pathname === "/manage/communication"}
+          >
+            <MailIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Communication`}</span>
           </NavItem>
         </li>
         <li class="contents">

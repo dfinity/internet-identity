@@ -32,11 +32,10 @@ test.describe("Verified emails — wizard surface", () => {
   test("manage page renders the panel and opens the wizard", async ({
     page,
     verifiedEmail,
-    manageRecoveryPage,
     signInWithIdentity,
     identities,
   }) => {
-    await manageRecoveryPage.goto();
+    await verifiedEmail.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
     await verifiedEmail.assertPanelVisible();
 
@@ -70,7 +69,7 @@ test.describe("Verified emails — real DNSSEC + DKIM flow", () => {
     // the canister issues, which `PendingKind` uses to dispatch.
     await emailRecovery.installDohInterceptor();
 
-    await manageRecoveryPage.goto();
+    await verifiedEmail.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
     await verifiedEmail.assertPanelVisible();
 
@@ -94,14 +93,18 @@ test.describe("Verified emails — real DNSSEC + DKIM flow", () => {
     await verifiedEmail.assertAddressListed(address);
 
     // ---------------------------------------------------------------
-    // Recovery card stays untouched — the recovery-email setup CTA is
-    // still in its "Activate recovery email" state.
+    // Recovery card stays untouched — the recovery page's setup CTA
+    // is still in its "Activate recovery email" state. Hop to that
+    // sibling route to assert it (Communication and Recovery are now
+    // separate top-level pages).
     // ---------------------------------------------------------------
+    await manageRecoveryPage.goto();
     await emailRecovery.assertSetupCardVisible();
 
     // ---------------------------------------------------------------
     // Remove the verified email — confirmation dialog, list updates.
     // ---------------------------------------------------------------
+    await verifiedEmail.goto();
     await verifiedEmail.removeAddress(address);
     await verifiedEmail.assertAddressAbsent(address);
   });
