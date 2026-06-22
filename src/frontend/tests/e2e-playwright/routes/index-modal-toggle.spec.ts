@@ -17,22 +17,22 @@ test.describe("Sign-in ↔ sign-up modal toggle on returning-user landing", () =
     },
   );
 
-  test("clicking Sign up CTA inside sign-in modal opens sign-up modal and closes sign-in modal", async ({
+  test("clicking Create CTA inside sign-in modal opens sign-up modal and closes sign-in modal", async ({
     page,
   }) => {
     // Open the sign-in modal from "Add identity" on the returning-user landing
     await page.getByRole("button", { name: "Add identity" }).click();
     await expect(
-      page.getByRole("heading", { name: "Sign in", exact: true }),
+      page.getByRole("heading", { name: "Add existing identity" }),
     ).toBeVisible();
 
-    // Click the "Sign up" toggle CTA inside the sign-in modal
-    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    // Click the "Create" toggle CTA inside the sign-in modal
+    await page.getByRole("button", { name: "Create", exact: true }).click();
 
     // Sign-up modal should be visible; sign-in heading should be gone
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Sign in", exact: true }),
+      page.getByRole("heading", { name: "Add existing identity" }),
     ).toBeHidden();
   });
 
@@ -42,17 +42,17 @@ test.describe("Sign-in ↔ sign-up modal toggle on returning-user landing", () =
     // Open sign-in modal, then toggle to sign-up
     await page.getByRole("button", { name: "Add identity" }).click();
     await expect(
-      page.getByRole("heading", { name: "Sign in", exact: true }),
+      page.getByRole("heading", { name: "Add existing identity" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Sign in", exact: true }),
+      page.getByRole("heading", { name: "Add existing identity" }),
     ).toBeHidden();
 
     // Click "Sign in" inside the sign-up modal — should return to sign-in modal
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Sign in", exact: true }),
+      page.getByRole("heading", { name: "Add existing identity" }),
     ).toBeVisible();
   });
 
@@ -60,7 +60,7 @@ test.describe("Sign-in ↔ sign-up modal toggle on returning-user landing", () =
     page,
   }) => {
     await page.getByRole("button", { name: "Add identity" }).click();
-    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
 
     // Close via the accessible Close button
     await page.getByRole("button", { name: "Close" }).click();
@@ -68,7 +68,7 @@ test.describe("Sign-in ↔ sign-up modal toggle on returning-user landing", () =
     // No dialog open; landing page is visible again
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(
-      page.getByRole("heading", { name: "Sign in", exact: true }),
+      page.getByRole("heading", { name: "Add existing identity" }),
     ).toBeHidden();
     await expect(
       page.getByRole("button", { name: "Add identity" }),

@@ -360,6 +360,9 @@
                   handleError(error);
                 }}
                 bind:mode={inlinePickerMode}
+                passkeyLabel={inlinePickerMode === "signin"
+                  ? $t`Select a passkey`
+                  : undefined}
               >
                 {#snippet children(presenting)}
                   {#if presenting === true && inlinePickerMode === "signup"}
@@ -368,7 +371,7 @@
                     <h1
                       class="text-text-primary my-2 self-start text-2xl font-medium"
                     >
-                      {$t`Sign in`}
+                      {$t`Add existing identity`}
                     </h1>
                     <p class="text-text-secondary mb-6 self-start text-sm">
                       {$t`Choose method to continue`}
@@ -405,12 +408,15 @@
         handleError(error);
       }}
       bind:mode={authDialogMode}
+      passkeyLabel={authDialogMode === "signin"
+        ? $t`Select a passkey`
+        : undefined}
     >
       {#if authDialogMode === "signup"}
         <SignUpHero />
       {:else}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {$t`Sign in`}
+          {$t`Add existing identity`}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
           {$t`Choose method to continue`}

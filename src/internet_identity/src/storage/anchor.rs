@@ -134,24 +134,17 @@ impl From<Device> for DeviceDataWithoutAlias {
 
 impl From<OpenIdCredential> for OpenIdCredentialData {
     fn from(openid_credential: OpenIdCredential) -> Self {
-        // Prefer the SSO fields stamped on the stored credential. Fall back
-        // to the live `DISCOVERY_TASKS` lookup for credentials that haven't
-        // been stamped yet (written before the fields existed and not yet
-        // covered by the `sso_credential_migration` backfill, see
-        // `docs/ongoing/openid-sso-prod-readiness.md` §8.6). The fallback is
-        // removed once the migration has completed.
-        let (sso_domain, sso_name) = match openid_credential.sso_domain {
-            Some(domain) => (Some(domain), openid_credential.sso_name),
-            None => crate::openid::sso_fields_for(&openid_credential.iss, &openid_credential.aud),
-        };
+        // The `sso_credential_migration` backfill has completed, so every SSO
+        // credential carries its own `sso_domain` / `sso_name` stamp; read them
+        // directly (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
         Self {
             iss: openid_credential.iss,
             sub: openid_credential.sub,
             aud: openid_credential.aud,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
-            sso_domain,
-            sso_name,
+            sso_domain: openid_credential.sso_domain,
+            sso_name: openid_credential.sso_name,
         }
     }
 }

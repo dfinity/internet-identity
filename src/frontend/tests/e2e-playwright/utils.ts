@@ -186,9 +186,10 @@ export const addPasskeyCurrentDevice = async (
   dummyAuth: DummyAuthFn,
 ): Promise<void> => {
   await page.getByRole("button", { name: "Add new" }).click();
-  await page.getByRole("button", { name: "Continue with passkey" }).click();
+  // The chooser triggers WebAuthn `create()` directly — arm the dummy
+  // authenticator before the click so the upcoming prompt is satisfied.
   dummyAuth(page);
-  await page.getByRole("button", { name: "Create Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
 };
 
 export const renamePasskey = async (

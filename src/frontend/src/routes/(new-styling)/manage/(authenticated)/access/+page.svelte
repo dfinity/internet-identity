@@ -81,7 +81,6 @@
     "recoveryPhrase" in $authenticatedStore.authMethod ||
       "emailRecovery" in $authenticatedStore.authMethod,
   );
-  const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
     accessMethods.filter((m) => "passkey" in m).length >= MAX_PASSKEYS,
   );
@@ -469,7 +468,6 @@
         handleError(error);
       }}
       {maxPasskeysReached}
-      {isUsingPasskeys}
       {openIdCredentials}
       identityName={data.identityInfo.name[0]}
     />

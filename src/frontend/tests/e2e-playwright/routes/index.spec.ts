@@ -12,8 +12,8 @@ test.describe("First visit", () => {
     await page.goto(II_URL);
     // The homepage's empty-state picker renders in sign-in mode; toggle
     // to sign-up via the picker CTA, which opens the sign-up dialog.
-    await page.getByRole("button", { name: "Sign up", exact: true }).click();
-    await page.getByRole("button", { name: "Sign up with passkey" }).click();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await page.getByRole("button", { name: "Create with passkey" }).click();
     await page.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     await page.getByRole("button", { name: "Create identity" }).click();
     await page.waitForURL(II_URL + "/manage");
@@ -33,7 +33,7 @@ test.describe("First visit", () => {
     await addAuthenticatorForIdentity(page, identities[0].identityNumber);
     await page.goto(II_URL);
     // Sign-in mode picker goes directly to existing-passkey WebAuthn.
-    await page.getByRole("button", { name: "Sign in with passkey" }).click();
+    await page.getByRole("button", { name: "Select a passkey" }).click();
     await managePage.assertVisible();
   });
 
@@ -55,15 +55,17 @@ test.describe("First visit", () => {
       const newDevicePage = await newDeviceContext.newPage();
       await addVirtualAuthenticator(newDevicePage);
       await newDevicePage.goto(II_URL);
-      // No existing passkeys on the new device, so the sign-in click
-      // surfaces the "Can't find your identity?" cross-device prompt.
+      // No existing passkeys on the new device. The cancel→QR auto
+      // transition was removed; reach the cross-device flow via the
+      // explicit "URL | QR Code" CTA on the "Add identity from another
+      // device" row.
       await newDevicePage
-        .getByRole("button", { name: "Sign in with passkey" })
+        .getByRole("button", { name: "URL | QR Code" })
         .click();
       await newDevicePage
         .getByRole("heading", {
           level: 1,
-          name: "Can't find your identity?",
+          name: "Add identity from another device",
         })
         .waitFor();
       const linkToPair = `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`;
@@ -75,7 +77,7 @@ test.describe("First visit", () => {
       );
       await existingDevicePage.goto(linkToPair);
       await existingDevicePage
-        .getByRole("button", { name: "Sign in with passkey" })
+        .getByRole("button", { name: "Select a passkey" })
         .click();
 
       // Switch to new device and get confirmation code
@@ -543,7 +545,7 @@ test.describe("Last used identities listed", () => {
     // Now sign in through the welcome-back "Add identity" entry point;
     // the sign-in dialog opens with the mode="signin" picker.
     await page.getByRole("button", { name: "Add identity" }).click();
-    await page.getByRole("button", { name: "Sign in with passkey" }).click();
+    await page.getByRole("button", { name: "Select a passkey" }).click();
     await managePage.assertVisible();
   });
 
@@ -560,12 +562,12 @@ test.describe("Last used identities listed", () => {
     await managePage.signOut();
     await removeAuthenticatorForIdentity(identities[0].identityNumber);
 
-    // Now sign up for a new identity via "Add identity" → "Sign up"
+    // Now sign up for a new identity via "Add identity" → "Create"
     // toggle in the sign-in dialog → sign-up dialog.
     await addVirtualAuthenticator(page);
     await page.getByRole("button", { name: "Add identity" }).click();
-    await page.getByRole("button", { name: "Sign up", exact: true }).click();
-    await page.getByRole("button", { name: "Sign up with passkey" }).click();
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await page.getByRole("button", { name: "Create with passkey" }).click();
     await page.getByLabel("Identity name").fill(SECONDARY_USER_NAME);
     await page.getByRole("button", { name: "Create identity" }).click();
     await managePage.assertVisible();
