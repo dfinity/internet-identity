@@ -98,7 +98,7 @@ pub struct IdentityInfo {
     /// verified emails configured. Capped server-side by
     /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub verified_emails:
-        Option<Vec<crate::internet_identity::types::email_recovery::VerifiedEmail>>,
+        Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

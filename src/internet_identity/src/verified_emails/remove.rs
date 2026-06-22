@@ -49,7 +49,7 @@ pub fn remove(anchor: &mut Anchor, address: &str) -> Result<Operation, RemoveErr
 mod tests {
     use super::*;
     use crate::storage::anchor::Anchor;
-    use internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail;
+    use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 
     fn anchor_with(addresses: &[&str]) -> Anchor {
         let mut a = Anchor {

@@ -11,10 +11,9 @@ use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
-use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryCredential, VerifiedEmail,
-};
+use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
+use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;

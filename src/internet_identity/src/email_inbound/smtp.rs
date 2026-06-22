@@ -769,7 +769,7 @@ pub(super) fn bind_credential(
 }
 
 /// Verified-email counterpart to [`bind_credential`]: append a fresh
-/// [`internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail`]
+/// [`internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail`]
 /// onto the anchor's `verified_emails` list.
 ///
 /// Unlike `bind_credential` this does *not* touch the recovery
@@ -784,7 +784,7 @@ pub(super) fn bind_verified_email(
     claimed_address: &str,
     now_secs: u64,
 ) -> Result<(), EmailRecoveryError> {
-    use internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail;
+    use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 
     let mut a = state::anchor(anchor);
     let now_ns = now_secs.saturating_mul(1_000_000_000);

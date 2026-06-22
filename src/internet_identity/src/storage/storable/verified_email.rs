@@ -14,7 +14,7 @@
 //! Subject prefix, and serve a different purpose (attribute sources
 //! for dapps — see Phase 2 of the design doc).
 
-use internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail;
+use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 use internet_identity_interface::internet_identity::types::Timestamp;
 use minicbor::{Decode, Encode};
 

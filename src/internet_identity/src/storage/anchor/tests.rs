@@ -1195,7 +1195,7 @@ mod from_conversion_tests {
 mod mirror_verified_email_tests {
     use super::*;
     use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
-    use internet_identity_interface::internet_identity::types::email_recovery::VerifiedEmail;
+    use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 
     #[test]
     fn appends_new_address() {
