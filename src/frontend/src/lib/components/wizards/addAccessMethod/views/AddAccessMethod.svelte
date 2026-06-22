@@ -157,8 +157,8 @@
       {/each}
       <!--
         SSO entry is always rendered alongside the named providers. The SSO
-        screen calls `add_discoverable_oidc_config` on submit; domains not on
-        the backend canary allowlist are rejected there.
+        screen resolves the domain via the canister; domains not on the backend
+        canary allowlist are rejected there.
       -->
       <button
         class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"

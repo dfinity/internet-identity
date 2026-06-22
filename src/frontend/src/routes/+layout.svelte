@@ -23,8 +23,6 @@
       window.location.pathname !== "/self-service" &&
       // Don't redirect if we're visiting webauthn iframe used for migration
       window.location.pathname !== "/iframe/webauthn" &&
-      // Don't redirect if we're visiting callback used for OpenID flows
-      window.location.pathname !== "/callback" &&
       // Don't redirect if we're visiting new authorize flow
       // TODO: Implement redirect with pending ICRC-29 state
       window.location.pathname !== "/authorize"

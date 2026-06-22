@@ -148,14 +148,13 @@
         </Tooltip>
       {/each}
       <!--
-        SSO entry is always rendered. Registration is enforced on the
-        backend by the `sso_discoverable_domains` allowlist (init arg,
-        falling back to the `is_production`-keyed defaults in
-        `allowed_discovery_domains`) checked inside
-        `add_discoverable_oidc_config`. Unregistered domains surface as
-        an error inside the SignInWithSso screen rather than being gated
-        here — we keep this option visible so users know the mechanism
-        exists.
+        SSO entry is always rendered. The allowed domains are enforced on the
+        backend by the `sso_discoverable_domains` allowlist (init arg, falling
+        back to the `is_production`-keyed defaults in
+        `allowed_discovery_domains`) checked inside `discover_sso`. Disallowed
+        domains surface as an error inside the SignInWithSso screen rather than
+        being gated here — we keep this option visible so users know the
+        mechanism exists.
       -->
       <button
         class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"

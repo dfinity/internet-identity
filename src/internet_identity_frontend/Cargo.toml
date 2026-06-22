@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 # Core dependencies for HTTP gateway functionality
 internet_identity_interface.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_bytes.workspace = true
 
 # IC canister dependencies
@@ -21,6 +22,7 @@ include_dir.workspace = true
 # Asset utilities and encoding
 asset_util.workspace = true
 base64.workspace = true
+form_urlencoded = "1.2"
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 sha2.workspace = true
 lazy_static.workspace = true
@@ -32,5 +34,6 @@ candid_parser.workspace = true
 canister_tests.workspace = true
 ic-response-verification.workspace = true
 pocket-ic.workspace = true
+proptest.workspace = true
 
 

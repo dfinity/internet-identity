@@ -324,10 +324,8 @@ pub struct InternetIdentityInit {
 
 /// One entry of the `sso_credential_migration` backfill (see
 /// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
-/// pair of stored SSO credentials to the discovery domain (and optional
-/// human-readable name) they were registered through. Field names match the
-/// `discovered_oidc_configs` query output so the deployer can transcribe its
-/// result field-for-field before submitting the upgrade proposal.
+/// pair of a stored SSO credential to the discovery domain and optional
+/// human-readable name it resolves to.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoCredentialMigrationEntry {
     pub discovery_domain: String,
@@ -471,15 +469,34 @@ pub struct DiscoverableOidcConfig {
     pub discovery_domain: String,
 }
 
-/// Resolved SSO provider state returned by the `discovered_oidc_configs` query.
-/// Any field other than `discovery_domain` is `None` until the two-hop discovery
-/// completes for that domain.
+/// Fully resolved SSO discovery result returned by `discover_sso` /
+/// `discover_sso_query`. Carries everything the frontend needs to build the
+/// authorization request: the canister resolves it from the domain's two-hop
+/// discovery documents.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct OidcConfig {
+pub struct SsoDiscovery {
     pub discovery_domain: String,
-    pub client_id: Option<String>,
-    pub openid_configuration: Option<String>,
-    pub issuer: Option<String>,
+    pub client_id: String,
+    pub issuer: String,
+    pub authorization_endpoint: String,
+    pub scopes: Vec<String>,
+    /// Human-readable SSO label, if the domain published one in its
+    /// `ii-openid-configuration`.
+    pub name: Option<String>,
+}
+
+/// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
+/// fetch isn't a distinct state — it reads as `Pending` and the frontend times
+/// out — so the states are: resolved, in flight, or not allowed.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SsoDiscoveryState {
+    /// Discovery completed; the resolved configuration.
+    Resolved(SsoDiscovery),
+    /// Discovery is in flight (or not yet started) — drive it with
+    /// `discover_sso` and poll again.
+    Pending,
+    /// The domain is not on the canister's `sso_discoverable_domains` allowlist.
+    NotAllowed,
 }
 
 pub enum AuthorizationKey {
