@@ -1,3 +1,4 @@
+use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
@@ -873,6 +874,41 @@ impl Anchor {
         let index = self.openid_credential_index(key)?;
         self.openid_credentials.remove(index);
         Ok(())
+    }
+
+    /// Mirror an IdP-vouched email into the anchor's verified-emails list.
+    /// Called from `add_openid_credential_skip_checks` whenever an OIDC or
+    /// SSO credential is linked and the provider vouches for the address.
+    ///
+    /// Returns `true` when an entry was appended, `false` otherwise (already
+    /// present, or cap reached). Never errors — the surrounding OIDC link
+    /// must not fail just because the verified-emails bucket is full.
+    ///
+    /// The mirror only fires on link: removing the OIDC credential later
+    /// leaves the entry in place, so the address survives an unlink. If the
+    /// user manually removes the entry from the panel, re-adding requires
+    /// the DKIM verification flow — re-linking the OIDC credential does
+    /// not refresh `verified_at` on a pre-existing entry.
+    pub fn mirror_verified_email_from_oidc(
+        &mut self,
+        address: &str,
+        verified_at_ns: Timestamp,
+    ) -> bool {
+        if self
+            .verified_emails
+            .iter()
+            .any(|e| e.address.eq_ignore_ascii_case(address))
+        {
+            return false;
+        }
+        if self.verified_emails.len() >= MAX_VERIFIED_EMAILS_PER_ANCHOR {
+            return false;
+        }
+        self.verified_emails.push(VerifiedEmail {
+            address: address.to_ascii_lowercase(),
+            verified_at: verified_at_ns,
+        });
+        true
     }
 
     pub fn update_openid_credential(
