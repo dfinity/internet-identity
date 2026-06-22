@@ -33,8 +33,8 @@
   import { nanosToMillis } from "$lib/utils/time";
   import { throwCanisterError } from "$lib/utils/utils";
   import type {
-    EmailRecoveryDnsInput,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeDnsInput,
+    EmailChallengeSubmitDkimLeafArg,
     VerifiedEmail,
   } from "$lib/generated/internet_identity_types";
 
@@ -60,7 +60,7 @@
   // --- Canister wrappers (same as recovery wizard) -------------------
 
   /** Authenticated wrapper around `verified_email_prepare_add`. */
-  const prepareAddVerifiedEmail = (input: EmailRecoveryDnsInput) =>
+  const prepareAddVerifiedEmail = (input: EmailChallengeDnsInput) =>
     $authenticatedStore.actor
       .verified_email_prepare_add($authenticatedStore.identityNumber, input)
       .then(throwCanisterError);
@@ -68,22 +68,22 @@
   /** Anonymous wrappers — status / diagnostics / submit / DoH are
    *  shared with the recovery flow (keyed by nonce, not by purpose). */
   const statusEmailRecovery = (nonce: string) =>
-    anonymousActor.email_recovery_status(nonce);
+    anonymousActor.email_challenge_status(nonce);
 
   const diagnosticsEmailRecovery = (nonce: string) =>
-    anonymousActor.email_recovery_diagnostics(nonce);
+    anonymousActor.email_challenge_diagnostics(nonce);
 
   const submitEmailDkimLeaf = async (
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+      await anonymousActor.email_challenge_submit_dkim_leaf(arg),
     );
   };
 
   const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
+      await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
     );
   };
 

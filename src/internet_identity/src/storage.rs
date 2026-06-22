@@ -2283,7 +2283,7 @@ pub enum StorageError {
     /// Tried to bind a recovery email that's already on a different
     /// anchor. The "one anchor per address" invariant from design
     /// §8.2 is enforced at the storage layer; the caller surfaces
-    /// `EmailRecoveryError::AddressAlreadyRegistered`.
+    /// `EmailChallengeError::AddressAlreadyRegistered`.
     EmailRecoveryAddressAlreadyBound {
         existing_anchor: AnchorNumber,
     },

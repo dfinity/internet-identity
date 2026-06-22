@@ -54,12 +54,12 @@ pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
 pub fn pending_status(
     nonce: &str,
     now_secs: u64,
-) -> internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryStatus {
+) -> internet_identity_interface::internet_identity::types::email_recovery::EmailChallengeStatus {
     pending::status_of(nonce, now_secs)
 }
 
 /// Wrapper around `pending::diagnostics_of` (see
-/// `EmailRecoveryDiagnostics`) so the canister method in `main.rs`
+/// `EmailChallengeDiagnostics`) so the canister method in `main.rs`
 /// doesn't reach into the submodule. Returns `None` for an
 /// unknown/expired nonce; the record carries strictly-public fields
 /// only.
@@ -67,8 +67,8 @@ pub fn pending_diagnostics(
     nonce: &str,
     now_secs: u64,
 ) -> Option<
-    internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryDiagnostics,
-> {
+    internet_identity_interface::internet_identity::types::email_recovery::EmailChallengeDiagnostics,
+>{
     pending::diagnostics_of(nonce, now_secs)
 }
 

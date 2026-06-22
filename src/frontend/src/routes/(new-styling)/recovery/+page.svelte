@@ -23,9 +23,9 @@
     type RecoverySuccess,
   } from "$lib/components/wizards/recoverWithEmail";
   import type {
-    EmailRecoveryDnsInput,
+    EmailChallengeDnsInput,
     EmailRecoveryGetDelegationArgs,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeSubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -82,7 +82,7 @@
   // -------------------------------------------------------------
 
   const prepareEmailDelegation = (
-    input: EmailRecoveryDnsInput,
+    input: EmailChallengeDnsInput,
     sessionPublicKey: Uint8Array,
   ) =>
     anonymousActor
@@ -90,22 +90,22 @@
       .then(throwCanisterError);
 
   const emailRecoveryStatus = (nonce: string) =>
-    anonymousActor.email_recovery_status(nonce);
+    anonymousActor.email_challenge_status(nonce);
 
   const emailRecoveryDiagnostics = (nonce: string) =>
-    anonymousActor.email_recovery_diagnostics(nonce);
+    anonymousActor.email_challenge_diagnostics(nonce);
 
   const submitEmailDkimLeaf = async (
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+      await anonymousActor.email_challenge_submit_dkim_leaf(arg),
     );
   };
 
   const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
+      await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
     );
   };
 

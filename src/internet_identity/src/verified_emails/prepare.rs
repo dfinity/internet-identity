@@ -19,7 +19,7 @@ use crate::email_inbound::{
 };
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
+    EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
 use internet_identity_interface::internet_identity::types::AnchorNumber;
 
@@ -34,16 +34,16 @@ use internet_identity_interface::internet_identity::types::AnchorNumber;
 /// for testability.
 pub async fn prepare_add(
     anchor: AnchorNumber,
-    dns_input: EmailRecoveryDnsInput,
+    dns_input: EmailChallengeDnsInput,
     now_secs: u64,
-) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+) -> Result<EmailChallenge, EmailChallengeError> {
     // Per-anchor cap. Checked before issuing the nonce so the FE
     // wizard can show a "limit reached" notice without the user
     // having to send a magic email first. Compared inclusively
     // because we're about to add one more.
     let current = state::anchor(anchor).verified_emails.len();
     if current >= MAX_VERIFIED_EMAILS_PER_ANCHOR {
-        return Err(EmailRecoveryError::InternalCanisterError(format!(
+        return Err(EmailChallengeError::InternalCanisterError(format!(
             "anchor already holds {current} verified emails — limit is {MAX_VERIFIED_EMAILS_PER_ANCHOR}",
         )));
     }

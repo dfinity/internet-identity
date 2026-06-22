@@ -47,7 +47,7 @@ pub const DS_DIGEST_TYPE_SHA256: u8 = 2;
 /// A TXT RDATA chunk's length octet ran past the end of the chunk —
 /// see [`parse_txt_rdata`]. Marker type rather than a stringly-typed
 /// error so callers map it to whichever module-specific error they
-/// want (e.g. `EmailRecoveryError::EmailVerificationFailed`).
+/// want (e.g. `EmailChallengeError::EmailVerificationFailed`).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TxtRdataTruncated;
 

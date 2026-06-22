@@ -18,7 +18,7 @@
    *      subject prefix is what disambiguates the two on the canister
    *      side).
    *   3. User sends the DKIM-signed email; we poll
-   *      `email_recovery_status` (shared with recovery — keyed by
+   *      `email_challenge_status` (shared with recovery — keyed by
    *      nonce, not by flow). On the DNSSEC path that yields a
    *      `NeedDkimLeaf` step; on the DoH path verification finishes
    *      synchronously and the loop goes straight to terminal.
@@ -34,12 +34,12 @@
   import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
   import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
   import type {
-    EmailRecoveryChallenge,
-    EmailRecoveryDiagnostics,
-    EmailRecoveryDnsInput,
-    EmailRecoveryError,
-    EmailRecoveryStatus,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallenge,
+    EmailChallengeDiagnostics,
+    EmailChallengeDnsInput,
+    EmailChallengeError,
+    EmailChallengeStatus,
+    EmailChallengeSubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
@@ -52,16 +52,16 @@
 
   interface Props {
     /** Authenticated wrapper around `verified_email_prepare_add`. */
-    prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
-    /** Anonymous wrapper around `email_recovery_status` (query). Status,
+    prepare: (input: EmailChallengeDnsInput) => Promise<EmailChallenge>;
+    /** Anonymous wrapper around `email_challenge_status` (query). Status,
      *  diagnostics, submit-dkim-leaf and resolve-via-doh are shared with
      *  the recovery flow — keyed by nonce. */
-    status: (nonce: string) => Promise<EmailRecoveryStatus>;
-    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
-    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. */
-    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    status: (nonce: string) => Promise<EmailChallengeStatus>;
+    /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
+    diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
+    /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. */
+    submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
     resolveViaDoh: (nonce: string) => Promise<void>;
     /** Address to pre-fill (Phase 1.5 "Verify from unverified" entry). */
     initialAddress?: string;
@@ -87,13 +87,13 @@
     | { kind: "enter"; initialError?: string }
     | {
         kind: "sending";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         path: Path;
       }
     | {
         kind: "waiting";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         path: Path;
       }
@@ -126,7 +126,7 @@
     }
     const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
-    const input: EmailRecoveryDnsInput = {
+    const input: EmailChallengeDnsInput = {
       address,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
@@ -139,7 +139,7 @@
       stage = { kind: "sending", challenge, address, path };
       void runPoll(challenge.nonce, domain, address);
     } catch (e) {
-      if (isCanisterError<EmailRecoveryError>(e)) {
+      if (isCanisterError<EmailChallengeError>(e)) {
         if (
           e.type === "DomainNotAllowlisted" ||
           e.type === "DomainNotSupported"

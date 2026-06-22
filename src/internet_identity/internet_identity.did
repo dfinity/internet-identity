@@ -568,21 +568,20 @@ type VerifiedEmail = record {
     verified_at : Timestamp;
 };
 
-type EmailRecoveryChallenge = record {
+type EmailChallenge = record {
     nonce : text;
     expires_at : Timestamp;
 };
 
-type EmailRecoveryDnsInput = record {
+type EmailChallengeDnsInput = record {
     address : text;
     dns_proof : opt DnsProofBundle;
 };
 
-// Used by both the recovery flow and the verified-emails flow — the
-// `email_recovery_` prefix is a historical artifact. The pending entry's
-// `PendingKind` dispatches to the right anchor sink after the
-// cryptographic check; the argument itself is flow-neutral.
-type EmailRecoverySubmitDkimLeafArg = record {
+// Used by both the recovery flow and the verified-emails flow. The
+// pending entry's `PendingKind` dispatches to the right anchor sink
+// after the cryptographic check; the argument itself is flow-neutral.
+type EmailChallengeSubmitDkimLeafArg = record {
     nonce : text;
     // The DKIM resolution chain in CNAME order, ending in a TXT. At
     // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
@@ -593,7 +592,7 @@ type EmailRecoverySubmitDkimLeafArg = record {
     // leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
     // `selector1._domainkey.outlook.com` is a signed CNAME into the
     // unsigned `outbound.protection.outlook.com`) — it must NOT submit
-    // an empty vec here; it drives `email_recovery_resolve_via_doh`
+    // an empty vec here; it drives `email_challenge_resolve_via_doh`
     // instead, which resolves the key over the canister's DoH path.
     hops : vec SignedRRset;
     // Delegation chains for signed zones touched by `hops` that
@@ -602,11 +601,11 @@ type EmailRecoverySubmitDkimLeafArg = record {
     extra_chains : vec DelegationChain;
 };
 
-// Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
-// EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+// Argument to email_challenge_resolve_via_doh. Wrapped in a record (like
+// EmailChallengeSubmitDkimLeafArg) so the method can grow fields without a
 // breaking interface change; nonce is the lookup key and is always
 // required.
-type EmailRecoveryResolveViaDohArg = record {
+type EmailChallengeResolveViaDohArg = record {
     nonce : text;
 };
 
@@ -663,11 +662,10 @@ type DohFailureReason = variant {
     ResponseMalformed : text;
 };
 
-// Shared by both flows (recovery + verified emails). The
-// `email_recovery_` prefix is a historical artifact; the variants here
-// describe inbound-DKIM-challenge failure modes, none of which are
+// Shared by both flows (recovery + verified emails). The variants
+// describe inbound-DKIM-challenge failure modes; none are
 // recovery-specific.
-type EmailRecoveryError = variant {
+type EmailChallengeError = variant {
     Unauthorized : principal;
     NonceUnknown;
     NonceExpired;
@@ -676,9 +674,9 @@ type EmailRecoveryError = variant {
     DomainNotSupported : text;
     EmailVerificationFailed : text;
     DkimLeafMismatch;
-    // email_recovery_submit_dkim_leaf was called with an empty `hops`
+    // email_challenge_submit_dkim_leaf was called with an empty `hops`
     // vector; an FE that can't walk DNSSEC must drive
-    // email_recovery_resolve_via_doh instead.
+    // email_challenge_resolve_via_doh instead.
     EmptyDkimLeafHops;
     NoDkimLeafExpected;
     AddressMismatch;
@@ -688,12 +686,12 @@ type EmailRecoveryError = variant {
     InternalCanisterError : text;
 };
 
-// Polling status returned by `email_recovery_status` — shared between
+// Polling status returned by `email_challenge_status` — shared between
 // the recovery flow and the verified-emails flow. `RegistrationSucceeded`
 // covers both "recovery email bound" and "verified email bound";
 // `RecoveryReady` is recovery-only and only emitted when the pending
 // entry's `PendingKind` is `Recover`.
-type EmailRecoveryStatus = variant {
+type EmailChallengeStatus = variant {
     Pending;
     ResolvingDoh;
     NeedDkimLeaf : record { selector : text };
@@ -703,7 +701,7 @@ type EmailRecoveryStatus = variant {
         expiration : Timestamp;
         anchor_number : IdentityNumber;
     };
-    Failed : EmailRecoveryError;
+    Failed : EmailChallengeError;
     Expired;
 };
 
@@ -713,12 +711,12 @@ type EmailRecoveryStatus = variant {
 type VerificationPath = variant { Doh; Dnssec };
 
 // Strictly-public, user-copyable diagnostics for one pending challenge
-// (see email_recovery_diagnostics). Intended for a support ticket so a
+// (see email_challenge_diagnostics). Intended for a support ticket so a
 // case can be lined up across the SMTP gateway logs and the canister's
 // production logs via message_id. NO email address, anchor, principal,
 // delegation/seed, or inner error string — reason_code is the failing
 // variant's name only.
-type EmailRecoveryDiagnostics = record {
+type EmailChallengeDiagnostics = record {
     message_id : opt text;
     reason_code : text;
     verification_path : VerificationPath;
@@ -1624,28 +1622,26 @@ service : (opt InternetIdentityInit) -> {
     //   email_recovery_get_delegation to retrieve the
     //   SignedDelegation.
     // Both flows share the polling status query.
-    email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
-    email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    email_recovery_credential_prepare_add : (IdentityNumber, EmailChallengeDnsInput) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
+    email_recovery_prepare_delegation : (EmailChallengeDnsInput, SessionKey) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
     // The next four methods (status / diagnostics / submit_dkim_leaf /
-    // resolve_via_doh) are **shared with the verified-emails flow** —
-    // flow-neutral, keyed by nonce. The pending entry's `PendingKind`
-    // dispatches to the right anchor sink (`Anchor::email_recovery` for
-    // recovery, `Anchor::verified_emails` for verified-email setup); the
-    // candid surface here does not depend on which flow is in progress.
-    // The legacy `email_recovery_` prefix pre-dates the verified-emails
-    // split and is kept for Candid backwards-compat — a future PR will
-    // rename these to a flow-neutral prefix (e.g. `email_challenge_*`).
-    email_recovery_status : (text) -> (EmailRecoveryStatus) query;
-    email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
-    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok; Err : EmailRecoveryError });
+    // resolve_via_doh) are **shared between the recovery flow and the
+    // verified-emails flow** — flow-neutral, keyed by nonce. The pending
+    // entry's `PendingKind` dispatches to the right anchor sink
+    // (`Anchor::email_recovery` for recovery, `Anchor::verified_emails`
+    // for verified-email setup); the candid surface here does not
+    // depend on which flow is in progress.
+    email_challenge_status : (text) -> (EmailChallengeStatus) query;
+    email_challenge_diagnostics : (text) -> (opt EmailChallengeDiagnostics) query;
+    email_challenge_submit_dkim_leaf : (EmailChallengeSubmitDkimLeafArg) -> (variant { Ok; Err : EmailChallengeError });
     // Resolves the DKIM key over the canister's own allowlist-gated DoH
     // path, called with just the nonce. Used for the pure-DoH (Gmail)
     // case and as the fallback when the FE can't walk a fully-signed
     // DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
     // Polled: the FE calls it repeatedly while the status is ResolvingDoh.
-    email_recovery_resolve_via_doh : (EmailRecoveryResolveViaDohArg) -> (variant { Ok; Err : EmailRecoveryError });
-    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
-    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
+    email_challenge_resolve_via_doh : (EmailChallengeResolveViaDohArg) -> (variant { Ok; Err : EmailChallengeError });
+    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailChallengeError }) query;
+    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailChallengeError });
 
     // Verified emails
     // ===============
@@ -1658,8 +1654,8 @@ service : (opt InternetIdentityInit) -> {
     // dkim-leaf / resolve-via-doh / diagnostics are shared with
     // recovery — the FE keys them by the same nonce. Capped at
     // MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
-    verified_email_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
-    verified_email_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
+    verified_email_prepare_add : (IdentityNumber, EmailChallengeDnsInput) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
+    verified_email_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailChallengeError });
 
     // SMTP gateway protocol
     // =====================

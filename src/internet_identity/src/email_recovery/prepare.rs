@@ -16,7 +16,7 @@
 //!   carry an optional DMARC leaf at `_dmarc.<domain>`; if present
 //!   we validate it and cache the TXT bytes. The DKIM leaf is *not*
 //!   in this bundle — it lands later via
-//!   `email_recovery_submit_dkim_leaf`.
+//!   `email_challenge_submit_dkim_leaf`.
 //! - **DoH allowlist**: when `dns_proof` is absent, the registered
 //!   domain must be in `DohConfig.allowed_domains`. The DKIM TXT is
 //!   resolved via `crate::doh::fetch_txt` at email-arrival time and
@@ -26,7 +26,7 @@
 use crate::email_inbound::prepare::prepare_common;
 use crate::email_inbound::{PendingKind, MAX_SESSION_KEY_BYTES, NONCE_PREFIX};
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryChallenge, EmailRecoveryDnsInput, EmailRecoveryError,
+    EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};
 
@@ -43,9 +43,9 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, Sessio
 /// for testability.
 pub async fn prepare_add(
     anchor: AnchorNumber,
-    dns_input: EmailRecoveryDnsInput,
+    dns_input: EmailChallengeDnsInput,
     now_secs: u64,
-) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+) -> Result<EmailChallenge, EmailChallengeError> {
     prepare_common(
         dns_input,
         now_secs,
@@ -63,17 +63,17 @@ pub async fn prepare_add(
 /// `submit_dkim_leaf` succeeds, at which point the canister stamps a
 /// delegation seed and adds the matching canister-signature.
 pub async fn prepare_delegation(
-    dns_input: EmailRecoveryDnsInput,
+    dns_input: EmailChallengeDnsInput,
     session_pk: SessionKey,
     now_secs: u64,
-) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+) -> Result<EmailChallenge, EmailChallengeError> {
     // Cap the FE-supplied `session_pk` length. The pending entry
     // holds this for up to 30 minutes; without a bound an open
     // caller could inflate every challenge they prepare. Real
     // session keys are well under 1 KB regardless of algorithm
     // (Ed25519 ~44 bytes, ECDSA P-256 ~91, RSA-2048 ~294).
     if session_pk.len() > MAX_SESSION_KEY_BYTES {
-        return Err(EmailRecoveryError::InternalCanisterError(format!(
+        return Err(EmailChallengeError::InternalCanisterError(format!(
             "session_pk is {} bytes, exceeds the {}-byte limit",
             session_pk.len(),
             MAX_SESSION_KEY_BYTES,
@@ -94,8 +94,8 @@ pub async fn prepare_delegation(
 #[cfg(not(test))]
 pub async fn prepare_add_now(
     anchor: AnchorNumber,
-    dns_input: EmailRecoveryDnsInput,
-) -> Result<EmailRecoveryChallenge, EmailRecoveryError> {
+    dns_input: EmailChallengeDnsInput,
+) -> Result<EmailChallenge, EmailChallengeError> {
     let now_secs = ic_cdk::api::time() / 1_000_000_000;
     prepare_add(anchor, dns_input, now_secs).await
 }
@@ -114,8 +114,8 @@ mod tests {
         });
     }
 
-    fn doh_input(addr: &str) -> EmailRecoveryDnsInput {
-        EmailRecoveryDnsInput {
+    fn doh_input(addr: &str) -> EmailChallengeDnsInput {
+        EmailChallengeDnsInput {
             address: addr.to_string(),
             dns_proof: None,
         }
@@ -125,7 +125,7 @@ mod tests {
     /// bundle. With the flag off the bundle is dropped before any
     /// validation runs, so its contents don't matter; with the flag on it
     /// reaches `verify_dnssec_skeleton` and fails there.
-    fn dnssec_input(addr: &str) -> EmailRecoveryDnsInput {
+    fn dnssec_input(addr: &str) -> EmailChallengeDnsInput {
         use internet_identity_interface::internet_identity::types::dnssec::{
             DnsProofBundle, Rrsig, SignedRRset,
         };
@@ -147,7 +147,7 @@ mod tests {
                 signature: ByteBuf::new(),
             },
         };
-        EmailRecoveryDnsInput {
+        EmailChallengeDnsInput {
             address: addr.to_string(),
             dns_proof: Some(DnsProofBundle {
                 root_dnskey: empty_rrset,
@@ -185,7 +185,7 @@ mod tests {
         install_doh_allowlist(&["gmail.com"]);
         let result = block_on(prepare_add(1, doh_input("alice@example.com"), 100));
         match result {
-            Err(EmailRecoveryError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
+            Err(EmailChallengeError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
             other => panic!("expected DomainNotAllowlisted, got {other:?}"),
         }
     }
@@ -197,7 +197,7 @@ mod tests {
         let result = block_on(prepare_add(1, doh_input("alice@gmail.com"), 100));
         assert!(matches!(
             result,
-            Err(EmailRecoveryError::DomainNotAllowlisted(_))
+            Err(EmailChallengeError::DomainNotAllowlisted(_))
         ));
     }
 
@@ -212,7 +212,7 @@ mod tests {
         install_doh_allowlist(&["gmail.com"]);
         let result = block_on(prepare_add(1, dnssec_input("alice@example.com"), 100));
         match result {
-            Err(EmailRecoveryError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
+            Err(EmailChallengeError::DomainNotAllowlisted(d)) => assert_eq!(d, "example.com"),
             other => panic!("expected DomainNotAllowlisted, got {other:?}"),
         }
     }
@@ -241,7 +241,7 @@ mod tests {
         crate::state::persistent_state_mut(|p| p.dnssec_config = None);
         let result = block_on(prepare_add(1, dnssec_input("alice@example.com"), 100));
         match result {
-            Err(EmailRecoveryError::DomainNotSupported(msg)) => {
+            Err(EmailChallengeError::DomainNotSupported(msg)) => {
                 assert!(msg.contains("trust anchors"), "unexpected message: {msg}")
             }
             other => panic!("expected DomainNotSupported (DNSSEC path), got {other:?}"),
@@ -262,7 +262,7 @@ mod tests {
         ] {
             let result = block_on(prepare_add(1, doh_input(bad), 100));
             assert!(
-                matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
+                matches!(result, Err(EmailChallengeError::DomainNotSupported(_))),
                 "expected DomainNotSupported for {bad:?}, got {result:?}"
             );
         }
@@ -288,7 +288,7 @@ mod tests {
         ] {
             let result = block_on(prepare_add(1, doh_input(bad), 100));
             assert!(
-                matches!(result, Err(EmailRecoveryError::DomainNotSupported(_))),
+                matches!(result, Err(EmailChallengeError::DomainNotSupported(_))),
                 "expected DomainNotSupported for oversized {bad:?}, got {result:?}"
             );
         }

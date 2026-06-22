@@ -536,7 +536,7 @@ export interface DummyAuthConfig {
    */
   'prompt_for_index' : boolean,
 }
-export interface EmailRecoveryChallenge {
+export interface EmailChallenge {
   'nonce' : string,
   'expires_at' : Timestamp,
 }
@@ -547,23 +547,23 @@ export interface EmailRecoveryCredential {
 }
 /**
  * Strictly-public, user-copyable diagnostics for one pending challenge
- * (see email_recovery_diagnostics). Intended for a support ticket so a
+ * (see email_challenge_diagnostics). Intended for a support ticket so a
  * case can be lined up across the SMTP gateway logs and the canister's
  * production logs via message_id. NO email address, anchor, principal,
  * delegation/seed, or inner error string — reason_code is the failing
  * variant's name only.
  */
-export interface EmailRecoveryDiagnostics {
+export interface EmailChallengeDiagnostics {
   'created_at' : Timestamp,
   'verification_path' : VerificationPath,
   'message_id' : [] | [string],
   'reason_code' : string,
 }
-export interface EmailRecoveryDnsInput {
+export interface EmailChallengeDnsInput {
   'dns_proof' : [] | [DnsProofBundle],
   'address' : string,
 }
-export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
+export type EmailChallengeError = { 'EmailVerificationFailed' : string } |
   { 'DkimLeafMismatch' : null } |
   { 'InternalCanisterError' : string } |
   { 'NonceUnknown' : null } |
@@ -573,9 +573,9 @@ export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
   { 'AddressNotRegistered' : null } |
   {
     /**
-     * email_recovery_submit_dkim_leaf was called with an empty `hops`
+     * email_challenge_submit_dkim_leaf was called with an empty `hops`
      * vector; an FE that can't walk DNSSEC must drive
-     * email_recovery_resolve_via_doh instead.
+     * email_challenge_resolve_via_doh instead.
      */
     'EmptyDkimLeafHops' : null
   } |
@@ -591,13 +591,13 @@ export interface EmailRecoveryGetDelegationArgs {
   'nonce' : string,
 }
 /**
- * Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
- * EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+ * Argument to email_challenge_resolve_via_doh. Wrapped in a record (like
+ * EmailChallengeSubmitDkimLeafArg) so the method can grow fields without a
  * breaking interface change; nonce is the lookup key and is always
  * required.
  */
-export interface EmailRecoveryResolveViaDohArg { 'nonce' : string }
-export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
+export interface EmailChallengeResolveViaDohArg { 'nonce' : string }
+export type EmailChallengeStatus = { 'Failed' : EmailChallengeError } |
   { 'ResolvingDoh' : null } |
   { 'NeedDkimLeaf' : { 'selector' : string } } |
   {
@@ -610,7 +610,7 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'RegistrationSucceeded' : null } |
   { 'Expired' : null } |
   { 'Pending' : null };
-export interface EmailRecoverySubmitDkimLeafArg {
+export interface EmailChallengeSubmitDkimLeafArg {
   /**
    * Delegation chains for signed zones touched by `hops` that
    * weren't already covered by the skeleton chain anchored at
@@ -627,7 +627,7 @@ export interface EmailRecoverySubmitDkimLeafArg {
    * leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
    * `selector1._domainkey.outlook.com` is a signed CNAME into the
    * unsigned `outbound.protection.outlook.com`) — it must NOT submit
-   * an empty vec here; it drives `email_recovery_resolve_via_doh`
+   * an empty vec here; it drives `email_challenge_resolve_via_doh`
    * instead, which resolves the key over the canister's DoH path.
    */
   'hops' : Array<SignedRRset>,
@@ -1768,28 +1768,28 @@ export interface _SERVICE {
    * Both flows share the polling status query.
    */
   'email_recovery_credential_prepare_add' : ActorMethod<
-    [IdentityNumber, EmailRecoveryDnsInput],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [IdentityNumber, EmailChallengeDnsInput],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_credential_remove' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
-  'email_recovery_diagnostics' : ActorMethod<
+  'email_challenge_diagnostics' : ActorMethod<
     [string],
-    [] | [EmailRecoveryDiagnostics]
+    [] | [EmailChallengeDiagnostics]
   >,
   'email_recovery_get_delegation' : ActorMethod<
     [EmailRecoveryGetDelegationArgs],
     { 'Ok' : SignedDelegation } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_prepare_delegation' : ActorMethod<
-    [EmailRecoveryDnsInput, SessionKey],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [EmailChallengeDnsInput, SessionKey],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
   >,
   /**
    * Resolves the DKIM key over the canister's own allowlist-gated DoH
@@ -1798,16 +1798,16 @@ export interface _SERVICE {
    * DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
    * Polled: the FE calls it repeatedly while the status is ResolvingDoh.
    */
-  'email_recovery_resolve_via_doh' : ActorMethod<
-    [EmailRecoveryResolveViaDohArg],
+  'email_challenge_resolve_via_doh' : ActorMethod<
+    [EmailChallengeResolveViaDohArg],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
-  'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
-  'email_recovery_submit_dkim_leaf' : ActorMethod<
-    [EmailRecoverySubmitDkimLeafArg],
+  'email_challenge_status' : ActorMethod<[string], EmailChallengeStatus>,
+  'email_challenge_submit_dkim_leaf' : ActorMethod<
+    [EmailChallengeSubmitDkimLeafArg],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
@@ -2104,14 +2104,14 @@ export interface _SERVICE {
    * MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
    */
   'verified_email_prepare_add' : ActorMethod<
-    [IdentityNumber, EmailRecoveryDnsInput],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [IdentityNumber, EmailChallengeDnsInput],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
   >,
   'verified_email_remove' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],

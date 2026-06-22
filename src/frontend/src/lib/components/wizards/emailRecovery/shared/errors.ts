@@ -1,6 +1,6 @@
 import type {
-  EmailRecoveryError,
-  EmailRecoveryStatus,
+  EmailChallengeError,
+  EmailChallengeStatus,
 } from "$lib/generated/internet_identity_types";
 
 /**
@@ -11,7 +11,7 @@ import type {
  * `friendlyFailedReason` stay exhaustive over everything that remains.
  */
 export type FailedReason = Exclude<
-  EmailRecoveryError,
+  EmailChallengeError,
   { DomainNotAllowlisted: string } | { DomainNotSupported: string }
 >;
 
@@ -20,7 +20,7 @@ export type FailedReason = Exclude<
  * both the setup and recovery wizards.
  *
  * Exhaustive over `FailedReason`: the trailing `satisfies never` makes
- * the build fail if a new `EmailRecoveryError` variant is added (or one
+ * the build fail if a new `EmailChallengeError` variant is added (or one
  * is moved out of the unsupported-domain routing) until it's given
  * copy — instead of silently falling through to a raw variant name.
  *
@@ -79,12 +79,12 @@ export const EXPIRED_MESSAGE =
   "This recovery link timed out. Please try again.";
 
 /**
- * Map a terminal `EmailRecoveryStatus` (`Failed` or `Expired`) to the
+ * Map a terminal `EmailChallengeStatus` (`Failed` or `Expired`) to the
  * variant-name string used as the `reason` property on the Plausible
  * `*-failed` / `*-unsupported-domain` events. Falls back to `unknown`
  * so a partial candid-shape change doesn't drop the event entirely.
  */
-export const plausibleFailureReason = (status: EmailRecoveryStatus): string => {
+export const plausibleFailureReason = (status: EmailChallengeStatus): string => {
   if ("Failed" in status) {
     return Object.keys(status.Failed)[0] ?? "unknown";
   }
@@ -109,7 +109,7 @@ export const plausibleFailureReason = (status: EmailRecoveryStatus): string => {
  * a token here.
  */
 export const dohSubReason = (
-  status: EmailRecoveryStatus,
+  status: EmailChallengeStatus,
 ): string | undefined => {
   if (!("Failed" in status)) return undefined;
   const reason = status.Failed;

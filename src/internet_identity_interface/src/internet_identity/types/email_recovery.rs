@@ -24,7 +24,7 @@
 //!    canister parses `s=` from the DKIM-Signature header and flips
 //!    the polled status to `NeedDkimLeaf { selector }`; the FE walks
 //!    DNSSEC for `<selector>._domainkey.<domain>` and submits the
-//!    leaf via `email_recovery_submit_dkim_leaf` to finish the
+//!    leaf via `email_challenge_submit_dkim_leaf` to finish the
 //!    pipeline. See design doc §8.4 / §8.5 for the rationale (no
 //!    selector probing — the selector is authoritative from the email
 //!    itself).
@@ -73,7 +73,7 @@ pub struct EmailRecoveryCredential {
 /// match the inbound email and the FE uses to poll for status. There
 /// is no separate `challenge_id`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
-pub struct EmailRecoveryChallenge {
+pub struct EmailChallenge {
     /// Human-typeable token the user must include verbatim in the
     /// `Subject:` of their challenge email. Format: `II-Recovery-`
     /// followed by 16 lowercase hex characters (8 random bytes from
@@ -115,14 +115,14 @@ pub struct EmailRecoveryChallenge {
 /// authoritatively known once the email arrives (the
 /// `DKIM-Signature: s=` tag). On the DNSSEC path the FE walks the
 /// remaining leaf after the email is delivered and submits it via
-/// `email_recovery_submit_dkim_leaf` — see design doc §8.4.
+/// `email_challenge_submit_dkim_leaf` — see design doc §8.4.
 ///
 /// The frontend deliberately doesn't need to know which domains are
 /// on the DoH allowlist — that's operator config, not user-visible
 /// state. It just calls prepare and reads back any `Domain*` error
 /// to render an actionable message.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct EmailRecoveryDnsInput {
+pub struct EmailChallengeDnsInput {
     /// Lowercased canonical form: `lowercase(local-part) + "@" +
     /// lowercase(domain)`.
     pub address: String,
@@ -132,7 +132,7 @@ pub struct EmailRecoveryDnsInput {
     /// field carries at most the DMARC TXT at
     /// `_dmarc.<registered_domain>` (optional). The DKIM leaf is
     /// *not* included; it lands later via
-    /// `email_recovery_submit_dkim_leaf` once the email arrives
+    /// `email_challenge_submit_dkim_leaf` once the email arrives
     /// and the selector is known.
     ///
     /// When supplied, the canister:
@@ -154,7 +154,7 @@ pub struct EmailRecoveryDnsInput {
     pub dns_proof: Option<DnsProofBundle>,
 }
 
-/// What the FE submits at `email_recovery_submit_dkim_leaf` —
+/// What the FE submits at `email_challenge_submit_dkim_leaf` —
 /// the signed DKIM resolution chain `<selector>._domainkey.<d>`
 /// → … → final TXT, plus any *additional* delegation chains for
 /// signed zones the resolution crosses into.
@@ -189,7 +189,7 @@ pub struct EmailRecoveryDnsInput {
 ///
 /// See design doc §8.4 / §8.5.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct EmailRecoverySubmitDkimLeafArg {
+pub struct EmailChallengeSubmitDkimLeafArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`
     /// (or `email_recovery_prepare_delegation` for recovery). Both
     /// flows share the same submit-leaf surface — the canister
@@ -209,13 +209,13 @@ pub struct EmailRecoverySubmitDkimLeafArg {
     pub extra_chains: Vec<DelegationChain>,
 }
 
-/// Argument to `email_recovery_resolve_via_doh` — the DoH-resolution
-/// sibling of `email_recovery_submit_dkim_leaf`. Wrapped in a record
-/// (like [`EmailRecoverySubmitDkimLeafArg`]) so the method can grow
+/// Argument to `email_challenge_resolve_via_doh` — the DoH-resolution
+/// sibling of `email_challenge_submit_dkim_leaf`. Wrapped in a record
+/// (like [`EmailChallengeSubmitDkimLeafArg`]) so the method can grow
 /// fields without a breaking interface change; `nonce` is the lookup key
 /// and is always required.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct EmailRecoveryResolveViaDohArg {
+pub struct EmailChallengeResolveViaDohArg {
     /// The challenge nonce from `email_recovery_credential_prepare_add`
     /// (or `email_recovery_prepare_delegation` for recovery). The method
     /// carries no leaf data; the canister resolves the DKIM key over its
@@ -243,7 +243,7 @@ pub enum DohFailureReason {
 
 /// Errors surfaced by every email-recovery flow method.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
-pub enum EmailRecoveryError {
+pub enum EmailChallengeError {
     /// The caller's principal isn't authorised for this anchor (setup
     /// flow only).
     Unauthorized(candid::Principal),
@@ -266,7 +266,7 @@ pub enum EmailRecoveryError {
     /// comes from `dkim::verify` / `dmarc::verify_email` — see the
     /// `EmailVerificationStatus` type in those modules.
     EmailVerificationFailed(String),
-    /// The DKIM leaf submitted via `email_recovery_submit_dkim_leaf`
+    /// The DKIM leaf submitted via `email_challenge_submit_dkim_leaf`
     /// didn't match what's needed to complete the pending challenge
     /// — either the leaf's owner name isn't `<expected_selector>.
     /// _domainkey.<registered_domain>`, the leaf's RRSIG didn't
@@ -274,10 +274,10 @@ pub enum EmailRecoveryError {
     /// the leaf differs from the `s=` tag the email was signed
     /// under. The FE typically retries the DoH walk and resubmits.
     DkimLeafMismatch,
-    /// `email_recovery_submit_dkim_leaf` was called with an empty
+    /// `email_challenge_submit_dkim_leaf` was called with an empty
     /// `hops` vector. A genuine DNSSEC submission always carries at
     /// least the final TXT hop; an FE that can't walk DNSSEC must call
-    /// `email_recovery_submit_dkim_leaf_via_doh` instead. Distinct from
+    /// `email_challenge_resolve_via_doh` instead. Distinct from
     /// `DkimLeafMismatch` (which means a *non-empty* chain failed to
     /// validate) so the malformed-request case is unambiguous in
     /// telemetry and user-facing copy.
@@ -286,7 +286,7 @@ pub enum EmailRecoveryError {
     /// in the right state for it. Either the email hasn't arrived
     /// yet (status is still `Pending`), or it already advanced past
     /// `NeedDkimLeaf` (status is terminal). The FE should resume
-    /// polling `email_recovery_status`.
+    /// polling `email_challenge_status`.
     NoDkimLeafExpected,
     /// `From:` did not match the address claimed at prepare time.
     AddressMismatch,
@@ -301,10 +301,10 @@ pub enum EmailRecoveryError {
     InternalCanisterError(String),
 }
 
-/// Stable, public reason code for an `EmailRecoveryError`: the variant
+/// Stable, public reason code for an `EmailChallengeError`: the variant
 /// **name** only, dropping every inner payload (`String` / `Principal`).
 ///
-/// Used to build [`EmailRecoveryDiagnostics::reason_code`] for the
+/// Used to build [`EmailChallengeDiagnostics::reason_code`] for the
 /// user-copyable support blob. Returning the bare discriminant is what
 /// keeps that blob strictly public — variants like
 /// `EmailVerificationFailed(String)`, `InternalCanisterError(String)`,
@@ -312,32 +312,32 @@ pub enum EmailRecoveryError {
 /// payloads (domains, principals, free-form internal detail) that must
 /// never leak into it. Mirrors the FE's existing `failureReason()`,
 /// which already treats the variant name as the stable reason.
-pub fn error_code_name(error: &EmailRecoveryError) -> &'static str {
+pub fn error_code_name(error: &EmailChallengeError) -> &'static str {
     match error {
-        EmailRecoveryError::Unauthorized(_) => "Unauthorized",
-        EmailRecoveryError::NonceUnknown => "NonceUnknown",
-        EmailRecoveryError::NonceExpired => "NonceExpired",
-        EmailRecoveryError::DomainNotAllowlisted(_) => "DomainNotAllowlisted",
-        EmailRecoveryError::DohFetchFailed(_) => "DohFetchFailed",
-        EmailRecoveryError::DomainNotSupported(_) => "DomainNotSupported",
-        EmailRecoveryError::EmailVerificationFailed(_) => "EmailVerificationFailed",
-        EmailRecoveryError::DkimLeafMismatch => "DkimLeafMismatch",
-        EmailRecoveryError::EmptyDkimLeafHops => "EmptyDkimLeafHops",
-        EmailRecoveryError::NoDkimLeafExpected => "NoDkimLeafExpected",
-        EmailRecoveryError::AddressMismatch => "AddressMismatch",
-        EmailRecoveryError::SubjectNotSigned => "SubjectNotSigned",
-        EmailRecoveryError::AddressAlreadyRegistered => "AddressAlreadyRegistered",
-        EmailRecoveryError::AddressNotRegistered => "AddressNotRegistered",
-        EmailRecoveryError::InternalCanisterError(_) => "InternalCanisterError",
+        EmailChallengeError::Unauthorized(_) => "Unauthorized",
+        EmailChallengeError::NonceUnknown => "NonceUnknown",
+        EmailChallengeError::NonceExpired => "NonceExpired",
+        EmailChallengeError::DomainNotAllowlisted(_) => "DomainNotAllowlisted",
+        EmailChallengeError::DohFetchFailed(_) => "DohFetchFailed",
+        EmailChallengeError::DomainNotSupported(_) => "DomainNotSupported",
+        EmailChallengeError::EmailVerificationFailed(_) => "EmailVerificationFailed",
+        EmailChallengeError::DkimLeafMismatch => "DkimLeafMismatch",
+        EmailChallengeError::EmptyDkimLeafHops => "EmptyDkimLeafHops",
+        EmailChallengeError::NoDkimLeafExpected => "NoDkimLeafExpected",
+        EmailChallengeError::AddressMismatch => "AddressMismatch",
+        EmailChallengeError::SubjectNotSigned => "SubjectNotSigned",
+        EmailChallengeError::AddressAlreadyRegistered => "AddressAlreadyRegistered",
+        EmailChallengeError::AddressNotRegistered => "AddressNotRegistered",
+        EmailChallengeError::InternalCanisterError(_) => "InternalCanisterError",
     }
 }
 
 /// Polling result for a pending challenge. The FE polls
-/// `email_recovery_status(nonce)` at 1–5 s cadence until it sees a
+/// `email_challenge_status(nonce)` at 1–5 s cadence until it sees a
 /// terminal variant — or sees `NeedDkimLeaf`, which is the trigger
-/// to walk the DKIM leaf and call `email_recovery_submit_dkim_leaf`.
+/// to walk the DKIM leaf and call `email_challenge_submit_dkim_leaf`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
-pub enum EmailRecoveryStatus {
+pub enum EmailChallengeStatus {
     /// Challenge is still waiting for the email to arrive at the
     /// gateway.
     Pending,
@@ -346,14 +346,14 @@ pub enum EmailRecoveryStatus {
     /// stashed a partial-verification record on the pending
     /// challenge. It now needs the FE to walk DNSSEC for
     /// `<selector>._domainkey.<registered_domain>` and submit the
-    /// leaf via `email_recovery_submit_dkim_leaf`. The selector
+    /// leaf via `email_challenge_submit_dkim_leaf`. The selector
     /// returned here is the one in the email's
     /// `DKIM-Signature: s=` tag (the canonical selector for that
     /// message); the FE uses it both to query DoH and as the
     /// leaf's owner-name component.
     NeedDkimLeaf { selector: String },
     /// The email arrived and the DKIM key is being resolved over DoH. The
-    /// FE drives `email_recovery_resolve_via_doh` while this is set: each
+    /// FE drives `email_challenge_resolve_via_doh` while this is set: each
     /// call reads the canister's DoH cache and either finishes or leaves the
     /// status here to poll again. Reached on the DoH path (`smtp_request`
     /// for a non-DNSSEC domain) and on the DNSSEC path's DoH fallback (when
@@ -377,7 +377,7 @@ pub enum EmailRecoveryStatus {
     },
     /// Verification failed. The FE shows the granular reason and
     /// offers a retry.
-    Failed(EmailRecoveryError),
+    Failed(EmailChallengeError),
     /// 30-minute TTL elapsed without an email matching the nonce.
     Expired,
 }
@@ -394,7 +394,7 @@ pub enum VerificationPath {
 }
 
 /// Strictly-public, user-copyable diagnostics for one pending
-/// challenge, returned by `email_recovery_diagnostics(nonce)`.
+/// challenge, returned by `email_challenge_diagnostics(nonce)`.
 ///
 /// Intended to be pasted into a support ticket so the case can be lined
 /// up against the SMTP gateway logs and the canister's production logs
@@ -403,9 +403,9 @@ pub enum VerificationPath {
 /// principal, NO delegation/seed material, and NO inner error string —
 /// `reason_code` is the failing variant's *name* only (see
 /// [`error_code_name`]). Readable only by whoever holds the 64-bit
-/// nonce, exactly like `EmailRecoveryStatus`.
+/// nonce, exactly like `EmailChallengeStatus`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Serialize)]
-pub struct EmailRecoveryDiagnostics {
+pub struct EmailChallengeDiagnostics {
     /// The gateway-supplied `SmtpRequest.message_id`, verbatim. `None`
     /// until an email bearing this nonce reaches the canister (or if
     /// the gateway omitted it). This is the cross-log correlation id.

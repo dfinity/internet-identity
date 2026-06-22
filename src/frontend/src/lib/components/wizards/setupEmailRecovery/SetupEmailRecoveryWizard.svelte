@@ -10,10 +10,10 @@
    *      call `email_recovery_credential_prepare_add`, and show the
    *      canister-issued nonce + recipient mailbox.
    *   3. User sends a DKIM-signed email containing that nonce; we
-   *      poll `email_recovery_status`. The first non-Pending result
+   *      poll `email_challenge_status`. The first non-Pending result
    *      is `NeedDkimLeaf { selector }` (DNSSEC path) — at which
    *      point we walk that one DKIM leaf and call
-   *      `email_recovery_submit_dkim_leaf`. We then keep polling
+   *      `email_challenge_submit_dkim_leaf`. We then keep polling
    *      until status flips to `RegistrationSucceeded` (or terminal
    *      Failed/Expired). On the DoH path the canister finishes
    *      verification synchronously inside `smtp_request`, so we go
@@ -30,12 +30,12 @@
   import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
   import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
   import type {
-    EmailRecoveryChallenge,
-    EmailRecoveryDiagnostics,
-    EmailRecoveryDnsInput,
-    EmailRecoveryError,
-    EmailRecoveryStatus,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallenge,
+    EmailChallengeDiagnostics,
+    EmailChallengeDnsInput,
+    EmailChallengeError,
+    EmailChallengeStatus,
+    EmailChallengeSubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
@@ -48,15 +48,15 @@
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-    prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
-    /** Anonymous wrapper around `email_recovery_status` (query). */
-    status: (nonce: string) => Promise<EmailRecoveryStatus>;
-    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
-    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
+    prepare: (input: EmailChallengeDnsInput) => Promise<EmailChallenge>;
+    /** Anonymous wrapper around `email_challenge_status` (query). */
+    status: (nonce: string) => Promise<EmailChallengeStatus>;
+    /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
+    diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
+    /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. Accept-only:
      *  rejects on a call-level error, else resolves void (poll for verdict). */
-    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
     resolveViaDoh: (nonce: string) => Promise<void>;
     /** Called once on `RegistrationSucceeded`. The host is expected to
      *  show a success toast and close the dialog. */
@@ -76,7 +76,7 @@
     | { kind: "enter"; initialError?: string }
     | {
         kind: "sending";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         path: Path;
       }
@@ -87,7 +87,7 @@
     // both stages — see the guard in `runPoll`.
     | {
         kind: "waiting";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         path: Path;
       }
@@ -147,7 +147,7 @@
     }
     const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
-    const input: EmailRecoveryDnsInput = {
+    const input: EmailChallengeDnsInput = {
       address,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
@@ -165,7 +165,7 @@
       // — route to the dedicated unsupported view so the user gets
       // the technical "why + how to fix" treatment instead of an
       // opaque inline error string.
-      if (isCanisterError<EmailRecoveryError>(e)) {
+      if (isCanisterError<EmailChallengeError>(e)) {
         if (
           e.type === "DomainNotAllowlisted" ||
           e.type === "DomainNotSupported"

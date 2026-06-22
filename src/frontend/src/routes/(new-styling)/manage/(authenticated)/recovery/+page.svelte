@@ -29,8 +29,8 @@
   import { SetupEmailRecoveryWizard } from "$lib/components/wizards/setupEmailRecovery";
   import { VerifiedEmailsPanel } from "$lib/components/settings";
   import type {
-    EmailRecoveryDnsInput,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeDnsInput,
+    EmailChallengeSubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY_SETUP } from "$lib/state/featureFlags";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
@@ -280,7 +280,7 @@
   // -------------------------------------------------------------
 
   /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-  const prepareAddEmail = (input: EmailRecoveryDnsInput) =>
+  const prepareAddEmail = (input: EmailChallengeDnsInput) =>
     $authenticatedStore.actor
       .email_recovery_credential_prepare_add(
         $authenticatedStore.identityNumber,
@@ -288,29 +288,29 @@
       )
       .then(throwCanisterError);
 
-  /** Anonymous wrapper around `email_recovery_status` (query). */
+  /** Anonymous wrapper around `email_challenge_status` (query). */
   const statusEmailRecovery = (nonce: string) =>
-    anonymousActor.email_recovery_status(nonce);
+    anonymousActor.email_challenge_status(nonce);
 
-  /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
+  /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
   const diagnosticsEmailRecovery = (nonce: string) =>
-    anonymousActor.email_recovery_diagnostics(nonce);
+    anonymousActor.email_challenge_diagnostics(nonce);
 
-  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
+  /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. Accept-only:
    *  rejects on a call-level error, otherwise resolves void (poll for the
    *  verdict). */
   const submitEmailDkimLeaf = async (
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+      await anonymousActor.email_challenge_submit_dkim_leaf(arg),
     );
   };
 
-  /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+  /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
   const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
+      await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
     );
   };
 

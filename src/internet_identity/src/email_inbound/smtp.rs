@@ -40,14 +40,14 @@
 //! finish:
 //!
 //! - **DoH path** (no DNSSEC chain cached at prepare time): `status` →
-//!   `ResolvingDoh`. The FE drives `email_recovery_resolve_via_doh`, which
+//!   `ResolvingDoh`. The FE drives `email_challenge_resolve_via_doh`, which
 //!   resolves the DKIM key (and DMARC) over the canister's allowlist-gated
 //!   DoH cache and finishes off the stashed partial.
 //!
 //! - **DNSSEC path** (skeleton chain cached at prepare time): `status` →
 //!   `NeedDkimLeaf { selector }`. The FE walks DNSSEC for that one leaf and
-//!   finishes via `email_recovery_submit_dkim_leaf` (or falls back to
-//!   `email_recovery_resolve_via_doh` when the leaf CNAMEs into an unsigned
+//!   finishes via `email_challenge_submit_dkim_leaf` (or falls back to
+//!   `email_challenge_resolve_via_doh` when the leaf CNAMEs into an unsigned
 //!   zone).
 //!
 //! A failure building the partial flips the challenge to `Failed(reason)`
@@ -60,7 +60,7 @@
 use super::pending::{self, PartialVerification, PendingKind, PendingStatus};
 use crate::state;
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    DohFailureReason, EmailRecoveryCredential, EmailRecoveryError,
+    DohFailureReason, EmailChallengeError, EmailRecoveryCredential,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
@@ -261,7 +261,7 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     let snapshot = match pending::with_mut(&nonce, now_secs, |c| {
         // Retain the gateway-supplied correlation id on the user's own
         // (nonce-keyed) entry as early as possible — before the
-        // recipient/kind dispatch below — so `email_recovery_diagnostics`
+        // recipient/kind dispatch below — so `email_challenge_diagnostics`
         // can surface it even in silent-drop cases where the entry exists
         // but we don't process the email (e.g. a recipient/kind mismatch).
         //
@@ -335,8 +335,8 @@ pub fn handle_smtp_request(request: SmtpRequest) -> SmtpResponse {
     // how to obtain the DKIM key:
     //
     // - DNSSEC path → `NeedDkimLeaf { selector }`: the FE walks the signed
-    //   DNSSEC resolution and calls `email_recovery_submit_dkim_leaf`.
-    // - DoH path → `ResolvingDoh`: the FE drives `email_recovery_resolve_via_doh`,
+    //   DNSSEC resolution and calls `email_challenge_submit_dkim_leaf`.
+    // - DoH path → `ResolvingDoh`: the FE drives `email_challenge_resolve_via_doh`,
     //   which resolves the key over the canister's allowlist-gated DoH cache.
     //
     // The completion (signature check + bind/stamp) runs later, off the
@@ -493,9 +493,9 @@ fn prepare_partial_verification(
     request: &SmtpRequest,
     snapshot: &PendingSnapshot,
     now_secs: u64,
-) -> Result<PartialVerification, EmailRecoveryError> {
+) -> Result<PartialVerification, EmailChallengeError> {
     let message = request.message.as_ref().ok_or_else(|| {
-        EmailRecoveryError::EmailVerificationFailed("missing message body".into())
+        EmailChallengeError::EmailVerificationFailed("missing message body".into())
     })?;
 
     // Use the *first* DKIM-Signature header. RFC 6376 permits
@@ -512,17 +512,17 @@ fn prepare_partial_verification(
         .iter()
         .find(|h| h.name.eq_ignore_ascii_case("DKIM-Signature"))
         .ok_or_else(|| {
-            EmailRecoveryError::EmailVerificationFailed("no DKIM-Signature header".into())
+            EmailChallengeError::EmailVerificationFailed("no DKIM-Signature header".into())
         })?;
     let sig = crate::dkim::parse_dkim_signature(&dkim_header.value).map_err(|e| {
-        EmailRecoveryError::EmailVerificationFailed(format!("DKIM-Signature parse: {e}"))
+        EmailChallengeError::EmailVerificationFailed(format!("DKIM-Signature parse: {e}"))
     })?;
 
     // Reject simple/* on the header side. See design §5.2 — the
     // canister-side verifier always uses relaxed header canonicalisation;
     // simple-header signers are too rare to support.
     if sig.c_header != crate::dkim::HeaderCanon::Relaxed {
-        return Err(EmailRecoveryError::EmailVerificationFailed(
+        return Err(EmailChallengeError::EmailVerificationFailed(
             "header canonicalisation must be relaxed".into(),
         ));
     }
@@ -548,9 +548,9 @@ fn prepare_partial_verification(
     {
         return Err(match reason {
             crate::dkim::VerificationFailReason::SubjectNotSigned => {
-                EmailRecoveryError::SubjectNotSigned
+                EmailChallengeError::SubjectNotSigned
             }
-            other => EmailRecoveryError::EmailVerificationFailed(format!("{other:?}")),
+            other => EmailChallengeError::EmailVerificationFailed(format!("{other:?}")),
         });
     }
     let subject_signed = true;
@@ -563,7 +563,7 @@ fn prepare_partial_verification(
     };
     let computed_bh = crate::dkim::body_hash_sha256(&canonical_body, sig.l);
     if computed_bh.as_slice() != sig.bh.as_slice() {
-        return Err(EmailRecoveryError::EmailVerificationFailed(
+        return Err(EmailChallengeError::EmailVerificationFailed(
             "computed body hash does not match bh=".into(),
         ));
     }
@@ -584,7 +584,7 @@ fn prepare_partial_verification(
     // the message later.
     let from_address_lc = extract_from_address(message)?;
     if !from_address_lc.eq_ignore_ascii_case(&snapshot.claimed_address) {
-        return Err(EmailRecoveryError::AddressMismatch);
+        return Err(EmailChallengeError::AddressMismatch);
     }
 
     // Reject signatures whose `d=` doesn't anchor in the registered
@@ -600,7 +600,7 @@ fn prepare_partial_verification(
             && d.to_ascii_lowercase().ends_with(&zone.to_ascii_lowercase())
             && d.as_bytes()[d.len() - zone.len() - 1] == b'.');
     if !d_in_zone {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+        return Err(EmailChallengeError::EmailVerificationFailed(format!(
             "DKIM d={d} is not within the claimed zone {zone}"
         )));
     }
@@ -626,12 +626,12 @@ fn prepare_partial_verification(
 /// behaviour to the user.
 pub(super) fn extract_from_address(
     message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
-) -> Result<String, EmailRecoveryError> {
+) -> Result<String, EmailChallengeError> {
     let from_header = message
         .headers
         .iter()
         .find(|h| h.name.eq_ignore_ascii_case("From"))
-        .ok_or(EmailRecoveryError::AddressMismatch)?;
+        .ok_or(EmailChallengeError::AddressMismatch)?;
     let value = from_header.value.trim();
     // `From:` is RFC 5322 `address-list` in the general case, but
     // DMARC requires exactly one mailbox. The DMARC verifier already
@@ -640,9 +640,9 @@ pub(super) fn extract_from_address(
     let addr_spec = if let Some(start) = value.rfind('<') {
         let end = value
             .rfind('>')
-            .ok_or(EmailRecoveryError::AddressMismatch)?;
+            .ok_or(EmailChallengeError::AddressMismatch)?;
         if end <= start + 1 {
-            return Err(EmailRecoveryError::AddressMismatch);
+            return Err(EmailChallengeError::AddressMismatch);
         }
         &value[start + 1..end]
     } else {
@@ -654,17 +654,17 @@ pub(super) fn extract_from_address(
     // limits stop it well before us), but we don't want to rely on
     // the gateway to enforce that.
     if addr_spec.len() > super::MAX_ADDRESS {
-        return Err(EmailRecoveryError::AddressMismatch);
+        return Err(EmailChallengeError::AddressMismatch);
     }
     let (local, domain) = addr_spec
         .split_once('@')
-        .ok_or(EmailRecoveryError::AddressMismatch)?;
+        .ok_or(EmailChallengeError::AddressMismatch)?;
     if local.is_empty()
         || domain.is_empty()
         || local.len() > super::MAX_LOCAL_PART
         || domain.len() > super::MAX_DOMAIN
     {
-        return Err(EmailRecoveryError::AddressMismatch);
+        return Err(EmailChallengeError::AddressMismatch);
     }
     Ok(format!(
         "{}@{}",
@@ -673,7 +673,7 @@ pub(super) fn extract_from_address(
     ))
 }
 
-/// Translate an internal `DohError` into the `EmailRecoveryError` the FE
+/// Translate an internal `DohError` into the `EmailChallengeError` the FE
 /// polls, grouped into the buckets the FE acts on: config misses
 /// (`DomainNotAllowed` / `NotConfigured`) → `DomainNotAllowlisted`; a
 /// quorum "no record" (`NoAnswer`) → `EmailVerificationFailed` (signed
@@ -690,17 +690,17 @@ pub(super) fn extract_from_address(
 ///
 /// `pub(super)` so the DNSSEC-path DoH fallback in `submit_leaf.rs`
 /// (empty `hops`) maps its own `fetch_txt` errors identically.
-pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRecoveryError {
+pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailChallengeError {
     use crate::doh::DohError;
     match err {
         DohError::DomainNotAllowed | DohError::NotConfigured => {
-            EmailRecoveryError::DomainNotAllowlisted(domain.to_string())
+            EmailChallengeError::DomainNotAllowlisted(domain.to_string())
         }
         DohError::AllProvidersFailed => {
-            EmailRecoveryError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
+            EmailChallengeError::DohFetchFailed(DohFailureReason::AllProvidersFailed)
         }
         DohError::QuorumFailed { agreeing, total } => {
-            EmailRecoveryError::DohFetchFailed(DohFailureReason::QuorumFailed {
+            EmailChallengeError::DohFetchFailed(DohFailureReason::QuorumFailed {
                 agreeing: agreeing as u32,
                 total: total as u32,
             })
@@ -712,19 +712,19 @@ pub(super) fn map_doh_error(err: crate::doh::DohError, domain: &str) -> EmailRec
         // which means the signature's public key is gone (key rotation
         // or a forged `s=` tag). Treat that as a verification rejection
         // rather than a transient DoH outage.
-        DohError::NoAnswer => EmailRecoveryError::EmailVerificationFailed(
+        DohError::NoAnswer => EmailChallengeError::EmailVerificationFailed(
             "DKIM record not found at signed selector".into(),
         ),
         DohError::ResponseMalformed(msg) => {
-            EmailRecoveryError::DohFetchFailed(DohFailureReason::ResponseMalformed(msg))
+            EmailChallengeError::DohFetchFailed(DohFailureReason::ResponseMalformed(msg))
         }
         DohError::InvalidName(msg) => {
-            EmailRecoveryError::InternalCanisterError(format!("DoH rejected query name: {msg}"))
+            EmailChallengeError::InternalCanisterError(format!("DoH rejected query name: {msg}"))
         }
         DohError::NameOutsideRegisteredDomain {
             name,
             registered_domain,
-        } => EmailRecoveryError::InternalCanisterError(format!(
+        } => EmailChallengeError::InternalCanisterError(format!(
             "DoH rejected name {name:?} as outside registered domain {registered_domain:?}"
         )),
     }
@@ -742,7 +742,7 @@ pub(super) fn bind_credential(
     anchor: AnchorNumber,
     claimed_address: &str,
     now_secs: u64,
-) -> Result<(), EmailRecoveryError> {
+) -> Result<(), EmailChallengeError> {
     let mut a = state::anchor(anchor);
     // `email_recovery` is a `Vec` in the data model; the API caps it
     // at one entry, so any prior binding is replaced (and we leave it
@@ -761,9 +761,9 @@ pub(super) fn bind_credential(
         // user-facing error rather than the InternalCanisterError
         // catch-all. See `Storage::update_email_recovery_lookup`.
         crate::storage::StorageError::EmailRecoveryAddressAlreadyBound { .. } => {
-            EmailRecoveryError::AddressAlreadyRegistered
+            EmailChallengeError::AddressAlreadyRegistered
         }
-        other => EmailRecoveryError::InternalCanisterError(format!("write anchor: {other:?}")),
+        other => EmailChallengeError::InternalCanisterError(format!("write anchor: {other:?}")),
     })?;
     Ok(())
 }
@@ -783,7 +783,7 @@ pub(super) fn bind_verified_email(
     anchor: AnchorNumber,
     claimed_address: &str,
     now_secs: u64,
-) -> Result<(), EmailRecoveryError> {
+) -> Result<(), EmailChallengeError> {
     use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 
     let mut a = state::anchor(anchor);
@@ -799,7 +799,7 @@ pub(super) fn bind_verified_email(
         existing.verified_at = now_ns;
     } else {
         if a.verified_emails.len() >= super::MAX_VERIFIED_EMAILS_PER_ANCHOR {
-            return Err(EmailRecoveryError::InternalCanisterError(
+            return Err(EmailChallengeError::InternalCanisterError(
                 "verified email cap reached".into(),
             ));
         }
@@ -809,7 +809,7 @@ pub(super) fn bind_verified_email(
         });
     }
     state::storage_borrow_mut(|storage| storage.write(a))
-        .map_err(|e| EmailRecoveryError::InternalCanisterError(format!("write anchor: {e:?}")))?;
+        .map_err(|e| EmailChallengeError::InternalCanisterError(format!("write anchor: {e:?}")))?;
     Ok(())
 }
 
@@ -843,14 +843,14 @@ pub(super) fn recovery_snapshot(
 /// can retrieve it.
 ///
 /// Returns the `RecoveryOutcome` to cache on the pending challenge —
-/// `email_recovery_status` reads it to answer with
+/// `email_challenge_status` reads it to answer with
 /// `RecoveryReady { user_key, expiration, anchor_number }`, and
 /// `email_recovery_get_delegation` reads the cached `seed` to look
 /// up the signature without re-deriving from the anchor.
 pub(super) async fn stamp_recovery_delegation(
     snapshot: &PendingSnapshot,
     session_pk: &SessionKey,
-) -> Result<super::pending::RecoveryOutcome, EmailRecoveryError> {
+) -> Result<super::pending::RecoveryOutcome, EmailChallengeError> {
     use ic_certification::Hash;
 
     // The verifier already checked that From == claimed_address, so
@@ -861,7 +861,7 @@ pub(super) async fn stamp_recovery_delegation(
     let anchor_number = state::storage_borrow(|storage| {
         storage.lookup_anchor_with_email_recovery_address(&snapshot.claimed_address)
     })
-    .ok_or(EmailRecoveryError::AddressNotRegistered)?;
+    .ok_or(EmailChallengeError::AddressNotRegistered)?;
 
     // The signature-map operations need the canister salt. In
     // production it's already initialised (every prior delegation
@@ -962,7 +962,7 @@ mod tests {
         // sync with that FE switch.
         let reason = |e: DohError| -> DohFailureReason {
             match map_doh_error(e, "example.com") {
-                EmailRecoveryError::DohFetchFailed(r) => r,
+                EmailChallengeError::DohFetchFailed(r) => r,
                 other => panic!("expected DohFetchFailed, got {other:?}"),
             }
         };
@@ -990,11 +990,11 @@ mod tests {
         // needed.
         assert!(matches!(
             map_doh_error(DohError::NoAnswer, "example.com"),
-            EmailRecoveryError::EmailVerificationFailed(_)
+            EmailChallengeError::EmailVerificationFailed(_)
         ));
         assert!(matches!(
             map_doh_error(DohError::DomainNotAllowed, "example.com"),
-            EmailRecoveryError::DomainNotAllowlisted(_)
+            EmailChallengeError::DomainNotAllowlisted(_)
         ));
     }
 
@@ -1291,7 +1291,7 @@ mod tests {
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
         match prepare_partial_verification(&req, &snap, TEST_NOW) {
-            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+            Err(EmailChallengeError::EmailVerificationFailed(msg)) => {
                 assert!(
                     msg.contains("SignatureFutureDated"),
                     "DNSSEC path must reject future-dated t=; got {msg}"
@@ -1312,7 +1312,7 @@ mod tests {
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
         let result = prepare_partial_verification(&req, &snap, TEST_NOW);
-        if let Err(EmailRecoveryError::EmailVerificationFailed(msg)) = &result {
+        if let Err(EmailChallengeError::EmailVerificationFailed(msg)) = &result {
             assert!(
                 !msg.contains("SignatureFutureDated"),
                 "t= within skew must not be rejected as future-dated; got {msg}"
@@ -1333,7 +1333,7 @@ mod tests {
         let req = smtp_with_dkim(dkim_value);
         let snap = dnssec_snapshot("alice@example.com", "example.com");
         match prepare_partial_verification(&req, &snap, TEST_NOW) {
-            Err(EmailRecoveryError::EmailVerificationFailed(msg)) => {
+            Err(EmailChallengeError::EmailVerificationFailed(msg)) => {
                 assert!(
                     msg.contains("SignatureExpired"),
                     "DNSSEC path must reject signatures past x=; got {msg}"
@@ -1355,7 +1355,7 @@ mod tests {
         let snap = dnssec_snapshot("alice@example.com", "example.com");
         assert!(matches!(
             prepare_partial_verification(&req, &snap, TEST_NOW),
-            Err(EmailRecoveryError::SubjectNotSigned)
+            Err(EmailChallengeError::SubjectNotSigned)
         ));
     }
 

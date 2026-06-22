@@ -16,7 +16,7 @@ use crate::email_recovery::{
 };
 use canister_tests::{api::internet_identity as api, framework::*};
 use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryDnsInput, EmailRecoveryError, EmailRecoveryStatus,
+    EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus,
 };
 use internet_identity_interface::internet_identity::types::smtp::SmtpResponse;
 
@@ -28,8 +28,8 @@ use internet_identity_interface::internet_identity::types::smtp::SmtpResponse;
 // `email_recovery`.
 const VERIFIED_ADDRESS: &str = "vera@test.example.com";
 
-fn verified_dns_input(addr: &str) -> EmailRecoveryDnsInput {
-    EmailRecoveryDnsInput {
+fn verified_dns_input(addr: &str) -> EmailChallengeDnsInput {
+    EmailChallengeDnsInput {
         address: addr.into(),
         dns_proof: None,
     }
@@ -45,7 +45,7 @@ fn run_verified_doh_flow(
     sender: candid::Principal,
     identity_number: u64,
     address: &str,
-) -> EmailRecoveryStatus {
+) -> EmailChallengeStatus {
     let challenge = api::verified_email_prepare_add(
         env,
         canister_id,
@@ -125,7 +125,7 @@ fn verified_email_prepare_add_rejects_unauthorized_caller() {
     .expect("call failed");
 
     assert!(
-        matches!(result, Err(EmailRecoveryError::Unauthorized(_))),
+        matches!(result, Err(EmailChallengeError::Unauthorized(_))),
         "expected Unauthorized, got {result:?}",
     );
 }
@@ -139,7 +139,7 @@ fn verified_email_remove_rejects_when_nothing_bound() {
     let result = api::verified_email_remove(&env, canister_id, p, id, VERIFIED_ADDRESS)
         .expect("call failed");
     assert!(
-        matches!(result, Err(EmailRecoveryError::AddressNotRegistered)),
+        matches!(result, Err(EmailChallengeError::AddressNotRegistered)),
         "expected AddressNotRegistered, got {result:?}",
     );
 }
@@ -164,7 +164,7 @@ fn full_verified_email_flow_writes_to_identity_info() {
 
     let status = run_verified_doh_flow(&env, canister_id, p, id, VERIFIED_ADDRESS);
     assert!(
-        matches!(status, EmailRecoveryStatus::RegistrationSucceeded),
+        matches!(status, EmailChallengeStatus::RegistrationSucceeded),
         "expected RegistrationSucceeded, got {status:?}",
     );
 
@@ -201,7 +201,10 @@ fn verified_email_add_then_remove_is_idempotent_on_second_remove() {
     let (id, p) = fresh_identity(&env, canister_id);
 
     let status = run_verified_doh_flow(&env, canister_id, p, id, VERIFIED_ADDRESS);
-    assert!(matches!(status, EmailRecoveryStatus::RegistrationSucceeded));
+    assert!(matches!(
+        status,
+        EmailChallengeStatus::RegistrationSucceeded
+    ));
 
     // First remove succeeds; second loud-fails so a buggy retry on
     // the FE side surfaces rather than silently masks.
@@ -212,7 +215,7 @@ fn verified_email_add_then_remove_is_idempotent_on_second_remove() {
     let second = api::verified_email_remove(&env, canister_id, p, id, VERIFIED_ADDRESS)
         .expect("second remove call failed");
     assert!(
-        matches!(second, Err(EmailRecoveryError::AddressNotRegistered)),
+        matches!(second, Err(EmailChallengeError::AddressNotRegistered)),
         "expected AddressNotRegistered on second remove, got {second:?}",
     );
 }

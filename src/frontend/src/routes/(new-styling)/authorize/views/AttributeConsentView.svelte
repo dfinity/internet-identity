@@ -19,8 +19,8 @@
   import { handleError } from "$lib/components/utils/error";
   import { VerifiedEmailWizard } from "$lib/components/wizards/verifiedEmail";
   import type {
-    EmailRecoveryDnsInput,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeDnsInput,
+    EmailChallengeSubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { MailPlusIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
@@ -174,28 +174,28 @@
   // Same shape as the settings panel: authenticated `prepare_add`, anonymous
   // status / diagnostics / submit / DoH (keyed by nonce, flow-neutral).
 
-  const prepareAddVerifiedEmail = (input: EmailRecoveryDnsInput) =>
+  const prepareAddVerifiedEmail = (input: EmailChallengeDnsInput) =>
     $authenticatedStore.actor
       .verified_email_prepare_add($authenticatedStore.identityNumber, input)
       .then(throwCanisterError);
 
   const statusEmailRecovery = (nonce: string) =>
-    anonymousActor.email_recovery_status(nonce);
+    anonymousActor.email_challenge_status(nonce);
 
   const diagnosticsEmailRecovery = (nonce: string) =>
-    anonymousActor.email_recovery_diagnostics(nonce);
+    anonymousActor.email_challenge_diagnostics(nonce);
 
   const submitEmailDkimLeaf = async (
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
+      await anonymousActor.email_challenge_submit_dkim_leaf(arg),
     );
   };
 
   const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
+      await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
     );
   };
 

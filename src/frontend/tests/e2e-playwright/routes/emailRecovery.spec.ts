@@ -129,7 +129,7 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
       .fill(emailRecovery.fromAddress);
     await setupDialog.getByRole("button", { name: "Continue" }).click();
 
-    // The wizard is now polling email_recovery_status. Pull the
+    // The wizard is now polling email_challenge_status. Pull the
     // canister-issued nonce off the rendered token block, sign an
     // email with the matching subject, submit it via smtp_request.
     await expect(

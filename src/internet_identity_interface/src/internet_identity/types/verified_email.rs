@@ -11,9 +11,9 @@
 //!
 //! The canister-side wrappers live in `crate::internet_identity::
 //! types::email_recovery` for the shared challenge / status / DKIM-
-//! leaf-submission types (`EmailRecoveryChallenge`,
-//! `EmailRecoveryDnsInput`, `EmailRecoveryStatus`,
-//! `EmailRecoveryError`, etc.) since those describe the inbound-DKIM
+//! leaf-submission types (`EmailChallenge`,
+//! `EmailChallengeDnsInput`, `EmailChallengeStatus`,
+//! `EmailChallengeError`, etc.) since those describe the inbound-DKIM
 //! primitive both flows consume.
 
 use crate::internet_identity::types::Timestamp;
