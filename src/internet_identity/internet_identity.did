@@ -578,6 +578,10 @@ type EmailRecoveryDnsInput = record {
     dns_proof : opt DnsProofBundle;
 };
 
+// Used by both the recovery flow and the verified-emails flow — the
+// `email_recovery_` prefix is a historical artifact. The pending entry's
+// `PendingKind` dispatches to the right anchor sink after the
+// cryptographic check; the argument itself is flow-neutral.
 type EmailRecoverySubmitDkimLeafArg = record {
     nonce : text;
     // The DKIM resolution chain in CNAME order, ending in a TXT. At
@@ -659,6 +663,10 @@ type DohFailureReason = variant {
     ResponseMalformed : text;
 };
 
+// Shared by both flows (recovery + verified emails). The
+// `email_recovery_` prefix is a historical artifact; the variants here
+// describe inbound-DKIM-challenge failure modes, none of which are
+// recovery-specific.
 type EmailRecoveryError = variant {
     Unauthorized : principal;
     NonceUnknown;
@@ -680,6 +688,11 @@ type EmailRecoveryError = variant {
     InternalCanisterError : text;
 };
 
+// Polling status returned by `email_recovery_status` — shared between
+// the recovery flow and the verified-emails flow. `RegistrationSucceeded`
+// covers both "recovery email bound" and "verified email bound";
+// `RecoveryReady` is recovery-only and only emitted when the pending
+// entry's `PendingKind` is `Recover`.
 type EmailRecoveryStatus = variant {
     Pending;
     ResolvingDoh;
@@ -1613,6 +1626,15 @@ service : (opt InternetIdentityInit) -> {
     // Both flows share the polling status query.
     email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
     email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
+    // The next four methods (status / diagnostics / submit_dkim_leaf /
+    // resolve_via_doh) are **shared with the verified-emails flow** —
+    // flow-neutral, keyed by nonce. The pending entry's `PendingKind`
+    // dispatches to the right anchor sink (`Anchor::email_recovery` for
+    // recovery, `Anchor::verified_emails` for verified-email setup); the
+    // candid surface here does not depend on which flow is in progress.
+    // The legacy `email_recovery_` prefix pre-dates the verified-emails
+    // split and is kept for Candid backwards-compat — a future PR will
+    // rename these to a flow-neutral prefix (e.g. `email_challenge_*`).
     email_recovery_status : (text) -> (EmailRecoveryStatus) query;
     email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
     email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok; Err : EmailRecoveryError });
