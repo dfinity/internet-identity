@@ -30,7 +30,7 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::{api::internet_identity as api, framework::*};
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus, VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::smtp::{
@@ -869,7 +869,7 @@ fn full_setup_flow_via_dnssec_path() {
     api::email_challenge_submit_dkim_leaf(
         &env,
         canister_id,
-        internet_identity_interface::internet_identity::types::email_recovery::EmailChallengeSubmitDkimLeafArg {
+        internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeSubmitDkimLeafArg {
             nonce: challenge.nonce.clone(),
             hops: vec![chain.dkim_leaf.clone()],
             extra_chains: vec![],

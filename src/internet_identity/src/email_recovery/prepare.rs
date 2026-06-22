@@ -25,7 +25,7 @@
 
 use crate::email_inbound::prepare::prepare_common;
 use crate::email_inbound::{PendingKind, MAX_SESSION_KEY_BYTES, NONCE_PREFIX};
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey};

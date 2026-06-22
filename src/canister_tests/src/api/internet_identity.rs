@@ -653,11 +653,11 @@ pub fn email_recovery_credential_prepare_add(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    dns_input: types::email_recovery::EmailChallengeDnsInput,
+    dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
     Result<
-        types::email_recovery::EmailChallenge,
-        types::email_recovery::EmailChallengeError,
+        types::email_challenge::EmailChallenge,
+        types::email_challenge::EmailChallengeError,
     >,
     RejectResponse,
 > {
@@ -676,7 +676,7 @@ pub fn email_challenge_status(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
-) -> Result<types::email_recovery::EmailChallengeStatus, RejectResponse> {
+) -> Result<types::email_challenge::EmailChallengeStatus, RejectResponse> {
     query_candid(env, canister_id, "email_challenge_status", (nonce,)).map(|(x,)| x)
 }
 
@@ -684,19 +684,19 @@ pub fn email_challenge_diagnostics(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
-) -> Result<Option<types::email_recovery::EmailChallengeDiagnostics>, RejectResponse> {
+) -> Result<Option<types::email_challenge::EmailChallengeDiagnostics>, RejectResponse> {
     query_candid(env, canister_id, "email_challenge_diagnostics", (nonce,)).map(|(x,)| x)
 }
 
 pub fn email_recovery_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
-    dns_input: types::email_recovery::EmailChallengeDnsInput,
+    dns_input: types::email_challenge::EmailChallengeDnsInput,
     session_key: types::SessionKey,
 ) -> Result<
     Result<
-        types::email_recovery::EmailChallenge,
-        types::email_recovery::EmailChallengeError,
+        types::email_challenge::EmailChallenge,
+        types::email_challenge::EmailChallengeError,
     >,
     RejectResponse,
 > {
@@ -713,8 +713,8 @@ pub fn email_recovery_prepare_delegation(
 pub fn email_challenge_submit_dkim_leaf(
     env: &PocketIc,
     canister_id: CanisterId,
-    arg: types::email_recovery::EmailChallengeSubmitDkimLeafArg,
-) -> Result<Result<(), types::email_recovery::EmailChallengeError>, RejectResponse> {
+    arg: types::email_challenge::EmailChallengeSubmitDkimLeafArg,
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -729,8 +729,8 @@ pub fn email_challenge_resolve_via_doh(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
-) -> Result<Result<(), types::email_recovery::EmailChallengeError>, RejectResponse> {
-    let arg = types::email_recovery::EmailChallengeResolveViaDohArg {
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
+    let arg = types::email_challenge::EmailChallengeResolveViaDohArg {
         nonce: nonce.to_string(),
     };
     call_candid(
@@ -748,7 +748,7 @@ pub fn email_recovery_get_delegation(
     canister_id: CanisterId,
     args: types::email_recovery::EmailRecoveryGetDelegationArgs,
 ) -> Result<
-    Result<types::SignedDelegation, types::email_recovery::EmailChallengeError>,
+    Result<types::SignedDelegation, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     query_candid(env, canister_id, "email_recovery_get_delegation", (args,)).map(|(x,)| x)
@@ -760,7 +760,7 @@ pub fn email_recovery_credential_remove(
     sender: Principal,
     identity_number: IdentityNumber,
     address: &str,
-) -> Result<Result<(), types::email_recovery::EmailChallengeError>, RejectResponse> {
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -777,11 +777,11 @@ pub fn verified_email_prepare_add(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    dns_input: types::email_recovery::EmailChallengeDnsInput,
+    dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
     Result<
-        types::email_recovery::EmailChallenge,
-        types::email_recovery::EmailChallengeError,
+        types::email_challenge::EmailChallenge,
+        types::email_challenge::EmailChallengeError,
     >,
     RejectResponse,
 > {
@@ -802,7 +802,7 @@ pub fn verified_email_remove(
     sender: Principal,
     identity_number: IdentityNumber,
     address: &str,
-) -> Result<Result<(), types::email_recovery::EmailChallengeError>, RejectResponse> {
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,

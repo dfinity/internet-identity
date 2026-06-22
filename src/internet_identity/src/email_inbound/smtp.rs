@@ -59,9 +59,10 @@
 
 use super::pending::{self, PartialVerification, PendingKind, PendingStatus};
 use crate::state;
-use internet_identity_interface::internet_identity::types::email_recovery::{
-    DohFailureReason, EmailChallengeError, EmailRecoveryCredential,
+use internet_identity_interface::internet_identity::types::email_challenge::{
+    DohFailureReason, EmailChallengeError,
 };
+use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
 use internet_identity_interface::internet_identity::types::smtp::{
     smtp_err, validate_smtp_request, SmtpRequest, SmtpResponse, SMTP_ERR_MAILBOX_UNAVAILABLE,
     SMTP_ERR_SYNTAX_ERROR, SMTP_ERR_USER_NOT_LOCAL,

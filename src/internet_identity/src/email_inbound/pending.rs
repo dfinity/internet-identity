@@ -11,7 +11,7 @@
 //! (eviction is benign for both legitimate users and attackers).
 
 use ic_certification::Hash;
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     error_code_name, EmailChallengeDiagnostics, EmailChallengeError, EmailChallengeStatus,
     VerificationPath,
 };

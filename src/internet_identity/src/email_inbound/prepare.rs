@@ -30,7 +30,7 @@
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
 use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce_with_prefix};
 use crate::state;
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
 

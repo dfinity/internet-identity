@@ -54,7 +54,7 @@ pub use smtp::{handle_smtp_request, handle_smtp_request_validate};
 pub fn pending_status(
     nonce: &str,
     now_secs: u64,
-) -> internet_identity_interface::internet_identity::types::email_recovery::EmailChallengeStatus {
+) -> internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeStatus {
     pending::status_of(nonce, now_secs)
 }
 
@@ -67,7 +67,7 @@ pub fn pending_diagnostics(
     nonce: &str,
     now_secs: u64,
 ) -> Option<
-    internet_identity_interface::internet_identity::types::email_recovery::EmailChallengeDiagnostics,
+    internet_identity_interface::internet_identity::types::email_challenge::EmailChallengeDiagnostics,
 >{
     pending::diagnostics_of(nonce, now_secs)
 }

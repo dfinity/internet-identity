@@ -51,7 +51,7 @@
 use super::pending::{self, PendingKind, PendingStatus};
 use crate::doh::{DohError, DohRecord};
 use crate::single_flight_cache::Cached;
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallengeError, EmailChallengeSubmitDkimLeafArg,
 };
 use internet_identity_interface::internet_identity::types::{

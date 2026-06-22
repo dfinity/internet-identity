@@ -1568,11 +1568,11 @@ mod email_recovery_api {
     use ic_canister_sig_creation::delegation_signature_msg;
     use ic_canister_sig_creation::signature_map::CanisterSigInputs;
     use ic_canister_sig_creation::DELEGATION_SIG_DOMAIN;
-    use internet_identity_interface::internet_identity::types::email_recovery::{
+    use internet_identity_interface::internet_identity::types::email_challenge::{
         EmailChallenge, EmailChallengeDiagnostics, EmailChallengeDnsInput, EmailChallengeError,
         EmailChallengeResolveViaDohArg, EmailChallengeStatus, EmailChallengeSubmitDkimLeafArg,
-        EmailRecoveryGetDelegationArgs,
     };
+    use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryGetDelegationArgs;
     use internet_identity_interface::internet_identity::types::SessionKey;
 
     /// Authenticated. Validates the caller owns `identity_number`,

@@ -18,7 +18,7 @@ use crate::email_inbound::{
     VERIFIED_EMAIL_NONCE_PREFIX,
 };
 use crate::state;
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
 };
 use internet_identity_interface::internet_identity::types::AnchorNumber;

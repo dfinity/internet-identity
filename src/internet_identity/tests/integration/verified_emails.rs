@@ -15,7 +15,7 @@ use crate::email_recovery::{
     TEST_BODY, TEST_DOMAIN, TEST_SELECTOR,
 };
 use canister_tests::{api::internet_identity as api, framework::*};
-use internet_identity_interface::internet_identity::types::email_recovery::{
+use internet_identity_interface::internet_identity::types::email_challenge::{
     EmailChallengeDnsInput, EmailChallengeError, EmailChallengeStatus,
 };
 use internet_identity_interface::internet_identity::types::smtp::SmtpResponse;
