@@ -86,10 +86,13 @@ class VerifiedEmailFixtures {
   }
 
   /** The "Communication" page sits on its own top-level route under
-   *  /manage; assert the panel rendered. */
+   *  /manage; assert the page header and the panel rendered. */
   async assertPanelVisible(): Promise<void> {
     await expect(
-      this.#page.getByRole("heading", { name: "Communication" }),
+      this.#page.getByRole("heading", { name: "Communication", level: 1 }),
+    ).toBeVisible();
+    await expect(
+      this.#page.getByRole("heading", { name: "Email addresses", level: 2 }),
     ).toBeVisible();
     await expect(
       this.#page.getByRole("button", { name: "Add an email" }),
@@ -135,12 +138,11 @@ class VerifiedEmailFixtures {
     await expect(confirm).toBeHidden();
   }
 
-  /** Locator scoped to the "Communication" panel section. The panel
-   *  shares the manage-recovery page with the recovery-email card,
-   *  so scoping prevents accidentally matching recovery rows. */
+  /** Locator scoped to the "Email addresses" panel section on the
+   *  Communication page. */
   #panel(): Locator {
     return this.#page.locator("section").filter({
-      has: this.#page.getByRole("heading", { name: "Communication" }),
+      has: this.#page.getByRole("heading", { name: "Email addresses" }),
     });
   }
 }

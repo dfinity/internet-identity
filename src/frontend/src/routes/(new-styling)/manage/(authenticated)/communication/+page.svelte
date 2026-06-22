@@ -3,17 +3,18 @@
    * Communication page — Phase 1's home for `Anchor.verified_emails`.
    * Sibling of the Recovery page: this surface manages the addresses
    * dapps can use to reach the user, while Recovery manages methods
-   * for regaining access to the anchor itself. The two used to share
-   * the `/manage/recovery` route while verified-emails was a narrow
-   * panel; per the production design they're separate top-level
-   * destinations now.
+   * for regaining access to the anchor itself.
    *
-   * Phase 1.5 will widen this page into the unified "Reach"
-   * experience (verified rows joined with unverified OIDC/SSO emails
-   * + per-row "Verify" CTA); for Phase 1 the page is just the
-   * verified-emails panel.
+   * Page chrome mirrors the access page (bare `<header>` + content;
+   * no outer card wrapper — individual rows carry their own border).
+   * Phase 1.5 widens this page into the unified "Reach" experience
+   * (verified rows joined with unverified OIDC/SSO emails + per-row
+   * "Verify" CTA); for Phase 1 the page is just the verified-emails
+   * panel.
    */
   import { VerifiedEmailsPanel } from "$lib/components/settings";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
   import type { PageProps } from "./$types";
 
   const { data }: PageProps = $props();
@@ -28,6 +29,13 @@
   let verifiedEmails = $derived(data.identityInfo.verified_emails[0] ?? []);
 </script>
 
-<div class="grid max-w-5xl grid-cols-1 gap-5">
+<header class="flex flex-col gap-3">
+  <h1 class="text-text-primary text-3xl font-medium">{$t`Communication`}</h1>
+  <p class="text-text-tertiary text-base">
+    <Trans>How apps can reach you when you sign in.</Trans>
+  </p>
+</header>
+
+<div class="mt-10">
   <VerifiedEmailsPanel {verifiedEmails} capacity={VERIFIED_EMAILS_CAPACITY} />
 </div>
