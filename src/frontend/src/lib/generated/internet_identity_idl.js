@@ -72,6 +72,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
+    'sso_allow_any_domain' : IDL.Opt(IDL.Bool),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
@@ -1311,6 +1312,7 @@ export const init = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
+    'sso_allow_any_domain' : IDL.Opt(IDL.Bool),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
