@@ -86,6 +86,41 @@ fn setup_canister(env: &PocketIc) -> candid::Principal {
     install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
 }
 
+/// Like [`setup_canister`] but also flips on the deploy flag that
+/// enables the legacy DNSSEC email-recovery path. The DNSSEC-path tests
+/// need it on; production (and [`setup_canister`]) default to off so the
+/// canister runs DoH-only.
+fn setup_canister_dnssec_enabled(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
+/// Like [`setup_canister`] but explicitly sets the DNSSEC deploy flag to
+/// `false`. Behaviourally identical to the default, but makes the disabled
+/// state a test relies on explicit at the call site.
+fn setup_canister_dnssec_disabled(env: &PocketIc) -> candid::Principal {
+    let args = InternetIdentityInit {
+        doh_config: Some(Some(DohConfig {
+            allowed_domains: vec![TEST_DOMAIN.into()],
+            max_cache_age_secs: Some(3600),
+        })),
+        related_origins: Some(vec!["https://id.ai".into()]),
+        canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(false),
+        ..Default::default()
+    };
+    install_ii_canister_with_arg_and_cycles(env, II_WASM.clone(), Some(args), 10_000_000_000_000)
+}
+
 /// Create an identity and return `(identity_number, principal)`. The
 /// principal is needed for any caller-authenticated method calls
 /// (`prepare_add`, `credential_remove`).
@@ -413,12 +448,13 @@ fn dnssec_path_rejects_when_no_trust_anchors_configured() {
     use serde_bytes::ByteBuf;
 
     let env = env();
-    let canister_id = setup_canister(&env);
+    // DNSSEC path enabled, but no trust anchors configured.
+    let canister_id = setup_canister_dnssec_enabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     // A minimal-but-shape-valid bundle. The canister rejects before
     // it even validates because no trust anchors are configured for
-    // this canister (we only set `doh_config` in `setup_canister`).
+    // this canister (we only set `doh_config`, not `dnssec_config`).
     let stub_rrsig = Rrsig {
         type_covered: 16,
         algorithm: 8,
@@ -488,13 +524,13 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
     };
     use serde_bytes::ByteBuf;
 
-    // Even when the registered domain *is* on the DoH allowlist,
-    // supplying a `dns_proof` puts us on the DNSSEC path. This test
-    // confirms that by sending a malformed DNSSEC bundle and
-    // checking we get a DNSSEC error rather than the call falling
+    // With the DNSSEC path enabled, even when the registered domain *is*
+    // on the DoH allowlist, supplying a `dns_proof` puts us on the DNSSEC
+    // path. This test confirms that by sending a malformed DNSSEC bundle
+    // and checking we get a DNSSEC error rather than the call falling
     // through to the DoH happy path.
     let env = env();
-    let canister_id = setup_canister(&env);
+    let canister_id = setup_canister_dnssec_enabled(&env);
     let (id, p) = fresh_identity(&env, canister_id);
 
     let stub_rrsig = Rrsig {
@@ -558,6 +594,146 @@ fn dnssec_path_takes_precedence_over_doh_allowlist() {
 }
 
 #[test]
+fn register_with_dnssec_disabled_and_non_allowlisted_email_fails() {
+    // Setup (register) flow with the DNSSEC path disabled: even when the
+    // caller supplies a DNSSEC proof, the canister drops it and falls
+    // through to the DoH allowlist. `example.com` is not on the allowlist
+    // (only `test.example.com` is), so the call fails with
+    // `DomainNotAllowlisted`.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailRecoveryDnsInput {
+        address: "alice@example.com".into(),
+        dns_proof: Some(proof),
+    };
+    let err = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect_err("expected rejection");
+    match err {
+        EmailRecoveryError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
+        other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
+    }
+}
+
+#[test]
+fn recovery_with_dnssec_disabled_and_non_allowlisted_email_fails() {
+    // Recovery (prepare_delegation) flow, same scenario: DNSSEC disabled +
+    // a supplied proof that gets dropped + a non-allowlisted domain →
+    // `DomainNotAllowlisted`. The allowlist gate runs before any
+    // address→anchor resolution, so an unbound address still surfaces the
+    // allowlist rejection.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+
+    // Dummy session key — the call is rejected at the allowlist gate long
+    // before the key is used.
+    let session_key = ByteBuf::from(vec![0u8; 32]);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailRecoveryDnsInput {
+        address: "alice@example.com".into(),
+        dns_proof: Some(proof),
+    };
+    let err = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
+        .expect("call failed")
+        .expect_err("expected rejection");
+    match err {
+        EmailRecoveryError::DomainNotAllowlisted(d) => assert_eq!(d, "example.com"),
+        other => panic!("expected DomainNotAllowlisted(example.com), got {other:?}"),
+    }
+}
+
+#[test]
+fn register_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+    // Setup (register) flow with DNSSEC disabled and an allowlisted
+    // domain: the supplied proof is dropped and the DoH path accepts the
+    // allowlisted domain, so prepare_add issues a challenge.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+    let (id, p) = fresh_identity(&env, canister_id);
+
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(proof),
+    };
+    let challenge = api::email_recovery_credential_prepare_add(&env, canister_id, p, id, input)
+        .expect("call failed")
+        .expect("prepare_add should succeed via DoH");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
+    );
+}
+
+#[test]
+fn recovery_with_dnssec_disabled_and_allowlisted_email_uses_doh() {
+    // Recovery (prepare_delegation) flow, same scenario: the proof is
+    // dropped and the allowlisted domain is accepted on the DoH path, so
+    // prepare_delegation issues a challenge.
+    let env = env();
+    let canister_id = setup_canister_dnssec_disabled(&env);
+
+    let session_key = ByteBuf::from(vec![0u8; 32]);
+    let now_secs: u32 = (time(&env) / 1_000_000_000)
+        .try_into()
+        .expect("PocketIC time fits in u32");
+    let proof = dnssec_signer::build_chain(
+        TEST_DOMAIN,
+        TEST_SELECTOR,
+        b"v=DKIM1; k=rsa; p=AAAA",
+        None,
+        now_secs,
+    )
+    .skeleton;
+    let input = EmailRecoveryDnsInput {
+        address: TEST_ADDRESS.into(),
+        dns_proof: Some(proof),
+    };
+    let challenge = api::email_recovery_prepare_delegation(&env, canister_id, input, session_key)
+        .expect("call failed")
+        .expect("prepare_delegation should succeed via DoH");
+    assert!(
+        challenge.nonce.starts_with("II-Recovery-"),
+        "unexpected nonce: {}",
+        challenge.nonce
+    );
+}
+
+#[test]
 fn full_setup_flow_via_dnssec_path() {
     use internet_identity_interface::internet_identity::types::DnssecConfig;
 
@@ -604,6 +780,7 @@ fn full_setup_flow_via_dnssec_path() {
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
         ..Default::default()
     };
     let canister_id = install_ii_canister_with_arg_and_cycles(
@@ -759,6 +936,7 @@ fn dnssec_flow_until_need_dkim_leaf(
         })),
         related_origins: Some(vec!["https://id.ai".into()]),
         canister_creation_cycles_cost: Some(0),
+        enable_dnssec_email_recovery: Some(true),
         ..Default::default()
     };
     let canister_id = install_ii_canister_with_arg_and_cycles(

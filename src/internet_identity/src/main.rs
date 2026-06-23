@@ -5,6 +5,7 @@ use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
+use authz_utils::check_session_authorization;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
 };
@@ -28,7 +29,7 @@ use internet_identity_interface::internet_identity::types::attributes::{
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
-    OpenIdPrepareDelegationResponse,
+    OpenIdPrepareDelegationResponse, OpenIdResult,
 };
 use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
@@ -62,6 +63,7 @@ mod http;
 mod ii_domain;
 
 mod openid;
+mod session_delegation;
 mod single_flight_cache;
 mod state;
 mod stats;
@@ -333,10 +335,9 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
             anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
         }
 
-        Ok::<_, String>((
-            (),
-            anchor_management::replace_device(anchor_number, anchor, device_key, device_data),
-        ))
+        let operation =
+            anchor_management::replace_device(anchor_number, anchor, device_key, device_data);
+        Ok::<_, String>(((), operation))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -344,10 +345,8 @@ fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devi
 #[update]
 fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>((
-            (),
-            anchor_management::remove_device(anchor_number, anchor, device_key),
-        ))
+        let operation = anchor_management::remove_device(anchor_number, anchor, device_key);
+        Ok::<_, String>(((), operation))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -483,7 +482,7 @@ fn get_accounts(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
-    match check_authorization(anchor_number) {
+    match check_session_authorization(anchor_number) {
         Ok(_) => Ok(
             account_management::get_accounts_for_origin(anchor_number, &origin)
                 .iter()
@@ -534,7 +533,7 @@ fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    check_authorization(anchor_number)
+    check_session_authorization(anchor_number)
         .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
 
     let default_account_info =
@@ -563,14 +562,12 @@ fn set_default_account(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    anchor_operation_with_authz_check(anchor_number, |_| {
-        let result = account_management::set_default_account_for_origin(
-            anchor_number,
-            origin,
-            account_number,
-        )?;
-        Ok((result, Operation::SetDefaultAccount))
-    })
+    check_authz_and_record_activity(anchor_number).map_err(SetDefaultAccountError::from)?;
+
+    let result =
+        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
+    anchor_management::post_operation_bookkeeping(anchor_number, Operation::SetDefaultAccount);
+    Ok(result)
 }
 
 #[update]
@@ -615,6 +612,30 @@ fn get_account_delegation(
         ),
         Err(err) => Err(err.into()),
     }
+}
+
+#[update]
+async fn prepare_session_delegation(
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<
+    internet_identity_interface::internet_identity::types::PrepareSessionDelegation,
+    internet_identity_interface::internet_identity::types::SessionDelegationError,
+> {
+    session_delegation::prepare_session_delegation(anchor_number, session_key, max_ttl).await
+}
+
+#[query]
+fn get_session_delegation(
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<
+    SignedDelegation,
+    internet_identity_interface::internet_identity::types::SessionDelegationError,
+> {
+    session_delegation::get_session_delegation(anchor_number, session_key, expiration)
 }
 
 #[query]
@@ -662,16 +683,6 @@ fn whoami() -> Principal {
 }
 
 #[query]
-fn discovered_oidc_configs() -> Vec<OidcConfig> {
-    openid::get_discovered_oidc_configs()
-}
-
-#[update]
-fn add_discoverable_oidc_config(config: DiscoverableOidcConfig) {
-    openid::add_oidc_config(config);
-}
-
-#[query]
 fn config() -> InternetIdentityInit {
     let archive_config = match state::archive_state() {
         ArchiveState::NotConfigured => None,
@@ -700,6 +711,7 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: persistent_state.backend_origin.clone(),
+        enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
     })
@@ -752,14 +764,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     update_root_hash();
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
-    }
-    // Re-populate in-memory SSO provider state from persistent storage.
-    // `OIDC_CONFIGS` is a thread-local Vec that is lost across upgrades, so we
-    // need to replay the persisted domains here. SSO providers cannot be
-    // registered via init args — only via `add_discoverable_oidc_config`.
-    let persisted_oidc_configs = state::persistent_state(|s| s.oidc_configs.clone());
-    if let Some(oidc_configs) = persisted_oidc_configs {
-        openid::setup_oidc(oidc_configs);
     }
 
     // Kick off the SSO credential batch migration. Examines at most
@@ -853,6 +857,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(dummy_auth) = arg.dummy_auth {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.dummy_auth = dummy_auth;
+            })
+        }
+        if let Some(enable_dnssec_email_recovery) = arg.enable_dnssec_email_recovery {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.enable_dnssec_email_recovery = Some(enable_dnssec_email_recovery);
             })
         }
         if let Some(dnssec_config) = arg.dnssec_config {
@@ -988,6 +997,7 @@ mod v2_api {
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
         registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::PubkeyAuthn(arg),
+            None,
         )
     }
 
@@ -1305,7 +1315,8 @@ mod openid_api {
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
-        OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
+        OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult, SessionKey,
+        Timestamp,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -1327,13 +1338,28 @@ mod openid_api {
 
     #[update]
     fn openid_identity_registration_finish(
-        arg: OpenIDRegFinishArg,
-    ) -> Result<IdRegFinishResult, IdRegFinishError> {
-        openid::with_provider(&arg.jwt, |provider| provider.verify(&arg.jwt, &arg.salt))?;
-
-        registration::registration_flow_v2::identity_registration_finish(
+        mut arg: OpenIDRegFinishArg,
+    ) -> OpenIdResult<IdRegFinishResult, IdRegFinishError> {
+        // Canonicalize the untrusted discovery domain at the boundary so both
+        // verification and the credential stored from `arg` see the same value.
+        arg.discovery_domain = openid::canonical_discovery_domain_opt(arg.discovery_domain);
+        // Verify the JWT (driving the SSO discovery/JWKS fetches it may need)
+        // up front: a cold or evicted cache surfaces as the `Pending` retry arm
+        // instead of a terminal registration error. The verified credential is
+        // then handed to the shared flow so it isn't re-verified.
+        let verified =
+            match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+                Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+                Ok(openid::Cached::Ready(verified)) => verified,
+                Err(err) => return OpenIdResult::Err(err),
+            };
+        match registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
-        )
+            Some(verified),
+        ) {
+            Ok(result) => OpenIdResult::Ok(result),
+            Err(err) => OpenIdResult::Err(err),
+        }
     }
 
     #[update]
@@ -1341,10 +1367,18 @@ mod openid_api {
         identity_number: IdentityNumber,
         jwt: String,
         salt: [u8; 32],
-    ) -> Result<(), OpenIdCredentialAddError> {
-        anchor_operation_with_authz_check(identity_number, |anchor| {
-            let openid_credential =
-                openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))?;
+        discovery_domain: Option<String>,
+    ) -> OpenIdResult<(), OpenIdCredentialAddError> {
+        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
+        openid::prefetch_sso(discovery_domain.as_deref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
+            // frontend retries the call.
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
+        let outcome = anchor_operation_with_authz_check(identity_number, |anchor| {
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
@@ -1353,7 +1387,11 @@ mod openid_api {
                     }
                     err => OpenIdCredentialAddError::InternalCanisterError(err.to_string()),
                 })
-        })
+        });
+        match outcome {
+            Ok(()) => OpenIdResult::Ok(()),
+            Err(err) => OpenIdResult::Err(err),
+        }
     }
 
     #[update]
@@ -1378,43 +1416,60 @@ mod openid_api {
         jwt: String,
         salt: [u8; 32],
         session_key: SessionKey,
-    ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
-        let openid_credential =
-            openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+        discovery_domain: Option<String>,
+    ) -> OpenIdResult<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
+        // Drive the SSO discovery/JWKS fetches (if any) on this update, then
+        // read the result. A cold cache reads `Pending`; the frontend polls
+        // `openid_get_delegation` and re-calls this until the delegation is
+        // ready.
+        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
+        openid::prefetch_sso(discovery_domain.as_deref());
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
 
-        let anchor_number = state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-        })
-        .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+        let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
+            let anchor_number = state::storage_borrow(|storage| {
+                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+            })
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        // Update anchor with latest OpenID credential from JWT so latest information is stored,
-        // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
-        let mut anchor = state::anchor(anchor_number);
-        update_openid_credential(&mut anchor, openid_credential.clone())
-            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
-        state::storage_borrow_mut(|storage| storage.write(anchor))
-            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            // Update anchor with latest OpenID credential from JWT so latest information is stored,
+            // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
+            let mut anchor = state::anchor(anchor_number);
+            update_openid_credential(&mut anchor, openid_credential.clone())
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            state::storage_borrow_mut(|storage| storage.write(anchor))
+                .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
-        let (user_key, expiration) = openid_credential
-            .prepare_jwt_delegation(session_key, anchor_number)
-            .await;
+            let (user_key, expiration) = openid_credential
+                .prepare_jwt_delegation(session_key, anchor_number)
+                .await;
 
-        // Checking again because the association could've changed during the .await
-        let still_anchor_number = state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
-        })
-        .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            // Checking again because the association could've changed during the .await
+            let still_anchor_number = state::storage_borrow(|storage| {
+                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+            })
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-        if anchor_number != still_anchor_number {
-            return Err(OpenIdDelegationError::NoSuchAnchor);
+            if anchor_number != still_anchor_number {
+                return Err(OpenIdDelegationError::NoSuchAnchor);
+            }
+
+            Ok(OpenIdPrepareDelegationResponse {
+                user_key,
+                expiration,
+                anchor_number,
+            })
         }
+        .await;
 
-        Ok(OpenIdPrepareDelegationResponse {
-            user_key,
-            expiration,
-            anchor_number,
-        })
+        match prepared {
+            Ok(response) => OpenIdResult::Ok(response),
+            Err(err) => OpenIdResult::Err(err),
+        }
     }
 
     #[query]
@@ -1423,19 +1478,49 @@ mod openid_api {
         salt: [u8; 32],
         session_key: SessionKey,
         expiration: Timestamp,
-    ) -> Result<SignedDelegation, OpenIdDelegationError> {
-        let openid_credential =
-            openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+        discovery_domain: Option<String>,
+    ) -> OpenIdResult<SignedDelegation, OpenIdDelegationError> {
+        // A query can't drive the SSO fetches, so `verify_jwt` only reads the
+        // caches. A `Pending` means discovery/JWKS isn't cached yet — the
+        // frontend re-calls `openid_prepare_delegation` (an update, which drives
+        // the fetch) and polls this again.
+        let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
 
-        match state::storage_borrow(|storage| {
+        let delegation = match state::storage_borrow(|storage| {
             storage.lookup_anchor_with_openid_credential(&openid_credential.key())
         }) {
             Some(anchor_number) => {
                 openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
             }
             None => Err(OpenIdDelegationError::NoSuchAnchor),
+        };
+
+        match delegation {
+            Ok(signed) => OpenIdResult::Ok(signed),
+            Err(err) => OpenIdResult::Err(err),
         }
+    }
+
+    /// Drive the two-hop SSO discovery fetch for `domain`. The frontend calls
+    /// this when `get_sso_discovery` reads `Pending`, then keeps polling the
+    /// query until it returns `Resolved`.
+    #[update]
+    fn discover_sso(domain: String) {
+        openid::discover_sso(&openid::canonical_discovery_domain(&domain))
+    }
+
+    /// Read the state of `domain`'s SSO discovery: `Resolved` with the config,
+    /// `Pending` while the fetch is in flight, or `NotAllowed`.
+    #[query]
+    fn get_sso_discovery(
+        domain: String,
+    ) -> internet_identity_interface::internet_identity::types::SsoDiscoveryState {
+        openid::get_sso_discovery(&openid::canonical_discovery_domain(&domain))
     }
 }
 
@@ -1725,10 +1810,6 @@ mod email_recovery_api {
         identity_number: IdentityNumber,
         address: String,
     ) -> Result<(), EmailRecoveryError> {
-        // Inlined auth + write rather than going through
-        // `anchor_operation_with_authz_check` because that helper's
-        // `E: From<IdentityUpdateError>` bound is awkward to satisfy
-        // for an interface-crate error type (orphan rule).
         let (mut anchor, authz_key) = crate::authz_utils::check_authorization(identity_number)
             .map_err(|err| EmailRecoveryError::Unauthorized(err.principal))?;
         crate::anchor_management::activity_bookkeeping(&mut anchor, &authz_key);

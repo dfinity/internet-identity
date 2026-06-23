@@ -17,6 +17,7 @@ export const idlFactory = ({ IDL }) => {
     'backend_origin' : IDL.Text,
     'dev_csp' : IDL.Opt(IDL.Bool),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'mcp_server_origin' : IDL.Opt(IDL.Text),
     'feature_flags' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))),
   });
   const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
@@ -56,6 +57,7 @@ export const init = ({ IDL }) => {
     'backend_origin' : IDL.Text,
     'dev_csp' : IDL.Opt(IDL.Bool),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
+    'mcp_server_origin' : IDL.Opt(IDL.Text),
     'feature_flags' : IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))),
   });
   return [InternetIdentityFrontendInit];

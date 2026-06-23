@@ -197,6 +197,56 @@ test.describe("Access methods", () => {
     await manageAccessPage.assertPasskeyCount(16);
   });
 
+  test("returns to the chooser when the cross-device dialog is closed", async ({
+    page,
+  }) => {
+    // Open the "Add access method" chooser.
+    await page
+      .getByRole("main")
+      .getByRole("button", { name: "Add new" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Add access method" }),
+    ).toBeVisible();
+
+    // Open the cross-device pairing modal via the single "URL | QR Code" link.
+    await page.getByRole("button", { name: "URL | QR Code" }).click();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Add this identity to another device",
+      }),
+    ).toBeVisible();
+
+    // The pairing modal is layered on top of the chooser; closing it returns
+    // to the chooser rather than tearing down the whole add-access dialog.
+    // Both <dialog>s match getByRole("dialog") (the pairing one is nested),
+    // so target the innermost via .last().
+    const pairingDialog = page
+      .getByRole("dialog")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Add this identity to another device",
+        }),
+      })
+      .last();
+    await pairingDialog.getByRole("button", { name: "Close" }).click();
+
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Add this identity to another device",
+      }),
+    ).toBeHidden();
+    // The chooser is still open — the dialog was not torn down.
+    await expect(
+      page.getByRole("heading", { name: "Add access method" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Continue with passkey" }),
+    ).toBeVisible();
+  });
+
   test.describe("can remove a legacy passkey", () => {
     const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
 

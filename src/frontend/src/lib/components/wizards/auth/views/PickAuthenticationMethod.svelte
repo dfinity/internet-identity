@@ -11,27 +11,42 @@
   import { ArrowRightIcon } from "@lucide/svelte";
 
   interface Props {
-    setupOrUseExistingPasskey: () => void;
+    // The signin variant in AuthWizard returns a promise that resolves
+    // to `"cancelled"` on WebAuthn cancel; the signup / both variants
+    // are synchronous view transitions. We don't await the result here
+    // (Svelte onclick fires it as a handler), but the type has to
+    // accommodate both shapes so callers don't trip the prop checker.
+    setupOrUseExistingPasskey: () => void | Promise<void | "cancelled">;
     continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
     signInWithSso: () => void;
+    continueOnAnotherDevice?: () => void;
     mode?: "signin" | "signup" | "both";
     onSwitchMode?: () => void;
     withinDialog?: boolean;
-    // Override the switch-mode CTA title (used when the picker lives
-    // inside a logged-in surface where the default "New to Internet
-    // Identity?" copy is misleading). When set, the description line is
-    // suppressed and the title carries the full prompt on its own.
+    // Override the switch-mode CTA title (e.g. "Create a new identity"
+    // instead of the default "Want a new identity?" pull).
     switchModeTitle?: string;
+    // Override the switch-mode CTA button label (e.g. "Create" instead
+    // of the default "Sign up" / "Sign in").
+    switchModeAction?: string;
+    // Override the primary passkey-button label. The add-identity
+    // "Add existing identity" (signin) surfaces set this to "Select a
+    // passkey" instead of the default mode-derived "Sign in with passkey".
+    // Sign-up surfaces keep the default ("Create with passkey").
+    passkeyLabel?: string;
   }
 
   const {
     setupOrUseExistingPasskey,
     continueWithOpenId,
     signInWithSso,
+    continueOnAnotherDevice,
     mode = "both",
     onSwitchMode,
     withinDialog = false,
     switchModeTitle,
+    switchModeAction,
+    passkeyLabel: passkeyLabelOverride,
   }: Props = $props();
 
   const showLostAccess = $derived(mode !== "signup");
@@ -40,23 +55,24 @@
   );
 
   const passkeyLabel = $derived(
-    mode === "signin"
-      ? $t`Sign in with passkey`
-      : mode === "signup"
-        ? $t`Sign up with passkey`
-        : $t`Continue with passkey`,
+    passkeyLabelOverride ??
+      (mode === "signin"
+        ? $t`Sign in with passkey`
+        : mode === "signup"
+          ? $t`Create with passkey`
+          : $t`Continue with passkey`),
   );
   const providerLabel = (name: string) =>
     mode === "signin"
       ? $t`Sign in with ${name}`
       : mode === "signup"
-        ? $t`Sign up with ${name}`
+        ? $t`Create with ${name}`
         : $t`Continue with ${name}`;
   const ssoLabel = $derived(
     mode === "signin"
       ? $t`Sign in with SSO`
       : mode === "signup"
-        ? $t`Sign up with SSO`
+        ? $t`Create with SSO`
         : $t`Continue with SSO`,
   );
 
@@ -132,14 +148,13 @@
         </Tooltip>
       {/each}
       <!--
-        SSO entry is always rendered. Registration is enforced on the
-        backend by the `sso_discoverable_domains` allowlist (init arg,
-        falling back to the `is_production`-keyed defaults in
-        `allowed_discovery_domains`) checked inside
-        `add_discoverable_oidc_config`. Unregistered domains surface as
-        an error inside the SignInWithSso screen rather than being gated
-        here — we keep this option visible so users know the mechanism
-        exists.
+        SSO entry is always rendered. The allowed domains are enforced on the
+        backend by the `sso_discoverable_domains` allowlist (init arg, falling
+        back to the `is_production`-keyed defaults in
+        `allowed_discovery_domains`) checked inside `discover_sso`. Disallowed
+        domains surface as an error inside the SignInWithSso screen rather than
+        being gated here — we keep this option visible so users know the
+        mechanism exists.
       -->
       <button
         class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
@@ -152,6 +167,20 @@
       </button>
     </div>
   </div>
+  {#if continueOnAnotherDevice !== undefined && showLostAccess}
+    <div class="flex flex-row items-center justify-between gap-4">
+      <p class="text-text-tertiary text-sm">
+        {$t`Add identity from another device`}
+      </p>
+      <button
+        onclick={continueOnAnotherDevice}
+        disabled={authenticatingProviderId !== undefined}
+        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+      >
+        {$t`URL | QR Code`}
+      </button>
+    </div>
+  {/if}
   {#if showLostAccess}
     <div class="flex flex-row items-center justify-between gap-4">
       <p class="text-text-tertiary text-sm">
@@ -182,23 +211,19 @@
         <div class="text-text-primary text-sm font-semibold">
           {switchModeTitle ??
             (mode === "signin"
-              ? $t`Want a new identity?`
+              ? $t`Create new identity`
               : $t`Already have an identity?`)}
         </div>
-        {#if switchModeTitle === undefined}
-          <div class="text-text-tertiary mt-1 text-xs">
-            {mode === "signin"
-              ? $t`Create one in seconds.`
-              : $t`Use a passkey or familiar provider.`}
-          </div>
-        {/if}
+        <div class="text-text-tertiary mt-1 text-xs">
+          {$t`Use a passkey or familiar provider.`}
+        </div>
       </div>
       <button
         onclick={onSwitchMode}
         disabled={authenticatingProviderId !== undefined}
         class="btn btn-secondary btn-sm shrink-0 gap-2"
       >
-        {mode === "signin" ? $t`Sign up` : $t`Sign in`}
+        {switchModeAction ?? (mode === "signin" ? $t`Create` : $t`Sign in`)}
         <ArrowRightIcon class="size-4 rtl:-scale-x-100" />
       </button>
     </div>

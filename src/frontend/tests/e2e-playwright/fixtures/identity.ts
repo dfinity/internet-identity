@@ -222,9 +222,16 @@ export class IdentityWizard {
     }
     // mode="signin" picker — goes straight to the existing-passkey
     // WebAuthn flow; no intermediate Use existing / Create new dialog.
-    await this.#page
-      .getByRole("button", { name: "Sign in with passkey" })
-      .click();
+    // The button label varies by surface: /authorize landing keeps the
+    // default "Sign in with passkey", while / and /manage / /authorize
+    // header dialogs override to "Select a passkey".
+    const selectPasskey = this.#page.getByRole("button", {
+      name: "Select a passkey",
+    });
+    const signInWithPasskey = this.#page.getByRole("button", {
+      name: "Sign in with passkey",
+    });
+    await selectPasskey.or(signInWithPasskey).first().click();
   }
 
   async signUp(name: string): Promise<void> {
@@ -244,14 +251,14 @@ export class IdentityWizard {
       // Switch to sign-up via the picker's toggle CTA, which surfaces
       // the dedicated sign-up dialog with mode="signup" labels.
       const signUpToggle = this.#page.getByRole("button", {
-        name: "Sign up",
+        name: "Create",
         exact: true,
       });
       if (await signUpToggle.isVisible()) {
         await signUpToggle.click();
       }
       await this.#page
-        .getByRole("button", { name: "Sign up with passkey" })
+        .getByRole("button", { name: "Create with passkey" })
         .click();
     }
     // Only the homepage flow navigates to /manage after registration.
@@ -278,7 +285,7 @@ export class IdentityWizard {
    * sits behind an "Add identity" / "Switch identity" CTA on the
    * welcome-back state and on `/authorize` / `/manage`. The picker may
    * be in mode="both" ("Continue with passkey") or in a mode-specific
-   * variant ("Sign in with passkey" / "Sign up with passkey") depending
+   * variant ("Sign in with passkey" / "Create with passkey") depending
    * on which surface rendered it. Callers handle the variants
    * themselves; this method just makes sure a picker is on screen.
    */
@@ -295,13 +302,17 @@ export class IdentityWizard {
     const signInWithPasskey = this.#page.getByRole("button", {
       name: "Sign in with passkey",
     });
+    const selectPasskey = this.#page.getByRole("button", {
+      name: "Select a passkey",
+    });
     const signUpWithPasskey = this.#page.getByRole("button", {
-      name: "Sign up with passkey",
+      name: "Create with passkey",
     });
     await switchIdentity
       .or(addIdentity)
       .or(continueWithPasskey)
       .or(signInWithPasskey)
+      .or(selectPasskey)
       .or(signUpWithPasskey)
       .first()
       .waitFor();
@@ -309,6 +320,7 @@ export class IdentityWizard {
     if (
       (await continueWithPasskey.isVisible()) ||
       (await signInWithPasskey.isVisible()) ||
+      (await selectPasskey.isVisible()) ||
       (await signUpWithPasskey.isVisible())
     ) {
       return;
@@ -320,6 +332,7 @@ export class IdentityWizard {
     await addIdentity.click();
     await continueWithPasskey
       .or(signInWithPasskey)
+      .or(selectPasskey)
       .or(signUpWithPasskey)
       .first()
       .waitFor();

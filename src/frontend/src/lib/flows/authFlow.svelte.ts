@@ -23,6 +23,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+import { retryWhilePending } from "$lib/utils/openidPoll";
 import {
   CheckCaptchaError,
   IdentityAnchorInfo,
@@ -80,6 +81,9 @@ export class AuthFlow {
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
+  // SSO discovery domain for a 1-click OpenID/SSO flow whose JWT is redeemed
+  // through `continueWithOpenId`; `undefined` for a direct provider.
+  #openIdDiscoveryDomain = $state<string>();
   #ssoJwt = $state<string>();
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
@@ -200,6 +204,7 @@ export class AuthFlow {
     this.#pendingOpenIdSignIn = undefined;
     this.#jwt = undefined;
     this.#configIssuer = undefined;
+    this.#openIdDiscoveryDomain = undefined;
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
@@ -211,6 +216,7 @@ export class AuthFlow {
     this.#pendingOpenIdSignIn = undefined;
     this.#jwt = undefined;
     this.#configIssuer = undefined;
+    this.#openIdDiscoveryDomain = undefined;
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
@@ -259,11 +265,15 @@ export class AuthFlow {
   > => {
     const { clientId, discovery, domain, name: ssoName } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
-    const result = await this.#openIdJwtSignIn({
-      clientId,
-      authURL: discovery.authorization_endpoint,
-      authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
-    });
+    const result = await this.#openIdJwtSignIn(
+      {
+        clientId,
+        authURL: discovery.authorization_endpoint,
+        authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
+      },
+      undefined,
+      domain,
+    );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
         .trackLastUsed
@@ -391,6 +401,7 @@ export class AuthFlow {
     config: OpenIdConfig,
     existingJwt?: string,
     mode: AuthMode = this.#mode,
+    discoveryDomain?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -415,6 +426,7 @@ export class AuthFlow {
         configURL: config.fedcm_uri?.[0],
       },
       existingJwt,
+      discoveryDomain,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -446,6 +458,7 @@ export class AuthFlow {
         }
         this.#jwt = result.jwt;
         this.#configIssuer = config.issuer;
+        this.#openIdDiscoveryDomain = discoveryDomain;
         this.#pendingOpenIdSignIn = result.identityNumber;
         this.#view = "openIdAlreadyLinked";
         return undefined;
@@ -461,6 +474,7 @@ export class AuthFlow {
     }
     this.#jwt = result.jwt;
     this.#configIssuer = config.issuer;
+    this.#openIdDiscoveryDomain = discoveryDomain;
     if (mode === "signin") {
       this.#view = "openIdNotConnected";
       return undefined;
@@ -481,6 +495,7 @@ export class AuthFlow {
   #openIdJwtSignIn = async (
     requestConfig: RequestConfig,
     existingJwt?: string,
+    discoveryDomain?: string,
   ): Promise<
     | {
         type: "signIn";
@@ -524,6 +539,7 @@ export class AuthFlow {
         canisterId,
         session: get(sessionStore),
         jwt,
+        discoveryDomain,
       });
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       await authenticationStore.set({
@@ -563,7 +579,12 @@ export class AuthFlow {
     }
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
     await this.#startRegistration();
-    return this.#registerWithOpenId(this.#jwt, name, this.#configIssuer);
+    return this.#registerWithOpenId(
+      this.#jwt,
+      name,
+      this.#configIssuer,
+      this.#openIdDiscoveryDomain,
+    );
   };
 
   #solveCaptcha = (image: string, attempt = 0): Promise<void> =>
@@ -693,8 +714,13 @@ export class AuthFlow {
     jwt: string,
     name: string,
     configIssuer: string,
+    discoveryDomain?: string,
   ): Promise<bigint> => {
-    const result = await this.#openIdRegistrationCommit(jwt, name);
+    const result = await this.#openIdRegistrationCommit(
+      jwt,
+      name,
+      discoveryDomain,
+    );
     if (this.#options.trackLastUsed) {
       const { name: jwtName, email, ...restJWTClaims } = result.decodedJwt;
       const metadata: MetadataMapV2 = [];
@@ -732,7 +758,7 @@ export class AuthFlow {
     domain: string,
     ssoName: string | undefined,
   ): Promise<bigint> => {
-    const result = await this.#openIdRegistrationCommit(jwt, name);
+    const result = await this.#openIdRegistrationCommit(jwt, name, domain);
     if (this.#options.trackLastUsed) {
       // See `continueWithSso`: email is kept only for the identity-row
       // display fallback chain (email → name → domain).
@@ -761,6 +787,7 @@ export class AuthFlow {
   #openIdRegistrationCommit = async (
     jwt: string,
     name: string,
+    discoveryDomain?: string,
   ): Promise<{
     iss: string;
     sub: string;
@@ -769,19 +796,24 @@ export class AuthFlow {
     decodedJwt: ReturnType<typeof decodeJWT>;
   }> => {
     try {
-      await get(sessionStore)
-        .actor.openid_identity_registration_finish({
+      // An SSO discovery / JWKS cache that's cold (or has since been evicted)
+      // reports `Pending`; retry until it warms instead of failing the signup.
+      await retryWhilePending(() =>
+        get(sessionStore).actor.openid_identity_registration_finish({
           jwt,
           salt: get(sessionStore).salt,
           name,
-        })
-        .then(throwCanisterError);
+          discovery_domain:
+            discoveryDomain !== undefined ? [discoveryDomain] : [],
+        }),
+      ).then(throwCanisterError);
       const decodedJwt = decodeJWT(jwt);
       const { iss, sub, loginHint } = decodedJwt;
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
         jwt,
+        discoveryDomain,
       });
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulOpenIDRegistration,
@@ -803,7 +835,7 @@ export class AuthFlow {
           await this.#solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
-          return this.#openIdRegistrationCommit(jwt, name);
+          return this.#openIdRegistrationCommit(jwt, name, discoveryDomain);
         }
       }
       throw error;
