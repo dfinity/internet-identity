@@ -36,6 +36,6 @@
   </p>
 </header>
 
-<div class="mt-10">
+<div class="mt-10 max-w-3xl">
   <VerifiedEmailsPanel {verifiedEmails} capacity={VERIFIED_EMAILS_CAPACITY} />
 </div>
