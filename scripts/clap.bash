@@ -75,9 +75,11 @@ function clap.define() {
 		clap_flag_match="${clap_flag_match}#NL#TB#TB${long}${short:+|${short}})#NL#TB#TB#TB${variable}=(); for ((i=0; i<nargs; i++)); do ${variable}+=( \"\$1\" ); shift 1; done;;"
 	fi
 	if [ "${default:-}" != "" ]; then
-		# `printf '%q'` (not `${default@Q}`, which needs bash 4.4+) keeps this
-		# parseable under macOS's stock /bin/bash 3.2; both shell-quote the
-		# value so the later eval of clap_defaults stays safe.
+		# Use `printf '%q'`, not `${default@Q}` (bash 4.4+, which fails to
+		# parse under macOS's stock /bin/bash 3.2). Both shell-quote the
+		# value so the `<variable>=<default>` line that clap.build bakes into
+		# the generated, sourced build file stays safe for defaults with
+		# spaces or special characters.
 		clap_defaults="${clap_defaults}#NL${variable}=$(printf '%q' "$default")"
 	fi
 	clap_arguments_string="${clap_arguments_string}${shortname:-}"
