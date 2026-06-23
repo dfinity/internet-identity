@@ -441,6 +441,10 @@ pub fn prepare_account_delegation(
             params.account_number,
             params.session_key.clone(),
             max_ttl,
+            // Explicitly unrestricted: the canister defaults an omitted
+            // `read_only` argument to read-only, so a plain (non-read-only)
+            // delegation must pass `Some(false)`.
+            Some(false),
         ),
     )
     .map(|(x,)| x)
@@ -461,6 +465,9 @@ pub fn get_account_delegation(
             params.account_number,
             params.session_key.clone(),
             expiration,
+            // Explicitly unrestricted: must match the plain
+            // `prepare_account_delegation` helper above.
+            Some(false),
         ),
     )
     .map(|(x,)| x)

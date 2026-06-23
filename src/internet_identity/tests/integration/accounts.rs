@@ -510,7 +510,8 @@ fn should_only_update_owned_account() {
 
 /// Verifies that read-only account delegations carry the `permissions`
 /// field restricting the session to query calls, and that the signature
-/// binds to it (the same session key without `read_only` has no signature).
+/// binds to it (an explicitly unrestricted lookup of the same session key
+/// has no signature).
 #[test]
 fn should_get_read_only_account_delegation_with_queries_permissions() -> Result<(), RejectResponse>
 {
@@ -548,12 +549,57 @@ fn should_get_read_only_account_delegation_with_queries_permissions() -> Result<
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
 
-    // The signature binds to the permissions: looking up an unrestricted
-    // delegation for the same session key must fail.
-    let result = get_account_delegation_with_read_only(&params, expiration, None)
+    // The signature binds to the permissions: looking up an explicitly
+    // unrestricted delegation for the same session key must fail.
+    let result = get_account_delegation_with_read_only(&params, expiration, Some(false))
         .unwrap()
         .unwrap_err();
     assert!(matches!(result, AccountDelegationError::NoSuchDelegation));
+
+    Ok(())
+}
+
+/// Verifies that an omitted `read_only` argument defaults to a read-only
+/// (queries-only) account delegation: the backend errs on the side of caution
+/// when the caller does not specify, unlike the interface spec's unrestricted
+/// default for an absent `permissions` field.
+#[test]
+fn should_default_to_read_only_account_delegation_when_unspecified() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key.clone(),
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation_with_read_only(&params, None, None)
+        .unwrap()
+        .unwrap();
+
+    // Omitting `read_only` yields a queries-only delegation, retrievable by a
+    // lookup that likewise omits the argument.
+    let signed_delegation = get_account_delegation_with_read_only(&params, expiration, None)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        signed_delegation.delegation.permissions,
+        Some("queries".to_string())
+    );
+    assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+    verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
 
     Ok(())
 }

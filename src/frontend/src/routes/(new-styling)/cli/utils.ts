@@ -76,7 +76,9 @@ export const cliAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
-      [],
+      // Explicitly unrestricted: CLI sessions are update-capable, and the
+      // backend defaults an omitted `read_only` argument to read-only.
+      [false],
     )
     .then(throwCanisterError);
 
@@ -88,7 +90,8 @@ export const cliAuthorize = async ({
         [],
         ephemeralPublicKey,
         expiration,
-        [],
+        // Must match the value passed to `prepare_account_delegation` above.
+        [false],
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

@@ -1651,7 +1651,11 @@ service : (opt InternetIdentityInit) -> {
         max_ttl : opt nat64,
         // When `opt true`, the prepared delegation restricts the session to
         // query calls: it carries `permissions = "queries"`, which makes the
-        // IC reject update calls authenticated through it.
+        // IC reject update calls authenticated through it. When omitted
+        // (`null`), the delegation defaults to read-only (erring on the side of
+        // caution); pass `opt false` for an unrestricted delegation. Note this
+        // differs from the interface spec, where an absent `permissions` field
+        // means unrestricted.
         read_only : opt bool
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
     
@@ -1661,7 +1665,8 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
         expiration : Timestamp,
-        // Must match the value passed to `prepare_account_delegation`.
+        // Must match the value passed to `prepare_account_delegation`,
+        // including the omitted (`null`) case, which defaults to read-only.
         read_only : opt bool
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 
