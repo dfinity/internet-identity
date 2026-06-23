@@ -1106,7 +1106,7 @@ dry_run_proposal() {
       --use-hsm \
       --key-id "01" \
       --slot 0 \
-      --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
+      --pin "$(read -sp 'HSM PIN? '; echo >&2; echo "$REPLY")" \
       --nns-url "https://ic0.app" \
       propose-to-change-nns-canister \
       --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
@@ -1128,7 +1128,7 @@ dry_run_proposal() {
       --use-hsm \
       --key-id "01" \
       --slot 0 \
-      --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
+      --pin "$(read -sp 'HSM PIN? '; echo >&2; echo "$REPLY")" \
       --nns-url "https://ic0.app" \
       propose-to-change-nns-canister \
       --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
@@ -1186,7 +1186,7 @@ make_backend_proposal() {
     --use-hsm \
     --key-id "01" \
     --slot 0 \
-    --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
+    --pin "$(read -sp 'HSM PIN? '; echo >&2; echo "$REPLY")" \
     --nns-url "https://ic0.app" \
     propose-to-change-nns-canister \
     --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
@@ -1211,7 +1211,7 @@ make_frontend_proposal() {
     --use-hsm \
     --key-id "01" \
     --slot 0 \
-    --pin "$(read -p 'HSM PIN? '; echo "$REPLY")" \
+    --pin "$(read -sp 'HSM PIN? '; echo >&2; echo "$REPLY")" \
     --nns-url "https://ic0.app" \
     propose-to-change-nns-canister \
     --proposer "$(read -p 'NEURON ID? '; echo "$REPLY")" \
