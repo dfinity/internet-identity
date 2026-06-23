@@ -2,17 +2,39 @@ import * as oidc from "oidc-provider";
 import express from "express";
 
 const app = express();
-const port = parseInt(process.argv[2], 10) || 11105; // "OpenID" (O = 111, I = 105)
+// Port the server binds to locally. CI/dev pass it as argv (`npm start -- 11105`);
+// a public deployment behind a tunnel can instead set OIDC_PORT.
+const port = parseInt(process.env.OIDC_PORT ?? process.argv[2], 10) || 11105; // "OpenID" (O = 111, I = 105)
+
+// Public base URL (the OIDC issuer). Defaults to the localhost form used by the
+// e2e/dev setup; set OIDC_ISSUER to the public HTTPS URL (e.g. a tunnel host)
+// when deploying so the issuer, jwks_uri and authorization_endpoint all resolve
+// to a host the IC's HTTP outcalls — and the browser — can reach. II requires
+// https for any non-loopback discovery host.
+const issuer = process.env.OIDC_ISSUER ?? `http://localhost:${port}`;
+
+// Redirect URIs the IdP will accept. Defaults to the dev + e2e callbacks; set
+// OIDC_REDIRECT_URIS (comma-separated) to point at a deployed II origin's
+// callback, e.g. "https://beta.id.ai/callback".
+const redirectUris = (
+  process.env.OIDC_REDIRECT_URIS ??
+  "http://localhost:5173/callback,https://id.ai/callback"
+)
+  .split(",")
+  .map((uri) => uri.trim())
+  .filter(Boolean);
+
+// Human-readable SSO name surfaced in II's consent screen (see the
+// ii-openid-configuration endpoint below).
+const ssoName = process.env.OIDC_SSO_NAME ?? `Test SSO ${port}`;
+
 const accountClaims = new Map();
-const provider = new oidc.Provider(`http://localhost:${port}`, {
+const provider = new oidc.Provider(issuer, {
   clients: [
     {
       client_id: "internet_identity",
       client_secret: "secret", // Not used but required here
-      redirect_uris: [
-        "http://localhost:5173/callback", // Local development
-        "https://id.ai/callback", // e2e tests
-      ],
+      redirect_uris: redirectUris,
       response_types: ["code id_token"],
       grant_types: ["implicit", "authorization_code"],
     },
@@ -30,6 +52,14 @@ const provider = new oidc.Provider(`http://localhost:${port}`, {
     };
   },
 });
+
+// When the issuer is HTTPS the server runs behind a TLS-terminating tunnel that
+// forwards plain HTTP locally. Trust the proxy's X-Forwarded-* headers so
+// oidc-provider treats the request as secure — otherwise it refuses to set the
+// secure session cookie and the authorization flow fails.
+if (issuer.startsWith("https://")) {
+  provider.proxy = true;
+}
 
 // Bypass "`select_account` prompt is unsupported" error
 provider.use(async (ctx, next) => {
@@ -80,21 +110,18 @@ app.post("/account/:id/claims", express.json(), async (req, res) => {
 app.get("/.well-known/ii-openid-configuration", (req, res) => {
   res.status(200).json({
     client_id: "internet_identity",
-    openid_configuration: `http://localhost:${port}/.well-known/openid-configuration`,
+    openid_configuration: `${issuer}/.well-known/openid-configuration`,
     // Optional human-readable SSO name. Surfaced in the II consent
     // screen as `<name> email:` etc., so e2e tests can verify the
     // prefix branch instead of the bare-domain fallback.
-    name: `Test SSO ${port}`
+    name: ssoName,
   });
 });
 
 // Register provider and start server
 app.use(provider.callback());
 app.listen(port, () => {
-  console.log(
-    `For endpoints see: http://localhost:${port}/.well-known/openid-configuration`,
-  );
-  console.log(
-    `For SSO discovery see: http://localhost:${port}/.well-known/ii-openid-configuration`,
-  );
+  console.log(`Test OpenID provider listening on http://localhost:${port}`);
+  console.log(`OIDC discovery:  ${issuer}/.well-known/openid-configuration`);
+  console.log(`SSO discovery:   ${issuer}/.well-known/ii-openid-configuration`);
 });
