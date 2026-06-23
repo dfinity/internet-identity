@@ -25,6 +25,13 @@ const config = {
         universal: "src/frontend/src/hooks",
       },
     },
+    // The OpenID provider's `response_mode=form_post` callback is a
+    // cross-origin form POST to /callback, which SvelteKit's CSRF origin
+    // check would reject with a 403 before the server hook that forwards it
+    // to the canister in dev can run. The check only ever applies to the dev
+    // server — adapter-static ships no server in production — and the dev
+    // server holds no cookie-backed state a forged POST could abuse.
+    csrf: { trustedOrigins: ["*"] },
     version: { name: packagejson.version },
   },
 };

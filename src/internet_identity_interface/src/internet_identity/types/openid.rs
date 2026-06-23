@@ -15,11 +15,8 @@ pub struct OpenIdCredentialData {
     // authn method stats if this value is already set to any value.
     pub last_usage_timestamp: Option<Timestamp>,
     pub metadata: HashMap<String, MetadataEntryV2>,
-    /// SSO discovery domain for credentials linked via two-hop OIDC
-    /// discovery, looked up on demand by `(iss, aud)`. `None` for direct-
-    /// provider credentials (Google / Apple / Microsoft) and for SSO
-    /// credentials whose provider is no longer registered on the
-    /// canister.
+    /// SSO discovery domain this credential was verified through. `None` for
+    /// direct-provider credentials (Google / Apple / Microsoft).
     pub sso_domain: Option<String>,
     /// Human-readable SSO name served alongside `client_id` at
     /// `{sso_domain}/.well-known/ii-openid-configuration`. `None` when
@@ -57,6 +54,21 @@ pub enum OpenIdDelegationError {
     NoSuchDelegation,
     JwtVerificationFailed,
     JwtExpired,
+}
+
+/// Result of an OpenID call whose verification may need SSO discovery / JWKS
+/// that isn't cached yet.
+///
+/// `Pending` is a retry signal, not an error: the canister kicked off the
+/// fetch in the background, so the caller should poll the same method again
+/// shortly. It is only ever returned for SSO discovery domains — configured
+/// providers (Google / Microsoft / Apple) keep their keys warm and resolve to
+/// `Ok` or `Err` directly.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum OpenIdResult<T, E> {
+    Ok(T),
+    Pending,
+    Err(E),
 }
 
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);

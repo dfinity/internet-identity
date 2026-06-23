@@ -58,10 +58,10 @@ export const test = base.extend<{
         await authPage
           .getByRole("textbox", { name: "Company domain" })
           .fill(domain);
-        // Continue is disabled until both `add_discoverable_oidc_config`
-        // and the two-hop discovery resolve and stash a `preparedResult`.
-        // The button label flips between "Checking..." and "Continue" —
-        // wait on the latter to know discovery's done.
+        // Continue is disabled until the canister resolves SSO discovery for
+        // the domain and stashes a `preparedResult`. The button label flips
+        // between "Checking..." and "Continue" — wait on the latter to know
+        // discovery's done.
         const continueButton = authPage.getByRole("button", {
           name: "Continue",
           exact: true,

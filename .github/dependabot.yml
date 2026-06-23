@@ -1,0 +1,121 @@
+version: 2
+updates:
+  # ── cargo ──────────────────────────────────────────────
+  - package-ecosystem: cargo
+    directories:
+      - "/"
+      - "/demos/test-app"
+      - "/demos/vc_issuer"
+      - "/src/try-ii"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+    groups:
+      cargo-all:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - pocket-ic
+      pocket-ic:
+        patterns:
+          - pocket-ic
+        update-types:
+          - minor
+          - patch
+
+  # ── npm ────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/demos/test-app"
+      - "/demos/vc_issuer"
+      - "/demos/using-dev-build"
+      - "/src/sig-verifier-js"
+      - "/src/test_openid_provider"
+      - "/src/vite-plugins"
+      - "/src/vc-api"
+      - "/src/try-ii"
+      - "/src/try-ii/src/try-ii-frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+    groups:
+      npm-all:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - "@dfinity/*"
+      agent-js:
+        patterns:
+          - "@dfinity/*"
+        update-types:
+          - minor
+          - patch
+
+  # ── github-actions ─────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # ── docker ─────────────────────────────────────────────
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major

@@ -7,6 +7,7 @@
     authorizedStore,
   } from "$lib/stores/authorization.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import {
     authenticationStore,
     type AuthenticationResult,
@@ -178,6 +179,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -368,11 +370,16 @@
                   handleError(error);
                 }}
                 bind:mode={authDialogMode}
+                passkeyLabel={authDialogMode === "signin"
+                  ? $t`Select a passkey`
+                  : undefined}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
                 >
-                  {authDialogMode === "signup" ? $t`Sign up` : $t`Sign in`}
+                  {authDialogMode === "signup"
+                    ? $t`Create new identity`
+                    : $t`Add existing identity`}
                 </h1>
                 <p class="text-text-secondary mb-6 self-start text-sm">
                   {$t`Choose method to continue`}

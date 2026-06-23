@@ -108,14 +108,10 @@ export class AuthLastUsedFlow {
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);
       } else if ("sso" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
-        // SSO providers aren't in the static `openid_configs` list — the
-        // canister only knows the discovery domain. Re-run the FE-side
-        // two-hop chain so the request config is rebuilt from a fresh
-        // provider discovery doc. No `add_discoverable_oidc_config` call
-        // here: the only way to have a stored `sso` LastUsedIdentity is
-        // to have completed an initial sign-up that already registered
-        // the domain canister-side, and the canister persists those
-        // registrations across upgrades.
+        // SSO providers aren't in the static `openid_configs` list — only
+        // the discovery domain is known. Re-resolve the SSO config via the
+        // canister so the request config is rebuilt from a fresh provider
+        // discovery doc.
         //
         // Calling `requestWithPopup` directly (rather than `requestJWT`)
         // with a `Promise<RequestConfig>` so the popup opens synchronously
@@ -143,6 +139,7 @@ export class AuthLastUsedFlow {
           canisterId,
           session: get(sessionStore),
           jwt,
+          discoveryDomain: domain,
         });
         await authenticationStore.set({
           identity,

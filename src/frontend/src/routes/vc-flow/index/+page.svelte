@@ -24,6 +24,7 @@
     captcha_config: [],
     dummy_auth: [],
     register_rate_limit: [],
+    enable_dnssec_email_recovery: [],
     doh_config: [],
     dnssec_config: [],
   });

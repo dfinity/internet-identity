@@ -13,6 +13,7 @@
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
   import { afterNavigate, beforeNavigate, preloadData } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import {
@@ -109,6 +110,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -358,6 +360,9 @@
                   handleError(error);
                 }}
                 bind:mode={inlinePickerMode}
+                passkeyLabel={inlinePickerMode === "signin"
+                  ? $t`Select a passkey`
+                  : undefined}
               >
                 {#snippet children(presenting)}
                   {#if presenting === true && inlinePickerMode === "signup"}
@@ -366,7 +371,7 @@
                     <h1
                       class="text-text-primary my-2 self-start text-2xl font-medium"
                     >
-                      {$t`Sign in`}
+                      {$t`Add existing identity`}
                     </h1>
                     <p class="text-text-secondary mb-6 self-start text-sm">
                       {$t`Choose method to continue`}
@@ -403,12 +408,15 @@
         handleError(error);
       }}
       bind:mode={authDialogMode}
+      passkeyLabel={authDialogMode === "signin"
+        ? $t`Select a passkey`
+        : undefined}
     >
       {#if authDialogMode === "signup"}
         <SignUpHero />
       {:else}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {$t`Sign in`}
+          {$t`Add existing identity`}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
           {$t`Choose method to continue`}

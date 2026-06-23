@@ -248,6 +248,10 @@ pub struct OpenIDRegFinishArg {
     pub jwt: String,
     pub salt: [u8; 32],
     pub name: String,
+    /// SSO discovery domain the JWT was obtained through, or `None` for a
+    /// direct provider (Google / Microsoft / Apple). Selects which JWK source
+    /// verifies the JWT.
+    pub discovery_domain: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
