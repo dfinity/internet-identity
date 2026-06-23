@@ -250,7 +250,45 @@ fn is_explicitly_allowlisted(domain: &str) -> bool {
 }
 
 pub fn is_allowed_discovery_domain(domain: &str) -> bool {
-    sso_allow_any_domain() || is_explicitly_allowlisted(domain)
+    // An explicitly allowlisted domain is admin-curated and trusted verbatim.
+    // The `sso_allow_any_domain` flag, by contrast, makes the domain
+    // caller-controlled, and `domain` is later interpolated into a discovery
+    // URL (`{scheme}://{domain}/.well-known/...`). Require it to be a bare
+    // authority so the flag means "any *domain*", not "any string that happens
+    // to parse inside a URL": inputs carrying userinfo (`evil.com@127.0.0.1`), a
+    // path (`host/..`), a query, or a fragment could otherwise change the
+    // effective request target.
+    is_explicitly_allowlisted(domain) || (sso_allow_any_domain() && is_bare_authority(domain))
+}
+
+/// True if `domain` is a bare URL authority — a host, optionally `host:port`,
+/// and nothing else: no scheme, userinfo, path, query, or fragment. It is
+/// parsed the same way it is later used (as the authority of an `https`
+/// discovery URL) and required to round-trip exactly, so anything the URL
+/// parser would reinterpret — embedded userinfo/path/query/fragment, stripped
+/// control characters, an injected scheme — is rejected. (A redundant
+/// `:443`/`:80` default port is normalized away by the parser and thus rejected
+/// too; real discovery domains don't carry one.)
+fn is_bare_authority(domain: &str) -> bool {
+    let Ok(url) = url::Url::parse(&format!("https://{domain}")) else {
+        return false;
+    };
+    if !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !matches!(url.path(), "" | "/")
+    {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let authority = match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host.to_string(),
+    };
+    authority == domain.to_ascii_lowercase()
 }
 
 /// True if `host` (the `host:port` portion of a URL) matches an allowlist
@@ -617,6 +655,47 @@ mod tests {
         assert_eq!(scheme_for_allowlisted_host("127.0.0.1:8080"), "https");
         // Non-loopback hosts are always https regardless.
         assert_eq!(scheme_for_allowlisted_host("evil.example.com"), "https");
+    }
+
+    #[test]
+    fn allow_any_domain_rejects_non_authority() {
+        reset();
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+
+        // Bare authorities pass: host, sub-host, and explicit (non-default)
+        // port, case-insensitively.
+        assert!(is_allowed_discovery_domain("example.com"));
+        assert!(is_allowed_discovery_domain("sub.example.com"));
+        assert!(is_allowed_discovery_domain("example.com:8443"));
+        assert!(is_allowed_discovery_domain("Example.COM"));
+
+        // Anything that isn't a bare host[:port] is rejected even with the flag
+        // on, so the caller-controlled value can't reshape the interpolated
+        // discovery URL (`{scheme}://{domain}/.well-known/...`).
+        for bad in [
+            "evil.com@127.0.0.1",    // userinfo — real host is 127.0.0.1
+            "user:pass@example.com", // userinfo
+            "example.com/..",        // path traversal
+            "example.com/foo",       // path
+            "example.com?x=1",       // query
+            "example.com#frag",      // fragment
+            "https://example.com",   // injected scheme
+            "example.com:443",       // redundant default port (normalized away)
+            "exa mple.com",          // whitespace in host
+            "",                      // empty
+        ] {
+            assert!(
+                !is_allowed_discovery_domain(bad),
+                "expected `{bad}` to be rejected even with sso_allow_any_domain on",
+            );
+        }
+
+        // The bare-authority check only gates the flag path: an explicitly
+        // allowlisted entry is admin-curated and trusted verbatim, so it is
+        // accepted even if it wouldn't pass `is_bare_authority` on its own.
+        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.com/weird".to_string()]);
+        assert!(!is_bare_authority("example.com/weird"));
+        assert!(is_allowed_discovery_domain("example.com/weird"));
     }
 
     #[test]
