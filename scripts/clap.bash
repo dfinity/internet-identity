@@ -75,7 +75,10 @@ function clap.define() {
 		clap_flag_match="${clap_flag_match}#NL#TB#TB${long}${short:+|${short}})#NL#TB#TB#TB${variable}=(); for ((i=0; i<nargs; i++)); do ${variable}+=( \"\$1\" ); shift 1; done;;"
 	fi
 	if [ "${default:-}" != "" ]; then
-		clap_defaults="${clap_defaults}#NL${variable}=${default@Q}"
+		# `printf '%q'` (not `${default@Q}`, which needs bash 4.4+) keeps this
+		# parseable under macOS's stock /bin/bash 3.2; both shell-quote the
+		# value so the later eval of clap_defaults stays safe.
+		clap_defaults="${clap_defaults}#NL${variable}=$(printf '%q' "$default")"
 	fi
 	clap_arguments_string="${clap_arguments_string}${shortname:-}"
 	if [ "${val:-}" = "\$OPTARG" ]; then
