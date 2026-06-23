@@ -13,7 +13,7 @@
    * the existing recovery card and remain a distinct concept.
    */
 
-  import { MailIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
+  import { MailCheckIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { anonymousActor } from "$lib/globals";
   import { invalidateAll } from "$app/navigation";
@@ -158,11 +158,7 @@
       onclick={() => (showAddWizard = true)}
       class="border-border-tertiary bg-bg-primary hover:border-border-secondary hover:bg-bg-primary_hover flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition-colors duration-200 outline-none"
     >
-      <span
-        class="bg-bg-secondary border-border-secondary text-fg-primary flex size-10 items-center justify-center rounded-full border"
-      >
-        <MailIcon class="size-5" aria-hidden="true" />
-      </span>
+      <MailCheckIcon class="text-fg-secondary size-7" aria-hidden="true" />
       <p class="text-text-tertiary max-w-xs text-sm">
         <Trans>
           No emails yet. Verify one so apps can use it to reach you.
