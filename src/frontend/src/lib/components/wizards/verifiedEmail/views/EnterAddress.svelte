@@ -57,7 +57,7 @@
     </h1>
     <p class="text-text-tertiary text-base font-medium">
       <Trans>
-        Verify an email address so dapps can use it to reach you. We'll ask you
+        Verify an email address so apps can use it to reach you. We'll ask you
         to send a signed email from this inbox to confirm.
       </Trans>
     </p>

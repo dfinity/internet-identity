@@ -156,16 +156,12 @@
          inert "no rows yet" placeholder. -->
     <button
       onclick={() => (showAddWizard = true)}
-      class="border-border-tertiary bg-bg-primary hover:border-border-secondary hover:bg-bg-primary_hover flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition-colors duration-200 outline-none"
+      class="border-border-tertiary bg-bg-primary hover:border-border-secondary hover:bg-bg-primary_hover flex flex-col items-center justify-center gap-2 rounded-sm border border-dashed px-6 py-10 text-center transition-colors duration-200 outline-none"
     >
       <MailCheckIcon class="text-fg-secondary size-7" aria-hidden="true" />
-      <p class="text-text-tertiary max-w-xs text-sm">
-        <Trans>
-          No emails yet. Verify one so apps can use it to reach you.
-        </Trans>
-      </p>
+      <p class="text-text-tertiary text-sm">{$t`No emails yet.`}</p>
       <span
-        class="text-text-primary inline-flex items-center gap-1.5 text-sm font-semibold"
+        class="text-text-primary mt-4 inline-flex items-center gap-1.5 text-sm font-semibold"
       >
         <PlusIcon class="size-4" aria-hidden="true" />
         {$t`Add an email`}
