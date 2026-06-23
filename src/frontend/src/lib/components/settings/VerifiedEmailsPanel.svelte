@@ -135,19 +135,29 @@
         <Trans>Only verified emails can be used to reach you.</Trans>
       </p>
     </div>
-    <button
-      class="btn btn-primary btn-sm shrink-0"
-      onclick={() => (showAddWizard = true)}
-      disabled={isFull}
-      aria-label={$t`Add an email`}
-    >
-      <PlusIcon class="size-4" aria-hidden="true" />
-      <span>{$t`Add an email`}</span>
-    </button>
+    {#if verifiedEmails.length > 0}
+      <button
+        class="btn btn-primary btn-sm shrink-0"
+        onclick={() => (showAddWizard = true)}
+        disabled={isFull}
+        aria-label={$t`Add an email`}
+      >
+        <PlusIcon class="size-4" aria-hidden="true" />
+        <span>{$t`Add an email`}</span>
+      </button>
+    {/if}
   </div>
 
   {#if verifiedEmails.length === 0}
-    <div class="flex flex-col items-center gap-3 px-6 py-7 text-center">
+    <!-- Dedicated empty-state container — mirrors the access page's
+         "Add new" idiom (a single full-width CTA card with icon +
+         label + click target) so the user has one clear next step
+         instead of a separate header-row Add button paired with an
+         inert "no rows yet" placeholder. -->
+    <button
+      onclick={() => (showAddWizard = true)}
+      class="border-border-tertiary bg-bg-primary hover:border-border-secondary hover:bg-bg-primary_hover flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition-colors duration-200 outline-none"
+    >
       <span
         class="bg-bg-secondary border-border-secondary text-fg-primary flex size-10 items-center justify-center rounded-full border"
       >
@@ -158,7 +168,13 @@
           No emails yet. Verify one so apps can use it to reach you.
         </Trans>
       </p>
-    </div>
+      <span
+        class="text-text-primary inline-flex items-center gap-1.5 text-sm font-semibold"
+      >
+        <PlusIcon class="size-4" aria-hidden="true" />
+        {$t`Add an email`}
+      </span>
+    </button>
   {:else}
     <ul class="flex flex-col gap-2">
       {#each verifiedEmails as entry (entry.address)}
