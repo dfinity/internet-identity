@@ -181,10 +181,13 @@ Common options:
                             file holding one or more `field = value;` lines
                             (e.g. mcp_server_origin = opt "https://mcp.id.ai";).
                             The escape hatch for any BE init field without a
-                            dedicated flag. Fields the script already manages
-                            (backend_canister_id, backend_origin,
-                            related_origins, openid_configs, dnssec_config,
-                            doh_config) are rejected — use their own flags.
+                            dedicated flag. Fields the script already sets are
+                            rejected; set those via their own path instead:
+                            backend_canister_id (from staging selection),
+                            backend_origin / related_origins (prompts),
+                            openid_configs (--openid-configs-file), and
+                            dnssec_config / doh_config
+                            (--update-email-recovery-init).
                             Encoding is type-checked against the deployed wasm.
   -h, --help                Show this help
 EOF
@@ -795,10 +798,12 @@ EXTRA
             # false positives on the same word appearing inside a value string.
             if printf '%s\n' "$extra_user" \
                     | grep -qE "^[[:space:]]*${managed}[[:space:]]*=" ; then
-                echo "Error: --be-extra-args-file sets '$managed', which this script already manages." >&2
-                echo "       Use its dedicated flag/prompt instead (--openid-configs-file," >&2
-                echo "       --update-email-recovery-init / --doh-domains, or the" >&2
-                echo "       backend_origin / related_origins prompts)." >&2
+                echo "Error: --be-extra-args-file sets '$managed', which this script already sets." >&2
+                echo "       Set it via its own path instead: backend_canister_id comes from the" >&2
+                echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin and" >&2
+                echo "       related_origins from the prompts; openid_configs from" >&2
+                echo "       --openid-configs-file; dnssec_config / doh_config from" >&2
+                echo "       --update-email-recovery-init." >&2
                 return 1
             fi
         done
