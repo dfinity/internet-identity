@@ -128,7 +128,7 @@
           class="border-border-tertiary text-text-secondary inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium"
           aria-label={$t`${verifiedEmails.length} of ${capacity} verified emails`}
         >
-          {verifiedEmails.length}
+          {verifiedEmails.length}/{capacity}
         </span>
       </div>
       <p class="text-text-tertiary text-sm">
