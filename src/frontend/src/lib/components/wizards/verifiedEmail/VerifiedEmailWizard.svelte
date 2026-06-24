@@ -170,10 +170,13 @@
           const { limit } = e.value("LimitReached");
           throw new Error(
             $t`You've reached the limit of ${limit} verified emails. Remove one to add another.`,
+            { cause: e },
           );
         }
         if (e.type === "InvalidEmailAddress") {
-          throw new Error($t`This doesn't look like a valid email address.`);
+          throw new Error($t`This doesn't look like a valid email address.`, {
+            cause: e,
+          });
         }
       }
       throw e;

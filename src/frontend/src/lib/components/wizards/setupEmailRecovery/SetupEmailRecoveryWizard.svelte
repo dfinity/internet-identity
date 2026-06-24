@@ -188,7 +188,9 @@
           return;
         }
         if (e.type === "InvalidEmailAddress") {
-          throw new Error($t`This doesn't look like a valid email address.`);
+          throw new Error($t`This doesn't look like a valid email address.`, {
+            cause: e,
+          });
         }
       }
       // Anything else propagates to EnterAddress's inline error.
