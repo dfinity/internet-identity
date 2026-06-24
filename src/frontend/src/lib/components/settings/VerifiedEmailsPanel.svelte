@@ -98,7 +98,7 @@
     void invalidateAll();
     toaster.success({
       title: $t`Email verified`,
-      description: $t`${address} is now available for apps to request.`,
+      description: $t`${address} has been added to your verified emails.`,
     });
   };
 
