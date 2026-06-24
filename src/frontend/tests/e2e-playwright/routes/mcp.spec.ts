@@ -72,12 +72,67 @@ test("A non-https, non-loopback callback is rejected", async ({
   ).toBeVisible();
 });
 
-test("After signing up, the connect screen shows", async ({ page, mcp }) => {
-  // Connecting is the opt-in: there is no separate device-local gate to flip,
-  // so a fresh sign-up lands straight on the connect screen.
+test("Signing up to an untrusted server prompts to add it in settings", async ({
+  page,
+  mcp,
+}) => {
+  // Each identity trusts no MCP server by default, and a fresh in-flow sign-up
+  // has no chance to pre-trust one, so it lands on the untrusted screen rather
+  // than connecting.
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
+  await expect(
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Manage trusted servers" }),
+  ).toBeVisible();
+});
+
+test("After trusting the server, the connect screen shows", async ({
+  page,
+  mcp,
+}) => {
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
+});
+
+test("Adding a trusted server in Settings unlocks the connect screen", async ({
+  page,
+  mcp,
+}) => {
+  // End-to-end: add the server via the Settings allowlist UI (not the seeding
+  // helper), then connecting to it reaches the connect screen.
+  await addVirtualAuthenticator(page);
+  // The best-effort reachability probe fetches the URL; fulfill it so the add
+  // is fast and deterministic instead of waiting on a real network failure.
+  await page.route(`${mcp.mcpOrigin}/**`, (route) =>
+    route.fulfill({ status: 200, body: "ok" }),
+  );
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+
+  await page.goto(II_URL + "/manage/settings");
+  await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
+  await page.getByRole("button", { name: "Add" }).click();
+  // The list shows the normalized origin (path dropped); its remove button's
+  // aria-label carries the full origin, so it's a unique, truncation-proof
+  // assertion that the server was added.
+  await expect(
+    page.getByRole("button", { name: `Remove ${mcp.mcpOrigin}` }),
+  ).toBeVisible();
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await expect(
     page.getByRole("button", { name: "Allow access" }),
   ).toBeVisible();
@@ -91,6 +146,7 @@ test("Returning user lands on the connect screen immediately", async ({
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await expect(
@@ -104,6 +160,7 @@ test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await page.getByRole("button", { name: "Allow access" }).click();
@@ -138,6 +195,7 @@ test("Identity switcher shows while signing in and hides on the success screen",
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   const switcher = page.getByRole("button", { name: "Switch identity" });
@@ -159,6 +217,7 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
 
   const before = Date.now();
   await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlMinutes }));

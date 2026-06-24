@@ -11,6 +11,8 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
+  import { parseMcpServerUrl } from "$lib/utils/mcpServer";
+  import { mcpTrustedServersStore } from "$lib/stores/mcp-trusted-servers.store";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
@@ -18,6 +20,7 @@
   import McpCloseWindowView from "./views/McpCloseWindowView.svelte";
   import McpErrorView from "./views/McpErrorView.svelte";
   import McpInvalidView from "./views/McpInvalidView.svelte";
+  import McpUntrustedView from "./views/McpUntrustedView.svelte";
   import { mcpAuthorize } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
@@ -37,26 +40,17 @@
   // loopback on 127.0.0.1 (not `localhost`, which can resolve off-loopback).
   // A disallowed (or unparsable) callback yields `undefined` → the invalid
   // screen, rather than a silent CSP block at submit time.
-  const mcpServer = $derived.by(
-    (): { origin: string; host: string } | undefined => {
-      if (params.kind !== "valid") {
-        return undefined;
-      }
-      let url: URL;
-      try {
-        url = new URL(params.callback);
-      } catch {
-        return undefined;
-      }
-      const isHttps = url.protocol === "https:";
-      const isHttpLoopback =
-        url.protocol === "http:" && url.hostname === "127.0.0.1";
-      if (!isHttps && !isHttpLoopback) {
-        return undefined;
-      }
-      return { origin: url.origin, host: url.host };
-    },
+  const mcpServer = $derived(
+    params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
+
+  // The chosen identity must have added this server to its trusted list (via
+  // Settings) before we connect it. The actual authority is the backend binding
+  // `mcp_set_access` creates on connect; this device-local allowlist is the
+  // user-controlled pre-gate that decides which servers reach that step.
+  const isServerTrusted = (identityNumber: bigint): boolean =>
+    mcpServer !== undefined &&
+    mcpTrustedServersStore.isTrusted(identityNumber, mcpServer.origin);
 
   // Origin used for canister account calls: remap a gateway origin
   // (*.icp0.io / *.icp.net) to *.ic0.app so the derived principal matches the
@@ -83,6 +77,12 @@
         mcpAuthorizeFunnel.close();
       } else {
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestReceived);
+        // A returning user whose selected identity hasn't trusted this server
+        // opens straight on the untrusted screen, so record that here (the
+        // post-sign-in path records it from the phase effect instead).
+        if (phase.kind === "untrusted") {
+          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
+        }
       }
     }
 
@@ -100,14 +100,16 @@
   type Phase =
     | { kind: "wizard" }
     | { kind: "authorize" }
+    | { kind: "untrusted" }
     | { kind: "close" }
     | { kind: "invalid" }
     | { kind: "error" };
 
   // The phase the page opens on. Outcomes the MCP server redirects back with
   // take priority; otherwise a returning user with a previously-used identity
-  // opens on the authorize (connect) screen, and a user with no last-used
-  // identity starts in the sign-in method wizard.
+  // opens on the connect screen (or the untrusted screen if that identity
+  // hasn't trusted this server), and a user with no last-used identity starts
+  // in the sign-in method wizard.
   const initialPhase = (): Phase => {
     if (status === "success") {
       return { kind: "close" };
@@ -119,32 +121,60 @@
       return { kind: "invalid" };
     }
     const selected = get(lastUsedIdentitiesStore).selected;
-    return selected !== undefined ? { kind: "authorize" } : { kind: "wizard" };
+    if (selected === undefined) {
+      return { kind: "wizard" };
+    }
+    return isServerTrusted(selected.identityNumber)
+      ? { kind: "authorize" }
+      : { kind: "untrusted" };
   };
 
   let phase = $state<Phase>(initialPhase());
 
-  // The switcher is only meaningful while the user is choosing how to sign in.
+  // The switcher is meaningful while the user is choosing/confirming an identity
+  // — including on the untrusted screen, where switching to an identity that
+  // does trust this server moves straight to the connect screen.
   $effect(() => {
     showIdentitySwitcher.set(
-      phase.kind === "wizard" || phase.kind === "authorize",
+      phase.kind === "wizard" ||
+        phase.kind === "authorize" ||
+        phase.kind === "untrusted",
     );
   });
 
-  // Once an identity has actually signed in (via the wizard here or the "use
-  // another identity" dialog in the layout), advance from the wizard to the
-  // connect step. Switching identity only *selects* and never authenticates, so
-  // it never triggers this. We also wait for `selected` to be populated:
-  // sign-up authenticates and *then* selects the identity, and the reused
-  // account picker (ContinueView) reads `selected` at mount, so advancing on
-  // authentication alone can mount it before `selected` is set.
+  // Manage the live sign-in phases (wizard → connect / untrusted). Terminal and
+  // redirect-outcome phases (close, error, invalid) are owned by the initial
+  // outcome and never re-evaluated here. Switching identity only *selects* (it
+  // doesn't authenticate), so we leave the wizard only once the chosen identity
+  // has actually authenticated — and only once `selected` is populated, since
+  // sign-up authenticates and *then* selects, and the reused picker reads
+  // `selected` at mount. On the connect/untrusted screens we re-derive trust
+  // whenever the selection changes.
   $effect(() => {
     if (
-      phase.kind === "wizard" &&
-      $isAuthenticatedStore &&
-      $lastUsedIdentitiesStore.selected !== undefined
+      phase.kind !== "wizard" &&
+      phase.kind !== "authorize" &&
+      phase.kind !== "untrusted"
     ) {
-      phase = { kind: "authorize" };
+      return;
+    }
+    const selected = $lastUsedIdentitiesStore.selected;
+    if (selected === undefined) {
+      if (phase.kind !== "wizard") {
+        phase = { kind: "wizard" };
+      }
+      return;
+    }
+    if (phase.kind === "wizard" && !$isAuthenticatedStore) {
+      return;
+    }
+    if (isServerTrusted(selected.identityNumber)) {
+      if (phase.kind !== "authorize") {
+        phase = { kind: "authorize" };
+      }
+    } else if (phase.kind !== "untrusted") {
+      mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
+      phase = { kind: "untrusted" };
     }
   });
 
@@ -227,6 +257,8 @@
     displayOrigin={mcpServer.origin}
     onAuthorize={handleAuthorize}
   />
+{:else if phase.kind === "untrusted" && mcpServer !== undefined}
+  <McpUntrustedView mcpServerHost={mcpServer.host} />
 {:else if phase.kind === "close"}
   <McpCloseWindowView />
 {/if}

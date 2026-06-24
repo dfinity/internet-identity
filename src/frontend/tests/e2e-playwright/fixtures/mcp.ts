@@ -1,6 +1,7 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { test as base, type Page } from "@playwright/test";
 import { toBase64URL } from "../../../src/lib/utils/utils";
+import { storeLocalStorageKey } from "../../../src/lib/constants/store.constants";
 import { II_URL } from "../utils";
 
 /** What the MCP server stand-in does on its next form POST. */
@@ -37,6 +38,14 @@ export type McpFixture = {
   receivedDelegations: unknown[];
   /** Sets what the MCP server stand-in does on its next form POST. */
   setNextOutcome: (outcome: McpOutcome) => void;
+  /**
+   * Seeds the device-local trusted-servers allowlist so the connect flow treats
+   * this fixture's MCP origin as trusted for the already-signed-up identity.
+   * Call after sign-up and before navigating to `/mcp`. Without it the flow
+   * lands on the "untrusted" screen, since each identity trusts nothing by
+   * default.
+   */
+  trustServer: (page: Page) => Promise<void>;
   /**
    * Installs the form-POST interceptor on `page`. Must be called before the
    * flow submits the delegation. Reads the posted `delegation`/`state` and
@@ -106,6 +115,37 @@ export const test = base.extend<{ mcp: McpFixture }>({
       });
     };
 
+    const trustServer = async (page: Page): Promise<void> => {
+      await page.evaluate(
+        ({ trustedKey, lastUsedKey, origin }) => {
+          const raw = localStorage.getItem(lastUsedKey);
+          if (raw === null) {
+            throw new Error("trustServer: no last-used identities to trust for");
+          }
+          const parsed = JSON.parse(raw) as { data?: Record<string, unknown> };
+          const identityNumbers = Object.keys(parsed.data ?? {});
+          if (identityNumbers.length === 0) {
+            throw new Error("trustServer: no identity number in localStorage");
+          }
+          // Trust the origin for every known identity (tests sign up exactly
+          // one), matching the writableStored `{ data, version }` envelope.
+          const trusted: Record<string, string[]> = {};
+          for (const num of identityNumbers) {
+            trusted[num] = [origin];
+          }
+          localStorage.setItem(
+            trustedKey,
+            JSON.stringify({ data: trusted, version: 1 }),
+          );
+        },
+        {
+          trustedKey: storeLocalStorageKey.McpTrustedServers,
+          lastUsedKey: storeLocalStorageKey.LastUsedIdentities,
+          origin: MCP_SERVER_ORIGIN,
+        },
+      );
+    };
+
     const buildAuthorizeUrl = (opts: {
       app: string;
       ttlMinutes?: number;
@@ -130,6 +170,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
       receivedDelegation,
       receivedDelegations,
       setNextOutcome,
+      trustServer,
       installInterceptor,
       buildAuthorizeUrl,
     });
