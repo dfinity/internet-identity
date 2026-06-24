@@ -89,23 +89,29 @@
       .email_recovery_prepare_delegation(input, sessionPublicKey)
       .then(throwCanisterError);
 
+  // Recovery-as-login keeps calling the original `email_recovery_*`
+  // method names (the BE exposes them as aliases of the renamed
+  // `email_challenge_*` surface) so the FE bundle stays compatible
+  // with both the pre-rename BE and the post-rename BE during a
+  // staggered deploy.
+
   const emailRecoveryStatus = (nonce: string) =>
-    anonymousActor.email_challenge_status(nonce);
+    anonymousActor.email_recovery_status(nonce);
 
   const emailRecoveryDiagnostics = (nonce: string) =>
-    anonymousActor.email_challenge_diagnostics(nonce);
+    anonymousActor.email_recovery_diagnostics(nonce);
 
   const submitEmailDkimLeaf = async (
     arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_challenge_submit_dkim_leaf(arg),
+      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
     );
   };
 
   const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
+      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
     );
   };
 

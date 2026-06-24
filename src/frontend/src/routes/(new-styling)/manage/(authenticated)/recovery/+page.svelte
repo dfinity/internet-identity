@@ -273,29 +273,35 @@
       )
       .then(throwCanisterError);
 
-  /** Anonymous wrapper around `email_challenge_status` (query). */
+  // Recovery flow keeps calling the original `email_recovery_*` method
+  // names (the BE exposes them as aliases of the renamed
+  // `email_challenge_*` surface). This keeps the FE bundle compatible
+  // with both the pre-rename BE and the post-rename BE, so the
+  // recovery flow doesn't break in an FE-first deploy window.
+
+  /** Anonymous wrapper around `email_recovery_status` (query). */
   const statusEmailRecovery = (nonce: string) =>
-    anonymousActor.email_challenge_status(nonce);
+    anonymousActor.email_recovery_status(nonce);
 
-  /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
+  /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
   const diagnosticsEmailRecovery = (nonce: string) =>
-    anonymousActor.email_challenge_diagnostics(nonce);
+    anonymousActor.email_recovery_diagnostics(nonce);
 
-  /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. Accept-only:
+  /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
    *  rejects on a call-level error, otherwise resolves void (poll for the
    *  verdict). */
   const submitEmailDkimLeaf = async (
     arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_challenge_submit_dkim_leaf(arg),
+      await anonymousActor.email_recovery_submit_dkim_leaf(arg),
     );
   };
 
-  /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
+  /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
   const resolveEmailViaDoh = async (nonce: string): Promise<void> => {
     await throwCanisterError(
-      await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
+      await anonymousActor.email_recovery_resolve_via_doh({ nonce }),
     );
   };
 

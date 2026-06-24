@@ -1809,6 +1809,21 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : EmailChallengeError }
   >,
+  'email_recovery_diagnostics' : ActorMethod<
+    [string],
+    [] | [EmailChallengeDiagnostics]
+  >,
+  'email_recovery_resolve_via_doh' : ActorMethod<
+    [EmailChallengeResolveViaDohArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
+  >,
+  'email_recovery_status' : ActorMethod<[string], EmailChallengeStatus>,
+  'email_recovery_submit_dkim_leaf' : ActorMethod<
+    [EmailChallengeSubmitDkimLeafArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
+  >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   /**

@@ -10,10 +10,10 @@
    *      call `email_recovery_credential_prepare_add`, and show the
    *      canister-issued nonce + recipient mailbox.
    *   3. User sends a DKIM-signed email containing that nonce; we
-   *      poll `email_challenge_status`. The first non-Pending result
+   *      poll the challenge-status query. The first non-Pending result
    *      is `NeedDkimLeaf { selector }` (DNSSEC path) — at which
-   *      point we walk that one DKIM leaf and call
-   *      `email_challenge_submit_dkim_leaf`. We then keep polling
+   *      point we walk that one DKIM leaf and submit it via the
+   *      challenge submit-leaf method. We then keep polling
    *      until status flips to `RegistrationSucceeded` (or terminal
    *      Failed/Expired). On the DoH path the canister finishes
    *      verification synchronously inside `smtp_request`, so we go
@@ -50,14 +50,15 @@
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
     prepare: (input: EmailChallengeDnsInput) => Promise<EmailChallenge>;
-    /** Anonymous wrapper around `email_challenge_status` (query). */
+    /** Anonymous wrapper around the challenge-status query. */
     status: (nonce: string) => Promise<EmailChallengeStatus>;
-    /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
+    /** Anonymous wrapper around the challenge-diagnostics query. */
     diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
-    /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. Accept-only:
-     *  rejects on a call-level error, else resolves void (poll for verdict). */
+    /** Anonymous wrapper around the challenge submit-dkim-leaf method.
+     *  Accept-only: rejects on a call-level error, else resolves void
+     *  (poll for verdict). */
     submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
+    /** Anonymous wrapper around the challenge resolve-via-doh method. */
     resolveViaDoh: (nonce: string) => Promise<void>;
     /** Called once on `RegistrationSucceeded`. The host is expected to
      *  show a success toast and close the dialog. */

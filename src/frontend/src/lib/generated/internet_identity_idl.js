@@ -953,6 +953,26 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
         [],
       ),
+    'email_recovery_diagnostics' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(EmailChallengeDiagnostics)],
+        ['query'],
+      ),
+    'email_recovery_resolve_via_doh' : IDL.Func(
+        [EmailChallengeResolveViaDohArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
+        [],
+      ),
+    'email_recovery_status' : IDL.Func(
+        [IDL.Text],
+        [EmailChallengeStatus],
+        ['query'],
+      ),
+    'email_recovery_submit_dkim_leaf' : IDL.Func(
+        [EmailChallengeSubmitDkimLeafArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
+        [],
+      ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
