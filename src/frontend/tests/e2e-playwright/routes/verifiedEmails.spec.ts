@@ -46,7 +46,7 @@ test.describe("Verified emails — wizard surface", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByRole("heading", { name: "Verify an email" }),
+      dialog.getByRole("heading", { name: "Verify your email address" }),
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();

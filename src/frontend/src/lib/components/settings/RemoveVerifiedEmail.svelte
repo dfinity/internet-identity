@@ -30,12 +30,12 @@
     <Trash2Icon class="size-5" />
   </FeaturedIcon>
   <h1 class="text-text-primary text-xl font-medium">
-    {$t`Remove this email?`}
+    {$t`Forget this email?`}
   </h1>
   <p class="text-text-secondary mb-6 text-sm">
     <Trans>
       <strong class="text-text-primary break-all">{address}</strong> will no longer
-      be available for apps to reach you. You can verify it again later.
+      be associated with your Internet Identity.
     </Trans>
   </p>
   <div class="mt-auto flex flex-row items-stretch gap-3">

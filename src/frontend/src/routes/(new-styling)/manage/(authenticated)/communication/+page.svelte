@@ -30,9 +30,14 @@
 </script>
 
 <header class="flex flex-col gap-3">
-  <h1 class="text-text-primary text-3xl font-medium">{$t`Communication`}</h1>
+  <h1 class="text-text-primary text-3xl font-medium">
+    {$t`Associated emails`}
+  </h1>
   <p class="text-text-tertiary text-base">
-    <Trans>How apps can reach you when you sign in.</Trans>
+    <Trans>
+      You can choose emails from this list to provide email confirmation when an
+      app requests it. Without your consent, your emails are always kept secret.
+    </Trans>
   </p>
 </header>
 

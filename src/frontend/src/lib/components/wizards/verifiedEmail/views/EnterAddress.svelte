@@ -53,12 +53,11 @@
 <form onsubmit={handleSubmit} class="flex flex-col gap-6">
   <header class="flex flex-col gap-2">
     <h1 class="text-text-primary text-2xl font-medium">
-      {$t`Verify an email`}
+      {$t`Verify your email address`}
     </h1>
     <p class="text-text-tertiary text-base font-medium">
       <Trans>
-        Verify an email address so apps can use it to reach you. We'll ask you
-        to send a signed email from this inbox to confirm.
+        We'll ask you to send a signed email from this inbox to confirm.
       </Trans>
     </p>
   </header>

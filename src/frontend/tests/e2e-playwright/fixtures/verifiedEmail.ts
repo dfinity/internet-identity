@@ -26,7 +26,7 @@ class VerifiedEmailWizard {
 
   async enterAddress(address: string): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", { name: "Verify an email" }),
+      this.#view.getByRole("heading", { name: "Verify your email address" }),
     ).toBeVisible();
     await this.#view
       .getByRole("textbox", { name: "Email address" })
@@ -35,10 +35,15 @@ class VerifiedEmailWizard {
   }
 
   /** Step 2: assert the verify-email view rendered with the right
-   *  recipient and an `II-Verify-` nonce in the Subject. */
+   *  recipient and an `II-Verify-` nonce in the Subject. `exact` so
+   *  this matcher doesn't bleed onto the step-1 "Verify your email
+   *  address" heading. */
   async expectVerifyEmailView(): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", { name: "Verify your email" }),
+      this.#view.getByRole("heading", {
+        name: "Verify your email",
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(this.#view.getByText("register@id.ai")).toBeVisible();
     await expect(this.#view.getByText(/II-Verify-[0-9a-f]{16}/)).toBeVisible();
@@ -85,11 +90,11 @@ class VerifiedEmailFixtures {
     await this.#page.goto(II_URL + "/manage/communication");
   }
 
-  /** The "Communication" page sits on its own top-level route under
-   *  /manage; assert the page header and the panel rendered. */
+  /** The "Associated emails" page sits on its own top-level route
+   *  under /manage; assert the page header and the panel rendered. */
   async assertPanelVisible(): Promise<void> {
     await expect(
-      this.#page.getByRole("heading", { name: "Communication", level: 1 }),
+      this.#page.getByRole("heading", { name: "Associated emails", level: 1 }),
     ).toBeVisible();
     await expect(
       this.#page.getByRole("heading", { name: "Email addresses", level: 2 }),

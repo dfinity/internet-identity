@@ -344,19 +344,19 @@
         <MailPlusIcon class="size-7" />
       </div>
       <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-        {$t`Add a verified email`}
+        {$t`Associate an email address with your Internet Identity`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
         <Trans>
-          This app would like to reach you by email. You can verify an address
-          now to share it, or skip and continue without sharing.
+          This app is requesting your email address. You can verify your email
+          address now and share it, or skip and continue without sharing.
         </Trans>
       </p>
       <button
         class="btn btn-primary btn-xl mb-3 w-full"
         onclick={() => (showVerifyWizard = true)}
       >
-        {$t`Verify an email`}
+        {$t`Verify an email address`}
       </button>
       <button class="btn btn-tertiary btn-xl w-full" onclick={handleSkip}>
         {$t`Skip for now`}

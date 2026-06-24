@@ -426,7 +426,7 @@ test.describe("Authorize — explicit consent UI", () => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       await expect(
         authorizePage.page.getByRole("heading", {
-          name: "Add a verified email",
+          name: "Associate an email address with your Internet Identity",
         }),
       ).toBeVisible();
       await authorizePage.page
