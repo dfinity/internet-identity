@@ -2,7 +2,6 @@
   import { PlusIcon, Trash2Icon } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Input from "$lib/components/ui/Input.svelte";
-  import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { Trans } from "$lib/components/locale";
@@ -120,7 +119,7 @@
       class="flex-1"
       placeholder="https://mcp.example.com/mcp"
       aria-label={$t`MCP server URL`}
-      error={error}
+      {error}
       disabled={checking}
       autocomplete="off"
       autocapitalize="off"

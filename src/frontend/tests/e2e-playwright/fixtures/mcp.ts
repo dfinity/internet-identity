@@ -116,33 +116,31 @@ export const test = base.extend<{ mcp: McpFixture }>({
     };
 
     const trustServer = async (page: Page): Promise<void> => {
+      // Read just the signed-up identity number(s) out of the last-used store.
+      const identityNumbers = await page.evaluate((lastUsedKey) => {
+        const raw = localStorage.getItem(lastUsedKey);
+        if (raw === null) {
+          return [] as string[];
+        }
+        const parsed = JSON.parse(raw) as { data?: Record<string, unknown> };
+        return Object.keys(parsed.data ?? {});
+      }, storeLocalStorageKey.LastUsedIdentities);
+      if (identityNumbers.length === 0) {
+        throw new Error("trustServer: no identity number in localStorage");
+      }
+      // Build the trusted-servers envelope in Node (matching writableStored's
+      // `{ data, version }` shape — tests sign up exactly one identity) and
+      // write the finished string back. Keeping the read and the write in
+      // separate evaluates means the page-side write just persists a known
+      // constant, not data read from storage in the same step.
+      const trusted: Record<string, string[]> = {};
+      for (const num of identityNumbers) {
+        trusted[num] = [MCP_SERVER_ORIGIN];
+      }
+      const value = JSON.stringify({ data: trusted, version: 1 });
       await page.evaluate(
-        ({ trustedKey, lastUsedKey, origin }) => {
-          const raw = localStorage.getItem(lastUsedKey);
-          if (raw === null) {
-            throw new Error("trustServer: no last-used identities to trust for");
-          }
-          const parsed = JSON.parse(raw) as { data?: Record<string, unknown> };
-          const identityNumbers = Object.keys(parsed.data ?? {});
-          if (identityNumbers.length === 0) {
-            throw new Error("trustServer: no identity number in localStorage");
-          }
-          // Trust the origin for every known identity (tests sign up exactly
-          // one), matching the writableStored `{ data, version }` envelope.
-          const trusted: Record<string, string[]> = {};
-          for (const num of identityNumbers) {
-            trusted[num] = [origin];
-          }
-          localStorage.setItem(
-            trustedKey,
-            JSON.stringify({ data: trusted, version: 1 }),
-          );
-        },
-        {
-          trustedKey: storeLocalStorageKey.McpTrustedServers,
-          lastUsedKey: storeLocalStorageKey.LastUsedIdentities,
-          origin: MCP_SERVER_ORIGIN,
-        },
+        ({ trustedKey, value }) => localStorage.setItem(trustedKey, value),
+        { trustedKey: storeLocalStorageKey.McpTrustedServers, value },
       );
     };
 
