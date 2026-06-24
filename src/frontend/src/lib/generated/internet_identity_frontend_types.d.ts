@@ -45,13 +45,6 @@ export interface InternetIdentityFrontendInit {
   'dev_csp' : [] | [boolean],
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   /**
-   * Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
-   * slash). The /mcp delegation flow delivers the delegation to this origin
-   * only (it's added to the form-action CSP and /mcp rejects callbacks on any
-   * other origin). When unset, the /mcp flow is disabled.
-   */
-  'mcp_server_origin' : [] | [string],
-  /**
    * Frontend feature flag overrides keyed by flag name, e.g.
    * record { "EMAIL_RECOVERY"; true }. Sets the deployment-level baseline for
    * each flag; localStorage, the flag's init callback and ?feature_flag_* URL

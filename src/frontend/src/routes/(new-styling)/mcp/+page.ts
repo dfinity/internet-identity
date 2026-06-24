@@ -8,13 +8,14 @@ const DEFAULT_TTL_MINUTES = 60;
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
  * browser to. `valid` carries the validated request — the session public key to
  * delegate to, the callback to post the delegation back to, the single-use
- * `state` echoed back to the MCP server, and the delegation TTL. The account the
- * delegation acts as is the user's default account at the configured MCP server
- * origin (II config), not a request parameter. `invalid` means the fragment was
- * missing or malformed.
+ * `state` echoed back to the MCP server, and the delegation TTL. The MCP server
+ * the user connects is identified by the callback's origin (each user trusts
+ * whichever server they connect), and the account is chosen in the picker.
+ * `invalid` means the fragment was missing or malformed.
  *
- * The callback's origin is checked against the configured MCP server origin in
- * the page component (where the canister config is available), not here.
+ * Whether the callback origin is one the connect flow accepts (https, or http
+ * loopback for a self-hosted server) is checked in the page component, which
+ * shows a clean invalid screen and mirrors the `form-action` CSP.
  */
 export type McpParams =
   | {
@@ -55,9 +56,10 @@ const parseBase64Url = (raw: string | null): string | undefined => {
 };
 
 /**
- * Structural callback check: must be an absolute http(s) URL. The exact origin
- * match against the configured MCP server origin happens in the component — the
- * canister config isn't available here (this `load` also runs at prerender).
+ * Structural callback check: must be an absolute http(s) URL. The stricter
+ * "is this an origin the connect flow accepts" check (https, or http loopback)
+ * happens in the component, alongside the consent UI — keeping this `load`
+ * minimal since it also runs at prerender.
  */
 const parseCallback = (raw: string | null): string | undefined => {
   if (raw === null || raw === "") {

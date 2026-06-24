@@ -5,21 +5,17 @@
     authenticationStore,
   } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { sessionStore } from "$lib/stores/session.store";
-  import { mcpAccessStore } from "$lib/stores/mcp-access.store";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import { t } from "$lib/stores/locale.store";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { getMcpServerOrigin } from "$lib/globals";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
   import McpAuthorizeView from "./views/McpAuthorizeView.svelte";
   import McpCloseWindowView from "./views/McpCloseWindowView.svelte";
-  import McpDisabledView from "./views/McpDisabledView.svelte";
   import McpErrorView from "./views/McpErrorView.svelte";
   import McpInvalidView from "./views/McpInvalidView.svelte";
   import { mcpAuthorize } from "./utils";
@@ -33,54 +29,45 @@
   const params = $derived(data.params);
   const status = $derived(data.status);
 
-  // The MCP server is configured as a deploy arg; when unset (or misconfigured)
-  // the flow is disabled. The delegation is delivered to this origin only.
-  // Parse it once, defensively: a malformed value is treated as unset so the
-  // route shows the invalid screen rather than throwing during render.
-  const mcpServer = ((): { origin: string; host: string } | undefined => {
-    const raw = getMcpServerOrigin();
-    if (raw === undefined) {
-      return undefined;
-    }
-    try {
-      const url = new URL(raw);
+  // The MCP server the user is connecting is identified by the origin of the
+  // request's callback: each user trusts whichever server they connect (a public
+  // https server, or one they run locally on http://127.0.0.1). The standing
+  // delegation is delivered there via a top-level form-POST, so we only accept
+  // callbacks the /mcp `form-action` CSP allows — any https origin, or http
+  // loopback on 127.0.0.1 (not `localhost`, which can resolve off-loopback).
+  // A disallowed (or unparsable) callback yields `undefined` → the invalid
+  // screen, rather than a silent CSP block at submit time.
+  const mcpServer = $derived.by(
+    (): { origin: string; host: string } | undefined => {
+      if (params.kind !== "valid") {
+        return undefined;
+      }
+      let url: URL;
+      try {
+        url = new URL(params.callback);
+      } catch {
+        return undefined;
+      }
+      const isHttps = url.protocol === "https:";
+      const isHttpLoopback =
+        url.protocol === "http:" && url.hostname === "127.0.0.1";
+      if (!isHttps && !isHttpLoopback) {
+        return undefined;
+      }
       return { origin: url.origin, host: url.host };
-    } catch {
-      return undefined;
-    }
-  })();
-  const mcpServerHost = mcpServer?.host;
+    },
+  );
 
-  // The request's callback must point at the configured MCP server origin. This
-  // mirrors the `form-action` CSP, which only allows that origin — checking it
-  // here lets us show a clean invalid screen instead of a silent CSP block.
-  const callbackMatchesMcpServer = (callback: string): boolean => {
-    if (mcpServer === undefined) {
-      return false;
-    }
-    try {
-      return new URL(callback).origin === mcpServer.origin;
-    } catch {
-      return false;
-    }
-  };
+  // Origin used for canister account calls: remap a gateway origin
+  // (*.icp0.io / *.icp.net) to *.ic0.app so the derived principal matches the
+  // one /authorize derives for that origin.
+  const effectiveOrigin = $derived(
+    mcpServer !== undefined ? remapToLegacyDomain(mcpServer.origin) : undefined,
+  );
+
   const requestValid = $derived(
-    params.kind === "valid" && callbackMatchesMcpServer(params.callback),
+    params.kind === "valid" && mcpServer !== undefined,
   );
-
-  const authFlow = new AuthLastUsedFlow();
-  $effect(() =>
-    authFlow.init(
-      Object.values($lastUsedIdentitiesStore.identities).map(
-        ({ identityNumber }) => identityNumber,
-      ),
-    ),
-  );
-
-  // MCP is always app-scoped, so the chosen identity must have MCP access
-  // enabled on this device.
-  const isMcpAccessGated = (identityNumber: bigint | undefined): boolean =>
-    identityNumber !== undefined && !mcpAccessStore.isEnabled(identityNumber);
 
   onMount(() => {
     // A redirect back from the MCP server carries an outcome `status`; a fresh
@@ -96,12 +83,6 @@
         mcpAuthorizeFunnel.close();
       } else {
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestReceived);
-        // A returning user without device MCP access opens straight on the
-        // gated screen, so record that terminal outcome here.
-        if (phase.kind === "mcp-disabled") {
-          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.AccessDisabled);
-          mcpAuthorizeFunnel.close();
-        }
       }
     }
 
@@ -120,14 +101,13 @@
     | { kind: "wizard" }
     | { kind: "authorize" }
     | { kind: "close" }
-    | { kind: "mcp-disabled" }
     | { kind: "invalid" }
     | { kind: "error" };
 
   // The phase the page opens on. Outcomes the MCP server redirects back with
   // take priority; otherwise a returning user with a previously-used identity
-  // opens on the authorize screen, and a user with no last-used identity starts
-  // in the sign-in method wizard.
+  // opens on the authorize (connect) screen, and a user with no last-used
+  // identity starts in the sign-in method wizard.
   const initialPhase = (): Phase => {
     if (status === "success") {
       return { kind: "close" };
@@ -139,15 +119,7 @@
       return { kind: "invalid" };
     }
     const selected = get(lastUsedIdentitiesStore).selected;
-    if (selected !== undefined) {
-      // MCP access is a device-local flag we can read up front, so when it's
-      // off for this identity show the gated screen immediately rather than the
-      // Allow access button followed by a gate after sign-in.
-      return isMcpAccessGated(selected.identityNumber)
-        ? { kind: "mcp-disabled" }
-        : { kind: "authorize" };
-    }
-    return { kind: "wizard" };
+    return selected !== undefined ? { kind: "authorize" } : { kind: "wizard" };
   };
 
   let phase = $state<Phase>(initialPhase());
@@ -161,59 +133,49 @@
 
   // Once an identity has actually signed in (via the wizard here or the "use
   // another identity" dialog in the layout), advance from the wizard to the
-  // authorize step. Switching identity only *selects* and never authenticates,
-  // so it never triggers this.
+  // connect step. Switching identity only *selects* and never authenticates, so
+  // it never triggers this.
   $effect(() => {
     if (phase.kind === "wizard" && $isAuthenticatedStore) {
-      phase = isMcpAccessGated($authenticationStore?.identityNumber)
-        ? { kind: "mcp-disabled" }
-        : { kind: "authorize" };
+      phase = { kind: "authorize" };
     }
   });
 
-  const handleAuthorize = async (): Promise<void> => {
-    if (params.kind !== "valid" || mcpServer === undefined) {
+  // Invoked by the reused account picker once it has authenticated the selected
+  // identity and resolved the chosen account. Connecting performs the opt-in
+  // (`mcp_set_access`) and delivers the standing delegation to the MCP server.
+  const handleAuthorize = (
+    accountNumberPromise: Promise<bigint | undefined>,
+  ): void => {
+    const server = mcpServer;
+    if (params.kind !== "valid" || server === undefined) {
       return;
     }
-    const selected = $lastUsedIdentitiesStore.selected;
-    if (selected === undefined) {
-      return;
-    }
+    const request = params;
     mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Confirmed);
-    try {
-      // The Allow access button is the single sign-in point: switching identity
-      // only selects, so authenticate the selected identity now if it isn't
-      // already the active session.
-      if ($authenticationStore?.identityNumber !== selected.identityNumber) {
-        sessionStore.reset();
-        await authFlow.authenticate(
-          $lastUsedIdentitiesStore.identities[`${selected.identityNumber}`],
-        );
+    void (async () => {
+      try {
+        const accountNumber = await accountNumberPromise;
+        const authenticated = get(authenticationStore);
+        if (authenticated === undefined) {
+          return;
+        }
+        // On success `mcpAuthorize` navigates the browser to the MCP server,
+        // which redirects back here with a status — so a resolved promise means
+        // the chain was built and submitted, not that we stay on this page.
+        await mcpAuthorize({
+          authenticated,
+          publicKey: request.publicKey,
+          mcpServerOrigin: server.origin,
+          accountNumber,
+          ttlMinutes: request.ttlMinutes,
+          callback: request.callback,
+          state: request.state,
+        });
+      } catch (error) {
+        handleError(error);
       }
-      const authenticated = get(authenticationStore);
-      if (authenticated === undefined) {
-        return;
-      }
-      if (isMcpAccessGated(authenticated.identityNumber)) {
-        mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.AccessDisabled);
-        mcpAuthorizeFunnel.close();
-        phase = { kind: "mcp-disabled" };
-        return;
-      }
-      // On success `mcpAuthorize` navigates the browser to the MCP server,
-      // which redirects back here with a status — so a resolved promise means
-      // the chain was built and submitted, not that we stay on this page.
-      await mcpAuthorize({
-        authenticated,
-        publicKey: params.publicKey,
-        mcpServerOrigin: mcpServer.origin,
-        ttlMinutes: params.ttlMinutes,
-        callback: params.callback,
-        state: params.state,
-      });
-    } catch (error) {
-      handleError(error);
-    }
+    })();
   };
 
   const wizardSignInHandlers = {
@@ -237,24 +199,27 @@
   <McpInvalidView />
 {:else if phase.kind === "error"}
   <McpErrorView />
-{:else if phase.kind === "wizard" && params.kind === "valid" && mcpServerHost !== undefined}
+{:else if phase.kind === "wizard" && mcpServer !== undefined}
   <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
     <AuthPanel>
-      <McpHero mcpServer={mcpServerHost} />
+      <McpHero mcpServer={mcpServer.host} />
       <AuthWizard {...wizardSignInHandlers}>
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
           {$t`Choose method`}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
-          {$t`to connect ${mcpServerHost}`}
+          {$t`to connect ${mcpServer.host}`}
         </p>
       </AuthWizard>
     </AuthPanel>
   </div>
-{:else if phase.kind === "authorize" && params.kind === "valid" && mcpServerHost !== undefined}
-  <McpAuthorizeView mcpServer={mcpServerHost} onAuthorize={handleAuthorize} />
-{:else if phase.kind === "mcp-disabled"}
-  <McpDisabledView />
+{:else if phase.kind === "authorize" && mcpServer !== undefined && effectiveOrigin !== undefined}
+  <McpAuthorizeView
+    mcpServerHost={mcpServer.host}
+    {effectiveOrigin}
+    displayOrigin={mcpServer.origin}
+    onAuthorize={handleAuthorize}
+  />
 {:else if phase.kind === "close"}
   <McpCloseWindowView />
 {/if}
