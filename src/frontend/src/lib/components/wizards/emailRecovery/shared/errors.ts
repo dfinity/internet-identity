@@ -84,7 +84,9 @@ export const EXPIRED_MESSAGE =
  * `*-failed` / `*-unsupported-domain` events. Falls back to `unknown`
  * so a partial candid-shape change doesn't drop the event entirely.
  */
-export const plausibleFailureReason = (status: EmailChallengeStatus): string => {
+export const plausibleFailureReason = (
+  status: EmailChallengeStatus,
+): string => {
   if ("Failed" in status) {
     return Object.keys(status.Failed)[0] ?? "unknown";
   }
