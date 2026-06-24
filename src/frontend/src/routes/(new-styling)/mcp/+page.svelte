@@ -250,7 +250,7 @@
       </AuthWizard>
     </AuthPanel>
   </div>
-{:else if phase.kind === "authorize" && mcpServer !== undefined && effectiveOrigin !== undefined}
+{:else if phase.kind === "authorize" && mcpServer !== undefined && effectiveOrigin !== undefined && $lastUsedIdentitiesStore.selected !== undefined}
   <McpAuthorizeView
     mcpServerHost={mcpServer.host}
     {effectiveOrigin}

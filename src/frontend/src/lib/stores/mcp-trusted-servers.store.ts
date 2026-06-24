@@ -1,4 +1,4 @@
-import { derived, get, type Readable } from "svelte/store";
+import { get, type Readable } from "svelte/store";
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { writableStored } from "./writable.store";
 
@@ -23,8 +23,6 @@ type McpTrustedServersState = {
 };
 
 type McpTrustedServersStore = Readable<McpTrustedServersState> & {
-  /** Trusted origins for an identity (empty array when none). */
-  list: (identityNumber: bigint) => string[];
   isTrusted: (identityNumber: bigint, origin: string) => boolean;
   /** Adds a normalized origin; idempotent. */
   add: (identityNumber: bigint, origin: string) => void;
@@ -45,7 +43,6 @@ export const initMcpTrustedServersStore = (): McpTrustedServersStore => {
 
   return {
     subscribe: store.subscribe,
-    list: (identityNumber) => originsFor(get(store), identityNumber),
     isTrusted: (identityNumber, origin) =>
       originsFor(get(store), identityNumber).includes(origin),
     add: (identityNumber, origin) => {
@@ -75,9 +72,3 @@ export const initMcpTrustedServersStore = (): McpTrustedServersStore => {
 };
 
 export const mcpTrustedServersStore = initMcpTrustedServersStore();
-
-/** Reactive list of trusted origins for a specific identity. */
-export const trustedMcpServersStore = (
-  identityNumber: bigint,
-): Readable<string[]> =>
-  derived(mcpTrustedServersStore, (state) => originsFor(state, identityNumber));
