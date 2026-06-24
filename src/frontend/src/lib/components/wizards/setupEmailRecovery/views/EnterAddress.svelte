@@ -1,6 +1,5 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
-  import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -86,12 +85,20 @@
     autofocus
   />
   {#if overlapsVerified}
-    <Alert
-      variant="warning"
-      direction="horizontal"
-      title={$t`Using a shareable email isn't recommended`}
-      description={$t`Recovery is best kept as a private mailbox, separate from the addresses you share with apps — that way, losing access to one doesn't lock you out of the other.`}
-    />
+    <div
+      class="border-fg-warning-primary bg-bg-warning-primary flex flex-col gap-1 rounded-xl border p-4"
+    >
+      <div class="text-text-warning-primary text-sm font-semibold">
+        {$t`Using a shareable email isn't recommended`}
+      </div>
+      <div class="text-text-warning-primary text-sm">
+        <Trans>
+          Recovery is best kept as a private mailbox, separate from the
+          addresses you share with apps — that way, losing access to one doesn't
+          lock you out of the other.
+        </Trans>
+      </div>
+    </div>
   {/if}
   <button
     class="btn btn-primary btn-lg"

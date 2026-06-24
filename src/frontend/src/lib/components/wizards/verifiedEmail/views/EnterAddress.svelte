@@ -1,6 +1,5 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
-  import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -111,12 +110,20 @@
     autofocus={!addressLocked}
   />
   {#if overlapsRecovery}
-    <Alert
-      variant="warning"
-      direction="horizontal"
-      title={$t`This is your recovery email — best not to share it`}
-      description={$t`Verifying it here lets apps request it. Your recovery email is meant to stay private so it can serve as a backup if you lose access to your identity.`}
-    />
+    <div
+      class="border-fg-warning-primary bg-bg-warning-primary flex flex-col gap-1 rounded-xl border p-4"
+    >
+      <div class="text-text-warning-primary text-sm font-semibold">
+        {$t`This is your recovery email — best not to share it`}
+      </div>
+      <div class="text-text-warning-primary text-sm">
+        <Trans>
+          Verifying it here lets apps request it. Your recovery email is meant
+          to stay private so it can serve as a backup if you lose access to your
+          identity.
+        </Trans>
+      </div>
+    </div>
   {/if}
   <button
     class="btn btn-primary btn-lg"
