@@ -83,11 +83,10 @@ class VerifiedEmailFixtures {
     this.#page = page;
   }
 
-  /** Navigate to the /manage/communication page where the
-   *  verified-emails panel now lives (sibling of /manage/recovery
-   *  after the Communication-page split). */
+  /** Navigate to the /manage/share page where the verified-emails
+   *  panel lives (sibling of /manage/recovery). */
   async goto(): Promise<void> {
-    await this.#page.goto(II_URL + "/manage/communication");
+    await this.#page.goto(II_URL + "/manage/share");
   }
 
   /** The "Shareable info" page sits on its own top-level route under
@@ -144,7 +143,7 @@ class VerifiedEmailFixtures {
   }
 
   /** Locator scoped to the "Email addresses" panel section on the
-   *  Communication page. */
+   *  Shareable info page. */
   #panel(): Locator {
     return this.#page.locator("section").filter({
       has: this.#page.getByRole("heading", { name: "Email addresses" }),

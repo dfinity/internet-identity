@@ -1,15 +1,14 @@
 <script lang="ts">
   /**
-   * Communication page — Phase 1's home for `Anchor.verified_emails`.
-   * Sibling of the Recovery page: this surface manages the addresses
-   * dapps can use to reach the user, while Recovery manages methods
-   * for regaining access to the anchor itself.
+   * "Shareable info" page — Phase 1's home for
+   * `Anchor.verified_emails`. Sibling of the Recovery page: this
+   * surface manages info the user can share with apps, while Recovery
+   * manages methods for regaining access to the anchor itself.
    *
    * Page chrome mirrors the access page (bare `<header>` + content;
    * no outer card wrapper — individual rows carry their own border).
-   * Phase 1.5 widens this page into the unified "Reach" experience
-   * (verified rows joined with unverified OIDC/SSO emails + per-row
-   * "Verify" CTA); for Phase 1 the page is just the verified-emails
+   * Phase 1.5 widens this surface with unverified OIDC/SSO emails +
+   * a per-row "Verify" CTA; for Phase 1 it's just the verified-emails
    * panel.
    */
   import { VerifiedEmailsPanel } from "$lib/components/settings";
