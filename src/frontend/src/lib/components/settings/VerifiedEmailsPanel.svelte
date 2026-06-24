@@ -103,12 +103,12 @@
   };
 
   const handleRemove = async (address: string) => {
-    const result = await $authenticatedStore.actor.verified_email_remove(
-      $authenticatedStore.identityNumber,
-      address,
-    );
-    if ("Err" in result) {
-      handleError(new Error(JSON.stringify(result.Err)));
+    try {
+      await $authenticatedStore.actor
+        .verified_email_remove($authenticatedStore.identityNumber, address)
+        .then(throwCanisterError);
+    } catch (err) {
+      handleError(err);
       return;
     }
     removingAddress = undefined;

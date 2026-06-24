@@ -41,6 +41,7 @@
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
+  import { t } from "$lib/stores/locale.store";
   import {
     setupEmailRecoveryFunnel,
     SetupEmailRecoveryEvents,
@@ -185,6 +186,9 @@
           setupEmailRecoveryFunnel.close();
           stage = { kind: "unsupported", domain };
           return;
+        }
+        if (e.type === "InvalidEmailAddress") {
+          throw new Error($t`This doesn't look like a valid email address.`);
         }
       }
       // Anything else propagates to EnterAddress's inline error.

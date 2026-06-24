@@ -7,8 +7,11 @@ import type {
  * The `Failed` reasons that can actually reach the failed view. The
  * poll loop intercepts `DomainNotAllowlisted` / `DomainNotSupported`
  * first and routes them to the dedicated unsupported-domain view, so
- * they never need a friendly string here. Excluding them lets
- * `friendlyFailedReason` stay exhaustive over everything that remains.
+ * they never need a friendly string here. `InvalidEmailAddress` and
+ * `LimitReached` are prepare-time variants that the wizard catches
+ * before polling — they shouldn't reach this surface either, but they
+ * stay in the union for type-safety: a defensive friendly string
+ * below keeps the build green if the canister ever surfaces one here.
  */
 export type FailedReason = Exclude<
   EmailChallengeError,
@@ -68,6 +71,17 @@ export const friendlyFailedReason = (reason: FailedReason): string => {
   }
   if ("NonceExpired" in reason) {
     return "This recovery link timed out. Please try again.";
+  }
+  if ("InvalidEmailAddress" in reason) {
+    // The wizard catches this at prepare time and surfaces it inline on
+    // the address-entry view; this fallback only fires if the canister
+    // ever routes it through `Failed` (shouldn't happen).
+    return "The email address didn't pass validation.";
+  }
+  if ("LimitReached" in reason) {
+    // Same as above — caught at prepare time normally; defensive
+    // friendly string for the (unreachable) poll-time fallthrough.
+    return `You've reached the limit of ${reason.LimitReached.limit} verified emails. Remove one to add another.`;
   }
   return reason satisfies never;
 };

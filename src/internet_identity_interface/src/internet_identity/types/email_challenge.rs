@@ -272,6 +272,20 @@ pub enum EmailChallengeError {
     AddressAlreadyRegistered,
     /// Tried to remove a credential the anchor doesn't have.
     AddressNotRegistered,
+    /// The submitted address doesn't pass shape validation
+    /// (`local-part@domain` with the right lengths, no whitespace,
+    /// non-empty parts). Distinct from `DomainNotSupported`, which
+    /// is about a valid address whose registered domain can't be
+    /// verified by any supported path. The FE surfaces this inline
+    /// on the address-entry form so the user can edit and retry.
+    InvalidEmailAddress(String),
+    /// The anchor has reached its per-bucket cap for the challenge
+    /// kind (currently only fires for the verified-emails bucket).
+    /// The FE surfaces a "limit reached" message; the user has to
+    /// remove an existing entry before the prepare call will succeed.
+    LimitReached {
+        limit: u8,
+    },
     InternalCanisterError(String),
 }
 
@@ -302,6 +316,8 @@ pub fn error_code_name(error: &EmailChallengeError) -> &'static str {
         EmailChallengeError::SubjectNotSigned => "SubjectNotSigned",
         EmailChallengeError::AddressAlreadyRegistered => "AddressAlreadyRegistered",
         EmailChallengeError::AddressNotRegistered => "AddressNotRegistered",
+        EmailChallengeError::InvalidEmailAddress(_) => "InvalidEmailAddress",
+        EmailChallengeError::LimitReached { .. } => "LimitReached",
         EmailChallengeError::InternalCanisterError(_) => "InternalCanisterError",
     }
 }

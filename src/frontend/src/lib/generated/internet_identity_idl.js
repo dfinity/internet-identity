@@ -332,6 +332,8 @@ export const idlFactory = ({ IDL }) => {
     'DomainNotAllowlisted' : IDL.Text,
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
+    'InvalidEmailAddress' : IDL.Text,
+    'LimitReached' : IDL.Record({ 'limit' : IDL.Nat8 }),
   });
   const VerificationPath = IDL.Variant({
     'Doh' : IDL.Null,

@@ -262,8 +262,8 @@ mod tests {
         ] {
             let result = block_on(prepare_add(1, doh_input(bad), 100));
             assert!(
-                matches!(result, Err(EmailChallengeError::DomainNotSupported(_))),
-                "expected DomainNotSupported for {bad:?}, got {result:?}"
+                matches!(result, Err(EmailChallengeError::InvalidEmailAddress(_))),
+                "expected InvalidEmailAddress for {bad:?}, got {result:?}"
             );
         }
     }
@@ -288,8 +288,8 @@ mod tests {
         ] {
             let result = block_on(prepare_add(1, doh_input(bad), 100));
             assert!(
-                matches!(result, Err(EmailChallengeError::DomainNotSupported(_))),
-                "expected DomainNotSupported for oversized {bad:?}, got {result:?}"
+                matches!(result, Err(EmailChallengeError::InvalidEmailAddress(_))),
+                "expected InvalidEmailAddress for oversized {bad:?}, got {result:?}"
             );
         }
     }

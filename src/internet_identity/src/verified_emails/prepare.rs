@@ -43,9 +43,9 @@ pub async fn prepare_add(
     // because we're about to add one more.
     let current = state::anchor(anchor).verified_emails.len();
     if current >= MAX_VERIFIED_EMAILS_PER_ANCHOR {
-        return Err(EmailChallengeError::InternalCanisterError(format!(
-            "anchor already holds {current} verified emails — limit is {MAX_VERIFIED_EMAILS_PER_ANCHOR}",
-        )));
+        return Err(EmailChallengeError::LimitReached {
+            limit: MAX_VERIFIED_EMAILS_PER_ANCHOR as u8,
+        });
     }
 
     prepare_common(

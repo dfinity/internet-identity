@@ -52,10 +52,13 @@ pub(crate) async fn prepare_common(
     // Sanity check the address shape. Detailed RFC 5321/5322 validation
     // is the verifier's job; here we just want to fail fast on the
     // obviously-malformed inputs (no `@`, leading/trailing whitespace,
-    // empty parts) so the FE doesn't get back an opaque rejection
-    // half a flow later.
+    // empty parts, oversized local-part) so the FE doesn't get back an
+    // opaque rejection half a flow later. Reported as
+    // `InvalidEmailAddress` so the wizard can show an inline form error
+    // instead of routing to the "domain not supported" view, which is
+    // for valid addresses whose domain we can't verify.
     let address = normalize_address(&address)
-        .ok_or_else(|| EmailChallengeError::DomainNotSupported(address.clone()))?;
+        .ok_or_else(|| EmailChallengeError::InvalidEmailAddress(address.clone()))?;
     let registered_domain = registered_domain_of(&address)
         .ok_or_else(|| EmailChallengeError::DomainNotSupported(address.clone()))?;
 

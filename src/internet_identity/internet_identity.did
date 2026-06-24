@@ -683,6 +683,15 @@ type EmailChallengeError = variant {
     SubjectNotSigned;
     AddressAlreadyRegistered;
     AddressNotRegistered;
+    // The submitted address didn't pass shape validation (missing `@`,
+    // empty local-part or domain, whitespace, oversized parts). Distinct
+    // from DomainNotSupported, which is about a valid address whose
+    // registered domain can't be verified.
+    InvalidEmailAddress : text;
+    // The anchor has reached its per-bucket cap (currently only fires
+    // for the verified-emails bucket). FE shows a "limit reached"
+    // notice; user must remove an existing entry to add another.
+    LimitReached : record { limit : nat8 };
     InternalCanisterError : text;
 };
 

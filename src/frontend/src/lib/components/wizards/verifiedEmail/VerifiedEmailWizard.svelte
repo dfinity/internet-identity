@@ -45,6 +45,7 @@
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
+  import { t } from "$lib/stores/locale.store";
   import {
     setupVerifiedEmailFunnel,
     SetupVerifiedEmailEvents,
@@ -158,6 +159,17 @@
           setupVerifiedEmailFunnel.close();
           stage = { kind: "unsupported", domain };
           return;
+        }
+        // Prepare-time variants that the EnterAddress view surfaces
+        // inline rather than via a dedicated stage.
+        if (e.type === "LimitReached") {
+          const { limit } = e.value("LimitReached");
+          throw new Error(
+            $t`You've reached the limit of ${limit} verified emails. Remove one to add another.`,
+          );
+        }
+        if (e.type === "InvalidEmailAddress") {
+          throw new Error($t`This doesn't look like a valid email address.`);
         }
       }
       throw e;

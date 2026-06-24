@@ -584,7 +584,9 @@ export type EmailChallengeError = { 'EmailVerificationFailed' : string } |
   { 'AddressMismatch' : null } |
   { 'DomainNotAllowlisted' : string } |
   { 'SubjectNotSigned' : null } |
-  { 'AddressAlreadyRegistered' : null };
+  { 'AddressAlreadyRegistered' : null } |
+  { 'InvalidEmailAddress' : string } |
+  { 'LimitReached' : { 'limit' : number } };
 export interface EmailRecoveryGetDelegationArgs {
   'session_key' : SessionKey,
   'expiration' : Timestamp,

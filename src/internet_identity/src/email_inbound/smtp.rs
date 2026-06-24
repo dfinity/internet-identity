@@ -800,9 +800,9 @@ pub(super) fn bind_verified_email(
         existing.verified_at = now_ns;
     } else {
         if a.verified_emails.len() >= super::MAX_VERIFIED_EMAILS_PER_ANCHOR {
-            return Err(EmailChallengeError::InternalCanisterError(
-                "verified email cap reached".into(),
-            ));
+            return Err(EmailChallengeError::LimitReached {
+                limit: super::MAX_VERIFIED_EMAILS_PER_ANCHOR as u8,
+            });
         }
         a.verified_emails.push(VerifiedEmail {
             address: claimed_address.to_string(),
