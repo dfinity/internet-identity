@@ -65,7 +65,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
   dummy_auth: [],
   backend_canister_id: [],
   backend_origin: [],
-  mcp_server_origin: [],
   enable_dnssec_email_recovery: [],
   doh_config: [],
   dnssec_config: [],

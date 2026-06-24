@@ -22,7 +22,6 @@
     sso_allow_any_domain: [],
     sso_credential_migration: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
-    mcp_server_origin: [],
     captcha_config: [],
     dummy_auth: [],
     register_rate_limit: [],
