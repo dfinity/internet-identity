@@ -1,7 +1,8 @@
-//! Integration tests for the backend `/mcp` delegation path: a deploy-configured
-//! MCP server, acting as the principal II derives for an anchor at
-//! `mcp_server_origin`, fetches per-app account delegations without a per-app
-//! browser flow. The anchor is recovered from `caller()` via the opt-in index.
+//! Integration tests for the backend `/mcp` delegation path: an MCP server the
+//! user chooses to trust, acting as the principal II derives for an anchor's
+//! chosen account at that server's origin, fetches per-app account delegations
+//! without a per-app browser flow. The anchor is recovered from `caller()` via
+//! the opt-in index.
 
 use candid::Principal;
 use canister_tests::{
@@ -16,7 +17,7 @@ use canister_tests::{
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountDelegationError, AnchorNumber, InternetIdentityInit, PrepareAccountDelegation,
+    AccountDelegationError, AnchorNumber, PrepareAccountDelegation,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -27,15 +28,10 @@ const MCP_ORIGIN: &str = "https://mcp.id.ai";
 /// The backend caps MCP-minted delegations at 5 minutes.
 const MCP_MAX_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 
+// The `/mcp` path is no longer gated by a global config; the trusted origin is
+// supplied per opt-in. So a plain install suffices.
 fn install_with_mcp(env: &PocketIc) -> Principal {
-    install_ii_canister_with_arg(
-        env,
-        II_WASM.clone(),
-        Some(InternetIdentityInit {
-            mcp_server_origin: Some(MCP_ORIGIN.to_string()),
-            ..Default::default()
-        }),
-    )
+    install_ii_canister_with_arg(env, II_WASM.clone(), None)
 }
 
 /// The principal II derives for `anchor`'s default account at `MCP_ORIGIN` — the
@@ -72,10 +68,13 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     let mcp = mcp_server_principal(&env, canister_id, anchor);
 
     // Opt in: bind the MCP-server principal to the anchor.
-    mcp_set_access(&env, canister_id, principal_1(), anchor, true)
+    mcp_set_access(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None, true)
         .unwrap()
         .unwrap();
-    assert!(mcp_access_enabled(&env, canister_id, principal_1(), anchor).unwrap());
+    assert!(
+        mcp_access_enabled(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None)
+            .unwrap()
+    );
 
     // Mint the per-app delegation as the MCP server — no anchor_number passed.
     let PrepareAccountDelegation {
@@ -141,7 +140,7 @@ fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
     let mcp = mcp_server_principal(&env, canister_id, anchor);
-    mcp_set_access(&env, canister_id, principal_1(), anchor, true)
+    mcp_set_access(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None, true)
         .unwrap()
         .unwrap();
 
@@ -216,7 +215,7 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("k");
 
-    mcp_set_access(&env, canister_id, principal_1(), anchor, true)
+    mcp_set_access(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None, true)
         .unwrap()
         .unwrap();
     assert!(mcp_prepare_account_delegation(
@@ -230,34 +229,27 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
     .unwrap()
     .is_ok());
 
-    mcp_set_access(&env, canister_id, principal_1(), anchor, false)
-        .unwrap()
-        .unwrap();
-    assert!(!mcp_access_enabled(&env, canister_id, principal_1(), anchor).unwrap());
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None,
+        false,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(
+        !mcp_access_enabled(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None)
+            .unwrap()
+    );
     match mcp_prepare_account_delegation(&env, canister_id, mcp, target, session_key, None).unwrap()
     {
         Err(AccountDelegationError::Unauthorized(_)) => {}
         Ok(_) => panic!("expected Unauthorized after disabling, got Ok"),
         Err(e) => panic!("expected Unauthorized after disabling, got {e:?}"),
     }
-
-    Ok(())
-}
-
-/// With no `mcp_server_origin` configured, the path is disabled: enabling access
-/// fails rather than binding a bogus principal.
-#[test]
-fn mcp_disabled_without_configured_origin() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
-    let anchor = flows::register_anchor(&env, canister_id);
-
-    assert!(
-        mcp_set_access(&env, canister_id, principal_1(), anchor, true)
-            .unwrap()
-            .is_err()
-    );
-    assert!(!mcp_access_enabled(&env, canister_id, principal_1(), anchor).unwrap());
 
     Ok(())
 }

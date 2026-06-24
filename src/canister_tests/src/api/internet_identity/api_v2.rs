@@ -470,6 +470,8 @@ pub fn mcp_set_access(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
+    mcp_server_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     enabled: bool,
 ) -> Result<Result<(), String>, RejectResponse> {
     call_candid_as(
@@ -478,7 +480,7 @@ pub fn mcp_set_access(
         RawEffectivePrincipal::None,
         sender,
         "mcp_set_access",
-        (identity_number, enabled),
+        (identity_number, mcp_server_origin, account_number, enabled),
     )
     .map(|(x,)| x)
 }
@@ -488,13 +490,15 @@ pub fn mcp_access_enabled(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
+    mcp_server_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
 ) -> Result<bool, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
         sender,
         "mcp_access_enabled",
-        (identity_number,),
+        (identity_number, mcp_server_origin, account_number),
     )
     .map(|(x,)| x)
 }

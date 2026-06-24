@@ -6,7 +6,6 @@ mod canister_creation_cycles_cost;
 mod captcha_config;
 mod enable_dapps_explorer;
 mod is_production;
-mod mcp_server_origin;
 mod new_flow_origins;
 mod openid_configs;
 mod register_rate_limit;
