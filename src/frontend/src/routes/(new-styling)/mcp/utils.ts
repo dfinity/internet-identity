@@ -55,26 +55,30 @@ export const mcpAuthorize = async ({
 }: McpAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
 
-  // Connecting the MCP server is the opt-in: enable MCP access for this anchor
-  // so II authorizes the server's later on-demand per-app delegation calls. The
-  // backend recovers the anchor from the caller principal it derives for this
-  // anchor at the configured mcp_server_origin (see the `mcp_*` canister
-  // methods), which is exactly the principal the standing delegation below
-  // carries. Idempotent.
-  const accessResult = await actor.mcp_set_access(identityNumber, true);
-  if ("Err" in accessResult) {
-    throw new Error(accessResult.Err);
-  }
-
-  // The delegation acts as the user's account at the configured MCP server
-  // origin. Remap a gateway origin (*.icp0.io / *.icp.net) to *.ic0.app so the
-  // principal matches the one /authorize derives for that origin.
+  // The delegation acts as the user's chosen account at the MCP server origin.
+  // Remap a gateway origin (*.icp0.io / *.icp.net) to *.ic0.app so the principal
+  // matches the one /authorize derives for that origin.
   const effectiveOrigin = remapToLegacyDomain(mcpServerOrigin);
   const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
 
   const { account_number } = await actor
     .get_default_account(identityNumber, effectiveOrigin)
     .then(throwCanisterError);
+
+  // Connecting the MCP server is the opt-in: enable MCP access for this anchor at
+  // (mcp_server_origin, account) so II authorizes the server's later on-demand
+  // per-app delegation calls. The backend binds the principal it derives for this
+  // (account, origin) pair — exactly the principal the standing delegation below
+  // carries — and re-derives the same principal to revoke. Idempotent.
+  const accessResult = await actor.mcp_set_access(
+    identityNumber,
+    effectiveOrigin,
+    account_number,
+    true,
+  );
+  if ("Err" in accessResult) {
+    throw new Error(accessResult.Err);
+  }
 
   const ephemeralIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
