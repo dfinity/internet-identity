@@ -7,17 +7,19 @@ import { II_URL } from "../utils";
 type McpOutcome = "success" | "error";
 
 /**
- * The origin the e2e canister is deployed with as `mcp_server_origin` (see
- * `local_test_arg.did.template`). The `/mcp` page only accepts a callback on
- * this origin and the `form-action` CSP only allows posting to it.
+ * A stand-in MCP server origin. There's no global `mcp_server_origin` config
+ * any more: the connect flow takes the MCP server origin from the request's
+ * callback, accepting any https origin (or http loopback). This is just a valid
+ * https origin to drive the flow with; the `/mcp` page's `form-action` CSP
+ * allows posting the delegation to it.
  */
 const MCP_SERVER_ORIGIN = "https://mcp.id.ai";
 
 /**
  * Stands in for a remote MCP server. Unlike the CLI loopback fixture there's no
- * real HTTP server: the configured MCP origin is a public https origin, so the
- * delegation arrives as a top-level form-POST navigation to it. We intercept
- * that navigation with `page.route` (which catches it before the network, so no
+ * real HTTP server: the callback is a public https origin, so the delegation
+ * arrives as a top-level form-POST navigation to it. We intercept that
+ * navigation with `page.route` (which catches it before the network, so no
  * server or DNS for `mcp.id.ai` is needed), read the posted delegation, and
  * fulfill a 303 redirect back to `/mcp` with a `status` — exactly what a real
  * MCP server would do.

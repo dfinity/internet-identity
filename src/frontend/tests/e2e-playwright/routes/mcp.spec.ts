@@ -3,8 +3,9 @@ import { test } from "../fixtures";
 import { addVirtualAuthenticator, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
- *  delegation acts as the user's account at the configured MCP-server origin),
- *  but kept to exercise that the param is tolerated. */
+ *  delegation acts as the user's chosen account at the MCP-server origin the
+ *  request's callback identifies), but kept to exercise that the param is
+ *  tolerated. */
 const APP = "nice-name.com";
 
 const signUp = async (page: Page): Promise<void> => {
@@ -45,25 +46,6 @@ const expirationMillis = (body: unknown): number => {
   return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
 };
 
-/**
- * Enables device-local MCP access for the signed-in identity via Settings.
- * Assumes the page is already on `/manage`.
- */
-const enableMcpAccessInSettings = async (
-  page: Page,
-  isMobile: boolean,
-): Promise<void> => {
-  if (isMobile) {
-    await page.getByRole("button", { name: "Open menu" }).click();
-  }
-  await page.getByRole("link", { name: "Settings" }).click();
-  await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch", { name: "MCP access" }).check();
-  await page.getByLabel("I understand the risks.").check();
-  await page.getByRole("button", { name: "Enable MCP access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
-};
-
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
   await expect(
@@ -71,14 +53,18 @@ test("Invalid params show the error screen", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("A callback off the configured MCP origin is rejected", async ({
+test("A non-https, non-loopback callback is rejected", async ({
   page,
   mcp,
 }) => {
+  // Each user connects whichever MCP server they trust, so any https origin (or
+  // http loopback for a server they run themselves) is accepted. A plain http
+  // origin on a remote host is not — the /mcp `form-action` CSP wouldn't allow
+  // posting the delegation there, so the flow rejects it up front.
   await page.goto(
     mcp.buildAuthorizeUrl({
       app: APP,
-      callbackUrl: "https://attacker.example.com/cb",
+      callbackUrl: "http://evil.example.com/cb",
     }),
   );
   await expect(
@@ -86,19 +72,18 @@ test("A callback off the configured MCP origin is rejected", async ({
   ).toBeVisible();
 });
 
-test("Without MCP access enabled the gated screen shows", async ({
-  page,
-  mcp,
-}) => {
+test("After signing up, the connect screen shows", async ({ page, mcp }) => {
+  // Connecting is the opt-in: there is no separate device-local gate to flip,
+  // so a fresh sign-up lands straight on the connect screen.
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
   await expect(
-    page.getByRole("heading", { name: "MCP access not enabled" }),
+    page.getByRole("button", { name: "Allow access" }),
   ).toBeVisible();
 });
 
-test("Returning user without MCP access lands on the gated screen immediately", async ({
+test("Returning user lands on the connect screen immediately", async ({
   page,
   mcp,
 }) => {
@@ -109,22 +94,16 @@ test("Returning user without MCP access lands on the gated screen immediately", 
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await expect(
-    page.getByRole("heading", { name: "MCP access not enabled" }),
+    page.getByRole("button", { name: "Allow access" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Allow access" })).toBeHidden();
 });
 
-test("Once MCP access is enabled, Allow access posts a two-hop delegation chain", async ({
-  page,
-  mcp,
-  isMobile,
-}) => {
+test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await page.getByRole("button", { name: "Allow access" }).click();
@@ -153,14 +132,12 @@ test("Once MCP access is enabled, Allow access posts a two-hop delegation chain"
 test("Identity switcher shows while signing in and hides on the success screen", async ({
   page,
   mcp,
-  isMobile,
 }) => {
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   const switcher = page.getByRole("button", { name: "Switch identity" });
@@ -175,18 +152,13 @@ test("Identity switcher shows while signing in and hides on the success screen",
   await expect(switcher).toBeHidden();
 });
 
-test("Requested TTL within bounds is honoured", async ({
-  page,
-  mcp,
-  isMobile,
-}) => {
+test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   const ttlMinutes = 60;
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
 
   const before = Date.now();
   await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlMinutes }));
@@ -198,8 +170,9 @@ test("Requested TTL within bounds is honoured", async ({
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-// The browser /mcp flow issues the standing credential for the user's account
-// at the configured MCP *server* origin (not a per-request app); per-app
-// delegations are minted server-side by the `mcp_prepare/get_account_delegation`
-// canister methods. Principal-derivation parity for those is canister logic and
-// is covered by the integration tests (tests/integration/mcp.rs), not here.
+// The browser /mcp flow issues the standing credential for the user's chosen
+// account at the MCP *server* origin the callback identifies (not a per-request
+// app); per-app delegations are minted server-side by the
+// `mcp_prepare/get_account_delegation` canister methods. Principal-derivation
+// parity for those is canister logic, covered by the integration tests
+// (tests/integration/mcp.rs), not here.
