@@ -39,11 +39,14 @@
 
   const { context, variant, onConsent }: Props = $props();
 
-  /** Whether the dapp asked for `email` or `verified_email` in any shape
-   *  (scoped or unscoped). Drives the empty-state branch below — without
-   *  an email-shaped request there's no useful CTA to offer, so the
-   *  empty-set short-circuit in the handler still fires upstream. */
+  /** Whether the dapp asked for an **unscoped** `email` or `verified_email`.
+   *  Drives the empty-state branch below. Scoped requests
+   *  (`openid:<iss>:email`, `sso:<domain>:verified_email`, etc.) are pinned
+   *  to a specific source — verifying a fresh email via DKIM wouldn't
+   *  satisfy them, so we fall through to the empty-set short-circuit
+   *  upstream instead of surfacing a CTA the user can't act on. */
   const isEmailKey = (key: string): boolean => {
+    if (extractScope(key) !== undefined) return false;
     const name = extractAttributeName(key);
     return name === "email" || name === "verified_email";
   };

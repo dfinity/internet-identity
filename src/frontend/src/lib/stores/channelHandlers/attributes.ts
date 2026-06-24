@@ -672,7 +672,13 @@ export const handleIcrc3ConsentAttributes =
           omit_scope: boolean;
         }>;
 
+        // Only unscoped email/verified_email requests can be satisfied by
+        // verifying a fresh address. Scoped keys (openid:..., sso:...,
+        // verified:...) are pinned to a specific source that DKIM
+        // verification can't satisfy, so they fall through to the
+        // empty-set short-circuit.
         const emailRequested = requestedKeys.some((key) => {
+          if (extractScope(key) !== undefined) return false;
           const name = extractAttributeName(key);
           return name === "email" || name === "verified_email";
         });

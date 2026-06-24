@@ -392,10 +392,12 @@ test.describe("Authorize — explicit consent UI", () => {
     });
   });
 
-  test.describe("with no available attributes", () => {
-    // A request whose keys all resolve to nothing available on the anchor
-    // (here: user has no email claim) auto-resolves the consent result so
-    // the UI never renders a blank screen.
+  test.describe("with no available attributes for an unscoped email request", () => {
+    // An unscoped `email` request against an anchor with no email source
+    // surfaces the inline "Verify an email" empty-state CTA. The user can
+    // either verify a fresh address (covered elsewhere) or skip — the
+    // skip path falls through to an empty consent set, matching the old
+    // auto-resolve behavior.
     test.use({
       openIdConfig: {
         defaultPort: DEFAULT_OPENID_PORT,
@@ -416,20 +418,20 @@ test.describe("Authorize — explicit consent UI", () => {
       expect(entries.email).toBeUndefined();
     });
 
-    test("should skip the consent UI", async ({
-      attributeConsentView,
+    test("should surface the verify-email CTA and skip cleanly", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
     }) => {
-      const consent = attributeConsentView(authorizePage.page);
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      // Handler auto-resolves → II window closes without ever rendering the
-      // consent heading. The fixture waits for the window to close after the
-      // test body returns; if the consent screen were ever shown, the
-      // auto-close would block and this test would time out instead of the
-      // assertion below firing.
-      await consent.expectHidden();
+      await expect(
+        authorizePage.page.getByRole("heading", {
+          name: "Add a verified email",
+        }),
+      ).toBeVisible();
+      await authorizePage.page
+        .getByRole("button", { name: "Skip for now" })
+        .click();
     });
   });
 
