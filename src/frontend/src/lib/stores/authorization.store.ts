@@ -13,9 +13,9 @@ export type AuthorizationContext = {
 export type Authorized = {
   accountNumberPromise: Promise<bigint | undefined>;
   /** Whether the user restricted this authorization to read-only access:
-   *  attributes certified for this session will carry
-   *  `implicit:permissions = "queries"`, which makes the IC reject update
-   *  calls that present them as `sender_info`. */
+   *  the session delegation will carry `permissions = "queries"`, which
+   *  makes the Internet Computer reject update calls authenticated through
+   *  it. Enforcement is protocol-level, not up to the app or canister. */
   readOnly: boolean;
 };
 

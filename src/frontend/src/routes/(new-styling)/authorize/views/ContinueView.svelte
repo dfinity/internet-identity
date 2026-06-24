@@ -34,9 +34,9 @@
     effectiveOrigin: string;
     /** Called when the user confirms with the default account or selects a
      *  specific account. `readOnly` reflects the "Read-only mode" checkbox:
-     *  when `true`, attributes certified for this session restrict the app
-     *  to query calls (it can read on the user's behalf but cannot change
-     *  state). */
+     *  when `true`, the session delegation is restricted to query calls, so
+     *  the app can read on the user's behalf but cannot change state (the
+     *  Internet Computer rejects update calls authenticated through it). */
     onAuthorize: (
       accountNumber: Promise<bigint | undefined>,
       readOnly?: boolean,
@@ -421,7 +421,7 @@
     />
     <Tooltip
       label={$t`Read-only mode`}
-      description={$t`When enabled, the app can read data on your behalf but cannot make any changes: calls that would change state are rejected. Only apps that support certified session attributes enforce this restriction.`}
+      description={$t`When enabled, the app can read your data but cannot make changes on your behalf: the Internet Computer rejects any call that would change state.`}
       direction="up"
       align="end"
       offset="0rem"
