@@ -134,9 +134,16 @@
   // Once an identity has actually signed in (via the wizard here or the "use
   // another identity" dialog in the layout), advance from the wizard to the
   // connect step. Switching identity only *selects* and never authenticates, so
-  // it never triggers this.
+  // it never triggers this. We also wait for `selected` to be populated:
+  // sign-up authenticates and *then* selects the identity, and the reused
+  // account picker (ContinueView) reads `selected` at mount, so advancing on
+  // authentication alone can mount it before `selected` is set.
   $effect(() => {
-    if (phase.kind === "wizard" && $isAuthenticatedStore) {
+    if (
+      phase.kind === "wizard" &&
+      $isAuthenticatedStore &&
+      $lastUsedIdentitiesStore.selected !== undefined
+    ) {
       phase = { kind: "authorize" };
     }
   });
