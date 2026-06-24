@@ -191,7 +191,7 @@
         <li
           class="bg-bg-secondary border-border-secondary flex flex-row items-center gap-3 rounded-xl border px-4 py-3"
         >
-          <div class="flex flex-1 flex-col gap-1 overflow-hidden">
+          <div class="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
             <div class="flex flex-row items-center gap-2.5">
               <span
                 class="text-text-primary min-w-0 truncate text-sm font-semibold"
