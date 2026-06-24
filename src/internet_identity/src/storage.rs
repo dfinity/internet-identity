@@ -1069,7 +1069,23 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Record (enable) MCP access: bind an anchor's MCP-server principal to it.
+    ///
+    /// Like the passkey / recovery-phrase reverse indices, we refuse to
+    /// overwrite a principal already bound to a *different* anchor — defense in
+    /// depth against a cross-anchor takeover were the derived principal ever to
+    /// collide. Re-binding the same anchor is idempotent.
     pub fn set_anchor_mcp_principal(&mut self, principal: Principal, anchor_number: AnchorNumber) {
+        if let Some(existing) = self.lookup_anchor_with_mcp_principal_memory.get(&principal) {
+            if existing != anchor_number {
+                ic_cdk::println!(
+                    "WARNING: MCP-server principal {:?} is already indexed for another anchor; \
+                     skipping indexing for anchor number {}",
+                    principal,
+                    anchor_number,
+                );
+                return;
+            }
+        }
         self.lookup_anchor_with_mcp_principal_memory
             .insert(principal, anchor_number);
     }
