@@ -54,7 +54,12 @@
   let showAddWizard = $state(false);
   let removingAddress = $state<string | undefined>(undefined);
 
-  const isFull = $derived(verifiedEmails.length >= capacity);
+  // Aliased so the lingui-extracted placeholder name in the count-chip
+  // aria-label stays `count` even if the underlying prop or expression
+  // changes — renaming `verifiedEmails.length` directly would orphan
+  // existing translations of `${length} of ${capacity} verified emails`.
+  const count = $derived(verifiedEmails.length);
+  const isFull = $derived(count >= capacity);
 
   // --- Canister wrappers (same as recovery wizard) -------------------
 
@@ -132,16 +137,16 @@
         </h2>
         <span
           class="border-border-tertiary text-text-secondary inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium"
-          aria-label={$t`${verifiedEmails.length} of ${capacity} verified emails`}
+          aria-label={$t`${count} of ${capacity} verified emails`}
         >
-          {verifiedEmails.length}/{capacity}
+          {count}/{capacity}
         </span>
       </div>
       <p class="text-text-tertiary text-sm">
         <Trans>Only verified emails can be used to reach you.</Trans>
       </p>
     </div>
-    {#if verifiedEmails.length > 0}
+    {#if count > 0}
       <button
         class="btn btn-primary btn-sm shrink-0"
         onclick={() => (showAddWizard = true)}
@@ -154,19 +159,25 @@
     {/if}
   </div>
 
-  {#if verifiedEmails.length === 0}
+  {#if count === 0}
     <!-- Dedicated empty-state container — mirrors the access page's
          "Add new" idiom (a single full-width CTA card with icon +
          label + click target) so the user has one clear next step
          instead of a separate header-row Add button paired with an
-         inert "no rows yet" placeholder. -->
+         inert "no rows yet" placeholder. The descriptive bits inside
+         are aria-hidden so the button's accessible name is just
+         "Add an email" rather than the concatenated visible copy. -->
     <button
       onclick={() => (showAddWizard = true)}
+      aria-label={$t`Add an email`}
       class="border-border-tertiary bg-bg-primary hover:border-border-secondary hover:bg-bg-primary_hover flex flex-col items-center justify-center gap-2 rounded-sm border border-dashed px-6 py-10 text-center transition-colors duration-200 outline-none"
     >
       <MailCheckIcon class="text-fg-secondary size-7" aria-hidden="true" />
-      <p class="text-text-tertiary text-sm">{$t`No emails yet.`}</p>
+      <p aria-hidden="true" class="text-text-tertiary text-sm">
+        {$t`No emails yet.`}
+      </p>
       <span
+        aria-hidden="true"
         class="text-text-primary mt-4 inline-flex items-center gap-1.5 text-sm font-semibold"
       >
         <PlusIcon class="size-4" aria-hidden="true" />
@@ -188,7 +199,7 @@
                 {entry.address}
               </span>
               <span
-                class="border-color-success-600 bg-bg-success-primary text-text-success-primary inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
+                class="border-fg-success-primary bg-bg-success-primary text-text-success-primary inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
               >
                 <span
                   class="bg-fg-success-primary size-1.5 rounded-full"
