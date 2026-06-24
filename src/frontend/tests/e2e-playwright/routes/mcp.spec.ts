@@ -124,7 +124,12 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
 
   // Reach Settings via in-app navigation rather than page.goto: a full reload
   // of an /manage/(authenticated) route drops the just-signed-up in-memory
-  // session and lands on the sign-in screen, whereas the SPA nav keeps it.
+  // session and lands on the sign-in screen, whereas the SPA nav keeps it. On
+  // mobile the sidebar is collapsed behind a menu button, so open it first.
+  const openMenu = page.getByRole("button", { name: "Open menu" });
+  if (await openMenu.isVisible()) {
+    await openMenu.click();
+  }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
