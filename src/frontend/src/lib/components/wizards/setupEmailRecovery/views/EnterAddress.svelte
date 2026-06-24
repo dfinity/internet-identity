@@ -73,7 +73,7 @@
   <Input
     label={$t`Email address`}
     bind:value={address}
-    placeholder="alice@example.com"
+    placeholder="you@example.com"
     type="email"
     autocomplete="off"
     autocorrect="off"
@@ -89,8 +89,8 @@
     <Alert
       variant="warning"
       direction="horizontal"
-      title={$t`Using the same address for both isn't recommended`}
-      description={$t`Recovery is meant to be a separate mailbox you can fall back to if you lose access to this one. Pointing it at an address you've already verified here doesn't add redundancy.`}
+      title={$t`Using a shareable email isn't recommended`}
+      description={$t`Recovery is best kept as a private mailbox, separate from the addresses you share with apps — that way, losing access to one doesn't lock you out of the other.`}
     />
   {/if}
   <button
