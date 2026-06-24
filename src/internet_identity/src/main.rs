@@ -615,22 +615,36 @@ fn get_account_delegation(
     }
 }
 
-/// Enable or disable the backend `/mcp` delegation path for `anchor_number`.
-/// Enabling binds the anchor's principal at the configured `mcp_server_origin`
-/// so the MCP server can later fetch per-app delegations as this anchor.
+/// Enable or disable the backend `/mcp` delegation path for `anchor_number` at
+/// `mcp_server_origin`, for the given account (the unreserved default when
+/// `account_number` is `None`). Enabling binds the principal II derives for that
+/// `(account, origin)` pair — the principal the MCP server's standing delegation
+/// carries — so it can later fetch per-app delegations as this anchor; disabling
+/// unbinds exactly that principal. The origin comes from the connect request, so
+/// each user trusts the MCP server they choose.
 #[update]
-fn mcp_set_access(anchor_number: AnchorNumber, enabled: bool) -> Result<(), String> {
+fn mcp_set_access(
+    anchor_number: AnchorNumber,
+    mcp_server_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    enabled: bool,
+) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_access(anchor_number, enabled)
+    mcp::set_mcp_access(anchor_number, mcp_server_origin, account_number, enabled)
 }
 
-/// Whether `anchor_number` currently has MCP access enabled.
+/// Whether `anchor_number` has MCP access enabled for the
+/// `(mcp_server_origin, account_number)` pair.
 #[query]
-fn mcp_access_enabled(anchor_number: AnchorNumber) -> bool {
+fn mcp_access_enabled(
+    anchor_number: AnchorNumber,
+    mcp_server_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> bool {
     if check_session_authorization(anchor_number).is_err() {
         return false;
     }
-    mcp::is_mcp_access_enabled(anchor_number)
+    mcp::is_mcp_access_enabled(anchor_number, mcp_server_origin, account_number)
 }
 
 /// Called by the MCP server (authorized by `caller()` == the anchor's principal
@@ -752,7 +766,6 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
         backend_origin: persistent_state.backend_origin.clone(),
-        mcp_server_origin: persistent_state.mcp_server_origin.clone(),
         enable_dnssec_email_recovery: persistent_state.enable_dnssec_email_recovery,
         dnssec_config: Some(persistent_state.dnssec_config.clone()),
         doh_config: Some(persistent_state.doh_config.clone()),
@@ -849,11 +862,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(backend_origin) = arg.backend_origin {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.backend_origin = Some(backend_origin);
-            })
-        }
-        if let Some(mcp_server_origin) = arg.mcp_server_origin {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.mcp_server_origin = Some(mcp_server_origin);
             })
         }
         if let Some(openid_configs) = arg.openid_configs {

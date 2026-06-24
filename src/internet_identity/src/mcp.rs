@@ -1,16 +1,18 @@
-//! Backend `/mcp` delegation path: lets a single, deploy-configured MCP server
-//! act as an anchor's account at any app, without a per-app browser flow.
+//! Backend `/mcp` delegation path: lets an MCP server the user chooses to trust
+//! act as one of the user's accounts at any app, without a per-app browser flow.
 //!
-//! At connect time the MCP server obtains (via the existing `/mcp` browser
-//! delegation flow) a 60-minute standing delegation `anchor -> MCP server key`,
-//! issued for `mcp_server_origin`. Its principal is therefore the principal II
-//! derives for that anchor's default account at `mcp_server_origin`. When the
-//! anchor enables MCP access, we record `that principal -> anchor` in the
-//! reverse index (see [`crate::storage`]). The MCP server then calls
-//! [`prepare_account_delegation`] / [`get_account_delegation`] *as that
+//! At connect time the MCP server obtains (via the `/mcp` browser delegation
+//! flow) a standing delegation `anchor -> MCP server key`, issued for the MCP
+//! server's own origin and a specific account the user picks. Its principal is
+//! therefore the principal II derives for that `(account, origin)` pair. When
+//! the anchor enables MCP access for that pair, we record `that principal ->
+//! anchor` in the reverse index (see [`crate::storage`]). The MCP server then
+//! calls [`prepare_account_delegation`] / [`get_account_delegation`] *as that
 //! principal*; we recover the anchor from `caller()` via the index, so no
 //! `anchor_number` parameter is needed — being the right caller is the
-//! authorization. Issued per-app delegations are capped at 5 minutes.
+//! authorization. The trusted origin comes from the connect request, so each
+//! user trusts the server they choose. Issued per-app delegations are capped at
+//! 5 minutes.
 
 use candid::Principal;
 use ic_cdk::caller;
@@ -21,7 +23,7 @@ use internet_identity_interface::internet_identity::types::{
 use crate::{
     account_management,
     delegation::der_encode_canister_sig_key,
-    state::{self, storage_borrow, storage_borrow_mut},
+    state::{storage_borrow, storage_borrow_mut},
     storage::account::{
         Account, AccountDelegationError, PrepareAccountDelegation, ReadAccountParams,
     },
@@ -29,12 +31,6 @@ use crate::{
 
 /// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
 const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 5 * 60 * 1_000_000_000;
-
-/// The configured MCP server origin, or an error if the path is disabled.
-fn mcp_server_origin() -> Result<FrontendHostname, String> {
-    state::persistent_state(|ps| ps.mcp_server_origin.clone())
-        .ok_or_else(|| "MCP delegation is not enabled on this canister".to_string())
-}
 
 /// The anchor's default account at `origin` (synthetic when none is reserved).
 fn default_account(anchor_number: AnchorNumber, origin: &FrontendHostname) -> Account {
@@ -67,19 +63,54 @@ fn default_account_number(
     default_account(anchor_number, origin).account_number
 }
 
-/// The principal II derives for `anchor_number`'s default account at `origin` —
+/// The anchor's account `account_number` at `origin` — or the synthetic default
+/// (the unreserved account) when `account_number` is `None` or the account
+/// can't be read.
+fn account_for(
+    anchor_number: AnchorNumber,
+    account_number: Option<AccountNumber>,
+    origin: &FrontendHostname,
+) -> Account {
+    let Some(account_number) = account_number else {
+        return Account::synthetic(anchor_number, origin.clone());
+    };
+    storage_borrow(|storage| {
+        let known_app_num = storage.lookup_application_number_with_origin(origin);
+        storage
+            .read_account(ReadAccountParams {
+                account_number: Some(account_number),
+                anchor_number,
+                origin,
+                known_app_num,
+            })
+            .unwrap_or_else(|| Account::synthetic(anchor_number, origin.clone()))
+    })
+}
+
+/// The principal II derives for `anchor_number`'s `account_number` at `origin` —
 /// the principal the MCP server's standing delegation carries.
-fn mcp_principal_for(anchor_number: AnchorNumber, origin: &FrontendHostname) -> Principal {
-    let seed = default_account(anchor_number, origin).calculate_seed();
+fn mcp_principal_for(
+    anchor_number: AnchorNumber,
+    account_number: Option<AccountNumber>,
+    origin: &FrontendHostname,
+) -> Principal {
+    let seed = account_for(anchor_number, account_number, origin).calculate_seed();
     Principal::self_authenticating(der_encode_canister_sig_key(seed.to_vec()))
 }
 
-/// Enable or disable MCP access for `anchor_number`: bind/unbind its principal
-/// at the configured `mcp_server_origin` in the reverse index. The caller must
-/// already be authorized for `anchor_number` (checked by the canister method).
-pub fn set_mcp_access(anchor_number: AnchorNumber, enabled: bool) -> Result<(), String> {
-    let origin = mcp_server_origin()?;
-    let principal = mcp_principal_for(anchor_number, &origin);
+/// Enable or disable MCP access for `anchor_number` at `mcp_server_origin` for
+/// `account_number` (the unreserved default when `None`): bind/unbind the
+/// principal II derives for that `(account, origin)` pair in the reverse index.
+/// The caller must already be authorized for `anchor_number` (checked by the
+/// canister method). Disabling re-derives the same principal from the supplied
+/// origin+account, so it always unbinds exactly what enabling bound.
+pub fn set_mcp_access(
+    anchor_number: AnchorNumber,
+    mcp_server_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    enabled: bool,
+) -> Result<(), String> {
+    let principal = mcp_principal_for(anchor_number, account_number, &mcp_server_origin);
     storage_borrow_mut(|storage| {
         if enabled {
             storage.set_anchor_mcp_principal(principal, anchor_number);
@@ -90,12 +121,14 @@ pub fn set_mcp_access(anchor_number: AnchorNumber, enabled: bool) -> Result<(), 
     Ok(())
 }
 
-/// Whether `anchor_number` currently has MCP access enabled.
-pub fn is_mcp_access_enabled(anchor_number: AnchorNumber) -> bool {
-    let Ok(origin) = mcp_server_origin() else {
-        return false;
-    };
-    let principal = mcp_principal_for(anchor_number, &origin);
+/// Whether `anchor_number` has MCP access enabled for the
+/// `(mcp_server_origin, account_number)` pair.
+pub fn is_mcp_access_enabled(
+    anchor_number: AnchorNumber,
+    mcp_server_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> bool {
+    let principal = mcp_principal_for(anchor_number, account_number, &mcp_server_origin);
     storage_borrow(|storage| storage.lookup_anchor_with_mcp_principal(principal))
         == Some(anchor_number)
 }

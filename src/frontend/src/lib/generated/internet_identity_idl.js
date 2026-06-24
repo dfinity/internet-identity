@@ -90,7 +90,6 @@ export const idlFactory = ({ IDL }) => {
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
-    'mcp_server_origin' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -1103,7 +1102,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DeviceKeyWithAnchor)],
         ['query'],
       ),
-    'mcp_access_enabled' : IDL.Func([UserNumber], [IDL.Bool], ['query']),
+    'mcp_access_enabled' : IDL.Func(
+        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
+        [IDL.Bool],
+        ['query'],
+      ),
     'mcp_get_account_delegation' : IDL.Func(
         [FrontendHostname, SessionKey, Timestamp],
         [
@@ -1125,7 +1128,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_set_access' : IDL.Func(
-        [UserNumber, IDL.Bool],
+        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), IDL.Bool],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
@@ -1357,7 +1360,6 @@ export const init = ({ IDL }) => {
     'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
-    'mcp_server_origin' : IDL.Opt(IDL.Text),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];
