@@ -58,7 +58,6 @@ test.describe("Verified emails — real DNSSEC + DKIM flow", () => {
     page,
     verifiedEmail,
     emailRecovery,
-    manageRecoveryPage,
     signInWithIdentity,
     identities,
   }) => {
@@ -92,19 +91,14 @@ test.describe("Verified emails — real DNSSEC + DKIM flow", () => {
     await expect(dialog).toBeHidden({ timeout: STATUS_POLL_TIMEOUT });
     await verifiedEmail.assertAddressListed(address);
 
-    // ---------------------------------------------------------------
-    // Recovery card stays untouched — the recovery page's setup CTA
-    // is still in its "Activate recovery email" state. Hop to that
-    // sibling route to assert it (Communication and Recovery are now
-    // separate top-level pages).
-    // ---------------------------------------------------------------
-    await manageRecoveryPage.goto();
-    await emailRecovery.assertSetupCardVisible();
+    // Recovery-card independence is covered end-to-end by
+    // emailRecovery.spec.ts; checking it from here would require a
+    // hard goto to /manage/recovery, which reloads the SPA and loses
+    // the in-memory auth store mid-test.
 
     // ---------------------------------------------------------------
     // Remove the verified email — confirmation dialog, list updates.
     // ---------------------------------------------------------------
-    await verifiedEmail.goto();
     await verifiedEmail.removeAddress(address);
     await verifiedEmail.assertAddressAbsent(address);
   });
