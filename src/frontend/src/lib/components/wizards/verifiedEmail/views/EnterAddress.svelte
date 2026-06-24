@@ -93,9 +93,10 @@
   />
   {#if overlapsRecovery}
     <Alert
-      variant="info"
-      title={$t`This is also your recovery email`}
-      description={$t`Verifying it here adds it as a separate entry — the two are independent, so removing one won't affect the other.`}
+      variant="warning"
+      direction="horizontal"
+      title={$t`This is your recovery email — best not to share it`}
+      description={$t`Verifying it here lets apps request it. Your recovery email is meant to stay private so it can serve as a backup if you lose access to the addresses you do share.`}
     />
   {/if}
   <button

@@ -87,9 +87,10 @@
   />
   {#if overlapsVerified}
     <Alert
-      variant="info"
-      title={$t`This is already a verified email`}
-      description={$t`Setting it as your recovery email adds it as a separate entry — the two are independent, so removing one won't affect the other.`}
+      variant="warning"
+      direction="horizontal"
+      title={$t`Using the same address for both isn't recommended`}
+      description={$t`Recovery is meant to be a separate mailbox you can fall back to if you lose access to this one. Pointing it at an address you've already verified here doesn't add redundancy.`}
     />
   {/if}
   <button
