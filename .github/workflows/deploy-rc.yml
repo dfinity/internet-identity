@@ -74,7 +74,7 @@ jobs:
         run: |
           key_pem=$(mktemp)
           printenv "ICP_DEPLOY_KEY" > "$key_pem"
-          icp identity import --disable-encryption --force default "$key_pem"
+          icp identity import --force --from-pem "$key_pem" default
           rm "$key_pem"
 
       - name: "Deploy Release Candidate"
