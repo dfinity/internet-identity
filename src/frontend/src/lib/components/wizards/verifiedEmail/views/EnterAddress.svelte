@@ -96,7 +96,7 @@
       variant="warning"
       direction="horizontal"
       title={$t`This is your recovery email — best not to share it`}
-      description={$t`Verifying it here lets apps request it. Your recovery email is meant to stay private so it can serve as a backup if you lose access to the addresses you do share.`}
+      description={$t`Verifying it here lets apps request it. Your recovery email is meant to stay private so it can serve as a backup if you lose access to your identity.`}
     />
   {/if}
   <button
