@@ -60,6 +60,10 @@
     submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
     /** Anonymous wrapper around the challenge resolve-via-doh method. */
     resolveViaDoh: (nonce: string) => Promise<void>;
+    /** Pool of addresses the user has already verified on the share
+     *  page. Surfaced as a non-blocking heads-up on the address-entry
+     *  view when the typed address matches one of them. */
+    verifiedAddresses?: string[];
     /** Called once on `RegistrationSucceeded`. The host is expected to
      *  show a success toast and close the dialog. */
     onSuccess: (address: string) => void;
@@ -71,6 +75,7 @@
     diagnostics,
     submitDkimLeaf,
     resolveViaDoh,
+    verifiedAddresses = [],
     onSuccess,
   }: Props = $props();
 
@@ -251,6 +256,7 @@
 {#if stage.kind === "enter"}
   <EnterAddress
     onSubmit={handleAddressSubmitted}
+    {verifiedAddresses}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}

@@ -68,6 +68,14 @@
    */
   let emailRecovery = $derived(data.identityInfo.email_recovery[0]?.[0]);
 
+  // Threaded into the recovery wizard for the cross-bucket overlap
+  // heads-up: when a user types an address that's already in their
+  // verified-emails bucket, the wizard warns that the two are
+  // independent (recovery here is a second DKIM round-trip).
+  let verifiedAddresses = $derived(
+    (data.identityInfo.verified_emails[0] ?? []).map((e) => e.address),
+  );
+
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
       (m) =>
@@ -523,6 +531,7 @@
       diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
       resolveViaDoh={resolveEmailViaDoh}
+      {verifiedAddresses}
       onSuccess={handleEmailWizardSuccess}
     />
   </Dialog>

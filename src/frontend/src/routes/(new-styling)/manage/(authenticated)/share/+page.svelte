@@ -26,6 +26,13 @@
    */
   const VERIFIED_EMAILS_CAPACITY = 5;
   let verifiedEmails = $derived(data.identityInfo.verified_emails[0] ?? []);
+  // Threaded into the verify wizard for the cross-bucket overlap
+  // heads-up: when a user types an address that's already their
+  // recovery email, the wizard warns that the two buckets are
+  // independent (verifying here is a second DKIM round-trip).
+  let recoveryAddresses = $derived(
+    (data.identityInfo.email_recovery[0] ?? []).map((c) => c.address),
+  );
 </script>
 
 <header class="flex flex-col gap-3">
@@ -39,5 +46,9 @@
 </header>
 
 <div class="mt-10 max-w-3xl">
-  <VerifiedEmailsPanel {verifiedEmails} capacity={VERIFIED_EMAILS_CAPACITY} />
+  <VerifiedEmailsPanel
+    {verifiedEmails}
+    {recoveryAddresses}
+    capacity={VERIFIED_EMAILS_CAPACITY}
+  />
 </div>

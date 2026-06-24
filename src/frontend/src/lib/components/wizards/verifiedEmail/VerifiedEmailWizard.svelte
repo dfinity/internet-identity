@@ -68,6 +68,10 @@
     initialAddress?: string;
     /** When true, the address input is locked to `initialAddress`. */
     addressLocked?: boolean;
+    /** Pool of addresses bound to the user's recovery email slot — the
+     *  wizard surfaces a non-blocking heads-up when the typed address
+     *  matches one of them. */
+    recoveryAddresses?: string[];
     /** Called once on `RegistrationSucceeded`. The host shows a toast
      *  and closes the dialog. */
     onSuccess: (address: string) => void;
@@ -81,6 +85,7 @@
     resolveViaDoh,
     initialAddress,
     addressLocked = false,
+    recoveryAddresses = [],
     onSuccess,
   }: Props = $props();
 
@@ -220,6 +225,7 @@
     onSubmit={handleAddressSubmitted}
     {initialAddress}
     {addressLocked}
+    {recoveryAddresses}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}

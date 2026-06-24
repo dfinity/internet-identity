@@ -1,5 +1,6 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
+  import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -12,6 +13,12 @@
      *  silently swap the address being verified. */
     addressLocked?: boolean;
     initialError?: string;
+    /** Case-insensitive pool of addresses bound to the user's recovery
+     *  email slot. When the typed address matches one of these, render
+     *  a non-blocking heads-up — recovery and verified are independent
+     *  buckets, so adding the same address here means a second DKIM
+     *  round-trip. Continue still works. */
+    recoveryAddresses?: string[];
   }
 
   const {
@@ -19,11 +26,14 @@
     initialAddress,
     addressLocked = false,
     initialError,
+    recoveryAddresses = [],
   }: Props = $props();
 
   let address = $state(initialAddress ?? "");
   let error = $state(initialError);
   let busy = $state(false);
+
+  const normalized = $derived(address.trim().toLowerCase());
 
   const isShapeValid = $derived(
     address.includes("@") &&
@@ -31,6 +41,11 @@
       !address.endsWith("@") &&
       !/\s/.test(address) &&
       address.length <= 254,
+  );
+
+  const overlapsRecovery = $derived(
+    isShapeValid &&
+      recoveryAddresses.some((a) => a.toLowerCase() === normalized),
   );
 
   const handleSubmit = async (event: Event) => {
@@ -76,6 +91,13 @@
     disabled={busy || addressLocked}
     autofocus={!addressLocked}
   />
+  {#if overlapsRecovery}
+    <Alert
+      variant="info"
+      title={$t`This is also your recovery email`}
+      description={$t`Verifying it here adds it as a separate entry — the two are independent, so removing one won't affect the other.`}
+    />
+  {/if}
   <button
     class="btn btn-primary btn-lg"
     type="submit"

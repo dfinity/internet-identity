@@ -43,9 +43,14 @@
      *  panel doesn't hard-code it; bumping the constant is a backend
      *  change that should propagate without a frontend edit. */
     capacity: number;
+    /** Recovery-email addresses on this anchor (currently 0 or 1 — the
+     *  candid is `opt vec` for future multi-credential support). Wired
+     *  through to the verify wizard for the cross-bucket overlap
+     *  heads-up. */
+    recoveryAddresses?: string[];
   }
 
-  const { verifiedEmails, capacity }: Props = $props();
+  const { verifiedEmails, capacity, recoveryAddresses = [] }: Props = $props();
 
   let showAddWizard = $state(false);
   let removingAddress = $state<string | undefined>(undefined);
@@ -239,6 +244,7 @@
       diagnostics={diagnosticsEmailRecovery}
       submitDkimLeaf={submitEmailDkimLeaf}
       resolveViaDoh={resolveEmailViaDoh}
+      {recoveryAddresses}
       onSuccess={handleAddSuccess}
     />
   </Dialog>

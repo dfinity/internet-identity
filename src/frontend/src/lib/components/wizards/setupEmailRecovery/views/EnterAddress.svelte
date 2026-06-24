@@ -1,5 +1,6 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
+  import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -7,13 +8,21 @@
   interface Props {
     onSubmit: (address: string) => Promise<void>;
     initialError?: string;
+    /** Case-insensitive pool of addresses the user has already verified
+     *  on the share page. When the typed address matches one of these,
+     *  render a non-blocking heads-up — recovery and verified are
+     *  independent buckets, so setting the same address here means a
+     *  second DKIM round-trip. Continue still works. */
+    verifiedAddresses?: string[];
   }
 
-  const { onSubmit, initialError }: Props = $props();
+  const { onSubmit, initialError, verifiedAddresses = [] }: Props = $props();
 
   let address = $state("");
   let error = $state(initialError);
   let busy = $state(false);
+
+  const normalized = $derived(address.trim().toLowerCase());
 
   // Lightweight client-side check — the canister does the
   // authoritative validation. We just want to flag the obvious
@@ -24,6 +33,11 @@
       !address.endsWith("@") &&
       !/\s/.test(address) &&
       address.length <= 254,
+  );
+
+  const overlapsVerified = $derived(
+    isShapeValid &&
+      verifiedAddresses.some((a) => a.toLowerCase() === normalized),
   );
 
   const handleSubmit = async (event: Event) => {
@@ -71,6 +85,13 @@
     disabled={busy}
     autofocus
   />
+  {#if overlapsVerified}
+    <Alert
+      variant="info"
+      title={$t`This is already a verified email`}
+      description={$t`Setting it as your recovery email adds it as a separate entry — the two are independent, so removing one won't affect the other.`}
+    />
+  {/if}
   <button
     class="btn btn-primary btn-lg"
     type="submit"
