@@ -18,7 +18,6 @@
   import { anonymousActor } from "$lib/globals";
   import { invalidateAll } from "$app/navigation";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { VerifiedEmailWizard } from "$lib/components/wizards/verifiedEmail";
   import RemoveVerifiedEmail from "./RemoveVerifiedEmail.svelte";
   import { Trans } from "$lib/components/locale";
@@ -198,19 +197,17 @@
                 {$t`Verified`}
               </span>
             </div>
-            <Tooltip
-              label={$formatDate(verifiedAt, {
+            <time
+              datetime={verifiedAt.toISOString()}
+              title={$formatDate(verifiedAt, {
                 timeStyle: "short",
                 dateStyle: "medium",
               })}
-              direction="up"
-              align="start"
+              class="text-text-tertiary text-sm"
             >
-              <span class="text-text-tertiary text-sm">
-                {$t`Verified`}
-                {$formatRelative(verifiedAt, { style: "long" })}
-              </span>
-            </Tooltip>
+              {$t`Verified`}
+              {$formatRelative(verifiedAt, { style: "long" })}
+            </time>
           </div>
           <button
             class="btn btn-tertiary btn-sm btn-icon shrink-0"
