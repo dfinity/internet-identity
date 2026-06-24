@@ -168,6 +168,7 @@
       effectiveOrigin: ctx.effectiveOrigin,
       requestedKeys: ctx.requestedKeys,
       emailRequested: ctx.requestedKeys.some(isEmailKey),
+      recoveryAddresses: ctx.recoveryAddresses,
     };
   })();
 
@@ -459,6 +460,7 @@
         diagnostics={diagnosticsEmailRecovery}
         submitDkimLeaf={submitEmailDkimLeaf}
         resolveViaDoh={resolveEmailViaDoh}
+        recoveryAddresses={data.recoveryAddresses}
         onSuccess={(address) =>
           handleVerifySuccess(address, data.requestedKeys)}
       />
