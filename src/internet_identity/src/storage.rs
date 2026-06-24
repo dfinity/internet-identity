@@ -230,11 +230,11 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
 /// and are available for JWT verification before the first post-upgrade fetch.
 const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
 
-/// Reverse index for MCP access: maps the principal II derives for an anchor at
-/// the configured `mcp_server_origin` (i.e. that anchor's standing MCP-server
-/// principal) to the anchor. Populated when the anchor enables MCP access; the
-/// `mcp_*_account_delegation` methods use it to authorize a caller (the MCP
-/// server, acting as that principal) and recover its anchor without an
+/// Reverse index for MCP access: maps the principal II derives for an anchor's
+/// chosen account at the MCP server origin it connected (that anchor's standing
+/// MCP-server principal) to the anchor. Populated when the anchor enables MCP
+/// access; the `mcp_*_account_delegation` methods use it to authorize a caller
+/// (the MCP server, acting as that principal) and recover its anchor without an
 /// `anchor_number` parameter.
 const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX);

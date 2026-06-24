@@ -243,12 +243,6 @@ pub struct InternetIdentityFrontendArgs {
     /// own init callback, and `?feature_flag_*` URL params take precedence.
     /// Names that don't match a known frontend flag are ignored by the frontend.
     pub feature_flags: Option<Vec<(String, bool)>>,
-    /// Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
-    /// slash). The `/mcp` delegation flow delivers the delegation to this origin
-    /// (and only this origin — it's added to the `form-action` CSP and the
-    /// `/mcp` page rejects callbacks on any other origin). When unset, the
-    /// `/mcp` flow is disabled.
-    pub mcp_server_origin: Option<String>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.

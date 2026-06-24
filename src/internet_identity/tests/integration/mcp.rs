@@ -68,13 +68,26 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     let mcp = mcp_server_principal(&env, canister_id, anchor);
 
     // Opt in: bind the MCP-server principal to the anchor.
-    mcp_set_access(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None, true)
-        .unwrap()
-        .unwrap();
-    assert!(
-        mcp_access_enabled(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None)
-            .unwrap()
-    );
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None,
+        true,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(mcp_access_enabled(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None
+    )
+    .unwrap());
 
     // Mint the per-app delegation as the MCP server — no anchor_number passed.
     let PrepareAccountDelegation {
@@ -140,9 +153,17 @@ fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
     let mcp = mcp_server_principal(&env, canister_id, anchor);
-    mcp_set_access(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None, true)
-        .unwrap()
-        .unwrap();
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None,
+        true,
+    )
+    .unwrap()
+    .unwrap();
 
     let prepared = mcp_prepare_account_delegation(
         &env,
@@ -215,9 +236,17 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("k");
 
-    mcp_set_access(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None, true)
-        .unwrap()
-        .unwrap();
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None,
+        true,
+    )
+    .unwrap()
+    .unwrap();
     assert!(mcp_prepare_account_delegation(
         &env,
         canister_id,
@@ -240,10 +269,15 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
     )
     .unwrap()
     .unwrap();
-    assert!(
-        !mcp_access_enabled(&env, canister_id, principal_1(), anchor, MCP_ORIGIN.to_string(), None)
-            .unwrap()
-    );
+    assert!(!mcp_access_enabled(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None
+    )
+    .unwrap());
     match mcp_prepare_account_delegation(&env, canister_id, mcp, target, session_key, None).unwrap()
     {
         Err(AccountDelegationError::Unauthorized(_)) => {}
