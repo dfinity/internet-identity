@@ -286,6 +286,14 @@ pub struct InternetIdentityInit {
     /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
     /// keyed off `is_production`.
     pub sso_discoverable_domains: Option<Vec<String>>,
+    /// Deploy flag that opens the SSO discovery domain gate to *any* domain.
+    /// When `Some(true)`, `sso_discoverable_domains` (and its built-in
+    /// `is_production` defaults) no longer restrict which domains may be
+    /// discovered as SSO providers — every domain is accepted. `None` /
+    /// `Some(false)` leave the allowlist in force. The strict-`https` posture
+    /// is unaffected: a domain must still be on the explicit
+    /// `sso_discoverable_domains` list to serve discovery over plain `http`.
+    pub sso_allow_any_domain: Option<bool>,
     /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
     /// §8.6). When `Some`, a batched timer-driven migration stamps every

@@ -742,6 +742,7 @@ fn config() -> InternetIdentityInit {
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
         sso_discoverable_domains: persistent_state.sso_discoverable_domains.clone(),
+        sso_allow_any_domain: persistent_state.sso_allow_any_domain,
         // One-shot upgrade arg driving the SSO credential backfill; not
         // persisted as config, so there is nothing to report back here.
         sso_credential_migration: None,
@@ -872,6 +873,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 .collect();
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.sso_discoverable_domains = Some(sso_discoverable_domains);
+            })
+        }
+        if let Some(sso_allow_any_domain) = arg.sso_allow_any_domain {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.sso_allow_any_domain = Some(sso_allow_any_domain);
             })
         }
         if let Some(entries) = arg.sso_credential_migration {

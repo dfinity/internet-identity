@@ -19,6 +19,7 @@
     related_origins: frontendCanisterConfig.related_origins,
     openid_configs: [],
     sso_discoverable_domains: [],
+    sso_allow_any_domain: [],
     sso_credential_migration: [],
     backend_origin: [frontendCanisterConfig.backend_origin],
     mcp_server_origin: [],

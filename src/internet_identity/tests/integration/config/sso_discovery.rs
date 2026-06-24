@@ -61,3 +61,33 @@ fn sso_discovery_honours_explicit_allowlist() {
         SsoDiscoveryState::NotAllowed
     );
 }
+
+/// The `sso_allow_any_domain` deploy flag opens the gate to every domain: a
+/// domain off the allowlist reads `Pending` instead of `NotAllowed`.
+#[test]
+fn sso_allow_any_domain_opens_the_gate() {
+    let env = env();
+    let arg = InternetIdentityInit {
+        sso_discoverable_domains: Some(vec!["example.com".to_string()]),
+        sso_allow_any_domain: Some(true),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(arg),
+        10_000_000_000_000,
+    );
+
+    // The explicit entry is still allowed.
+    assert_eq!(
+        api::get_sso_discovery(&env, canister_id, "example.com").unwrap(),
+        SsoDiscoveryState::Pending
+    );
+    // A domain off the allowlist is now accepted rather than `NotAllowed`.
+    assert_eq!(
+        api::get_sso_discovery(&env, canister_id, "evil.example.com").unwrap(),
+        SsoDiscoveryState::Pending
+    );
+    api::discover_sso(&env, canister_id, "evil.example.com").unwrap();
+}

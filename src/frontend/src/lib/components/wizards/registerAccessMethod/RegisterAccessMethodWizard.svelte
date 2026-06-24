@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import ContinueFromExistingDevice from "$lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte";
   import WaitingForExistingDevice from "$lib/components/wizards/registerAccessMethod/views/WaitingForExistingDevice.svelte";
+  import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 
   interface Props {
     registrationId?: string;
@@ -20,6 +21,13 @@
     try {
       onRegistered(await registerAccessMethodFlow.createPasskey());
     } catch (error) {
+      // Cancelling the WebAuthn prompt must not tear down the whole dialog.
+      // Stay on the confirm view so the user can retry "Create passkey" (or
+      // dismiss the modal to return to the picker). Only real errors — which
+      // the parent surfaces by closing the dialog — propagate.
+      if (isWebAuthnCancelError(error)) {
+        return;
+      }
       onError(error);
     }
   };
