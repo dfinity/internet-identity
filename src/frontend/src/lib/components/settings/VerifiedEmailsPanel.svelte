@@ -89,7 +89,7 @@
     void invalidateAll();
     toaster.success({
       title: $t`Email verified`,
-      description: $t`${address} is now available for dapps to request.`,
+      description: $t`${address} is now available for apps to request.`,
     });
   };
 

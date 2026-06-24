@@ -90,11 +90,11 @@ class VerifiedEmailFixtures {
     await this.#page.goto(II_URL + "/manage/communication");
   }
 
-  /** The "Associated emails" page sits on its own top-level route
-   *  under /manage; assert the page header and the panel rendered. */
+  /** The "Shareable info" page sits on its own top-level route under
+   *  /manage; assert the page header and the panel rendered. */
   async assertPanelVisible(): Promise<void> {
     await expect(
-      this.#page.getByRole("heading", { name: "Associated emails", level: 1 }),
+      this.#page.getByRole("heading", { name: "Shareable info", level: 1 }),
     ).toBeVisible();
     await expect(
       this.#page.getByRole("heading", { name: "Email addresses", level: 2 }),

@@ -331,7 +331,7 @@
             current={page.url.pathname === "/manage/communication"}
           >
             <AtSignIcon class="size-5 sm:max-md:mx-auto" />
-            <span class="sm:max-md:hidden">{$t`Communication`}</span>
+            <span class="sm:max-md:hidden">{$t`Shareable info`}</span>
           </NavItem>
         </li>
         <li class="contents">

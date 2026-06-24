@@ -30,13 +30,11 @@
 </script>
 
 <header class="flex flex-col gap-3">
-  <h1 class="text-text-primary text-3xl font-medium">
-    {$t`Associated emails`}
-  </h1>
+  <h1 class="text-text-primary text-3xl font-medium">{$t`Shareable info`}</h1>
   <p class="text-text-tertiary text-base">
     <Trans>
-      You can choose emails from this list to provide email confirmation when an
-      app requests it. Without your consent, your emails are always kept secret.
+      Info you can choose to share when an app requests it. Without your
+      consent, your info is always kept secret.
     </Trans>
   </p>
 </header>
