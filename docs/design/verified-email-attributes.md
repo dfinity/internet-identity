@@ -68,7 +68,11 @@ Pick a new `#[n(...)]` field number for `verified_emails`; do not touch the lega
 
 No migration logic, no post-upgrade hook, no read/write abstraction. The two storage locations are entirely independent.
 
-Cap at 5 entries per anchor (bounds stable-memory growth, suffices for any real user). Enforced at `verified_email_prepare_add` time.
+Cap at 5 entries per anchor (bounds stable-memory growth, suffices for any real user). Enforced both at `verified_email_prepare_add` time **and** at commit time (in the SnapshotKind::VerifyEmail arm that writes to `Anchor.verified_emails`). The double-check exists because prepare and commit are separated by an async DKIM round-trip — two concurrent prepares at cap-1 would both pass a prepare-only check and both commit, blowing past the cap. The commit-time recheck makes the cap an invariant of the stored anchor, not just an entry condition on the wizard.
+
+**Address normalization.** Stored addresses are ASCII-lowercased on commit. The wizard SHOULD also normalize on submit (trim leading/trailing whitespace + lowercase) so what the user sees in the wizard matches what gets stored — and so the cross-bucket overlap warnings (above) compare apples to apples. Plus-addressing (`user+tag@example.com`) is treated as a literal address distinct from `user@example.com`; no plus-stripping. IDN domains follow whatever normalization the DKIM-recovery flow already does; no new logic here.
+
+**Pending-entry collision.** If `verified_email_prepare_add` is called while a pending entry for the same address (under the same anchor + `PendingKind::VerifyEmail`) already exists, the call inherits the recovery flow's behavior: the existing pending entry is replaced with a fresh nonce. The user clicking "Resend" in the wizard issues a new nonce; an old nonce already in the user's inbox stops working. There is no separate "cancel pending" action — the entry expires on its own TTL (same as the recovery pending map's TTL) or is overwritten by the next prepare call.
 
 ### Verification flow
 
@@ -87,6 +91,19 @@ The inbound verification mechanism is identical to the recovery flow: same `regi
 - `PendingKind::VerifyEmail { anchor }` — **new**, drives the verified-email add flow. Writes to `verified_emails`.
 
 The subject-prefix parser (`find_nonce_in`) accepts both `II-Recovery-` and `II-Verify-` prefixes — it's just an anchor for the 16-hex nonce suffix, not a security primitive. Once the nonce matches a pending entry, dispatch is by `PendingKind`.
+
+### Silent mirror on OIDC / SSO link
+
+Whenever an OIDC or SSO credential is added to an anchor and the provider vouches for the email (`OpenIdCredential::get_verified_email()` returns `Some` — Google with `email_verified: true`, Microsoft personal-tenant, etc.), the canister silently appends a `StorableVerifiedEmail` entry to `Anchor.verified_emails` in the same atomic write. The address is lowercased; `verified_at` is `ic_cdk::api::time()`. Both add paths share the mirror — `openid_credential_add` (post-registration) and `openid_identity_registration_finish` (registration) both flow through `add_openid_credential_skip_checks`.
+
+The mirror exists so a verified address survives an OIDC unlink. The user picks a "reach" email once; unlinking the IdP later doesn't quietly take that email away from the dapps that already learnt to ask for it via `verified:<H>:email`.
+
+Properties:
+
+- **Idempotent.** If the address is already in `verified_emails` (case-insensitive ASCII match), the call is a no-op. Re-linking an OIDC credential never refreshes a pre-existing entry's `verified_at`.
+- **Cap-respecting.** If `verified_emails.len() >= MAX_VERIFIED_EMAILS_PER_ANCHOR`, the mirror is skipped silently. The OIDC link still succeeds — the surrounding operation must not fail because the verified-emails bucket is full.
+- **One-way.** Removing the OIDC credential does **not** remove the mirrored entry. The user removes verified-email entries from the panel, like any other entry.
+- **No DKIM-bypass round-trip.** If the user manually removes the verified-email entry, re-adding the same address requires going through the DKIM flow — the mirror only fires on a fresh OIDC link, and the entry it left behind is gone.
 
 ### Candid surface
 
@@ -150,6 +167,17 @@ BODY     (anything, leave it blank)
 
 The only user-visible difference from the recovery flow's dialog is the subject prefix.
 
+### Cross-bucket overlap warnings
+
+Recovery and verified are independent buckets. The same address can live in both, but each side requires its own DKIM proof — there is no cross-promotion in v1. To keep the "verify twice" semantic from feeling like a mistake on the user's part, each wizard surfaces a non-blocking heads-up when the address the user just typed already lives in the other bucket:
+
+- **Verified-email wizard (Phase 1).** If the entered address case-insensitively matches the anchor's current `email_recovery` entry, the address-entry view shows a banner above the Continue button: "This is also your recovery email. Verifying it here adds it as a separate verified entry — the two are independent, so removing one won't affect the other." The user can still proceed; the banner just makes the duplicate-verification cost legible up front.
+- **Recovery-email wizard (Phase 1).** Symmetric. If the entered address matches any entry in `verified_emails`, the wizard shows: "This is already a verified email on your account. Setting it as your recovery email adds it to a separate bucket — the two are independent, so removing one won't affect the other." Same shape, same non-blocking posture.
+
+Both checks are FE-only, run against the data already loaded for the wizard's surrounding panel — no extra canister calls. The check fires on Continue (not on every keystroke) so the user isn't nagged while typing. If the user updates the address after seeing the banner so it no longer overlaps, the banner clears.
+
+The warnings deliberately do not offer a "skip re-verification" shortcut: cross-promotion is out of scope for v1 (see Phase 1 open decisions and §11 future enhancements). The banner is purely informational so the user understands why they are about to be asked to send a second email.
+
 ### Phase 1 open decisions
 
 - [ ] **Cross-promotion (v2 framing).** A user who wants the same address as both their recovery email and a shareable verified email currently has to verify it twice. Worth designing in v2: a "also set as my recovery email" affordance on the new verified-email row, and a "also add as a verified email" affordance on the recovery email management view. Both would skip re-verification since the address is already DKIM-proven in one bucket. Out of scope for v1.
@@ -160,25 +188,24 @@ The only user-visible difference from the recovery flow's dialog is the subject 
 
 ### Concept
 
-The narrow Verified emails panel from Phase 1 widens into a page titled **"Reach"** with the subtitle "How apps can reach you when you sign in." The page presents the user's emails across all sources in two sections:
+The narrow Verified emails panel from Phase 1 widens into a page titled **"Reach"** with the subtitle "How apps can reach you when you sign in." The page presents the user's emails in two sections:
 
-- **Verified emails** — emails from OIDC credentials where `email_verified: true`, SSO credentials where the IdP vouches for the address, and `verified_emails` entries from Phase 1. Rendered as one unified list, deduped by address.
-- **Unverified emails** — emails from OIDC/SSO credentials where the IdP did not vouch for verification (`email_verified: false`). Each row has a "Verify" CTA that opens the Phase 1 wizard pre-filled with the address; on success, the address joins the Verified list.
+- **Verified emails** — `Anchor.verified_emails` entries. The canister already mirrored IdP-vouched OIDC/SSO emails into this list at link time (Phase 1, "Silent mirror on OIDC / SSO link"), so this section is a single-source read: no front-end dedup needed.
+- **Unverified emails** — emails from OIDC/SSO credentials where the IdP did not vouch for verification (`email_verified: false` and no other signal). Each row has a "Verify" CTA that opens the Phase 1 wizard pre-filled with the address; on success the entry lands in `verified_emails` and the row moves up to the Verified section on the next refetch.
 
 This phase is purely frontend work. No new candid, no new storage, no new backend logic. It depends on Phase 1's backend but doesn't gate Phase 2 or Phase 3.
 
 ### Verified emails section
 
-- Lists the union of `openid_credentials` (where verified), SSO credentials (where verified), and `verified_emails` entries from Phase 1.
-- **Dedup by address.** Same address in multiple sources (e.g. an OIDC cred + a `verified_emails` entry the user added through DKIM) renders as one row. Source label prefers the IdP name when present; verification date uses whichever source produced it.
-- **Source icon** per row: per-IdP icon (Google, Microsoft, Apple, etc.) for entries backed by an OIDC/SSO credential; a generic envelope icon for entries backed only by `verified_emails`.
-- **Remove button** is only shown on rows backed exclusively by `verified_emails`. Rows backed by an IdP-issued credential don't show Remove — removing such an email means unlinking the IdP, which is a different concern handled elsewhere on `/manage`. Silently hidden, no tooltip.
+- Lists `Anchor.verified_emails` directly — no union, no dedup. Whether the entry got there by the DKIM wizard or by the OIDC-link mirror is the same as far as the user is concerned: it's a verified address dapps can reach them at.
+- **Source affinity badge** (optional, FE-only join). For each verified entry whose address also appears on a current `openid_credentials` row, render a small IdP icon next to the row as a hint that this address is also tied to a linked account. The join is a pure FE convenience — case-insensitive address match against the live `openid_credentials` list. Removing the OIDC credential drops the badge; the verified-email entry persists. **Tie-break when multiple IdPs vouch for the same address** (Google + Microsoft both with `email_verified: true` for `user@example.com`): render the icon of whichever credential was linked most recently (largest `last_usage_timestamp`, ties broken by insertion order). The badge is a hint, not a source-of-truth; we don't render multi-IdP stacks.
+- **Remove button** is always shown — every row is a `verified_emails` entry the user controls. Removing the entry is a manual deletion, even if the underlying OIDC credential is still linked. Re-adding the same address has two paths: either run the DKIM wizard again, or unlink and re-link the OIDC credential (a fresh credential add re-fires the silent mirror). Both are explicit user actions — there is no passive re-population of a row the user just removed.
 - **Cap counter** "N of 5 verified emails" rendered below the list, always visible.
 - **"Add an email"** CTA → mounts the wizard from Phase 1.
 
 ### Unverified emails section
 
-- Lists `openid_credentials` and SSO credentials whose `email_verified` claim is false.
+- Lists `openid_credentials` (or SSO) entries whose `email_verified` claim is false **and** whose address is not already in `verified_emails` (i.e. the user hasn't separately DKIM-proven it). Same case-insensitive address compare used for the source-affinity badge.
 - Per row: address, source label ("Microsoft · Not verified"), source icon, "Verify" CTA.
 - **Section hidden entirely** when there are no unverified entries.
 
@@ -189,9 +216,9 @@ When the user clicks Verify on an unverified row:
 1. The Phase 1 wizard mounts with the address pre-filled and read-only (the user can't accidentally verify a different address than the one they clicked).
 2. Standard `verified_email_prepare_add` → DKIM challenge → poll.
 3. On success, a new `StorableVerifiedEmail` entry lands in `Anchor.verified_emails`.
-4. The dashboard re-fetches. The address now appears in both `openid_credentials` (the unverified IdP cred, untouched) and `verified_emails` (the new II-DKIM entry). Dedup shows one row in the Verified section, sourced from the IdP, with II's verification date.
+4. The dashboard re-fetches. The address now lives in `verified_emails`; the OIDC credential is untouched (still `email_verified: false`). The Unverified section filter drops the row (address now in `verified_emails`); the Verified section renders it with the source-affinity badge for the originating IdP.
 
-The original OIDC/SSO credential is not modified — the IdP still thinks the email is unverified. But II has its own proof, so the attribute-resolution downstream of Phase 2 correctly surfaces it:
+The original OIDC/SSO credential is not modified — the IdP still thinks the email is unverified. But II has its own proof, so Phase 2 attribute resolution correctly surfaces it:
 
 - `verified:<H(addr)>:verified_email` resolves to the address (Phase 2 reads `verified_emails`).
 - `openid:<issuer>:verified_email` still doesn't resolve (the IdP claim is false).
@@ -200,9 +227,11 @@ The original OIDC/SSO credential is not modified — the IdP still thinks the em
 ### Phase 1.5 locked decisions
 
 - **Page name:** "Reach" (with subtitle "How apps can reach you when you sign in.").
-- **Dedup rule:** one row per address. When an address is in both `openid_credentials` (or SSO) and `verified_emails`, prefer the IdP source label; the verification date is whichever source produced it most recently.
-- **Source icons:** per-IdP (Google, Microsoft, Apple) for IdP-backed entries; generic envelope for `verified_emails`-only entries.
-- **Remove on IdP-backed rows:** hidden, no tooltip.
+- **Verified emails source:** `Anchor.verified_emails` only — no front-end union with `openid_credentials`. The mirror in Phase 1 makes the union redundant.
+- **Source-affinity badge:** purely an FE-side hint; address-equality join against `openid_credentials`. No effect on Remove visibility or row identity.
+- **Source icons:** per-IdP icon on the badge for verified rows when the address also lives on an OIDC credential; generic envelope when there's no matching credential.
+- **Remove visibility:** always shown on verified rows. The user owns the `verified_emails` entry independently of any OIDC link.
+- **Unverified section filter:** an OIDC/SSO email with `email_verified: false` only appears in the Unverified section if it's not already in `verified_emails`. Otherwise the verified row covers it.
 - **Verify CTA on SSO rows:** behaves identically to OIDC — same DKIM wizard, same `verified_email_prepare_add` flow.
 - **Cap counter:** always visible.
 - **Unverified section visibility:** hidden when empty.
@@ -279,6 +308,8 @@ For unscoped `email` / `verified_email` requests:
 3. On Continue with a non-empty selection, the canister updates `last_shared_email_scope` to whatever was shared.
 
 "Deny all" doesn't update `last_shared_email_scope` — we track the last _shared_ choice, not the last action. So denying once doesn't change the default the next time.
+
+**Write timing.** The scope is written as a side effect of `prepare_icrc3_attributes` succeeding — i.e. the moment the canister has packaged the attributes for delivery. This is technically before the dapp consumes the result (the FE still has to surface them through the delegation channel), so an unlucky network drop after prepare and before delivery would record a "share" that never reached the dapp. That's accepted: from the user's perspective, they clicked Continue with that selection, and the next time they see the dialog we honor that intent. The alternative — deferring the write until `get_icrc3_attributes` is consumed — costs an extra update call on a hot path and saves us from a vanishingly rare edge case where the FE crashes between prepare and consume. Not worth it.
 
 Scoped requests (`openid:...:email`, `verified:<H>:email`, etc.) bypass step 1 — the dapp asked for a specific source. They go straight to the consent dialog with that source pre-selected.
 

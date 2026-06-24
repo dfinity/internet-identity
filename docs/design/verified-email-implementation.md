@@ -98,11 +98,21 @@
 ### 1.E. Backend: cap + helpers
 
 - [ ] [src/internet_identity/src/email_recovery/mod.rs](../../src/internet_identity/src/email_recovery/mod.rs) — `pub const MAX_VERIFIED_EMAILS_PER_ANCHOR: usize = 5;`.
-- [ ] New module `src/internet_identity/src/verified_emails/` (or extend `email_recovery/` if you prefer — the verification primitive is genuinely shared). New file `verified_emails/prepare.rs` mirroring [prepare.rs](../../src/internet_identity/src/email_recovery/prepare.rs):
+- [ ] Three sibling modules at the crate root reflect the actual layering: `email_inbound/` owns the shared inbound-DKIM-challenge primitive (pending map, SMTP dispatcher, DKIM leaf submission, nonce RNG, shared `prepare_common` core, shared constants), and `email_recovery/` and `verified_emails/` are two consumer flows built on top of it. Neither flow module reaches into the other. New file `verified_emails/prepare.rs` calls `email_inbound::prepare::prepare_common` to mirror the recovery prepare path:
   - `pub async fn prepare_add(anchor: AnchorNumber, dns_input: EmailRecoveryDnsInput, now_secs: u64) -> Result<EmailRecoveryChallenge, EmailRecoveryError>` — same structure as the recovery `prepare_add`, but stores `PendingKind::VerifyEmail { anchor }` and issues the nonce with the `II-Verify-` prefix.
   - Enforce the cap: reject if `anchor.verified_emails.as_ref().map_or(0, |v| v.len()) >= MAX_VERIFIED_EMAILS_PER_ANCHOR`.
 - [ ] New `verified_emails/remove.rs`: `pub fn remove(anchor: &mut Anchor, address: &str) -> Result<Operation, RemoveError>`. Find the matching entry in `verified_emails`, remove it. Does not touch `email_recovery`.
 - [ ] Commit logic on verification success (in `submit_leaf.rs` or wherever the `SnapshotKind::VerifyEmail` arm lands): append a new `StorableVerifiedEmail { address, verified_at: now }` to `Anchor.verified_emails`. Initialize the Vec if `None`.
+- [ ] **Commit-time cap recheck.** Inside the same `SnapshotKind::VerifyEmail` commit arm, before appending, re-evaluate `anchor.verified_emails.len() >= MAX_VERIFIED_EMAILS_PER_ANCHOR` and drop the write (return an error suitable for the polling loop to surface) if the cap is now full. Necessary because two concurrent `prepare_add` calls at cap-1 both pass the prepare-time check, both verify, and a single check at prepare time would let both commits land. Unit test: simulate two committed verifications racing into a cap-1 anchor; only one should land.
+- [ ] **Pending-entry collision behavior.** When `verified_email_prepare_add` is called for an anchor + address that already has a pending `PendingKind::VerifyEmail` entry, replace the existing entry with the fresh nonce (mirrors the recovery flow's behavior). Do not create two pending entries for the same (anchor, address). Old nonces still in the user's inbox stop matching. Unit test asserting the second prepare overwrites, doesn't duplicate.
+
+### 1.E.bis. Backend: silent mirror on OIDC / SSO link
+
+- [ ] [src/internet_identity/src/storage/anchor.rs](../../src/internet_identity/src/storage/anchor.rs) — add `Anchor::mirror_verified_email_from_oidc(&mut self, address: &str, verified_at_ns: Timestamp) -> bool`. Case-insensitive ASCII dedup against `verified_emails`; respect `MAX_VERIFIED_EMAILS_PER_ANCHOR`; lowercase the stored address; never return an error. Returns `true` when an entry was appended.
+- [ ] [src/internet_identity/src/anchor_management.rs](../../src/internet_identity/src/anchor_management.rs) — inside `add_openid_credential_skip_checks` (the choke point for both `openid_credential_add` and `openid_identity_registration_finish`), read `openid_credential.get_verified_email()` _before_ moving the credential into the anchor, then call `anchor.mirror_verified_email_from_oidc(&addr, ic_cdk::api::time())` after the credential add succeeds. The mirror writes happen in the same atomic anchor write as the OIDC credential add.
+- [ ] Do **not** mirror on `openid_credential_remove` or anywhere else. The mirror is one-way.
+- [ ] Unit tests in [storage/anchor/tests.rs](../../src/internet_identity/src/storage/anchor/tests.rs) covering: append on new address, lowercase normalisation, dedup preserves existing `verified_at` (no refresh on re-link), cap-respect skips silently.
+- [ ] Integration test: link an OIDC credential whose JWT carries `email_verified: true` → `Anchor.verified_emails` contains the address; remove the OIDC credential → entry persists; remove the verified-email entry through the panel; re-adding the same address only works through the DKIM flow.
 
 ### 1.F. Backend: candid surface
 
@@ -141,6 +151,9 @@
   - The polling helper `runEmailRecoveryPoll` from [emailRecovery/shared/](../../src/frontend/src/lib/components/wizards/emailRecovery/shared/) (purpose-neutral once the pending entry exists).
 - [ ] Wizard flow: address input → call `verified_email_prepare_add` → show the dialog with the canister-issued nonce (`II-Verify-…`) → poll for status → success/failure view.
 - [ ] **No `markAsRecovery` prop, no recovery branching.** The wizard is exclusively for adding entries to `verified_emails`. If a user wants their address as a recovery email too, they use the existing recovery flow separately.
+- [ ] **Recovery-overlap heads-up.** On the address-entry view, when the user presses Continue, case-insensitively compare the typed address against the anchor's current `email_recovery` entry (already loaded for the surrounding Communication panel — no extra canister call). On match, render a non-blocking banner above Continue: "This is also your recovery email. Verifying it here adds it as a separate verified entry — the two are independent, so removing one won't affect the other." Continue still works. Banner clears if the user edits the address so it no longer overlaps. String via `$t`.
+- [ ] **Normalize the typed address before the overlap check** (and before sending to the canister): `.trim().toLowerCase()`. Without normalization, `Foo@Example.com` typed in the wizard wouldn't match a stored `foo@example.com` and the overlap banner would silently fail to fire.
+- [ ] **Cap-full error UX.** When `verified_email_prepare_add` returns the cap-reached error variant, the wizard's address-entry view renders a blocking inline error in place of the normal validation row: "You already have 5 verified emails — the limit per identity. Remove one from the Communication settings page to add another." Continue is disabled until the user edits the field (the disabling exists only to make it obvious that retrying won't help; the next attempt is still allowed). The wizard does not surface this as a toast — the user is already in the wizard, the message belongs there. String via `$t`.
 
 ### 1.I. Frontend: narrow "Verified emails" settings panel
 
@@ -154,6 +167,7 @@ This is the **narrow** version that ships with Phase 1. Phase 1.5 widens it into
   - **No global "Don't share my email" toggle.**
 - [ ] Mount under the `/manage` route, alongside (not replacing) the existing recovery email section.
 - [ ] Copy follows the "Copy and tone" guidance in the design doc — empty state leads with user benefit, not "add an email" as a bare CTA. Strings via `$t` calls; don't edit `.po` files directly.
+- [ ] **Verified-overlap heads-up on the recovery wizard.** Symmetric to the verified wizard's recovery-overlap banner: in [src/frontend/src/lib/components/wizards/setupEmailRecovery/views/EnterAddress.svelte](../../src/frontend/src/lib/components/wizards/setupEmailRecovery/views/EnterAddress.svelte), on Continue, case-insensitively compare the typed address against `Anchor.verified_emails` (loaded via `identity_info` for the surrounding manage view — no extra canister call). On match, render a non-blocking banner above Continue: "This is already a verified email on your account. Setting it as your recovery email adds it to a separate bucket — the two are independent, so removing one won't affect the other." Continue still works. Banner clears if the user edits the address so it no longer overlaps. String via `$t`.
 
 ### 1.J. Frontend: /authorize empty-state inline flow
 
@@ -169,6 +183,8 @@ This is the **narrow** version that ships with Phase 1. Phase 1.5 widens it into
   - Remove a verified email → it disappears.
   - Cap-5: attempting to add a 6th surfaces the right error.
   - The recovery email flow remains untouched: adding a recovery email through the existing CTA still produces an `email_recovery` entry and does NOT populate `verified_emails`.
+- [ ] FE unit test (verified wizard): Continue with an address matching the anchor's `email_recovery` entry → recovery-overlap banner appears; Continue still proceeds; editing the address to a non-overlapping value clears the banner. Case-insensitive match.
+- [ ] FE unit test (recovery wizard): Continue with an address matching any `verified_emails` entry → verified-overlap banner appears; Continue still proceeds; editing the address to a non-overlapping value clears the banner. Case-insensitive match.
 
 ### 1.L. Documentation cleanup
 
@@ -186,35 +202,33 @@ Pure FE work. No new candid, no new storage, no backend changes. Depends on Phas
 - [ ] Rename or refactor `src/frontend/src/lib/components/settings/VerifiedEmailsPanel.svelte` into a "Reach" page component (or restructure as a child of the existing settings page — pick whatever matches the existing `/manage` layout best). Page title: "Reach". Subtitle: "How apps can reach you when you sign in." (Final strings land with UX review.)
 - [ ] Inside the page, add a "Verified emails" section header with a short subtitle (mockup uses "Apps can request one of these to reach you. Never shared without your consent.").
 
-### 1.5.B. Verified emails section (unified)
+### 1.5.B. Verified emails section
 
-- [ ] Render the list from the union of two sources:
-  - `openid_credentials` entries whose `email_verified` claim is true.
-  - SSO credentials whose IdP vouches for the address (same condition; the credential type already encodes verified status).
-  - `verified_emails` entries from Phase 1.
-- [ ] Dedup by address: if the same address appears in multiple sources, render one row. Source label prefers the IdP name; verification date uses whichever source produced it (most-recent wins on ties).
-- [ ] Source icon per row: per-IdP icon (Google, Microsoft, Apple, and any other configured IdPs); generic envelope for entries backed only by `verified_emails`. Reuse existing icon assets when available — most are already in `src/frontend/src/lib/components/icons/` or similar.
-- [ ] Remove button: only on rows backed exclusively by `verified_emails`. IdP-backed rows silently hide the Remove button (no tooltip).
+- [ ] Render the list from `Anchor.verified_emails` only. No union, no dedup — the Phase 1 backend mirror already writes IdP-vouched emails into this field at link time.
+- [ ] Source-affinity badge (FE-only join, case-insensitive address compare): for each verified row whose address also appears on a current `openid_credentials` row, render the per-IdP icon (Google, Microsoft, Apple, or any other configured provider) as a small badge. Verified rows without a matching credential render a generic envelope icon. Reuse existing icon assets from `src/frontend/src/lib/components/icons/`.
+- [ ] Multi-IdP tie-break for the badge: when two or more `openid_credentials` entries match the same verified address (e.g. user linked both Google and Microsoft for the same mailbox), pick the credential with the largest `last_usage_timestamp`; on tie, fall back to insertion order in the credentials list. Render that IdP's icon only — no stacking. FE unit test asserting the deterministic pick.
+- [ ] Remove button: always shown. Every row is a `verified_emails` entry the user owns; removing it is a direct deletion and does not affect any linked OIDC credential.
 - [ ] Cap counter below the list, always visible: "N of 5 verified emails" (final wording TBD).
 - [ ] "Add an email" CTA → mounts the wizard from Phase 1.
 
 ### 1.5.C. Unverified emails section
 
 - [ ] New section "Unverified emails" beneath the Verified section. Subtitle (mockup wording): "Verify one of these so apps can use it to reach you."
-- [ ] Lists `openid_credentials` / SSO credentials whose `email_verified` claim is false.
+- [ ] Lists `openid_credentials` / SSO credentials whose `email_verified` claim is false **and** whose address is not already in `verified_emails` (same case-insensitive compare used for the source-affinity badge). The filter prevents an OIDC unverified row from shadowing a verified row covering the same address.
 - [ ] Per row: address, source label ("Microsoft · Not verified"), source icon, "Verify" CTA.
-- [ ] **Hide the section entirely** when no unverified entries exist.
+- [ ] **Hide the section entirely** when no unverified entries exist after the filter.
 
 ### 1.5.D. Verify-from-unverified flow
 
 - [ ] "Verify" button on an unverified row opens the Phase 1 wizard with the address pre-filled. The address field is **read-only** in this entry mode so the user can't accidentally verify a different address than the one they clicked.
 - [ ] On wizard success: a new `StorableVerifiedEmail` entry lands in `Anchor.verified_emails` via `verified_email_prepare_add` → DKIM challenge → poll. **The original OIDC/SSO credential is not modified.**
-- [ ] After success, refetch the dashboard data. The address now appears in both `openid_credentials` (the unchanged IdP cred, still `email_verified: false`) and `verified_emails` (the new entry). Dedup renders one row in the Verified section, sourced from the IdP, dated as the II verification.
+- [ ] After success, refetch the dashboard data. The Unverified-section filter drops the row (address now in `verified_emails`); the Verified section renders it with the originating IdP's icon as the source-affinity badge.
 
 ### 1.5.E. Tests
 
-- [ ] FE unit test: dedup produces one row when the same address is in both `openid_credentials` and `verified_emails`.
-- [ ] FE unit test: Remove button visibility — visible on `verified_emails`-only rows, hidden on IdP-backed rows.
+- [ ] FE unit test: source-affinity badge renders the IdP icon when the address matches an `openid_credentials` entry; generic envelope otherwise.
+- [ ] FE unit test: Remove button is always present on verified rows (independent of whether the address also lives on an `openid_credentials` entry).
+- [ ] FE unit test: Unverified section filter drops OIDC `email_verified: false` rows whose address is already in `verified_emails`.
 - [ ] FE unit test: Unverified section hides entirely when there are no unverified entries.
 - [ ] E2E test: anchor with an unverified OIDC email → user clicks Verify → wizard opens with the address pre-filled and read-only → completes DKIM → row moves to Verified section after re-fetch.
 - [ ] E2E test: cap counter reflects the actual count.
@@ -257,6 +271,7 @@ Pure FE work. No new candid, no new storage, no backend changes. Depends on Phas
 
 - [ ] Add `last_shared_email_scope: Option<String>` to `StorableAnchor` (new `#[n(N)]` tag, additive).
 - [ ] [attributes.rs](../../src/internet_identity/src/attributes.rs) — `prepare_icrc3_attributes` (or the equivalent commit path): when the user shares an unscoped `email` / `verified_email`, write the resolved scope into `last_shared_email_scope` on the anchor. **Deny does not update this field** — we track last _shared_, not last action.
+- [ ] Write timing is at `prepare_icrc3_attributes` success, **not** deferred to `get_icrc3_attributes` consumption. A network drop between prepare and consume could record a share the dapp never collected — accepted, since from the user's perspective they clicked Continue with that intent. Documented in the spec under Phase 3 "Write timing".
 - [ ] Expose `last_shared_email_scope` to the FE — add it to `IdentityInfo` (or whatever the FE reads at authorize time) as `opt text`.
 
 ### 3.B. Frontend
