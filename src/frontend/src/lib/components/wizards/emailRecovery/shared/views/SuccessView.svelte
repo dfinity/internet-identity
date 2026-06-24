@@ -20,8 +20,8 @@
      *  the body copy. */
     address: string;
     /** Switches the body sentence. "recovery" → "<address> is now
-     *  your recovery email"; "verified" → "<address> has been added
-     *  to your verified emails". */
+     *  your recovery email"; "verified" → "<address> has been
+     *  associated with your Internet Identity". */
     flow: "recovery" | "verified";
     /** Triggered when the user dismisses the success card. The host
      *  is expected to close the wizard dialog. */
@@ -36,7 +36,7 @@
     <CheckIcon class="size-7" />
   </FeaturedIcon>
   <h1 class="text-text-primary mb-2 text-2xl font-medium">
-    {$t`Email verified`}
+    {$t`Email address verified`}
   </h1>
   <p class="text-text-secondary mb-8 max-w-xs text-base font-medium">
     {#if flow === "recovery"}
@@ -46,8 +46,8 @@
       </Trans>
     {:else}
       <Trans>
-        <strong class="text-text-primary break-all">{address}</strong> has been added
-        to your verified emails.
+        <strong class="text-text-primary break-all">{address}</strong> has been associated
+        with your Internet Identity.
       </Trans>
     {/if}
   </p>

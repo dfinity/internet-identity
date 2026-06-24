@@ -66,7 +66,7 @@ class VerifiedEmailWizard {
    *  `onSuccess` (toast + close). */
   async confirmSuccess(): Promise<void> {
     await expect(
-      this.#view.getByRole("heading", { name: "Email verified" }),
+      this.#view.getByRole("heading", { name: "Email address verified" }),
     ).toBeVisible({ timeout: 30_000 });
     await this.#view.getByRole("button", { name: "Done" }).click();
   }

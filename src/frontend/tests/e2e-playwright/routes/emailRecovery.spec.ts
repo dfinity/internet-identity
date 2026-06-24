@@ -147,14 +147,14 @@ test.describe("Email recovery — real DNSSEC + DKIM flow", () => {
     });
 
     // On RegistrationSucceeded the wizard parks on the shared
-    // SuccessView ("Email verified" + Done button). Clicking Done fires
+    // SuccessView ("Email address verified" + Done button). Clicking Done fires
     // the host's `onSuccess` which surfaces a toast and closes the
     // dialog. The address also shows on the active recovery-email card
     // (the inactive card variant doesn't). Use exact-text match because
     // the address also appears as a substring inside the success toast's
     // description.
     await expect(
-      setupDialog.getByRole("heading", { name: "Email verified" }),
+      setupDialog.getByRole("heading", { name: "Email address verified" }),
     ).toBeVisible({ timeout: STATUS_POLL_TIMEOUT });
     await setupDialog.getByRole("button", { name: "Done" }).click();
     await expect(setupDialog).toBeHidden();

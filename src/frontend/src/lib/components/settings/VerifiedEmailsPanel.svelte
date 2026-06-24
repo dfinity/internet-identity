@@ -97,8 +97,8 @@
     showAddWizard = false;
     void invalidateAll();
     toaster.success({
-      title: $t`Email verified`,
-      description: $t`${address} has been added to your verified emails.`,
+      title: $t`Email address verified`,
+      description: $t`${address} has been associated with your Internet Identity.`,
     });
   };
 
@@ -119,8 +119,8 @@
     removingAddress = undefined;
     void invalidateAll();
     toaster.success({
-      title: $t`Verified email removed`,
-      description: $t`${address} has been removed from your verified emails.`,
+      title: $t`Email address removed`,
+      description: $t`${address} is no longer associated with your Internet Identity.`,
     });
   };
 </script>
