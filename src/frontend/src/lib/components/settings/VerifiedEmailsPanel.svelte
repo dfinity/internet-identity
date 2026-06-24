@@ -253,6 +253,7 @@
       submitDkimLeaf={submitEmailDkimLeaf}
       resolveViaDoh={resolveEmailViaDoh}
       {recoveryAddresses}
+      verifiedAddresses={verifiedEmails.map((e) => e.address)}
       onSuccess={handleAddSuccess}
     />
   </Dialog>

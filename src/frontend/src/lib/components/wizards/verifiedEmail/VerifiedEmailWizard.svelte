@@ -73,6 +73,9 @@
      *  wizard surfaces a non-blocking heads-up when the typed address
      *  matches one of them. */
     recoveryAddresses?: string[];
+    /** Addresses already in the anchor's verified-emails bucket — used
+     *  to block a duplicate submit client-side. */
+    verifiedAddresses?: string[];
     /** Called once on `RegistrationSucceeded`. The host shows a toast
      *  and closes the dialog. */
     onSuccess: (address: string) => void;
@@ -87,6 +90,7 @@
     initialAddress,
     addressLocked = false,
     recoveryAddresses = [],
+    verifiedAddresses = [],
     onSuccess,
   }: Props = $props();
 
@@ -238,6 +242,7 @@
     {initialAddress}
     {addressLocked}
     {recoveryAddresses}
+    {verifiedAddresses}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}

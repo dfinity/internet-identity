@@ -19,6 +19,12 @@
      *  buckets, so adding the same address here means a second DKIM
      *  round-trip. Continue still works. */
     recoveryAddresses?: string[];
+    /** Case-insensitive pool of addresses already in the anchor's
+     *  verified-emails bucket. Used to block a duplicate submission
+     *  client-side; the canister would reject it anyway, but failing
+     *  fast here saves a round-trip and lets us show a clear inline
+     *  error instead of a generic canister rejection. */
+    verifiedAddresses?: string[];
   }
 
   const {
@@ -27,10 +33,11 @@
     addressLocked = false,
     initialError,
     recoveryAddresses = [],
+    verifiedAddresses = [],
   }: Props = $props();
 
   let address = $state(initialAddress ?? "");
-  let error = $state(initialError);
+  let submitError = $state(initialError);
   let busy = $state(false);
 
   const normalized = $derived(address.trim().toLowerCase());
@@ -48,17 +55,29 @@
       recoveryAddresses.some((a) => a.toLowerCase() === normalized),
   );
 
+  const isDuplicate = $derived(
+    isShapeValid &&
+      verifiedAddresses.some((a) => a.toLowerCase() === normalized),
+  );
+
+  // Inline error shown under the input. Duplicate-state takes priority
+  // over the last submit error so an out-of-date error string can't
+  // linger on top of the live duplicate signal once the user retypes.
+  const error = $derived(
+    isDuplicate ? $t`You've already verified this email.` : submitError,
+  );
+
   const handleSubmit = async (event: Event) => {
     event.preventDefault();
-    if (!isShapeValid || busy) {
+    if (!isShapeValid || isDuplicate || busy) {
       return;
     }
     busy = true;
-    error = undefined;
+    submitError = undefined;
     try {
       await onSubmit(address.trim().toLowerCase());
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      submitError = e instanceof Error ? e.message : String(e);
     } finally {
       busy = false;
     }
@@ -102,7 +121,7 @@
   <button
     class="btn btn-primary btn-lg"
     type="submit"
-    disabled={!isShapeValid || busy}
+    disabled={!isShapeValid || isDuplicate || busy}
   >
     {#if busy}
       <ProgressRing />
