@@ -135,7 +135,16 @@ class VerifiedEmailFixtures {
     const row = panel.locator("li").filter({
       has: this.#page.getByText(address, { exact: true }),
     });
-    await row.getByRole("button", { name: `Remove ${address}` }).click();
+    // `force: true` — on the mobile shard, Playwright's actionability
+    // check intermittently reports an ancestor of the button (the `<li>`,
+    // `<main>`, or the page subtitle `<p>`) as the topmost element at the
+    // button's center via `elementFromPoint`, even though the button is
+    // reported visible/enabled/stable and renders clearly at the row's
+    // right edge. A real touch on the device dispatches by bounding-box
+    // hit-test and would land on the button — bypass the check.
+    await row
+      .getByRole("button", { name: `Remove ${address}` })
+      .click({ force: true });
     const confirm = this.#page.getByRole("dialog");
     await expect(confirm).toBeVisible();
     await confirm.getByRole("button", { name: "Remove", exact: true }).click();
