@@ -203,9 +203,16 @@
         // connect only when this identity has MCP enabled and trusts this
         // server's origin. Verifying here (post-authentication) means the result
         // is the same on every device, regardless of any local state.
+        // TEMP DIAGNOSTIC (remove): pinpoint why verify-at-connect fails in e2e.
+        console.warn(
+          `[MCP-DIAG] verify start id=${authenticated.identityNumber} serverOrigin=${server.origin}`,
+        );
         const config = await readMcpConfig(
           authenticated.actor,
           authenticated.identityNumber,
+        );
+        console.warn(
+          `[MCP-DIAG] config enabled=${config.enabled} url=${config.url} trusted=${isOriginTrusted(config, server.origin)}`,
         );
         if (!isOriginTrusted(config, server.origin)) {
           mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
@@ -226,6 +233,8 @@
           state: request.state,
         });
       } catch (error) {
+        // TEMP DIAGNOSTIC (remove).
+        console.warn(`[MCP-DIAG] verify/connect threw: ${String(error)}`);
         // Return to the connect screen so the user can retry.
         phase = { kind: "authorize" };
         handleError(error);

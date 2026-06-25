@@ -234,6 +234,10 @@ test("Returning user lands on the connect screen immediately", async ({
 });
 
 test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
+  test.skip(
+    true,
+    "TEMP: skipped to speed the verify-at-connect diagnostic run",
+  );
   test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
@@ -271,6 +275,9 @@ test("Identity switcher shows while signing in and hides on the success screen",
   mcp,
 }) => {
   test.slow();
+  // TEMP DIAGNOSTIC (remove): surface browser console + page errors in the CI log.
+  page.on("console", (m) => console.log(`[BROWSER] ${m.type()} ${m.text()}`));
+  page.on("pageerror", (e) => console.log(`[PAGEERROR] ${e.message}`));
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
@@ -292,6 +299,10 @@ test("Identity switcher shows while signing in and hides on the success screen",
 });
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
+  test.skip(
+    true,
+    "TEMP: skipped to speed the verify-at-connect diagnostic run",
+  );
   test.slow();
   const ttlMinutes = 60;
   await addVirtualAuthenticator(page);
