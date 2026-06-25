@@ -7,13 +7,16 @@
   interface Props {
     onSubmit: (address: string) => Promise<void>;
     initialError?: string;
+    verifiedAddresses?: string[];
   }
 
-  const { onSubmit, initialError }: Props = $props();
+  const { onSubmit, initialError, verifiedAddresses = [] }: Props = $props();
 
   let address = $state("");
   let error = $state(initialError);
   let busy = $state(false);
+
+  const normalized = $derived(address.trim().toLowerCase());
 
   // Lightweight client-side check — the canister does the
   // authoritative validation. We just want to flag the obvious
@@ -24,6 +27,11 @@
       !address.endsWith("@") &&
       !/\s/.test(address) &&
       address.length <= 254,
+  );
+
+  const overlapsVerified = $derived(
+    isShapeValid &&
+      verifiedAddresses.some((a) => a.toLowerCase() === normalized),
   );
 
   const handleSubmit = async (event: Event) => {
@@ -59,7 +67,7 @@
   <Input
     label={$t`Email address`}
     bind:value={address}
-    placeholder="alice@example.com"
+    placeholder="you@example.com"
     type="email"
     autocomplete="off"
     autocorrect="off"
@@ -71,6 +79,22 @@
     disabled={busy}
     autofocus
   />
+  {#if overlapsVerified}
+    <div
+      class="border-fg-warning-primary bg-bg-warning-primary flex flex-col gap-1 rounded-xl border p-4"
+    >
+      <div class="text-text-warning-primary text-sm font-semibold">
+        {$t`Using a shareable email isn't recommended`}
+      </div>
+      <div class="text-text-warning-primary text-sm">
+        <Trans>
+          Recovery is best kept as a private mailbox, separate from the
+          addresses you share with apps — that way, losing access to one doesn't
+          lock you out of the other.
+        </Trans>
+      </div>
+    </div>
+  {/if}
   <button
     class="btn btn-primary btn-lg"
     type="submit"

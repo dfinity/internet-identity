@@ -23,19 +23,23 @@ mod api_v2;
 pub mod attributes;
 pub mod dnssec;
 pub mod doh;
+pub mod email_challenge;
 pub mod email_recovery;
 pub mod icrc3;
 pub mod openid;
 pub mod smtp;
 pub mod vc_mvp;
+pub mod verified_email;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::doh::*;
+pub use crate::internet_identity::types::email_challenge::*;
 pub use crate::internet_identity::types::email_recovery::*;
 pub use crate::internet_identity::types::openid::*;
 pub use crate::internet_identity::types::smtp::*;
+pub use crate::internet_identity::types::verified_email::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

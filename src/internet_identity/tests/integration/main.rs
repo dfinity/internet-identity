@@ -22,3 +22,4 @@ mod stable_memory;
 mod upgrade;
 mod v2_api;
 mod vc_mvp;
+mod verified_emails;

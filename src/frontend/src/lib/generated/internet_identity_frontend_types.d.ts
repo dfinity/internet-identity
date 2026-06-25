@@ -62,6 +62,7 @@ export type StreamingStrategy = {
 export type Token = {};
 export interface _SERVICE {
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
+  'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

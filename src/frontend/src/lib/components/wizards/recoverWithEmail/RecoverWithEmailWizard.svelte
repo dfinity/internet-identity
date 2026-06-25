@@ -14,7 +14,7 @@
    *      via `email_recovery_prepare_delegation`, and show those
    *      to the user.
    *   3. User sends a DKIM-signed email containing that nonce; we
-   *      poll `email_recovery_status` until it flips to
+   *      poll `email_challenge_status` until it flips to
    *      `RecoveryReady { user_key, expiration }`, then call
    *      `email_recovery_get_delegation` for the
    *      `SignedDelegation`. The wizard hands the delegation to the
@@ -29,13 +29,13 @@
   import { buildDiagnosticsBlob } from "$lib/components/wizards/emailRecovery/shared/diagnostics";
   import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
   import type {
-    EmailRecoveryChallenge,
-    EmailRecoveryDiagnostics,
-    EmailRecoveryDnsInput,
-    EmailRecoveryError,
+    EmailChallenge,
+    EmailChallengeDiagnostics,
+    EmailChallengeDnsInput,
+    EmailChallengeError,
     EmailRecoveryGetDelegationArgs,
-    EmailRecoveryStatus,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeStatus,
+    EmailChallengeSubmitDkimLeafArg,
     SignedDelegation,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
@@ -52,17 +52,17 @@
   interface Props {
     /** Anonymous wrapper around `email_recovery_prepare_delegation`. */
     prepareDelegation: (
-      input: EmailRecoveryDnsInput,
+      input: EmailChallengeDnsInput,
       sessionPublicKey: Uint8Array,
-    ) => Promise<EmailRecoveryChallenge>;
-    /** Anonymous wrapper around `email_recovery_status` (query). */
-    status: (nonce: string) => Promise<EmailRecoveryStatus>;
-    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
-    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
+    ) => Promise<EmailChallenge>;
+    /** Anonymous wrapper around `email_challenge_status` (query). */
+    status: (nonce: string) => Promise<EmailChallengeStatus>;
+    /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
+    diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
+    /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. Accept-only:
      *  rejects on a call-level error, else resolves void (poll for verdict). */
-    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
     resolveViaDoh: (nonce: string) => Promise<void>;
     /** Anonymous wrapper around `email_recovery_get_delegation`. */
     getDelegation: (
@@ -87,7 +87,7 @@
     | { kind: "enter"; initialError?: string }
     | {
         kind: "sending";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         sessionIdentity: ECDSAKeyIdentity;
         path: Path;
@@ -97,7 +97,7 @@
     // semantics as in SetupEmailRecoveryWizard — polling continues.
     | {
         kind: "waiting";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         sessionIdentity: ECDSAKeyIdentity;
         path: Path;
@@ -154,7 +154,7 @@
     }
     const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
-    const input: EmailRecoveryDnsInput = {
+    const input: EmailChallengeDnsInput = {
       address,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
@@ -165,7 +165,7 @@
       stage = { kind: "sending", challenge, address, sessionIdentity, path };
       void runPoll(challenge.nonce, domain, sessionIdentity);
     } catch (e) {
-      if (isCanisterError<EmailRecoveryError>(e)) {
+      if (isCanisterError<EmailChallengeError>(e)) {
         if (
           e.type === "DomainNotAllowlisted" ||
           e.type === "DomainNotSupported"

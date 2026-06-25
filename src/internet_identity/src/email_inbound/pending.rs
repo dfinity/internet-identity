@@ -11,8 +11,8 @@
 //! (eviction is benign for both legitimate users and attackers).
 
 use ic_certification::Hash;
-use internet_identity_interface::internet_identity::types::email_recovery::{
-    error_code_name, EmailRecoveryDiagnostics, EmailRecoveryError, EmailRecoveryStatus,
+use internet_identity_interface::internet_identity::types::email_challenge::{
+    error_code_name, EmailChallengeDiagnostics, EmailChallengeError, EmailChallengeStatus,
     VerificationPath,
 };
 use internet_identity_interface::internet_identity::types::{AnchorNumber, SessionKey, Timestamp};
@@ -43,7 +43,7 @@ pub struct PendingChallenge {
     /// path at prepare time (`dns_proof.is_some()`). The canister
     /// validates it against the configured trust anchors at prepare
     /// time and stashes it here so that
-    /// `email_recovery_submit_dkim_leaf` can admit *additional*
+    /// `email_challenge_submit_dkim_leaf` can admit *additional*
     /// delegation chains under the same root if the DKIM CNAME chain
     /// crosses into a new signed zone (Proton/Tutanota-style; see
     /// design doc §7.2). `None` means the DoH path —
@@ -86,7 +86,7 @@ pub struct PendingChallenge {
     /// Gateway-supplied correlation id from the inbound `SmtpRequest`
     /// (`SmtpRequest.message_id`), captured in `handle_smtp_request`
     /// the first time an email bearing this nonce arrives. Surfaced
-    /// verbatim by `email_recovery_diagnostics` so a support ticket can
+    /// verbatim by `email_challenge_diagnostics` so a support ticket can
     /// be lined up across the gateway and canister logs. Public,
     /// non-sensitive; `None` until an email arrives (or if the gateway
     /// omitted it).
@@ -94,7 +94,7 @@ pub struct PendingChallenge {
 }
 
 /// Cached output of a successful recovery flow. Used to answer
-/// `email_recovery_status` (which returns `RecoveryReady { user_key,
+/// `email_challenge_status` (which returns `RecoveryReady { user_key,
 /// expiration, anchor_number }`) and to look up the
 /// canister-signature in `email_recovery_get_delegation` (the `seed`
 /// is what the canister-sig store is keyed by).
@@ -180,6 +180,13 @@ pub enum PendingKind {
     /// cached `session_pk` is what the eventual delegation will be
     /// bound to.
     Recover { session_pk: SessionKey },
+    /// Verified-email flow — caller is authenticated; a
+    /// `StorableVerifiedEmail` will be written to this anchor on
+    /// success. Parallel to `Register`, but lives in its own anchor
+    /// field and uses the `II-Verify-` Subject prefix so an inbound
+    /// challenge email can never be cross-applied between the two
+    /// flows.
+    VerifyEmail { anchor: AnchorNumber },
 }
 
 /// Status the FE polls. The terminal variants (`Succeeded`,
@@ -197,7 +204,7 @@ pub enum PendingStatus {
         selector: String,
     },
     /// The email arrived and the DKIM key is being resolved over DoH. The FE
-    /// drives `email_recovery_resolve_via_doh` while this is set: each call
+    /// drives `email_challenge_resolve_via_doh` while this is set: each call
     /// reads the DoH cache and either finishes (cache `Ready`) or leaves the
     /// status here to poll again (cache `Pending`). Reached on the DoH path
     /// (`smtp_request` for a non-DNSSEC domain) and on the DNSSEC path's DoH
@@ -205,7 +212,7 @@ pub enum PendingStatus {
     /// leaf-walk path reports `NeedDkimLeaf` first.
     ResolvingDoh,
     Succeeded,
-    Failed(EmailRecoveryError),
+    Failed(EmailChallengeError),
     Expired,
 }
 
@@ -243,11 +250,11 @@ pub fn insert_with_eviction(nonce: String, challenge: PendingChallenge, now_secs
 }
 
 /// Read the status of a pending challenge. The query path:
-/// `email_recovery_status(nonce)` calls this after a TTL sweep so the
+/// `email_challenge_status(nonce)` calls this after a TTL sweep so the
 /// FE sees `Expired` at the moment the entry would otherwise have
 /// been evicted (rather than `Pending` until the next prepare call
 /// happens to evict it).
-pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
+pub fn status_of(nonce: &str, now_secs: u64) -> EmailChallengeStatus {
     PENDING.with(|cell| {
         let mut map = cell.borrow_mut();
 
@@ -258,22 +265,32 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
         if let Some(challenge) = map.get(nonce) {
             if is_expired_at(challenge, now_secs) {
                 map.remove(nonce);
-                return EmailRecoveryStatus::Expired;
+                return EmailChallengeStatus::Expired;
             }
         }
 
         match map.get(nonce) {
-            None => EmailRecoveryStatus::Expired, // Same observable effect as TTL eviction.
+            None => EmailChallengeStatus::Expired, // Same observable effect as TTL eviction.
             Some(c) => match &c.status {
-                PendingStatus::Pending => EmailRecoveryStatus::Pending,
-                PendingStatus::ResolvingDoh => EmailRecoveryStatus::ResolvingDoh,
-                PendingStatus::NeedDkimLeaf { selector } => EmailRecoveryStatus::NeedDkimLeaf {
+                PendingStatus::Pending => EmailChallengeStatus::Pending,
+                PendingStatus::ResolvingDoh => EmailChallengeStatus::ResolvingDoh,
+                PendingStatus::NeedDkimLeaf { selector } => EmailChallengeStatus::NeedDkimLeaf {
                     selector: selector.clone(),
                 },
                 PendingStatus::Succeeded => match (&c.kind, &c.recovery_outcome) {
-                    (PendingKind::Register { .. }, _) => EmailRecoveryStatus::RegistrationSucceeded,
+                    (PendingKind::Register { .. }, _) => {
+                        EmailChallengeStatus::RegistrationSucceeded
+                    }
+                    // VerifyEmail reuses `RegistrationSucceeded`: the
+                    // FE knows which prepare-add it kicked off (the
+                    // nonce maps 1:1 to a single wizard session) and
+                    // doesn't need a separate variant. Keeps the
+                    // candid surface lean.
+                    (PendingKind::VerifyEmail { .. }, _) => {
+                        EmailChallengeStatus::RegistrationSucceeded
+                    }
                     (PendingKind::Recover { .. }, Some(outcome)) => {
-                        EmailRecoveryStatus::RecoveryReady {
+                        EmailChallengeStatus::RecoveryReady {
                             user_key: serde_bytes::ByteBuf::from(outcome.user_key.clone()),
                             expiration: outcome.expiration,
                             anchor_number: outcome.anchor_number,
@@ -282,13 +299,13 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
                     // Recover succeeded without a cached outcome →
                     // canister bug. Fail closed so the FE retries.
                     (PendingKind::Recover { .. }, None) => {
-                        EmailRecoveryStatus::Failed(EmailRecoveryError::InternalCanisterError(
+                        EmailChallengeStatus::Failed(EmailChallengeError::InternalCanisterError(
                             "Recover challenge marked Succeeded without outcome".into(),
                         ))
                     }
                 },
-                PendingStatus::Failed(e) => EmailRecoveryStatus::Failed(e.clone()),
-                PendingStatus::Expired => EmailRecoveryStatus::Expired,
+                PendingStatus::Failed(e) => EmailChallengeStatus::Failed(e.clone()),
+                PendingStatus::Expired => EmailChallengeStatus::Expired,
             },
         }
     })
@@ -302,11 +319,11 @@ pub fn status_of(nonce: &str, now_secs: u64) -> EmailRecoveryStatus {
 /// one.
 ///
 /// The returned record is **strictly public** (see
-/// [`EmailRecoveryDiagnostics`]): the gateway `message_id`, a coarse
+/// [`EmailChallengeDiagnostics`]): the gateway `message_id`, a coarse
 /// reason code (variant name only), the verification path, and the
 /// challenge creation time. No address, anchor, principal, or inner
 /// error string is ever included.
-pub fn diagnostics_of(nonce: &str, now_secs: u64) -> Option<EmailRecoveryDiagnostics> {
+pub fn diagnostics_of(nonce: &str, now_secs: u64) -> Option<EmailChallengeDiagnostics> {
     PENDING.with(|cell| {
         let mut map = cell.borrow_mut();
 
@@ -330,7 +347,7 @@ pub fn diagnostics_of(nonce: &str, now_secs: u64) -> Option<EmailRecoveryDiagnos
             // `error_code_name` for why this stays strictly public.
             PendingStatus::Failed(e) => format!("Failed:{}", error_code_name(e)),
         };
-        Some(EmailRecoveryDiagnostics {
+        Some(EmailChallengeDiagnostics {
             message_id: c.message_id.clone(),
             reason_code,
             verification_path: if c.cached_root_dnskey.is_some() {
@@ -431,7 +448,10 @@ mod tests {
     fn insert_then_status_returns_pending() {
         reset_for_tests();
         insert_with_eviction("n1".into(), challenge("a@x.com", 100), 100);
-        assert!(matches!(status_of("n1", 200), EmailRecoveryStatus::Pending));
+        assert!(matches!(
+            status_of("n1", 200),
+            EmailChallengeStatus::Pending
+        ));
     }
 
     #[test]
@@ -443,7 +463,7 @@ mod tests {
         reset_for_tests();
         assert!(matches!(
             status_of("never-issued", 0),
-            EmailRecoveryStatus::Expired
+            EmailChallengeStatus::Expired
         ));
     }
 
@@ -456,13 +476,13 @@ mod tests {
         // Just under the TTL → still Pending.
         assert!(matches!(
             status_of("n1", created_at + super::super::CHALLENGE_TTL_SECS - 1),
-            EmailRecoveryStatus::Pending
+            EmailChallengeStatus::Pending
         ));
 
         // Right at the TTL → Expired (the inequality is `>=`).
         assert!(matches!(
             status_of("n1", created_at + super::super::CHALLENGE_TTL_SECS),
-            EmailRecoveryStatus::Expired
+            EmailChallengeStatus::Expired
         ));
         // And the entry was evicted on read.
         assert_eq!(len_for_tests(), 0);
@@ -508,7 +528,7 @@ mod tests {
         // The one with t0 + 0 (smallest created_at) should be gone.
         assert!(matches!(
             status_of("n0", t0 + 5),
-            EmailRecoveryStatus::Expired
+            EmailChallengeStatus::Expired
         ));
 
         // The actual capacity behaviour: on the cap-th insert, the
@@ -530,7 +550,7 @@ mod tests {
         // Subsequent status read sees Succeeded.
         assert!(matches!(
             status_of("n1", 200),
-            EmailRecoveryStatus::RegistrationSucceeded
+            EmailChallengeStatus::RegistrationSucceeded
         ));
     }
 
@@ -561,7 +581,7 @@ mod tests {
         // verification failure flips the status to `Failed`.
         with_mut("n1", 200, |c| {
             c.message_id = Some("<gw-123@gateway.example>".into());
-            c.status = PendingStatus::Failed(EmailRecoveryError::AddressMismatch);
+            c.status = PendingStatus::Failed(EmailChallengeError::AddressMismatch);
         });
         let d = diagnostics_of("n1", 200).expect("diagnostics present");
         assert_eq!(d.message_id.as_deref(), Some("<gw-123@gateway.example>"));
@@ -581,7 +601,7 @@ mod tests {
         insert_with_eviction("n1".into(), challenge("a@x.com", 100), 100);
         assert_eq!(diagnostics_of("n1", 200).unwrap().reason_code, "Pending");
         with_mut("n1", 200, |c| {
-            c.status = PendingStatus::Failed(EmailRecoveryError::DomainNotAllowlisted(
+            c.status = PendingStatus::Failed(EmailChallengeError::DomainNotAllowlisted(
                 "secret-domain.example".into(),
             ));
         });

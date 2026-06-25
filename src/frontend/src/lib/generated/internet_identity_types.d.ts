@@ -536,68 +536,84 @@ export interface DummyAuthConfig {
    */
   'prompt_for_index' : boolean,
 }
-export interface EmailRecoveryChallenge {
-  'nonce' : string,
-  'expires_at' : Timestamp,
-}
-export interface EmailRecoveryCredential {
-  'created_at' : Timestamp,
-  'address' : string,
-  'last_used' : [] | [Timestamp],
-}
+export interface EmailChallenge { 'nonce' : string, 'expires_at' : Timestamp }
 /**
  * Strictly-public, user-copyable diagnostics for one pending challenge
- * (see email_recovery_diagnostics). Intended for a support ticket so a
+ * (see email_challenge_diagnostics). Intended for a support ticket so a
  * case can be lined up across the SMTP gateway logs and the canister's
  * production logs via message_id. NO email address, anchor, principal,
  * delegation/seed, or inner error string — reason_code is the failing
  * variant's name only.
  */
-export interface EmailRecoveryDiagnostics {
+export interface EmailChallengeDiagnostics {
   'created_at' : Timestamp,
   'verification_path' : VerificationPath,
   'message_id' : [] | [string],
   'reason_code' : string,
 }
-export interface EmailRecoveryDnsInput {
+export interface EmailChallengeDnsInput {
   'dns_proof' : [] | [DnsProofBundle],
   'address' : string,
 }
-export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
+/**
+ * Shared by both flows (recovery + verified emails). The variants
+ * describe inbound-DKIM-challenge failure modes; none are
+ * recovery-specific.
+ */
+export type EmailChallengeError = { 'EmailVerificationFailed' : string } |
   { 'DkimLeafMismatch' : null } |
   { 'InternalCanisterError' : string } |
   { 'NonceUnknown' : null } |
   { 'DohFetchFailed' : DohFailureReason } |
   { 'NoDkimLeafExpected' : null } |
+  {
+    /**
+     * The anchor has reached its per-bucket cap (currently only fires
+     * for the verified-emails bucket). FE shows a "limit reached"
+     * notice; user must remove an existing entry to add another.
+     */
+    'LimitReached' : { 'limit' : number }
+  } |
   { 'DomainNotSupported' : string } |
   { 'AddressNotRegistered' : null } |
   {
     /**
-     * email_recovery_submit_dkim_leaf was called with an empty `hops`
+     * email_challenge_submit_dkim_leaf was called with an empty `hops`
      * vector; an FE that can't walk DNSSEC must drive
-     * email_recovery_resolve_via_doh instead.
+     * email_challenge_resolve_via_doh instead.
      */
     'EmptyDkimLeafHops' : null
   } |
   { 'Unauthorized' : Principal } |
   { 'NonceExpired' : null } |
   { 'AddressMismatch' : null } |
+  {
+    /**
+     * The submitted address didn't pass shape validation (missing `@`,
+     * empty local-part or domain, whitespace, oversized parts). Distinct
+     * from DomainNotSupported, which is about a valid address whose
+     * registered domain can't be verified.
+     */
+    'InvalidEmailAddress' : string
+  } |
   { 'DomainNotAllowlisted' : string } |
   { 'SubjectNotSigned' : null } |
   { 'AddressAlreadyRegistered' : null };
-export interface EmailRecoveryGetDelegationArgs {
-  'session_key' : SessionKey,
-  'expiration' : Timestamp,
-  'nonce' : string,
-}
 /**
- * Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
- * EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+ * Argument to email_challenge_resolve_via_doh. Wrapped in a record (like
+ * EmailChallengeSubmitDkimLeafArg) so the method can grow fields without a
  * breaking interface change; nonce is the lookup key and is always
  * required.
  */
-export interface EmailRecoveryResolveViaDohArg { 'nonce' : string }
-export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
+export interface EmailChallengeResolveViaDohArg { 'nonce' : string }
+/**
+ * Polling status returned by `email_challenge_status` — shared between
+ * the recovery flow and the verified-emails flow. `RegistrationSucceeded`
+ * covers both "recovery email bound" and "verified email bound";
+ * `RecoveryReady` is recovery-only and only emitted when the pending
+ * entry's `PendingKind` is `Recover`.
+ */
+export type EmailChallengeStatus = { 'Failed' : EmailChallengeError } |
   { 'ResolvingDoh' : null } |
   { 'NeedDkimLeaf' : { 'selector' : string } } |
   {
@@ -610,7 +626,12 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'RegistrationSucceeded' : null } |
   { 'Expired' : null } |
   { 'Pending' : null };
-export interface EmailRecoverySubmitDkimLeafArg {
+/**
+ * Used by both the recovery flow and the verified-emails flow. The
+ * pending entry's `PendingKind` dispatches to the right anchor sink
+ * after the cryptographic check; the argument itself is flow-neutral.
+ */
+export interface EmailChallengeSubmitDkimLeafArg {
   /**
    * Delegation chains for signed zones touched by `hops` that
    * weren't already covered by the skeleton chain anchored at
@@ -627,10 +648,20 @@ export interface EmailRecoverySubmitDkimLeafArg {
    * leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
    * `selector1._domainkey.outlook.com` is a signed CNAME into the
    * unsigned `outbound.protection.outlook.com`) — it must NOT submit
-   * an empty vec here; it drives `email_recovery_resolve_via_doh`
+   * an empty vec here; it drives `email_challenge_resolve_via_doh`
    * instead, which resolves the key over the canister's DoH path.
    */
   'hops' : Array<SignedRRset>,
+  'nonce' : string,
+}
+export interface EmailRecoveryCredential {
+  'created_at' : Timestamp,
+  'address' : string,
+  'last_used' : [] | [Timestamp],
+}
+export interface EmailRecoveryGetDelegationArgs {
+  'session_key' : SessionKey,
+  'expiration' : Timestamp,
   'nonce' : string,
 }
 export type FrontendHostname = string;
@@ -855,6 +886,13 @@ export interface IdentityAuthnInfo {
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
+  /**
+   * Verified emails bound to this anchor (absent when none is
+   * configured). Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR; the FE
+   * shows a "limit reached" notice in the wizard when adding
+   * beyond the cap.
+   */
+  'verified_emails' : [] | [Array<VerifiedEmail>],
   /**
    * Authentication method independent metadata
    */
@@ -1556,6 +1594,14 @@ export type UserNumber = bigint;
  */
 export type VerificationPath = { 'Doh' : null } |
   { 'Dnssec' : null };
+/**
+ * A verified email address bound to an anchor. Parallel to
+ * `EmailRecoveryCredential` but used as an attribute source (and
+ * surfaced in the smart-routing UI) rather than a recovery
+ * credential. The `verified_at` timestamp is when DKIM/DMARC
+ * verification completed successfully.
+ */
+export interface VerifiedEmail { 'address' : string, 'verified_at' : Timestamp }
 export type VerifyTentativeDeviceResponse = {
     /**
      * Device registration mode is off, either due to timeout or because it was never enabled.
@@ -1738,61 +1784,105 @@ export interface _SERVICE {
    * fetch completes the query returns `Resolved` with the config.
    */
   'discover_sso' : ActorMethod<[string], undefined>,
+  'email_challenge_diagnostics' : ActorMethod<
+    [string],
+    [] | [EmailChallengeDiagnostics]
+  >,
+  'email_challenge_resolve_via_doh' : ActorMethod<
+    [EmailChallengeResolveViaDohArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
+  >,
   /**
-   * Email-recovery protocol
-   * =======================
-   * See `docs/ongoing/email-recovery.md`. Covers both flows:
-   * - Setup: prepare_add (authenticated) → smtp_request for
-   * register@id.ai → credential bound to the anchor. Removed
-   * later via credential_remove.
-   * - Recovery: prepare_delegation (anonymous, bound to a
-   * session_key) → smtp_request for recover@id.ai → canister
-   * stamps a signed delegation seed. The FE then calls
-   * email_recovery_get_delegation to retrieve the
-   * SignedDelegation.
-   * Both flows share the polling status query.
+   * FE-side polling — the wizard / panel calls these repeatedly to
+   * drive the "waiting for your email" UI. Status flips through
+   * `Pending` → `ResolvingDoh` / `NeedDkimLeaf` → terminal.
+   * Diagnostics returns strictly-public, user-copyable failure
+   * detail for support tickets (no PII, no address, no anchor).
+   */
+  'email_challenge_status' : ActorMethod<[string], EmailChallengeStatus>,
+  /**
+   * DNSSEC-path completion (`submit_dkim_leaf`) and DoH-path
+   * completion (`resolve_via_doh`). One or the other runs per
+   * challenge depending on which path the canister picked at
+   * prepare-time. Both are polled by the FE while the status is
+   * `NeedDkimLeaf` / `ResolvingDoh`.
+   */
+  'email_challenge_submit_dkim_leaf' : ActorMethod<
+    [EmailChallengeSubmitDkimLeafArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
+  >,
+  /**
+   * ===================================================================
+   * Email-recovery flow (recovery-as-login)
+   * ===================================================================
+   * Recovery-specific surface built on top of the shared challenge
+   * primitive above. See `docs/ongoing/email-recovery.md` for the
+   * full design.
+   * - Setup: `credential_prepare_add` (authenticated) →
+   * `smtp_request` for `register@<domain>` → credential bound to
+   * the anchor's `email_recovery`. Removed via `credential_remove`.
+   * - Recovery: `prepare_delegation` (anonymous, bound to a
+   * `session_key`) → `smtp_request` for `recover@<domain>` →
+   * canister stamps a signed delegation seed. The FE then calls
+   * `get_delegation` to retrieve the `SignedDelegation`.
    */
   'email_recovery_credential_prepare_add' : ActorMethod<
-    [IdentityNumber, EmailRecoveryDnsInput],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [IdentityNumber, EmailChallengeDnsInput],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_credential_remove' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_diagnostics' : ActorMethod<
     [string],
-    [] | [EmailRecoveryDiagnostics]
+    [] | [EmailChallengeDiagnostics]
   >,
   'email_recovery_get_delegation' : ActorMethod<
     [EmailRecoveryGetDelegationArgs],
     { 'Ok' : SignedDelegation } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_prepare_delegation' : ActorMethod<
-    [EmailRecoveryDnsInput, SessionKey],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [EmailChallengeDnsInput, SessionKey],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
+  >,
+  'email_recovery_resolve_via_doh' : ActorMethod<
+    [EmailChallengeResolveViaDohArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
   >,
   /**
-   * Resolves the DKIM key over the canister's own allowlist-gated DoH
-   * path, called with just the nonce. Used for the pure-DoH (Gmail)
-   * case and as the fallback when the FE can't walk a fully-signed
-   * DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
-   * Polled: the FE calls it repeatedly while the status is ResolvingDoh.
+   * ===================================================================
+   * DEPRECATED — remove in a follow-up PR
+   * ===================================================================
+   * Legacy aliases for the four `email_challenge_*` methods, kept so
+   * a stale FE bundle in a browser cache — or any FE build that
+   * lands before this canister's renamed methods — can still drive
+   * the inbound-DKIM flow without a "method not found" break
+   * mid-verification.
+   * 
+   * The wire bytes are identical to the new methods (Candid is
+   * structurally typed; the renamed return types match the old
+   * types' shapes field-for-field), so old clients with bindings
+   * against the old type names deserialize successfully.
+   * 
+   * **All methods below must be removed together in a single
+   * follow-up `chore(be): remove deprecated email_recovery_* method
+   * aliases` PR**, once every deployed FE has refreshed to the
+   * `email_challenge_*` names. See `TASKS.md` for the tracked
+   * follow-up.
    */
-  'email_recovery_resolve_via_doh' : ActorMethod<
-    [EmailRecoveryResolveViaDohArg],
-    { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
-  >,
-  'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
+  'email_recovery_status' : ActorMethod<[string], EmailChallengeStatus>,
   'email_recovery_submit_dkim_leaf' : ActorMethod<
-    [EmailRecoverySubmitDkimLeafArg],
+    [EmailChallengeSubmitDkimLeafArg],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
@@ -2087,21 +2177,28 @@ export interface _SERVICE {
       { 'Err' : SetDefaultAccountError }
   >,
   /**
-   * SMTP gateway protocol
-   * =====================
+   * ===================================================================
+   * Email-challenge protocol (shared inbound-DKIM primitive)
+   * ===================================================================
+   * The flow-neutral surface — used by both the email-recovery flow
+   * and the verified-emails flow. Methods here are keyed by the
+   * canister-issued nonce; dispatch to the right anchor sink happens
+   * inside the canister via `PendingKind` on the pending entry.
+   * 
    * The off-chain SMTP gateway forwards every inbound message via
-   * smtp_request. The canister verifies the email cryptographically
-   * and dispatches by recipient: register@id.ai → setup completion,
-   * recover@id.ai → recovery delegation stamping. Always returns Ok
-   * — the gateway shouldn't get a per-message verification signal
-   * back. The FE sees outcomes via the polling status query.
+   * `smtp_request`. The canister verifies the email cryptographically
+   * and dispatches by recipient: `register@<domain>` → setup
+   * completion (either flow), `recover@<domain>` → recovery
+   * delegation stamping. Always returns Ok — the gateway shouldn't
+   * get a per-message verification signal back. The FE sees outcomes
+   * via `email_challenge_status`.
    */
   'smtp_request' : ActorMethod<[SmtpRequest], SmtpResponse>,
   /**
    * Called by the gateway at RCPT TO time to decide whether to
    * accept the connection before pulling the message body. Returns
-   * Ok for register@id.ai / recover@id.ai (case-insensitive), and
-   * 550 (mailbox unavailable) for everything else.
+   * Ok for `register@<domain>` / `recover@<domain>` (case-
+   * insensitive), and 550 (mailbox unavailable) for everything else.
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
@@ -2110,6 +2207,27 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
     { 'Ok' : AccountInfo } |
       { 'Err' : UpdateAccountError }
+  >,
+  /**
+   * ===================================================================
+   * Verified-emails flow (attribute source)
+   * ===================================================================
+   * Parallel to the recovery flow but the verified address is stored
+   * on `Anchor::verified_emails` rather than `Anchor::email_recovery`.
+   * Reuses the same SMTP gateway, DKIM verifier and DMARC alignment,
+   * but issues nonces with the `II-Verify-` prefix so an inbound
+   * challenge can never be cross-applied between the two flows.
+   * Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
+   */
+  'verified_email_prepare_add' : ActorMethod<
+    [IdentityNumber, EmailChallengeDnsInput],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
+  >,
+  'verified_email_remove' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
   >,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],

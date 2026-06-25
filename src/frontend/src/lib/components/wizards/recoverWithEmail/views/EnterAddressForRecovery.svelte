@@ -55,7 +55,7 @@
   <Input
     label={$t`Email address`}
     bind:value={address}
-    placeholder="alice@example.com"
+    placeholder="you@example.com"
     type="email"
     autocomplete="off"
     autocorrect="off"

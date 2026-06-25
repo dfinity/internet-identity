@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    AtSignIcon,
     BriefcaseMedicalIcon,
     ChevronDownIcon,
     HouseIcon,
@@ -326,6 +327,15 @@
         </li>
         <li class="contents">
           <NavItem
+            href="/manage/share"
+            current={page.url.pathname === "/manage/share"}
+          >
+            <AtSignIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Shareable info`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
             href="/manage/recovery"
             current={page.url.pathname === "/manage/recovery"}
           >
@@ -371,8 +381,13 @@
     </div>
     <div class="h-[env(safe-area-inset-bottom)]"></div>
   </aside>
-  <!-- Main content -->
-  <div class="relative flex flex-1 flex-col">
+  <!-- Main content. `min-w-0` so that a flex-row descendant whose
+       min-content (e.g. panel header with a `shrink-0` action button,
+       a wide unbreakable string) exceeds the viewport doesn't drag
+       this flex item — and the whole layout — into horizontal scroll
+       on narrow viewports. See the home page for the same defence
+       expressed via `grid-cols-[minmax(0,1fr)]`. -->
+  <div class="relative flex min-w-0 flex-1 flex-col">
     <div class="h-[env(safe-area-inset-top)]"></div>
     <!-- Header -->
     <header class="flex h-16 flex-row items-center px-4 sm:px-8 md:px-12">

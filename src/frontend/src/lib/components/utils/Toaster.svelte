@@ -13,7 +13,13 @@
   const api = $derived(toast.group.connect(service, normalizeProps));
 </script>
 
-<div {...api.getGroupProps()}>
+<!-- The toast group is positioned fixed at the top-end of the viewport.
+     On mobile (full-width toast) the group's box can overlap visible
+     page content underneath; without `pointer-events: none` here it
+     intercepts clicks on whatever sits under it. Each Toast card
+     re-enables pointer-events on itself so the Close button + action
+     buttons still work. -->
+<div {...api.getGroupProps()} class="pointer-events-none">
   {#each api.getToasts() as toast, index (toast.id)}
     <Toast {toast} {index} parent={service} />
   {/each}

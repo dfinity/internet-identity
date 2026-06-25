@@ -35,6 +35,7 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
+    'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
   });
 };
 export const init = ({ IDL }) => {
