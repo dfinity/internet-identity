@@ -88,18 +88,6 @@ pub async fn prepare_delegation(
     .await
 }
 
-/// Convenience wrapper used by the canister method that fetches
-/// `now_secs` from the IC clock. Tests pin `now_secs` and call
-/// `prepare_add` directly.
-#[cfg(not(test))]
-pub async fn prepare_add_now(
-    anchor: AnchorNumber,
-    dns_input: EmailChallengeDnsInput,
-) -> Result<EmailChallenge, EmailChallengeError> {
-    let now_secs = ic_cdk::api::time() / 1_000_000_000;
-    prepare_add(anchor, dns_input, now_secs).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
