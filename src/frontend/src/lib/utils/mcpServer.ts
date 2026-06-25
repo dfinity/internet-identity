@@ -6,8 +6,9 @@
  */
 
 export interface McpServer {
-  /** The full normalized endpoint URL the user entered (kept so we can probe a
-   *  path-based endpoint like `https://host/mcp`, not just the origin root). */
+  /** The URL the user entered, kept verbatim (not slash-normalized) so it
+   *  displays as typed and we can probe a path-based endpoint like
+   *  `https://host/mcp`, not just the origin root. */
   url: string;
   /** Normalized origin: scheme + host[:port], no path. Used for trust matching
    *  and as the `form-action` target. */
@@ -22,16 +23,20 @@ export interface McpServer {
  * the URL must be https (a plain-http or loopback URL is rejected).
  */
 export const parseMcpServerUrl = (raw: string): McpServer | undefined => {
+  const trimmed = raw.trim();
   let url: URL;
   try {
-    url = new URL(raw.trim());
+    url = new URL(trimmed);
   } catch {
     return undefined;
   }
   if (url.protocol !== "https:") {
     return undefined;
   }
-  return { url: url.href, origin: url.origin, host: url.host };
+  // Keep the URL as entered rather than `url.href`, which appends a trailing
+  // slash to a bare origin. Trust matching is by origin; verification matches
+  // the canonical resource URL.
+  return { url: trimmed, origin: url.origin, host: url.host };
 };
 
 /** MCP protocol revision we advertise in the `initialize` probe. */
@@ -64,35 +69,38 @@ export const probeMcpServer = async (url: string): Promise<boolean> => {
 
 /**
  * Whether the server advertises an RFC 9728 Protected Resource Metadata
- * document for this URL. The well-known segment is inserted between host and
- * path; deployments vary between the bare path and the resource-path-suffixed
- * form, so try both.
+ * document naming exactly this URL as its `resource`. The well-known segment is
+ * inserted between host and path; deployments vary between the bare path and
+ * the resource-path-suffixed form, so try both.
  */
 const hasProtectedResourceMetadata = async (url: string): Promise<boolean> => {
-  let origin: string;
-  let pathname: string;
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
-    origin = parsed.origin;
-    pathname = parsed.pathname;
+    parsed = new URL(url);
   } catch {
     return false;
   }
   const candidates = [
-    `${origin}/.well-known/oauth-protected-resource`,
-    `${origin}/.well-known/oauth-protected-resource${pathname}`,
+    `${parsed.origin}/.well-known/oauth-protected-resource`,
+    `${parsed.origin}/.well-known/oauth-protected-resource${parsed.pathname}`,
   ];
   for (const candidate of candidates) {
-    if (await isProtectedResourceMetadata(candidate, origin)) {
+    if (await describesResource(candidate, parsed.href)) {
       return true;
     }
   }
   return false;
 };
 
-const isProtectedResourceMetadata = async (
+/**
+ * Whether the metadata at `metadataUrl` is a Protected Resource Metadata
+ * document whose `resource` is exactly `resourceHref`. Matching the canonical
+ * `resource` — not merely its origin — means the real MCP endpoint
+ * (`https://host/mcp`) verifies while the bare origin or a wrong path does not.
+ */
+const describesResource = async (
   metadataUrl: string,
-  expectedOrigin: string,
+  resourceHref: string,
 ): Promise<boolean> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
@@ -106,24 +114,30 @@ const isProtectedResourceMetadata = async (
       return false;
     }
     const record = doc as Record<string, unknown>;
-    if (!Array.isArray(record.authorization_servers)) {
-      return false;
-    }
-    // If it names a `resource`, it must be on the origin we're verifying — a
-    // server shouldn't be able to vouch for a resource on someone else's origin.
-    if (typeof record.resource === "string") {
-      try {
-        return new URL(record.resource).origin === expectedOrigin;
-      } catch {
-        return false;
-      }
-    }
-    return true;
+    // RFC 9728 requires both fields; require `resource` to name this exact URL.
+    return (
+      Array.isArray(record.authorization_servers) &&
+      typeof record.resource === "string" &&
+      sameResource(record.resource, resourceHref)
+    );
   } catch {
     return false;
   } finally {
     clearTimeout(timer);
   }
+};
+
+/** Compares two resource URLs, tolerating a trailing slash. */
+const sameResource = (a: string, b: string): boolean => {
+  const normalize = (value: string): string | undefined => {
+    try {
+      return new URL(value).href.replace(/\/+$/, "");
+    } catch {
+      return undefined;
+    }
+  };
+  const normalized = normalize(a);
+  return normalized !== undefined && normalized === normalize(b);
 };
 
 /** Sends the MCP `initialize` request and checks for a JSON-RPC response. */

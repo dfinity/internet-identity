@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { PlusIcon, Trash2Icon, RotateCwIcon } from "@lucide/svelte";
+  import {
+    PlusIcon,
+    Trash2Icon,
+    RotateCwIcon,
+    TriangleAlertIcon,
+  } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
@@ -91,15 +96,22 @@
       <McpIcon class="size-5" />
     </span>
 
-    <div class="flex flex-1 flex-col gap-1">
+    <div class="flex flex-1 flex-col gap-2">
       <h3 id={titleId} class="text-text-primary text-base font-semibold">
         {$t`Trusted MCP server`}
       </h3>
+      <div
+        class="border-fg-warning-primary bg-bg-warning-primary text-fg-warning-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium"
+      >
+        <TriangleAlertIcon class="size-4 shrink-0" />
+        <span>
+          {$t`Internet Identity MCP connectors are in preview. Use this feature at your own risk.`}
+        </span>
+      </div>
       <p class="text-text-tertiary text-sm">
         <Trans>
-          Set the one MCP server you trust to sign you in to apps — for example
-          one you run yourself. A trusted server can act as you across apps, so
-          only set one you control or fully trust.
+          Set the URL of an MCP server you trust. You will be able to add MCP
+          connectors to your AI agents that will then act as you across apps.
         </Trans>
       </p>
     </div>
