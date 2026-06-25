@@ -13,8 +13,8 @@ const DEFAULT_TTL_MINUTES = 60;
  * whichever server they connect), and the account is chosen in the picker.
  * `invalid` means the fragment was missing or malformed.
  *
- * Whether the callback origin is one the connect flow accepts (https, or http
- * loopback for a self-hosted server) is checked in the page component, which
+ * Whether the callback origin is one the connect flow accepts (https only — MCP
+ * connections are to remote servers) is checked in the page component, which
  * shows a clean invalid screen and mirrors the `form-action` CSP.
  */
 export type McpParams =
@@ -57,9 +57,9 @@ const parseBase64Url = (raw: string | null): string | undefined => {
 
 /**
  * Structural callback check: must be an absolute http(s) URL. The stricter
- * "is this an origin the connect flow accepts" check (https, or http loopback)
- * happens in the component, alongside the consent UI — keeping this `load`
- * minimal since it also runs at prerender.
+ * "is this an origin the connect flow accepts" check (https only) happens in
+ * the component, alongside the consent UI — keeping this `load` minimal since
+ * it also runs at prerender.
  */
 const parseCallback = (raw: string | null): string | undefined => {
   if (raw === null || raw === "") {

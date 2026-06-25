@@ -9,9 +9,9 @@ type McpOutcome = "success" | "error";
 /**
  * A stand-in MCP server origin. There's no global `mcp_server_origin` config
  * any more: the connect flow takes the MCP server origin from the request's
- * callback, accepting any https origin (or http loopback). This is just a valid
- * https origin to drive the flow with; the `/mcp` page's `form-action` CSP
- * allows posting the delegation to it.
+ * callback, accepting any https origin (MCP connections are to remote servers).
+ * This is just a valid https origin to drive the flow with; the `/mcp` page's
+ * `form-action` CSP allows posting the delegation to it.
  */
 const MCP_SERVER_ORIGIN = "https://mcp.id.ai";
 

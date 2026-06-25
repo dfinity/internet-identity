@@ -13,9 +13,9 @@ interface McpAuthorizeInput {
   /** base64url-encoded DER session pubkey supplied by the MCP server. */
   publicKey: string;
   /** The MCP server origin, taken from the connect request's callback (e.g.
-   *  "https://mcp.id.ai", or an http://127.0.0.1 server the user runs). The
-   *  standing delegation acts as the user's account at this origin, so each
-   *  user trusts whichever server they connect. */
+   *  "https://mcp.id.ai"). MCP connections are to remote servers, so this is
+   *  always an https origin. The standing delegation acts as the user's account
+   *  at this origin, so each user trusts whichever server they connect. */
   mcpServerOrigin: string;
   /** The account to connect as, chosen in the picker. `undefined` is the
    *  unreserved default account. Bound by `mcp_set_access` and carried by the
@@ -134,9 +134,9 @@ export const mcpAuthorize = async ({
   );
 
   // Submit as a top-level navigation to the MCP server's callback. The /mcp
-  // landing page's `form-action` CSP allows https origins and http loopback,
-  // matching the callbacks the connect flow accepts. The MCP server redirects
-  // back to /mcp with a status param.
+  // landing page's `form-action` CSP is `'self' https:`, matching the https
+  // callbacks the connect flow accepts. The MCP server redirects back to /mcp
+  // with a status param.
   const form = document.createElement("form");
   form.method = "POST";
   form.action = callback;

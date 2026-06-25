@@ -40,7 +40,11 @@
     if (selectedIdentity === undefined) {
       return;
     }
-    await manageHandoff.start("/manage", selectedIdentity);
+    try {
+      await manageHandoff.start("/manage", selectedIdentity);
+    } catch (error) {
+      handleError(error);
+    }
   };
 
   // Switching identity only *selects* here — unlike the authorize route, it

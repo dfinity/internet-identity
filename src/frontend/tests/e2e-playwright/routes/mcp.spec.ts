@@ -123,6 +123,9 @@ test("After trusting the server, the connect screen shows", async ({
   page,
   mcp,
 }) => {
+  // Trust now lives on-chain (synced), so trustServer drives the Settings UI and
+  // the connect flow makes real canister round-trips — give it ample time.
+  test.slow();
   await addVirtualAuthenticator(page);
   await page.goto(II_URL);
   await signUp(page);
@@ -141,6 +144,7 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
 }) => {
   // End-to-end: add the server via the Settings UI (not the seeding helper),
   // then connecting to it reaches the connect screen.
+  test.slow();
   await addVirtualAuthenticator(page);
   // The Settings UI verifies the server via its RFC 9728 protected-resource
   // metadata (a CORS-enabled GET at /.well-known/oauth-protected-resource).
@@ -216,6 +220,7 @@ test("Returning user lands on the connect screen immediately", async ({
   page,
   mcp,
 }) => {
+  test.slow();
   await addVirtualAuthenticator(page);
   await page.goto(II_URL);
   await signUp(page);
@@ -229,6 +234,7 @@ test("Returning user lands on the connect screen immediately", async ({
 });
 
 test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
+  test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
@@ -264,6 +270,7 @@ test("Identity switcher shows while signing in and hides on the success screen",
   page,
   mcp,
 }) => {
+  test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
@@ -285,6 +292,7 @@ test("Identity switcher shows while signing in and hides on the success screen",
 });
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
+  test.slow();
   const ttlMinutes = 60;
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
