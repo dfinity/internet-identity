@@ -163,6 +163,8 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
+  // The URL box only appears once the master toggle is on.
+  await page.getByRole("switch", { name: "Trusted MCP server" }).check();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await page.getByRole("button", { name: "Add" }).click();
   // The trusted server is shown with a remove button whose aria-label carries

@@ -12,6 +12,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
+  import { mcpAccessStore } from "$lib/stores/mcp-access.store";
   import { mcpTrustedServersStore } from "$lib/stores/mcp-trusted-servers.store";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
@@ -43,12 +44,14 @@
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
 
-  // The chosen identity must have set this server as its trusted MCP server
-  // (via Settings) before we connect it. The actual authority is the backend
-  // binding `mcp_set_access` creates on connect; this device-local trust is the
-  // user-controlled pre-gate that decides which server reaches that step.
+  // The chosen identity must have MCP enabled on this device AND set this server
+  // as its trusted MCP server (both via Settings) before we connect it. The
+  // master toggle disables the feature completely; the trusted-server origin is
+  // the per-server pre-gate. The actual authority is the backend binding
+  // `mcp_set_access` creates on connect.
   const isServerTrusted = (identityNumber: bigint): boolean =>
     mcpServer !== undefined &&
+    mcpAccessStore.isEnabled(identityNumber) &&
     mcpTrustedServersStore.isTrusted(identityNumber, mcpServer.origin);
 
   // Origin used for canister account calls: remap a gateway origin

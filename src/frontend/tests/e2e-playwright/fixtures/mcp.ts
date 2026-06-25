@@ -128,20 +128,32 @@ export const test = base.extend<{ mcp: McpFixture }>({
       if (identityNumbers.length === 0) {
         throw new Error("trustServer: no identity number in localStorage");
       }
-      // Build the trusted-server envelope in Node (matching writableStored's
-      // `{ data, version }` shape — tests sign up exactly one identity, and the
-      // store holds a single trusted URL per identity) and write the finished
-      // string back. Keeping the read and the write in separate evaluates means
-      // the page-side write just persists a known constant, not data read from
+      // Build the envelopes in Node (matching writableStored's `{ data, version }`
+      // shape — tests sign up exactly one identity). Connecting requires both the
+      // device master toggle on (mcp-access) and a trusted server URL, so seed
+      // both. Keeping the read and the writes in separate evaluates means the
+      // page-side writes just persist known constants, not data read from
       // storage in the same step.
+      const enabled: Record<string, boolean> = {};
       const trusted: Record<string, string> = {};
       for (const num of identityNumbers) {
+        enabled[num] = true;
         trusted[num] = `${MCP_SERVER_ORIGIN}/mcp`;
       }
-      const value = JSON.stringify({ data: trusted, version: 2 });
+      const entries = [
+        {
+          key: storeLocalStorageKey.McpAccess,
+          value: JSON.stringify({ data: enabled, version: 1 }),
+        },
+        {
+          key: storeLocalStorageKey.McpTrustedServers,
+          value: JSON.stringify({ data: trusted, version: 2 }),
+        },
+      ];
       await page.evaluate(
-        ({ trustedKey, value }) => localStorage.setItem(trustedKey, value),
-        { trustedKey: storeLocalStorageKey.McpTrustedServers, value },
+        (items) =>
+          items.forEach(({ key, value }) => localStorage.setItem(key, value)),
+        entries,
       );
     };
 
