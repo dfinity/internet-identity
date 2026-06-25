@@ -388,7 +388,9 @@ test.describe("Access methods", () => {
         .getByRole("main")
         .getByRole("listitem")
         .filter({ hasText: "Passkey" });
-      await expect(passkeyItem.getByText("Active")).toBeVisible();
+      await expect(
+        passkeyItem.getByText("Active", { exact: true }),
+      ).toBeVisible();
 
       // Switch to the SSO method via More options → Switch → Continue. The
       // canister rejects the JWT as "Authorization invalid" if the handler
