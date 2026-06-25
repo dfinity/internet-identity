@@ -268,6 +268,31 @@ fn status_flips_to_expired_after_ttl() {
     assert!(matches!(status, EmailRecoveryStatus::Expired));
 }
 
+/// Headers that satisfy the typestate's stage-1 RFC 5322 §3.6
+/// well-formedness pass (exactly-once `From`/`Date`/`Subject`). The
+/// silent-drop tests below short-circuit before stage 2, so no
+/// DKIM-Signature header is needed.
+fn silent_drop_headers(subject_value: &str) -> Vec<SmtpHeader> {
+    vec![
+        SmtpHeader {
+            name: "From".into(),
+            value: TEST_ADDRESS.into(),
+        },
+        SmtpHeader {
+            name: "Date".into(),
+            value: "Mon, 1 Jan 2024 00:00:00 +0000".into(),
+        },
+        SmtpHeader {
+            name: "To".into(),
+            value: "register@id.ai".into(),
+        },
+        SmtpHeader {
+            name: "Subject".into(),
+            value: subject_value.into(),
+        },
+    ]
+}
+
 #[test]
 fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
     let env = env();
@@ -288,24 +313,7 @@ fn smtp_request_silently_drops_email_with_no_nonce_in_subject() {
             }],
         }),
         message: Some(SmtpMessage {
-            headers: vec![
-                SmtpHeader {
-                    name: "From".into(),
-                    value: TEST_ADDRESS.into(),
-                },
-                SmtpHeader {
-                    name: "Date".into(),
-                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
-                },
-                SmtpHeader {
-                    name: "To".into(),
-                    value: "register@id.ai".into(),
-                },
-                SmtpHeader {
-                    name: "Subject".into(),
-                    value: "Just a friendly email".into(),
-                },
-            ],
+            headers: silent_drop_headers("Just a friendly email"),
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,
@@ -332,26 +340,9 @@ fn smtp_request_silently_drops_email_with_unknown_nonce() {
             }],
         }),
         message: Some(SmtpMessage {
-            headers: vec![
-                SmtpHeader {
-                    name: "From".into(),
-                    value: TEST_ADDRESS.into(),
-                },
-                SmtpHeader {
-                    name: "Date".into(),
-                    value: "Mon, 5 May 2026 12:00:00 +0000".into(),
-                },
-                SmtpHeader {
-                    name: "To".into(),
-                    value: "register@id.ai".into(),
-                },
-                SmtpHeader {
-                    name: "Subject".into(),
-                    // Looks valid, but no prepare call was made for
-                    // this nonce so the canister has no pending entry.
-                    value: "II-Recovery-deadbeefcafebabe".into(),
-                },
-            ],
+            // Looks valid, but no prepare call was made for this
+            // nonce so the canister has no pending entry.
+            headers: silent_drop_headers("II-Recovery-deadbeefcafebabe"),
             body: ByteBuf::from(b"hello".to_vec()),
         }),
         gateway_flags: None,

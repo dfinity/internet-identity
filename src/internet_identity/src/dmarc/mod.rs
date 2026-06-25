@@ -1,21 +1,17 @@
-//! DMARC alignment check (RFC 7489) + the combined DKIM + DMARC
-//! email verifier entry point.
+//! DMARC alignment primitives (RFC 7489).
 //!
-//! This module sits one layer above `dkim`: it consumes a parsed
-//! `SmtpRequest` plus the (already-trusted) DKIM TXT record bytes and
-//! the DMARC TXT record bytes, runs DKIM verification, then checks
-//! that the DKIM-signed `d=` aligns with the From-header domain under
-//! the published `adkim=` mode. The public entry point is
-//! [`verify::verify_email`].
+//! Orchestration moved to [`crate::email_recovery::typestate`] — the
+//! canister consumes a `VerifiedSmtpRequest` produced by stage 3 of
+//! the typestate pipeline, which calls into the alignment helpers
+//! here directly. What stays in this module are the parsing and
+//! alignment primitives:
 //!
-//! The submodules are:
 //! - `types` — `DmarcOutcome`, `DmarcPolicy`, `AlignmentMode`,
-//!   `DmarcRecord`, plus the combined `EmailVerificationStatus`.
+//!   `DmarcRecord`.
 //! - `parse` — DMARC TXT record parser (RFC 7489 §6.3).
 //! - `from_header` — RFC 5322 single-mailbox From-header parser.
 //! - `alignment` — strict / relaxed alignment check (no PSL — see
 //!   design doc §6.4).
-//! - `verify` — orchestration; the public entry point lives here.
 //!
 //! # Security model
 //!
@@ -44,9 +40,8 @@
 //!   downgrade — a recovery attempt either proves mailbox control or
 //!   it doesn't run.
 
-// `crate::email_recovery::smtp::verify_setup_email` is the in-canister
-// consumer; some less-used variants in the public surface (e.g.
-// fine-grained `EmailVerificationStatus` reasons) aren't yet
+// `crate::email_recovery::typestate` is the in-canister consumer;
+// some less-used variants in the public surface aren't yet
 // pattern-matched. Suppress dead-code warnings until those land.
 #![allow(dead_code)]
 
@@ -56,16 +51,114 @@ mod parse;
 #[cfg(test)]
 mod test_vectors;
 mod types;
-mod verify;
 
 #[allow(unused_imports)]
-pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord, EmailVerificationStatus};
-#[allow(unused_imports)]
-pub use verify::verify_email;
+pub use types::{AlignmentMode, DmarcOutcome, DmarcPolicy, DmarcRecord};
 
-// Building blocks the email-recovery submit-leaf path needs to admit
-// a DMARC record cached at prepare time and re-check alignment
-// without re-running the full `verify_email` pipeline (which expects
-// the message body the body has already been dropped).
+// Building blocks the email-recovery typestate (stage 3) and the
+// submit-leaf path consume to admit a DMARC record cached at prepare
+// time and re-check alignment without re-running the full DKIM+DMARC
+// pipeline.
 pub(crate) use alignment::aligns;
+pub(crate) use from_header::parse_single_mailbox_domain as extract_from_value;
 pub(crate) use parse::parse_dmarc_txt;
+
+/// Compute the DMARC alignment outcome given the DKIM `d=`, the From-
+/// header domain, and the optional published DMARC record bytes.
+///
+/// `pub(crate)` so the email-recovery typestate orchestrator (and the
+/// DMARC unit tests) can drive the alignment check without going
+/// through a cryptographic round-trip. The function is a pure
+/// computation over already-trusted inputs — no I/O.
+pub(crate) fn compute_outcome(
+    dkim_domain: &str,
+    from_domain: &str,
+    dmarc_txt: Option<&str>,
+) -> types::DmarcOutcome {
+    let txt = match dmarc_txt {
+        None => return types::DmarcOutcome::NoRecord,
+        Some(t) => t,
+    };
+    let record = match parse_dmarc_txt(txt) {
+        Ok(r) => r,
+        Err(e) => return types::DmarcOutcome::Malformed(e),
+    };
+    if aligns(dkim_domain, from_domain, record.adkim) {
+        types::DmarcOutcome::Aligned {
+            policy: record.policy,
+            alignment_mode: record.adkim,
+        }
+    } else {
+        types::DmarcOutcome::Misaligned {
+            policy: record.policy,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use types::{AlignmentMode, DmarcOutcome, DmarcPolicy};
+
+    #[test]
+    fn no_record_when_dkim_equals_from() {
+        assert_eq!(
+            compute_outcome("example.com", "example.com", None),
+            DmarcOutcome::NoRecord,
+        );
+    }
+
+    #[test]
+    fn no_record_when_dkim_subdomain_of_from() {
+        // No DMARC record + dkim is a subdomain → still NoRecord at
+        // this layer. The typestate's wrapper then rejects on the
+        // strict equality fallback (only `dkim == from` is accepted
+        // when no record is published).
+        assert_eq!(
+            compute_outcome("mail.example.com", "example.com", None),
+            DmarcOutcome::NoRecord,
+        );
+    }
+
+    #[test]
+    fn aligned_under_relaxed_subdomain() {
+        let txt = "v=DMARC1; p=reject"; // adkim defaults to relaxed
+        assert!(matches!(
+            compute_outcome("mail.example.com", "example.com", Some(txt)),
+            DmarcOutcome::Aligned {
+                policy: DmarcPolicy::Reject,
+                alignment_mode: AlignmentMode::Relaxed,
+            }
+        ));
+    }
+
+    #[test]
+    fn misaligned_under_strict_subdomain() {
+        let txt = "v=DMARC1; p=reject; adkim=s";
+        assert!(matches!(
+            compute_outcome("mail.example.com", "example.com", Some(txt)),
+            DmarcOutcome::Misaligned { .. }
+        ));
+    }
+
+    #[test]
+    fn aligned_strict_exact_match() {
+        let txt = "v=DMARC1; p=reject; adkim=s";
+        assert!(matches!(
+            compute_outcome("example.com", "example.com", Some(txt)),
+            DmarcOutcome::Aligned {
+                alignment_mode: AlignmentMode::Strict,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn malformed_record_surfaces_as_outcome() {
+        let txt = "v=BOGUS";
+        match compute_outcome("example.com", "example.com", Some(txt)) {
+            DmarcOutcome::Malformed(e) => assert!(e.contains("BOGUS")),
+            other => panic!("expected Malformed, got {other:?}"),
+        }
+    }
+}

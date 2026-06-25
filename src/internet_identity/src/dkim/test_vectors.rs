@@ -13,9 +13,19 @@
 //! signed `.eml` files and the matching DKIM TXT record (containing the
 //! public key) live in `test_vectors/dkim/`. See that directory's
 //! README for the regeneration procedure.
+//!
+//! Each test drives the email-recovery typestate end-to-end: stage 1
+//! (RFC 5322 §3.6 well-formedness) → stage 2 (parse every
+//! `DKIM-Signature`) → stage 3 (cryptographic check + DMARC alignment).
+//! Failures surface via `VerificationError.last_reason`, which carries
+//! the same `VerificationFailReason` values the per-signature inner
+//! loop produces.
 
-use super::types::{DkimVerifyResult, VerificationFailReason};
-use super::verify::verify;
+use super::types::VerificationFailReason;
+use crate::email_recovery::typestate::{
+    SignedSmtpRequest, UnverifiedSmtpRequest, VerificationContext, VerificationError,
+    VerifiedSmtpRequest,
+};
 use internet_identity_interface::internet_identity::types::smtp::{
     SmtpAddress, SmtpEnvelope, SmtpHeader, SmtpMessage, SmtpRequest,
 };
@@ -34,7 +44,7 @@ const SYNTH_RSA_TXT: &str =
 /// produces. Continuation lines (those starting with WSP) are unfolded
 /// into the previous header's value, with the leading WSP preserved per
 /// RFC 5322 §2.2.3 so DKIM relaxed canonicalisation can collapse it.
-fn parse_eml(raw: &[u8]) -> SmtpRequest {
+pub(crate) fn parse_eml(raw: &[u8]) -> SmtpRequest {
     // Find the first \r\n\r\n that separates headers from body.
     let mut header_end = 0;
     while header_end + 4 <= raw.len() {
@@ -173,68 +183,71 @@ fn frozen_now() -> u64 {
     1_777_972_289 // matches t= in the committed fixtures
 }
 
+/// Run an `SmtpRequest` through the full typestate pipeline against
+/// the given DKIM/DMARC inputs. Stage-1 / stage-2 failures panic
+/// (the fixtures must satisfy them — they're real signed `.eml`
+/// files); only stage-3 results are returned.
+fn run(
+    req: SmtpRequest,
+    dkim_txt: &str,
+    dmarc_txt: Option<&str>,
+    now: u64,
+) -> Result<VerifiedSmtpRequest, VerificationError> {
+    let unverified = UnverifiedSmtpRequest::try_from(req)
+        .expect("fixture must satisfy stage 1 (bounds + RFC 5322 §3.6)");
+    let signed: SignedSmtpRequest = unverified
+        .try_into()
+        .expect("fixture must parse at least one DKIM-Signature");
+    let ctx = VerificationContext {
+        dkim_txt,
+        dmarc_txt,
+        now_secs: now,
+    };
+    VerifiedSmtpRequest::try_from((signed, &ctx))
+}
+
 #[test]
 fn verifies_synthetic_rsa_relaxed_relaxed() {
     let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
-    let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
-    match result {
-        DkimVerifyResult::Verified { dkim_domain, .. } => {
-            assert_eq!(dkim_domain, "test.example.com");
-        }
-        other => panic!("expected Verified, got {:?}", other),
-    }
+    let verified = run(req, SYNTH_RSA_TXT, None, frozen_now())
+        .expect("synth-rsa-relaxed-relaxed.eml must verify");
+    assert_eq!(verified.dkim_domain(), "test.example.com");
 }
 
 #[test]
 fn verifies_synthetic_rsa_relaxed_simple_body() {
     let req = parse_eml(SYNTH_RSA_RELAXED_SIMPLE);
-    let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
-    match result {
-        DkimVerifyResult::Verified { dkim_domain, .. } => {
-            assert_eq!(dkim_domain, "test.example.com");
-        }
-        other => panic!("expected Verified, got {:?}", other),
-    }
+    let verified = run(req, SYNTH_RSA_TXT, None, frozen_now())
+        .expect("synth-rsa-relaxed-simple.eml must verify");
+    assert_eq!(verified.dkim_domain(), "test.example.com");
 }
 
 #[test]
 fn rejects_simple_simple_canonicalization() {
     let req = parse_eml(SYNTH_RSA_SIMPLE_SIMPLE);
-    let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
-    match result {
-        DkimVerifyResult::Unverified { reason, .. } => {
-            assert_eq!(reason, VerificationFailReason::UnsupportedCanonicalization);
-        }
-        other => panic!(
-            "expected Unverified(UnsupportedCanonicalization), got {:?}",
-            other
-        ),
-    }
+    let err = run(req, SYNTH_RSA_TXT, None, frozen_now()).unwrap_err();
+    assert_eq!(
+        err.last_reason,
+        VerificationFailReason::UnsupportedCanonicalization,
+    );
 }
 
 #[test]
 fn rejects_flipped_body_byte() {
-    let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
-    let mut req = req;
+    let mut req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let message = req.message.as_mut().unwrap();
     let mut body = message.body.to_vec();
     if !body.is_empty() {
         body[0] ^= 0x01;
     }
     message.body = ByteBuf::from(body);
-    let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
-    match result {
-        DkimVerifyResult::Unverified { reason, .. } => {
-            assert_eq!(reason, VerificationFailReason::BodyHashMismatch);
-        }
-        other => panic!("expected BodyHashMismatch, got {:?}", other),
-    }
+    let err = run(req, SYNTH_RSA_TXT, None, frozen_now()).unwrap_err();
+    assert_eq!(err.last_reason, VerificationFailReason::BodyHashMismatch);
 }
 
 #[test]
 fn rejects_flipped_signature_byte() {
-    let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
-    let mut req = req;
+    let mut req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let message = req.message.as_mut().unwrap();
     // Flip a byte inside the b= value of the DKIM-Signature header.
     for header in message.headers.iter_mut() {
@@ -254,19 +267,16 @@ fn rejects_flipped_signature_byte() {
             header.value = String::from_utf8(bytes).unwrap();
         }
     }
-    let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
+    let err = run(req, SYNTH_RSA_TXT, None, frozen_now()).unwrap_err();
     assert!(
         matches!(
-            result,
-            DkimVerifyResult::Unverified {
-                reason: VerificationFailReason::SignatureInvalid
-                    | VerificationFailReason::SignatureMalformed(_)
-                    | VerificationFailReason::BodyHashMismatch,
-                ..
-            }
+            err.last_reason,
+            VerificationFailReason::SignatureInvalid
+                | VerificationFailReason::SignatureMalformed(_)
+                | VerificationFailReason::BodyHashMismatch,
         ),
-        "expected Unverified with signature/body failure, got {:?}",
-        result
+        "expected signature/body failure, got {:?}",
+        err.last_reason
     );
 }
 
@@ -276,38 +286,36 @@ fn rejects_wrong_public_key() {
     // A valid-shaped DKIM TXT record but with a different key
     // (truncated to a structural-but-not-correct value).
     let bad_txt = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxIDAQAB";
-    let result = verify(&req, bad_txt, frozen_now());
+    let err = run(req, bad_txt, None, frozen_now()).unwrap_err();
     assert!(
         matches!(
-            result,
-            DkimVerifyResult::Unverified {
-                reason: VerificationFailReason::SignatureInvalid
-                    | VerificationFailReason::DnsRecordMalformed(_),
-                ..
-            }
+            err.last_reason,
+            VerificationFailReason::SignatureInvalid
+                | VerificationFailReason::DnsRecordMalformed(_),
         ),
-        "expected Unverified, got {:?}",
-        result
+        "expected signature/DNS failure, got {:?}",
+        err.last_reason
     );
 }
 
 #[test]
-fn no_dkim_signature_header() {
-    let req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
-    let mut req = req;
-    // Strip the DKIM-Signature header.
+fn rejects_missing_dkim_signature_header() {
+    // The DNS layer in production never delivers a message without a
+    // DKIM-Signature; we exercise the negative path by stripping it.
+    // Under the typestate the rejection happens at stage 2 — DKIM
+    // isn't an RFC 5322 §3.6 header, so stage 1 lets it pass through
+    // into `other_headers`; stage 2 walks that slice for signatures
+    // and fails with `DkimScopeError::NoSignature` when none are
+    // present.
+    use crate::email_recovery::typestate::DkimScopeError;
+    let mut req = parse_eml(SYNTH_RSA_RELAXED_RELAXED);
     let message = req.message.as_mut().unwrap();
     message
         .headers
         .retain(|h| !h.name.eq_ignore_ascii_case("DKIM-Signature"));
-    let result = verify(&req, SYNTH_RSA_TXT, frozen_now());
-    assert!(matches!(
-        result,
-        DkimVerifyResult::Unverified {
-            reason: VerificationFailReason::NoSignature,
-            ..
-        }
-    ));
+    let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must accept");
+    let err = SignedSmtpRequest::try_from(unverified).expect_err("stage 2 must reject");
+    assert!(matches!(err, DkimScopeError::NoSignature));
 }
 
 #[test]

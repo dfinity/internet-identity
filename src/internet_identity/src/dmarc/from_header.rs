@@ -39,7 +39,12 @@ pub fn extract_from_domain(message: &SmtpMessage) -> Result<String, String> {
 /// Parse a single-mailbox `From:` value and return the domain
 /// lowercased. Tolerates an optional display name and angle-bracket
 /// `<addr-spec>`; rejects address-lists and group syntax.
-fn parse_single_mailbox_domain(value: &str) -> Result<String, String> {
+///
+/// `pub(crate)` so the email-recovery typestate (which holds the
+/// From-header value as a typed field, not as part of a header list)
+/// can parse it without going through `extract_from_domain`'s
+/// header-search shape.
+pub(crate) fn parse_single_mailbox_domain(value: &str) -> Result<String, String> {
     let value = value.trim();
     if value.is_empty() {
         return Err("empty From: value".to_string());

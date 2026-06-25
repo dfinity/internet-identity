@@ -1,9 +1,13 @@
-//! DKIM verifier (RFC 6376 + RFC 8463).
+//! DKIM primitives (RFC 6376 + RFC 8463).
 //!
 //! Hand-rolled because the well-tested upstream alternative (Stalwart's
 //! `mail-auth`) pulls a non-optional `hickory-resolver` dep that won't
-//! compile to `wasm32-unknown-unknown`. Each sub-module corresponds to a
-//! piece of RFC 6376 the verifier needs:
+//! compile to `wasm32-unknown-unknown`. Top-level orchestration moved
+//! to [`crate::email_recovery::typestate`] — the canister consumes a
+//! `VerifiedSmtpRequest` from stage 3 of the typestate pipeline, which
+//! calls into the primitives here directly.
+//!
+//! Sub-modules:
 //!
 //! - `parse` — `DKIM-Signature` header tag-list parser (§3.5).
 //! - `dns_record` — DKIM TXT record parser (§3.6.2).
@@ -13,8 +17,9 @@
 //! - `signature` — RSA-SHA256 (RFC 5702 / RFC 8301) and Ed25519-SHA256
 //!   (RFC 8463) signature verification, on top of the existing `rsa`
 //!   and `ed25519-dalek` workspace deps.
-//! - `verify` — orchestration: multi-signature loop, tag enforcement,
-//!   accept-on-first-pass.
+//! - `verify` — `build_header_hash_input` (§3.7) plus the `simple` body
+//!   canonicalisation helper; the multi-signature loop and tag
+//!   enforcement live in the typestate now.
 //! - `tag_checks` — the **tag-contract facade** (two `enforce_*` umbrella
 //!   functions) that both pipelines route their tag enforcement
 //!   through. The facade is the single source of truth so the DoH and
@@ -38,15 +43,15 @@
 //!   that runs immediately after the umbrella gives the most useful
 //!   diagnostic.
 //!
-//! The verifier consumes a DKIM TXT record (sourced either from a
-//! DNSSEC-verified `DnsProofBundle` cached at prepare time, or via
-//! `crate::doh::fetch_txt` at email-arrival time) plus a parsed
-//! `SmtpRequest`. It does not make any DNS calls itself; the caller
-//! is responsible for delivering the trusted public-key bytes.
+//! The DKIM TXT record is sourced either from a DNSSEC-verified
+//! `DnsProofBundle` cached at prepare time, or via
+//! `crate::doh::fetch_txt` at email-arrival time. This module does
+//! not make any DNS calls itself; the caller is responsible for
+//! delivering the trusted public-key bytes.
 
-// `crate::email_recovery::smtp::verify_setup_email` is the in-canister
-// consumer; some less-used items in the public surface aren't yet
-// referenced. Suppress dead-code warnings until those land.
+// `crate::email_recovery::typestate` is the in-canister consumer;
+// some less-used items in the public surface aren't yet referenced.
+// Suppress dead-code warnings until those land.
 #![allow(dead_code)]
 
 mod canonicalize;
@@ -55,20 +60,15 @@ mod parse;
 mod signature;
 mod tag_checks;
 #[cfg(test)]
-mod test_vectors;
+pub(crate) mod test_vectors;
 mod types;
 mod verify;
 
 #[allow(unused_imports)]
 pub use types::{
-    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
+    Algorithm, BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, HeaderCanon,
     VerificationFailReason,
 };
-// Re-exported as `verify_dkim` so downstream callers (the dmarc layer)
-// don't have to deal with both a `dkim::verify` and `dmarc::verify`
-// in scope at the same time.
-#[allow(unused_imports)]
-pub use verify::verify as verify_dkim;
 
 // Building blocks consumed by the email-recovery two-phase pipeline
 // (`crate::email_recovery::smtp` parses the signature and computes
@@ -99,4 +99,4 @@ pub(crate) use tag_checks::{
     enforce_signature_header_tag_contract,
 };
 #[allow(unused_imports)]
-pub(crate) use verify::{build_header_hash_input, simple_body};
+pub(crate) use verify::{build_header_hash_input, run_signature_check, simple_body};

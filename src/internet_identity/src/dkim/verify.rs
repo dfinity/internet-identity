@@ -1,167 +1,81 @@
-//! DKIM verification entry point — orchestrates parsing, canonicalisation,
-//! body hash, and signature verification per RFC 6376 §6.1.
+//! DKIM verification orchestration and canonicalisation primitives.
 //!
-//! Caller-facing API (re-exported as `crate::dkim::verify_dkim`):
+//! The top-level [`run_signature_check`] runs one signature end-to-end
+//! against an already-trusted DKIM TXT record: tag-contract checks,
+//! body-hash, signed-headers canonicalisation, and the cryptographic
+//! signature verification. It returns the per-step check trail on
+//! success, leaving DMARC alignment + From-domain extraction to the
+//! caller (the email-recovery typestate orchestrates DKIM and DMARC).
 //!
-//! ```ignore
-//! pub fn verify_dkim(
-//!     email: &SmtpRequest,
-//!     dkim_txt: &str,
-//!     now_secs: u64,
-//! ) -> DkimVerifyResult
-//! ```
+//! Two RFC 6376 §3.7 primitives also live here for the DNSSEC-path
+//! partial-verification flow, which runs everything except the
+//! cryptographic check at email-arrival time:
 //!
-//! `dkim_txt` is the (already-trusted) content of the DKIM TXT record
-//! at `<selector>._domainkey.<domain>` — in production it comes from
-//! the DNSSEC verifier (`VerifiedRecord`, cached on the pending
-//! challenge at prepare time) for DNSSEC-signed domains, or from
-//! `crate::doh::fetch_txt` at email-arrival time otherwise. This
-//! module does no DNS work itself; the caller delivers the bytes.
-//!
-//! Multi-signature behaviour (RFC 6376 §5.5 / design §5.5): an email
-//! may carry multiple `DKIM-Signature` headers. The verifier accepts
-//! the email as soon as *any one* signature passes; if all fail, it
-//! returns `Unverified` with a best-fit reason.
-//!
-//! Tag enforcement (design §5.4):
-//! - `v=` must be `1` (parse layer rejects others).
-//! - `a=` must be `rsa-sha256` or `ed25519-sha256` (parse rejects rest).
-//! - `c=` header side must be `relaxed` (rejected here).
-//! - `x=` if present must be in the future.
-//! - `t=` if present must not be in the future beyond `CLOCK_SKEW_SECS`.
-//! - `h=` must include `From` (parse-layer reject) **and** `Subject`
-//!   (rejected here as `SubjectNotSigned`). Subject coverage is
-//!   recovery-specific — the challenge nonce lives in `Subject:` and a
-//!   signature that doesn't cover it would let a MITM rewrite the
-//!   nonce on a legitimately-signed email.
-//! - `i=` must end in `@d` or `.d`. Soft-failed when DNS record has
-//!   `t=s` cleared (i.e. accept subdomains by default).
-//! - DNS `k=` must match `a=`'s underlying key type.
-//! - DNS `t=y` (testing mode) — emit Unverified with TestingMode reason.
+//! - [`build_header_hash_input`] — selects the headers named by `h=`
+//!   from the message bottom-up (RFC 6376 §5.4) and concatenates their
+//!   relaxed-canonical forms, plus the DKIM-Signature header itself
+//!   with its `b=` value blanked.
+//! - [`simple_body`] — the `simple/*` body canonicalisation form.
+//!   (`relaxed_body` lives in [`super::canonicalize`].)
 
 use super::canonicalize::{relaxed_body, relaxed_header};
 use super::dns_record::parse_dkim_txt;
-use super::parse::{parse_dkim_signature, DkimSignature};
+use super::parse::DkimSignature;
 use super::signature::{body_hash_sha256, verify_signature, VerifyOutcome};
 use super::tag_checks::{enforce_dns_record_tag_contract, enforce_signature_header_tag_contract};
 use super::types::{
-    DkimCheck, DkimCheckName, DkimCheckStatus, DkimVerifyResult, HeaderCanon,
-    VerificationFailReason,
+    BodyCanon, DkimCheck, DkimCheckName, DkimCheckStatus, HeaderCanon, VerificationFailReason,
 };
-use internet_identity_interface::internet_identity::types::smtp::{SmtpHeader, SmtpRequest};
+use internet_identity_interface::internet_identity::types::smtp::SmtpHeader;
 
 const DKIM_SIGNATURE_HEADER: &str = "DKIM-Signature";
 
-/// Verify an `SmtpRequest` against an already-trusted DKIM TXT record.
+/// Run one DKIM signature end-to-end against an already-trusted DKIM
+/// TXT record. Performs the c=, x=, t=, Subject-in-h=, DNS-record
+/// parse, t=y testing-mode, i= AUID, k= algorithm-family, body-hash,
+/// and signed-headers cryptographic checks; returns the per-step
+/// `DkimCheck` trail on success or a `(reason, partial_trail)` pair
+/// on failure.
 ///
-/// `now_secs` is Unix seconds — passed in so unit tests can pin time.
-pub fn verify(email: &SmtpRequest, dkim_txt: &str, now_secs: u64) -> DkimVerifyResult {
-    let message = match email.message.as_ref() {
-        Some(m) => m,
-        None => {
-            return Unverified(VerificationFailReason::NoSignature, vec![]);
-        }
-    };
-
-    // Find every DKIM-Signature header (case-insensitive). RFC 6376
-    // allows multiple; we try them in order and accept on first pass.
-    let dkim_headers: Vec<&SmtpHeader> = message
-        .headers
-        .iter()
-        .filter(|h| h.name.eq_ignore_ascii_case(DKIM_SIGNATURE_HEADER))
-        .collect();
-
-    if dkim_headers.is_empty() {
-        return Unverified(
-            VerificationFailReason::NoSignature,
-            vec![check(
-                DkimCheckName::DkimSignaturePresent,
-                DkimCheckStatus::Fail,
-                Some("no DKIM-Signature header in message".into()),
-            )],
-        );
-    }
-
-    let mut all_checks: Vec<DkimCheck> = Vec::new();
-    let mut last_reason = VerificationFailReason::NoSignature;
-
-    for dkim_header in &dkim_headers {
-        match try_verify_signature(email, message, dkim_header, dkim_txt, now_secs) {
-            Ok((dkim_domain, checks)) => {
-                // Per `DkimVerifyResult::Verified.checks` ("checks for
-                // the winning signature"), surface only the successful
-                // attempt's per-step trail — not the accumulated trail
-                // of every failed signature before it. Callers (and the
-                // DMARC layer) reason about the winning signature only.
-                return DkimVerifyResult::Verified {
-                    dkim_domain,
-                    checks,
-                };
-            }
-            Err((reason, mut checks)) => {
-                last_reason = reason;
-                all_checks.append(&mut checks);
-            }
-        }
-    }
-
-    Unverified(last_reason, all_checks)
-}
-
-#[allow(non_snake_case)]
-fn Unverified(reason: VerificationFailReason, checks: Vec<DkimCheck>) -> DkimVerifyResult {
-    DkimVerifyResult::Unverified { reason, checks }
-}
-
-/// Try to verify one specific DKIM-Signature header. Returns the `d=`
-/// domain on success, or a `(reason, partial-checks)` pair on failure.
-fn try_verify_signature(
-    _email: &SmtpRequest,
-    message: &internet_identity_interface::internet_identity::types::smtp::SmtpMessage,
-    dkim_header: &SmtpHeader,
+/// Inputs are primitives (no typestate types) so this function is
+/// reusable across both the in-flight DoH path (where the typestate
+/// hands us the parsed signature + raw message) and any future
+/// caller that has the same primitives in hand. DMARC alignment and
+/// From-domain extraction live in `crate::dmarc` and are sequenced
+/// by the typestate orchestrator after this check succeeds.
+pub(crate) fn run_signature_check(
+    sig: &DkimSignature,
+    headers: &[SmtpHeader],
+    body: &[u8],
+    dkim_header_value: &str,
     dkim_txt: &str,
     now_secs: u64,
-) -> Result<(String, Vec<DkimCheck>), (VerificationFailReason, Vec<DkimCheck>)> {
+) -> Result<Vec<DkimCheck>, (VerificationFailReason, Vec<DkimCheck>)> {
     let mut checks: Vec<DkimCheck> = Vec::new();
     checks.push(check(
         DkimCheckName::DkimSignaturePresent,
         DkimCheckStatus::Pass,
         None,
     ));
-
-    // Parse the DKIM-Signature header value.
-    let sig = match parse_dkim_signature(&dkim_header.value) {
-        Ok(s) => s,
-        Err(e) => {
-            checks.push(check(
-                DkimCheckName::SignatureParsed,
-                DkimCheckStatus::Fail,
-                Some(e.clone()),
-            ));
-            return Err((VerificationFailReason::SignatureMalformed(e), checks));
-        }
-    };
+    // The signature was parsed before reaching this entry point, so
+    // SignatureParsed and AlgorithmSupported are implicitly Pass.
     checks.push(check(
         DkimCheckName::SignatureParsed,
         DkimCheckStatus::Pass,
         None,
     ));
-
-    // (a=) Algorithm support is enforced by the parse layer; if we got
-    // here, the algorithm is one of our two. Record the check.
     checks.push(check(
         DkimCheckName::AlgorithmSupported,
         DkimCheckStatus::Pass,
         None,
     ));
 
-    // (c=) Reject simple/* on the header side. See design §5.2.
+    // (c=) Reject simple/* on the header side (design §5.2).
     if sig.c_header != HeaderCanon::Relaxed {
-        let detail = "header canonicalisation must be relaxed (c=relaxed/...)".into();
         checks.push(check(
             DkimCheckName::CanonicalizationSupported,
             DkimCheckStatus::Fail,
-            Some(detail),
+            Some("header canonicalisation must be relaxed (c=relaxed/...)".into()),
         ));
         return Err((VerificationFailReason::UnsupportedCanonicalization, checks));
     }
@@ -171,12 +85,8 @@ fn try_verify_signature(
         None,
     ));
 
-    // Signature-header-only tag contract: x= not expired, t= not
-    // future-dated, Subject in h=. Both pipelines route through the
-    // same umbrella so the contract can't drift; the trail the
-    // umbrella builds is appended verbatim to our per-check
-    // accumulator.
-    match enforce_signature_header_tag_contract(&sig, now_secs) {
+    // Signature-header-only tag contract (x=, t=, Subject ∈ h=).
+    match enforce_signature_header_tag_contract(sig, now_secs) {
         Ok(mut trail) => checks.append(&mut trail),
         Err((reason, mut trail)) => {
             checks.append(&mut trail);
@@ -184,13 +94,7 @@ fn try_verify_signature(
         }
     }
 
-    // Parse the DNS record now — we need its t=s flag to know how
-    // strict to be on i= alignment.
-    //
-    // SECURITY: `dkim_txt` is treated as trusted bytes. The caller is
-    // responsible for sourcing it from a DNSSEC-validated chain (PR
-    // #3838) or, for unsigned domains, a DoH outcall whose host is
-    // pinned per the design doc §7.6 (PR #3879).
+    // Parse the (already-trusted) DKIM TXT record.
     let dns = match parse_dkim_txt(dkim_txt) {
         Ok(r) => r,
         Err(e) => {
@@ -208,18 +112,7 @@ fn try_verify_signature(
         None,
     ));
 
-    // DNS-record-dependent tag contract: i= AUID aligned with d= per
-    // the record's t=s flag, and the record itself isn't t=y
-    // (testing). Routed through the same umbrella the DNSSEC path's
-    // submit step calls, so the contract stays in lock-step. Note
-    // the ordering shift relative to historical DoH-path code: the
-    // umbrella runs t=y first (a testing-flagged key invalidates a
-    // signature regardless of other tag state, so surfacing
-    // TestingMode first is more informative), then AUID. Pre-refactor
-    // ordering put t=y last among the DNS-record checks; if a
-    // signature triggered both TestingMode and AlgorithmKeyTypeMismatch
-    // the prior code surfaced the latter, this code surfaces
-    // TestingMode.
+    // DNS-record-dependent tag contract (t=y, i= alignment).
     match enforce_dns_record_tag_contract(&sig.i, &sig.d, &dns) {
         Ok(mut trail) => checks.append(&mut trail),
         Err((reason, mut trail)) => {
@@ -228,10 +121,7 @@ fn try_verify_signature(
         }
     }
 
-    // DNS k= must match the signature's algorithm family. Not a tag
-    // policy check (it's a wire-format compatibility check between
-    // the key type and the signing algorithm) so it stays outside
-    // the tag-contract umbrella.
+    // DNS k= must match a= family.
     if !dns.key_type.matches_signature_alg(sig.algorithm) {
         checks.push(check(
             DkimCheckName::PublicKeyTypeMatches,
@@ -249,10 +139,10 @@ fn try_verify_signature(
         None,
     ));
 
-    // Body hash check (bh=) — canonicalise the body, hash, compare.
+    // Body hash.
     let canonical_body = match sig.c_body {
-        super::types::BodyCanon::Relaxed => relaxed_body(&message.body),
-        super::types::BodyCanon::Simple => simple_body(&message.body),
+        BodyCanon::Relaxed => relaxed_body(body),
+        BodyCanon::Simple => simple_body(body),
     };
     let computed_bh = body_hash_sha256(&canonical_body, sig.l);
     if computed_bh.as_slice() != sig.bh.as_slice() {
@@ -269,12 +159,9 @@ fn try_verify_signature(
         None,
     ));
 
-    // Build the signed-data: relaxed-canonicalise each listed header
-    // from `h=`, then append the DKIM-Signature header itself with its
-    // `b=` value blanked, *without* a trailing CRLF (RFC 6376 §3.7).
-    let signed_data = build_header_hash_input(&message.headers, &sig, &dkim_header.value);
-
-    // Cryptographic signature check.
+    // Build the canonical signed-headers input, then verify the
+    // cryptographic signature.
+    let signed_data = build_header_hash_input(headers, sig, dkim_header_value);
     let outcome = verify_signature(
         sig.algorithm,
         dns.key_type,
@@ -289,7 +176,7 @@ fn try_verify_signature(
                 DkimCheckStatus::Pass,
                 None,
             ));
-            Ok((sig.d.clone(), checks))
+            Ok(checks)
         }
         VerifyOutcome::BadSignature => {
             checks.push(check(
@@ -494,9 +381,11 @@ pub(crate) fn simple_body(body: &[u8]) -> Vec<u8> {
 mod tests {
     use super::*;
 
-    // Tests for `auid_aligns` live alongside the helper itself in
-    // [`super::super::tag_checks::tests`], since it's now shared with
-    // the DNSSEC verification path.
+    // ---------------------------------------------------------------
+    // `blank_b_tag_value` — unit tests for the RFC 6376 §3.7 step-2
+    // primitive. Coverage moved here from the old `verify` entry
+    // point's test module; the behaviour they assert is the same.
+    // ---------------------------------------------------------------
 
     #[test]
     fn blank_b_tag_strips_simple_value() {
@@ -557,234 +446,161 @@ mod tests {
         assert_eq!(blanked, "v=1; b =; bh=ZGVm");
     }
 
-    #[test]
-    fn no_signature_returns_no_signature() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
+    // ---------------------------------------------------------------
+    // End-to-end behaviour tests — what used to live alongside the
+    // deleted `verify` entry point, now driven through the typestate.
+    // Each test builds an RFC 5322-compliant `SmtpRequest`, runs it
+    // through stage 1 (well-formedness) → stage 2 (parse signatures)
+    // → stage 3 (cryptographic + DMARC check), and asserts on the
+    // `VerificationError.last_reason`. The new shape catches a wider
+    // class of malformed inputs (wire-shape problems surface earlier
+    // as SMTP 555 via stage 1) but the DKIM-specific reasons asserted
+    // here flow through stage 3 unchanged.
+    // ---------------------------------------------------------------
 
-        let req = SmtpRequest {
+    use super::super::types::VerificationFailReason;
+    use crate::email_recovery::typestate::{
+        SignedSmtpRequest, UnverifiedSmtpRequest, VerificationContext, VerificationError,
+        VerifiedSmtpRequest,
+    };
+    use internet_identity_interface::internet_identity::types::smtp::{
+        SmtpAddress, SmtpEnvelope, SmtpMessage, SmtpRequest,
+    };
+    use serde_bytes::ByteBuf;
+
+    fn addr(user: &str, domain: &str) -> SmtpAddress {
+        SmtpAddress {
+            user: user.into(),
+            domain: domain.into(),
+        }
+    }
+
+    fn header(name: &str, value: &str) -> SmtpHeader {
+        SmtpHeader {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
+    /// Build an RFC 5322-compliant `SmtpRequest` (From, Date, Subject
+    /// each exactly once, one DKIM-Signature) for the per-test
+    /// fixture. `dkim_value` is the tag content placed in the
+    /// DKIM-Signature header — caller chooses what to put there.
+    fn request_with_dkim_signature(dkim_value: &str) -> SmtpRequest {
+        SmtpRequest {
             envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
+                from: addr("alice", "example.com"),
+                to: vec![addr("recover", "id.ai")],
             }),
             message: Some(SmtpMessage {
-                headers: vec![SmtpHeader {
-                    name: "From".into(),
-                    value: "alice@example.com".into(),
-                }],
+                headers: vec![
+                    header("From", "alice@example.com"),
+                    header("Date", "Mon, 1 Jan 2024 00:00:00 +0000"),
+                    header("Subject", "II-Recovery-deadbeefcafe1234"),
+                    header("DKIM-Signature", dkim_value),
+                ],
+                body: ByteBuf::from(b"hi".to_vec()),
+            }),
+            gateway_flags: None,
+            message_id: None,
+        }
+    }
+
+    fn run_typestate(
+        req: SmtpRequest,
+        dkim_txt: &str,
+        now_secs: u64,
+    ) -> Result<VerifiedSmtpRequest, VerificationError> {
+        let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must pass");
+        let signed: SignedSmtpRequest = unverified
+            .try_into()
+            .expect("stage 2 must yield a projection");
+        let ctx = VerificationContext {
+            dkim_txt,
+            dmarc_txt: None,
+            now_secs,
+        };
+        VerifiedSmtpRequest::try_from((signed, &ctx))
+    }
+
+    #[test]
+    fn no_signature_surfaces_at_stage2() {
+        // DKIM-Signature isn't RFC 5322 §3.6, so stage 1 doesn't
+        // enforce it. The rejection surfaces at stage 2, which walks
+        // `other_headers` for `DKIM-Signature` entries and errors out
+        // if none are present.
+        use crate::email_recovery::typestate::DkimScopeError;
+        let req = SmtpRequest {
+            envelope: Some(SmtpEnvelope {
+                from: addr("alice", "example.com"),
+                to: vec![addr("recover", "id.ai")],
+            }),
+            message: Some(SmtpMessage {
+                headers: vec![
+                    header("From", "alice@example.com"),
+                    header("Date", "Mon, 1 Jan 2024 00:00:00 +0000"),
+                    header("Subject", "II-Recovery-deadbeefcafe1234"),
+                ],
                 body: ByteBuf::from(b"hi".to_vec()),
             }),
             gateway_flags: None,
             message_id: None,
         };
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        match result {
-            DkimVerifyResult::Unverified { reason, .. } => {
-                assert_eq!(reason, VerificationFailReason::NoSignature);
-            }
-            other => panic!("expected Unverified(NoSignature), got {:?}", other),
-        }
+        let unverified = UnverifiedSmtpRequest::try_from(req).expect("stage 1 must accept");
+        let err = SignedSmtpRequest::try_from(unverified).expect_err("stage 2 must reject");
+        assert!(matches!(err, DkimScopeError::NoSignature));
     }
 
     #[test]
     fn rejects_simple_header_canon() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-
         // Synthesise a DKIM-Signature header that uses c=simple/simple.
-        // The body hash and signature won't be valid, but parsing will
+        // The body hash and signature won't be valid, but stage 3 will
         // get to the canonicalisation check first.
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
-                          c=simple/simple; h=From; bh=MTIzNDU2; b=YWJj";
-        let req = SmtpRequest {
-            envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
-            }),
-            message: Some(SmtpMessage {
-                headers: vec![
-                    SmtpHeader {
-                        name: "From".into(),
-                        value: "alice@example.com".into(),
-                    },
-                    SmtpHeader {
-                        name: "DKIM-Signature".into(),
-                        value: dkim_value.into(),
-                    },
-                ],
-                body: ByteBuf::from(b"hi".to_vec()),
-            }),
-            gateway_flags: None,
-            message_id: None,
-        };
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        match result {
-            DkimVerifyResult::Unverified { reason, .. } => {
-                assert_eq!(reason, VerificationFailReason::UnsupportedCanonicalization);
-            }
-            other => panic!(
-                "expected Unverified(UnsupportedCanonicalization), got {:?}",
-                other
-            ),
-        }
+                          c=simple/simple; h=From:Subject:Date; bh=MTIzNDU2; b=YWJj";
+        let req = request_with_dkim_signature(dkim_value);
+        let err = run_typestate(req, "v=DKIM1; p=YWJj", 1_700_000_000).unwrap_err();
+        assert_eq!(
+            err.last_reason,
+            VerificationFailReason::UnsupportedCanonicalization,
+        );
     }
 
     #[test]
     fn rejects_expired_signature() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
-                          c=relaxed/relaxed; h=From; bh=MTIzNDU2; b=YWJj; \
+                          c=relaxed/relaxed; h=From:Subject:Date; bh=MTIzNDU2; b=YWJj; \
                           x=1000";
-        let req = SmtpRequest {
-            envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
-            }),
-            message: Some(SmtpMessage {
-                headers: vec![
-                    SmtpHeader {
-                        name: "From".into(),
-                        value: "alice@example.com".into(),
-                    },
-                    SmtpHeader {
-                        name: "DKIM-Signature".into(),
-                        value: dkim_value.into(),
-                    },
-                ],
-                body: ByteBuf::from(b"hi".to_vec()),
-            }),
-            gateway_flags: None,
-            message_id: None,
-        };
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        match result {
-            DkimVerifyResult::Unverified { reason, .. } => {
-                assert_eq!(reason, VerificationFailReason::SignatureExpired);
-            }
-            other => panic!("expected Unverified(SignatureExpired), got {:?}", other),
-        }
+        let req = request_with_dkim_signature(dkim_value);
+        let err = run_typestate(req, "v=DKIM1; p=YWJj", 1_700_000_000).unwrap_err();
+        assert_eq!(err.last_reason, VerificationFailReason::SignatureExpired);
     }
 
     #[test]
     fn rejects_misaligned_auid() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-
         // i= claims a different domain than d=
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
-                          c=relaxed/relaxed; h=From:Subject; \
+                          c=relaxed/relaxed; h=From:Subject:Date; \
                           i=alice@evil.com; bh=MTIzNDU2; b=YWJj";
-        let req = SmtpRequest {
-            envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
-            }),
-            message: Some(SmtpMessage {
-                headers: vec![
-                    SmtpHeader {
-                        name: "From".into(),
-                        value: "alice@example.com".into(),
-                    },
-                    SmtpHeader {
-                        name: "DKIM-Signature".into(),
-                        value: dkim_value.into(),
-                    },
-                ],
-                body: ByteBuf::from(b"hi".to_vec()),
-            }),
-            gateway_flags: None,
-            message_id: None,
-        };
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        match result {
-            DkimVerifyResult::Unverified { reason, .. } => {
-                assert_eq!(reason, VerificationFailReason::AuidMisaligned);
-            }
-            other => panic!("expected Unverified(AuidMisaligned), got {:?}", other),
-        }
+        let req = request_with_dkim_signature(dkim_value);
+        let err = run_typestate(req, "v=DKIM1; p=YWJj", 1_700_000_000).unwrap_err();
+        assert_eq!(err.last_reason, VerificationFailReason::AuidMisaligned);
     }
 
     #[test]
     fn rejects_future_dated_signature() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-
         // t= claims a signing time well past now + CLOCK_SKEW_SECS.
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
-                          c=relaxed/relaxed; h=From:Subject; \
+                          c=relaxed/relaxed; h=From:Subject:Date; \
                           t=1700001000; bh=MTIzNDU2; b=YWJj";
-        let req = SmtpRequest {
-            envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
-            }),
-            message: Some(SmtpMessage {
-                headers: vec![
-                    SmtpHeader {
-                        name: "From".into(),
-                        value: "alice@example.com".into(),
-                    },
-                    SmtpHeader {
-                        name: "DKIM-Signature".into(),
-                        value: dkim_value.into(),
-                    },
-                ],
-                body: ByteBuf::from(b"hi".to_vec()),
-            }),
-            gateway_flags: None,
-            message_id: None,
-        };
-        // now = 1_700_000_000, t = 1_700_001_000 → 1000 s in the future,
-        // well beyond CLOCK_SKEW_SECS (60).
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        match result {
-            DkimVerifyResult::Unverified { reason, .. } => {
-                assert_eq!(reason, VerificationFailReason::SignatureFutureDated);
-            }
-            other => panic!("expected Unverified(SignatureFutureDated), got {:?}", other),
-        }
+        let req = request_with_dkim_signature(dkim_value);
+        // now = 1_700_000_000, t = 1_700_001_000 → 1000 s in the
+        // future, well beyond CLOCK_SKEW_SECS (60).
+        let err = run_typestate(req, "v=DKIM1; p=YWJj", 1_700_000_000).unwrap_err();
+        assert_eq!(
+            err.last_reason,
+            VerificationFailReason::SignatureFutureDated
+        );
     }
 
     #[test]
@@ -792,111 +608,39 @@ mod tests {
         // A `t=` value inside the CLOCK_SKEW_SECS window must NOT be
         // rejected as future-dated — that would create a spurious
         // failure mode for senders whose clock runs a few seconds
-        // ahead of the canister's. We test that the t= check passes;
-        // a later check (body-hash mismatch) trips the verdict.
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-
+        // ahead of the canister's. We assert the t= check passes by
+        // checking that the recorded `SignatureNotFromFuture` check
+        // status is `Pass` on whichever verdict we get (a later check
+        // — body-hash mismatch — trips the overall verdict).
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
-                          c=relaxed/relaxed; h=From:Subject; \
+                          c=relaxed/relaxed; h=From:Subject:Date; \
                           t=1700000030; bh=MTIzNDU2; b=YWJj";
-        let req = SmtpRequest {
-            envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
-            }),
-            message: Some(SmtpMessage {
-                headers: vec![
-                    SmtpHeader {
-                        name: "From".into(),
-                        value: "alice@example.com".into(),
-                    },
-                    SmtpHeader {
-                        name: "DKIM-Signature".into(),
-                        value: dkim_value.into(),
-                    },
-                ],
-                body: ByteBuf::from(b"hi".to_vec()),
-            }),
-            gateway_flags: None,
-            message_id: None,
-        };
+        let req = request_with_dkim_signature(dkim_value);
         // now = 1_700_000_000, t = 1_700_000_030 → 30 s in the future,
-        // inside the 60 s skew window. The t= check must pass; we
-        // assert that directly on the `checks` vec (available on both
-        // outcome variants) rather than via a fall-through `if let`
-        // that would silently skip the assertion if a future refactor
-        // ever made this fixture pass overall.
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        let checks = match &result {
-            DkimVerifyResult::Verified { checks, .. }
-            | DkimVerifyResult::Unverified { checks, .. } => checks,
-        };
-        let future_check = checks
+        // inside the 60 s skew window.
+        let err = run_typestate(req, "v=DKIM1; p=YWJj", 1_700_000_000).unwrap_err();
+        let future_check = err
+            .combined_checks
             .iter()
-            .find(|c| c.name == DkimCheckName::SignatureNotFromFuture)
+            .find(|c| c.name == super::super::types::DkimCheckName::SignatureNotFromFuture)
             .expect("SignatureNotFromFuture check must be emitted");
         assert_eq!(
             future_check.status,
-            DkimCheckStatus::Pass,
+            super::super::types::DkimCheckStatus::Pass,
             "t=now+30s with 60s skew must pass the future-dated check; got {future_check:?}"
         );
     }
 
     #[test]
     fn rejects_signature_without_subject_in_h() {
-        use internet_identity_interface::internet_identity::types::smtp::{
-            SmtpAddress, SmtpEnvelope, SmtpMessage,
-        };
-        use serde_bytes::ByteBuf;
-
-        // h= covers From but not Subject. The challenge nonce lives in
-        // Subject, so a signature that doesn't cover it would let a
-        // MITM rewrite the nonce on a legitimately-signed email
+        // h= covers From but not Subject. The challenge nonce lives
+        // in Subject, so a signature that doesn't cover it would let
+        // a MITM rewrite the nonce on a legitimately-signed email
         // (design §5.4).
         let dkim_value = "v=1; a=rsa-sha256; d=example.com; s=mail; \
                           c=relaxed/relaxed; h=From; bh=MTIzNDU2; b=YWJj";
-        let req = SmtpRequest {
-            envelope: Some(SmtpEnvelope {
-                from: SmtpAddress {
-                    user: "alice".into(),
-                    domain: "example.com".into(),
-                },
-                to: vec![SmtpAddress {
-                    user: "recover".into(),
-                    domain: "id.ai".into(),
-                }],
-            }),
-            message: Some(SmtpMessage {
-                headers: vec![
-                    SmtpHeader {
-                        name: "From".into(),
-                        value: "alice@example.com".into(),
-                    },
-                    SmtpHeader {
-                        name: "DKIM-Signature".into(),
-                        value: dkim_value.into(),
-                    },
-                ],
-                body: ByteBuf::from(b"hi".to_vec()),
-            }),
-            gateway_flags: None,
-            message_id: None,
-        };
-        let result = verify(&req, "v=DKIM1; p=YWJj", 1_700_000_000);
-        match result {
-            DkimVerifyResult::Unverified { reason, .. } => {
-                assert_eq!(reason, VerificationFailReason::SubjectNotSigned);
-            }
-            other => panic!("expected Unverified(SubjectNotSigned), got {:?}", other),
-        }
+        let req = request_with_dkim_signature(dkim_value);
+        let err = run_typestate(req, "v=DKIM1; p=YWJj", 1_700_000_000).unwrap_err();
+        assert_eq!(err.last_reason, VerificationFailReason::SubjectNotSigned);
     }
 }
