@@ -109,7 +109,7 @@
         </span>
       </div>
       <p class="text-text-tertiary text-sm">
-        <Trans>Only verified emails can be used to reach you.</Trans>
+        <Trans>Only verified emails can be shared.</Trans>
       </p>
     </div>
     {#if count > 0}

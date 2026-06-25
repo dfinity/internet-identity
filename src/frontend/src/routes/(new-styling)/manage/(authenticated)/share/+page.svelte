@@ -19,8 +19,8 @@
   <h1 class="text-text-primary text-3xl font-medium">{$t`Shareable info`}</h1>
   <p class="text-text-tertiary text-base">
     <Trans>
-      Info you can choose to share when an app requests it. Without your
-      consent, your info is always kept secret.
+      Info you can choose to share when an app requests it. Never shared without
+      your consent.
     </Trans>
   </p>
 </header>
