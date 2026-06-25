@@ -1,11 +1,14 @@
 /**
  * Helpers for the MCP server URL a user trusts: parsing/normalizing it and a
- * best-effort reachability probe. Shared by the Settings allowlist UI (where
- * the user enters the URL) and the `/mcp` connect flow (which reads the origin
- * from the request's callback).
+ * best-effort probe that it actually speaks MCP. Shared by the Settings UI
+ * (where the user enters the URL) and the `/mcp` connect flow (which matches the
+ * request's callback origin against the trusted server).
  */
 
 export interface McpServer {
+  /** The full normalized endpoint URL the user entered (kept so we can probe a
+   *  path-based endpoint like `https://host/mcp`, not just the origin root). */
+  url: string;
   /** Normalized origin: scheme + host[:port], no path. Used for trust matching
    *  and as the `form-action` target. */
   origin: string;
@@ -14,9 +17,9 @@ export interface McpServer {
 }
 
 /**
- * Parses an MCP server URL into its normalized origin, or `undefined` when it
- * isn't an acceptable target. Accepts any https origin, or http on the
- * 127.0.0.1 loopback (a server the user runs themselves) — mirroring the `/mcp`
+ * Parses an MCP server URL into its normalized parts, or `undefined` when it
+ * isn't an acceptable target. Accepts any https URL, or http on the 127.0.0.1
+ * loopback (a server the user runs themselves) — mirroring the `/mcp`
  * `form-action` CSP. `localhost` is excluded: it can resolve off-loopback, and
  * CSP's host-source grammar can't pin it to the loopback.
  */
@@ -33,24 +36,88 @@ export const parseMcpServerUrl = (raw: string): McpServer | undefined => {
   if (!isHttps && !isHttpLoopback) {
     return undefined;
   }
-  return { origin: url.origin, host: url.host };
+  return { url: url.href, origin: url.origin, host: url.host };
 };
 
+/** MCP protocol revision we advertise in the probe's `initialize` request. */
+const MCP_PROTOCOL_VERSION = "2025-06-18";
+const PROBE_TIMEOUT_MS = 5_000;
+
 /**
- * Best-effort reachability probe. A `no-cors` fetch can't read the response
- * (opaque), but resolving without throwing means the origin resolved and
- * answered at the network level. Returns `false` on any network error. This is
- * advisory only — callers surface a soft warning, never a hard block, so a
- * server that blocks cross-origin probes (or a momentary blip) doesn't prevent
- * the user from adding a server they know is correct.
+ * Probes whether `url` actually speaks MCP — not merely that "something loads".
+ *
+ * Sends the MCP `initialize` JSON-RPC request over the Streamable HTTP
+ * transport and resolves `true` only when the endpoint answers with a JSON-RPC
+ * `initialize` *result* (carrying `protocolVersion` / `serverInfo` /
+ * `capabilities`), read from either a JSON body or the first Server-Sent-Events
+ * `data:` frame. Resolves `false` on a network error, a timeout, a response we
+ * can't read (CORS), or any non-MCP answer.
+ *
+ * Inherently best-effort: a server that doesn't allow our origin via CORS can't
+ * be verified from the browser, so callers treat `false` as "couldn't verify"
+ * (surface a warning + offer a re-check), never as a hard block.
  */
-export const checkMcpServerReachable = async (
-  url: string,
-): Promise<boolean> => {
+export const probeMcpServer = async (url: string): Promise<boolean> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    await fetch(url, { method: "GET", mode: "no-cors", redirect: "follow" });
-    return true;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: "internet-identity", version: "1" },
+        },
+      }),
+      signal: controller.signal,
+    });
+    return isInitializeResult(await response.text());
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
+};
+
+/** Lines of an SSE body that carry a payload (`data: <json>`). */
+const sseDataFrames = (body: string): string[] =>
+  body
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice("data:".length).trim());
+
+/**
+ * Whether `body` contains a JSON-RPC `initialize` result. Tolerates both a
+ * plain JSON response and an SSE stream (the two Streamable-HTTP shapes).
+ */
+const isInitializeResult = (body: string): boolean => {
+  const candidates = [body.trim(), ...sseDataFrames(body)];
+  return candidates.some((candidate) => {
+    let message: unknown;
+    try {
+      message = JSON.parse(candidate);
+    } catch {
+      return false;
+    }
+    if (typeof message !== "object" || message === null) {
+      return false;
+    }
+    const { jsonrpc, result } = message as Record<string, unknown>;
+    return (
+      jsonrpc === "2.0" &&
+      typeof result === "object" &&
+      result !== null &&
+      ("protocolVersion" in result ||
+        "serverInfo" in result ||
+        "capabilities" in result)
+    );
+  });
 };

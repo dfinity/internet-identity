@@ -3,72 +3,71 @@ import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { writableStored } from "./writable.store";
 
 /**
- * Per-identity allowlist of MCP server origins the user trusts on this device.
+ * The single MCP server URL a user trusts on this device, per identity.
  *
- * Each user declares which MCP server they trust (e.g. one they run themselves)
- * rather than every user trusting a single operator-configured server. The
- * `/mcp` connect flow delivers a standing delegation to the server only when the
- * request's callback origin is on the trusted list for the chosen identity;
- * otherwise it points the user at Settings to add it. Stored origins are
- * normalized (scheme + host[:port], no path) so they compare directly against a
- * callback's origin.
+ * Each user declares the one MCP server they trust (e.g. one they run
+ * themselves) rather than every user trusting a single operator-configured
+ * server. The `/mcp` connect flow delivers a standing delegation only when the
+ * request's callback origin matches the trusted server's origin for the chosen
+ * identity; otherwise it points the user at Settings to set it. The full URL is
+ * stored (so the Settings UI can probe a path-based endpoint like
+ * `https://host/mcp`), while trust matching is by origin.
  *
- * Browser-local and same-origin protected: only the user can add entries (via
+ * Browser-local and same-origin protected: only the user can set it (via
  * Settings), never a page that initiated the connect request. The authoritative
  * trust is still the backend binding `mcp_set_access` creates at connect time;
- * this list is the user-controlled pre-gate in front of it.
+ * this is the user-controlled pre-gate in front of it.
  */
-type McpTrustedServersState = {
-  [identityNumber: string]: string[];
+type McpTrustedServerState = {
+  [identityNumber: string]: string;
 };
 
-type McpTrustedServersStore = Readable<McpTrustedServersState> & {
+type McpTrustedServerStore = Readable<McpTrustedServerState> & {
+  /** Whether the identity's trusted server has the given origin. */
   isTrusted: (identityNumber: bigint, origin: string) => boolean;
-  /** Adds a normalized origin; idempotent. */
-  add: (identityNumber: bigint, origin: string) => void;
-  remove: (identityNumber: bigint, origin: string) => void;
+  /** Set (replacing any previous) the trusted server URL for an identity. */
+  set: (identityNumber: bigint, url: string) => void;
+  /** Forget the trusted server for an identity. */
+  clear: (identityNumber: bigint) => void;
 };
 
-const originsFor = (
-  state: McpTrustedServersState,
-  identityNumber: bigint,
-): string[] => state[identityNumber.toString()] ?? [];
+const originOf = (url: string): string | undefined => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+};
 
-export const initMcpTrustedServersStore = (): McpTrustedServersStore => {
-  const store = writableStored<McpTrustedServersState>({
+export const initMcpTrustedServerStore = (): McpTrustedServerStore => {
+  // version 2: the value shape changed from a list of origins (`string[]`) to a
+  // single URL (`string`); the bump discards any incompatible persisted value.
+  const store = writableStored<McpTrustedServerState>({
     key: storeLocalStorageKey.McpTrustedServers,
     defaultValue: {},
-    version: 1,
+    version: 2,
   });
 
   return {
     subscribe: store.subscribe,
-    isTrusted: (identityNumber, origin) =>
-      originsFor(get(store), identityNumber).includes(origin),
-    add: (identityNumber, origin) => {
-      store.update((state) => {
-        const key = identityNumber.toString();
-        const current = state[key] ?? [];
-        if (current.includes(origin)) {
-          return state;
-        }
-        return { ...state, [key]: [...current, origin] };
-      });
+    isTrusted: (identityNumber, origin) => {
+      const trusted = get(store)[identityNumber.toString()];
+      return trusted !== undefined && originOf(trusted) === origin;
     },
-    remove: (identityNumber, origin) => {
+    set: (identityNumber, url) => {
+      store.update((state) => ({
+        ...state,
+        [identityNumber.toString()]: url,
+      }));
+    },
+    clear: (identityNumber) => {
       store.update((state) => {
-        const key = identityNumber.toString();
-        const next = (state[key] ?? []).filter((o) => o !== origin);
-        const updated = { ...state };
-        if (next.length === 0) {
-          delete updated[key];
-        } else {
-          updated[key] = next;
-        }
-        return updated;
+        const next = { ...state };
+        delete next[identityNumber.toString()];
+        return next;
       });
     },
   };
 };
 
-export const mcpTrustedServersStore = initMcpTrustedServersStore();
+export const mcpTrustedServersStore = initMcpTrustedServerStore();

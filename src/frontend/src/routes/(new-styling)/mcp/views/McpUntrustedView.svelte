@@ -16,9 +16,9 @@
 </script>
 
 <!--
-  Shown when the request's callback origin is not on the chosen identity's
-  trusted-server list. Each user decides which MCP servers they trust, so we
-  point them at Settings to add this one rather than silently connecting it.
+  Shown when the request's callback origin doesn't match the chosen identity's
+  trusted MCP server. Each user sets the one MCP server they trust, so we point
+  them at Settings to set this one rather than silently connecting it.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
@@ -36,8 +36,8 @@
     </div>
     <p class="text-text-tertiary mt-4 text-base text-pretty">
       <Trans>
-        For security, Internet Identity only connects MCP servers you've added
-        to your trusted list. Add this server in Settings, then try again.
+        For security, Internet Identity only connects the MCP server you've set
+        as trusted. Set this server in Settings, then try again.
       </Trans>
     </p>
 
@@ -48,7 +48,7 @@
       class="btn btn-secondary btn-xl mt-8 w-full"
     >
       <ExternalLinkIcon class="size-5" />
-      <span>{$t`Manage trusted servers`}</span>
+      <span>{$t`Manage trusted server`}</span>
     </a>
   </AuthPanel>
 </div>

@@ -44,10 +44,10 @@
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
 
-  // The chosen identity must have added this server to its trusted list (via
-  // Settings) before we connect it. The actual authority is the backend binding
-  // `mcp_set_access` creates on connect; this device-local allowlist is the
-  // user-controlled pre-gate that decides which servers reach that step.
+  // The chosen identity must have set this server as its trusted MCP server
+  // (via Settings) before we connect it. The actual authority is the backend
+  // binding `mcp_set_access` creates on connect; this device-local trust is the
+  // user-controlled pre-gate that decides which server reaches that step.
   const isServerTrusted = (identityNumber: bigint): boolean =>
     mcpServer !== undefined &&
     mcpTrustedServersStore.isTrusted(identityNumber, mcpServer.origin);

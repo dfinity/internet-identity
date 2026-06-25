@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { PlusIcon, Trash2Icon } from "@lucide/svelte";
+  import { onMount } from "svelte";
+  import { PlusIcon, Trash2Icon, RotateCwIcon } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
@@ -7,10 +8,7 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { mcpTrustedServersStore } from "$lib/stores/mcp-trusted-servers.store";
-  import {
-    parseMcpServerUrl,
-    checkMcpServerReachable,
-  } from "$lib/utils/mcpServer";
+  import { parseMcpServerUrl, probeMcpServer } from "$lib/utils/mcpServer";
 
   interface Props {
     identityNumber: bigint;
@@ -19,39 +17,54 @@
   const { identityNumber }: Props = $props();
   const titleId = $props.id();
 
-  // Reactive: the connect flow and this list share `mcpTrustedServersStore`.
-  const servers = $derived(
-    $mcpTrustedServersStore[identityNumber.toString()] ?? [],
-  );
+  // The single trusted MCP server URL for this identity (shared reactively with
+  // the connect flow), or undefined when none is set yet.
+  const trusted = $derived($mcpTrustedServersStore[identityNumber.toString()]);
 
   let urlInput = $state("");
   let error = $state<string | undefined>();
-  let warning = $state<string | undefined>();
+  // Live MCP-handshake status of the trusted server: undefined while unknown /
+  // in flight, true when it answered as MCP, false when it couldn't be verified.
+  let verified = $state<boolean | undefined>(undefined);
   let checking = $state(false);
+
+  // Probe the trusted server with a real MCP `initialize` handshake. Best-effort
+  // and advisory: a server we can't reach/read (e.g. CORS) shows as unverified
+  // but stays active. Guard against a stale result if the entry changed while
+  // the probe was in flight.
+  const verify = async () => {
+    const url = $mcpTrustedServersStore[identityNumber.toString()];
+    if (url === undefined) {
+      return;
+    }
+    checking = true;
+    const ok = await probeMcpServer(url);
+    if ($mcpTrustedServersStore[identityNumber.toString()] === url) {
+      verified = ok;
+    }
+    checking = false;
+  };
+
+  // Verify a server that was already set when the page opens.
+  onMount(() => {
+    if (trusted !== undefined) {
+      void verify();
+    }
+  });
 
   const handleAdd = async () => {
     error = undefined;
-    warning = undefined;
     const parsed = parseMcpServerUrl(urlInput);
     if (parsed === undefined) {
       error = $t`Enter a valid https URL (or http://127.0.0.1 for a server you run yourself).`;
       return;
     }
-    if (mcpTrustedServersStore.isTrusted(identityNumber, parsed.origin)) {
-      error = $t`That server is already on your trusted list.`;
-      return;
-    }
-    // Best-effort reachability: a no-cors probe can't read the response, so a
-    // failure is only advisory — we still add the server (the user may know it
-    // is correct or temporarily offline) but warn them to double-check.
-    checking = true;
-    const reachable = await checkMcpServerReachable(urlInput);
-    checking = false;
-    mcpTrustedServersStore.add(identityNumber, parsed.origin);
-    if (!reachable) {
-      warning = $t`Added ${parsed.host}, but it didn't respond. Double-check the URL and that the server is running.`;
-    }
+    // Activate immediately (like before): verification is advisory, so the
+    // server is trusted even if the probe can't confirm it speaks MCP.
+    mcpTrustedServersStore.set(identityNumber, parsed.url);
     urlInput = "";
+    verified = undefined;
+    await verify();
   };
 
   const handleKeydown = (event: KeyboardEvent) => {
@@ -61,8 +74,9 @@
     }
   };
 
-  const handleRemove = (origin: string) => {
-    mcpTrustedServersStore.remove(identityNumber, origin);
+  const handleRemove = () => {
+    mcpTrustedServersStore.clear(identityNumber);
+    verified = undefined;
   };
 </script>
 
@@ -79,67 +93,81 @@
 
     <div class="flex flex-1 flex-col gap-1">
       <h3 id={titleId} class="text-text-primary text-base font-semibold">
-        {$t`Trusted MCP servers`}
+        {$t`Trusted MCP server`}
       </h3>
       <p class="text-text-tertiary text-sm">
         <Trans>
-          Add the MCP servers you trust to sign you in to apps — for example one
-          you run yourself. A trusted server can act as you across apps, so only
-          add servers you control or fully trust.
+          Set the one MCP server you trust to sign you in to apps — for example
+          one you run yourself. A trusted server can act as you across apps, so
+          only set one you control or fully trust.
         </Trans>
       </p>
     </div>
   </div>
 
-  {#if servers.length > 0}
-    <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
-      {#each servers as origin (origin)}
-        <li
-          class="border-border-secondary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-4 py-2.5"
-        >
-          <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
-            <Ellipsis text={origin} position="middle" />
-          </span>
-          <button
-            class="btn btn-tertiary btn-sm btn-icon shrink-0"
-            onclick={() => handleRemove(origin)}
-            aria-label={$t`Remove ${origin}`}
-          >
-            <Trash2Icon class="size-5" />
-          </button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  <div class="flex flex-row items-start gap-2">
-    <Input
-      bind:value={urlInput}
-      onkeydown={handleKeydown}
-      class="flex-1"
-      placeholder="https://mcp.example.com/mcp"
-      aria-label={$t`MCP server URL`}
-      {error}
-      disabled={checking}
-      autocomplete="off"
-      autocapitalize="off"
-      spellcheck={false}
-    />
-    <button
-      class="btn btn-secondary h-11 shrink-0"
-      onclick={handleAdd}
-      disabled={checking || urlInput.trim() === ""}
+  {#if trusted !== undefined}
+    <div
+      class={[
+        "bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-4 py-2.5",
+        verified === false ? "border-border-error" : "border-border-secondary",
+      ]}
     >
-      {#if checking}
-        <ProgressRing class="size-5" />
-      {:else}
-        <PlusIcon class="size-5" />
-      {/if}
-      <span>{$t`Add`}</span>
-    </button>
-  </div>
+      <span
+        class={[
+          "min-w-0 flex-1 text-sm font-medium",
+          verified === false ? "text-text-error" : "text-text-primary",
+        ]}
+      >
+        <Ellipsis text={trusted} position="middle" />
+      </span>
+      <button
+        class="btn btn-tertiary btn-sm btn-icon shrink-0"
+        onclick={() => void verify()}
+        disabled={checking}
+        aria-label={$t`Re-check ${trusted}`}
+      >
+        {#if checking}
+          <ProgressRing class="size-5" />
+        {:else}
+          <RotateCwIcon class="size-5" />
+        {/if}
+      </button>
+      <button
+        class="btn btn-tertiary btn-sm btn-icon shrink-0"
+        onclick={handleRemove}
+        aria-label={$t`Remove ${trusted}`}
+      >
+        <Trash2Icon class="size-5" />
+      </button>
+    </div>
 
-  {#if warning !== undefined}
-    <p class="text-text-warning_primary text-sm">{warning}</p>
+    {#if verified === false && !checking}
+      <p class="text-text-error text-sm">
+        {$t`Couldn't verify an MCP server at this URL. It stays active — check the URL and that the server is running, then re-check.`}
+      </p>
+    {/if}
+  {:else}
+    <div class="flex flex-row items-start gap-2">
+      <Input
+        bind:value={urlInput}
+        onkeydown={handleKeydown}
+        class="flex-1"
+        placeholder="https://mcp.example.com/mcp"
+        aria-label={$t`MCP server URL`}
+        {error}
+        disabled={checking}
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck={false}
+      />
+      <button
+        class="btn btn-secondary h-11 shrink-0"
+        onclick={handleAdd}
+        disabled={urlInput.trim() === ""}
+      >
+        <PlusIcon class="size-5" />
+        <span>{$t`Add`}</span>
+      </button>
+    </div>
   {/if}
 </section>

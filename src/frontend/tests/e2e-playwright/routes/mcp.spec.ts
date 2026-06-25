@@ -86,7 +86,7 @@ test("Signing up to an untrusted server prompts to add it in settings", async ({
     page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Manage trusted servers" }),
+    page.getByRole("link", { name: "Manage trusted server" }),
   ).toBeVisible();
 });
 
@@ -110,14 +110,37 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   page,
   mcp,
 }) => {
-  // End-to-end: add the server via the Settings allowlist UI (not the seeding
-  // helper), then connecting to it reaches the connect screen.
+  // End-to-end: add the server via the Settings UI (not the seeding helper),
+  // then connecting to it reaches the connect screen.
   await addVirtualAuthenticator(page);
-  // The best-effort reachability probe fetches the URL; fulfill it so the add
-  // is fast and deterministic instead of waiting on a real network failure.
-  await page.route(`${mcp.mcpOrigin}/**`, (route) =>
-    route.fulfill({ status: 200, body: "ok" }),
-  );
+  // The Settings UI verifies the server with a real MCP `initialize` handshake
+  // (a cross-origin POST). Answer the CORS preflight and reply with a JSON-RPC
+  // initialize result + CORS headers so the browser lets the probe read it.
+  // (Activation is independent of the probe outcome, so the assertions below
+  // hold whether or not the browser surfaces it as verified.)
+  const cors = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+  };
+  await page.route(`${mcp.mcpOrigin}/**`, (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    return route.fulfill({
+      status: 200,
+      headers: { ...cors, "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          serverInfo: { name: "test-mcp", version: "1" },
+        },
+      }),
+    });
+  });
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
@@ -134,11 +157,10 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await page.getByRole("button", { name: "Add" }).click();
-  // The list shows the normalized origin (path dropped); its remove button's
-  // aria-label carries the full origin, so it's a unique, truncation-proof
-  // assertion that the server was added.
+  // The trusted server is shown with a remove button whose aria-label carries
+  // the full URL — a unique assertion that it was added.
   await expect(
-    page.getByRole("button", { name: `Remove ${mcp.mcpOrigin}` }),
+    page.getByRole("button", { name: `Remove ${mcp.mcpOrigin}/mcp` }),
   ).toBeVisible();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
