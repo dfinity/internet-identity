@@ -135,22 +135,10 @@ class VerifiedEmailFixtures {
     const row = panel.locator("li").filter({
       has: this.#page.getByText(address, { exact: true }),
     });
-    // `force: true` — on the Pixel 5 mobile shard, Playwright's
-    // actionability check intermittently reports an ancestor of the
-    // target as the topmost element at the button's center via
-    // `elementFromPoint`, even though the button is reported
-    // visible/enabled/stable and renders clearly where expected. A real
-    // touch on the device dispatches by bounding-box hit-test and would
-    // land on the button. Applied to both clicks — the trash on the
-    // panel row and the confirm-Remove inside the bottom-sheet dialog.
-    await row
-      .getByRole("button", { name: `Remove ${address}` })
-      .click({ force: true });
+    await row.getByRole("button", { name: `Remove ${address}` }).click();
     const confirm = this.#page.getByRole("dialog");
     await expect(confirm).toBeVisible();
-    await confirm
-      .getByRole("button", { name: "Remove", exact: true })
-      .click({ force: true });
+    await confirm.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(confirm).toBeHidden();
   }
 
