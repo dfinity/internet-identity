@@ -33,13 +33,12 @@
   const status = $derived(data.status);
 
   // The MCP server the user is connecting is identified by the origin of the
-  // request's callback: each user trusts whichever server they connect (a public
-  // https server, or one they run locally on http://127.0.0.1). The standing
-  // delegation is delivered there via a top-level form-POST, so we only accept
-  // callbacks the /mcp `form-action` CSP allows — any https origin, or http
-  // loopback on 127.0.0.1 (not `localhost`, which can resolve off-loopback).
-  // A disallowed (or unparsable) callback yields `undefined` → the invalid
-  // screen, rather than a silent CSP block at submit time.
+  // request's callback: each user trusts whichever (remote) server they connect.
+  // The standing delegation is delivered there via a top-level form-POST, so we
+  // only accept callbacks the /mcp `form-action` CSP allows — MCP is remote-only,
+  // so any https origin (a plain-http or loopback callback is rejected). A
+  // disallowed (or unparsable) callback yields `undefined` → the invalid screen,
+  // rather than a silent CSP block at submit time.
   const mcpServer = $derived(
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );

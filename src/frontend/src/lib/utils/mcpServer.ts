@@ -18,10 +18,8 @@ export interface McpServer {
 
 /**
  * Parses an MCP server URL into its normalized parts, or `undefined` when it
- * isn't an acceptable target. Accepts any https URL, or http on the 127.0.0.1
- * loopback (a server the user runs themselves) — mirroring the `/mcp`
- * `form-action` CSP. `localhost` is excluded: it can resolve off-loopback, and
- * CSP's host-source grammar can't pin it to the loopback.
+ * isn't an acceptable target. MCP connections are to remote servers only, so
+ * the URL must be https (a plain-http or loopback URL is rejected).
  */
 export const parseMcpServerUrl = (raw: string): McpServer | undefined => {
   let url: URL;
@@ -30,10 +28,7 @@ export const parseMcpServerUrl = (raw: string): McpServer | undefined => {
   } catch {
     return undefined;
   }
-  const isHttps = url.protocol === "https:";
-  const isHttpLoopback =
-    url.protocol === "http:" && url.hostname === "127.0.0.1";
-  if (!isHttps && !isHttpLoopback) {
+  if (url.protocol !== "https:") {
     return undefined;
   }
   return { url: url.href, origin: url.origin, host: url.host };

@@ -53,14 +53,10 @@ test("Invalid params show the error screen", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("A non-https, non-loopback callback is rejected", async ({
-  page,
-  mcp,
-}) => {
-  // Each user connects whichever MCP server they trust, so any https origin (or
-  // http loopback for a server they run themselves) is accepted. A plain http
-  // origin on a remote host is not — the /mcp `form-action` CSP wouldn't allow
-  // posting the delegation there, so the flow rejects it up front.
+test("A non-https callback is rejected", async ({ page, mcp }) => {
+  // MCP connections are to remote servers only, so callbacks must be https. A
+  // plain-http (or loopback) origin is rejected up front — the /mcp
+  // `form-action` CSP wouldn't allow posting the delegation there anyway.
   await page.goto(
     mcp.buildAuthorizeUrl({
       app: APP,

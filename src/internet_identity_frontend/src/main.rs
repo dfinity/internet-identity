@@ -101,13 +101,12 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
              }| {
                 if content_type == ContentType::HTML {
                     // The /mcp connect flow delivers the standing delegation to
-                    // the user's chosen MCP server via a top-level form-POST, so
-                    // that landing page — and only that page — needs
-                    // `form-action` to allow https origins (and http loopback for
-                    // self-hosted servers). Scoping the relaxation to the /mcp
-                    // asset keeps the SPA-wide policy tight for every other route
-                    // (/authorize, /cli, …), so an HTML injection elsewhere still
-                    // can't form-POST data cross-origin.
+                    // the user's chosen remote (https) MCP server via a top-level
+                    // form-POST, so that landing page — and only that page —
+                    // needs `form-action` to allow https origins. Scoping the
+                    // relaxation to the /mcp asset keeps the SPA-wide policy tight
+                    // for every other route (/authorize, /cli, …), so an HTML
+                    // injection elsewhere still can't form-POST data cross-origin.
                     let csp_override = if is_mcp_landing_path(&path) {
                         Some(get_content_security_policy(
                             integrity_hashes.clone(),
@@ -351,10 +350,11 @@ fn is_mcp_landing_path(path: &str) -> bool {
 ///   form can never post to a remote origin.
 ///   The SPA-wide policy is never broadened to `https:`. The `/mcp` connect
 ///   page is the sole exception: it form-POSTs the standing delegation to the
-///   MCP server the user chose, so that one asset is certified with a relaxed
-///   `form-action 'self' http://127.0.0.1:* https:` (see `is_mcp_landing_path`
-///   and the `relax_form_action_to_https` parameter). Scoping the relaxation to
-///   that page keeps every other route tight against cross-origin form posts.
+///   remote (https) MCP server the user chose, so that one asset is certified
+///   with a relaxed `form-action 'self' https:` (MCP is remote-only, so the
+///   loopback is not carried over; see `is_mcp_landing_path` and the
+///   `relax_form_action_to_https` parameter). Scoping the relaxation to that
+///   page keeps every other route tight against cross-origin form posts.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -417,11 +417,13 @@ fn get_content_security_policy(
 
     // The SPA-wide `form-action` is same-origin + http loopback (the latter for
     // the /cli flow). The /mcp connect page form-POSTs the standing delegation
-    // to the MCP server the user chose, so it — and only it — is certified with
-    // `relax_form_action_to_https = true`, which also allows https origins (see
-    // the certify loop and `is_mcp_landing_path`). Every other asset stays tight.
+    // to the remote (https) MCP server the user chose, so it — and only it — is
+    // certified with `relax_form_action_to_https = true`, giving it
+    // `form-action 'self' https:`. MCP is remote-only, so the loopback is not
+    // carried over (see the certify loop and `is_mcp_landing_path`). Every other
+    // asset stays tight.
     let form_action = if relax_form_action_to_https {
-        "'self' http://127.0.0.1:* https:"
+        "'self' https:"
     } else {
         "'self' http://127.0.0.1:*"
     };
@@ -680,13 +682,18 @@ mod tests {
             "default form-action must not allow https:, got: {tight}"
         );
 
-        // The /mcp landing page — and only it — relaxes form-action to also
-        // allow https origins, so the standing delegation can be form-POSTed to
-        // the MCP server the user chose.
+        // The /mcp landing page — and only it — relaxes form-action to https
+        // origins so the standing delegation can be form-POSTed to the MCP
+        // server. MCP is remote-only, so the loopback is dropped (not carried
+        // into the relaxed policy).
         let relaxed = get_content_security_policy(Vec::new(), None, false, true);
         assert!(
-            relaxed.contains("form-action 'self' http://127.0.0.1:* https:;"),
-            "relaxed form-action should add https:, got: {relaxed}"
+            relaxed.contains("form-action 'self' https:;"),
+            "relaxed form-action should be self + https, got: {relaxed}"
+        );
+        assert!(
+            !relaxed.contains("127.0.0.1"),
+            "relaxed /mcp form-action must not carry the loopback, got: {relaxed}"
         );
     }
 

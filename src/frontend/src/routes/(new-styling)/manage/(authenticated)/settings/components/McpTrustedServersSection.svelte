@@ -56,7 +56,7 @@
     error = undefined;
     const parsed = parseMcpServerUrl(urlInput);
     if (parsed === undefined) {
-      error = $t`Enter a valid https URL (or http://127.0.0.1 for a server you run yourself).`;
+      error = $t`Enter a valid https URL (for example https://mcp.example.com/mcp).`;
       return;
     }
     // Activate immediately (like before): verification is advisory, so the
