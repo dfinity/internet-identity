@@ -1237,8 +1237,9 @@ mod mirror_verified_email_tests {
 
     #[test]
     fn skips_when_cap_reached() {
+        let cap = usize::from(MAX_VERIFIED_EMAILS_PER_ANCHOR);
         let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
-        for i in 0..MAX_VERIFIED_EMAILS_PER_ANCHOR {
+        for i in 0..cap {
             anchor.verified_emails.push(VerifiedEmail {
                 address: format!("user{i}@example.com"),
                 verified_at: i as u64,
@@ -1249,7 +1250,7 @@ mod mirror_verified_email_tests {
 
         assert_eq!(
             anchor.verified_emails.len(),
-            MAX_VERIFIED_EMAILS_PER_ANCHOR,
+            cap,
             "cap must hold; OIDC mirror must not exceed it",
         );
         assert!(anchor

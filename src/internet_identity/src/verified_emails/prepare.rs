@@ -9,7 +9,7 @@ use internet_identity_interface::internet_identity::types::email_challenge::{
 use internet_identity_interface::internet_identity::types::AnchorNumber;
 
 /// `now_secs` is `ic_cdk::api::time() / 1_000_000_000`, hoisted for tests.
-pub async fn prepare_add(
+pub async fn prepare_add_verified_email(
     anchor: AnchorNumber,
     dns_input: EmailChallengeDnsInput,
     now_secs: u64,
@@ -17,9 +17,9 @@ pub async fn prepare_add(
     // Cap-check at prepare so the FE can show a "limit reached"
     // notice without the user sending the magic email first.
     let current = state::anchor(anchor).verified_emails.len();
-    if current >= MAX_VERIFIED_EMAILS_PER_ANCHOR {
+    if current >= usize::from(MAX_VERIFIED_EMAILS_PER_ANCHOR) {
         return Err(EmailChallengeError::LimitReached {
-            limit: MAX_VERIFIED_EMAILS_PER_ANCHOR as u8,
+            limit: MAX_VERIFIED_EMAILS_PER_ANCHOR,
         });
     }
 

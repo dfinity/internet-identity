@@ -227,7 +227,11 @@ async fn finalize(
             });
         }
         SnapshotKind::VerifyEmail { anchor } => {
-            let result = super::smtp::bind_verified_email(*anchor, &mat.claimed_address, now_secs);
+            let result = super::smtp::append_or_refresh_verified_email(
+                *anchor,
+                &mat.claimed_address,
+                now_secs,
+            );
             pending::with_mut(nonce, now_secs, |c| {
                 c.partial_verification = None;
                 c.status = match result {
@@ -525,8 +529,11 @@ fn finalize_via_doh(
                 });
             }
             SnapshotKind::VerifyEmail { anchor } => {
-                let result =
-                    super::smtp::bind_verified_email(*anchor, &mat.claimed_address, now_secs);
+                let result = super::smtp::append_or_refresh_verified_email(
+                    *anchor,
+                    &mat.claimed_address,
+                    now_secs,
+                );
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.partial_verification = None;
                     c.status = match result {

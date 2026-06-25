@@ -33,7 +33,6 @@
 //! anonymous, sends to `recover@id.ai`, and finishes by stamping a
 //! delegation seed bound to the FE's session_pk (see §8.5).
 
-
 mod prepare;
 mod remove;
 

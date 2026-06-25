@@ -780,36 +780,36 @@ pub(super) fn bind_credential(
 /// the inbound email already proved control, and refreshing
 /// `verified_at` is also a legitimate side effect of running the
 /// wizard again.
-pub(super) fn bind_verified_email(
+pub(super) fn append_or_refresh_verified_email(
     anchor: AnchorNumber,
     claimed_address: &str,
     now_secs: u64,
 ) -> Result<(), EmailChallengeError> {
     use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 
-    let mut a = state::anchor(anchor);
+    let mut anchor = state::anchor(anchor);
     let now_ns = now_secs.saturating_mul(1_000_000_000);
 
     // Refresh in place if the address is already verified on this
     // anchor; otherwise append a fresh entry.
-    if let Some(existing) = a
+    if let Some(existing) = anchor
         .verified_emails
         .iter_mut()
         .find(|e| e.address.eq_ignore_ascii_case(claimed_address))
     {
         existing.verified_at = now_ns;
     } else {
-        if a.verified_emails.len() >= super::MAX_VERIFIED_EMAILS_PER_ANCHOR {
+        if anchor.verified_emails.len() >= usize::from(super::MAX_VERIFIED_EMAILS_PER_ANCHOR) {
             return Err(EmailChallengeError::LimitReached {
-                limit: super::MAX_VERIFIED_EMAILS_PER_ANCHOR as u8,
+                limit: super::MAX_VERIFIED_EMAILS_PER_ANCHOR,
             });
         }
-        a.verified_emails.push(VerifiedEmail {
+        anchor.verified_emails.push(VerifiedEmail {
             address: claimed_address.to_string(),
             verified_at: now_ns,
         });
     }
-    state::storage_borrow_mut(|storage| storage.write(a))
+    state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|e| EmailChallengeError::InternalCanisterError(format!("write anchor: {e:?}")))?;
     Ok(())
 }

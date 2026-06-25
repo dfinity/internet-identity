@@ -101,7 +101,7 @@ pub const VERIFIED_EMAIL_NONCE_PREFIX: &str = "II-Verify-";
 /// users will have at most one or two; 5 leaves clear headroom for
 /// work/personal/alias combinations without inviting credential
 /// stuffing.
-pub const MAX_VERIFIED_EMAILS_PER_ANCHOR: usize = 5;
+pub const MAX_VERIFIED_EMAILS_PER_ANCHOR: u8 = 5;
 
 /// Byte length of the random suffix appended after [`NONCE_PREFIX`].
 /// 8 bytes → 16 hex chars → ~64 bits of entropy. The challenge map

@@ -217,13 +217,14 @@ pub fn check_openid_credential_is_unique<M: Memory + Clone>(
 pub fn add_openid_credential_skip_checks(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
+    now_ns: u64,
 ) -> Result<Operation, AnchorError> {
     let mirrored_address = openid_credential.get_verified_email();
     anchor.add_openid_credential(openid_credential.clone())?;
 
     // Mirror so the address survives an OIDC unlink.
     if let Some(address) = mirrored_address {
-        anchor.mirror_verified_email_from_oidc(&address, time());
+        anchor.mirror_verified_email_from_oidc(&address, now_ns);
     }
 
     Ok(Operation::AddOpenIdCredential {
@@ -236,12 +237,11 @@ pub fn add_openid_credential_skip_checks(
 pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
+    now_ns: u64,
 ) -> Result<Operation, AnchorError> {
     storage_borrow(|storage| check_openid_credential_is_unique(storage, &openid_credential.key()))?;
 
-    let operation = add_openid_credential_skip_checks(anchor, openid_credential)?;
-
-    Ok(operation)
+    add_openid_credential_skip_checks(anchor, openid_credential, now_ns)
 }
 
 /// Removes an `OpenIdCredential` of the given anchor and returns the operation to be archived.
@@ -329,7 +329,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
 
     // Check if OpenID credential can be added
     assert_eq!(
-        add_openid_credential(&mut anchor_0, openid_credential.clone()),
+        add_openid_credential(&mut anchor_0, openid_credential.clone(), 0),
         Ok(Operation::AddOpenIdCredential {
             iss: openid_credential.iss.clone()
         })
@@ -338,14 +338,14 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
 
     // Check if adding OpenID credential twice returns an error
     assert_eq!(
-        add_openid_credential(&mut anchor_0, openid_credential.clone()),
+        add_openid_credential(&mut anchor_0, openid_credential.clone(), 0),
         Err(AnchorError::OpenIdCredentialAlreadyRegistered)
     );
     storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
 
     // Check if adding OpenID credential to another anchor returns an error
     assert_eq!(
-        add_openid_credential(&mut anchor_1, openid_credential.clone()),
+        add_openid_credential(&mut anchor_1, openid_credential.clone(), 0),
         Err(AnchorError::OpenIdCredentialAlreadyRegistered)
     );
 
@@ -358,7 +358,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
     );
     storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
     assert_eq!(
-        add_openid_credential(&mut anchor_1, openid_credential.clone()),
+        add_openid_credential(&mut anchor_1, openid_credential.clone(), 0),
         Ok(Operation::AddOpenIdCredential {
             iss: openid_credential.iss.clone()
         })
@@ -402,4 +402,86 @@ fn should_set_timestamp() {
 
     // Assert postcondition
     assert_eq!(anchor.created_at(), Some(123456789));
+}
+
+#[test]
+fn oidc_link_at_verified_emails_cap_skips_mirror_but_succeeds() {
+    use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
+    use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig};
+
+    storage_replace(Storage::new(
+        (0, 10000),
+        ic_stable_structures::VectorMemory::default(),
+    ));
+    crate::openid::clear_for_test();
+    crate::openid::setup_for_test(
+        OpenIdConfig {
+            name: "Google".into(),
+            logo: String::new(),
+            issuer: "https://accounts.google.com".into(),
+            client_id: "test-aud".into(),
+            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+            auth_scope: vec!["openid".into(), "email".into()],
+            fedcm_uri: None,
+            email_verification: Some(
+                internet_identity_interface::internet_identity::types::OpenIdEmailVerificationScheme::Google,
+            ),
+            seed_jwks: None,
+        },
+        vec![],
+    );
+
+    let mut anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    for i in 0..MAX_VERIFIED_EMAILS_PER_ANCHOR {
+        anchor.verified_emails.push(VerifiedEmail {
+            address: format!("user{i}@example.com"),
+            verified_at: 100,
+        });
+    }
+
+    let mut metadata = HashMap::new();
+    metadata.insert(
+        "email".to_string(),
+        MetadataEntryV2::String("new-google-user@example.com".into()),
+    );
+    metadata.insert(
+        "email_verified".to_string(),
+        MetadataEntryV2::String("true".into()),
+    );
+    let credential = OpenIdCredential {
+        iss: "https://accounts.google.com".into(),
+        sub: "google-sub".into(),
+        aud: "test-aud".into(),
+        last_usage_timestamp: None,
+        metadata,
+        sso_domain: None,
+        sso_name: None,
+    };
+    assert_eq!(
+        credential.get_verified_email().as_deref(),
+        Some("new-google-user@example.com"),
+        "fixture: credential must vouch for the email so the mirror is exercised",
+    );
+
+    let result = add_openid_credential_skip_checks(&mut anchor, credential, 999);
+
+    assert!(
+        matches!(result, Ok(Operation::AddOpenIdCredential { .. })),
+        "OIDC link must succeed even when the verified-emails bucket is full; got {result:?}",
+    );
+    assert_eq!(anchor.openid_credentials.len(), 1);
+    assert_eq!(
+        anchor.verified_emails.len(),
+        usize::from(MAX_VERIFIED_EMAILS_PER_ANCHOR),
+        "mirror must be skipped silently when the cap is already reached",
+    );
+    assert!(!anchor
+        .verified_emails
+        .iter()
+        .any(|e| e.address == "new-google-user@example.com"),);
+
+    crate::openid::clear_for_test();
 }

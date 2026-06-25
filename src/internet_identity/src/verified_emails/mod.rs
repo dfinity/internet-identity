@@ -6,5 +6,5 @@
 pub mod prepare;
 pub mod remove;
 
-pub use prepare::prepare_add;
+pub use prepare::prepare_add_verified_email;
 pub use remove::{remove, RemoveError};

@@ -889,7 +889,7 @@ impl Anchor {
         {
             return false;
         }
-        if self.verified_emails.len() >= MAX_VERIFIED_EMAILS_PER_ANCHOR {
+        if self.verified_emails.len() >= usize::from(MAX_VERIFIED_EMAILS_PER_ANCHOR) {
             return false;
         }
         self.verified_emails.push(VerifiedEmail {

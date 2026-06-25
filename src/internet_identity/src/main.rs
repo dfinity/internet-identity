@@ -1394,8 +1394,9 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
+        let now_ns = ic_cdk::api::time();
         let outcome = anchor_operation_with_authz_check(identity_number, |anchor| {
-            add_openid_credential(anchor, openid_credential)
+            add_openid_credential(anchor, openid_credential, now_ns)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
                     AnchorError::OpenIdCredentialAlreadyRegistered => {
@@ -1918,7 +1919,8 @@ mod verified_email_api {
             .map_err(|err| EmailChallengeError::Unauthorized(err.principal))?;
 
         let now_secs = ic_cdk::api::time() / 1_000_000_000;
-        crate::verified_emails::prepare_add(identity_number, dns_input, now_secs).await
+        crate::verified_emails::prepare_add_verified_email(identity_number, dns_input, now_secs)
+            .await
     }
 
     #[update]
