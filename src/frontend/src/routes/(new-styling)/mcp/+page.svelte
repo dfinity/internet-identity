@@ -187,6 +187,7 @@
   // (`mcp_set_access`) and delivers the standing delegation to the MCP server.
   const handleAuthorize = (
     accountNumberPromise: Promise<bigint | undefined>,
+    ttlMinutes: number,
   ): void => {
     const server = mcpServer;
     if (params.kind !== "valid" || server === undefined) {
@@ -214,7 +215,7 @@
           publicKey: request.publicKey,
           mcpServerOrigin: server.origin,
           accountNumber,
-          ttlMinutes: request.ttlMinutes,
+          ttlMinutes,
           callback: request.callback,
           state: request.state,
         });
@@ -266,6 +267,7 @@
     mcpServerHost={mcpServer.host}
     {effectiveOrigin}
     displayOrigin={mcpServer.origin}
+    requestedTtlMinutes={params.kind === "valid" ? params.ttlMinutes : 60}
     onAuthorize={handleAuthorize}
   />
 {:else if phase.kind === "untrusted" && mcpServer !== undefined}
