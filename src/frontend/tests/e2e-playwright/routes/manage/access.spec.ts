@@ -392,6 +392,13 @@ test.describe("Access methods", () => {
         passkeyItem.getByText("Active", { exact: true }),
       ).toBeVisible();
 
+      // Drop the IdP's session cookie from the link popup so the switch
+      // popup re-prompts for sign-in; otherwise the IdP silently reuses
+      // the existing session and `signInWithOpenId` can't find its
+      // "Sign-in" heading. II's session lives in localStorage and on
+      // `id.ai`, so clearing `localhost` cookies leaves it untouched.
+      await page.context().clearCookies({ domain: "localhost" });
+
       // Switch to the SSO method via More options → Switch → Continue. The
       // canister rejects the JWT as "Authorization invalid" if the handler
       // omits the SSO discovery domain (regression guard for the prior bug).
