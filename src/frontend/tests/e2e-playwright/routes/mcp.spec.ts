@@ -81,9 +81,39 @@ test("Signing up to an untrusted server prompts to add it in settings", async ({
   await expect(
     page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
   ).toBeVisible();
+  // The button authenticates here and hands the session to a new Settings tab,
+  // rather than opening Settings cold (which would force a fresh sign-in).
   await expect(
-    page.getByRole("link", { name: "Manage trusted server" }),
+    page.getByRole("button", { name: "Manage trusted server" }),
   ).toBeVisible();
+});
+
+test("Manage trusted server hands the session to a new Settings tab", async ({
+  page,
+  mcp,
+}) => {
+  // Signing up authenticates the identity, so the untrusted screen's "Manage
+  // trusted server" button can open Settings in a new tab that adopts the
+  // session via postMessage — the same handoff as the authorize header, so no
+  // second sign-in is needed over there.
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+  const manageButton = page.getByRole("button", {
+    name: "Manage trusted server",
+  });
+  await expect(manageButton).toBeVisible();
+
+  const settingsPagePromise = page.context().waitForEvent("page");
+  await manageButton.click();
+  const settingsPage = await settingsPagePromise;
+  await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
+
+  // The handed-off session means Settings opens authenticated: the trusted
+  // server section heading is shown and no sign-in screen appears.
+  await expect(
+    settingsPage.getByRole("heading", { name: "Trusted MCP server" }),
+  ).toBeVisible({ timeout: 10_000 });
 });
 
 test("After trusting the server, the connect screen shows", async ({
@@ -166,11 +196,11 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   // The URL box only appears once the master toggle is on.
   await page.getByRole("switch", { name: "Trusted MCP server" }).check();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await page.getByRole("button", { name: "Add" }).click();
-  // The trusted server is shown with a remove button whose aria-label carries
-  // the full URL — a unique assertion that it was added.
+  await page.getByRole("button", { name: "Trust this server" }).click();
+  // Once a server is trusted the input is replaced by the server row, which
+  // carries a remove button — a unique assertion that it was added.
   await expect(
-    page.getByRole("button", { name: `Remove ${mcp.mcpOrigin}/mcp` }),
+    page.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));

@@ -4,15 +4,21 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
     /** Host of the MCP server the request wants to connect (e.g. mcp.id.ai). */
     mcpServerHost: string;
+    /** Authenticate here, then open Settings in a new tab carrying the session
+     *  (so the user doesn't have to sign in again to set the trusted server). */
+    onManageTrustedServer: () => void;
+    /** True while the sign-in ceremony for the handoff is in flight. */
+    busy: boolean;
   }
 
-  const { mcpServerHost }: Props = $props();
+  const { mcpServerHost, onManageTrustedServer, busy }: Props = $props();
 </script>
 
 <!--
@@ -41,14 +47,17 @@
       </Trans>
     </p>
 
-    <a
-      href="/manage/settings"
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
+      onclick={onManageTrustedServer}
+      disabled={busy}
       class="btn btn-secondary btn-xl mt-8 w-full"
     >
-      <ExternalLinkIcon class="size-5" />
+      {#if busy}
+        <ProgressRing class="size-5" />
+      {:else}
+        <ExternalLinkIcon class="size-5" />
+      {/if}
       <span>{$t`Manage trusted server`}</span>
-    </a>
+    </button>
   </AuthPanel>
 </div>

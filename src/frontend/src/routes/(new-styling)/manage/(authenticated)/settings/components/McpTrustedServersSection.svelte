@@ -10,8 +10,10 @@
   import Input from "$lib/components/ui/Input.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { toaster } from "$lib/components/utils/toaster";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import {
@@ -39,15 +41,25 @@
 
   let urlInput = $state("");
   let error = $state<string | undefined>();
-  // Live MCP-handshake status of the trusted server: undefined while unknown /
-  // in flight, true when it verified as MCP, false when it couldn't be.
+  // Live MCP status of the trusted server: undefined while unknown / in flight,
+  // true when it verified as MCP, false when it couldn't be.
   let verified = $state<boolean | undefined>(undefined);
   let checking = $state(false);
+
+  const hostOf = (url: string): string => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  };
 
   // Probe the trusted server for a real MCP endpoint. Best-effort and advisory:
   // a server we can't reach/read (e.g. CORS) shows as unverified but stays
   // active. Guard against a stale result if the entry changed while in flight.
-  const verify = async () => {
+  // `notify` surfaces a success toast for explicit checks (add / re-check), not
+  // the silent check on page load.
+  const verify = async (options?: { notify?: boolean }) => {
     const url = $mcpTrustedServersStore[identityNumber.toString()];
     if (url === undefined) {
       return;
@@ -56,6 +68,12 @@
     const ok = await probeMcpServer(url);
     if ($mcpTrustedServersStore[identityNumber.toString()] === url) {
       verified = ok;
+      if (ok && options?.notify === true) {
+        toaster.success({
+          title: $t`Verified ${hostOf(url)} as an MCP server.`,
+          duration: 4000,
+        });
+      }
     }
     checking = false;
   };
@@ -75,7 +93,7 @@
       mcpAccessStore.enable(identityNumber);
       // Re-check a previously-set server when re-enabling.
       if (trusted !== undefined) {
-        void verify();
+        void verify({ notify: true });
       }
     } else {
       mcpAccessStore.disable(identityNumber);
@@ -94,7 +112,7 @@
     mcpTrustedServersStore.set(identityNumber, parsed.url);
     urlInput = "";
     verified = undefined;
-    await verify();
+    await verify({ notify: true });
   };
 
   const handleKeydown = (event: KeyboardEvent) => {
@@ -133,19 +151,13 @@
         {/if}
       </div>
       <div
-        class="border-fg-warning-primary bg-bg-warning-primary text-fg-warning-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium"
+        class="border-fg-warning-primary bg-bg-warning-primary text-fg-warning-primary my-1.5 flex flex-row items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium"
       >
         <TriangleAlertIcon class="size-4 shrink-0" />
         <span>
           {$t`Internet Identity MCP connectors are in preview. Use this feature at your own risk.`}
         </span>
       </div>
-      <p class="text-text-tertiary text-sm">
-        <Trans>
-          Set the URL of an MCP server you trust. You will be able to add MCP
-          connectors to your AI agents that will then act as you across apps.
-        </Trans>
-      </p>
     </div>
 
     <div class="shrink-0">
@@ -158,47 +170,71 @@
   </div>
 
   {#if enabled}
+    <p class="text-text-tertiary text-sm">
+      <Trans>
+        Set the URL of an MCP server you trust. You will be able to add MCP
+        connectors to your AI agents that will then act as you across apps.
+      </Trans>
+    </p>
+
     {#if trusted !== undefined}
       <div
-        class={[
-          "bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-4 py-2.5",
-          verified === false
-            ? "border-border-error"
-            : "border-border-secondary",
-        ]}
+        class="border-border-secondary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-4 py-2.5"
       >
-        <span
-          class={[
-            "min-w-0 flex-1 text-sm font-medium",
-            verified === false ? "text-text-error" : "text-text-primary",
-          ]}
-        >
+        <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
           <Ellipsis text={trusted} position="middle" />
         </span>
-        <button
-          class="btn btn-tertiary btn-sm btn-icon shrink-0"
-          onclick={() => void verify()}
-          disabled={checking}
-          aria-label={$t`Re-check ${trusted}`}
-        >
-          {#if checking}
-            <ProgressRing class="size-5" />
-          {:else}
-            <RotateCwIcon class="size-5" />
-          {/if}
-        </button>
-        <button
-          class="btn btn-tertiary btn-sm btn-icon shrink-0"
-          onclick={handleRemove}
-          aria-label={$t`Remove ${trusted}`}
-        >
-          <XIcon class="size-5" />
-        </button>
+
+        {#if !checking}
+          <Tooltip
+            label={verified === true
+              ? $t`Verified MCP server`
+              : verified === false
+                ? $t`Couldn't verify this server`
+                : $t`Not checked yet`}
+          >
+            <span
+              class={[
+                "size-2.5 shrink-0 rounded-full",
+                verified === true
+                  ? "bg-fg-success-primary"
+                  : verified === false
+                    ? "bg-fg-error-primary"
+                    : "bg-fg-quaternary",
+              ]}
+            ></span>
+          </Tooltip>
+        {/if}
+
+        <Tooltip label={$t`Re-check connection`}>
+          <button
+            class="btn btn-tertiary btn-sm btn-icon shrink-0"
+            onclick={() => void verify({ notify: true })}
+            disabled={checking}
+            aria-label={$t`Re-check connection`}
+          >
+            {#if checking}
+              <ProgressRing class="size-5" />
+            {:else}
+              <RotateCwIcon class="size-5" />
+            {/if}
+          </button>
+        </Tooltip>
+
+        <Tooltip label={$t`Remove this server`}>
+          <button
+            class="btn btn-tertiary btn-sm btn-icon shrink-0"
+            onclick={handleRemove}
+            aria-label={$t`Remove this server`}
+          >
+            <XIcon class="size-5" />
+          </button>
+        </Tooltip>
       </div>
 
       {#if verified === false && !checking}
-        <p class="text-text-error text-sm">
-          {$t`Couldn't verify an MCP server at this URL. It stays active — check the URL and that the server is running, then re-check.`}
+        <p class="text-text-tertiary text-sm">
+          {$t`Couldn't verify an MCP server at this URL. Please check the URL and that the server is running and retry.`}
         </p>
       {/if}
     {:else}
@@ -215,14 +251,16 @@
           autocapitalize="off"
           spellcheck={false}
         />
-        <button
-          class="btn btn-secondary h-11 shrink-0"
-          onclick={handleAdd}
-          disabled={urlInput.trim() === ""}
-        >
-          <PlusIcon class="size-5" />
-          <span>{$t`Add`}</span>
-        </button>
+        <Tooltip label={$t`Trust this server`}>
+          <button
+            class="btn btn-secondary h-11 shrink-0"
+            onclick={handleAdd}
+            disabled={urlInput.trim() === ""}
+          >
+            <PlusIcon class="size-5" />
+            <span>{$t`Trust this server`}</span>
+          </button>
+        </Tooltip>
       </div>
     {/if}
   {/if}

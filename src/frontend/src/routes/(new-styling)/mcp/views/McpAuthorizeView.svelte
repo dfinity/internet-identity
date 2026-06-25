@@ -90,7 +90,7 @@
           {$t`Connect ${mcpServerHost}`}
         </h1>
         <p class="text-text-tertiary mt-1 text-base text-pretty">
-          {$t`Let ${mcpServerHost} act as you across your apps. You'll need to reconnect when this access expires.`}
+          {$t`Let ${mcpServerHost} act on your behalf across your apps. You'll need to reconnect when this access expires.`}
         </p>
         <div
           class="border-border-tertiary mt-4 mb-6 flex flex-row items-center justify-between gap-3 border-t pt-4"

@@ -10,9 +10,11 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
+  import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
+  import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
 
   const { children }: LayoutProps = $props();
@@ -29,6 +31,17 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+
+  // Authenticate the selected identity here, then open /manage in a new tab
+  // carrying the session — so the user doesn't have to sign in again there.
+  const manageHandoff = new ManageHandoffFlow();
+  const handleManageIdentity = async (): Promise<void> => {
+    isIdentityPopoverOpen = false;
+    if (selectedIdentity === undefined) {
+      return;
+    }
+    await manageHandoff.start("/manage", selectedIdentity);
+  };
 
   // Switching identity only *selects* here — unlike the authorize route, it
   // doesn't sign in. The page's Allow access button performs the authentication
@@ -122,11 +135,7 @@
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
             }}
-            onManageIdentity={(): Promise<void> => {
-              isIdentityPopoverOpen = false;
-              window.open("/manage", "_blank");
-              return Promise.resolve();
-            }}
+            onManageIdentity={handleManageIdentity}
             onManageIdentities={() => {
               isIdentityPopoverOpen = false;
               isManageIdentitiesDialogOpen = true;
@@ -177,3 +186,5 @@
     />
   </Dialog>
 {/if}
+
+<ManageHandoff flow={manageHandoff} />

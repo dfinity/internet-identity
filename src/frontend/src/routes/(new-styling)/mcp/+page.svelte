@@ -23,6 +23,8 @@
   import McpInvalidView from "./views/McpInvalidView.svelte";
   import McpUntrustedView from "./views/McpUntrustedView.svelte";
   import McpConnectingView from "./views/McpConnectingView.svelte";
+  import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
+  import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import { mcpAuthorize } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
@@ -227,6 +229,27 @@
     })();
   };
 
+  // The untrusted screen sends the user to Settings to set this server as their
+  // trusted one. Rather than open Settings cold (which would force a fresh
+  // sign-in in the new tab), authenticate the selected identity here and hand
+  // the session to the opened tab — same handoff as the header's "Manage
+  // identity". The returning-user untrusted screen often isn't authenticated
+  // yet, so this runs the full ceremony when needed.
+  const manageHandoff = new ManageHandoffFlow();
+  const handleManageTrustedServer = (): void => {
+    const selected = $lastUsedIdentitiesStore.selected;
+    if (selected === undefined) {
+      return;
+    }
+    void (async () => {
+      try {
+        await manageHandoff.start("/manage/settings", selected);
+      } catch (error) {
+        handleError(error);
+      }
+    })();
+  };
+
   const wizardSignInHandlers = {
     onSignIn: (identityNumber: bigint): Promise<void> => {
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -271,9 +294,19 @@
     onAuthorize={handleAuthorize}
   />
 {:else if phase.kind === "untrusted" && mcpServer !== undefined}
-  <McpUntrustedView mcpServerHost={mcpServer.host} />
+  <McpUntrustedView
+    mcpServerHost={mcpServer.host}
+    onManageTrustedServer={handleManageTrustedServer}
+    busy={manageHandoff.isAuthenticating}
+  />
 {:else if phase.kind === "connecting" && mcpServer !== undefined}
   <McpConnectingView mcpServer={mcpServer.host} />
 {:else if phase.kind === "close"}
   <McpCloseWindowView />
 {/if}
+
+<ManageHandoff
+  flow={manageHandoff}
+  description={$t`Open Settings in a new tab to set your trusted MCP server.`}
+  buttonLabel={$t`Open Settings`}
+/>
