@@ -89,9 +89,25 @@ const replaceKey = async (
   const others = info.metadata.filter(([entryKey]) => entryKey !== key);
   const entry: MetadataMapV2[number] = [key, { String: value ?? "" }];
   const next: MetadataMapV2 = value === undefined ? others : [...others, entry];
+  // TEMP DIAGNOSTIC (remove): log the write + an immediate same-session readback.
+  console.warn(
+    `[MCP-DIAG] write id=${identityNumber} key=${key} val=${value} existingKeys=[${info.metadata.map((e) => e[0]).join(",")}]`,
+  );
   await actor
     .identity_metadata_replace(identityNumber, next)
     .then(throwCanisterError);
+  try {
+    const rb = await actor
+      .identity_info(identityNumber)
+      .then(throwCanisterError);
+    console.warn(
+      `[MCP-DIAG] wrote id=${identityNumber} readbackKeys=[${rb.metadata.map((e) => e[0]).join(",")}]`,
+    );
+  } catch (e) {
+    console.warn(
+      `[MCP-DIAG] readback id=${identityNumber} FAILED: ${String(e)}`,
+    );
+  }
   return parseConfig(next);
 };
 
