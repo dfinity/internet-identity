@@ -275,6 +275,7 @@ type ConsentPipeline = {
   origin: string;
   unmappedOrigin: string;
   groups: AttributeGroup[];
+  recoveryAddresses: string[];
 };
 
 /**
@@ -312,15 +313,24 @@ const resolveConsentPipeline = async (params: {
     // keys. Today it errors on anything it doesn't recognise, which would
     // reject mixed `["email", "favorite_color"]` requests outright — so for
     // now we ask for everything available on the anchor and filter below.
-    const available =
+    const availablePromise: Promise<Array<[string, Uint8Array | number[]]>> =
       requestedKeys.length > 0
-        ? await authenticated.actor
+        ? authenticated.actor
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
             })
             .then(throwCanisterError)
-        : [];
+        : Promise.resolve([]);
+    const [available, identityInfo] = await Promise.all([
+      availablePromise,
+      authenticated.actor
+        .identity_info(authenticated.identityNumber)
+        .then(throwCanisterError),
+    ]);
+    const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
+      (c: { address: string }) => c.address,
+    );
 
     return {
       accountNumberPromise,
@@ -328,6 +338,7 @@ const resolveConsentPipeline = async (params: {
       origin,
       unmappedOrigin,
       groups: resolveAttributeGroups(requestedKeys, available),
+      recoveryAddresses,
     };
   } catch (error) {
     console.error(error);
@@ -653,6 +664,8 @@ export const handleIcrc3ConsentAttributes =
           pipelinePromise.then((pipeline) => ({
             groups: pipeline?.groups ?? [],
             effectiveOrigin: pipeline?.origin ?? "",
+            requestedKeys,
+            recoveryAddresses: pipeline?.recoveryAddresses ?? [],
           })),
         );
 
@@ -671,9 +684,17 @@ export const handleIcrc3ConsentAttributes =
           omit_scope: boolean;
         }>;
 
-        if (pipeline.groups.length === 0) {
-          // Nothing the dapp requested is available — certify an empty set
-          // and auto-resolve consent so the UI skips the empty picker view.
+        // Only unscoped email/verified_email; scoped keys are pinned to
+        // a source that the inline verify wizard can't satisfy.
+        const emailRequested = requestedKeys.some((key) => {
+          if (extractScope(key) !== undefined) return false;
+          const name = extractAttributeName(key);
+          return name === "email" || name === "verified_email";
+        });
+
+        if (pipeline.groups.length === 0 && !emailRequested) {
+          // Nothing to share and no inline "Verify an email" affordance —
+          // certify an empty set so the UI skips the empty picker view.
           attributeSpecs = [];
           attributeConsentStore.setConsent({ attributes: [] });
         } else {

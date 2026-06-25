@@ -296,6 +296,7 @@ fn validate_identity_data<M: Memory + Clone>(
 fn apply_identity_data(
     identity: &mut Anchor,
     arg: ValidatedCreateIdentityData,
+    now_ns: u64,
 ) -> Result<Operation, IdRegFinishError> {
     let name = arg.name().clone();
 
@@ -329,7 +330,7 @@ fn apply_identity_data(
             let key = credential.key();
             let iss = openid_config_iss.clone();
 
-            add_openid_credential_skip_checks(identity, credential)
+            add_openid_credential_skip_checks(identity, credential, now_ns)
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             (
@@ -367,7 +368,7 @@ fn create_identity(
         let arg = validate_identity_data(storage, arg, verified_openid)?;
 
         let allocation = storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
-            let operation = apply_identity_data(identity, arg)?;
+            let operation = apply_identity_data(identity, arg, now)?;
             let identity_number = identity.anchor_number();
             Ok::<_, IdRegFinishError>((identity_number, operation))
         })?;

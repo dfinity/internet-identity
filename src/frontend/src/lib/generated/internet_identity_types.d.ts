@@ -536,7 +536,7 @@ export interface DummyAuthConfig {
    */
   'prompt_for_index' : boolean,
 }
-export interface EmailRecoveryChallenge {
+export interface EmailChallenge {
   'nonce' : string,
   'expires_at' : Timestamp,
 }
@@ -547,23 +547,23 @@ export interface EmailRecoveryCredential {
 }
 /**
  * Strictly-public, user-copyable diagnostics for one pending challenge
- * (see email_recovery_diagnostics). Intended for a support ticket so a
+ * (see email_challenge_diagnostics). Intended for a support ticket so a
  * case can be lined up across the SMTP gateway logs and the canister's
  * production logs via message_id. NO email address, anchor, principal,
  * delegation/seed, or inner error string — reason_code is the failing
  * variant's name only.
  */
-export interface EmailRecoveryDiagnostics {
+export interface EmailChallengeDiagnostics {
   'created_at' : Timestamp,
   'verification_path' : VerificationPath,
   'message_id' : [] | [string],
   'reason_code' : string,
 }
-export interface EmailRecoveryDnsInput {
+export interface EmailChallengeDnsInput {
   'dns_proof' : [] | [DnsProofBundle],
   'address' : string,
 }
-export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
+export type EmailChallengeError = { 'EmailVerificationFailed' : string } |
   { 'DkimLeafMismatch' : null } |
   { 'InternalCanisterError' : string } |
   { 'NonceUnknown' : null } |
@@ -573,9 +573,9 @@ export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
   { 'AddressNotRegistered' : null } |
   {
     /**
-     * email_recovery_submit_dkim_leaf was called with an empty `hops`
+     * email_challenge_submit_dkim_leaf was called with an empty `hops`
      * vector; an FE that can't walk DNSSEC must drive
-     * email_recovery_resolve_via_doh instead.
+     * email_challenge_resolve_via_doh instead.
      */
     'EmptyDkimLeafHops' : null
   } |
@@ -584,20 +584,22 @@ export type EmailRecoveryError = { 'EmailVerificationFailed' : string } |
   { 'AddressMismatch' : null } |
   { 'DomainNotAllowlisted' : string } |
   { 'SubjectNotSigned' : null } |
-  { 'AddressAlreadyRegistered' : null };
+  { 'AddressAlreadyRegistered' : null } |
+  { 'InvalidEmailAddress' : string } |
+  { 'LimitReached' : { 'limit' : number } };
 export interface EmailRecoveryGetDelegationArgs {
   'session_key' : SessionKey,
   'expiration' : Timestamp,
   'nonce' : string,
 }
 /**
- * Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
- * EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+ * Argument to email_challenge_resolve_via_doh. Wrapped in a record (like
+ * EmailChallengeSubmitDkimLeafArg) so the method can grow fields without a
  * breaking interface change; nonce is the lookup key and is always
  * required.
  */
-export interface EmailRecoveryResolveViaDohArg { 'nonce' : string }
-export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
+export interface EmailChallengeResolveViaDohArg { 'nonce' : string }
+export type EmailChallengeStatus = { 'Failed' : EmailChallengeError } |
   { 'ResolvingDoh' : null } |
   { 'NeedDkimLeaf' : { 'selector' : string } } |
   {
@@ -610,7 +612,7 @@ export type EmailRecoveryStatus = { 'Failed' : EmailRecoveryError } |
   { 'RegistrationSucceeded' : null } |
   { 'Expired' : null } |
   { 'Pending' : null };
-export interface EmailRecoverySubmitDkimLeafArg {
+export interface EmailChallengeSubmitDkimLeafArg {
   /**
    * Delegation chains for signed zones touched by `hops` that
    * weren't already covered by the skeleton chain anchored at
@@ -627,7 +629,7 @@ export interface EmailRecoverySubmitDkimLeafArg {
    * leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
    * `selector1._domainkey.outlook.com` is a signed CNAME into the
    * unsigned `outbound.protection.outlook.com`) — it must NOT submit
-   * an empty vec here; it drives `email_recovery_resolve_via_doh`
+   * an empty vec here; it drives `email_challenge_resolve_via_doh`
    * instead, which resolves the key over the canister's DoH path.
    */
   'hops' : Array<SignedRRset>,
@@ -856,6 +858,13 @@ export interface IdentityAuthnInfo {
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   /**
+   * Verified emails bound to this anchor (absent when none is
+   * configured). Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR; the FE
+   * shows a "limit reached" notice in the wizard when adding
+   * beyond the cap.
+   */
+  'verified_emails' : [] | [Array<VerifiedEmail>],
+  /**
    * Authentication method independent metadata
    */
   'metadata' : MetadataMapV2,
@@ -942,6 +951,14 @@ export interface InternetIdentityInit {
    * `docs/ongoing/email-recovery.md` §7.6. Same set/clear pattern.
    */
   'doh_config' : [] | [[] | [DohConfig]],
+  /**
+   * Deploy flag opening the SSO discovery domain gate to any domain. When
+   * `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
+   * which domains may be discovered as SSO providers. Does not relax the
+   * strict-`https` requirement: serving discovery over plain `http` still
+   * requires the host to be on the explicit `sso_discoverable_domains` list.
+   */
+  'sso_allow_any_domain' : [] | [boolean],
   /**
    * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
    * OpenID credentials. When set, a batched timer-driven migration stamps
@@ -1548,6 +1565,14 @@ export type UserNumber = bigint;
  */
 export type VerificationPath = { 'Doh' : null } |
   { 'Dnssec' : null };
+/**
+ * A verified email address bound to an anchor. Parallel to
+ * `EmailRecoveryCredential` but used as an attribute source (and
+ * surfaced in the smart-routing UI) rather than a recovery
+ * credential. The `verified_at` timestamp is when DKIM/DMARC
+ * verification completed successfully.
+ */
+export interface VerifiedEmail { 'address' : string, 'verified_at' : Timestamp }
 export type VerifyTentativeDeviceResponse = {
     /**
      * Device registration mode is off, either due to timeout or because it was never enabled.
@@ -1745,28 +1770,28 @@ export interface _SERVICE {
    * Both flows share the polling status query.
    */
   'email_recovery_credential_prepare_add' : ActorMethod<
-    [IdentityNumber, EmailRecoveryDnsInput],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [IdentityNumber, EmailChallengeDnsInput],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_credential_remove' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
-  'email_recovery_diagnostics' : ActorMethod<
+  'email_challenge_diagnostics' : ActorMethod<
     [string],
-    [] | [EmailRecoveryDiagnostics]
+    [] | [EmailChallengeDiagnostics]
   >,
   'email_recovery_get_delegation' : ActorMethod<
     [EmailRecoveryGetDelegationArgs],
     { 'Ok' : SignedDelegation } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
   'email_recovery_prepare_delegation' : ActorMethod<
-    [EmailRecoveryDnsInput, SessionKey],
-    { 'Ok' : EmailRecoveryChallenge } |
-      { 'Err' : EmailRecoveryError }
+    [EmailChallengeDnsInput, SessionKey],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
   >,
   /**
    * Resolves the DKIM key over the canister's own allowlist-gated DoH
@@ -1775,16 +1800,31 @@ export interface _SERVICE {
    * DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
    * Polled: the FE calls it repeatedly while the status is ResolvingDoh.
    */
-  'email_recovery_resolve_via_doh' : ActorMethod<
-    [EmailRecoveryResolveViaDohArg],
+  'email_challenge_resolve_via_doh' : ActorMethod<
+    [EmailChallengeResolveViaDohArg],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
   >,
-  'email_recovery_status' : ActorMethod<[string], EmailRecoveryStatus>,
-  'email_recovery_submit_dkim_leaf' : ActorMethod<
-    [EmailRecoverySubmitDkimLeafArg],
+  'email_challenge_status' : ActorMethod<[string], EmailChallengeStatus>,
+  'email_challenge_submit_dkim_leaf' : ActorMethod<
+    [EmailChallengeSubmitDkimLeafArg],
     { 'Ok' : null } |
-      { 'Err' : EmailRecoveryError }
+      { 'Err' : EmailChallengeError }
+  >,
+  'email_recovery_diagnostics' : ActorMethod<
+    [string],
+    [] | [EmailChallengeDiagnostics]
+  >,
+  'email_recovery_resolve_via_doh' : ActorMethod<
+    [EmailChallengeResolveViaDohArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
+  >,
+  'email_recovery_status' : ActorMethod<[string], EmailChallengeStatus>,
+  'email_recovery_submit_dkim_leaf' : ActorMethod<
+    [EmailChallengeSubmitDkimLeafArg],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
   >,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
@@ -2066,6 +2106,29 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
     { 'Ok' : AccountInfo } |
       { 'Err' : UpdateAccountError }
+  >,
+  /**
+   * Verified emails
+   * ===============
+   * Parallel to the recovery flow but the verified address is
+   * stored on `Anchor::verified_emails` rather than
+   * `Anchor::email_recovery`. Reuses the same SMTP gateway, DKIM
+   * verifier and DMARC alignment, but issues nonces with the
+   * `II-Verify-` prefix so an inbound challenge can never be
+   * cross-applied between the two flows. Polling status / submit-
+   * dkim-leaf / resolve-via-doh / diagnostics are shared with
+   * recovery — the FE keys them by the same nonce. Capped at
+   * MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
+   */
+  'verified_email_prepare_add' : ActorMethod<
+    [IdentityNumber, EmailChallengeDnsInput],
+    { 'Ok' : EmailChallenge } |
+      { 'Err' : EmailChallengeError }
+  >,
+  'verified_email_remove' : ActorMethod<
+    [IdentityNumber, string],
+    { 'Ok' : null } |
+      { 'Err' : EmailChallengeError }
   >,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],

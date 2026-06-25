@@ -23,19 +23,23 @@ mod api_v2;
 pub mod attributes;
 pub mod dnssec;
 pub mod doh;
+pub mod email_challenge;
 pub mod email_recovery;
 pub mod icrc3;
 pub mod openid;
 pub mod smtp;
 pub mod vc_mvp;
+pub mod verified_email;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::doh::*;
+pub use crate::internet_identity::types::email_challenge::*;
 pub use crate::internet_identity::types::email_recovery::*;
 pub use crate::internet_identity::types::openid::*;
 pub use crate::internet_identity::types::smtp::*;
+pub use crate::internet_identity::types::verified_email::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -286,6 +290,14 @@ pub struct InternetIdentityInit {
     /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
     /// keyed off `is_production`.
     pub sso_discoverable_domains: Option<Vec<String>>,
+    /// Deploy flag that opens the SSO discovery domain gate to *any* domain.
+    /// When `Some(true)`, `sso_discoverable_domains` (and its built-in
+    /// `is_production` defaults) no longer restrict which domains may be
+    /// discovered as SSO providers — every domain is accepted. `None` /
+    /// `Some(false)` leave the allowlist in force. The strict-`https` posture
+    /// is unaffected: a domain must still be on the explicit
+    /// `sso_discoverable_domains` list to serve discovery over plain `http`.
+    pub sso_allow_any_domain: Option<bool>,
     /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
     /// §8.6). When `Some`, a batched timer-driven migration stamps every

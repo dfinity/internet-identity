@@ -224,10 +224,71 @@ pub fn allowed_discovery_domains() -> Vec<String> {
     }
 }
 
-pub fn is_allowed_discovery_domain(domain: &str) -> bool {
+/// Deploy flag: when set, the SSO discovery domain gate accepts *any* domain
+/// (see `InternetIdentityInit::sso_allow_any_domain`). Deliberately does not
+/// feed the `https`-relaxation gate ([`is_allowlisted_host`]), which always
+/// consults the explicit allowlist so opening the domain gate never lets an
+/// arbitrary host serve discovery over plain HTTP.
+fn sso_allow_any_domain() -> bool {
+    #[cfg(not(test))]
+    {
+        state::persistent_state(|ps| ps.sso_allow_any_domain).unwrap_or(false)
+    }
+    #[cfg(test)]
+    {
+        tests::TEST_ALLOW_ANY.with_borrow(|b| *b)
+    }
+}
+
+/// True if `domain` is on the configured/default SSO allowlist
+/// (case-insensitive). The explicit list only — independent of the
+/// `sso_allow_any_domain` deploy flag.
+fn is_explicitly_allowlisted(domain: &str) -> bool {
     allowed_discovery_domains()
         .iter()
         .any(|allowed| allowed.eq_ignore_ascii_case(domain))
+}
+
+pub fn is_allowed_discovery_domain(domain: &str) -> bool {
+    // An explicitly allowlisted domain is admin-curated and trusted verbatim.
+    // The `sso_allow_any_domain` flag, by contrast, makes the domain
+    // caller-controlled, and `domain` is later interpolated into a discovery
+    // URL (`{scheme}://{domain}/.well-known/...`). Require it to be a bare
+    // authority so the flag means "any *domain*", not "any string that happens
+    // to parse inside a URL": inputs carrying userinfo (`evil.com@127.0.0.1`), a
+    // path (`host/..`), a query, or a fragment could otherwise change the
+    // effective request target.
+    is_explicitly_allowlisted(domain) || (sso_allow_any_domain() && is_bare_authority(domain))
+}
+
+/// True if `domain` is a bare URL authority — a host, optionally `host:port`,
+/// and nothing else: no scheme, userinfo, path, query, or fragment. It is
+/// parsed the same way it is later used (as the authority of an `https`
+/// discovery URL) and required to round-trip exactly, so anything the URL
+/// parser would reinterpret — embedded userinfo/path/query/fragment, stripped
+/// control characters, an injected scheme — is rejected. (A redundant
+/// `:443`/`:80` default port is normalized away by the parser and thus rejected
+/// too; real discovery domains don't carry one.)
+fn is_bare_authority(domain: &str) -> bool {
+    let Ok(url) = url::Url::parse(&format!("https://{domain}")) else {
+        return false;
+    };
+    if !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !matches!(url.path(), "" | "/")
+    {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let authority = match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host.to_string(),
+    };
+    authority == domain.to_ascii_lowercase()
 }
 
 /// True if `host` (the `host:port` portion of a URL) matches an allowlist
@@ -235,9 +296,11 @@ pub fn is_allowed_discovery_domain(domain: &str) -> bool {
 /// explicitly blessed by an II admin MAY publish its discovery endpoints over
 /// plain HTTP, which is what makes e2e tests against `http://localhost:11107`
 /// work without weakening prod's strict-HTTPS posture for unblessed hosts.
+/// Consults the explicit allowlist only — the `sso_allow_any_domain` deploy
+/// flag opens the domain gate but never relaxes the `https` requirement.
 #[cfg(not(test))]
 fn is_allowlisted_host(host: &str) -> bool {
-    is_allowed_discovery_domain(host)
+    is_explicitly_allowlisted(host)
 }
 
 // ---------------------------------------------------------------------------
@@ -273,8 +336,9 @@ struct DiscoveryDocument {
 #[cfg(not(test))]
 async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     // Hop 1: fetch /.well-known/ii-openid-configuration. Default to https; an
-    // allowlisted loopback host (the e2e provider, which can't serve TLS) may
-    // use http. The allowlist is the trust gate.
+    // explicitly allowlisted loopback host (the e2e provider, which can't serve
+    // TLS) may use http. The explicit allowlist is the trust gate — the
+    // `sso_allow_any_domain` flag opens the domain gate but never picks http.
     let hop1_scheme = scheme_for_allowlisted_host(&domain);
     let hop1_url = format!("{hop1_scheme}://{domain}/.well-known/ii-openid-configuration");
     let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
@@ -455,12 +519,18 @@ fn host_with_port(url: &url::Url) -> Option<String> {
     })
 }
 
-/// Scheme for the hop-1 URL of an allowlisted domain: loopback (the e2e test
-/// provider) gets `http`, everything else `https`.
-#[cfg(not(test))]
+/// Scheme for the hop-1 URL. A loopback host (the e2e test provider, which
+/// can't serve TLS) gets `http`, but *only* when it's explicitly allowlisted;
+/// every other host gets `https`. Crucially, a loopback host that is reachable
+/// only because the `sso_allow_any_domain` flag opened the domain gate is *not*
+/// explicitly allowlisted, so it still gets `https`. This is what keeps the
+/// flag from becoming a plain-HTTP SSRF footgun: opening the domain gate must
+/// never let an un-allowlisted caller trigger an `http://` outcall to
+/// `localhost`/`127.0.0.1`. Consults the same explicit-allowlist gate as the
+/// hop-2 `https`-relaxation check ([`is_allowlisted_host`]).
 fn scheme_for_allowlisted_host(host: &str) -> &'static str {
     let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    if matches!(bare.as_str(), "localhost" | "127.0.0.1") {
+    if matches!(bare.as_str(), "localhost" | "127.0.0.1") && is_explicitly_allowlisted(host) {
         "http"
     } else {
         "https"
@@ -506,6 +576,7 @@ mod tests {
 
     thread_local! {
         pub(super) static TEST_ALLOWED: RefCell<Vec<String>> = const { RefCell::new(vec![]) };
+        pub(super) static TEST_ALLOW_ANY: RefCell<bool> = const { RefCell::new(false) };
         pub(super) static TEST_DISCOVERY: RefCell<HashMap<String, DiscoveredConfig>> = RefCell::new(HashMap::new());
         pub(super) static TEST_JWKS: RefCell<HashMap<String, Vec<Jwk>>> = RefCell::new(HashMap::new());
     }
@@ -513,6 +584,7 @@ mod tests {
     fn reset() {
         set_test_now(1_700_000_000);
         TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.org".to_string()]);
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
         TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
         TEST_JWKS.with_borrow_mut(|m| m.clear());
         DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
@@ -546,6 +618,84 @@ mod tests {
             &test_aud_claim()
         )
         .is_err());
+    }
+
+    #[test]
+    fn allow_any_domain_opens_the_gate() {
+        reset();
+        // Off by default: a domain off the explicit allowlist is rejected.
+        assert!(!is_allowed_discovery_domain("not-allowed.com"));
+        // Flag on: every domain passes the discovery gate.
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        assert!(is_allowed_discovery_domain("not-allowed.com"));
+        assert!(is_allowed_discovery_domain("example.org"));
+        // The explicit allowlist is unchanged — the `https`-relaxation gate
+        // still consults it, so the flag does not bless arbitrary http hosts.
+        assert!(is_explicitly_allowlisted("example.org"));
+        assert!(!is_explicitly_allowlisted("not-allowed.com"));
+    }
+
+    #[test]
+    fn allow_any_domain_does_not_relax_https_for_loopback() {
+        reset();
+        // e2e setup: the loopback provider is explicitly allowlisted, so hop-1
+        // is allowed to use plain http (it can't serve TLS).
+        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["localhost:11107".to_string()]);
+        assert_eq!(scheme_for_allowlisted_host("localhost:11107"), "http");
+
+        // Flag on opens the *domain* gate for everything, loopback included...
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        assert!(is_allowed_discovery_domain("localhost"));
+        assert!(is_allowed_discovery_domain("127.0.0.1:8080"));
+        // ...but a loopback host reachable only via the flag (not on the
+        // explicit allowlist) still gets https: the flag must never trigger a
+        // plain-http outcall to localhost/127.0.0.1.
+        assert_eq!(scheme_for_allowlisted_host("localhost"), "https");
+        assert_eq!(scheme_for_allowlisted_host("localhost:9999"), "https");
+        assert_eq!(scheme_for_allowlisted_host("127.0.0.1:8080"), "https");
+        // Non-loopback hosts are always https regardless.
+        assert_eq!(scheme_for_allowlisted_host("evil.example.com"), "https");
+    }
+
+    #[test]
+    fn allow_any_domain_rejects_non_authority() {
+        reset();
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+
+        // Bare authorities pass: host, sub-host, and explicit (non-default)
+        // port, case-insensitively.
+        assert!(is_allowed_discovery_domain("example.com"));
+        assert!(is_allowed_discovery_domain("sub.example.com"));
+        assert!(is_allowed_discovery_domain("example.com:8443"));
+        assert!(is_allowed_discovery_domain("Example.COM"));
+
+        // Anything that isn't a bare host[:port] is rejected even with the flag
+        // on, so the caller-controlled value can't reshape the interpolated
+        // discovery URL (`{scheme}://{domain}/.well-known/...`).
+        for bad in [
+            "evil.com@127.0.0.1",    // userinfo — real host is 127.0.0.1
+            "user:pass@example.com", // userinfo
+            "example.com/..",        // path traversal
+            "example.com/foo",       // path
+            "example.com?x=1",       // query
+            "example.com#frag",      // fragment
+            "https://example.com",   // injected scheme
+            "example.com:443",       // redundant default port (normalized away)
+            "exa mple.com",          // whitespace in host
+            "",                      // empty
+        ] {
+            assert!(
+                !is_allowed_discovery_domain(bad),
+                "expected `{bad}` to be rejected even with sso_allow_any_domain on",
+            );
+        }
+
+        // The bare-authority check only gates the flag path: an explicitly
+        // allowlisted entry is admin-curated and trusted verbatim, so it is
+        // accepted even if it wouldn't pass `is_bare_authority` on its own.
+        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.com/weird".to_string()]);
+        assert!(!is_bare_authority("example.com/weird"));
+        assert!(is_allowed_discovery_domain("example.com/weird"));
     }
 
     #[test]
