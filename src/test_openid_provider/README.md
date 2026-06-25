@@ -56,12 +56,12 @@ Against a non-loopback target two things change versus the localhost flow:
 
 ### Configuration (env vars)
 
-| Var                  | Default                  | Set it to…                                                                              |
-| -------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
-| `OIDC_PORT`          | `11105` (or argv)        | local bind port                                                                         |
-| `OIDC_ISSUER`        | `http://localhost:$PORT` | the **public HTTPS base URL** (your tunnel host)                                        |
-| `OIDC_REDIRECT_URIS` | dev + e2e callbacks      | comma-separated, must include the target's callback, e.g. `https://beta.id.ai/callback` |
-| `OIDC_SSO_NAME`      | `Test SSO $PORT`         | label shown on II's consent screen                                                      |
+| Var                  | Default                  | Set it to…                                                                               |
+| -------------------- | ------------------------ | ---------------------------------------------------------------------------------------- |
+| `OIDC_PORT`          | `11105` (or argv)        | local bind port                                                                          |
+| `OIDC_ISSUER`        | `http://localhost:$PORT` | the **public HTTPS base URL** (your tunnel host) — a bare origin, no trailing slash/path |
+| `OIDC_REDIRECT_URIS` | dev + e2e callbacks      | comma-separated, must include the target's callback, e.g. `https://beta.id.ai/callback`  |
+| `OIDC_SSO_NAME`      | `Test SSO $PORT`         | label shown on II's consent screen                                                       |
 
 When `OIDC_ISSUER` is `https://…` the server sets `provider.proxy = true` so it
 trusts the tunnel's `X-Forwarded-Proto`/`Host` headers and treats requests as

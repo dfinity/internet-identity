@@ -11,7 +11,34 @@ const port = parseInt(process.env.OIDC_PORT ?? process.argv[2], 10) || 11105; //
 // when deploying so the issuer, jwks_uri and authorization_endpoint all resolve
 // to a host the IC's HTTP outcalls — and the browser — can reach. II requires
 // https for any non-loopback discovery host.
-const issuer = process.env.OIDC_ISSUER ?? `http://localhost:${port}`;
+//
+// Normalize to a bare origin: the issuer is concatenated into discovery URLs
+// and the provider's routes mount at "/", so a trailing slash would emit
+// "//.well-known/..." and a path component (e.g. https://host/oidc) would never
+// actually be served. Fail fast with a clear message instead of booting a
+// server that hands out broken discovery URLs.
+const issuer = normalizeIssuer(
+  process.env.OIDC_ISSUER ?? `http://localhost:${port}`,
+);
+
+function normalizeIssuer(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    console.error(`OIDC_ISSUER is not a valid URL: "${raw}"`);
+    process.exit(1);
+  }
+  if (url.pathname !== "/" || url.search !== "" || url.hash !== "") {
+    console.error(
+      `OIDC_ISSUER must be a bare origin (scheme://host[:port]) with no path, ` +
+        `query, or fragment — got "${raw}". Try "${url.origin}".`,
+    );
+    process.exit(1);
+  }
+  // `url.origin` drops any trailing slash, so http://host:port/ → http://host:port.
+  return url.origin;
+}
 
 // Redirect URIs the IdP will accept. Defaults to the dev + e2e callbacks; set
 // OIDC_REDIRECT_URIS (comma-separated) to point at a deployed II origin's
