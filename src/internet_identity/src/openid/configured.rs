@@ -157,7 +157,7 @@ thread_local! {
 /// Test-only: register a configured provider and seed its JWKs without running
 /// the install-time outcall/timer machinery.
 #[cfg(test)]
-pub(super) fn setup_for_test(config: OpenIdConfig, keys: Vec<Jwk>) {
+pub(crate) fn setup_for_test(config: OpenIdConfig, keys: Vec<Jwk>) {
     TEST_JWKS.with_borrow_mut(|k| *k = keys);
     CONFIG_REGISTRY.with_borrow_mut(|registry| {
         registry.push(ConfiguredProvider {
@@ -169,7 +169,7 @@ pub(super) fn setup_for_test(config: OpenIdConfig, keys: Vec<Jwk>) {
 }
 
 #[cfg(test)]
-pub(super) fn clear_for_test() {
+pub(crate) fn clear_for_test() {
     CONFIG_REGISTRY.with_borrow_mut(|r| r.clear());
     TEST_JWKS.with_borrow_mut(|k| k.clear());
 }

@@ -653,11 +653,11 @@ pub fn email_recovery_credential_prepare_add(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    dns_input: types::email_recovery::EmailRecoveryDnsInput,
+    dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
     Result<
-        types::email_recovery::EmailRecoveryChallenge,
-        types::email_recovery::EmailRecoveryError,
+        types::email_challenge::EmailChallenge,
+        types::email_challenge::EmailChallengeError,
     >,
     RejectResponse,
 > {
@@ -672,31 +672,31 @@ pub fn email_recovery_credential_prepare_add(
     .map(|(x,)| x)
 }
 
-pub fn email_recovery_status(
+pub fn email_challenge_status(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
-) -> Result<types::email_recovery::EmailRecoveryStatus, RejectResponse> {
-    query_candid(env, canister_id, "email_recovery_status", (nonce,)).map(|(x,)| x)
+) -> Result<types::email_challenge::EmailChallengeStatus, RejectResponse> {
+    query_candid(env, canister_id, "email_challenge_status", (nonce,)).map(|(x,)| x)
 }
 
-pub fn email_recovery_diagnostics(
+pub fn email_challenge_diagnostics(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
-) -> Result<Option<types::email_recovery::EmailRecoveryDiagnostics>, RejectResponse> {
-    query_candid(env, canister_id, "email_recovery_diagnostics", (nonce,)).map(|(x,)| x)
+) -> Result<Option<types::email_challenge::EmailChallengeDiagnostics>, RejectResponse> {
+    query_candid(env, canister_id, "email_challenge_diagnostics", (nonce,)).map(|(x,)| x)
 }
 
 pub fn email_recovery_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
-    dns_input: types::email_recovery::EmailRecoveryDnsInput,
+    dns_input: types::email_challenge::EmailChallengeDnsInput,
     session_key: types::SessionKey,
 ) -> Result<
     Result<
-        types::email_recovery::EmailRecoveryChallenge,
-        types::email_recovery::EmailRecoveryError,
+        types::email_challenge::EmailChallenge,
+        types::email_challenge::EmailChallengeError,
     >,
     RejectResponse,
 > {
@@ -710,34 +710,34 @@ pub fn email_recovery_prepare_delegation(
     .map(|(x,)| x)
 }
 
-pub fn email_recovery_submit_dkim_leaf(
+pub fn email_challenge_submit_dkim_leaf(
     env: &PocketIc,
     canister_id: CanisterId,
-    arg: types::email_recovery::EmailRecoverySubmitDkimLeafArg,
-) -> Result<Result<(), types::email_recovery::EmailRecoveryError>, RejectResponse> {
+    arg: types::email_challenge::EmailChallengeSubmitDkimLeafArg,
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
     call_candid(
         env,
         canister_id,
         RawEffectivePrincipal::None,
-        "email_recovery_submit_dkim_leaf",
+        "email_challenge_submit_dkim_leaf",
         (arg,),
     )
     .map(|(x,)| x)
 }
 
-pub fn email_recovery_resolve_via_doh(
+pub fn email_challenge_resolve_via_doh(
     env: &PocketIc,
     canister_id: CanisterId,
     nonce: &str,
-) -> Result<Result<(), types::email_recovery::EmailRecoveryError>, RejectResponse> {
-    let arg = types::email_recovery::EmailRecoveryResolveViaDohArg {
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
+    let arg = types::email_challenge::EmailChallengeResolveViaDohArg {
         nonce: nonce.to_string(),
     };
     call_candid(
         env,
         canister_id,
         RawEffectivePrincipal::None,
-        "email_recovery_resolve_via_doh",
+        "email_challenge_resolve_via_doh",
         (arg,),
     )
     .map(|(x,)| x)
@@ -748,7 +748,7 @@ pub fn email_recovery_get_delegation(
     canister_id: CanisterId,
     args: types::email_recovery::EmailRecoveryGetDelegationArgs,
 ) -> Result<
-    Result<types::SignedDelegation, types::email_recovery::EmailRecoveryError>,
+    Result<types::SignedDelegation, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     query_candid(env, canister_id, "email_recovery_get_delegation", (args,)).map(|(x,)| x)
@@ -760,13 +760,55 @@ pub fn email_recovery_credential_remove(
     sender: Principal,
     identity_number: IdentityNumber,
     address: &str,
-) -> Result<Result<(), types::email_recovery::EmailRecoveryError>, RejectResponse> {
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "email_recovery_credential_remove",
+        (identity_number, address),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn verified_email_prepare_add(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    dns_input: types::email_challenge::EmailChallengeDnsInput,
+) -> Result<
+    Result<
+        types::email_challenge::EmailChallenge,
+        types::email_challenge::EmailChallengeError,
+    >,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "verified_email_prepare_add",
+        (identity_number, dns_input),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn verified_email_remove(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    address: &str,
+) -> Result<Result<(), types::email_challenge::EmailChallengeError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "verified_email_remove",
         (identity_number, address),
     )
     .map(|(x,)| x)

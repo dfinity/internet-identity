@@ -10,10 +10,10 @@
    *      call `email_recovery_credential_prepare_add`, and show the
    *      canister-issued nonce + recipient mailbox.
    *   3. User sends a DKIM-signed email containing that nonce; we
-   *      poll `email_recovery_status`. The first non-Pending result
+   *      poll the challenge-status query. The first non-Pending result
    *      is `NeedDkimLeaf { selector }` (DNSSEC path) — at which
-   *      point we walk that one DKIM leaf and call
-   *      `email_recovery_submit_dkim_leaf`. We then keep polling
+   *      point we walk that one DKIM leaf and submit it via the
+   *      challenge submit-leaf method. We then keep polling
    *      until status flips to `RegistrationSucceeded` (or terminal
    *      Failed/Expired). On the DoH path the canister finishes
    *      verification synchronously inside `smtp_request`, so we go
@@ -26,20 +26,22 @@
 
   import EnterAddress from "./views/EnterAddress.svelte";
   import SendConfirmationEmail from "$lib/components/wizards/emailRecovery/shared/views/SendConfirmationEmail.svelte";
+  import SuccessView from "$lib/components/wizards/emailRecovery/shared/views/SuccessView.svelte";
   import FailedView from "$lib/components/wizards/emailRecovery/shared/views/FailedView.svelte";
   import UnsupportedDomain from "$lib/components/wizards/emailRecovery/shared/views/UnsupportedDomain.svelte";
   import { runEmailRecoveryPoll } from "$lib/components/wizards/emailRecovery/shared/poll";
   import type {
-    EmailRecoveryChallenge,
-    EmailRecoveryDiagnostics,
-    EmailRecoveryDnsInput,
-    EmailRecoveryError,
-    EmailRecoveryStatus,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallenge,
+    EmailChallengeDiagnostics,
+    EmailChallengeDnsInput,
+    EmailChallengeError,
+    EmailChallengeStatus,
+    EmailChallengeSubmitDkimLeafArg,
     DnsProofBundle,
   } from "$lib/generated/internet_identity_types";
   import { assembleSkeleton, type Path } from "$lib/utils/dnssec";
   import { isCanisterError } from "$lib/utils/utils";
+  import { t } from "$lib/stores/locale.store";
   import {
     setupEmailRecoveryFunnel,
     SetupEmailRecoveryEvents,
@@ -48,16 +50,18 @@
 
   interface Props {
     /** Authenticated wrapper around `email_recovery_credential_prepare_add`. */
-    prepare: (input: EmailRecoveryDnsInput) => Promise<EmailRecoveryChallenge>;
-    /** Anonymous wrapper around `email_recovery_status` (query). */
-    status: (nonce: string) => Promise<EmailRecoveryStatus>;
-    /** Anonymous wrapper around `email_recovery_diagnostics` (query). */
-    diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
-    /** Anonymous wrapper around `email_recovery_submit_dkim_leaf`. Accept-only:
-     *  rejects on a call-level error, else resolves void (poll for verdict). */
-    submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_recovery_resolve_via_doh`. */
+    prepare: (input: EmailChallengeDnsInput) => Promise<EmailChallenge>;
+    /** Anonymous wrapper around the challenge-status query. */
+    status: (nonce: string) => Promise<EmailChallengeStatus>;
+    /** Anonymous wrapper around the challenge-diagnostics query. */
+    diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
+    /** Anonymous wrapper around the challenge submit-dkim-leaf method.
+     *  Accept-only: rejects on a call-level error, else resolves void
+     *  (poll for verdict). */
+    submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
+    /** Anonymous wrapper around the challenge resolve-via-doh method. */
     resolveViaDoh: (nonce: string) => Promise<void>;
+    verifiedAddresses?: string[];
     /** Called once on `RegistrationSucceeded`. The host is expected to
      *  show a success toast and close the dialog. */
     onSuccess: (address: string) => void;
@@ -69,6 +73,7 @@
     diagnostics,
     submitDkimLeaf,
     resolveViaDoh,
+    verifiedAddresses = [],
     onSuccess,
   }: Props = $props();
 
@@ -76,7 +81,7 @@
     | { kind: "enter"; initialError?: string }
     | {
         kind: "sending";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         path: Path;
       }
@@ -87,10 +92,11 @@
     // both stages — see the guard in `runPoll`.
     | {
         kind: "waiting";
-        challenge: EmailRecoveryChallenge;
+        challenge: EmailChallenge;
         address: string;
         path: Path;
       }
+    | { kind: "succeeded"; address: string }
     | { kind: "unsupported"; domain: string }
     | { kind: "failed"; reason: string; diagnostics?: string };
 
@@ -147,7 +153,7 @@
     }
     const path: Path = dnsProof === undefined ? "doh" : "dnssec";
 
-    const input: EmailRecoveryDnsInput = {
+    const input: EmailChallengeDnsInput = {
       address,
       dns_proof: dnsProof === undefined ? [] : [dnsProof],
     };
@@ -165,7 +171,7 @@
       // — route to the dedicated unsupported view so the user gets
       // the technical "why + how to fix" treatment instead of an
       // opaque inline error string.
-      if (isCanisterError<EmailRecoveryError>(e)) {
+      if (isCanisterError<EmailChallengeError>(e)) {
         if (
           e.type === "DomainNotAllowlisted" ||
           e.type === "DomainNotSupported"
@@ -177,6 +183,11 @@
           setupEmailRecoveryFunnel.close();
           stage = { kind: "unsupported", domain };
           return;
+        }
+        if (e.type === "InvalidEmailAddress") {
+          throw new Error($t`This doesn't look like a valid email address.`, {
+            cause: e,
+          });
         }
       }
       // Anything else propagates to EnterAddress's inline error.
@@ -201,13 +212,15 @@
         failed: SetupEmailRecoveryEvents.Failed,
         unsupportedDomain: SetupEmailRecoveryEvents.UnsupportedDomain,
       },
-      // Setup completes on `RegistrationSucceeded`: bind done, hand back
-      // to the host to toast + close the dialog.
+      // Setup completes on `RegistrationSucceeded`: bind done, park
+      // the wizard on the shared SuccessView. The host's
+      // `onSuccess` fires once the user dismisses it via Done so
+      // toast + close happen together.
       handleSuccess: (result) => {
         if (!("RegistrationSucceeded" in result)) return false;
         setupEmailRecoveryFunnel.trigger(SetupEmailRecoveryEvents.Succeeded);
         setupEmailRecoveryFunnel.close();
-        onSuccess(address);
+        stage = { kind: "succeeded", address };
         return true;
       },
       isActive: () =>
@@ -246,6 +259,7 @@
 {#if stage.kind === "enter"}
   <EnterAddress
     onSubmit={handleAddressSubmitted}
+    {verifiedAddresses}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
@@ -263,6 +277,13 @@
     fromAddress={stage.address}
     path={stage.path}
     sent
+  />
+{:else if stage.kind === "succeeded"}
+  {@const succeededAddress = stage.address}
+  <SuccessView
+    address={succeededAddress}
+    flow="recovery"
+    onDone={() => onSuccess(succeededAddress)}
   />
 {:else if stage.kind === "unsupported"}
   <UnsupportedDomain domain={stage.domain} onRetry={handleRetry} />

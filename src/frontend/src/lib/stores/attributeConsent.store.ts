@@ -18,6 +18,8 @@ export interface AttributeGroup {
 export interface AttributeConsentContext {
   groups: AttributeGroup[];
   effectiveOrigin: string;
+  requestedKeys: string[];
+  recoveryAddresses: string[];
 }
 
 export interface AttributeConsent {
