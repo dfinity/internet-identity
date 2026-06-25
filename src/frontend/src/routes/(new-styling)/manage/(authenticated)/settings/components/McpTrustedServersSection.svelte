@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import {
     PlusIcon,
-    Trash2Icon,
+    XIcon,
     RotateCwIcon,
     TriangleAlertIcon,
   } from "@lucide/svelte";
@@ -149,7 +149,7 @@
         onclick={handleRemove}
         aria-label={$t`Remove ${trusted}`}
       >
-        <Trash2Icon class="size-5" />
+        <XIcon class="size-5" />
       </button>
     </div>
 
