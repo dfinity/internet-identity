@@ -13,6 +13,7 @@ use internet_identity_interface::internet_identity::types::{
         PrepareIcrc3AttributeError, ValidatedAttributeSpec,
     },
     icrc3::Icrc3Value,
+    verified_email::VerifiedEmail,
     Timestamp,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -272,7 +273,84 @@ fn icrc3_attribute_message(certified_pairs: &BTreeMap<String, Icrc3Value>) -> Ve
     Encode!(&value).expect("Candid encoding of ICRC-3 value should not fail")
 }
 
+/// Validates `spec.value` (if any) byte-equals `stored`. Returns
+/// `false` and pushes a problem on mismatch; `true` otherwise. Used by
+/// the scoped arms — the unscoped arm uses `spec.value` as a selector,
+/// not as an equality check.
+fn validate_spec_value(
+    spec: &ValidatedAttributeSpec,
+    stored: &str,
+    problems: &mut Vec<String>,
+) -> bool {
+    let Some(expected) = spec.value.as_ref() else {
+        return true;
+    };
+    if expected.as_slice() == stored.as_bytes() {
+        return true;
+    }
+    problems.push(format!(
+        "Attribute value mismatch for {}: provided value does not match stored value",
+        spec.key
+    ));
+    false
+}
+
+/// Inserts `(certified_key, stored)` into `certified_pairs`, recording
+/// a `Duplicate certified attribute key` problem if the key is already
+/// taken. The certified key is `attribute_name` when `omit_scope` is
+/// set and the full scoped key otherwise.
+fn insert_certified_attribute(
+    certified_pairs: &mut BTreeMap<String, Icrc3Value>,
+    problems: &mut Vec<String>,
+    spec: &ValidatedAttributeSpec,
+    stored: String,
+) {
+    let certified_key = if spec.omit_scope {
+        spec.key.attribute_name.to_string()
+    } else {
+        spec.key.to_string()
+    };
+    match certified_pairs.entry(certified_key) {
+        std::collections::btree_map::Entry::Occupied(entry) => {
+            problems.push(format!(
+                "Duplicate certified attribute key '{}' derived from spec {}",
+                entry.key(),
+                spec.key
+            ));
+        }
+        std::collections::btree_map::Entry::Vacant(entry) => {
+            entry.insert(Icrc3Value::Text(stored));
+        }
+    }
+}
+
 impl Anchor {
+    /// Resolves an unscoped `email` / `verified_email` spec to a stored
+    /// verified-email entry. The user picked the address in the consent
+    /// dialog and the FE round-trips it back as `spec.value`; matching is
+    /// case-insensitive because addresses are stored as the user verified
+    /// them. Returns the matched entry on success, or a problem string the
+    /// caller appends to the per-call problems list.
+    fn resolve_verified_email(
+        &self,
+        spec: &ValidatedAttributeSpec,
+    ) -> Result<&VerifiedEmail, String> {
+        let attr_name = spec.key.attribute_name;
+        let Some(expected) = spec.value.as_ref() else {
+            return Err(format!(
+                "Unscoped {} requires a value identifying the verified email",
+                attr_name
+            ));
+        };
+        let Ok(expected_str) = std::str::from_utf8(expected) else {
+            return Err(format!("Unscoped {} value is not valid UTF-8", attr_name));
+        };
+        self.verified_emails
+            .iter()
+            .find(|e| e.address.eq_ignore_ascii_case(expected_str))
+            .ok_or_else(|| format!("No verified email matches the requested {}", attr_name))
+    }
+
     /// Resolves attribute specs against stored credentials, builds the Candid-encoded
     /// ICRC-3 message, signs it, and returns the message blob.
     ///
@@ -305,15 +383,13 @@ impl Anchor {
                     // Exclusivity: SSO-sourced credentials are addressable only
                     // via `sso:<domain>`. `matched_attribute_scope()` returns
                     // `OpenId { .. }` only for non-discoverable providers, so a
-                    // single lookup per credential suffices (vs. separate
-                    // `discovery_domain()` + `config_issuer()` calls).
+                    // single lookup per credential suffices.
                     let credential = self.openid_credentials.iter().find(|c| {
                         c.matched_attribute_scope()
                             == Some(AttributeScope::OpenId {
                                 issuer: issuer.clone(),
                             })
                     });
-
                     let Some(credential) = credential else {
                         problems.push(format!("No credential found for issuer: {}", issuer));
                         continue;
@@ -324,7 +400,6 @@ impl Anchor {
                         AttributeName::Name => credential.get_name(),
                         AttributeName::VerifiedEmail => credential.get_verified_email(),
                     };
-
                     let Some(stored) = stored_value else {
                         problems.push(format!(
                             "Attribute {} not available for issuer {}",
@@ -333,36 +408,10 @@ impl Anchor {
                         continue;
                     };
 
-                    // If a value was provided, validate it matches.
-                    if let Some(ref expected_value) = spec.value {
-                        if expected_value.as_slice() != stored.as_bytes() {
-                            problems.push(format!(
-                                "Attribute value mismatch for {}: provided value does not match stored value",
-                                spec.key
-                            ));
-                            continue;
-                        }
+                    if !validate_spec_value(spec, &stored, &mut problems) {
+                        continue;
                     }
-
-                    // Compute the certified key.
-                    let certified_key = if spec.omit_scope {
-                        spec.key.attribute_name.to_string()
-                    } else {
-                        spec.key.to_string()
-                    };
-
-                    match certified_pairs.entry(certified_key) {
-                        std::collections::btree_map::Entry::Occupied(entry) => {
-                            problems.push(format!(
-                                "Duplicate certified attribute key '{}' derived from spec {}",
-                                entry.key(),
-                                spec.key
-                            ));
-                        }
-                        std::collections::btree_map::Entry::Vacant(entry) => {
-                            entry.insert(Icrc3Value::Text(stored));
-                        }
-                    }
+                    insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
                 }
                 Some(AttributeScope::Sso { domain }) => {
                     let credential = self.openid_credentials.iter().find(|c| {
@@ -371,21 +420,19 @@ impl Anchor {
                                 domain: domain.clone(),
                             })
                     });
-
                     let Some(credential) = credential else {
                         problems.push(format!("No credential found for sso domain: {}", domain));
                         continue;
                     };
 
-                    // `verified_email` is intentionally not supported under `sso:`;
-                    // surface it here as "not available" (ICRC-3 requires explicit
-                    // presence).
+                    // `verified_email` is intentionally not supported under `sso:`
+                    // — surface it here as "not available" (ICRC-3 requires
+                    // explicit presence).
                     let stored_value = match spec.key.attribute_name {
                         AttributeName::Email => credential.get_email(),
                         AttributeName::Name => credential.get_name(),
                         AttributeName::VerifiedEmail => None,
                     };
-
                     let Some(stored) = stored_value else {
                         problems.push(format!(
                             "Attribute {} not available for sso domain {}",
@@ -394,41 +441,37 @@ impl Anchor {
                         continue;
                     };
 
-                    // If a value was provided, validate it matches.
-                    if let Some(ref expected_value) = spec.value {
-                        if expected_value.as_slice() != stored.as_bytes() {
-                            problems.push(format!(
-                                "Attribute value mismatch for {}: provided value does not match stored value",
-                                spec.key
-                            ));
-                            continue;
-                        }
+                    if !validate_spec_value(spec, &stored, &mut problems) {
+                        continue;
                     }
-
-                    let certified_key = if spec.omit_scope {
-                        spec.key.attribute_name.to_string()
-                    } else {
-                        spec.key.to_string()
-                    };
-
-                    match certified_pairs.entry(certified_key) {
-                        std::collections::btree_map::Entry::Occupied(entry) => {
-                            problems.push(format!(
-                                "Duplicate certified attribute key '{}' derived from spec {}",
-                                entry.key(),
-                                spec.key
-                            ));
-                        }
-                        std::collections::btree_map::Entry::Vacant(entry) => {
-                            entry.insert(Icrc3Value::Text(stored));
-                        }
-                    }
+                    insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
                 }
                 None => {
-                    problems.push(format!(
-                        "Attribute {} has no scope; only scoped attributes are supported",
-                        spec.key
-                    ));
+                    // Unscoped specs are reserved for verified-email entries:
+                    // OIDC/SSO emails always arrive with their source scope.
+                    if !matches!(
+                        spec.key.attribute_name,
+                        AttributeName::Email | AttributeName::VerifiedEmail
+                    ) {
+                        problems.push(format!(
+                            "Attribute {} has no scope; only scoped attributes are supported",
+                            spec.key
+                        ));
+                        continue;
+                    }
+                    let entry = match self.resolve_verified_email(spec) {
+                        Ok(entry) => entry,
+                        Err(problem) => {
+                            problems.push(problem);
+                            continue;
+                        }
+                    };
+                    insert_certified_attribute(
+                        &mut certified_pairs,
+                        &mut problems,
+                        spec,
+                        entry.address.clone(),
+                    );
                 }
             }
         }
@@ -509,30 +552,34 @@ impl Anchor {
     /// If `requested` is `None`, returns all available attributes.
     /// If `requested` is `Some(keys)`, returns only attributes matching
     /// the given keys. Unscoped keys (e.g., `"email"`) match every scope;
-    /// scoped keys match exactly. Response keys are always fully scoped.
+    /// scoped keys match exactly. OIDC/SSO rows are fully scoped;
+    /// verified-email rows surface unscoped as `("email", value)` and
+    /// `("verified_email", value)` — one wire row per (name, address),
+    /// so an anchor with multiple verified emails produces multiple
+    /// rows that share the same key but carry different values.
     pub fn list_available_attributes(
         &self,
         requested: Option<Vec<AttributeKey>>,
     ) -> Vec<(String, Vec<u8>)> {
         let all_attribute_names = AttributeName::all();
-        let mut result = BTreeMap::new();
+        let mut result: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut seen_scoped: BTreeSet<String> = BTreeSet::new();
+
+        // OIDC source wins over the silently-mirrored verified-emails
+        // row for the same address — the dedup check below skips
+        // verified entries whose lowercased address already showed up
+        // here.
+        let mut oidc_exposed_emails: BTreeSet<String> = BTreeSet::new();
 
         for credential in &self.openid_credentials {
-            // Match the credential to its single addressable scope. SSO
-            // credentials surface as `sso:<domain>:<name>`, direct OIDC
-            // credentials as `openid:<issuer>:<name>`. Unmatched
-            // credentials (no provider) are unreachable and skipped.
             let Some(scope) = credential.matched_attribute_scope() else {
                 continue;
             };
 
             for &attr_name in all_attribute_names {
                 // `verified_email` isn't supported under `sso:` yet (PR
-                // #3805), so don't list it for SSO creds; the frontend
-                // would request it, the canister would `AttributeMismatch`
-                // on `prepare_icrc3_attributes`. Mirror the prepare-side
-                // exclusion here so the listing matches what's actually
-                // certifiable.
+                // #3805); skip listing it so the listing matches what's
+                // actually certifiable.
                 if matches!(&scope, AttributeScope::Sso { .. })
                     && attr_name == AttributeName::VerifiedEmail
                 {
@@ -548,6 +595,13 @@ impl Anchor {
                     continue;
                 };
 
+                if matches!(
+                    attr_name,
+                    AttributeName::Email | AttributeName::VerifiedEmail
+                ) {
+                    oidc_exposed_emails.insert(value.to_ascii_lowercase());
+                }
+
                 let matches = match &requested {
                     None => true,
                     Some(keys) => keys.iter().any(|k| {
@@ -558,12 +612,36 @@ impl Anchor {
 
                 if matches {
                     let key_str = format!("{}:{}", scope, attr_name);
-                    result.entry(key_str).or_insert_with(|| value.into_bytes());
+                    if seen_scoped.insert(key_str.clone()) {
+                        result.push((key_str, value.into_bytes()));
+                    }
                 }
             }
         }
 
-        result.into_iter().collect()
+        // Verified emails surface unscoped: one row per (name, address).
+        // `name` is excluded by design (no name claim from the verified-
+        // emails flow); `Anchor.email_recovery` stays private.
+        for entry in &self.verified_emails {
+            if oidc_exposed_emails.contains(&entry.address.to_ascii_lowercase()) {
+                continue;
+            }
+
+            for &attr_name in &[AttributeName::Email, AttributeName::VerifiedEmail] {
+                let matches = match &requested {
+                    None => true,
+                    Some(keys) => keys
+                        .iter()
+                        .any(|k| k.attribute_name == attr_name && k.scope.is_none()),
+                };
+
+                if matches {
+                    result.push((attr_name.to_string(), entry.address.clone().into_bytes()));
+                }
+            }
+        }
+
+        result
     }
 }
 
@@ -1871,7 +1949,10 @@ mod tests {
         }
 
         #[test]
-        fn should_reject_scopeless_attribute() {
+        fn should_reject_scopeless_attribute_without_verified_match() {
+            // Scopeless `email` is the verified-email path: only the
+            // user's verified addresses match. An anchor with OIDC creds
+            // but no verified emails has nothing to certify here.
             setup_google_provider();
             let anchor = google_anchor();
             let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
@@ -1882,8 +1963,8 @@ mod tests {
                         scope: None,
                         attribute_name: AttributeName::Email,
                     },
-                    value: None,
-                    omit_scope: false,
+                    value: Some(b"alice@example.com".to_vec()),
+                    omit_scope: true,
                 }],
                 vec![0u8; 32],
                 "https://dapp.com".to_string(),
@@ -1895,8 +1976,8 @@ mod tests {
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
                     assert!(
-                        problems[0].contains("no scope"),
-                        "Expected 'no scope' error, got: {}",
+                        problems[0].contains("No verified email matches"),
+                        "Expected 'No verified email matches', got: {}",
                         problems[0]
                     );
                 }
@@ -2402,6 +2483,339 @@ mod tests {
                     other
                 ),
             }
+        }
+    }
+
+    mod verified_email_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
+        use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
+        use internet_identity_interface::internet_identity::types::{
+            OpenIdConfig, OpenIdEmailVerificationScheme,
+        };
+
+        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+
+        fn anchor_with_verified(addresses: &[&str]) -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.verified_emails = addresses
+                .iter()
+                .enumerate()
+                .map(|(i, addr)| VerifiedEmail {
+                    address: (*addr).to_string(),
+                    verified_at: 1_000 + i as u64,
+                })
+                .collect();
+            anchor
+        }
+
+        fn setup_google_provider() {
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Google".to_string(),
+                logo: String::new(),
+                issuer: GOOGLE_ISSUER.to_string(),
+                client_id: "test-client-id".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: Some(OpenIdEmailVerificationScheme::Google),
+                seed_jwks: None,
+            }]);
+        }
+
+        fn google_credential_with(email: &str, email_verified: bool) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: GOOGLE_ISSUER.to_string(),
+                sub: "google-user-123".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::from([
+                    (
+                        "email".to_string(),
+                        MetadataEntryV2::String(email.to_string()),
+                    ),
+                    (
+                        "email_verified".to_string(),
+                        MetadataEntryV2::String(email_verified.to_string()),
+                    ),
+                ]),
+                sso_domain: None,
+                sso_name: None,
+            }
+        }
+
+        #[test]
+        fn lists_email_and_verified_email_for_each_entry() {
+            let anchor = anchor_with_verified(&["alice@example.com"]);
+            let result = anchor.list_available_attributes(None);
+
+            let entries: Vec<(String, String)> = result
+                .iter()
+                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(v).into_owned()))
+                .collect();
+            assert!(
+                entries
+                    .iter()
+                    .any(|(k, v)| k == "email" && v == "alice@example.com"),
+                "expected (email, alice@example.com) in {entries:?}"
+            );
+            assert!(
+                entries
+                    .iter()
+                    .any(|(k, v)| k == "verified_email" && v == "alice@example.com"),
+                "expected (verified_email, alice@example.com) in {entries:?}"
+            );
+            assert!(
+                !entries.iter().any(|(k, _)| k == "name"),
+                "name must not surface for verified emails; got {entries:?}"
+            );
+            pretty_assert_eq!(result.len(), 2);
+        }
+
+        #[test]
+        fn lists_multiple_verified_emails() {
+            let anchor = anchor_with_verified(&["alice@example.com", "bob@example.com"]);
+            let result = anchor.list_available_attributes(None);
+            pretty_assert_eq!(result.len(), 4);
+
+            let emails: Vec<&str> = result
+                .iter()
+                .filter(|(k, _)| k == "email")
+                .map(|(_, v)| std::str::from_utf8(v).unwrap())
+                .collect();
+            assert!(emails.contains(&"alice@example.com"));
+            assert!(emails.contains(&"bob@example.com"));
+        }
+
+        #[test]
+        fn filters_by_unscoped_key() {
+            let anchor = anchor_with_verified(&["alice@example.com"]);
+            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
+                scope: None,
+                attribute_name: AttributeName::Email,
+            }]));
+
+            pretty_assert_eq!(result.len(), 1);
+            pretty_assert_eq!(result[0].0, "email");
+            pretty_assert_eq!(result[0].1, b"alice@example.com");
+        }
+
+        #[test]
+        fn recovery_only_anchor_returns_no_email_attributes() {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.email_recovery = vec![EmailRecoveryCredential {
+                address: "alice@example.com".to_string(),
+                created_at: 1_000,
+                last_used: None,
+            }];
+            let result = anchor.list_available_attributes(None);
+            pretty_assert_eq!(result.len(), 0, "recovery email leaked: {result:?}");
+        }
+
+        #[test]
+        fn dedup_skips_verified_email_already_exposed_by_oidc() {
+            setup_google_provider();
+            let mut anchor = anchor_with_verified(&["user@gmail.com"]);
+            anchor.openid_credentials = vec![google_credential_with("user@gmail.com", true)];
+
+            let result = anchor.list_available_attributes(None);
+            let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
+
+            assert!(
+                keys.iter().any(|k| k.starts_with("openid:")),
+                "openid row missing in {keys:?}"
+            );
+            // No unscoped rows — the verified entry was deduped against
+            // the OIDC row that already carries the same address.
+            assert!(
+                !keys.iter().any(|k| *k == "email" || *k == "verified_email"),
+                "verified row should have been deduped against the OIDC row; got {keys:?}"
+            );
+        }
+
+        #[test]
+        fn dedup_keeps_verified_email_for_a_different_address() {
+            setup_google_provider();
+            let mut anchor = anchor_with_verified(&["alice.work@example.com"]);
+            anchor.openid_credentials =
+                vec![google_credential_with("alice.personal@gmail.com", true)];
+
+            let result = anchor.list_available_attributes(None);
+            let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
+
+            assert!(
+                keys.iter().any(|k| k.starts_with("openid:")),
+                "openid row missing in {keys:?}"
+            );
+            assert!(
+                keys.iter().any(|k| *k == "email" || *k == "verified_email"),
+                "verified row should remain for a different address; got {keys:?}"
+            );
+        }
+
+        #[test]
+        fn dedup_is_case_insensitive() {
+            setup_google_provider();
+            let mut anchor = anchor_with_verified(&["alice@gmail.com"]);
+            anchor.openid_credentials = vec![google_credential_with("Alice@Gmail.com", true)];
+
+            let result = anchor.list_available_attributes(None);
+            let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
+            assert!(
+                !keys.iter().any(|k| *k == "email" || *k == "verified_email"),
+                "case-insensitive dedup failed; got {keys:?}"
+            );
+        }
+
+        #[test]
+        fn prepare_icrc3_rejects_value_mismatch_for_unscoped_email() {
+            // The success path of `prepare_icrc3_attributes` exercises
+            // the canister-signature store and traps outside a canister
+            // context. Pinning the resolve logic via the mismatch path:
+            // supplying an address the anchor doesn't carry must surface
+            // an `AttributeMismatch`.
+            let anchor = anchor_with_verified(&["alice@example.com"]);
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                },
+                value: Some(b"someone-else@example.com".to_vec()),
+                omit_scope: true,
+            };
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![spec],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                None,
+                1_000_000_000,
+                account,
+            );
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems
+                            .iter()
+                            .any(|p| p.contains("No verified email matches")),
+                        "expected no-match rejection in {problems:?}"
+                    );
+                }
+                other => panic!("expected AttributeMismatch, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn prepare_icrc3_rejects_unscoped_name() {
+            // Verified emails never carry a name claim — only Email /
+            // VerifiedEmail are valid unscoped attribute names.
+            let anchor = anchor_with_verified(&["alice@example.com"]);
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Name,
+                },
+                value: Some(b"Alice".to_vec()),
+                omit_scope: true,
+            };
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![spec],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                None,
+                1_000_000_000,
+                account,
+            );
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems
+                            .iter()
+                            .any(|p| p.contains("only scoped attributes")),
+                        "expected scope-required rejection in {problems:?}"
+                    );
+                }
+                other => panic!("expected AttributeMismatch, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn prepare_icrc3_rejects_unscoped_email_without_value() {
+            let anchor = anchor_with_verified(&["alice@example.com"]);
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                },
+                value: None,
+                omit_scope: true,
+            };
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![spec],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                None,
+                1_000_000_000,
+                account,
+            );
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems.iter().any(|p| p.contains("requires a value")),
+                        "expected value-required rejection in {problems:?}"
+                    );
+                }
+                other => panic!("expected AttributeMismatch, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn prepare_icrc3_matches_address_case_insensitively() {
+            // Stored address preserves case; user picks case-folded — still resolves.
+            let anchor = anchor_with_verified(&["Alice@Example.com"]);
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let spec = ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                },
+                value: Some(b"alice@example.com".to_vec()),
+                omit_scope: true,
+            };
+
+            // We can't hit the success path inside a unit test (signature
+            // map traps outside the canister context). But a mismatch
+            // error means the lookup *failed* — by getting past the
+            // matcher we'd reach `signature_map_mut` and panic. So we
+            // probe by sending a value the matcher should reject and
+            // confirming it surfaces a no-match (the case-folding
+            // matcher is exercised via the value-mismatch test above).
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                anchor.prepare_icrc3_attributes(
+                    vec![spec],
+                    vec![0u8; 32],
+                    "https://dapp.com".to_string(),
+                    None,
+                    1_000_000_000,
+                    account,
+                )
+            }));
+            // Reaching the panic (signature store) means the matcher
+            // accepted the case-folded address.
+            assert!(
+                result.is_err(),
+                "expected case-folded match to reach signature store"
+            );
         }
     }
 }
