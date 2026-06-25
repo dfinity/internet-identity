@@ -271,9 +271,13 @@
               ? lastUsedAuthMethod.sso.loginHint
               : undefined;
         let jwt: string;
+        let ssoDiscoveryPromise:
+          | ReturnType<typeof discoverSsoConfig>
+          | undefined;
         if (ssoDomain !== undefined) {
+          ssoDiscoveryPromise = discoverSsoConfig(ssoDomain);
           jwt = await requestWithPopup(
-            discoverSsoConfig(ssoDomain).then((ssoResult) => ({
+            ssoDiscoveryPromise.then((ssoResult) => ({
               clientId: ssoResult.clientId,
               authURL: ssoResult.discovery.authorization_endpoint,
               authScope: selectAuthScopes(
@@ -298,11 +302,17 @@
             { nonce: session.nonce, mediation: "optional", loginHint },
           );
         }
-        const { iss: jwtIss, sub, loginHint: jwtLoginHint } = decodeJWT(jwt);
+        const {
+          iss: jwtIss,
+          sub,
+          loginHint: jwtLoginHint,
+          email: jwtEmail,
+        } = decodeJWT(jwt);
         const { identity, identityNumber } = await authenticateWithJWT({
           canisterId,
           session,
           jwt,
+          discoveryDomain: ssoDomain,
         });
         // The OAuth popup lets the user pick any account — if they choose one
         // linked to a different anchor, the JWT authenticates to that anchor.
@@ -318,13 +328,32 @@
           identityNumber,
           authMethod: { openid: { iss: jwtIss, sub } },
         });
+        const ssoName =
+          ssoDiscoveryPromise !== undefined
+            ? (await ssoDiscoveryPromise).name
+            : undefined;
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber,
           name: data.identityInfo.name[0],
           createdAtMillis,
-          authMethod: {
-            openid: { iss: jwtIss, sub, loginHint: jwtLoginHint, metadata },
-          },
+          authMethod:
+            ssoDomain !== undefined
+              ? {
+                  sso: {
+                    domain: ssoDomain,
+                    name: ssoName,
+                    email: jwtEmail,
+                    loginHint: jwtLoginHint,
+                  },
+                }
+              : {
+                  openid: {
+                    iss: jwtIss,
+                    sub,
+                    loginHint: jwtLoginHint,
+                    metadata,
+                  },
+                },
         });
       }
       switchingAccessMethodKey = undefined;
