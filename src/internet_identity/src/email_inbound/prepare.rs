@@ -1,31 +1,6 @@
-//! Shared `prepare_common` core used by both flow-specific entry
-//! points ([`crate::email_recovery::prepare::prepare_add`] /
-//! `prepare_delegation` and
-//! [`crate::verified_emails::prepare::prepare_add`]).
-//!
-//! Validates the FE's input (address shape, registered-domain
-//! extraction), picks the verification path (DNSSEC skeleton if a
-//! bundle is supplied and the deploy flag is on, DoH allowlist
-//! otherwise), draws a fresh nonce from the heap PRNG, and parks a
-//! `PendingChallenge` keyed by that nonce. Returns the user-visible
-//! challenge (nonce + expiry) so the FE can render the "send a magic
-//! email" screen.
-//!
-//! Path picker (see `docs/ongoing/email-recovery.md` §8.4):
-//!
-//! - **DNSSEC**: when `dns_proof` is supplied and the flag is on,
-//!   validate the *skeleton chain* (root DNSKEY + delegations)
-//!   synchronously against the canister's trust anchors and cache the
-//!   deepest-zone DNSKEY RRset on the pending challenge. The bundle
-//!   may also carry an optional DMARC leaf at `_dmarc.<domain>`; if
-//!   present we validate it and cache the TXT bytes. The DKIM leaf is
-//!   *not* in this bundle — it lands later via
-//!   `email_challenge_submit_dkim_leaf`.
-//! - **DoH allowlist**: when `dns_proof` is absent (or the flag is
-//!   off), the registered domain must be in `DohConfig.allowed_domains`.
-//!   The DKIM TXT is resolved via `crate::doh::fetch_txt` at
-//!   email-arrival time and verification finishes inside
-//!   `smtp_request` (no submit-leaf follow-up).
+//! Shared `prepare_common` core used by the recovery and verified-
+//! emails flows. See `docs/ongoing/email-recovery.md` §8.4 for the
+//! DNSSEC-vs-DoH path picker.
 
 use super::pending::{insert_with_eviction, PendingChallenge, PendingKind, PendingStatus};
 use super::rng::{draw_nonce_bytes, ensure_seeded, format_nonce_with_prefix};
@@ -52,11 +27,8 @@ pub(crate) async fn prepare_common(
     // Sanity check the address shape. Detailed RFC 5321/5322 validation
     // is the verifier's job; here we just want to fail fast on the
     // obviously-malformed inputs (no `@`, leading/trailing whitespace,
-    // empty parts, oversized local-part) so the FE doesn't get back an
-    // opaque rejection half a flow later. Reported as
-    // `InvalidEmailAddress` so the wizard can show an inline form error
-    // instead of routing to the "domain not supported" view, which is
-    // for valid addresses whose domain we can't verify.
+    // empty parts) so the FE doesn't get back an opaque rejection
+    // half a flow later.
     let address = normalize_address(&address)
         .ok_or_else(|| EmailChallengeError::InvalidEmailAddress(address.clone()))?;
     let registered_domain = registered_domain_of(&address)

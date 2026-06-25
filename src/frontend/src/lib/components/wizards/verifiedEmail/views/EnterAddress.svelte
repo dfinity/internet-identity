@@ -7,22 +7,9 @@
   interface Props {
     onSubmit: (address: string) => Promise<void>;
     initialAddress?: string;
-    /** When true, the input is locked to `initialAddress` — used by the
-     *  Phase 1.5 "Verify from unverified" entry mode so a user can't
-     *  silently swap the address being verified. */
     addressLocked?: boolean;
     initialError?: string;
-    /** Case-insensitive pool of addresses bound to the user's recovery
-     *  email slot. When the typed address matches one of these, render
-     *  a non-blocking heads-up — recovery and verified are independent
-     *  buckets, so adding the same address here means a second DKIM
-     *  round-trip. Continue still works. */
     recoveryAddresses?: string[];
-    /** Case-insensitive pool of addresses already in the anchor's
-     *  verified-emails bucket. Used to block a duplicate submission
-     *  client-side; the canister would reject it anyway, but failing
-     *  fast here saves a round-trip and lets us show a clear inline
-     *  error instead of a generic canister rejection. */
     verifiedAddresses?: string[];
   }
 
@@ -59,9 +46,6 @@
       verifiedAddresses.some((a) => a.toLowerCase() === normalized),
   );
 
-  // Inline error shown under the input. Duplicate-state takes priority
-  // over the last submit error so an out-of-date error string can't
-  // linger on top of the live duplicate signal once the user retypes.
   const error = $derived(
     isDuplicate ? $t`You've already verified this email.` : submitError,
   );

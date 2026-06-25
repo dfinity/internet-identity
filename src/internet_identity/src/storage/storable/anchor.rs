@@ -29,10 +29,7 @@ pub struct StorableAnchor {
     /// pattern as `passkey_credentials` / `recovery_keys` above.
     #[n(5)]
     pub email_recovery: Option<Vec<StorableEmailRecoveryCredential>>,
-    /// Verified emails — a parallel anchor primitive to
-    /// `email_recovery`. Cap enforced at the API layer
-    /// (`MAX_VERIFIED_EMAILS_PER_ANCHOR`). `Option` keeps anchors
-    /// written before this field decoded cleanly.
+    /// `Option` so pre-existing anchors decode cleanly.
     #[n(6)]
     pub verified_emails: Option<Vec<StorableVerifiedEmail>>,
 }

@@ -221,9 +221,7 @@ pub fn add_openid_credential_skip_checks(
     let mirrored_address = openid_credential.get_verified_email();
     anchor.add_openid_credential(openid_credential.clone())?;
 
-    // Silently mirror an IdP-vouched email into the anchor's verified-emails
-    // list so the address survives an OIDC unlink. The user can still remove
-    // the entry from the panel; re-adding then goes through the DKIM flow.
+    // Mirror so the address survives an OIDC unlink.
     if let Some(address) = mirrored_address {
         anchor.mirror_verified_email_from_oidc(&address, time());
     }

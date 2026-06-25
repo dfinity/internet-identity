@@ -275,9 +275,6 @@ type ConsentPipeline = {
   origin: string;
   unmappedOrigin: string;
   groups: AttributeGroup[];
-  /** Recovery-email addresses on the anchor, fed to the inline verify
-   *  wizard so it can flag a cross-bucket overlap when the user types
-   *  an address that's already their recovery email. */
   recoveryAddresses: string[];
 };
 
@@ -316,11 +313,6 @@ const resolveConsentPipeline = async (params: {
     // keys. Today it errors on anything it doesn't recognise, which would
     // reject mixed `["email", "favorite_color"]` requests outright — so for
     // now we ask for everything available on the anchor and filter below.
-    //
-    // `identity_info` runs in parallel with `list_available_attributes` so
-    // the inline verify wizard's cross-bucket overlap warning has the
-    // anchor's recovery-email addresses to compare against without a
-    // serial roundtrip.
     const availablePromise: Promise<Array<[string, Uint8Array | number[]]>> =
       requestedKeys.length > 0
         ? authenticated.actor
@@ -692,11 +684,8 @@ export const handleIcrc3ConsentAttributes =
           omit_scope: boolean;
         }>;
 
-        // Only unscoped email/verified_email requests can be satisfied by
-        // verifying a fresh address. Scoped keys (openid:..., sso:...,
-        // verified:...) are pinned to a specific source that DKIM
-        // verification can't satisfy, so they fall through to the
-        // empty-set short-circuit.
+        // Only unscoped email/verified_email; scoped keys are pinned to
+        // a source that the inline verify wizard can't satisfy.
         const emailRequested = requestedKeys.some((key) => {
           if (extractScope(key) !== undefined) return false;
           const name = extractAttributeName(key);
@@ -704,15 +693,11 @@ export const handleIcrc3ConsentAttributes =
         });
 
         if (pipeline.groups.length === 0 && !emailRequested) {
-          // Nothing the dapp requested is available and there's no inline
-          // "Verify an email" affordance to surface — certify an empty set
-          // and auto-resolve consent so the UI skips the empty picker view.
+          // Nothing to share and no inline "Verify an email" affordance —
+          // certify an empty set so the UI skips the empty picker view.
           attributeSpecs = [];
           attributeConsentStore.setConsent({ attributes: [] });
         } else {
-          // Either there's something to pick, OR the view will surface the
-          // empty-state verify CTA and drive its own refetch loop before
-          // calling setConsent. Either way, wait for the consent decision.
           const consent = await waitForStore(attributeConsentResultStore);
           attributeSpecs = consent.attributes.map((attr) => ({
             key: attr.key,

@@ -7,11 +7,6 @@
   interface Props {
     onSubmit: (address: string) => Promise<void>;
     initialError?: string;
-    /** Case-insensitive pool of addresses the user has already verified
-     *  on the share page. When the typed address matches one of these,
-     *  render a non-blocking heads-up — recovery and verified are
-     *  independent buckets, so setting the same address here means a
-     *  second DKIM round-trip. Continue still works. */
     verifiedAddresses?: string[];
   }
 

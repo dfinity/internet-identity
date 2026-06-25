@@ -1561,12 +1561,6 @@ mod openid_api {
 /// `ic_cdk::api::time` so the inner functions stay testable), and
 /// the FE-facing `Result` shape. `status` is anonymous for both
 /// flows since the nonce is the only secret needed to poll.
-/// Canister handlers for the shared inbound-DKIM challenge primitive
-/// (the SMTP gateway entry points + polling/leaf-submission/DoH-
-/// resolution). Flow-neutral: the same handlers serve both the recovery
-/// flow and the verified-emails flow. Dispatch to the right anchor sink
-/// is by `PendingKind` inside the canister, not by which method the FE
-/// called.
 mod email_challenge_api {
     use super::*;
     use crate::email_inbound;
@@ -1773,11 +1767,6 @@ mod email_challenge_api {
     }
 }
 
-/// Canister handlers for the recovery flow (recovery-as-login). Builds
-/// on the shared challenge primitive in [`email_challenge_api`]; what
-/// this module adds is the recovery-specific surface: setup, the
-/// anonymous prepare-delegation entry point, the canister-signature
-/// retrieval, and credential removal.
 mod email_recovery_api {
     use super::*;
     use crate::authz_utils::check_authorization;
@@ -1913,11 +1902,6 @@ mod email_recovery_api {
     }
 }
 
-/// Canister handlers for the verified-emails flow. Builds on the same
-/// shared challenge primitive in [`email_challenge_api`] as the recovery
-/// flow; what this module adds is the verified-email-specific surface:
-/// adding an address (`II-Verify-` nonce, anchor-bound, cap-enforced)
-/// and removing one.
 mod verified_email_api {
     use super::*;
     use crate::authz_utils::check_authorization;
@@ -1925,22 +1909,6 @@ mod verified_email_api {
         EmailChallenge, EmailChallengeDnsInput, EmailChallengeError,
     };
 
-    /// Authenticated. Parallel to
-    /// `email_recovery_credential_prepare_add` but kicks off the
-    /// verified-email flow: the nonce is issued with the
-    /// `II-Verify-` prefix and the pending entry carries
-    /// `PendingKind::VerifyEmail { anchor }`. On success the SMTP
-    /// path writes a `StorableVerifiedEmail` onto
-    /// `anchor.verified_emails`. Capped at
-    /// `MAX_VERIFIED_EMAILS_PER_ANCHOR` per anchor; the cap is
-    /// checked here before issuing the nonce so the FE wizard can
-    /// surface "limit reached" without round-tripping.
-    ///
-    /// **Security:** caller must be the anchor controller — enforced
-    /// by `check_authorization(identity_number)`. Resource exposure
-    /// is bounded by the same pending-map cap + TTL as the recovery
-    /// flow; the prefix split prevents an inbound challenge from
-    /// being cross-applied between flows.
     #[update]
     async fn verified_email_prepare_add(
         identity_number: IdentityNumber,
@@ -1953,10 +1921,6 @@ mod verified_email_api {
         crate::verified_emails::prepare_add(identity_number, dns_input, now_secs).await
     }
 
-    /// Authenticated. Drops a previously-verified address from
-    /// `anchor.verified_emails`. Parallel to
-    /// `email_recovery_credential_remove`; emits
-    /// `Operation::RemoveVerifiedEmail` for the archive stream.
     #[update]
     fn verified_email_remove(
         identity_number: IdentityNumber,

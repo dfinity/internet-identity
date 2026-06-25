@@ -39,12 +39,8 @@
 
   const { context, variant, onConsent }: Props = $props();
 
-  /** Whether the dapp asked for an **unscoped** `email` or `verified_email`.
-   *  Drives the empty-state branch below. Scoped requests
-   *  (`openid:<iss>:email`, `sso:<domain>:verified_email`, etc.) are pinned
-   *  to a specific source — verifying a fresh email via DKIM wouldn't
-   *  satisfy them, so we fall through to the empty-set short-circuit
-   *  upstream instead of surfacing a CTA the user can't act on. */
+  // Unscoped email/verified_email only; scoped keys are pinned to a
+  // source that the inline verify wizard can't satisfy.
   const isEmailKey = (key: string): boolean => {
     if (extractScope(key) !== undefined) return false;
     const name = extractAttributeName(key);
@@ -144,10 +140,8 @@
     return () => ro.disconnect();
   });
 
-  /** Live group list — initially derived from the resolved context, but
-   *  mutated by {@link handleVerifySuccess} when the user verifies an
-   *  email from the empty-state pane so a fresh `list_available_attributes`
-   *  result can surface as a picker without remounting the view. */
+  // Mutated by handleVerifySuccess after a mid-flow verification so a
+  // fresh list_available_attributes can surface as a picker.
   let displayGroups = $state<MergedGroup[]>([]);
 
   /** Resolves only when the consent rows are fully ready to render:
@@ -174,10 +168,6 @@
 
   let showVerifyWizard = $state(false);
 
-  // --- Canister wrappers for the inline verify flow ------------------
-  // Same shape as the settings panel: authenticated `prepare_add`, anonymous
-  // status / diagnostics / submit / DoH (keyed by nonce, flow-neutral).
-
   const prepareAddVerifiedEmail = (input: EmailChallengeDnsInput) =>
     $authenticatedStore.actor
       .verified_email_prepare_add($authenticatedStore.identityNumber, input)
@@ -203,11 +193,6 @@
     );
   };
 
-  /** Re-evaluate available attributes after a successful verification and
-   *  update {@link displayGroups}. If the canister now exposes the verified
-   *  email as an attribute source (Phase 2+ wiring), the empty-state pane
-   *  is replaced by the picker; otherwise the user lands back on the same
-   *  pane and can fall through with "Skip for now". */
   const refetchGroups = async (requestedKeys: string[]): Promise<void> => {
     try {
       const available = await $authenticatedStore.actor
@@ -334,11 +319,6 @@
   <div class="flex min-w-0 flex-1 flex-col">
     <AuthorizeHeader origin={data.effectiveOrigin} />
     {#if displayGroups.length === 0 && data.emailRequested}
-      <!-- Empty-state pane: the dapp asked for an email-shaped attribute
-           but the user has no source available. Offer an inline
-           "Verify an email" affordance; "Skip for now" falls through to
-           the same empty-set certification the handler used to short-
-           circuit silently. -->
       <div
         class="bg-bg-tertiary text-fg-tertiary mb-4 flex size-14 items-center justify-center rounded-2xl"
       >

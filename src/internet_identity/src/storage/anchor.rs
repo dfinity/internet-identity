@@ -36,8 +36,7 @@ pub struct Anchor {
     /// is a `Vec` so the data model can carry multiple in the future
     /// without another schema bump.
     pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
-    /// Verified emails — a parallel anchor primitive to
-    /// `email_recovery`. Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
+    /// Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
     pub(crate) verified_emails: Vec<VerifiedEmail>,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
@@ -875,19 +874,9 @@ impl Anchor {
         Ok(())
     }
 
-    /// Mirror an IdP-vouched email into the anchor's verified-emails list.
-    /// Called from `add_openid_credential_skip_checks` whenever an OIDC or
-    /// SSO credential is linked and the provider vouches for the address.
-    ///
-    /// Returns `true` when an entry was appended, `false` otherwise (already
-    /// present, or cap reached). Never errors — the surrounding OIDC link
-    /// must not fail just because the verified-emails bucket is full.
-    ///
-    /// The mirror only fires on link: removing the OIDC credential later
-    /// leaves the entry in place, so the address survives an unlink. If the
-    /// user manually removes the entry from the panel, re-adding requires
-    /// the DKIM verification flow — re-linking the OIDC credential does
-    /// not refresh `verified_at` on a pre-existing entry.
+    /// Returns `true` when appended, `false` if already present or cap
+    /// reached. Never errors — the surrounding OIDC link must not fail
+    /// just because the verified-emails bucket is full.
     pub fn mirror_verified_email_from_oidc(
         &mut self,
         address: &str,

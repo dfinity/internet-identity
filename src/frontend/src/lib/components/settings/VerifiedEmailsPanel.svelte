@@ -1,18 +1,4 @@
 <script lang="ts">
-  /**
-   * Narrow "Verified emails" settings panel — Phase 1 of the verified-
-   * email feature. Lists `verified_emails` entries from the
-   * authenticated `IdentityInfo`, lets the user add a new one via
-   * {@link VerifiedEmailWizard}, and lets the user remove an existing
-   * one. Phase 1.5 widens this into the unified "Reach" page (verified
-   * via IdP _or_ via this flow + unverified IdP rows); Phase 2 wires
-   * `verified_emails` into the attribute-source pipeline so dapps can
-   * actually request these addresses.
-   *
-   * Recovery emails are intentionally NOT shown here — they live on
-   * the existing recovery card and remain a distinct concept.
-   */
-
   import { MailCheckIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { anonymousActor } from "$lib/globals";
@@ -33,19 +19,8 @@
   } from "$lib/generated/internet_identity_types";
 
   interface Props {
-    /** Current `verified_emails` list — comes from `IdentityInfo` via
-     *  the (authenticated) layout. The panel renders this list as-is;
-     *  add/remove call `invalidateAll()` so the layout re-fetches. */
     verifiedEmails: VerifiedEmail[];
-    /** Per-anchor cap, surfaced from the canister via
-     *  `MAX_VERIFIED_EMAILS_PER_ANCHOR`. Wired in as a prop so the
-     *  panel doesn't hard-code it; bumping the constant is a backend
-     *  change that should propagate without a frontend edit. */
     capacity: number;
-    /** Recovery-email addresses on this anchor (currently 0 or 1 — the
-     *  candid is `opt vec` for future multi-credential support). Wired
-     *  through to the verify wizard for the cross-bucket overlap
-     *  heads-up. */
     recoveryAddresses?: string[];
   }
 
@@ -54,23 +29,16 @@
   let showAddWizard = $state(false);
   let removingAddress = $state<string | undefined>(undefined);
 
-  // Aliased so the lingui-extracted placeholder name in the count-chip
-  // aria-label stays `count` even if the underlying prop or expression
-  // changes — renaming `verifiedEmails.length` directly would orphan
-  // existing translations of `${length} of ${capacity} verified emails`.
+  // Aliased so the lingui-extracted placeholder name stays `count` —
+  // renaming `verifiedEmails.length` would orphan translations.
   const count = $derived(verifiedEmails.length);
   const isFull = $derived(count >= capacity);
 
-  // --- Canister wrappers (same as recovery wizard) -------------------
-
-  /** Authenticated wrapper around `verified_email_prepare_add`. */
   const prepareAddVerifiedEmail = (input: EmailChallengeDnsInput) =>
     $authenticatedStore.actor
       .verified_email_prepare_add($authenticatedStore.identityNumber, input)
       .then(throwCanisterError);
 
-  /** Anonymous wrappers — status / diagnostics / submit / DoH are
-   *  shared with the recovery flow (keyed by nonce, not by purpose). */
   const statusEmailRecovery = (nonce: string) =>
     anonymousActor.email_challenge_status(nonce);
 
@@ -90,8 +58,6 @@
       await anonymousActor.email_challenge_resolve_via_doh({ nonce }),
     );
   };
-
-  // --- Handlers ------------------------------------------------------
 
   const handleAddSuccess = (address: string) => {
     showAddWizard = false;
@@ -160,13 +126,6 @@
   </div>
 
   {#if count === 0}
-    <!-- Dedicated empty-state container — mirrors the access page's
-         "Add new" idiom (a single full-width CTA card with icon +
-         label + click target) so the user has one clear next step
-         instead of a separate header-row Add button paired with an
-         inert "no rows yet" placeholder. The descriptive bits inside
-         are aria-hidden so the button's accessible name is just
-         "Add an email" rather than the concatenated visible copy. -->
     <button
       onclick={() => (showAddWizard = true)}
       aria-label={$t`Add an email`}

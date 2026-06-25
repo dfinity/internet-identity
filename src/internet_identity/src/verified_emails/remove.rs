@@ -1,38 +1,11 @@
-//! `verified_email_remove` — drop a verified address from an anchor.
-//!
-//! Parallel to `email_recovery::remove::remove_credential`. Same
-//! design notes apply:
-//!
-//! - The caller must *name* the address being removed, even though
-//!   the FE could in principle pass the index. Matching by string
-//!   keeps the FE honest if it ever caches a stale list, and lets
-//!   the confirmation modal show the address verbatim.
-//! - Emits `Operation::RemoveVerifiedEmail` for the archive stream.
-//!   The variant carries no payload — anchor + timestamp on the
-//!   surrounding entry are enough to answer "who dropped a verified
-//!   email when?" without leaking the address itself.
-//!
-//! Idempotency: a second remove of the same address returns
-//! `NotRegistered` rather than `Ok(())`. The FE shouldn't retry on
-//! success, but if it does (network blip), this loud-fail surfaces
-//! the bug instead of silently masking it.
-
 use crate::storage::anchor::Anchor;
 use internet_identity_interface::archive::types::Operation;
 
-/// Why a `verified_email_remove` call failed. The verified-email flow
-/// defines its own error rather than sharing `email_recovery::RemoveError`
-/// so the two anchor primitives stay structurally independent — see
-/// the module rustdoc on [`crate::verified_emails`].
 #[derive(Debug, Eq, PartialEq)]
 pub enum RemoveError {
-    /// No entry on the anchor's `verified_emails` list matched the
-    /// supplied address.
     NotRegistered,
 }
 
-/// Detach the verified email at `address` from `anchor`. Returns
-/// the archive `Operation` on success.
 pub fn remove(anchor: &mut Anchor, address: &str) -> Result<Operation, RemoveError> {
     let position = anchor
         .verified_emails

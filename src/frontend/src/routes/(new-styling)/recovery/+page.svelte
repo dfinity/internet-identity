@@ -89,11 +89,8 @@
       .email_recovery_prepare_delegation(input, sessionPublicKey)
       .then(throwCanisterError);
 
-  // Recovery-as-login keeps calling the original `email_recovery_*`
-  // method names (the BE exposes them as aliases of the renamed
-  // `email_challenge_*` surface) so the FE bundle stays compatible
-  // with both the pre-rename BE and the post-rename BE during a
-  // staggered deploy.
+  // Stick with the `email_recovery_*` aliases so the FE bundle works
+  // against both the pre-rename and post-rename BE during a deploy.
 
   const emailRecoveryStatus = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);

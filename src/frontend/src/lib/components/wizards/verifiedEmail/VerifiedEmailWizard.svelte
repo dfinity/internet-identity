@@ -1,33 +1,4 @@
 <script lang="ts">
-  /**
-   * Setup wizard for binding an email address as a **verified email**
-   * to the currently-authenticated Internet Identity. Parallel to
-   * {@link SetupEmailRecoveryWizard} — both flows ride the same SMTP
-   * gateway, DKIM verifier and DMARC alignment; the only differences
-   * are which canister method binds the entry, which `Anchor` field
-   * it lands on, and the nonce prefix (`II-Verify-` here vs
-   * `II-Recovery-` on the recovery wizard).
-   *
-   * Flow mirrors the recovery setup wizard:
-   *
-   *   1. User types their email address.
-   *   2. Assemble a DNSSEC skeleton bundle, call
-   *      `verified_email_prepare_add`, show the canister-issued nonce
-   *      + recipient mailbox (`register@<related_origin>` — same
-   *      recipient as the recovery setup flow; the `II-Verify-`
-   *      subject prefix is what disambiguates the two on the canister
-   *      side).
-   *   3. User sends the DKIM-signed email; we poll
-   *      `email_challenge_status` (shared with recovery — keyed by
-   *      nonce, not by flow). On the DNSSEC path that yields a
-   *      `NeedDkimLeaf` step; on the DoH path verification finishes
-   *      synchronously and the loop goes straight to terminal.
-   *
-   * On success the wizard hands control back to the host via
-   * `onSuccess(address)`; the host fires a toast and closes the
-   * dialog.
-   */
-
   import EnterAddress from "./views/EnterAddress.svelte";
   import SendConfirmationEmail from "$lib/components/wizards/emailRecovery/shared/views/SendConfirmationEmail.svelte";
   import SuccessView from "$lib/components/wizards/emailRecovery/shared/views/SuccessView.svelte";
@@ -53,31 +24,15 @@
   import { onDestroy, onMount } from "svelte";
 
   interface Props {
-    /** Authenticated wrapper around `verified_email_prepare_add`. */
     prepare: (input: EmailChallengeDnsInput) => Promise<EmailChallenge>;
-    /** Anonymous wrapper around `email_challenge_status` (query). Status,
-     *  diagnostics, submit-dkim-leaf and resolve-via-doh are shared with
-     *  the recovery flow — keyed by nonce. */
     status: (nonce: string) => Promise<EmailChallengeStatus>;
-    /** Anonymous wrapper around `email_challenge_diagnostics` (query). */
     diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
-    /** Anonymous wrapper around `email_challenge_submit_dkim_leaf`. */
     submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
-    /** Anonymous wrapper around `email_challenge_resolve_via_doh`. */
     resolveViaDoh: (nonce: string) => Promise<void>;
-    /** Address to pre-fill (Phase 1.5 "Verify from unverified" entry). */
     initialAddress?: string;
-    /** When true, the address input is locked to `initialAddress`. */
     addressLocked?: boolean;
-    /** Pool of addresses bound to the user's recovery email slot — the
-     *  wizard surfaces a non-blocking heads-up when the typed address
-     *  matches one of them. */
     recoveryAddresses?: string[];
-    /** Addresses already in the anchor's verified-emails bucket — used
-     *  to block a duplicate submit client-side. */
     verifiedAddresses?: string[];
-    /** Called once on `RegistrationSucceeded`. The host shows a toast
-     *  and closes the dialog. */
     onSuccess: (address: string) => void;
   }
 
@@ -164,8 +119,6 @@
           stage = { kind: "unsupported", domain };
           return;
         }
-        // Prepare-time variants that the EnterAddress view surfaces
-        // inline rather than via a dedicated stage.
         if (e.type === "LimitReached") {
           const { limit } = e.value("LimitReached");
           throw new Error(
@@ -204,9 +157,6 @@
         if (!("RegistrationSucceeded" in result)) return false;
         setupVerifiedEmailFunnel.trigger(SetupVerifiedEmailEvents.Succeeded);
         setupVerifiedEmailFunnel.close();
-        // Park the wizard on the success step; the host's
-        // `onSuccess` fires once the user dismisses it via Done so
-        // toast + close happen together.
         stage = { kind: "succeeded", address };
         return true;
       },

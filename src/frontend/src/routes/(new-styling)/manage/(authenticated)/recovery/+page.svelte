@@ -68,10 +68,6 @@
    */
   let emailRecovery = $derived(data.identityInfo.email_recovery[0]?.[0]);
 
-  // Threaded into the recovery wizard for the cross-bucket overlap
-  // heads-up: when a user types an address that's already in their
-  // verified-emails bucket, the wizard warns that the two are
-  // independent (recovery here is a second DKIM round-trip).
   let verifiedAddresses = $derived(
     (data.identityInfo.verified_emails[0] ?? []).map((e) => e.address),
   );
@@ -281,11 +277,8 @@
       )
       .then(throwCanisterError);
 
-  // Recovery flow keeps calling the original `email_recovery_*` method
-  // names (the BE exposes them as aliases of the renamed
-  // `email_challenge_*` surface). This keeps the FE bundle compatible
-  // with both the pre-rename BE and the post-rename BE, so the
-  // recovery flow doesn't break in an FE-first deploy window.
+  // Stick with the `email_recovery_*` aliases so the FE bundle works
+  // against both the pre-rename and post-rename BE during a deploy.
 
   /** Anonymous wrapper around `email_recovery_status` (query). */
   const statusEmailRecovery = (nonce: string) =>

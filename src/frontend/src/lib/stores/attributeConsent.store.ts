@@ -18,15 +18,7 @@ export interface AttributeGroup {
 export interface AttributeConsentContext {
   groups: AttributeGroup[];
   effectiveOrigin: string;
-  /** Requested keys from the JSON-RPC params, preserved through the
-   *  pipeline so the empty-state branch in the consent view can decide
-   *  whether to offer an inline "Verify an email" affordance — and after
-   *  a verification, re-resolve groups against the same request shape. */
   requestedKeys: string[];
-  /** Anchor's recovery-email addresses (currently 0 or 1; candid is
-   *  `opt vec` for future multi-credential support). Surfaced so the
-   *  inline verify wizard can raise the cross-bucket overlap warning
-   *  when the typed address already lives in the recovery slot. */
   recoveryAddresses: string[];
 }
 
