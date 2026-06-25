@@ -109,19 +109,31 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   // End-to-end: add the server via the Settings UI (not the seeding helper),
   // then connecting to it reaches the connect screen.
   await addVirtualAuthenticator(page);
-  // The Settings UI verifies the server with a real MCP `initialize` handshake
-  // (a cross-origin POST). Answer the CORS preflight and reply with a JSON-RPC
-  // initialize result + CORS headers so the browser lets the probe read it.
-  // (Activation is independent of the probe outcome, so the assertions below
-  // hold whether or not the browser surfaces it as verified.)
+  // The Settings UI verifies the server via its RFC 9728 protected-resource
+  // metadata (a CORS-enabled GET at /.well-known/oauth-protected-resource).
+  // Serve a valid doc with CORS headers so the probe confirms MCP. (Activation
+  // is independent of the probe outcome, so the assertions below hold either
+  // way.) The catch-all also answers the `initialize` fallback + its preflight.
   const cors = {
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "content-type",
   };
   await page.route(`${mcp.mcpOrigin}/**`, (route) => {
     if (route.request().method() === "OPTIONS") {
       return route.fulfill({ status: 204, headers: cors });
+    }
+    if (
+      route.request().url().includes("/.well-known/oauth-protected-resource")
+    ) {
+      return route.fulfill({
+        status: 200,
+        headers: { ...cors, "content-type": "application/json" },
+        body: JSON.stringify({
+          authorization_servers: [mcp.mcpOrigin],
+          resource: `${mcp.mcpOrigin}/mcp`,
+        }),
+      });
     }
     return route.fulfill({
       status: 200,
