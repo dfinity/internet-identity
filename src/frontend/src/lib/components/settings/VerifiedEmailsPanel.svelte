@@ -59,12 +59,11 @@
     );
   };
 
-  const handleAddSuccess = (address: string) => {
+  const handleAddSuccess = (_address: string) => {
     showAddWizard = false;
     void invalidateAll();
     toaster.success({
       title: $t`Email address verified`,
-      description: $t`${address} has been associated with your Internet Identity.`,
     });
   };
 
@@ -86,7 +85,6 @@
     void invalidateAll();
     toaster.success({
       title: $t`Email address removed`,
-      description: $t`${address} is no longer associated with your Internet Identity.`,
     });
   };
 </script>
@@ -150,7 +148,7 @@
         <li
           class="bg-bg-secondary border-border-secondary relative flex flex-row items-center gap-3 rounded-xl border px-4 py-3"
         >
-          <div class="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
+          <div class="pointer-events-none flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
             <div class="flex flex-row items-center gap-2.5">
               <span
                 class="text-text-primary min-w-0 truncate text-sm font-semibold"
