@@ -22,6 +22,7 @@
   import McpErrorView from "./views/McpErrorView.svelte";
   import McpInvalidView from "./views/McpInvalidView.svelte";
   import McpUntrustedView from "./views/McpUntrustedView.svelte";
+  import McpConnectingView from "./views/McpConnectingView.svelte";
   import { mcpAuthorize } from "./utils";
   import { showIdentitySwitcher } from "./mcp-switcher.store";
   import {
@@ -103,6 +104,7 @@
     | { kind: "wizard" }
     | { kind: "authorize" }
     | { kind: "untrusted" }
+    | { kind: "connecting" }
     | { kind: "close" }
     | { kind: "invalid" }
     | { kind: "error" };
@@ -192,11 +194,16 @@
     }
     const request = params;
     mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Confirmed);
+    // Show a loading screen while the standing delegation is prepared and
+    // form-POSTed: the picker's own button spinner stops once it hands off here,
+    // and `mcpAuthorize` then runs several canister calls before navigating away.
+    phase = { kind: "connecting" };
     void (async () => {
       try {
         const accountNumber = await accountNumberPromise;
         const authenticated = get(authenticationStore);
         if (authenticated === undefined) {
+          phase = { kind: "authorize" };
           return;
         }
         // On success `mcpAuthorize` navigates the browser to the MCP server,
@@ -212,6 +219,8 @@
           state: request.state,
         });
       } catch (error) {
+        // Return to the connect screen so the user can retry.
+        phase = { kind: "authorize" };
         handleError(error);
       }
     })();
@@ -261,6 +270,8 @@
   />
 {:else if phase.kind === "untrusted" && mcpServer !== undefined}
   <McpUntrustedView mcpServerHost={mcpServer.host} />
+{:else if phase.kind === "connecting" && mcpServer !== undefined}
+  <McpConnectingView mcpServer={mcpServer.host} />
 {:else if phase.kind === "close"}
   <McpCloseWindowView />
 {/if}
