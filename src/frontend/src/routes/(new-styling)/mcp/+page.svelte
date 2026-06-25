@@ -12,8 +12,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
-  import { mcpAccessStore } from "$lib/stores/mcp-access.store";
-  import { mcpTrustedServersStore } from "$lib/stores/mcp-trusted-servers.store";
+  import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
@@ -47,16 +46,6 @@
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
 
-  // The chosen identity must have MCP enabled on this device AND set this server
-  // as its trusted MCP server (both via Settings) before we connect it. The
-  // master toggle disables the feature completely; the trusted-server origin is
-  // the per-server pre-gate. The actual authority is the backend binding
-  // `mcp_set_access` creates on connect.
-  const isServerTrusted = (identityNumber: bigint): boolean =>
-    mcpServer !== undefined &&
-    mcpAccessStore.isEnabled(identityNumber) &&
-    mcpTrustedServersStore.isTrusted(identityNumber, mcpServer.origin);
-
   // Origin used for canister account calls: remap a gateway origin
   // (*.icp0.io / *.icp.net) to *.ic0.app so the derived principal matches the
   // one /authorize derives for that origin.
@@ -82,12 +71,6 @@
         mcpAuthorizeFunnel.close();
       } else {
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestReceived);
-        // A returning user whose selected identity hasn't trusted this server
-        // opens straight on the untrusted screen, so record that here (the
-        // post-sign-in path records it from the phase effect instead).
-        if (phase.kind === "untrusted") {
-          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
-        }
       }
     }
 
@@ -113,9 +96,12 @@
 
   // The phase the page opens on. Outcomes the MCP server redirects back with
   // take priority; otherwise a returning user with a previously-used identity
-  // opens on the connect screen (or the untrusted screen if that identity
-  // hasn't trusted this server), and a user with no last-used identity starts
-  // in the sign-in method wizard.
+  // opens on the connect screen, and a user with no last-used identity starts in
+  // the sign-in method wizard. Whether the server is actually trusted is the
+  // identity's synced (on-chain) config, which can only be read once
+  // authenticated — so we show the connect screen optimistically and verify it
+  // against the canister at connect time (`handleAuthorize`), moving to the
+  // untrusted screen if it isn't.
   const initialPhase = (): Phase => {
     if (status === "success") {
       return { kind: "close" };
@@ -130,12 +116,17 @@
     if (selected === undefined) {
       return { kind: "wizard" };
     }
-    return isServerTrusted(selected.identityNumber)
-      ? { kind: "authorize" }
-      : { kind: "untrusted" };
+    return { kind: "authorize" };
   };
 
   let phase = $state<Phase>(initialPhase());
+
+  // The identity the current live phase was last derived for. A change means the
+  // user switched identity, so we re-open the connect screen optimistically
+  // (re-verifying at connect for the new identity).
+  let phaseIdentity = $state<bigint | undefined>(
+    get(lastUsedIdentitiesStore).selected?.identityNumber,
+  );
 
   // The switcher is meaningful while the user is choosing/confirming an identity
   // — including on the untrusted screen, where switching to an identity that
@@ -148,14 +139,16 @@
     );
   });
 
-  // Manage the live sign-in phases (wizard → connect / untrusted). Terminal and
+  // Manage the live sign-in phases (wizard → connect). Terminal and
   // redirect-outcome phases (close, error, invalid) are owned by the initial
   // outcome and never re-evaluated here. Switching identity only *selects* (it
   // doesn't authenticate), so we leave the wizard only once the chosen identity
   // has actually authenticated — and only once `selected` is populated, since
   // sign-up authenticates and *then* selects, and the reused picker reads
-  // `selected` at mount. On the connect/untrusted screens we re-derive trust
-  // whenever the selection changes.
+  // `selected` at mount. Once an identity is selected we show the connect screen
+  // optimistically; trust is verified against the canister at connect time. A
+  // change of selected identity re-opens the connect screen for the new one (so
+  // an untrusted result for the previous identity doesn't stick).
   $effect(() => {
     if (
       phase.kind !== "wizard" &&
@@ -166,6 +159,7 @@
     }
     const selected = $lastUsedIdentitiesStore.selected;
     if (selected === undefined) {
+      phaseIdentity = undefined;
       if (phase.kind !== "wizard") {
         phase = { kind: "wizard" };
       }
@@ -174,13 +168,9 @@
     if (phase.kind === "wizard" && !$isAuthenticatedStore) {
       return;
     }
-    if (isServerTrusted(selected.identityNumber)) {
-      if (phase.kind !== "authorize") {
-        phase = { kind: "authorize" };
-      }
-    } else if (phase.kind !== "untrusted") {
-      mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
-      phase = { kind: "untrusted" };
+    if (selected.identityNumber !== phaseIdentity) {
+      phaseIdentity = selected.identityNumber;
+      phase = { kind: "authorize" };
     }
   });
 
@@ -197,18 +187,32 @@
     }
     const request = params;
     mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Confirmed);
-    // Show a loading screen while the standing delegation is prepared and
-    // form-POSTed: the picker's own button spinner stops once it hands off here,
-    // and `mcpAuthorize` then runs several canister calls before navigating away.
+    // Show a loading screen while we verify trust and (if trusted) prepare and
+    // form-POST the standing delegation: the picker's own button spinner stops
+    // once it hands off here, and the verify + `mcpAuthorize` calls run several
+    // canister calls before navigating away.
     phase = { kind: "connecting" };
     void (async () => {
       try {
-        const accountNumber = await accountNumberPromise;
         const authenticated = get(authenticationStore);
         if (authenticated === undefined) {
           phase = { kind: "authorize" };
           return;
         }
+        // The identity's synced trusted-server config is the source of truth:
+        // connect only when this identity has MCP enabled and trusts this
+        // server's origin. Verifying here (post-authentication) means the result
+        // is the same on every device, regardless of any local state.
+        const config = await readMcpConfig(
+          authenticated.actor,
+          authenticated.identityNumber,
+        );
+        if (!isOriginTrusted(config, server.origin)) {
+          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
+          phase = { kind: "untrusted" };
+          return;
+        }
+        const accountNumber = await accountNumberPromise;
         // On success `mcpAuthorize` navigates the browser to the MCP server,
         // which redirects back here with a status — so a resolved promise means
         // the chain was built and submitted, not that we stay on this page.

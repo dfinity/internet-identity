@@ -72,12 +72,14 @@ test("Signing up to an untrusted server prompts to add it in settings", async ({
   page,
   mcp,
 }) => {
-  // Each identity trusts no MCP server by default, and a fresh in-flow sign-up
-  // has no chance to pre-trust one, so it lands on the untrusted screen rather
-  // than connecting.
+  // A fresh sign-up trusts no MCP server yet. The connect screen shows
+  // optimistically, but at connect time — after the user authenticates — II
+  // verifies the server against the identity's synced config and, finding it
+  // untrusted, shows the screen pointing to Settings rather than connecting.
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
+  await page.getByRole("button", { name: "Allow access" }).click();
   await expect(
     page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
   ).toBeVisible();
@@ -92,13 +94,14 @@ test("Manage trusted server hands the session to a new Settings tab", async ({
   page,
   mcp,
 }) => {
-  // Signing up authenticates the identity, so the untrusted screen's "Manage
+  // Reaching the untrusted screen authenticates the identity, so its "Manage
   // trusted server" button can open Settings in a new tab that adopts the
   // session via postMessage — the same handoff as the authorize header, so no
   // second sign-in is needed over there.
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
+  await page.getByRole("button", { name: "Allow access" }).click();
   const manageButton = page.getByRole("button", {
     name: "Manage trusted server",
   });

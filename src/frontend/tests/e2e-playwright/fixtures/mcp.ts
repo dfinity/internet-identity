@@ -1,7 +1,6 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { test as base, type Page } from "@playwright/test";
 import { toBase64URL } from "../../../src/lib/utils/utils";
-import { storeLocalStorageKey } from "../../../src/lib/constants/store.constants";
 import { II_URL } from "../utils";
 
 /** What the MCP server stand-in does on its next form POST. */
@@ -39,11 +38,12 @@ export type McpFixture = {
   /** Sets what the MCP server stand-in does on its next form POST. */
   setNextOutcome: (outcome: McpOutcome) => void;
   /**
-   * Seeds the device-local trusted-servers allowlist so the connect flow treats
-   * this fixture's MCP origin as trusted for the already-signed-up identity.
-   * Call after sign-up and before navigating to `/mcp`. Without it the flow
-   * lands on the "untrusted" screen, since each identity trusts nothing by
-   * default.
+   * Trusts this fixture's MCP origin for the signed-up identity by driving the
+   * Settings UI — the trusted server is now the identity's synced (on-chain)
+   * config, not device-local storage, so there's no shortcut. Call after sign-up
+   * (while on `/manage`) and before navigating to `/mcp`. Without it the connect
+   * flow lands on the "untrusted" screen once the user authenticates, since each
+   * identity trusts nothing by default.
    */
   trustServer: (page: Page) => Promise<void>;
   /**
@@ -116,45 +116,44 @@ export const test = base.extend<{ mcp: McpFixture }>({
     };
 
     const trustServer = async (page: Page): Promise<void> => {
-      // Read just the signed-up identity number(s) out of the last-used store.
-      const identityNumbers = await page.evaluate((lastUsedKey) => {
-        const raw = localStorage.getItem(lastUsedKey);
-        if (raw === null) {
-          return [] as string[];
-        }
-        const parsed = JSON.parse(raw) as { data?: Record<string, unknown> };
-        return Object.keys(parsed.data ?? {});
-      }, storeLocalStorageKey.LastUsedIdentities);
-      if (identityNumbers.length === 0) {
-        throw new Error("trustServer: no identity number in localStorage");
-      }
-      // Build the envelopes in Node (matching writableStored's `{ data, version }`
-      // shape — tests sign up exactly one identity). Connecting requires both the
-      // device master toggle on (mcp-access) and a trusted server URL, so seed
-      // both. Keeping the read and the writes in separate evaluates means the
-      // page-side writes just persist known constants, not data read from
-      // storage in the same step.
-      const enabled: Record<string, boolean> = {};
-      const trusted: Record<string, string> = {};
-      for (const num of identityNumbers) {
-        enabled[num] = true;
-        trusted[num] = `${MCP_SERVER_ORIGIN}/mcp`;
-      }
-      const entries = [
-        {
-          key: storeLocalStorageKey.McpAccess,
-          value: JSON.stringify({ data: enabled, version: 1 }),
-        },
-        {
-          key: storeLocalStorageKey.McpTrustedServers,
-          value: JSON.stringify({ data: trusted, version: 2 }),
-        },
-      ];
-      await page.evaluate(
-        (items) =>
-          items.forEach(({ key, value }) => localStorage.setItem(key, value)),
-        entries,
+      // The trusted server is the identity's synced (on-chain) config, set via
+      // Settings — so seed it the way a user would. Mock this origin's RFC 9728
+      // metadata first so the Settings probe verifies fast and clean (the probe
+      // is advisory; activation happens regardless). The narrow well-known
+      // pattern doesn't collide with the callback interceptor's `/**` route.
+      await page.route(
+        `${MCP_SERVER_ORIGIN}/.well-known/oauth-protected-resource**`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            headers: {
+              "access-control-allow-origin": "*",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              authorization_servers: [MCP_SERVER_ORIGIN],
+              resource: `${MCP_SERVER_ORIGIN}/mcp`,
+            }),
+          }),
       );
+
+      // Reach Settings via in-app navigation (a full reload of an authenticated
+      // route would drop the just-signed-up in-memory session). On mobile the
+      // sidebar is collapsed behind a menu button, so open it first.
+      const openMenu = page.getByRole("button", { name: "Open menu" });
+      if (await openMenu.isVisible()) {
+        await openMenu.click();
+      }
+      await page.locator('a[href="/manage/settings"]').click();
+      await page.waitForURL(`${II_URL}/manage/settings`);
+      // The URL box only appears once the master toggle is on; the remove button
+      // appears once the trusted server is saved to the canister.
+      await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+      await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
+      await page.getByRole("button", { name: "Trust this server" }).click();
+      await page
+        .getByRole("button", { name: "Remove this server" })
+        .waitFor({ state: "visible" });
     };
 
     const buildAuthorizeUrl = (opts: {
