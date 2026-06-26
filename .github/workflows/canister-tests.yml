@@ -642,7 +642,12 @@ jobs:
 
       - name: Stop dev server
         if: ${{ always() }}
-        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }}
+        # `2>/dev/null || true` so cleanup never fails an otherwise-green job:
+        # under `bash -e` a bare `kill` of an already-exited dev server (the
+        # backgrounded `npm run dev | tee` pipeline PID is often reaped before
+        # this step) exits non-zero and would fail the run. Anything still
+        # alive is reaped by the runner's orphan-process cleanup.
+        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }} 2>/dev/null || true
 
       - name: Archive dev server logs
         if: ${{ always() }}
