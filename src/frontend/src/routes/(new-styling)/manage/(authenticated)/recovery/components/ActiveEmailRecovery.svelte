@@ -130,6 +130,6 @@
     </div>
   </div>
   <div class="text-text-primary text-xs">
-    <Trans>Sign in by sending a signed email from your inbox.</Trans>
+    <Trans>Sign in by sending an email from your inbox.</Trans>
   </div>
 </section>

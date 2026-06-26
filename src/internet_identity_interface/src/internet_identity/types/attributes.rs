@@ -239,8 +239,8 @@ impl TryFrom<&str> for AttributeScope {
     /// Parses an attribute scope string by splitting on the first `':'`.
     ///
     /// Supported forms:
-    /// - `openid:<issuer>`  (e.g. `openid:https://accounts.google.com`)
-    /// - `sso:<domain>`     (e.g. `sso:dfinity.org`)
+    /// - `openid:<issuer>`     (e.g. `openid:https://accounts.google.com`)
+    /// - `sso:<domain>`        (e.g. `sso:dfinity.org`)
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut parts = value.splitn(2, ':');
 
@@ -1279,6 +1279,26 @@ mod tests {
                 domain: "dfinity.org".to_string(),
             };
             pretty_assert_eq!(sso.to_string(), "sso:dfinity.org");
+        }
+
+        #[test]
+        fn test_attribute_scope_round_trip() {
+            // Display → try_from should round-trip cleanly for each
+            // variant. Guards against drift between the formatter and
+            // the parser when one is updated without the other.
+            for scope in [
+                AttributeScope::OpenId {
+                    issuer: "https://accounts.google.com".to_string(),
+                },
+                AttributeScope::Sso {
+                    domain: "dfinity.org".to_string(),
+                },
+            ] {
+                let rendered = scope.to_string();
+                let parsed =
+                    AttributeScope::try_from(rendered.as_str()).expect("round-trip must parse");
+                pretty_assert_eq!(parsed, scope, "round-trip failed for {}", rendered);
+            }
         }
 
         #[test]

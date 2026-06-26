@@ -327,8 +327,8 @@
         </li>
         <li class="contents">
           <NavItem
-            href="/manage/share"
-            current={page.url.pathname === "/manage/share"}
+            href="/manage/shareable-info"
+            current={page.url.pathname === "/manage/shareable-info"}
           >
             <AtSignIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Shareable info`}</span>

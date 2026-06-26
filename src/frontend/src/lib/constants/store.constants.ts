@@ -3,6 +3,7 @@ export const storeLocalStorageKey = {
   Locale: "ii-locale",
   CliAccess: "ii-cli-access",
   McpAccess: "ii-mcp-access",
+  LastSharedEmails: "ii-last-shared-emails",
 } as const;
 
 export type StoreLocalStorageKey =

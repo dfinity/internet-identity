@@ -2,6 +2,10 @@
   import type { LayoutProps } from "./$types";
   import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
   import {
+    attributeConsentResultStore,
+    attributeConsentStore,
+  } from "$lib/stores/attributeConsent.store";
+  import {
     authorizationContextStore,
     authorizationStore,
     authorizedStore,
@@ -110,12 +114,22 @@
     // OpenID/SSO 1-click flows gate on channel establishment
     return $channelStore !== undefined;
   });
+  // Attribute consent runs *after* authorize, so by the time the
+  // consent view paints, $authorizedStore is set and the
+  // base condition below would hide the identity switcher. Keep the
+  // header visible during the consent step so the user can switch
+  // identities or sign out before sharing data with the dapp.
+  const isAttributeConsenting = $derived(
+    $attributeConsentStore !== undefined &&
+      $attributeConsentResultStore === undefined,
+  );
   const showHeaderFooter = $derived(
     isReady &&
-      $authorizedStore === undefined &&
-      flow !== "openid-init" &&
-      flow !== "sso-init" &&
-      flow !== "openid-resume",
+      (isAttributeConsenting ||
+        ($authorizedStore === undefined &&
+          flow !== "openid-init" &&
+          flow !== "sso-init" &&
+          flow !== "openid-resume")),
   );
 
   // --- Identity switcher state ---
