@@ -869,7 +869,7 @@ EOF
 # identical — only how the branch is derived differs.
 # -------------------------
 
-# Verify the gh CLI is installed + authenticated and export AUTH_HEADER for
+# Verify the gh CLI is installed + authenticated and set AUTH_HEADER for
 # the GitHub REST calls the CI-artifact flow makes. Exits (rather than
 # returns) on failure — there's nothing the caller can do to recover, and
 # every caller would just `|| exit 1` anyway.

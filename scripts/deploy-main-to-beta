@@ -65,7 +65,7 @@ BRANCH="main"
 # CI run doesn't exist or isn't green.
 #
 # `ensure_github_auth` (deploy-common.bash) verifies the gh CLI is present +
-# authenticated and exports AUTH_HEADER; REPO / WORKFLOW_FILE are shared
+# authenticated and sets AUTH_HEADER; REPO / WORKFLOW_FILE are shared
 # constants from the same file.
 # -------------------------
 ensure_github_auth
