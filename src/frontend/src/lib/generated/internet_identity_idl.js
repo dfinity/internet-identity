@@ -1145,7 +1145,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
     'mcp_prepare_account_delegation' : IDL.Func(
-        [FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
+        [
+          FrontendHostname,
+          IDL.Opt(AccountNumber),
+          SessionKey,
+          IDL.Opt(IDL.Nat64),
+        ],
         [
           IDL.Variant({
             'Ok' : McpPrepareDelegation,

@@ -680,10 +680,11 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
 #[update]
 async fn mcp_prepare_account_delegation(
     target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    mcp::prepare_account_delegation(target_origin, session_key, max_ttl).await
+    mcp::prepare_account_delegation(target_origin, account_number, session_key, max_ttl).await
 }
 
 #[query]

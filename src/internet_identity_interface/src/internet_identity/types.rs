@@ -594,14 +594,17 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
-/// Result of `mcp_prepare_account_delegation`. Unlike the browser flow — where
-/// the caller chooses the account and so already knows it for the matching
-/// `get` — the MCP server doesn't pass an account; the canister resolves the
-/// anchor's default account at `target_origin`. We return that resolved
-/// `account_number` so the server can thread the *same* account into
-/// `mcp_get_account_delegation`; otherwise `get` would re-resolve the (mutable)
-/// default and, if it changed in between, look under a different account and
-/// return `NoSuchDelegation`.
+/// Result of `mcp_prepare_account_delegation`. The matching
+/// `mcp_get_account_delegation` must use the *same* account, so we return the
+/// resolved `account_number` for the server to thread back. When preparing, the
+/// MCP server may name an account explicitly (one of the anchor's accounts at
+/// `target_origin`) or leave it unset to use the anchor's default there; either
+/// way `account_number` reports the one actually used. (Accounts are per-origin,
+/// so this is an account at `target_origin` — the app being acted on — not the
+/// account the user picked at the MCP server's own origin when connecting.)
+/// Returning it also keeps `get` from independently re-resolving the *mutable*
+/// default and, if it changed in between, looking under a different account's
+/// seed and returning `NoSuchDelegation`.
 #[derive(CandidType, Deserialize)]
 pub struct McpPrepareDelegation {
     pub user_key: UserKey,

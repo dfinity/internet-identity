@@ -542,6 +542,7 @@ pub fn mcp_prepare_account_delegation(
     canister_id: CanisterId,
     sender: Principal,
     target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<Result<McpPrepareDelegation, AccountDelegationError>, RejectResponse> {
@@ -551,7 +552,7 @@ pub fn mcp_prepare_account_delegation(
         RawEffectivePrincipal::None,
         sender,
         "mcp_prepare_account_delegation",
-        (target_origin, session_key, max_ttl),
+        (target_origin, account_number, session_key, max_ttl),
     )
     .map(|(x,)| x)
 }

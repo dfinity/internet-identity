@@ -100,6 +100,7 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
         canister_id,
         mcp,
         target.clone(),
+        None, // account_number: use the anchor's default at the app
         session_key.clone(),
         None,
     )
@@ -174,6 +175,7 @@ fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
         canister_id,
         mcp,
         "https://some-app.com".to_string(),
+        None,
         ByteBuf::from("k"),
         Some(Duration::from_secs(3600).as_nanos() as u64), // request 1 hour
     )
@@ -201,6 +203,7 @@ fn mcp_rejects_unregistered_callers() -> Result<(), RejectResponse> {
         canister_id,
         mcp,
         target.clone(),
+        None,
         session_key.clone(),
         None,
     )
@@ -217,6 +220,7 @@ fn mcp_rejects_unregistered_callers() -> Result<(), RejectResponse> {
         canister_id,
         principal_2(),
         target,
+        None,
         session_key,
         None,
     )
@@ -256,6 +260,7 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         canister_id,
         mcp,
         target.clone(),
+        None,
         session_key.clone(),
         None
     )
@@ -282,7 +287,8 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         None
     )
     .unwrap());
-    match mcp_prepare_account_delegation(&env, canister_id, mcp, target, session_key, None).unwrap()
+    match mcp_prepare_account_delegation(&env, canister_id, mcp, target, None, session_key, None)
+        .unwrap()
     {
         Err(AccountDelegationError::Unauthorized(_)) => {}
         Ok(_) => panic!("expected Unauthorized after disabling, got Ok"),
@@ -318,13 +324,14 @@ fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectRe
     .unwrap()
     .unwrap();
 
-    // Prepare resolves the default account at `target` (None = the synthetic
-    // default, since none is reserved yet) and reports it back.
+    // Prepare without naming an account resolves the default at `target`
+    // (None = the synthetic default, since none is reserved yet) and reports it.
     let prepared = mcp_prepare_account_delegation(
         &env,
         canister_id,
         mcp,
         target.clone(),
+        None,
         session_key.clone(),
         None,
     )
@@ -383,6 +390,74 @@ fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectRe
         .unwrap(),
         Err(AccountDelegationError::NoSuchDelegation)
     ));
+
+    Ok(())
+}
+
+/// The MCP server can name a specific (non-default) account at the target app
+/// when preparing; `prepare` mints for that account (validated as the anchor's
+/// at that origin), reports it back, and `get` resolves it with the same number.
+#[test]
+fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("k");
+
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None,
+        true,
+    )
+    .unwrap()
+    .unwrap();
+
+    // A specific account the user holds at the target app.
+    let account = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        target.clone(),
+        "work".to_string(),
+    )
+    .unwrap()
+    .unwrap()
+    .account_number;
+    assert!(account.is_some());
+
+    // Naming it explicitly mints for exactly that account and echoes it back.
+    let prepared = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(prepared.account_number, account);
+
+    // `get` resolves that same account's delegation.
+    assert!(mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        account,
+        session_key,
+        prepared.expiration,
+    )
+    .unwrap()
+    .is_ok());
 
     Ok(())
 }

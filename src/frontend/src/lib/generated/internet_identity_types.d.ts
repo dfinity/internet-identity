@@ -2086,9 +2086,12 @@ export interface _SERVICE {
    * for the (account, origin) it was bound to. Mints a <=5-minute delegation
    * for the anchor's default account at target_origin. Anchor recovered from
    * the caller.
+   * account_number names one of the anchor's accounts at target_origin to act
+   * as; null uses the anchor's default account there. The resolved account is
+   * returned in McpPrepareDelegation to thread into mcp_get_account_delegation.
    */
   'mcp_prepare_account_delegation' : ActorMethod<
-    [FrontendHostname, SessionKey, [] | [bigint]],
+    [FrontendHostname, [] | [AccountNumber], SessionKey, [] | [bigint]],
     { 'Ok' : McpPrepareDelegation } |
       { 'Err' : AccountDelegationError }
   >,

@@ -173,15 +173,20 @@ fn caller_anchor() -> Result<AnchorNumber, AccountDelegationError> {
 }
 
 /// `mcp_prepare_account_delegation`: mint a ≤5-minute account delegation for the
-/// calling MCP server, as its anchor's default account at `target_origin`.
+/// calling MCP server at `target_origin`, as `account_number` — one of the
+/// anchor's accounts at that origin when given explicitly, or the anchor's
+/// default account there when `None`. (Accounts are per-origin, so this is an
+/// account at `target_origin`, the app being acted on — not the account the user
+/// picked at the MCP server's own origin when connecting; an `account_number`
+/// that isn't the anchor's at `target_origin` is rejected as `Unauthorized`.)
 ///
 /// Returns the resolved `account_number` so the server can thread the *same*
-/// account into [`get_account_delegation`]. The default account at an origin is
-/// mutable (the user can change it), so if `get` re-resolved it independently
-/// and it had changed in between, it would look under a different account's seed
-/// and return `NoSuchDelegation`.
+/// account into [`get_account_delegation`]: the default account at an origin is
+/// mutable, so if `get` re-resolved it independently and it had changed in
+/// between, it would look under a different account's seed and `NoSuchDelegation`.
 pub async fn prepare_account_delegation(
     target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
@@ -190,7 +195,9 @@ pub async fn prepare_account_delegation(
         max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
         MCP_MAX_EXPIRATION_PERIOD_NS,
     ));
-    let account_number = default_account_number(anchor_number, &target_origin);
+    // An explicit account wins; otherwise act as the anchor's default at the app.
+    let account_number =
+        account_number.or_else(|| default_account_number(anchor_number, &target_origin));
     let prepared = account_management::prepare_account_delegation(
         anchor_number,
         target_origin,
