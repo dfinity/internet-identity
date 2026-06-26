@@ -22,3 +22,4 @@ pub mod passkey_credential;
 pub mod recovery_key;
 pub mod special_device_migration;
 pub mod storable_persistent_state;
+pub mod verified_email;

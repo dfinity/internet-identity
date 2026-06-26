@@ -37,7 +37,7 @@
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="text-text-primary flex flex-col gap-3 text-xs">
     <p>
-      <Trans>Sign in by sending a signed email from your inbox.</Trans>
+      <Trans>Sign in by sending an email from your inbox.</Trans>
     </p>
     <p>
       <Trans>

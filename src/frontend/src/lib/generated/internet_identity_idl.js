@@ -72,6 +72,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
+    'sso_allow_any_domain' : IDL.Opt(IDL.Bool),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
@@ -299,11 +300,11 @@ export const idlFactory = ({ IDL }) => {
     'hops' : IDL.Vec(SignedRRset),
     'chains' : IDL.Vec(DelegationChain),
   });
-  const EmailRecoveryDnsInput = IDL.Record({
+  const EmailChallengeDnsInput = IDL.Record({
     'dns_proof' : IDL.Opt(DnsProofBundle),
     'address' : IDL.Text,
   });
-  const EmailRecoveryChallenge = IDL.Record({
+  const EmailChallenge = IDL.Record({
     'nonce' : IDL.Text,
     'expires_at' : Timestamp,
   });
@@ -315,7 +316,7 @@ export const idlFactory = ({ IDL }) => {
       'agreeing' : IDL.Nat32,
     }),
   });
-  const EmailRecoveryError = IDL.Variant({
+  const EmailChallengeError = IDL.Variant({
     'EmailVerificationFailed' : IDL.Text,
     'DkimLeafMismatch' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -331,12 +332,14 @@ export const idlFactory = ({ IDL }) => {
     'DomainNotAllowlisted' : IDL.Text,
     'SubjectNotSigned' : IDL.Null,
     'AddressAlreadyRegistered' : IDL.Null,
+    'InvalidEmailAddress' : IDL.Text,
+    'LimitReached' : IDL.Record({ 'limit' : IDL.Nat8 }),
   });
   const VerificationPath = IDL.Variant({
     'Doh' : IDL.Null,
     'Dnssec' : IDL.Null,
   });
-  const EmailRecoveryDiagnostics = IDL.Record({
+  const EmailChallengeDiagnostics = IDL.Record({
     'created_at' : Timestamp,
     'verification_path' : VerificationPath,
     'message_id' : IDL.Opt(IDL.Text),
@@ -357,10 +360,10 @@ export const idlFactory = ({ IDL }) => {
     'signature' : IDL.Vec(IDL.Nat8),
     'delegation' : Delegation,
   });
-  const EmailRecoveryResolveViaDohArg = IDL.Record({ 'nonce' : IDL.Text });
+  const EmailChallengeResolveViaDohArg = IDL.Record({ 'nonce' : IDL.Text });
   const UserKey = PublicKey;
-  const EmailRecoveryStatus = IDL.Variant({
-    'Failed' : EmailRecoveryError,
+  const EmailChallengeStatus = IDL.Variant({
+    'Failed' : EmailChallengeError,
     'ResolvingDoh' : IDL.Null,
     'NeedDkimLeaf' : IDL.Record({ 'selector' : IDL.Text }),
     'RecoveryReady' : IDL.Record({
@@ -372,7 +375,7 @@ export const idlFactory = ({ IDL }) => {
     'Expired' : IDL.Null,
     'Pending' : IDL.Null,
   });
-  const EmailRecoverySubmitDkimLeafArg = IDL.Record({
+  const EmailChallengeSubmitDkimLeafArg = IDL.Record({
     'extra_chains' : IDL.Vec(DelegationChain),
     'hops' : IDL.Vec(SignedRRset),
     'nonce' : IDL.Text,
@@ -547,6 +550,10 @@ export const idlFactory = ({ IDL }) => {
     'authn_methods' : IDL.Vec(AuthnMethod),
     'recovery_authn_methods' : IDL.Vec(AuthnMethod),
   });
+  const VerifiedEmail = IDL.Record({
+    'address' : IDL.Text,
+    'verified_at' : Timestamp,
+  });
   const EmailRecoveryCredential = IDL.Record({
     'created_at' : Timestamp,
     'address' : IDL.Text,
@@ -559,6 +566,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
+    'verified_emails' : IDL.Opt(IDL.Vec(VerifiedEmail)),
     'metadata' : MetadataMapV2,
     'name' : IDL.Opt(IDL.Text),
     'email_recovery' : IDL.Opt(IDL.Vec(EmailRecoveryCredential)),
@@ -898,53 +906,73 @@ export const idlFactory = ({ IDL }) => {
     'deploy_archive' : IDL.Func([IDL.Vec(IDL.Nat8)], [DeployArchiveResult], []),
     'discover_sso' : IDL.Func([IDL.Text], [], []),
     'email_recovery_credential_prepare_add' : IDL.Func(
-        [IdentityNumber, EmailRecoveryDnsInput],
+        [IdentityNumber, EmailChallengeDnsInput],
         [
           IDL.Variant({
-            'Ok' : EmailRecoveryChallenge,
-            'Err' : EmailRecoveryError,
+            'Ok' : EmailChallenge,
+            'Err' : EmailChallengeError,
           }),
         ],
         [],
       ),
     'email_recovery_credential_remove' : IDL.Func(
         [IdentityNumber, IDL.Text],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
         [],
       ),
-    'email_recovery_diagnostics' : IDL.Func(
+    'email_challenge_diagnostics' : IDL.Func(
         [IDL.Text],
-        [IDL.Opt(EmailRecoveryDiagnostics)],
+        [IDL.Opt(EmailChallengeDiagnostics)],
         ['query'],
       ),
     'email_recovery_get_delegation' : IDL.Func(
         [EmailRecoveryGetDelegationArgs],
-        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : EmailRecoveryError })],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : EmailChallengeError })],
         ['query'],
       ),
     'email_recovery_prepare_delegation' : IDL.Func(
-        [EmailRecoveryDnsInput, SessionKey],
+        [EmailChallengeDnsInput, SessionKey],
         [
           IDL.Variant({
-            'Ok' : EmailRecoveryChallenge,
-            'Err' : EmailRecoveryError,
+            'Ok' : EmailChallenge,
+            'Err' : EmailChallengeError,
           }),
         ],
         [],
       ),
+    'email_challenge_resolve_via_doh' : IDL.Func(
+        [EmailChallengeResolveViaDohArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
+        [],
+      ),
+    'email_challenge_status' : IDL.Func(
+        [IDL.Text],
+        [EmailChallengeStatus],
+        ['query'],
+      ),
+    'email_challenge_submit_dkim_leaf' : IDL.Func(
+        [EmailChallengeSubmitDkimLeafArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
+        [],
+      ),
+    'email_recovery_diagnostics' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(EmailChallengeDiagnostics)],
+        ['query'],
+      ),
     'email_recovery_resolve_via_doh' : IDL.Func(
-        [EmailRecoveryResolveViaDohArg],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [EmailChallengeResolveViaDohArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
         [],
       ),
     'email_recovery_status' : IDL.Func(
         [IDL.Text],
-        [EmailRecoveryStatus],
+        [EmailChallengeStatus],
         ['query'],
       ),
     'email_recovery_submit_dkim_leaf' : IDL.Func(
-        [EmailRecoverySubmitDkimLeafArg],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailRecoveryError })],
+        [EmailChallengeSubmitDkimLeafArg],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
         [],
       ),
     'enter_device_registration_mode' : IDL.Func([UserNumber], [Timestamp], []),
@@ -1231,6 +1259,21 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : UpdateAccountError })],
         [],
       ),
+    'verified_email_prepare_add' : IDL.Func(
+        [IdentityNumber, EmailChallengeDnsInput],
+        [
+          IDL.Variant({
+            'Ok' : EmailChallenge,
+            'Err' : EmailChallengeError,
+          }),
+        ],
+        [],
+      ),
+    'verified_email_remove' : IDL.Func(
+        [IdentityNumber, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : EmailChallengeError })],
+        [],
+      ),
     'verify_tentative_device' : IDL.Func(
         [UserNumber, IDL.Text],
         [VerifyTentativeDeviceResponse],
@@ -1311,6 +1354,7 @@ export const init = ({ IDL }) => {
   });
   const InternetIdentityInit = IDL.Record({
     'doh_config' : IDL.Opt(IDL.Opt(DohConfig)),
+    'sso_allow_any_domain' : IDL.Opt(IDL.Bool),
     'sso_credential_migration' : IDL.Opt(IDL.Vec(SsoCredentialMigrationEntry)),
     'is_production' : IDL.Opt(IDL.Bool),
     'backend_canister_id' : IDL.Opt(IDL.Principal),
