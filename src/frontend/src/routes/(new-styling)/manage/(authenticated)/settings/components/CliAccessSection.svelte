@@ -56,7 +56,7 @@
       </h3>
       {#if enabled}
         <Badge color="success" size="sm" dot>
-          {$t`Enabled`}
+          {$t`Enabled on this device`}
         </Badge>
       {/if}
     </div>

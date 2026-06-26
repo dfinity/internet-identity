@@ -429,6 +429,7 @@
 {#snippet continueContent()}
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
+    displayOrigin={$establishedChannelStore.origin}
     onAuthorize={handleAuthorize}
   />
 {/snippet}

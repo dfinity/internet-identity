@@ -1078,6 +1078,17 @@ type PrepareAccountDelegation = record {
     expiration : Timestamp;
 };
 
+// Result of mcp_prepare_account_delegation. Carries the account_number the
+// canister resolved (the anchor's default account at target_origin) so the MCP
+// server can thread the same account into mcp_get_account_delegation — the
+// default is mutable, so re-resolving it in `get` could otherwise diverge and
+// yield NoSuchDelegation.
+type McpPrepareDelegation = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    account_number : opt AccountNumber;
+};
+
 type SessionDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
@@ -1087,6 +1098,17 @@ type SessionDelegationError = variant {
 type PrepareSessionDelegation = record {
     user_key : UserKey;
     expiration : Timestamp;
+};
+
+// The identity's synced trusted-MCP-server configuration: a master toggle and
+// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+// anchor), so it follows the identity across all of its devices — unlike the
+// device-local CLI-access toggle. `url` is kept verbatim so the Settings UI can
+// display/re-probe a path-based endpoint; the connect flow matches trust by
+// origin.
+type McpConfig = record {
+    enabled : bool;
+    url : opt text;
 };
 
 type GetAccountsError = variant {
@@ -1764,6 +1786,65 @@ service : (opt InternetIdentityInit) -> {
         anchor_number : UserNumber,
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
+        session_key : SessionKey,
+        expiration : Timestamp
+    ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
+
+    // Enable/disable the backend /mcp delegation path for an anchor at a given
+    // MCP server origin and account (null account = unreserved default).
+    // Enabling binds the principal II derives for that (account, origin) pair;
+    // disabling unbinds exactly that principal. The origin comes from the
+    // connect request, so each user trusts the MCP server they choose.
+    mcp_set_access : (
+        anchor_number : UserNumber,
+        mcp_server_origin : FrontendHostname,
+        account_number : opt AccountNumber, // Null is unreserved default account
+        enabled : bool
+    ) -> (variant { Ok; Err : text });
+
+    // Whether the anchor has MCP access enabled for the (mcp_server_origin,
+    // account_number) pair.
+    mcp_access_enabled : (
+        anchor_number : UserNumber,
+        mcp_server_origin : FrontendHostname,
+        account_number : opt AccountNumber // Null is unreserved default account
+    ) -> (bool) query;
+
+    // Read the identity's synced trusted-MCP-server config (master toggle + the
+    // trusted server URL). Persisted on-chain, so it follows the identity across
+    // devices. Read by the Settings UI and the /mcp connect flow (which verifies
+    // the connecting origin against it). Returns the disabled, no-server default
+    // for an unauthorized caller or an anchor that never wrote a config.
+    mcp_get_config : (anchor_number : UserNumber) -> (McpConfig) query;
+
+    // Persist the identity's trusted-MCP-server config so it syncs across the
+    // identity's devices. Authenticated as the identity, so only the user — never
+    // a page that initiates a connect request — can change what it trusts.
+    mcp_set_config : (
+        anchor_number : UserNumber,
+        config : McpConfig
+    ) -> (variant { Ok; Err : text });
+
+    // Called by the MCP server, authorized by caller() == the anchor's principal
+    // for the (account, origin) it was bound to. Mints a <=5-minute delegation
+    // for the anchor's default account at target_origin. Anchor recovered from
+    // the caller.
+    // account_number names one of the anchor's accounts at target_origin to act
+    // as; null uses the anchor's default account there. The resolved account is
+    // returned in McpPrepareDelegation to thread into mcp_get_account_delegation.
+    mcp_prepare_account_delegation : (
+        target_origin : FrontendHostname,
+        account_number : opt AccountNumber,
+        session_key : SessionKey,
+        max_ttl : opt nat64
+    ) -> (variant { Ok : McpPrepareDelegation; Err : AccountDelegationError });
+
+    // account_number must be the value returned by the matching
+    // mcp_prepare_account_delegation, so `get` reads the same account `prepare`
+    // signed for (the default account at target_origin is mutable).
+    mcp_get_account_delegation : (
+        target_origin : FrontendHostname,
+        account_number : opt AccountNumber,
         session_key : SessionKey,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;

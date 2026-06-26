@@ -8,12 +8,14 @@ const DEFAULT_TTL_MINUTES = 60;
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
  * browser to. `valid` carries the validated request — the session public key to
  * delegate to, the callback to post the delegation back to, the single-use
- * `state` echoed back to the MCP server, the delegation TTL, and the app whose
- * account the delegation acts as. `invalid` means the fragment was missing or
- * malformed.
+ * `state` echoed back to the MCP server, and the delegation TTL. The MCP server
+ * the user connects is identified by the callback's origin (each user trusts
+ * whichever server they connect), and the account is chosen in the picker.
+ * `invalid` means the fragment was missing or malformed.
  *
- * The callback's origin is checked against the configured MCP server origin in
- * the page component (where the canister config is available), not here.
+ * Whether the callback origin is one the connect flow accepts (https only — MCP
+ * connections are to remote servers) is checked in the page component, which
+ * shows a clean invalid screen and mirrors the `form-action` CSP.
  */
 export type McpParams =
   | {
@@ -25,8 +27,6 @@ export type McpParams =
        *  delegation to the request it started (CSRF protection). */
       state: string;
       ttlMinutes: number;
-      /** Hostname of the app whose account the delegation acts as. */
-      app: string;
     }
   | { kind: "invalid" };
 
@@ -56,9 +56,10 @@ const parseBase64Url = (raw: string | null): string | undefined => {
 };
 
 /**
- * Structural callback check: must be an absolute http(s) URL. The exact origin
- * match against the configured MCP server origin happens in the component — the
- * canister config isn't available here (this `load` also runs at prerender).
+ * Structural callback check: must be an absolute http(s) URL. The stricter
+ * "is this an origin the connect flow accepts" check (https only) happens in
+ * the component, alongside the consent UI — keeping this `load` minimal since
+ * it also runs at prerender.
  */
 const parseCallback = (raw: string | null): string | undefined => {
   if (raw === null || raw === "") {
@@ -74,28 +75,6 @@ const parseCallback = (raw: string | null): string | undefined => {
     return undefined;
   }
   return raw;
-};
-
-/**
- * Returns the normalised hostname if `raw` is a bare hostname (optionally with
- * mixed case), or undefined if it's not. Rejects port, path, query, fragment,
- * scheme prefix, and userinfo by requiring the round-trip through `new URL` to
- * leave only the hostname behind.
- */
-const parseApp = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  let url: URL;
-  try {
-    url = new URL(`https://${raw}`);
-  } catch {
-    return undefined;
-  }
-  if (url.hostname.toLowerCase() !== raw.toLowerCase()) {
-    return undefined;
-  }
-  return url.hostname;
 };
 
 const parseState = (raw: string | null): string | undefined => {
@@ -130,20 +109,18 @@ export const load: PageLoad = ({
   const publicKey = parseBase64Url(params.get("public_key"));
   const callback = parseCallback(params.get("callback"));
   const state = parseState(params.get("state"));
-  const app = parseApp(params.get("app"));
   const ttlMinutes = parseTtl(params.get("ttl"));
 
   if (
     publicKey === undefined ||
     callback === undefined ||
     state === undefined ||
-    app === undefined ||
     ttlMinutes === undefined
   ) {
     return { params: { kind: "invalid" }, status };
   }
   return {
-    params: { kind: "valid", publicKey, callback, state, ttlMinutes, app },
+    params: { kind: "valid", publicKey, callback, state, ttlMinutes },
     status,
   };
 };

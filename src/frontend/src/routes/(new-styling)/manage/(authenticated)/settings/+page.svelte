@@ -3,7 +3,7 @@
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import CliAccessSection from "./components/CliAccessSection.svelte";
-  import McpAccessSection from "./components/McpAccessSection.svelte";
+  import McpTrustedServersSection from "./components/McpTrustedServersSection.svelte";
 </script>
 
 <header class="flex flex-col gap-3">
@@ -17,5 +17,7 @@
 
 <div class="mt-10 flex max-w-3xl flex-col gap-5">
   <CliAccessSection identityNumber={$authenticatedStore.identityNumber} />
-  <McpAccessSection identityNumber={$authenticatedStore.identityNumber} />
+  <McpTrustedServersSection
+    identityNumber={$authenticatedStore.identityNumber}
+  />
 </div>

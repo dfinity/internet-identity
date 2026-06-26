@@ -1,6 +1,6 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { establishedChannelStore } from "$lib/stores/channelStore";
   import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
@@ -38,11 +38,27 @@
 
   interface Props {
     effectiveOrigin: string;
+    /** Origin shown to the user — drives the app-name lookup and the default
+     *  header. Kept separate from `effectiveOrigin` (which may be remapped for
+     *  canister calls) and from the postMessage channel, so non-authorize flows
+     *  (e.g. /mcp) can reuse this picker by passing the origin they connect to. */
+    displayOrigin: string;
     /** Called when the user confirms with the default account or selects a specific account. */
     onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
+    /** Replaces the default authorize header (app tile + "Continue to <app>"),
+     *  letting /mcp render its own connect consent above the same picker. */
+    header?: Snippet;
+    /** Label for the default-account confirm button. Defaults to "Continue". */
+    continueLabel?: string;
   }
 
-  const { effectiveOrigin, onAuthorize }: Props = $props();
+  const {
+    effectiveOrigin,
+    displayOrigin,
+    onAuthorize,
+    header,
+    continueLabel,
+  }: Props = $props();
 
   type PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
@@ -100,11 +116,9 @@
   );
   const dapps = getDapps();
   const application = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin))?.name,
+    dapps.find((dapp) => dapp.hasOrigin(displayOrigin))?.name,
   );
-  const dappName = $derived(
-    application ?? new URL($establishedChannelStore.origin).hostname,
-  );
+  const dappName = $derived(application ?? new URL(displayOrigin).hostname);
   const primaryAccountName = $derived(
     application !== undefined ? $t`My ${application} account` : $t`My account`,
   );
@@ -486,20 +500,24 @@
         <ProgressRing />
         <span>{$t`Authenticating...`}</span>
       {:else}
-        <span>{$t`Continue`}</span>
+        <span>{continueLabel ?? $t`Continue`}</span>
       {/if}
     </button>
   </div>
 {/snippet}
 
 <div class="flex flex-1 flex-col">
-  <AuthorizeHeader origin={$establishedChannelStore.origin} />
-  <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-    {$t`Continue to ${dappName}`}
-  </h1>
-  <p class="text-text-secondary mb-6 self-start text-sm">
-    {$t`with your Internet Identity`}
-  </p>
+  {#if header}
+    {@render header()}
+  {:else}
+    <AuthorizeHeader origin={displayOrigin} />
+    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
+      {$t`Continue to ${dappName}`}
+    </h1>
+    <p class="text-text-secondary mb-6 self-start text-sm">
+      {$t`with your Internet Identity`}
+    </p>
+  {/if}
   <div class="grid">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
     {#if isMultipleAccountsEnabled && accounts !== undefined}

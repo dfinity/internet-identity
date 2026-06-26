@@ -5,10 +5,11 @@ import { Funnel } from "./Funnel";
  *
  * start-mcp-authorize (INIT)
  *   mcp-authorize--request-invalid   (fragment missing/malformed, or callback
- *                                      origin ≠ configured MCP server origin)
- *   mcp-authorize--request-received  (valid request, authorize screen shown)
+ *                                      not an acceptable MCP server URL)
+ *   mcp-authorize--request-received  (valid request, connect screen shown)
+ *     mcp-authorize--server-untrusted (callback origin not on the chosen
+ *                                      identity's trusted-server list)
  *     mcp-authorize--confirmed       (user clicked Allow access)
- *       mcp-authorize--access-disabled (MCP access not enabled on this device)
  *       mcp-authorize--success       (MCP server redirected back status=success)
  *       mcp-authorize--error         (MCP server redirected back status=error)
  * end-mcp-authorize
@@ -20,8 +21,8 @@ import { Funnel } from "./Funnel";
 export const McpAuthorizeEvents = {
   RequestInvalid: "request-invalid",
   RequestReceived: "request-received",
+  ServerUntrusted: "server-untrusted",
   Confirmed: "confirmed",
-  AccessDisabled: "access-disabled",
   Success: "success",
   Error: "error",
 } as const;
