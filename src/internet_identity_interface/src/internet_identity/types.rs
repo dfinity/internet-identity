@@ -23,19 +23,23 @@ mod api_v2;
 pub mod attributes;
 pub mod dnssec;
 pub mod doh;
+pub mod email_challenge;
 pub mod email_recovery;
 pub mod icrc3;
 pub mod openid;
 pub mod smtp;
 pub mod vc_mvp;
+pub mod verified_email;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::doh::*;
+pub use crate::internet_identity::types::email_challenge::*;
 pub use crate::internet_identity::types::email_recovery::*;
 pub use crate::internet_identity::types::openid::*;
 pub use crate::internet_identity::types::smtp::*;
+pub use crate::internet_identity::types::verified_email::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -243,12 +247,6 @@ pub struct InternetIdentityFrontendArgs {
     /// own init callback, and `?feature_flag_*` URL params take precedence.
     /// Names that don't match a known frontend flag are ignored by the frontend.
     pub feature_flags: Option<Vec<(String, bool)>>,
-    /// Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
-    /// slash). The `/mcp` delegation flow delivers the delegation to this origin
-    /// (and only this origin — it's added to the `form-action` CSP and the
-    /// `/mcp` page rejects callbacks on any other origin). When unset, the
-    /// `/mcp` flow is disabled.
-    pub mcp_server_origin: Option<String>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -286,6 +284,14 @@ pub struct InternetIdentityInit {
     /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
     /// keyed off `is_production`.
     pub sso_discoverable_domains: Option<Vec<String>>,
+    /// Deploy flag that opens the SSO discovery domain gate to *any* domain.
+    /// When `Some(true)`, `sso_discoverable_domains` (and its built-in
+    /// `is_production` defaults) no longer restrict which domains may be
+    /// discovered as SSO providers — every domain is accepted. `None` /
+    /// `Some(false)` leave the allowlist in force. The strict-`https` posture
+    /// is unaffected: a domain must still be on the explicit
+    /// `sso_discoverable_domains` list to serve discovery over plain `http`.
+    pub sso_allow_any_domain: Option<bool>,
     /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
     /// §8.6). When `Some`, a batched timer-driven migration stamps every
@@ -588,6 +594,24 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
+/// Result of `mcp_prepare_account_delegation`. The matching
+/// `mcp_get_account_delegation` must use the *same* account, so we return the
+/// resolved `account_number` for the server to thread back. When preparing, the
+/// MCP server may name an account explicitly (one of the anchor's accounts at
+/// `target_origin`) or leave it unset to use the anchor's default there; either
+/// way `account_number` reports the one actually used. (Accounts are per-origin,
+/// so this is an account at `target_origin` — the app being acted on — not the
+/// account the user picked at the MCP server's own origin when connecting.)
+/// Returning it also keeps `get` from independently re-resolving the *mutable*
+/// default and, if it changed in between, looking under a different account's
+/// seed and returning `NoSuchDelegation`.
+#[derive(CandidType, Deserialize)]
+pub struct McpPrepareDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    pub account_number: Option<AccountNumber>,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountDelegationError {
     Unauthorized(Principal),
@@ -611,6 +635,19 @@ pub enum SessionDelegationError {
     InternalCanisterError(String),
     Unauthorized(Principal),
     NoSuchDelegation,
+}
+
+/// The identity's synced trusted-MCP-server configuration: a master toggle and
+/// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+/// anchor) so it follows the identity across all of its devices — unlike the
+/// device-local CLI-access toggle. Read by the Settings UI and by the `/mcp`
+/// connect flow, which verifies the connecting origin against it at connect
+/// time. `url` is kept verbatim so Settings can display/re-probe a path-based
+/// endpoint like `https://host/mcp`; trust matching is by origin.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Default)]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub url: Option<String>,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

@@ -1,14 +1,12 @@
 import { expect, type Page } from "@playwright/test";
-import { Principal } from "@icp-sdk/core/principal";
 import { test } from "../fixtures";
-import { addVirtualAuthenticator, authorize, II_URL } from "../utils";
+import { addVirtualAuthenticator, II_URL } from "../utils";
 
-/** The app the MCP delegation acts as, used across the tests. */
+/** A target app passed in the request. It is ignored by the connect flow (the
+ *  delegation acts as the user's chosen account at the MCP-server origin the
+ *  request's callback identifies), but kept to exercise that the param is
+ *  tolerated. */
 const APP = "nice-name.com";
-
-/** Decodes a hex string (as delegation chains encode public keys) to bytes. */
-const hexToBytes = (hex: string): Uint8Array =>
-  Uint8Array.from(hex.match(/.{1,2}/g) ?? [], (byte) => parseInt(byte, 16));
 
 const signUp = async (page: Page): Promise<void> => {
   const continueWithPasskey = page.getByRole("button", {
@@ -48,38 +46,6 @@ const expirationMillis = (body: unknown): number => {
   return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
 };
 
-/** The hex root public key of a delegation chain (the per-account key). */
-const rootPublicKey = (body: unknown): string => {
-  if (
-    typeof body === "object" &&
-    body !== null &&
-    "publicKey" in body &&
-    typeof body.publicKey === "string"
-  ) {
-    return body.publicKey;
-  }
-  throw new Error("delegation chain missing publicKey");
-};
-
-/**
- * Enables device-local MCP access for the signed-in identity via Settings.
- * Assumes the page is already on `/manage`.
- */
-const enableMcpAccessInSettings = async (
-  page: Page,
-  isMobile: boolean,
-): Promise<void> => {
-  if (isMobile) {
-    await page.getByRole("button", { name: "Open menu" }).click();
-  }
-  await page.getByRole("link", { name: "Settings" }).click();
-  await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch", { name: "MCP access" }).check();
-  await page.getByLabel("I understand the risks.").check();
-  await page.getByRole("button", { name: "Enable MCP access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
-};
-
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
   await expect(
@@ -87,14 +53,14 @@ test("Invalid params show the error screen", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("A callback off the configured MCP origin is rejected", async ({
-  page,
-  mcp,
-}) => {
+test("A non-https callback is rejected", async ({ page, mcp }) => {
+  // MCP connections are to remote servers only, so callbacks must be https. A
+  // plain-http (or loopback) origin is rejected up front — the /mcp
+  // `form-action` CSP wouldn't allow posting the delegation there anyway.
   await page.goto(
     mcp.buildAuthorizeUrl({
       app: APP,
-      callbackUrl: "https://attacker.example.com/cb",
+      callbackUrl: "http://evil.example.com/cb",
     }),
   );
   await expect(
@@ -102,45 +68,179 @@ test("A callback off the configured MCP origin is rejected", async ({
   ).toBeVisible();
 });
 
-test("Without MCP access enabled the gated screen shows", async ({
+test("Signing up to an untrusted server prompts to add it in settings", async ({
   page,
   mcp,
 }) => {
+  // A fresh sign-up trusts no MCP server yet. The connect screen shows
+  // optimistically, but at connect time — after the user authenticates — II
+  // verifies the server against the identity's synced config and, finding it
+  // untrusted, shows the screen pointing to Settings rather than connecting.
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
+  await page.getByRole("button", { name: "Allow access" }).click();
   await expect(
-    page.getByRole("heading", { name: "MCP access not enabled" }),
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+  // The button authenticates here and hands the session to a new Settings tab,
+  // rather than opening Settings cold (which would force a fresh sign-in).
+  await expect(
+    page.getByRole("button", { name: "Manage trusted server" }),
   ).toBeVisible();
 });
 
-test("Returning user without MCP access lands on the gated screen immediately", async ({
+test("Manage trusted server hands the session to a new Settings tab", async ({
   page,
   mcp,
 }) => {
+  // Reaching the untrusted screen authenticates the identity, so its "Manage
+  // trusted server" button can open Settings in a new tab that adopts the
+  // session via postMessage — the same handoff as the authorize header, so no
+  // second sign-in is needed over there.
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+  await page.getByRole("button", { name: "Allow access" }).click();
+  const manageButton = page.getByRole("button", {
+    name: "Manage trusted server",
+  });
+  await expect(manageButton).toBeVisible();
+
+  const settingsPagePromise = page.context().waitForEvent("page");
+  await manageButton.click();
+  const settingsPage = await settingsPagePromise;
+  await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
+
+  // The handed-off session means Settings opens authenticated: the trusted
+  // server section heading is shown and no sign-in screen appears.
+  await expect(
+    settingsPage.getByRole("heading", { name: "Trusted MCP server" }),
+  ).toBeVisible({ timeout: 10_000 });
+});
+
+test("After trusting the server, the connect screen shows", async ({
+  page,
+  mcp,
+}) => {
+  // Trust now lives on-chain (synced), so trustServer drives the Settings UI and
+  // the connect flow makes real canister round-trips — give it ample time.
+  test.slow();
   await addVirtualAuthenticator(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await expect(
-    page.getByRole("heading", { name: "MCP access not enabled" }),
+    page.getByRole("button", { name: "Allow access" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Allow access" })).toBeHidden();
 });
 
-test("Once MCP access is enabled, Allow access posts a two-hop delegation chain", async ({
+test("Adding a trusted server in Settings unlocks the connect screen", async ({
   page,
   mcp,
-  isMobile,
 }) => {
+  // End-to-end: add the server via the Settings UI (not the seeding helper),
+  // then connecting to it reaches the connect screen.
+  test.slow();
+  await addVirtualAuthenticator(page);
+  // The Settings UI verifies the server via its RFC 9728 protected-resource
+  // metadata (a CORS-enabled GET at /.well-known/oauth-protected-resource).
+  // Serve a valid doc with CORS headers so the probe confirms MCP. (Activation
+  // is independent of the probe outcome, so the assertions below hold either
+  // way.) The catch-all also answers the `initialize` fallback + its preflight.
+  const cors = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+  };
+  await page.route(`${mcp.mcpOrigin}/**`, (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    if (
+      route.request().url().includes("/.well-known/oauth-protected-resource")
+    ) {
+      return route.fulfill({
+        status: 200,
+        headers: { ...cors, "content-type": "application/json" },
+        body: JSON.stringify({
+          authorization_servers: [mcp.mcpOrigin],
+          resource: `${mcp.mcpOrigin}/mcp`,
+        }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      headers: { ...cors, "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          serverInfo: { name: "test-mcp", version: "1" },
+        },
+      }),
+    });
+  });
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+
+  // Reach Settings via in-app navigation rather than page.goto: a full reload
+  // of an /manage/(authenticated) route drops the just-signed-up in-memory
+  // session and lands on the sign-in screen, whereas the SPA nav keeps it. On
+  // mobile the sidebar is collapsed behind a menu button, so open it first.
+  const openMenu = page.getByRole("button", { name: "Open menu" });
+  if (await openMenu.isVisible()) {
+    await openMenu.click();
+  }
+  await page.locator('a[href="/manage/settings"]').click();
+  await page.waitForURL(II_URL + "/manage/settings");
+  // The URL box only appears once the master toggle is on.
+  await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+  await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
+  await page.getByRole("button", { name: "Trust this server" }).click();
+  // Once a server is trusted the input is replaced by the server row, which
+  // carries a remove button — a unique assertion that it was added.
+  await expect(
+    page.getByRole("button", { name: "Remove this server" }),
+  ).toBeVisible();
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
+});
+
+test("Returning user lands on the connect screen immediately", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
+});
+
+test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
+  test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
+  await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await page.getByRole("button", { name: "Allow access" }).click();
@@ -169,14 +269,14 @@ test("Once MCP access is enabled, Allow access posts a two-hop delegation chain"
 test("Identity switcher shows while signing in and hides on the success screen", async ({
   page,
   mcp,
-  isMobile,
 }) => {
+  test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
+  await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   const switcher = page.getByRole("button", { name: "Switch identity" });
@@ -191,18 +291,15 @@ test("Identity switcher shows while signing in and hides on the success screen",
   await expect(switcher).toBeHidden();
 });
 
-test("Requested TTL within bounds is honoured", async ({
-  page,
-  mcp,
-  isMobile,
-}) => {
+test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
+  test.slow();
   const ttlMinutes = 60;
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
   await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
+  await mcp.trustServer(page);
 
   const before = Date.now();
   await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlMinutes }));
@@ -214,40 +311,9 @@ test("Requested TTL within bounds is honoured", async ({
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-test("MCP acts as the same principal that /authorize gives for that app", async ({
-  page,
-  mcp,
-  identities,
-  signInWithIdentity,
-  isMobile,
-}) => {
-  const identityNumber = identities[0].identityNumber;
-
-  // Principal the app (nice-name.com) sees via the normal /authorize flow — its
-  // default account.
-  const authorizePrincipal = await authorize(page, async (authPage) => {
-    await signInWithIdentity(authPage, identityNumber);
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-
-  // Enable device MCP access for the same identity.
-  await page.goto(II_URL);
-  await signInWithIdentity(page, identityNumber);
-  await page.waitForURL(II_URL + "/manage");
-  await enableMcpAccessInSettings(page, isMobile);
-
-  // Principal the MCP server is granted: the self-authenticating principal of
-  // the delegation chain's root public key.
-  await mcp.installInterceptor(page);
-  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await page.getByRole("button", { name: "Allow access" }).click();
-  const chain = await mcp.receivedDelegation;
-  const mcpPrincipal = Principal.selfAuthenticating(
-    hexToBytes(rootPublicKey(chain)),
-  ).toText();
-
-  // Same identity + same default account for the app ⇒ same principal.
-  expect(mcpPrincipal).toBe(authorizePrincipal);
-});
+// The browser /mcp flow issues the standing credential for the user's chosen
+// account at the MCP *server* origin the callback identifies (not a per-request
+// app); per-app delegations are minted server-side by the
+// `mcp_prepare/get_account_delegation` canister methods. Principal-derivation
+// parity for those is canister logic, covered by the integration tests
+// (tests/integration/mcp.rs), not here.

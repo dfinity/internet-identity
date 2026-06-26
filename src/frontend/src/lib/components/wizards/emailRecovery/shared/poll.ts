@@ -4,7 +4,7 @@
  * Both the setup wizard (binding an email to the current identity) and
  * the recovery wizard (proving control of a bound email to sign in)
  * drive the *same* canister-side flow: send a DKIM-signed email, poll
- * `email_recovery_status`, and — on the DNSSEC path — resolve the one
+ * `email_challenge_status`, and — on the DNSSEC path — resolve the one
  * missing DKIM leaf and submit it. The only real differences are the
  * terminal *success* handling (bind credential vs. retrieve delegation)
  * and which analytics funnel fires; everything else (backoff, the leaf
@@ -15,10 +15,10 @@
  */
 
 import type {
-  EmailRecoveryDiagnostics,
-  EmailRecoveryError,
-  EmailRecoveryStatus,
-  EmailRecoverySubmitDkimLeafArg,
+  EmailChallengeDiagnostics,
+  EmailChallengeError,
+  EmailChallengeStatus,
+  EmailChallengeSubmitDkimLeafArg,
 } from "$lib/generated/internet_identity_types";
 import type { Funnel } from "$lib/utils/analytics/Funnel";
 import { assembleDkimResolution } from "$lib/utils/dnssec";
@@ -50,20 +50,20 @@ export interface EmailRecoveryPollDeps<E extends Record<string, string>> {
   domain: string;
 
   // --- canister wrappers ------------------------------------------------
-  /** `email_recovery_status` (query). */
-  status: (nonce: string) => Promise<EmailRecoveryStatus>;
-  /** `email_recovery_submit_dkim_leaf` — the DNSSEC path (≥1 hop). Accepts
+  /** `email_challenge_status` (query). */
+  status: (nonce: string) => Promise<EmailChallengeStatus>;
+  /** `email_challenge_submit_dkim_leaf` — the DNSSEC path (≥1 hop). Accepts
    *  the leaf and returns; the verdict is read by polling `status`. Rejects
    *  only on a call-level error (unknown nonce / wrong state). */
-  submitDkimLeaf: (arg: EmailRecoverySubmitDkimLeafArg) => Promise<void>;
-  /** `email_recovery_resolve_via_doh` — resolves the DKIM key over the
+  submitDkimLeaf: (arg: EmailChallengeSubmitDkimLeafArg) => Promise<void>;
+  /** `email_challenge_resolve_via_doh` — resolves the DKIM key over the
    *  canister's DoH path. Driven repeatedly while the status is
    *  `ResolvingDoh` (the pure-DoH/Gmail case, and the fallback when a DNSSEC
    *  leaf CNAMEs into an unsigned zone). Carries only the nonce; idempotent
    *  and accept-only — poll `status` for the verdict. */
   resolveViaDoh: (nonce: string) => Promise<void>;
-  /** `email_recovery_diagnostics` (query). */
-  diagnostics: (nonce: string) => Promise<[] | [EmailRecoveryDiagnostics]>;
+  /** `email_challenge_diagnostics` (query). */
+  diagnostics: (nonce: string) => Promise<[] | [EmailChallengeDiagnostics]>;
 
   // --- analytics --------------------------------------------------------
   funnel: Funnel<E>;
@@ -83,7 +83,7 @@ export interface EmailRecoveryPollDeps<E extends Record<string, string>> {
    * loop keeps going. Setup checks `RegistrationSucceeded`; recovery
    * checks `RecoveryReady` and awaits the delegation retrieval.
    */
-  handleSuccess: (status: EmailRecoveryStatus) => boolean | Promise<boolean>;
+  handleSuccess: (status: EmailChallengeStatus) => boolean | Promise<boolean>;
   /** Whether the loop should keep running: the polling flag is set AND
    *  the wizard is still in a sending/waiting stage. */
   isActive: () => boolean;
@@ -137,7 +137,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
   // unsupported-domain view (matching the prepare-time routing); every
   // other reason gets the generic failed view with diagnostics.
   const handleTerminalFailure = async (
-    terminal: { Failed: EmailRecoveryError } | { Expired: null },
+    terminal: { Failed: EmailChallengeError } | { Expired: null },
   ): Promise<void> => {
     if ("Failed" in terminal) {
       const reason = terminal.Failed;
@@ -177,7 +177,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
   };
   try {
     while (isActive()) {
-      let result: EmailRecoveryStatus;
+      let result: EmailChallengeStatus;
       try {
         result = await status(nonce);
         consecutivePollErrors = 0;
@@ -240,7 +240,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
           // DomainNotSupported to the unsupported view, everything else to
           // the failed view) instead of discarding it and re-polling
           // canister state we don't own.
-          if (isCanisterError<EmailRecoveryError>(e)) {
+          if (isCanisterError<EmailChallengeError>(e)) {
             await handleTerminalFailure({ Failed: e.raw });
             return;
           }
@@ -266,7 +266,7 @@ export const runEmailRecoveryPoll = async <E extends Record<string, string>>(
         try {
           await resolveViaDoh(nonce);
         } catch (e) {
-          if (isCanisterError<EmailRecoveryError>(e)) {
+          if (isCanisterError<EmailChallengeError>(e)) {
             await handleTerminalFailure({ Failed: e.raw });
             return;
           }

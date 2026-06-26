@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildDiagnosticsBlob } from "./diagnostics";
-import type { EmailRecoveryDiagnostics } from "$lib/generated/internet_identity_types";
+import type { EmailChallengeDiagnostics } from "$lib/generated/internet_identity_types";
 
 // 1_700_000_000 s since epoch → 2023-11-14T22:13:20Z. Stored in ns.
 const CREATED_AT_NS = BigInt("1700000000000000000");
 
 describe("buildDiagnosticsBlob", () => {
   it("includes the gateway message_id, reason code and DoH path", () => {
-    const diag: EmailRecoveryDiagnostics = {
+    const diag: EmailChallengeDiagnostics = {
       message_id: ["<gw-123@gateway.example>"],
       reason_code: "Failed:AddressMismatch",
       verification_path: { Doh: null },
@@ -21,7 +21,7 @@ describe("buildDiagnosticsBlob", () => {
   });
 
   it("renders an absent message_id and the DNSSEC path", () => {
-    const diag: EmailRecoveryDiagnostics = {
+    const diag: EmailChallengeDiagnostics = {
       message_id: [],
       reason_code: "Pending",
       verification_path: { Dnssec: null },

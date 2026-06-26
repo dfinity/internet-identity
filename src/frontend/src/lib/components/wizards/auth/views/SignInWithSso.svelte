@@ -96,9 +96,18 @@
   ): string | undefined => {
     if (e instanceof DomainNotConfiguredError) {
       if (e.reason === "timeout") {
-        return $t`${domainInput} took too long to respond. Try again in a moment.`;
+        // The domain IS on II's allowlist, but discovery never resolved.
+        // A failed or unreachable discovery fetch surfaces here too — the
+        // canister keeps reporting `Pending` until we time out — so this is
+        // the case where pointing the SSO admin at the discovery endpoint
+        // actually helps.
+        return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
       }
-      return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
+      // `rejected` is the canister's `NotAllowed`: the domain isn't on II's
+      // SSO allowlist, so no discovery was ever attempted. Telling the user
+      // to check the discovery endpoint would be misleading — the domain
+      // simply isn't set up for SSO with II yet.
+      return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
     }
     if (e instanceof OAuthProviderError) {
       // `unsupported_response_type` = the SSO app is code-only; II needs
@@ -117,12 +126,6 @@
         return $t`${domainInput}'s SSO returned "${e.error}": ${e.errorDescription}`;
       }
       return $t`${domainInput}'s SSO returned error "${e.error}".`;
-    }
-    if (e instanceof Error) {
-      const msg = e.message;
-      if (msg.toLowerCase().includes("canary allowlist")) {
-        return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
-      }
     }
     return undefined;
   };

@@ -298,6 +298,12 @@ type InternetIdentityInit = record {
     // to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
     // keyed off `is_production`.
     sso_discoverable_domains : opt vec text;
+    // Deploy flag opening the SSO discovery domain gate to any domain. When
+    // `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
+    // which domains may be discovered as SSO providers. Does not relax the
+    // strict-`https` requirement: serving discovery over plain `http` still
+    // requires the host to be on the explicit `sso_discoverable_domains` list.
+    sso_allow_any_domain : opt bool;
     // One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     // OpenID credentials. When set, a batched timer-driven migration stamps
     // every stored credential whose (iss, aud) matches an entry and whose
@@ -552,17 +558,30 @@ type EmailRecoveryCredential = record {
     last_used : opt Timestamp;
 };
 
-type EmailRecoveryChallenge = record {
+// A verified email address bound to an anchor. Parallel to
+// `EmailRecoveryCredential` but used as an attribute source (and
+// surfaced in the smart-routing UI) rather than a recovery
+// credential. The `verified_at` timestamp is when DKIM/DMARC
+// verification completed successfully.
+type VerifiedEmail = record {
+    address : text;
+    verified_at : Timestamp;
+};
+
+type EmailChallenge = record {
     nonce : text;
     expires_at : Timestamp;
 };
 
-type EmailRecoveryDnsInput = record {
+type EmailChallengeDnsInput = record {
     address : text;
     dns_proof : opt DnsProofBundle;
 };
 
-type EmailRecoverySubmitDkimLeafArg = record {
+// Used by both the recovery flow and the verified-emails flow. The
+// pending entry's `PendingKind` dispatches to the right anchor sink
+// after the cryptographic check; the argument itself is flow-neutral.
+type EmailChallengeSubmitDkimLeafArg = record {
     nonce : text;
     // The DKIM resolution chain in CNAME order, ending in a TXT. At
     // least one hop required; bounded by `MAX_CNAME_HOPS = 4` at the
@@ -573,7 +592,7 @@ type EmailRecoverySubmitDkimLeafArg = record {
     // leaf — the DKIM record CNAMEs into an unsigned zone (e.g.
     // `selector1._domainkey.outlook.com` is a signed CNAME into the
     // unsigned `outbound.protection.outlook.com`) — it must NOT submit
-    // an empty vec here; it drives `email_recovery_resolve_via_doh`
+    // an empty vec here; it drives `email_challenge_resolve_via_doh`
     // instead, which resolves the key over the canister's DoH path.
     hops : vec SignedRRset;
     // Delegation chains for signed zones touched by `hops` that
@@ -582,11 +601,11 @@ type EmailRecoverySubmitDkimLeafArg = record {
     extra_chains : vec DelegationChain;
 };
 
-// Argument to email_recovery_resolve_via_doh. Wrapped in a record (like
-// EmailRecoverySubmitDkimLeafArg) so the method can grow fields without a
+// Argument to email_challenge_resolve_via_doh. Wrapped in a record (like
+// EmailChallengeSubmitDkimLeafArg) so the method can grow fields without a
 // breaking interface change; nonce is the lookup key and is always
 // required.
-type EmailRecoveryResolveViaDohArg = record {
+type EmailChallengeResolveViaDohArg = record {
     nonce : text;
 };
 
@@ -643,7 +662,10 @@ type DohFailureReason = variant {
     ResponseMalformed : text;
 };
 
-type EmailRecoveryError = variant {
+// Shared by both flows (recovery + verified emails). The variants
+// describe inbound-DKIM-challenge failure modes; none are
+// recovery-specific.
+type EmailChallengeError = variant {
     Unauthorized : principal;
     NonceUnknown;
     NonceExpired;
@@ -652,19 +674,33 @@ type EmailRecoveryError = variant {
     DomainNotSupported : text;
     EmailVerificationFailed : text;
     DkimLeafMismatch;
-    // email_recovery_submit_dkim_leaf was called with an empty `hops`
+    // email_challenge_submit_dkim_leaf was called with an empty `hops`
     // vector; an FE that can't walk DNSSEC must drive
-    // email_recovery_resolve_via_doh instead.
+    // email_challenge_resolve_via_doh instead.
     EmptyDkimLeafHops;
     NoDkimLeafExpected;
     AddressMismatch;
     SubjectNotSigned;
     AddressAlreadyRegistered;
     AddressNotRegistered;
+    // The submitted address didn't pass shape validation (missing `@`,
+    // empty local-part or domain, whitespace, oversized parts). Distinct
+    // from DomainNotSupported, which is about a valid address whose
+    // registered domain can't be verified.
+    InvalidEmailAddress : text;
+    // The anchor has reached its per-bucket cap (currently only fires
+    // for the verified-emails bucket). FE shows a "limit reached"
+    // notice; user must remove an existing entry to add another.
+    LimitReached : record { limit : nat8 };
     InternalCanisterError : text;
 };
 
-type EmailRecoveryStatus = variant {
+// Polling status returned by `email_challenge_status` — shared between
+// the recovery flow and the verified-emails flow. `RegistrationSucceeded`
+// covers both "recovery email bound" and "verified email bound";
+// `RecoveryReady` is recovery-only and only emitted when the pending
+// entry's `PendingKind` is `Recover`.
+type EmailChallengeStatus = variant {
     Pending;
     ResolvingDoh;
     NeedDkimLeaf : record { selector : text };
@@ -674,7 +710,7 @@ type EmailRecoveryStatus = variant {
         expiration : Timestamp;
         anchor_number : IdentityNumber;
     };
-    Failed : EmailRecoveryError;
+    Failed : EmailChallengeError;
     Expired;
 };
 
@@ -684,12 +720,12 @@ type EmailRecoveryStatus = variant {
 type VerificationPath = variant { Doh; Dnssec };
 
 // Strictly-public, user-copyable diagnostics for one pending challenge
-// (see email_recovery_diagnostics). Intended for a support ticket so a
+// (see email_challenge_diagnostics). Intended for a support ticket so a
 // case can be lined up across the SMTP gateway logs and the canister's
 // production logs via message_id. NO email address, anchor, principal,
 // delegation/seed, or inner error string — reason_code is the failing
 // variant's name only.
-type EmailRecoveryDiagnostics = record {
+type EmailChallengeDiagnostics = record {
     message_id : opt text;
     reason_code : text;
     verification_path : VerificationPath;
@@ -946,6 +982,11 @@ type IdentityInfo = record {
     // the first one — but exposing it as a `vec` lets future
     // multi-credential support land without a candid schema bump.
     email_recovery : opt vec EmailRecoveryCredential;
+    // Verified emails bound to this anchor (absent when none is
+    // configured). Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR; the FE
+    // shows a "limit reached" notice in the wizard when adding
+    // beyond the cap.
+    verified_emails : opt vec VerifiedEmail;
 };
 
 type IdentityInfoError = variant {
@@ -1037,6 +1078,17 @@ type PrepareAccountDelegation = record {
     expiration : Timestamp;
 };
 
+// Result of mcp_prepare_account_delegation. Carries the account_number the
+// canister resolved (the anchor's default account at target_origin) so the MCP
+// server can thread the same account into mcp_get_account_delegation — the
+// default is mutable, so re-resolving it in `get` could otherwise diverge and
+// yield NoSuchDelegation.
+type McpPrepareDelegation = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    account_number : opt AccountNumber;
+};
+
 type SessionDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
@@ -1046,6 +1098,17 @@ type SessionDelegationError = variant {
 type PrepareSessionDelegation = record {
     user_key : UserKey;
     expiration : Timestamp;
+};
+
+// The identity's synced trusted-MCP-server configuration: a master toggle and
+// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+// anchor), so it follows the identity across all of its devices — unlike the
+// device-local CLI-access toggle. `url` is kept verbatim so the Settings UI can
+// display/re-probe a path-based endpoint; the connect flow matches trust by
+// origin.
+type McpConfig = record {
+    enabled : bool;
+    url : opt text;
 };
 
 type GetAccountsError = variant {
@@ -1578,47 +1641,98 @@ service : (opt InternetIdentityInit) -> {
     discover_sso : (text) -> ();
     get_sso_discovery : (text) -> (SsoDiscoveryState) query;
 
-    // Email-recovery protocol
-    // =======================
-    // See `docs/ongoing/email-recovery.md`. Covers both flows:
-    // - Setup: prepare_add (authenticated) → smtp_request for
-    //   register@id.ai → credential bound to the anchor. Removed
-    //   later via credential_remove.
-    // - Recovery: prepare_delegation (anonymous, bound to a
-    //   session_key) → smtp_request for recover@id.ai → canister
-    //   stamps a signed delegation seed. The FE then calls
-    //   email_recovery_get_delegation to retrieve the
-    //   SignedDelegation.
-    // Both flows share the polling status query.
-    email_recovery_credential_prepare_add : (IdentityNumber, EmailRecoveryDnsInput) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
-    email_recovery_prepare_delegation : (EmailRecoveryDnsInput, SessionKey) -> (variant { Ok : EmailRecoveryChallenge; Err : EmailRecoveryError });
-    email_recovery_status : (text) -> (EmailRecoveryStatus) query;
-    email_recovery_diagnostics : (text) -> (opt EmailRecoveryDiagnostics) query;
-    email_recovery_submit_dkim_leaf : (EmailRecoverySubmitDkimLeafArg) -> (variant { Ok; Err : EmailRecoveryError });
-    // Resolves the DKIM key over the canister's own allowlist-gated DoH
-    // path, called with just the nonce. Used for the pure-DoH (Gmail)
-    // case and as the fallback when the FE can't walk a fully-signed
-    // DNSSEC resolution (the DKIM record CNAMEs into an unsigned zone).
-    // Polled: the FE calls it repeatedly while the status is ResolvingDoh.
-    email_recovery_resolve_via_doh : (EmailRecoveryResolveViaDohArg) -> (variant { Ok; Err : EmailRecoveryError });
-    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailRecoveryError }) query;
-    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailRecoveryError });
-
-    // SMTP gateway protocol
-    // =====================
+    // ===================================================================
+    // Email-challenge protocol (shared inbound-DKIM primitive)
+    // ===================================================================
+    // The flow-neutral surface — used by both the email-recovery flow
+    // and the verified-emails flow. Methods here are keyed by the
+    // canister-issued nonce; dispatch to the right anchor sink happens
+    // inside the canister via `PendingKind` on the pending entry.
+    //
     // The off-chain SMTP gateway forwards every inbound message via
-    // smtp_request. The canister verifies the email cryptographically
-    // and dispatches by recipient: register@id.ai → setup completion,
-    // recover@id.ai → recovery delegation stamping. Always returns Ok
-    // — the gateway shouldn't get a per-message verification signal
-    // back. The FE sees outcomes via the polling status query.
+    // `smtp_request`. The canister verifies the email cryptographically
+    // and dispatches by recipient: `register@<domain>` → setup
+    // completion (either flow), `recover@<domain>` → recovery
+    // delegation stamping. Always returns Ok — the gateway shouldn't
+    // get a per-message verification signal back. The FE sees outcomes
+    // via `email_challenge_status`.
     smtp_request : (SmtpRequest) -> (SmtpResponse);
 
     // Called by the gateway at RCPT TO time to decide whether to
     // accept the connection before pulling the message body. Returns
-    // Ok for register@id.ai / recover@id.ai (case-insensitive), and
-    // 550 (mailbox unavailable) for everything else.
+    // Ok for `register@<domain>` / `recover@<domain>` (case-
+    // insensitive), and 550 (mailbox unavailable) for everything else.
     smtp_request_validate : (SmtpRequest) -> (SmtpResponse) query;
+
+    // FE-side polling — the wizard / panel calls these repeatedly to
+    // drive the "waiting for your email" UI. Status flips through
+    // `Pending` → `ResolvingDoh` / `NeedDkimLeaf` → terminal.
+    // Diagnostics returns strictly-public, user-copyable failure
+    // detail for support tickets (no PII, no address, no anchor).
+    email_challenge_status : (text) -> (EmailChallengeStatus) query;
+    email_challenge_diagnostics : (text) -> (opt EmailChallengeDiagnostics) query;
+
+    // DNSSEC-path completion (`submit_dkim_leaf`) and DoH-path
+    // completion (`resolve_via_doh`). One or the other runs per
+    // challenge depending on which path the canister picked at
+    // prepare-time. Both are polled by the FE while the status is
+    // `NeedDkimLeaf` / `ResolvingDoh`.
+    email_challenge_submit_dkim_leaf : (EmailChallengeSubmitDkimLeafArg) -> (variant { Ok; Err : EmailChallengeError });
+    email_challenge_resolve_via_doh : (EmailChallengeResolveViaDohArg) -> (variant { Ok; Err : EmailChallengeError });
+
+    // ===================================================================
+    // Email-recovery flow (recovery-as-login)
+    // ===================================================================
+    // Recovery-specific surface built on top of the shared challenge
+    // primitive above. See `docs/ongoing/email-recovery.md` for the
+    // full design.
+    //   - Setup: `credential_prepare_add` (authenticated) →
+    //     `smtp_request` for `register@<domain>` → credential bound to
+    //     the anchor's `email_recovery`. Removed via `credential_remove`.
+    //   - Recovery: `prepare_delegation` (anonymous, bound to a
+    //     `session_key`) → `smtp_request` for `recover@<domain>` →
+    //     canister stamps a signed delegation seed. The FE then calls
+    //     `get_delegation` to retrieve the `SignedDelegation`.
+    email_recovery_credential_prepare_add : (IdentityNumber, EmailChallengeDnsInput) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
+    email_recovery_prepare_delegation : (EmailChallengeDnsInput, SessionKey) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
+    email_recovery_get_delegation : (EmailRecoveryGetDelegationArgs) -> (variant { Ok : SignedDelegation; Err : EmailChallengeError }) query;
+    email_recovery_credential_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailChallengeError });
+
+    // ===================================================================
+    // Verified-emails flow (attribute source)
+    // ===================================================================
+    // Parallel to the recovery flow but the verified address is stored
+    // on `Anchor::verified_emails` rather than `Anchor::email_recovery`.
+    // Reuses the same SMTP gateway, DKIM verifier and DMARC alignment,
+    // but issues nonces with the `II-Verify-` prefix so an inbound
+    // challenge can never be cross-applied between the two flows.
+    // Capped at MAX_VERIFIED_EMAILS_PER_ANCHOR (5) addresses per anchor.
+    verified_email_prepare_add : (IdentityNumber, EmailChallengeDnsInput) -> (variant { Ok : EmailChallenge; Err : EmailChallengeError });
+    verified_email_remove : (IdentityNumber, text) -> (variant { Ok; Err : EmailChallengeError });
+
+    // ===================================================================
+    // DEPRECATED — remove in a follow-up PR
+    // ===================================================================
+    // Legacy aliases for the four `email_challenge_*` methods, kept so
+    // a stale FE bundle in a browser cache — or any FE build that
+    // lands before this canister's renamed methods — can still drive
+    // the inbound-DKIM flow without a "method not found" break
+    // mid-verification.
+    //
+    // The wire bytes are identical to the new methods (Candid is
+    // structurally typed; the renamed return types match the old
+    // types' shapes field-for-field), so old clients with bindings
+    // against the old type names deserialize successfully.
+    //
+    // **All methods below must be removed together in a single
+    // follow-up `chore(be): remove deprecated email_recovery_* method
+    // aliases` PR**, once every deployed FE has refreshed to the
+    // `email_challenge_*` names. See `TASKS.md` for the tracked
+    // follow-up.
+    email_recovery_status : (text) -> (EmailChallengeStatus) query;
+    email_recovery_diagnostics : (text) -> (opt EmailChallengeDiagnostics) query;
+    email_recovery_submit_dkim_leaf : (EmailChallengeSubmitDkimLeafArg) -> (variant { Ok; Err : EmailChallengeError });
+    email_recovery_resolve_via_doh : (EmailChallengeResolveViaDohArg) -> (variant { Ok; Err : EmailChallengeError });
 
     // HTTP Gateway protocol
     // =====================
@@ -1672,6 +1786,65 @@ service : (opt InternetIdentityInit) -> {
         anchor_number : UserNumber,
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
+        session_key : SessionKey,
+        expiration : Timestamp
+    ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
+
+    // Enable/disable the backend /mcp delegation path for an anchor at a given
+    // MCP server origin and account (null account = unreserved default).
+    // Enabling binds the principal II derives for that (account, origin) pair;
+    // disabling unbinds exactly that principal. The origin comes from the
+    // connect request, so each user trusts the MCP server they choose.
+    mcp_set_access : (
+        anchor_number : UserNumber,
+        mcp_server_origin : FrontendHostname,
+        account_number : opt AccountNumber, // Null is unreserved default account
+        enabled : bool
+    ) -> (variant { Ok; Err : text });
+
+    // Whether the anchor has MCP access enabled for the (mcp_server_origin,
+    // account_number) pair.
+    mcp_access_enabled : (
+        anchor_number : UserNumber,
+        mcp_server_origin : FrontendHostname,
+        account_number : opt AccountNumber // Null is unreserved default account
+    ) -> (bool) query;
+
+    // Read the identity's synced trusted-MCP-server config (master toggle + the
+    // trusted server URL). Persisted on-chain, so it follows the identity across
+    // devices. Read by the Settings UI and the /mcp connect flow (which verifies
+    // the connecting origin against it). Returns the disabled, no-server default
+    // for an unauthorized caller or an anchor that never wrote a config.
+    mcp_get_config : (anchor_number : UserNumber) -> (McpConfig) query;
+
+    // Persist the identity's trusted-MCP-server config so it syncs across the
+    // identity's devices. Authenticated as the identity, so only the user — never
+    // a page that initiates a connect request — can change what it trusts.
+    mcp_set_config : (
+        anchor_number : UserNumber,
+        config : McpConfig
+    ) -> (variant { Ok; Err : text });
+
+    // Called by the MCP server, authorized by caller() == the anchor's principal
+    // for the (account, origin) it was bound to. Mints a <=5-minute delegation
+    // for the anchor's default account at target_origin. Anchor recovered from
+    // the caller.
+    // account_number names one of the anchor's accounts at target_origin to act
+    // as; null uses the anchor's default account there. The resolved account is
+    // returned in McpPrepareDelegation to thread into mcp_get_account_delegation.
+    mcp_prepare_account_delegation : (
+        target_origin : FrontendHostname,
+        account_number : opt AccountNumber,
+        session_key : SessionKey,
+        max_ttl : opt nat64
+    ) -> (variant { Ok : McpPrepareDelegation; Err : AccountDelegationError });
+
+    // account_number must be the value returned by the matching
+    // mcp_prepare_account_delegation, so `get` reads the same account `prepare`
+    // signed for (the default account at target_origin is mutable).
+    mcp_get_account_delegation : (
+        target_origin : FrontendHostname,
+        account_number : opt AccountNumber,
         session_key : SessionKey,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
