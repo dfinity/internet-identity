@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: ./deploy-main-to-beta [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) [options]
+#
+# The `main`-branch sibling of deploy-pr-to-beta. Instead of resolving a
+# pull request's head branch, it goes straight to `main`, finds the newest
+# canister-tests.yml run there, and upgrades the selected staging
+# canister(s) to that run's CI-built artifacts.
+
+print_usage() {
+    cat <<EOF
+Usage: $0 [-sa|-sb|-sc|-sd|--staging custom] (-fe|-be) [--dry-run] [--no-checks]
+
+Downloads the CI-built wasm.gz files from the most recent canister-tests.yml
+run on the \`main\` branch and upgrades the selected staging canister(s) to
+them. The main-branch counterpart of deploy-pr-to-beta — no PR number is
+taken; \`main\` is always the source.
+
+EOF
+    print_common_usage
+    cat <<EOF
+
+Artifacts fetched (named per the CI workflow):
+  Backend  → internet_identity_backend.wasm.gz
+  Frontend → docker-build-internet_identity_frontend job's
+             internet_identity_frontend.wasm.gz artifact
+EOF
+}
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT_DIR="$SCRIPTS_DIR/.."
+cd "$ROOT_DIR"
+
+# shellcheck source=deploy-common.bash
+source "$SCRIPTS_DIR/deploy-common.bash"
+
+# -------------------------
+# CLI
+# -------------------------
+parse_common_args "$@" || { rc=$?; if [ "$rc" -eq 2 ]; then print_usage; exit 0; fi; print_usage; exit 1; }
+
+# `main` is always the source: no PR number, and `--reconfigure` (the
+# args-only, on-chain-hash-matched flow) belongs to deploy-pr-to-beta.
+if [ "${#REMAINING_ARGS[@]}" -gt 0 ]; then
+    echo "Error: deploy-main-to-beta does not take a PR number (got: ${REMAINING_ARGS[*]})." >&2
+    echo "       It always deploys the latest main-branch CI build." >&2
+    print_usage
+    exit 1
+fi
+if [ "$IS_RECONFIGURE" = true ]; then
+    echo "Error: --reconfigure is a deploy-pr-to-beta feature (args-only, hash-matched)." >&2
+    echo "       deploy-main-to-beta always ships main's latest CI wasm." >&2
+    exit 1
+fi
+
+resolve_staging_config
+print_deployment_summary
+
+BRANCH="main"
+
+# -------------------------
+# Fetch CI artifacts FIRST, before asking the user any interactive questions.
+# Failing fast here avoids wasting the operator's time on prompts when main's
+# CI run doesn't exist or isn't green.
+#
+# `ensure_github_auth` (deploy-common.bash) verifies the gh CLI is present +
+# authenticated and exports AUTH_HEADER; REPO / WORKFLOW_FILE are shared
+# constants from the same file.
+# -------------------------
+ensure_github_auth
+
+# Artifact temp dir + its EXIT-trap cleanup. The CI artifact names collide
+# with the names `scripts/build` produces locally, so extracting in the repo
+# root would clobber the developer's working-tree wasms — keep them isolated.
+ARTIFACT_DIR=$(mktemp -d -t ii-deploy-main.XXXXXX)
+cleanup() {
+    if [ -n "$ARTIFACT_DIR" ] && [ -d "$ARTIFACT_DIR" ]; then
+        echo "Cleaning up downloaded artifacts (in $ARTIFACT_DIR)..." >&2
+        rm -rf "$ARTIFACT_DIR"
+    fi
+}
+trap cleanup EXIT
+
+# Populated by resolve_and_download_ci_artifacts; read by the per-end deploy
+# log lines below (same run id for both ends here).
+declare -A RUN_ID_BY_ARTIFACT=()
+
+echo ""
+echo "Resolving latest $WORKFLOW_FILE run on '$BRANCH'..."
+resolve_and_download_ci_artifacts "$BRANCH"
+
+# -------------------------
+# Reachability + consistency
+# -------------------------
+run_reachability_checks || exit 1
+run_consistency_checks
+
+# -------------------------
+# Now — after CI artifacts are verified AND on disk — prompt for install-arg
+# fields that the operator should review on each upgrade (custom-domain
+# origins, behaviour knobs). See deploy-common.bash for the per-end fields.
+# -------------------------
+if [ "$DEPLOY_BE" = true ]; then
+    prompt_be_extra_args
+fi
+if [ "$DEPLOY_FE" = true ]; then
+    prompt_fe_extra_args
+fi
+
+# -------------------------
+# Deploy (honours --dry-run)
+#
+# Args are encoded via the pinned didc against the schema embedded in the
+# wasm being deployed *before* the install runs — see deploy-common.bash's
+# encode_install_arg_bin for the rationale.
+# -------------------------
+if [ "$DEPLOY_BE" = true ]; then
+    echo ""
+    echo "=== Deploying backend (main, run $RUN_ID) to $BE_ID ==="
+    encode_install_arg_bin \
+        "$ARTIFACT_DIR/internet_identity_backend.wasm.gz" \
+        "$(build_be_install_arg)" \
+        "$ARTIFACT_DIR/internet_identity_backend.args.bin" \
+        || exit 1
+    run_icp_install \
+        "$BE_ID" \
+        "$ARTIFACT_DIR/internet_identity_backend.wasm.gz" \
+        "$ARTIFACT_DIR/internet_identity_backend.args.bin"
+fi
+
+if [ "$DEPLOY_FE" = true ]; then
+    echo ""
+    echo "=== Deploying frontend (main, run $RUN_ID) to $FE_ID ==="
+    encode_install_arg_bin \
+        "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz" \
+        "$(build_fe_install_arg)" \
+        "$ARTIFACT_DIR/internet_identity_frontend.args.bin" \
+        || exit 1
+    run_icp_install \
+        "$FE_ID" \
+        "$ARTIFACT_DIR/internet_identity_frontend.wasm.gz" \
+        "$ARTIFACT_DIR/internet_identity_frontend.args.bin"
+fi
+
+echo ""
+echo "All deployments complete."
