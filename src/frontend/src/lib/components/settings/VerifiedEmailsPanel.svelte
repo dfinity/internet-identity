@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MailCheckIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
+  import { MailIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { anonymousActor } from "$lib/globals";
   import { invalidateAll } from "$app/navigation";
@@ -109,7 +109,10 @@
         </span>
       </div>
       <p class="text-text-tertiary text-sm">
-        <Trans>Only verified emails can be shared.</Trans>
+        <Trans>
+          Manage your shareable emails. These should be different from your
+          recovery email.
+        </Trans>
       </p>
     </div>
     {#if count > 0}
@@ -131,7 +134,7 @@
       aria-label={$t`Add an email`}
       class="border-border-tertiary bg-bg-primary hover:border-border-secondary hover:bg-bg-primary_hover flex flex-col items-center justify-center gap-2 rounded-sm border border-dashed px-6 py-10 text-center transition-colors duration-200 outline-none"
     >
-      <MailCheckIcon class="text-fg-secondary size-7" aria-hidden="true" />
+      <MailIcon class="text-fg-secondary size-7" aria-hidden="true" />
       <p aria-hidden="true" class="text-text-tertiary text-sm">
         {$t`No emails yet.`}
       </p>

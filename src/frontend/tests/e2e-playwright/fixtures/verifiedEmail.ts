@@ -83,10 +83,10 @@ class VerifiedEmailFixtures {
     this.#page = page;
   }
 
-  /** Navigate to the /manage/share page where the verified-emails
-   *  panel lives (sibling of /manage/recovery). */
+  /** Navigate to the /manage/shareable-info page where the
+   *  verified-emails panel lives (sibling of /manage/recovery). */
   async goto(): Promise<void> {
-    await this.#page.goto(II_URL + "/manage/share");
+    await this.#page.goto(II_URL + "/manage/shareable-info");
   }
 
   /** The "Shareable info" page sits on its own top-level route under

@@ -98,7 +98,7 @@
       class="border-fg-warning-primary bg-bg-warning-primary flex flex-col gap-1 rounded-xl border p-4"
     >
       <div class="text-text-warning-primary text-sm font-semibold">
-        {$t`This is your recovery email — best not to share it`}
+        {$t`This is your recovery email. Best not to share it.`}
       </div>
       <div class="text-text-warning-primary text-sm">
         <Trans>
