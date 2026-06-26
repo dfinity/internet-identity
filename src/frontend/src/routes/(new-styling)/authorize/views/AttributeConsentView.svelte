@@ -10,6 +10,7 @@
     resolveAttributeGroups,
   } from "$lib/stores/channelHandlers/attributes";
   import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { lastSharedEmailsStore } from "$lib/stores/last-shared-emails.store";
   import { anonymousActor, backendCanisterConfig } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import { throwCanisterError } from "$lib/utils/utils";
@@ -88,8 +89,9 @@
   };
 
   const getProviderName = (key: string): string | undefined => {
+    // No scope = unscoped wire row from `Anchor.verified_emails`.
     const scope = extractScope(key);
-    if (scope === undefined) return undefined;
+    if (scope === undefined) return $t`Verified email`;
     if (scope.startsWith("openid:")) {
       const issuer = scope.slice("openid:".length);
       return backendCanisterConfig.openid_configs[0]?.find(
@@ -144,18 +146,34 @@
   // fresh list_available_attributes can surface as a picker.
   let displayGroups = $state<MergedGroup[]>([]);
 
-  /** Resolves only when the consent rows are fully ready to render:
-   *  attribute groups computed, SSO provider names discovered, and
-   *  `selections` initialised. Gating the template on this promise
-   *  (rather than `context`) means `{:then}` never sees an in-between
-   *  frame where a fast click could submit an empty consent result. */
+  // For email-shaped groups, prefer the option whose displayed address
+  // case-matches the saved last-shared email; fall back to index 0.
+  const indexForSavedEmail = (
+    group: MergedGroup,
+    savedEmail: string | undefined,
+  ): number => {
+    if (savedEmail === undefined) return 0;
+    if (group.name !== "email" && group.name !== "verified_email") return 0;
+    const idx = group.options.findIndex(
+      (o) => o.display.displayValue.toLowerCase() === savedEmail.toLowerCase(),
+    );
+    return idx >= 0 ? idx : 0;
+  };
+
   const prepared = (async () => {
     const ctx = await context;
     const groups = mergeGroups(ctx.groups);
     await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
+    const savedEmail = lastSharedEmailsStore.get(
+      $authenticatedStore.identityNumber,
+      ctx.effectiveOrigin,
+    );
     selections.clear();
     for (const group of groups) {
-      selections.set(groupId(group), { checked: true, selectedIndex: 0 });
+      selections.set(groupId(group), {
+        checked: true,
+        selectedIndex: indexForSavedEmail(group, savedEmail),
+      });
     }
     displayGroups = groups;
     return {
@@ -163,6 +181,7 @@
       requestedKeys: ctx.requestedKeys,
       emailRequested: ctx.requestedKeys.some(isEmailKey),
       recoveryAddresses: ctx.recoveryAddresses,
+      verifiedAddresses: ctx.verifiedAddresses,
     };
   })();
 
@@ -193,7 +212,12 @@
     );
   };
 
-  const refetchGroups = async (requestedKeys: string[]): Promise<void> => {
+  // `preferredAddress` pre-selects the matching option in email-shaped
+  // groups so the user lands on the address they just verified.
+  const refetchGroups = async (
+    requestedKeys: string[],
+    preferredAddress?: string,
+  ): Promise<void> => {
     try {
       const available = await $authenticatedStore.actor
         .list_available_attributes({
@@ -207,7 +231,19 @@
       await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
       selections.clear();
       for (const group of groups) {
-        selections.set(groupId(group), { checked: true, selectedIndex: 0 });
+        const preferred =
+          preferredAddress !== undefined &&
+          (group.name === "email" || group.name === "verified_email")
+            ? group.options.findIndex(
+                (o) =>
+                  o.display.displayValue.toLowerCase() ===
+                  preferredAddress.toLowerCase(),
+              )
+            : -1;
+        selections.set(groupId(group), {
+          checked: true,
+          selectedIndex: preferred >= 0 ? preferred : 0,
+        });
       }
       displayGroups = groups;
     } catch (error) {
@@ -216,11 +252,11 @@
   };
 
   const handleVerifySuccess = async (
-    _address: string,
+    address: string,
     requestedKeys: string[],
   ): Promise<void> => {
     showVerifyWizard = false;
-    await refetchGroups(requestedKeys);
+    await refetchGroups(requestedKeys, address);
   };
 
   const handleSkip = () => onConsent({ attributes: [] });
@@ -231,12 +267,24 @@
     }
   };
 
-  const handleContinue = (groups: MergedGroup[]) => {
+  const handleContinue = async (groups: MergedGroup[]) => {
     const attributes = groups.flatMap((group) => {
       const selection = selections.get(groupId(group));
       if (selection === undefined || !selection.checked) return [];
       return group.options[selection.selectedIndex].originals;
     });
+    const sharedEmail = attributes.find((attr) => {
+      const name = extractAttributeName(attr.key);
+      return name === "email" || name === "verified_email";
+    })?.displayValue;
+    if (sharedEmail !== undefined) {
+      const { effectiveOrigin } = await prepared;
+      lastSharedEmailsStore.set(
+        $authenticatedStore.identityNumber,
+        effectiveOrigin,
+        sharedEmail,
+      );
+    }
     onConsent({ attributes });
   };
 
@@ -377,7 +425,7 @@
             <span class="shrink-0 text-sm font-medium">
               {group.options[0].display.displayValue}
             </span>
-            {#if group.options.length > 1}
+            {#if group.options.length > 1 || group.name === "email" || group.name === "verified_email"}
               <span class="ms-auto size-6 shrink-0"></span>
             {/if}
           </div>
@@ -393,7 +441,7 @@
               label={labelForGroup(group)}
               {maxLabelWidth}
               options={group.options.map((o) => ({
-                id: o.display.key,
+                id: `${o.display.key}|${o.display.displayValue}`,
                 value: o.display.displayValue,
                 providerLabel: scopedProviderLabel(o.display.key),
               }))}
@@ -408,6 +456,10 @@
                   selectedIndex: index,
                 });
               }}
+              onVerifyNew={group.name === "email" ||
+              group.name === "verified_email"
+                ? () => (showVerifyWizard = true)
+                : undefined}
             />
           {/if}
         {/each}
@@ -441,6 +493,7 @@
         submitDkimLeaf={submitEmailDkimLeaf}
         resolveViaDoh={resolveEmailViaDoh}
         recoveryAddresses={data.recoveryAddresses}
+        verifiedAddresses={data.verifiedAddresses}
         onSuccess={(address) =>
           handleVerifySuccess(address, data.requestedKeys)}
       />
