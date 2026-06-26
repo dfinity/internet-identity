@@ -682,17 +682,18 @@ async fn mcp_prepare_account_delegation(
     target_origin: FrontendHostname,
     session_key: SessionKey,
     max_ttl: Option<u64>,
-) -> Result<PrepareAccountDelegation, AccountDelegationError> {
+) -> Result<McpPrepareDelegation, AccountDelegationError> {
     mcp::prepare_account_delegation(target_origin, session_key, max_ttl).await
 }
 
 #[query]
 fn mcp_get_account_delegation(
     target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    mcp::get_account_delegation(target_origin, session_key, expiration)
+    mcp::get_account_delegation(target_origin, account_number, session_key, expiration)
 }
 
 #[update]

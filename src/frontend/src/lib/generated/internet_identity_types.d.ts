@@ -1144,6 +1144,18 @@ export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
  */
 export interface McpConfig { 'url' : [] | [string], 'enabled' : boolean }
 /**
+ * Result of mcp_prepare_account_delegation. Carries the account_number the
+ * canister resolved (the anchor's default account at target_origin) so the MCP
+ * server can thread the same account into mcp_get_account_delegation — the
+ * default is mutable, so re-resolving it in `get` could otherwise diverge and
+ * yield NoSuchDelegation.
+ */
+export interface McpPrepareDelegation {
+  'user_key' : UserKey,
+  'account_number' : [] | [AccountNumber],
+  'expiration' : Timestamp,
+}
+/**
  * Map with some variants for the value type.
  * Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
  */
@@ -2051,8 +2063,13 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, [] | [AccountNumber]],
     boolean
   >,
+  /**
+   * account_number must be the value returned by the matching
+   * mcp_prepare_account_delegation, so `get` reads the same account `prepare`
+   * signed for (the default account at target_origin is mutable).
+   */
   'mcp_get_account_delegation' : ActorMethod<
-    [FrontendHostname, SessionKey, Timestamp],
+    [FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
   >,
@@ -2072,7 +2089,7 @@ export interface _SERVICE {
    */
   'mcp_prepare_account_delegation' : ActorMethod<
     [FrontendHostname, SessionKey, [] | [bigint]],
-    { 'Ok' : PrepareAccountDelegation } |
+    { 'Ok' : McpPrepareDelegation } |
       { 'Err' : AccountDelegationError }
   >,
   /**

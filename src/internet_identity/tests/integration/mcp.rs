@@ -7,9 +7,9 @@
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        mcp_access_enabled, mcp_get_account_delegation, mcp_get_config,
+        create_account, mcp_access_enabled, mcp_get_account_delegation, mcp_get_config,
         mcp_prepare_account_delegation, mcp_set_access, mcp_set_config, prepare_account_delegation,
-        AccountDelegationParams,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
@@ -18,7 +18,7 @@ use canister_tests::{
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountDelegationError, AnchorNumber, McpConfig, PrepareAccountDelegation,
+    AccountDelegationError, AnchorNumber, McpConfig, McpPrepareDelegation, PrepareAccountDelegation,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -91,9 +91,10 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     .unwrap());
 
     // Mint the per-app delegation as the MCP server — no anchor_number passed.
-    let PrepareAccountDelegation {
+    let McpPrepareDelegation {
         user_key,
         expiration,
+        account_number,
     } = mcp_prepare_account_delegation(
         &env,
         canister_id,
@@ -108,11 +109,13 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     // Default TTL is the 5-minute cap.
     assert_eq!(expiration, time(&env) + MCP_MAX_TTL_NS);
 
+    // `get` is handed back the same account `prepare` resolved.
     let signed = mcp_get_account_delegation(
         &env,
         canister_id,
         mcp,
         target.clone(),
+        account_number,
         session_key.clone(),
         expiration,
     )
@@ -285,6 +288,101 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         Ok(_) => panic!("expected Unauthorized after disabling, got Ok"),
         Err(e) => panic!("expected Unauthorized after disabling, got {e:?}"),
     }
+
+    Ok(())
+}
+
+/// Regression: `get` must read the account `prepare` signed for, even if the
+/// anchor's default account at the target origin changes in between. `prepare`
+/// returns the resolved `account_number`; threading it into `get` keeps the two
+/// consistent. Re-resolving the (mutable) default in `get` — as the code used to
+/// — would derive a different seed and return `NoSuchDelegation`.
+#[test]
+fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("k");
+
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        None,
+        true,
+    )
+    .unwrap()
+    .unwrap();
+
+    // Prepare resolves the default account at `target` (None = the synthetic
+    // default, since none is reserved yet) and reports it back.
+    let prepared = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(prepared.account_number, None);
+
+    // The user reserves a *different* default account at `target` after preparing,
+    // so re-resolving the default would now point elsewhere.
+    let new_default = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        target.clone(),
+        "work".to_string(),
+    )
+    .unwrap()
+    .unwrap()
+    .account_number;
+    set_default_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        target.clone(),
+        new_default,
+    )
+    .unwrap()
+    .unwrap();
+
+    // `get` with the account `prepare` returned still finds the delegation...
+    assert!(mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        prepared.account_number,
+        session_key.clone(),
+        prepared.expiration,
+    )
+    .unwrap()
+    .is_ok());
+    // ...while the now-current (changed) default has nothing prepared for it,
+    // which is exactly the divergence the old re-resolving `get` would have hit.
+    assert!(matches!(
+        mcp_get_account_delegation(
+            &env,
+            canister_id,
+            mcp,
+            target,
+            new_default,
+            session_key,
+            prepared.expiration,
+        )
+        .unwrap(),
+        Err(AccountDelegationError::NoSuchDelegation)
+    ));
 
     Ok(())
 }

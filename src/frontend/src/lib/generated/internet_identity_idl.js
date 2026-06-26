@@ -631,8 +631,9 @@ export const idlFactory = ({ IDL }) => {
     'url' : IDL.Opt(IDL.Text),
     'enabled' : IDL.Bool,
   });
-  const PrepareAccountDelegation = IDL.Record({
+  const McpPrepareDelegation = IDL.Record({
     'user_key' : UserKey,
+    'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
   });
   const JWT = IDL.Text;
@@ -666,6 +667,10 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
     'anchor_number' : UserNumber,
+  });
+  const PrepareAccountDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
   });
   const PrepareAttributeRequest = IDL.Record({
     'origin' : FrontendHostname,
@@ -1129,7 +1134,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'mcp_get_account_delegation' : IDL.Func(
-        [FrontendHostname, SessionKey, Timestamp],
+        [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
         [
           IDL.Variant({
             'Ok' : SignedDelegation,
@@ -1143,7 +1148,7 @@ export const idlFactory = ({ IDL }) => {
         [FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [
           IDL.Variant({
-            'Ok' : PrepareAccountDelegation,
+            'Ok' : McpPrepareDelegation,
             'Err' : AccountDelegationError,
           }),
         ],

@@ -544,7 +544,7 @@ pub fn mcp_prepare_account_delegation(
     target_origin: FrontendHostname,
     session_key: SessionKey,
     max_ttl: Option<u64>,
-) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, RejectResponse> {
+) -> Result<Result<McpPrepareDelegation, AccountDelegationError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -561,6 +561,7 @@ pub fn mcp_get_account_delegation(
     canister_id: CanisterId,
     sender: Principal,
     target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: u64,
 ) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
@@ -569,7 +570,7 @@ pub fn mcp_get_account_delegation(
         canister_id,
         sender,
         "mcp_get_account_delegation",
-        (target_origin, session_key, expiration),
+        (target_origin, account_number, session_key, expiration),
     )
     .map(|(x,)| x)
 }

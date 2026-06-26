@@ -17,17 +17,15 @@
 use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, McpConfig, SessionKey, SignedDelegation,
-    Timestamp,
+    AccountNumber, AnchorNumber, FrontendHostname, McpConfig, McpPrepareDelegation, SessionKey,
+    SignedDelegation, Timestamp,
 };
 
 use crate::{
     account_management,
     delegation::der_encode_canister_sig_key,
     state::{storage_borrow, storage_borrow_mut},
-    storage::account::{
-        Account, AccountDelegationError, PrepareAccountDelegation, ReadAccountParams,
-    },
+    storage::account::{Account, AccountDelegationError, ReadAccountParams},
     storage::storable::mcp_config::StorableMcpConfig,
 };
 
@@ -176,18 +174,24 @@ fn caller_anchor() -> Result<AnchorNumber, AccountDelegationError> {
 
 /// `mcp_prepare_account_delegation`: mint a ≤5-minute account delegation for the
 /// calling MCP server, as its anchor's default account at `target_origin`.
+///
+/// Returns the resolved `account_number` so the server can thread the *same*
+/// account into [`get_account_delegation`]. The default account at an origin is
+/// mutable (the user can change it), so if `get` re-resolved it independently
+/// and it had changed in between, it would look under a different account's seed
+/// and return `NoSuchDelegation`.
 pub async fn prepare_account_delegation(
     target_origin: FrontendHostname,
     session_key: SessionKey,
     max_ttl: Option<u64>,
-) -> Result<PrepareAccountDelegation, AccountDelegationError> {
+) -> Result<McpPrepareDelegation, AccountDelegationError> {
     let anchor_number = caller_anchor()?;
     let capped_ttl = Some(u64::min(
         max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
         MCP_MAX_EXPIRATION_PERIOD_NS,
     ));
     let account_number = default_account_number(anchor_number, &target_origin);
-    account_management::prepare_account_delegation(
+    let prepared = account_management::prepare_account_delegation(
         anchor_number,
         target_origin,
         account_number,
@@ -195,17 +199,26 @@ pub async fn prepare_account_delegation(
         capped_ttl,
         &None,
     )
-    .await
+    .await?;
+    Ok(McpPrepareDelegation {
+        user_key: prepared.user_key,
+        expiration: prepared.expiration,
+        account_number,
+    })
 }
 
 /// `mcp_get_account_delegation`: fetch the signed delegation prepared above.
+/// `account_number` must be the value returned by the matching
+/// `prepare_account_delegation`, so `get` reads the same account `prepare`
+/// signed for (see the note there); the caller is still authorized only for its
+/// own anchor (recovered from `caller()`), so it can only fetch what it prepared.
 pub fn get_account_delegation(
     target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     let anchor_number = caller_anchor()?;
-    let account_number = default_account_number(anchor_number, &target_origin);
     account_management::get_account_delegation(
         anchor_number,
         &target_origin,

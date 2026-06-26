@@ -1078,6 +1078,17 @@ type PrepareAccountDelegation = record {
     expiration : Timestamp;
 };
 
+// Result of mcp_prepare_account_delegation. Carries the account_number the
+// canister resolved (the anchor's default account at target_origin) so the MCP
+// server can thread the same account into mcp_get_account_delegation — the
+// default is mutable, so re-resolving it in `get` could otherwise diverge and
+// yield NoSuchDelegation.
+type McpPrepareDelegation = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    account_number : opt AccountNumber;
+};
+
 type SessionDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
@@ -1822,10 +1833,14 @@ service : (opt InternetIdentityInit) -> {
         target_origin : FrontendHostname,
         session_key : SessionKey,
         max_ttl : opt nat64
-    ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
+    ) -> (variant { Ok : McpPrepareDelegation; Err : AccountDelegationError });
 
+    // account_number must be the value returned by the matching
+    // mcp_prepare_account_delegation, so `get` reads the same account `prepare`
+    // signed for (the default account at target_origin is mutable).
     mcp_get_account_delegation : (
         target_origin : FrontendHostname,
+        account_number : opt AccountNumber,
         session_key : SessionKey,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
