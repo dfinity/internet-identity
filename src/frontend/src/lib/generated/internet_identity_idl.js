@@ -627,6 +627,10 @@ export const idlFactory = ({ IDL }) => {
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
   });
+  const McpConfig = IDL.Record({
+    'url' : IDL.Opt(IDL.Text),
+    'enabled' : IDL.Bool,
+  });
   const PrepareAccountDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
@@ -1134,6 +1138,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
     'mcp_prepare_account_delegation' : IDL.Func(
         [FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [
@@ -1146,6 +1151,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'mcp_set_access' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), IDL.Bool],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'mcp_set_config' : IDL.Func(
+        [UserNumber, McpConfig],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),

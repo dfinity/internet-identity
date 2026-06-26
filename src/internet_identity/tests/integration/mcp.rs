@@ -7,17 +7,18 @@
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        mcp_access_enabled, mcp_get_account_delegation, mcp_prepare_account_delegation,
-        mcp_set_access, prepare_account_delegation, AccountDelegationParams,
+        mcp_access_enabled, mcp_get_account_delegation, mcp_get_config,
+        mcp_prepare_account_delegation, mcp_set_access, mcp_set_config, prepare_account_delegation,
+        AccountDelegationParams,
     },
     flows,
     framework::{
-        env, install_ii_canister_with_arg, principal_1, principal_2, time, verify_delegation,
-        II_WASM,
+        env, install_ii_canister_with_arg, principal_1, principal_2, time, upgrade_ii_canister,
+        verify_delegation, II_WASM,
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountDelegationError, AnchorNumber, PrepareAccountDelegation,
+    AccountDelegationError, AnchorNumber, McpConfig, PrepareAccountDelegation,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -284,6 +285,84 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         Ok(_) => panic!("expected Unauthorized after disabling, got Ok"),
         Err(e) => panic!("expected Unauthorized after disabling, got {e:?}"),
     }
+
+    Ok(())
+}
+
+/// The trusted-MCP-server config round-trips through the authenticated
+/// get/set methods and survives a canister upgrade — it lives in stable
+/// memory, which is what lets it sync across the identity's devices.
+#[test]
+fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    // An anchor that never wrote a config reads the disabled, no-server default.
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        McpConfig::default()
+    );
+
+    let config = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+    mcp_set_config(&env, canister_id, principal_1(), anchor, config.clone())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        config
+    );
+
+    // Persisted in stable memory: the same config reads back after an upgrade.
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        config
+    );
+
+    Ok(())
+}
+
+/// Only the authenticated identity can change what it trusts. An unrelated
+/// caller's write is rejected and an unrelated caller's read returns the
+/// (safe) default rather than leaking the real config.
+#[test]
+fn mcp_config_is_gated_to_the_identity() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    let config = McpConfig {
+        enabled: true,
+        url: Some(format!("{MCP_ORIGIN}/mcp")),
+    };
+    mcp_set_config(&env, canister_id, principal_1(), anchor, config.clone())
+        .unwrap()
+        .unwrap();
+
+    // A different caller can neither overwrite the config...
+    assert!(mcp_set_config(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor,
+        McpConfig::default(),
+    )
+    .unwrap()
+    .is_err());
+    // ...nor read the real one back (gets the default instead).
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_2(), anchor).unwrap(),
+        McpConfig::default()
+    );
+    // The owner's config is unchanged.
+    assert_eq!(
+        mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
+        config
+    );
 
     Ok(())
 }

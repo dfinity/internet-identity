@@ -130,6 +130,7 @@ use storable::credential_id::StorableCredentialId;
 use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
 use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
+use storable::mcp_config::StorableMcpConfig;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
@@ -184,6 +185,7 @@ const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
 const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
+const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -238,6 +240,14 @@ const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_ME
 /// `anchor_number` parameter.
 const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX);
+
+/// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
+/// URL), keyed by anchor number. Written by the authenticated `mcp_set_config`
+/// method and read by the `/mcp` connect flow (verify-at-connect) and the
+/// Settings UI; persisting it on-chain is what makes the config sync across all
+/// of the identity's devices. Kept in its own map so it never touches anchor
+/// serialization.
+const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -390,6 +400,10 @@ pub struct Storage<M: Memory> {
     /// Persistent per-provider JWK cache, keyed by the provider's `issuer`.
     /// See [`OPENID_JWKS_CACHE_MEMORY_ID`].
     openid_jwks_cache_memory: StableBTreeMap<String, StorableJwks, ManagedMemory<M>>,
+
+    mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
+    mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -478,6 +492,7 @@ impl<M: Memory + Clone> Storage<M> {
         let lookup_anchor_with_mcp_principal_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
+        let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -592,6 +607,8 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
+            mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
+            mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
         }
     }
 
@@ -1077,27 +1094,42 @@ impl<M: Memory + Clone> Storage<M> {
     /// Like the passkey / recovery-phrase reverse indices, we refuse to
     /// overwrite a principal already bound to a *different* anchor — defense in
     /// depth against a cross-anchor takeover were the derived principal ever to
-    /// collide. Re-binding the same anchor is idempotent.
-    pub fn set_anchor_mcp_principal(&mut self, principal: Principal, anchor_number: AnchorNumber) {
+    /// collide. Re-binding the same anchor is idempotent. Returns
+    /// `Err(other_anchor)` on a cross-anchor collision so the caller can surface
+    /// the failure rather than silently no-op.
+    pub fn set_anchor_mcp_principal(
+        &mut self,
+        principal: Principal,
+        anchor_number: AnchorNumber,
+    ) -> Result<(), AnchorNumber> {
         if let Some(existing) = self.lookup_anchor_with_mcp_principal_memory.get(&principal) {
             if existing != anchor_number {
-                ic_cdk::println!(
-                    "WARNING: MCP-server principal {:?} is already indexed for another anchor; \
-                     skipping indexing for anchor number {}",
-                    principal,
-                    anchor_number,
-                );
-                return;
+                return Err(existing);
             }
         }
         self.lookup_anchor_with_mcp_principal_memory
             .insert(principal, anchor_number);
+        Ok(())
     }
 
     /// Forget (disable) an anchor's MCP-server principal.
     pub fn remove_anchor_mcp_principal(&mut self, principal: Principal) {
         self.lookup_anchor_with_mcp_principal_memory
             .remove(&principal);
+    }
+
+    /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
+    /// default (disabled, no server) for an anchor that never wrote one.
+    pub fn read_mcp_config(&self, anchor_number: AnchorNumber) -> StorableMcpConfig {
+        self.mcp_config_memory
+            .get(&anchor_number)
+            .unwrap_or_default()
+    }
+
+    /// Persist `anchor_number`'s trusted-MCP-server config (overwriting any
+    /// previous value), so it syncs across the identity's devices.
+    pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {
+        self.mcp_config_memory.insert(anchor_number, config);
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to
@@ -2305,6 +2337,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_anchor_with_mcp_principal_memory".to_string(),
                 self.lookup_anchor_with_mcp_principal_memory_wrapper.size(),
+            ),
+            (
+                "mcp_config_memory".to_string(),
+                self.mcp_config_memory_wrapper.size(),
             ),
         ])
     }

@@ -1135,6 +1135,15 @@ export type ListAvailableAttributesResponse = Array<
 >;
 export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
 /**
+ * The identity's synced trusted-MCP-server configuration: a master toggle and
+ * the single MCP server URL the user trusts. Persisted on-chain (keyed by
+ * anchor), so it follows the identity across all of its devices — unlike the
+ * device-local CLI-access toggle. `url` is kept verbatim so the Settings UI can
+ * display/re-probe a path-based endpoint; the connect flow matches trust by
+ * origin.
+ */
+export interface McpConfig { 'url' : [] | [string], 'enabled' : boolean }
+/**
  * Map with some variants for the value type.
  * Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
  */
@@ -2048,6 +2057,14 @@ export interface _SERVICE {
       { 'Err' : AccountDelegationError }
   >,
   /**
+   * Read the identity's synced trusted-MCP-server config (master toggle + the
+   * trusted server URL). Persisted on-chain, so it follows the identity across
+   * devices. Read by the Settings UI and the /mcp connect flow (which verifies
+   * the connecting origin against it). Returns the disabled, no-server default
+   * for an unauthorized caller or an anchor that never wrote a config.
+   */
+  'mcp_get_config' : ActorMethod<[UserNumber], McpConfig>,
+  /**
    * Called by the MCP server, authorized by caller() == the anchor's principal
    * for the (account, origin) it was bound to. Mints a <=5-minute delegation
    * for the anchor's default account at target_origin. Anchor recovered from
@@ -2067,6 +2084,16 @@ export interface _SERVICE {
    */
   'mcp_set_access' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], boolean],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Persist the identity's trusted-MCP-server config so it syncs across the
+   * identity's devices. Authenticated as the identity, so only the user — never
+   * a page that initiates a connect request — can change what it trusts.
+   */
+  'mcp_set_config' : ActorMethod<
+    [UserNumber, McpConfig],
     { 'Ok' : null } |
       { 'Err' : string }
   >,

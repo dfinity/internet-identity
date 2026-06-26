@@ -649,6 +649,31 @@ fn mcp_access_enabled(
     mcp::is_mcp_access_enabled(anchor_number, mcp_server_origin, account_number)
 }
 
+/// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
+/// trusted server URL). Persisted on-chain, so it follows the identity across
+/// devices. Read by the Settings UI and by the `/mcp` connect flow, which
+/// verifies the connecting origin against it at connect time. Returns the
+/// disabled, no-server default for an unauthorized caller or an anchor that
+/// never wrote a config.
+#[query]
+fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
+    if check_session_authorization(anchor_number).is_err() {
+        return McpConfig::default();
+    }
+    mcp::get_mcp_config(anchor_number)
+}
+
+/// Persist `anchor_number`'s trusted-MCP-server config so it syncs across the
+/// identity's devices. Authenticated as the identity (full authorization), so
+/// only the user — never a page that initiates a connect request — can change
+/// what their identity trusts.
+#[update]
+fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    mcp::set_mcp_config(anchor_number, config);
+    Ok(())
+}
+
 /// Called by the MCP server (authorized by `caller()` == the anchor's principal
 /// at `mcp_server_origin`): prepare a ≤5-minute delegation for the anchor's
 /// default account at `target_origin`.

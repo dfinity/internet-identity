@@ -1,26 +1,21 @@
 /**
- * The user's trusted-MCP-server configuration, stored as on-chain identity
- * metadata so it syncs across all of the identity's devices — unlike the
- * CLI-access toggle, which is device-local. It is read via `identity_info` and
- * written via `identity_metadata_replace`, both authenticated as the identity,
- * so only the user (never a page that initiates a connect request) can change
- * it. The `/mcp` connect flow reads it as the source of truth at connect time.
+ * The user's trusted-MCP-server configuration, persisted on-chain (keyed by
+ * anchor) so it syncs across all of the identity's devices — unlike the
+ * CLI-access toggle, which is device-local. It is read via `mcp_get_config` and
+ * written via `mcp_set_config`, both authenticated as the identity, so only the
+ * user (never a page that initiates a connect request) can change it. The `/mcp`
+ * connect flow reads it as the source of truth at connect time.
  *
- * Two identity-metadata keys back it:
- *  - `mcp_enabled`: "true" when the feature's master toggle is on.
- *  - `mcp_trusted_server`: the trusted server URL, kept verbatim (so the
- *    Settings UI can probe a path-based endpoint like `https://host/mcp`);
- *    trust matching is by origin.
+ * The config has two parts:
+ *  - `enabled`: the feature's master toggle for this identity.
+ *  - `url`: the trusted server URL, kept verbatim (so the Settings UI can probe
+ *    a path-based endpoint like `https://host/mcp`); trust matching is by origin.
  */
 import type { ActorSubclass } from "@icp-sdk/core/agent";
 import type {
   _SERVICE,
-  MetadataMapV2,
+  McpConfig as CanisterMcpConfig,
 } from "$lib/generated/internet_identity_types";
-import { throwCanisterError } from "$lib/utils/utils";
-
-const KEY_ENABLED = "mcp_enabled";
-const KEY_URL = "mcp_trusted_server";
 
 export interface McpConfig {
   /** Master toggle for the feature on this identity. */
@@ -29,21 +24,20 @@ export interface McpConfig {
   url: string | undefined;
 }
 
-const stringEntry = (
-  metadata: MetadataMapV2,
-  key: string,
-): string | undefined => {
-  const entry = metadata.find(([entryKey]) => entryKey === key);
-  if (entry === undefined) {
-    return undefined;
-  }
-  const value = entry[1];
-  return "String" in value ? value.String : undefined;
-};
+// Candid `opt text` <-> `string | undefined`.
+const fromOpt = (opt: [] | [string]): string | undefined =>
+  opt.length === 0 ? undefined : opt[0];
+const toOpt = (value: string | undefined): [] | [string] =>
+  value === undefined ? [] : [value];
 
-const parseConfig = (metadata: MetadataMapV2): McpConfig => ({
-  enabled: stringEntry(metadata, KEY_ENABLED) === "true",
-  url: stringEntry(metadata, KEY_URL),
+const fromCanister = (config: CanisterMcpConfig): McpConfig => ({
+  enabled: config.enabled,
+  url: fromOpt(config.url),
+});
+
+const toCanister = (config: McpConfig): CanisterMcpConfig => ({
+  enabled: config.enabled,
+  url: toOpt(config.url),
 });
 
 /** Origin (scheme + host[:port], no path) of a URL, or undefined if unparsable. */
@@ -63,52 +57,28 @@ export const originOf = (url: string): string | undefined => {
 export const isOriginTrusted = (config: McpConfig, origin: string): boolean =>
   config.enabled && config.url !== undefined && originOf(config.url) === origin;
 
-/** Read the identity's synced MCP config from its on-chain metadata. */
+/** Read the identity's synced MCP config from the canister. */
 export const readMcpConfig = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
-): Promise<McpConfig> => {
-  const info = await actor
-    .identity_info(identityNumber)
-    .then(throwCanisterError);
-  return parseConfig(info.metadata);
-};
+): Promise<McpConfig> =>
+  fromCanister(await actor.mcp_get_config(identityNumber));
 
-// Replace a single identity-metadata key (preserving all others) and persist.
-// Reads the current metadata first so concurrent/unrelated keys aren't dropped
-// by the wholesale `identity_metadata_replace`.
-const replaceKey = async (
+// Read-modify-write a single field of the synced config and persist it. Reads
+// the current config first so an unrelated field (toggle vs URL) isn't clobbered
+// by the wholesale `mcp_set_config`.
+const updateConfig = async (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
-  key: string,
-  value: string | undefined,
+  patch: Partial<McpConfig>,
 ): Promise<McpConfig> => {
-  const info = await actor
-    .identity_info(identityNumber)
-    .then(throwCanisterError);
-  const others = info.metadata.filter(([entryKey]) => entryKey !== key);
-  const entry: MetadataMapV2[number] = [key, { String: value ?? "" }];
-  const next: MetadataMapV2 = value === undefined ? others : [...others, entry];
-  // TEMP DIAGNOSTIC (remove): log the write + an immediate same-session readback.
-  console.warn(
-    `[MCP-DIAG] write id=${identityNumber} key=${key} val=${value} existingKeys=[${info.metadata.map((e) => e[0]).join(",")}]`,
-  );
-  await actor
-    .identity_metadata_replace(identityNumber, next)
-    .then(throwCanisterError);
-  try {
-    const rb = await actor
-      .identity_info(identityNumber)
-      .then(throwCanisterError);
-    console.warn(
-      `[MCP-DIAG] wrote id=${identityNumber} readbackKeys=[${rb.metadata.map((e) => e[0]).join(",")}]`,
-    );
-  } catch (e) {
-    console.warn(
-      `[MCP-DIAG] readback id=${identityNumber} FAILED: ${String(e)}`,
-    );
+  const current = await readMcpConfig(actor, identityNumber);
+  const next: McpConfig = { ...current, ...patch };
+  const result = await actor.mcp_set_config(identityNumber, toCanister(next));
+  if ("Err" in result) {
+    throw new Error(result.Err);
   }
-  return parseConfig(next);
+  return next;
 };
 
 /** Turn the master toggle on/off (synced). */
@@ -116,18 +86,18 @@ export const setMcpEnabled = (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
   enabled: boolean,
-): Promise<McpConfig> =>
-  replaceKey(actor, identityNumber, KEY_ENABLED, enabled ? "true" : undefined);
+): Promise<McpConfig> => updateConfig(actor, identityNumber, { enabled });
 
 /** Set the trusted server URL (synced). */
 export const setMcpTrustedServer = (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
   url: string,
-): Promise<McpConfig> => replaceKey(actor, identityNumber, KEY_URL, url);
+): Promise<McpConfig> => updateConfig(actor, identityNumber, { url });
 
 /** Forget the trusted server URL (synced). */
 export const clearMcpTrustedServer = (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,
-): Promise<McpConfig> => replaceKey(actor, identityNumber, KEY_URL, undefined);
+): Promise<McpConfig> =>
+  updateConfig(actor, identityNumber, { url: undefined });

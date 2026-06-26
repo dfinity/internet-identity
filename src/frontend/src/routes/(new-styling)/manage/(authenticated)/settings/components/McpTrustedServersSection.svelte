@@ -33,9 +33,9 @@
   const titleId = $props.id();
 
   // The synced (on-chain) MCP config: a master toggle and the single trusted
-  // server URL for this identity. Stored as identity metadata, so it follows the
-  // identity across devices. Read once on mount and kept in local state that the
-  // handlers update after each canister write.
+  // server URL for this identity. Persisted on-chain (keyed by anchor), so it
+  // follows the identity across devices. Read once on mount and kept in local
+  // state that the handlers update after each canister write.
   let enabled = $state(false);
   let trusted = $state<string | undefined>(undefined);
   // True until the initial config read completes, so the toggle doesn't flicker

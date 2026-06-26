@@ -619,6 +619,19 @@ pub enum SessionDelegationError {
     NoSuchDelegation,
 }
 
+/// The identity's synced trusted-MCP-server configuration: a master toggle and
+/// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+/// anchor) so it follows the identity across all of its devices — unlike the
+/// device-local CLI-access toggle. Read by the Settings UI and by the `/mcp`
+/// connect flow, which verifies the connecting origin against it at connect
+/// time. `url` is kept verbatim so Settings can display/re-probe a path-based
+/// endpoint like `https://host/mcp`; trust matching is by origin.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Default)]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub url: Option<String>,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountNameValidationError {
     NameTooLong,

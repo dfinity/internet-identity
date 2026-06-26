@@ -503,6 +503,40 @@ pub fn mcp_access_enabled(
     .map(|(x,)| x)
 }
 
+pub fn mcp_set_config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    config: McpConfig,
+) -> Result<Result<(), String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_set_config",
+        (identity_number, config),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_get_config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<McpConfig, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_get_config",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn mcp_prepare_account_delegation(
     env: &PocketIc,
     canister_id: CanisterId,

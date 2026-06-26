@@ -17,7 +17,8 @@
 use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, SessionKey, SignedDelegation, Timestamp,
+    AccountNumber, AnchorNumber, FrontendHostname, McpConfig, SessionKey, SignedDelegation,
+    Timestamp,
 };
 
 use crate::{
@@ -27,6 +28,7 @@ use crate::{
     storage::account::{
         Account, AccountDelegationError, PrepareAccountDelegation, ReadAccountParams,
     },
+    storage::storable::mcp_config::StorableMcpConfig,
 };
 
 /// Maximum lifetime of an MCP-minted per-app account delegation: 5 minutes.
@@ -113,12 +115,45 @@ pub fn set_mcp_access(
     let principal = mcp_principal_for(anchor_number, account_number, &mcp_server_origin);
     storage_borrow_mut(|storage| {
         if enabled {
-            storage.set_anchor_mcp_principal(principal, anchor_number);
+            // Surface a cross-anchor collision instead of silently no-op'ing, so
+            // the caller learns the (account, origin) pair couldn't be bound.
+            storage
+                .set_anchor_mcp_principal(principal, anchor_number)
+                .map_err(|existing| {
+                    format!(
+                        "MCP access could not be enabled: the principal for this \
+                         (account, origin) is already bound to identity {existing}."
+                    )
+                })
         } else {
             storage.remove_anchor_mcp_principal(principal);
+            Ok(())
         }
-    });
-    Ok(())
+    })
+}
+
+/// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
+/// trusted server URL). Returns the disabled, no-server default for an anchor
+/// that has never written one. The caller must already be authorized for
+/// `anchor_number` (checked by the canister method).
+pub fn get_mcp_config(anchor_number: AnchorNumber) -> McpConfig {
+    let stored = storage_borrow(|storage| storage.read_mcp_config(anchor_number));
+    McpConfig {
+        enabled: stored.enabled,
+        url: stored.url,
+    }
+}
+
+/// Persist `anchor_number`'s trusted-MCP-server config, overwriting any previous
+/// value. Storing it on-chain (keyed by anchor) is what makes the config sync
+/// across the identity's devices. The caller must already be authorized for
+/// `anchor_number` (checked by the canister method).
+pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) {
+    let stored = StorableMcpConfig {
+        enabled: config.enabled,
+        url: config.url,
+    };
+    storage_borrow_mut(|storage| storage.write_mcp_config(anchor_number, stored));
 }
 
 /// Whether `anchor_number` has MCP access enabled for the
