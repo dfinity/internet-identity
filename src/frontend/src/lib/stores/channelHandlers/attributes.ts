@@ -280,6 +280,7 @@ type ConsentPipeline = {
   unmappedOrigin: string;
   groups: AttributeGroup[];
   recoveryAddresses: string[];
+  verifiedAddresses: string[];
 };
 
 /**
@@ -335,6 +336,9 @@ const resolveConsentPipeline = async (params: {
     const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
       (c: { address: string }) => c.address,
     );
+    const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
+      (e: { address: string }) => e.address,
+    );
 
     return {
       accountNumberPromise,
@@ -343,6 +347,7 @@ const resolveConsentPipeline = async (params: {
       unmappedOrigin,
       groups: resolveAttributeGroups(requestedKeys, available),
       recoveryAddresses,
+      verifiedAddresses,
     };
   } catch (error) {
     console.error(error);
@@ -670,6 +675,7 @@ export const handleIcrc3ConsentAttributes =
             effectiveOrigin: pipeline?.origin ?? "",
             requestedKeys,
             recoveryAddresses: pipeline?.recoveryAddresses ?? [],
+            verifiedAddresses: pipeline?.verifiedAddresses ?? [],
           })),
         );
 

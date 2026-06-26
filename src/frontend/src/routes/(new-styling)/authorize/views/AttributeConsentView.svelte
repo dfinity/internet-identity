@@ -181,6 +181,7 @@
       requestedKeys: ctx.requestedKeys,
       emailRequested: ctx.requestedKeys.some(isEmailKey),
       recoveryAddresses: ctx.recoveryAddresses,
+      verifiedAddresses: ctx.verifiedAddresses,
     };
   })();
 
@@ -492,6 +493,7 @@
         submitDkimLeaf={submitEmailDkimLeaf}
         resolveViaDoh={resolveEmailViaDoh}
         recoveryAddresses={data.recoveryAddresses}
+        verifiedAddresses={data.verifiedAddresses}
         onSuccess={(address) =>
           handleVerifySuccess(address, data.requestedKeys)}
       />
