@@ -6,8 +6,9 @@
   import { ChevronDownIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import { isAuthenticatedStore } from "$lib/stores/authentication.store";
+  import { authenticationStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { sessionStore } from "$lib/stores/session.store";
   import { handleError } from "$lib/components/utils/error";
 
   interface Props {
@@ -26,8 +27,8 @@
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
   // an app). The identity switcher (shown by the layout) is how the user picks
-  // which identity. The connect screen can show before sign-in, so authenticate
-  // the selected identity on "Allow access" if it isn't already.
+  // which identity, and it only *selects* (it doesn't sign in). So "Allow access"
+  // authenticates the selected identity unless it's already the live session.
   const authLastUsedFlow = new AuthLastUsedFlow();
   const selectedIdentityNumber = $derived(
     $lastUsedIdentitiesStore.selected?.identityNumber,
@@ -82,7 +83,11 @@
     }
     isAuthorizing = true;
     try {
-      if (!$isAuthenticatedStore) {
+      // Authenticate unless the live session is already the selected identity.
+      // The switcher only selects, so a session for a *different* identity must
+      // not be reused — that would connect as the wrong anchor.
+      if ($authenticationStore?.identityNumber !== selected.identityNumber) {
+        sessionStore.reset();
         await authLastUsedFlow.authenticate(selected);
       }
       onAuthorize(selectedTtlMinutes);
