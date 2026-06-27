@@ -293,7 +293,9 @@ test("Identity switcher shows while signing in and hides on the success screen",
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   test.slow();
-  const ttlMinutes = 60;
+  // A non-preset value (2 hours), in seconds, to exercise that an arbitrary
+  // requested TTL is honoured exactly — not snapped to a dropdown preset.
+  const ttlSeconds = 2 * 60 * 60;
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
@@ -302,11 +304,11 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   await mcp.trustServer(page);
 
   const before = Date.now();
-  await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlMinutes }));
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlSeconds }));
   await page.getByRole("button", { name: "Allow access" }).click();
 
   const expMillis = expirationMillis(await mcp.receivedDelegation);
-  const requestedMillis = ttlMinutes * 60 * 1000;
+  const requestedMillis = ttlSeconds * 1000;
   expect(expMillis - before).toBeGreaterThanOrEqual(requestedMillis - 60_000);
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });

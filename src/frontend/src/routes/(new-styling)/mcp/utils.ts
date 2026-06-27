@@ -17,8 +17,8 @@ interface McpAuthorizeInput {
    *  always an https origin. Connecting binds the agent to this origin and the
    *  standing delegation acts as the user's identity there. */
   mcpServerOrigin: string;
-  /** Lifetime in minutes. */
-  ttlMinutes: number;
+  /** Lifetime in seconds (already clamped to the 30-day backend cap). */
+  ttlSeconds: number;
   /** Callback URL (on the MCP server origin) the delegation chain is
    *  form-POSTed to. */
   callback: string;
@@ -50,7 +50,7 @@ export const mcpAuthorize = async ({
   authenticated,
   publicKey,
   mcpServerOrigin,
-  ttlMinutes,
+  ttlSeconds,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
@@ -60,7 +60,7 @@ export const mcpAuthorize = async ({
   // *.icp.net) to *.ic0.app so the principal matches the one /authorize derives
   // for that origin.
   const effectiveOrigin = remapToLegacyDomain(mcpServerOrigin);
-  const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
+  const maxTimeToLiveNanos = BigInt(ttlSeconds) * BigInt(1e9);
 
   // Connecting is the opt-in: authorize this agent for the anchor at the MCP
   // server origin so II honors the server's later on-demand per-app delegation

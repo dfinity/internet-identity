@@ -169,7 +169,7 @@
   // Invoked by the reused account picker once it has authenticated the selected
   // identity and resolved the chosen account. Connecting performs the opt-in
   // (`mcp_set_access`) and delivers the standing delegation to the MCP server.
-  const handleAuthorize = (ttlMinutes: number): void => {
+  const handleAuthorize = (ttlSeconds: number): void => {
     const server = mcpServer;
     if (params.kind !== "valid" || server === undefined) {
       return;
@@ -208,7 +208,7 @@
           authenticated,
           publicKey: request.publicKey,
           mcpServerOrigin: server.origin,
-          ttlMinutes,
+          ttlSeconds,
           callback: request.callback,
           state: request.state,
         });
@@ -279,7 +279,7 @@
 {:else if phase.kind === "authorize" && mcpServer !== undefined && $lastUsedIdentitiesStore.selected !== undefined}
   <McpAuthorizeView
     mcpServerHost={mcpServer.host}
-    requestedTtlMinutes={params.kind === "valid" ? params.ttlMinutes : 60}
+    requestedTtlSeconds={params.kind === "valid" ? params.ttlSeconds : 3600}
     onAuthorize={handleAuthorize}
   />
 {:else if phase.kind === "untrusted" && mcpServer !== undefined}

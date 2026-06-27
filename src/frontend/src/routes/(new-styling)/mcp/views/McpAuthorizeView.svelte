@@ -14,15 +14,15 @@
   interface Props {
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
-    /** Session duration the request asked for (minutes); used as the initial
-     *  selection when it matches a preset, otherwise we default to 1 hour. */
-    requestedTtlMinutes: number;
+    /** Session duration the request asked for (seconds, already clamped to the
+     *  30-day cap); the initial selection, which the user can change. */
+    requestedTtlSeconds: number;
     /** Called once the selected identity is authenticated, with the chosen
-     *  session duration, to connect. */
-    onAuthorize: (ttlMinutes: number) => void;
+     *  session duration (seconds), to connect. */
+    onAuthorize: (ttlSeconds: number) => void;
   }
 
-  const { mcpServerHost, requestedTtlMinutes, onAuthorize }: Props = $props();
+  const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
 
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
@@ -40,39 +40,56 @@
   });
   let isAuthorizing = $state(false);
 
-  const HOUR = 60;
+  const MINUTE = 60;
+  const HOUR = 60 * MINUTE;
   const DAY = 24 * HOUR;
-  // Session-duration presets (minutes). The backend caps a standing delegation
+  const WEEK = 7 * DAY;
+  const MONTH = 30 * DAY;
+  // Session-duration presets (seconds). The backend caps a standing delegation
   // at 30 days, so that's the longest offered.
-  const PRESETS = [HOUR, 8 * HOUR, DAY, 7 * DAY, 30 * DAY];
+  const PRESETS = [HOUR, 8 * HOUR, DAY, WEEK, MONTH];
 
-  const labelFor = (minutes: number): string => {
-    switch (minutes) {
+  // Compact label for an arbitrary duration: the request can ask for any number
+  // of seconds (within the 30-day cap), so the selected value isn't always one
+  // of the presets.
+  const formatTtl = (seconds: number): string => {
+    const parts: string[] = [];
+    const d = Math.floor(seconds / DAY);
+    const h = Math.floor((seconds % DAY) / HOUR);
+    const m = Math.floor((seconds % HOUR) / MINUTE);
+    const s = seconds % MINUTE;
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    if (s > 0) parts.push(`${s}s`);
+    return parts.length > 0 ? parts.join(" ") : "0s";
+  };
+
+  const labelFor = (seconds: number): string => {
+    switch (seconds) {
       case HOUR:
         return $t`1 hour`;
       case 8 * HOUR:
         return $t`8 hours`;
       case DAY:
         return $t`1 day`;
-      case 7 * DAY:
+      case WEEK:
         return $t`1 week`;
-      case 30 * DAY:
+      case MONTH:
         return $t`30 days`;
       default:
-        return $t`1 hour`;
+        return formatTtl(seconds);
     }
   };
 
-  // Start from the requested duration when it's one of the presets; otherwise
-  // default to 1 hour. The user can change it before connecting.
-  let selectedTtlMinutes = $state(
-    PRESETS.includes(requestedTtlMinutes) ? requestedTtlMinutes : HOUR,
-  );
+  // Honor the exact requested duration (already clamped to the cap); the user can
+  // still override it with one of the presets before connecting.
+  let selectedTtlSeconds = $state(requestedTtlSeconds);
   const options = $derived(
-    PRESETS.map((minutes) => ({
-      value: minutes,
-      label: labelFor(minutes),
-      selected: minutes === selectedTtlMinutes,
+    PRESETS.map((seconds) => ({
+      value: seconds,
+      label: labelFor(seconds),
+      selected: seconds === selectedTtlSeconds,
     })),
   );
 
@@ -90,7 +107,7 @@
         sessionStore.reset();
         await authLastUsedFlow.authenticate(selected);
       }
-      onAuthorize(selectedTtlMinutes);
+      onAuthorize(selectedTtlSeconds);
     } catch (error) {
       handleError(error);
     } finally {
@@ -122,11 +139,11 @@
       </span>
       <Select
         {options}
-        onChange={(value) => (selectedTtlMinutes = value)}
+        onChange={(value) => (selectedTtlSeconds = value)}
         align="end"
       >
         <button type="button" class="btn btn-secondary btn-sm gap-2">
-          <span>{labelFor(selectedTtlMinutes)}</span>
+          <span>{labelFor(selectedTtlSeconds)}</span>
           <ChevronDownIcon class="size-4" />
         </button>
       </Select>

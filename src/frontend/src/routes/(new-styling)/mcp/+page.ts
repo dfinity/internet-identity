@@ -1,17 +1,21 @@
 import type { PageLoad } from "./$types";
 import { fromBase64URL } from "$lib/utils/utils";
 
-/** Default delegation lifetime in minutes when the request omits `ttl`. */
-const DEFAULT_TTL_MINUTES = 60;
+/** Default delegation lifetime in seconds when the request omits `ttl`. */
+const DEFAULT_TTL_SECONDS = 60 * 60;
+/** Largest TTL the request can ask for: the backend caps a delegation at 30 days
+ *  (`MAX_EXPIRATION_PERIOD_NS`), so anything larger is clamped to this. */
+const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
  * browser to. `valid` carries the validated request — the session public key to
  * delegate to, the callback to post the delegation back to, the single-use
- * `state` echoed back to the MCP server, and the delegation TTL. The MCP server
- * the user connects is identified by the callback's origin (each user trusts
- * whichever server they connect), and the account is chosen in the picker.
- * `invalid` means the fragment was missing or malformed.
+ * `state` echoed back to the MCP server, and the delegation TTL (`ttl`, in
+ * seconds). The MCP server the user connects is identified by the callback's
+ * origin (each user trusts whichever server they connect); no account is chosen
+ * here (it's per-app, picked server-side at delegation time). `invalid` means
+ * the fragment was missing or malformed.
  *
  * Whether the callback origin is one the connect flow accepts (https only — MCP
  * connections are to remote servers) is checked in the page component, which
@@ -26,7 +30,8 @@ export type McpParams =
       /** Opaque value echoed back to the MCP server so it can tie the delivered
        *  delegation to the request it started (CSRF protection). */
       state: string;
-      ttlMinutes: number;
+      /** Requested delegation lifetime in seconds (clamped to the 30-day cap). */
+      ttlSeconds: number;
     }
   | { kind: "invalid" };
 
@@ -84,15 +89,19 @@ const parseState = (raw: string | null): string | undefined => {
   return raw;
 };
 
+// `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
+// the allowed range (the backend caps at 30 days regardless); an omitted `ttl`
+// uses the default, and a malformed one (non-numeric or <= 0) invalidates the
+// request.
 const parseTtl = (raw: string | null): number | undefined => {
   if (raw === null) {
-    return DEFAULT_TTL_MINUTES;
+    return DEFAULT_TTL_SECONDS;
   }
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return undefined;
   }
-  return Math.floor(parsed);
+  return Math.min(Math.floor(parsed), MAX_TTL_SECONDS);
 };
 
 export const load: PageLoad = ({
@@ -109,18 +118,18 @@ export const load: PageLoad = ({
   const publicKey = parseBase64Url(params.get("public_key"));
   const callback = parseCallback(params.get("callback"));
   const state = parseState(params.get("state"));
-  const ttlMinutes = parseTtl(params.get("ttl"));
+  const ttlSeconds = parseTtl(params.get("ttl"));
 
   if (
     publicKey === undefined ||
     callback === undefined ||
     state === undefined ||
-    ttlMinutes === undefined
+    ttlSeconds === undefined
   ) {
     return { params: { kind: "invalid" }, status };
   }
   return {
-    params: { kind: "valid", publicKey, callback, state, ttlMinutes },
+    params: { kind: "valid", publicKey, callback, state, ttlSeconds },
     status,
   };
 };
