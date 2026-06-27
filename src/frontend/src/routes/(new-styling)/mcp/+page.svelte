@@ -10,7 +10,6 @@
   import { t } from "$lib/stores/locale.store";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import { remapToLegacyDomain } from "$lib/utils/iiConnection";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
   import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
   import { get } from "svelte/store";
@@ -44,13 +43,6 @@
   // rather than a silent CSP block at submit time.
   const mcpServer = $derived(
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
-  );
-
-  // Origin used for canister account calls: remap a gateway origin
-  // (*.icp0.io / *.icp.net) to *.ic0.app so the derived principal matches the
-  // one /authorize derives for that origin.
-  const effectiveOrigin = $derived(
-    mcpServer !== undefined ? remapToLegacyDomain(mcpServer.origin) : undefined,
   );
 
   const requestValid = $derived(
@@ -177,10 +169,7 @@
   // Invoked by the reused account picker once it has authenticated the selected
   // identity and resolved the chosen account. Connecting performs the opt-in
   // (`mcp_set_access`) and delivers the standing delegation to the MCP server.
-  const handleAuthorize = (
-    accountNumberPromise: Promise<bigint | undefined>,
-    ttlMinutes: number,
-  ): void => {
+  const handleAuthorize = (ttlMinutes: number): void => {
     const server = mcpServer;
     if (params.kind !== "valid" || server === undefined) {
       return;
@@ -212,7 +201,6 @@
           phase = { kind: "untrusted" };
           return;
         }
-        const accountNumber = await accountNumberPromise;
         // On success `mcpAuthorize` navigates the browser to the MCP server,
         // which redirects back here with a status — so a resolved promise means
         // the chain was built and submitted, not that we stay on this page.
@@ -220,7 +208,6 @@
           authenticated,
           publicKey: request.publicKey,
           mcpServerOrigin: server.origin,
-          accountNumber,
           ttlMinutes,
           callback: request.callback,
           state: request.state,
@@ -289,11 +276,9 @@
       </AuthWizard>
     </AuthPanel>
   </div>
-{:else if phase.kind === "authorize" && mcpServer !== undefined && effectiveOrigin !== undefined && $lastUsedIdentitiesStore.selected !== undefined}
+{:else if phase.kind === "authorize" && mcpServer !== undefined && $lastUsedIdentitiesStore.selected !== undefined}
   <McpAuthorizeView
     mcpServerHost={mcpServer.host}
-    {effectiveOrigin}
-    displayOrigin={mcpServer.origin}
     requestedTtlMinutes={params.kind === "valid" ? params.ttlMinutes : 60}
     onAuthorize={handleAuthorize}
   />

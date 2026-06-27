@@ -1,36 +1,43 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import ContinueView from "../../authorize/views/ContinueView.svelte";
   import McpHero from "../components/McpHero.svelte";
   import Select from "$lib/components/ui/Select.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { ChevronDownIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { isAuthenticatedStore } from "$lib/stores/authentication.store";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
-    /** Origin used for canister account calls (gateway origins remapped). */
-    effectiveOrigin: string;
-    /** The MCP server origin, shown to the user and used for the app lookup. */
-    displayOrigin: string;
     /** Session duration the request asked for (minutes); used as the initial
      *  selection when it matches a preset, otherwise we default to 1 hour. */
     requestedTtlMinutes: number;
-    /** Receives the chosen account (resolved after sign-in) and the chosen
-     *  session duration, then connects. */
-    onAuthorize: (
-      accountNumber: Promise<bigint | undefined>,
-      ttlMinutes: number,
-    ) => void;
+    /** Called once the selected identity is authenticated, with the chosen
+     *  session duration, to connect. */
+    onAuthorize: (ttlMinutes: number) => void;
   }
 
-  const {
-    mcpServerHost,
-    effectiveOrigin,
-    displayOrigin,
-    requestedTtlMinutes,
-    onAuthorize,
-  }: Props = $props();
+  const { mcpServerHost, requestedTtlMinutes, onAuthorize }: Props = $props();
+
+  // Connecting authorizes this agent for the user's identity — no account is
+  // chosen here (accounts are app-specific; the MCP server is the connector, not
+  // an app). The identity switcher (shown by the layout) is how the user picks
+  // which identity. The connect screen can show before sign-in, so authenticate
+  // the selected identity on "Allow access" if it isn't already.
+  const authLastUsedFlow = new AuthLastUsedFlow();
+  const selectedIdentityNumber = $derived(
+    $lastUsedIdentitiesStore.selected?.identityNumber,
+  );
+  $effect(() => {
+    if (selectedIdentityNumber !== undefined) {
+      authLastUsedFlow.init([selectedIdentityNumber]);
+    }
+  });
+  let isAuthorizing = $state(false);
 
   const HOUR = 60;
   const DAY = 24 * HOUR;
@@ -67,49 +74,67 @@
       selected: minutes === selectedTtlMinutes,
     })),
   );
+
+  const handleAllowAccess = async (): Promise<void> => {
+    const selected = $lastUsedIdentitiesStore.selected;
+    if (selected === undefined) {
+      return;
+    }
+    isAuthorizing = true;
+    try {
+      if (!$isAuthenticatedStore) {
+        await authLastUsedFlow.authenticate(selected);
+      }
+      onAuthorize(selectedTtlMinutes);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      isAuthorizing = false;
+    }
+  };
 </script>
 
 <!--
-  The MCP connect screen reuses the regular continue-with-ii account picker
-  (multi-account toggle, add/edit account, account list) so the user binds a
-  specific, stable account — the same principal that enable and disable derive.
-  The MCP-specific consent (which server, what it can do, and for how long, with
-  a user-chosen session duration) replaces the picker's app header via `header`.
+  The MCP connect screen is a consent step: it authorizes the agent for the
+  user's identity and lets the user choose the session duration. There is no
+  account picker — accounts are per-app and the MCP server origin is just the
+  connector; the server selects an app account per call later.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
-    <ContinueView
-      {effectiveOrigin}
-      {displayOrigin}
-      onAuthorize={(account) => onAuthorize(account, selectedTtlMinutes)}
-      continueLabel={$t`Allow access`}
+    <McpHero mcpServer={mcpServerHost} />
+    <h1 class="text-text-primary mt-2 text-2xl font-medium">
+      {$t`Connect ${mcpServerHost}`}
+    </h1>
+    <p class="text-text-tertiary mt-1 text-base text-pretty">
+      {$t`Let ${mcpServerHost} act on your behalf across your apps. You'll need to reconnect when this access expires.`}
+    </p>
+    <div
+      class="border-border-tertiary mt-4 mb-6 flex flex-row items-center justify-between gap-3 border-t pt-4"
     >
-      {#snippet header()}
-        <McpHero mcpServer={mcpServerHost} />
-        <h1 class="text-text-primary mt-2 text-2xl font-medium">
-          {$t`Connect ${mcpServerHost}`}
-        </h1>
-        <p class="text-text-tertiary mt-1 text-base text-pretty">
-          {$t`Let ${mcpServerHost} act on your behalf across your apps. You'll need to reconnect when this access expires.`}
-        </p>
-        <div
-          class="border-border-tertiary mt-4 mb-6 flex flex-row items-center justify-between gap-3 border-t pt-4"
-        >
-          <span class="text-text-secondary text-sm font-medium">
-            {$t`Access expires after`}
-          </span>
-          <Select
-            {options}
-            onChange={(value) => (selectedTtlMinutes = value)}
-            align="end"
-          >
-            <button type="button" class="btn btn-secondary btn-sm gap-2">
-              <span>{labelFor(selectedTtlMinutes)}</span>
-              <ChevronDownIcon class="size-4" />
-            </button>
-          </Select>
-        </div>
-      {/snippet}
-    </ContinueView>
+      <span class="text-text-secondary text-sm font-medium">
+        {$t`Access expires after`}
+      </span>
+      <Select
+        {options}
+        onChange={(value) => (selectedTtlMinutes = value)}
+        align="end"
+      >
+        <button type="button" class="btn btn-secondary btn-sm gap-2">
+          <span>{labelFor(selectedTtlMinutes)}</span>
+          <ChevronDownIcon class="size-4" />
+        </button>
+      </Select>
+    </div>
+    <button
+      class="btn btn-primary w-full gap-2"
+      onclick={handleAllowAccess}
+      disabled={isAuthorizing || selectedIdentityNumber === undefined}
+    >
+      {#if isAuthorizing}
+        <ProgressRing class="size-5" />
+      {/if}
+      <span>{$t`Allow access`}</span>
+    </button>
   </AuthPanel>
 </div>

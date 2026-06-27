@@ -14,14 +14,9 @@ interface McpAuthorizeInput {
   publicKey: string;
   /** The MCP server origin, taken from the connect request's callback (e.g.
    *  "https://mcp.id.ai"). MCP connections are to remote servers, so this is
-   *  always an https origin. The standing delegation acts as the user's account
-   *  at this origin, so each user trusts whichever server they connect. */
+   *  always an https origin. Connecting binds the agent to this origin and the
+   *  standing delegation acts as the user's identity there. */
   mcpServerOrigin: string;
-  /** The account to connect as, chosen in the picker. `undefined` is the
-   *  unreserved default account. Bound by `mcp_set_access` and carried by the
-   *  standing delegation, so enable/disable derive the *same* principal even if
-   *  the user later changes their default account for this origin. */
-  accountNumber: bigint | undefined;
   /** Lifetime in minutes. */
   ttlMinutes: number;
   /** Callback URL (on the MCP server origin) the delegation chain is
@@ -39,13 +34,12 @@ interface McpAuthorizeInput {
  * redirects the browser back to `/mcp` with a `status` so this page keeps
  * owning the UI.
  *
- * The chain is derived for the account the user picked at the MCP server
- * origin (`accountNumber`, or the unreserved default when omitted) — so the
- * MCP server acts as the same account a normal `/authorize` sign-in to that
- * origin would use, not the legacy anchor-seed principal a blind `null`
- * produces. Binding to a specific account (rather than re-resolving the
- * mutable default each call) keeps enable and disable deriving the same
- * principal.
+ * Connecting authorizes the agent for the user's identity, not for a specific
+ * account: it binds the principal II derives for the anchor at the MCP server
+ * origin (`mcp_set_access`), which is the same principal the standing delegation
+ * below carries. No account is chosen here — the MCP server origin is the
+ * connector, not an app, and accounts are per-origin; the server selects an app
+ * account per call later via `mcp_prepare_account_delegation`.
  *
  * The canister only ever signs a delegation to a freshly-generated,
  * non-extractable browser key — never to the public_key from the URL fragment
@@ -56,32 +50,26 @@ export const mcpAuthorize = async ({
   authenticated,
   publicKey,
   mcpServerOrigin,
-  accountNumber,
   ttlMinutes,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
 
-  // The delegation acts as the user's chosen account at the MCP server origin.
-  // Remap a gateway origin (*.icp0.io / *.icp.net) to *.ic0.app so the principal
-  // matches the one /authorize derives for that origin.
+  // Bind and sign at the MCP server origin. Remap a gateway origin (*.icp0.io /
+  // *.icp.net) to *.ic0.app so the principal matches the one /authorize derives
+  // for that origin.
   const effectiveOrigin = remapToLegacyDomain(mcpServerOrigin);
   const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
 
-  // Candid `opt AccountNumber`: `[]` is the unreserved default account.
-  const accountOpt: [] | [bigint] =
-    accountNumber === undefined ? [] : [accountNumber];
-
-  // Connecting the MCP server is the opt-in: enable MCP access for this anchor at
-  // (mcp_server_origin, account) so II authorizes the server's later on-demand
-  // per-app delegation calls. The backend binds the principal it derives for this
-  // (account, origin) pair — exactly the principal the standing delegation below
-  // carries — and re-derives the same principal to revoke. Idempotent.
+  // Connecting is the opt-in: authorize this agent for the anchor at the MCP
+  // server origin so II honors the server's later on-demand per-app delegation
+  // calls. The backend binds the principal it derives for the anchor at this
+  // origin — exactly the principal the standing delegation below carries — and
+  // re-derives the same principal to revoke. Idempotent.
   const accessResult = await actor.mcp_set_access(
     identityNumber,
     effectiveOrigin,
-    accountOpt,
     true,
   );
   if ("Err" in accessResult) {
@@ -95,11 +83,13 @@ export const mcpAuthorize = async ({
     ephemeralIdentity.getPublicKey().toDer(),
   );
 
+  // The standing delegation is for the identity's default account at the MCP
+  // server origin (`[]`) — the same principal `mcp_set_access` bound above.
   const { user_key, expiration } = await actor
     .prepare_account_delegation(
       identityNumber,
       effectiveOrigin,
-      accountOpt,
+      [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
     )
@@ -110,7 +100,7 @@ export const mcpAuthorize = async ({
       .get_account_delegation(
         identityNumber,
         effectiveOrigin,
-        accountOpt,
+        [],
         ephemeralPublicKey,
         expiration,
       )

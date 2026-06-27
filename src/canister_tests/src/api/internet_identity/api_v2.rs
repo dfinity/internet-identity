@@ -471,7 +471,6 @@ pub fn mcp_set_access(
     sender: Principal,
     identity_number: IdentityNumber,
     mcp_server_origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
     enabled: bool,
 ) -> Result<Result<(), String>, RejectResponse> {
     call_candid_as(
@@ -480,7 +479,7 @@ pub fn mcp_set_access(
         RawEffectivePrincipal::None,
         sender,
         "mcp_set_access",
-        (identity_number, mcp_server_origin, account_number, enabled),
+        (identity_number, mcp_server_origin, enabled),
     )
     .map(|(x,)| x)
 }
@@ -491,14 +490,29 @@ pub fn mcp_access_enabled(
     sender: Principal,
     identity_number: IdentityNumber,
     mcp_server_origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
 ) -> Result<bool, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
         sender,
         "mcp_access_enabled",
-        (identity_number, mcp_server_origin, account_number),
+        (identity_number, mcp_server_origin),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_get_accounts(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    target_origin: FrontendHostname,
+) -> Result<Result<Vec<AccountInfo>, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_get_accounts",
+        (target_origin,),
     )
     .map(|(x,)| x)
 }
