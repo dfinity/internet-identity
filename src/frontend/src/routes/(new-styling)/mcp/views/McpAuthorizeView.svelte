@@ -14,8 +14,8 @@
   interface Props {
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
-    /** Session duration the request asked for (seconds, already clamped to the
-     *  30-day cap); the initial selection, which the user can change. */
+    /** Session duration the request asked for (seconds, already clamped to
+     *  [10 min, 30 days]); the initial selection, which the user can change. */
     requestedTtlSeconds: number;
     /** Called once the selected identity is authenticated, with the chosen
      *  session duration (seconds), to connect. */

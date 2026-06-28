@@ -3,6 +3,10 @@ import { fromBase64URL } from "$lib/utils/utils";
 
 /** Default delegation lifetime in seconds when the request omits `ttl`. */
 const DEFAULT_TTL_SECONDS = 60 * 60;
+/** Shortest TTL honoured: a request asking for less is clamped up to this, so a
+ *  too-short value (e.g. a server still sending minutes-as-seconds) can't mint a
+ *  uselessly-brief session. */
+const MIN_TTL_SECONDS = 10 * 60;
 /** Largest TTL the request can ask for: the backend caps a delegation at 30 days
  *  (`MAX_EXPIRATION_PERIOD_NS`), so anything larger is clamped to this. */
 const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -30,7 +34,7 @@ export type McpParams =
       /** Opaque value echoed back to the MCP server so it can tie the delivered
        *  delegation to the request it started (CSRF protection). */
       state: string;
-      /** Requested delegation lifetime in seconds (clamped to the 30-day cap). */
+      /** Requested delegation lifetime in seconds (clamped to [10 min, 30 days]). */
       ttlSeconds: number;
     }
   | { kind: "invalid" };
@@ -90,9 +94,10 @@ const parseState = (raw: string | null): string | undefined => {
 };
 
 // `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
-// the allowed range (the backend caps at 30 days regardless); an omitted `ttl`
-// uses the default, and a malformed one (non-numeric or <= 0) invalidates the
-// request.
+// the allowed range — at least 10 minutes, at most 30 days (the backend cap) —
+// so the exact requested duration is honoured within those bounds. An omitted
+// `ttl` uses the default, and a malformed one (non-numeric or <= 0) invalidates
+// the request.
 const parseTtl = (raw: string | null): number | undefined => {
   if (raw === null) {
     return DEFAULT_TTL_SECONDS;
@@ -101,7 +106,10 @@ const parseTtl = (raw: string | null): number | undefined => {
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return undefined;
   }
-  return Math.min(Math.floor(parsed), MAX_TTL_SECONDS);
+  return Math.min(
+    Math.max(Math.floor(parsed), MIN_TTL_SECONDS),
+    MAX_TTL_SECONDS,
+  );
 };
 
 export const load: PageLoad = ({
