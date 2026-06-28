@@ -142,7 +142,13 @@
         onChange={(value) => (selectedTtlSeconds = value)}
         align="end"
       >
-        <button type="button" class="btn btn-secondary btn-sm gap-2">
+        <!-- Disabled while connecting: a disabled button dispatches no click, so
+             the Select can't open once the user has committed to "Allow access". -->
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm gap-2"
+          disabled={isAuthorizing}
+        >
           <span>{labelFor(selectedTtlSeconds)}</span>
           <ChevronDownIcon class="size-4" />
         </button>
