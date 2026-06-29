@@ -25,14 +25,14 @@
 <div class="mt-4 flex flex-col gap-8">
   <div>
     <h1 class="text-text-primary mb-3 text-xl font-medium sm:text-center">
-      {$t`Can't find your identity?`}
+      {$t`Add identity from another device`}
     </h1>
     <p
       class="text-text-tertiary text-base font-medium text-balance sm:text-center"
     >
       <Trans>
         Use a device that already holds your identity to scan or open the URL.
-        This will link your identity to this device.
+        This will add your identity to this device.
       </Trans>
     </p>
   </div>

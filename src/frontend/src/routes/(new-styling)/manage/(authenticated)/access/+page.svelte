@@ -23,6 +23,7 @@
   } from "$app/navigation";
   import { canisterId } from "$lib/globals";
   import { authenticationStore } from "$lib/stores/authentication.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithPasskey } from "$lib/utils/authentication/passkey";
   import { authenticateWithJWT } from "$lib/utils/authentication/jwt";
   import {
@@ -80,7 +81,6 @@
     "recoveryPhrase" in $authenticatedStore.authMethod ||
       "emailRecovery" in $authenticatedStore.authMethod,
   );
-  const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
     accessMethods.filter((m) => "passkey" in m).length >= MAX_PASSKEYS,
   );
@@ -271,9 +271,13 @@
               ? lastUsedAuthMethod.sso.loginHint
               : undefined;
         let jwt: string;
+        let ssoDiscoveryPromise:
+          | ReturnType<typeof discoverSsoConfig>
+          | undefined;
         if (ssoDomain !== undefined) {
+          ssoDiscoveryPromise = discoverSsoConfig(ssoDomain);
           jwt = await requestWithPopup(
-            discoverSsoConfig(ssoDomain).then((ssoResult) => ({
+            ssoDiscoveryPromise.then((ssoResult) => ({
               clientId: ssoResult.clientId,
               authURL: ssoResult.discovery.authorization_endpoint,
               authScope: selectAuthScopes(
@@ -298,11 +302,17 @@
             { nonce: session.nonce, mediation: "optional", loginHint },
           );
         }
-        const { iss: jwtIss, sub, loginHint: jwtLoginHint } = decodeJWT(jwt);
+        const {
+          iss: jwtIss,
+          sub,
+          loginHint: jwtLoginHint,
+          email: jwtEmail,
+        } = decodeJWT(jwt);
         const { identity, identityNumber } = await authenticateWithJWT({
           canisterId,
           session,
           jwt,
+          discoveryDomain: ssoDomain,
         });
         // The OAuth popup lets the user pick any account — if they choose one
         // linked to a different anchor, the JWT authenticates to that anchor.
@@ -318,13 +328,32 @@
           identityNumber,
           authMethod: { openid: { iss: jwtIss, sub } },
         });
+        const ssoName =
+          ssoDiscoveryPromise !== undefined
+            ? (await ssoDiscoveryPromise).name
+            : undefined;
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber,
           name: data.identityInfo.name[0],
           createdAtMillis,
-          authMethod: {
-            openid: { iss: jwtIss, sub, loginHint: jwtLoginHint, metadata },
-          },
+          authMethod:
+            ssoDomain !== undefined
+              ? {
+                  sso: {
+                    domain: ssoDomain,
+                    name: ssoName,
+                    email: jwtEmail,
+                    loginHint: jwtLoginHint,
+                  },
+                }
+              : {
+                  openid: {
+                    iss: jwtIss,
+                    sub,
+                    loginHint: jwtLoginHint,
+                    metadata,
+                  },
+                },
         });
       }
       switchingAccessMethodKey = undefined;
@@ -362,9 +391,9 @@
       }
       // Logout and forget identity if it's the current access method
       if (isCurrentAccessMethod($authenticatedStore, removingAccessMethod)) {
-        lastUsedIdentitiesStore.removeIdentity(
-          $authenticatedStore.identityNumber,
-        );
+        const identityNumber = $authenticatedStore.identityNumber;
+        lastUsedIdentitiesStore.removeIdentity(identityNumber);
+        void purgeSession(identityNumber);
         sessionStore.reset();
         location.replace("/login");
         return;
@@ -468,7 +497,6 @@
         handleError(error);
       }}
       {maxPasskeysReached}
-      {isUsingPasskeys}
       {openIdCredentials}
       identityName={data.identityInfo.name[0]}
     />

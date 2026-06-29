@@ -23,9 +23,9 @@
     type RecoverySuccess,
   } from "$lib/components/wizards/recoverWithEmail";
   import type {
-    EmailRecoveryDnsInput,
+    EmailChallengeDnsInput,
     EmailRecoveryGetDelegationArgs,
-    EmailRecoverySubmitDkimLeafArg,
+    EmailChallengeSubmitDkimLeafArg,
   } from "$lib/generated/internet_identity_types";
   import { EMAIL_RECOVERY } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -38,6 +38,7 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
   import { authenticationStore } from "$lib/stores/authentication.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { goto, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
@@ -81,12 +82,15 @@
   // -------------------------------------------------------------
 
   const prepareEmailDelegation = (
-    input: EmailRecoveryDnsInput,
+    input: EmailChallengeDnsInput,
     sessionPublicKey: Uint8Array,
   ) =>
     anonymousActor
       .email_recovery_prepare_delegation(input, sessionPublicKey)
       .then(throwCanisterError);
+
+  // Stick with the `email_recovery_*` aliases so the FE bundle works
+  // against both the pre-rename and post-rename BE during a deploy.
 
   const emailRecoveryStatus = (nonce: string) =>
     anonymousActor.email_recovery_status(nonce);
@@ -95,7 +99,7 @@
     anonymousActor.email_recovery_diagnostics(nonce);
 
   const submitEmailDkimLeaf = async (
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
   ): Promise<void> => {
     await throwCanisterError(
       await anonymousActor.email_recovery_submit_dkim_leaf(arg),
@@ -147,6 +151,7 @@
     } catch (error) {
       showEmailRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(success.identityNumber);
       handleError(error);
     }
   };
@@ -188,6 +193,7 @@
     } catch (error) {
       showRecoveryDialog = false;
       authenticationStore.reset();
+      void purgeSession(identityNumber);
       handleError(error);
     }
   };

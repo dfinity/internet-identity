@@ -4,7 +4,6 @@
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
-  import { anonymousActor } from "$lib/globals";
   import {
     validateDomain,
     discoverSsoConfig,
@@ -96,16 +95,19 @@
     domainInput: string,
   ): string | undefined => {
     if (e instanceof DomainNotConfiguredError) {
-      if (e.reason === "http-error" && e.httpStatus !== undefined) {
-        return $t`${domainInput} didn't publish /.well-known/ii-openid-configuration (HTTP ${String(e.httpStatus)}).`;
-      }
       if (e.reason === "timeout") {
-        return $t`${domainInput} took too long to respond. Try again in a moment.`;
-      }
-      if (e.reason === "network") {
+        // The domain IS on II's allowlist, but discovery never resolved.
+        // A failed or unreachable discovery fetch surfaces here too — the
+        // canister keeps reporting `Pending` until we time out — so this is
+        // the case where pointing the SSO admin at the discovery endpoint
+        // actually helps.
         return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
       }
-      return $t`${domainInput}'s /.well-known/ii-openid-configuration is malformed.`;
+      // `rejected` is the canister's `NotAllowed`: the domain isn't on II's
+      // SSO allowlist, so no discovery was ever attempted. Telling the user
+      // to check the discovery endpoint would be misleading — the domain
+      // simply isn't set up for SSO with II yet.
+      return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
     }
     if (e instanceof OAuthProviderError) {
       // `unsupported_response_type` = the SSO app is code-only; II needs
@@ -124,12 +126,6 @@
         return $t`${domainInput}'s SSO returned "${e.error}": ${e.errorDescription}`;
       }
       return $t`${domainInput}'s SSO returned error "${e.error}".`;
-    }
-    if (e instanceof Error) {
-      const msg = e.message;
-      if (msg.toLowerCase().includes("canary allowlist")) {
-        return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
-      }
     }
     return undefined;
   };
@@ -160,9 +156,9 @@
   };
 
   /**
-   * Debounced lookup: runs the backend registration + two-hop discovery
-   * shortly after the user stops typing, and stashes the result so the
-   * Continue button can hand off to `continueWithSso` synchronously.
+   * Debounced lookup: resolves the SSO config via the canister shortly after
+   * the user stops typing, and stashes the result so the Continue button can
+   * hand off to `continueWithSso` synchronously.
    *
    * Drives the button's enabled state: the button lights up only once
    * `preparedResult` is populated for the current `domain`.
@@ -190,26 +186,22 @@
     debounceTimer = setTimeout(async () => {
       debounceTimer = undefined;
       isLookingUp = true;
-      // The input may change again while these awaits are in flight; we
+      // The input may change again while this await is in flight; we
       // only apply / error-out when our `trimmed` is still the current
       // domain, so a stale response can't clobber a fresher one. The
       // matching `lookupController` is also aborted by `invalidatePrepared`,
-      // which causes `discoverSsoConfig` to reject with `AbortError` —
-      // explicitly ignored below since cancellation isn't a user error.
+      // so a superseded lookup stops polling — ignored below since
+      // cancellation isn't a user error.
       const matchesCurrent = () => trimmed === domain.trim().toLowerCase();
       try {
-        await anonymousActor.add_discoverable_oidc_config({
-          discovery_domain: trimmed,
-        });
         const result = await discoverSsoConfig(trimmed, controller.signal);
         if (matchesCurrent()) {
           preparedResult = result;
         }
       } catch (e) {
-        // Cancelled by a fresher keystroke — silently drop. Distinguishing
-        // on `controller.signal.aborted` (not just the error's name) means
-        // we don't accidentally swallow a hop-2 timeout, which surfaces as
-        // an `AbortError` too but isn't user-initiated.
+        // Cancelled by a fresher keystroke — silently drop, keyed on
+        // `controller.signal.aborted` rather than the error so a genuine
+        // discovery timeout still surfaces.
         if (controller.signal.aborted) return;
         if (matchesCurrent()) {
           setErrorFrom(e, trimmed);
@@ -233,10 +225,8 @@
       // opened synchronously inside `continueWithSso → requestJWT →
       // requestWithPopup → redirectInPopup → window.open`. Any await
       // between the click event and `window.open` causes Safari to
-      // block the popup. All the network work
-      // (add_discoverable_oidc_config + two-hop discovery) is already
-      // done — stashed in `preparedResult` by the debounced input
-      // handler.
+      // block the popup. The discovery is already resolved — stashed in
+      // `preparedResult` by the debounced input handler.
       await continueWithSso(preparedResult);
     } catch (e) {
       setErrorFrom(e, domain.trim().toLowerCase());

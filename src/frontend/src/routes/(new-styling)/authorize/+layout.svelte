@@ -2,15 +2,17 @@
   import type { LayoutProps } from "./$types";
   import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
   import {
+    attributeConsentResultStore,
+    attributeConsentStore,
+  } from "$lib/stores/attributeConsent.store";
+  import {
     authorizationContextStore,
     authorizationStore,
     authorizedStore,
   } from "$lib/stores/authorization.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import {
-    authenticationStore,
-    type AuthenticationResult,
-  } from "$lib/stores/authentication.store";
+  import { purgeSession } from "$lib/stores/session-delegation.store";
+  import { authenticationStore } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import { handleError } from "$lib/components/utils/error";
@@ -19,14 +21,11 @@
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
-  import { get } from "svelte/store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { ManageHandoffFlow } from "$lib/flows/manageHandoffFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
-  import {
-    HANDOFF_HASH_KEY,
-    sendAuthToOpenedTab,
-  } from "$lib/utils/auth-handoff";
+  import ManageHandoff from "$lib/components/ui/ManageHandoff.svelte";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
@@ -35,7 +34,7 @@
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { ChevronDownIcon, ExternalLinkIcon, UserIcon } from "@lucide/svelte";
+  import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
 
   const { children }: LayoutProps = $props();
 
@@ -109,12 +108,22 @@
     // OpenID/SSO 1-click flows gate on channel establishment
     return $channelStore !== undefined;
   });
+  // Attribute consent runs *after* authorize, so by the time the
+  // consent view paints, $authorizedStore is set and the
+  // base condition below would hide the identity switcher. Keep the
+  // header visible during the consent step so the user can switch
+  // identities or sign out before sharing data with the dapp.
+  const isAttributeConsenting = $derived(
+    $attributeConsentStore !== undefined &&
+      $attributeConsentResultStore === undefined,
+  );
   const showHeaderFooter = $derived(
     isReady &&
-      $authorizedStore === undefined &&
-      flow !== "openid-init" &&
-      flow !== "sso-init" &&
-      flow !== "openid-resume",
+      (isAttributeConsenting ||
+        ($authorizedStore === undefined &&
+          flow !== "openid-init" &&
+          flow !== "sso-init" &&
+          flow !== "openid-resume")),
   );
 
   // --- Identity switcher state ---
@@ -133,13 +142,10 @@
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
   let authDialogMode = $state<AuthMode>("signin");
-  let pendingHandoff: { cancel: () => void } | undefined;
-  // Set when the user clicked manage but had to authenticate first — the
-  // passkey/IdP prompt consumes the click's transient activation on Safari
-  // (and strict Firefox), so a follow-up window.open() would be silently
-  // blocked. The confirmation dialog's own button click provides fresh
-  // activation and drives window.open from there.
-  let pendingManageOpen = $state<{ auth: AuthenticationResult }>();
+  // Authenticates the selected identity (if needed) and hands the session to a
+  // new /manage tab — shared with the /mcp flow. Renders its own "You're signed
+  // in" confirmation + provider-overlay backdrop via <ManageHandoff> below.
+  const manageHandoff = new ManageHandoffFlow();
 
   const handleSignIn = async (identityNumber: bigint) => {
     try {
@@ -178,6 +184,7 @@
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    void purgeSession(identityNumber);
 
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
@@ -203,64 +210,16 @@
     }
   };
   const handleManageIdentity = async (): Promise<void> => {
-    pendingHandoff?.cancel();
-    pendingHandoff = undefined;
     isIdentityPopoverOpen = false;
     if (selectedIdentity === undefined) return;
     try {
       isAuthenticating = true;
-      const needsAuth =
-        $authenticationStore?.identityNumber !==
-        selectedIdentity.identityNumber;
-      if (needsAuth) {
-        sessionStore.reset();
-        await authLastUsedFlow.authenticate(
-          $lastUsedIdentitiesStore.identities[
-            `${selectedIdentity.identityNumber}`
-          ],
-        );
-      }
-      const auth = get(authenticationStore);
-      if (auth === undefined) {
-        await goto("/manage");
-        return;
-      }
-      if (needsAuth) {
-        // The just-completed passkey/IdP prompt consumed the click's
-        // transient activation on Safari/strict Firefox, so window.open()
-        // here would be silently blocked. Surface the confirmation dialog
-        // and let its own button click drive window.open with fresh
-        // activation. When the user was already signed in we never awaited
-        // anything, so the popup goes straight through.
-        pendingManageOpen = { auth };
-        return;
-      }
-      const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
-      if (w === null) {
-        await goto("/manage");
-        return;
-      }
-      pendingHandoff = sendAuthToOpenedTab(w, auth);
+      await manageHandoff.start("/manage", selectedIdentity);
     } catch (error) {
       handleError(error);
     } finally {
       isAuthenticating = false;
     }
-  };
-  const handleOpenManageTab = (pending: { auth: AuthenticationResult }) => {
-    const w = window.open(`/manage#${HANDOFF_HASH_KEY}`, "_blank");
-    if (w === null) {
-      pendingManageOpen = undefined;
-      void goto("/manage");
-      return;
-    }
-    pendingHandoff = sendAuthToOpenedTab(w, pending.auth);
-    pendingManageOpen = undefined;
-  };
-  const dismissPendingManageOpen = () => {
-    pendingHandoff?.cancel();
-    pendingHandoff = undefined;
-    pendingManageOpen = undefined;
   };
   const authorizeDefault = async () => {
     try {
@@ -368,11 +327,16 @@
                   handleError(error);
                 }}
                 bind:mode={authDialogMode}
+                passkeyLabel={authDialogMode === "signin"
+                  ? $t`Select a passkey`
+                  : undefined}
               >
                 <h1
                   class="text-text-primary my-2 self-start text-2xl font-medium"
                 >
-                  {authDialogMode === "signup" ? $t`Sign up` : $t`Sign in`}
+                  {authDialogMode === "signup"
+                    ? $t`Create new identity`
+                    : $t`Add existing identity`}
                 </h1>
                 <p class="text-text-secondary mb-6 self-start text-sm">
                   {$t`Choose method to continue`}
@@ -401,24 +365,5 @@
     </Dialog>
   {/if}
 
-  {#if pendingManageOpen !== undefined}
-    {@const pending = pendingManageOpen}
-    <Dialog onClose={dismissPendingManageOpen}>
-      <div class="flex flex-col">
-        <h2 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {$t`You're signed in`}
-        </h2>
-        <p class="text-text-secondary mb-6 self-start text-sm">
-          {$t`Open Internet Identity in a new tab to manage your access methods and recovery options.`}
-        </p>
-        <button
-          class="btn btn-primary btn-lg w-full gap-2"
-          onclick={() => handleOpenManageTab(pending)}
-        >
-          <ExternalLinkIcon class="size-4" aria-hidden="true" />
-          {$t`Open manage`}
-        </button>
-      </div>
-    </Dialog>
-  {/if}
+  <ManageHandoff flow={manageHandoff} />
 {/if}

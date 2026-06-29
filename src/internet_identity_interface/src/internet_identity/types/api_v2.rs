@@ -93,6 +93,12 @@ pub struct IdentityInfo {
     /// a `vec` lets future multi-credential support land without a
     /// candid schema bump.
     pub email_recovery: Option<Vec<crate::internet_identity::types::EmailRecoveryCredential>>,
+    /// Verified emails bound to this anchor — a parallel anchor
+    /// primitive to `email_recovery`. `None` for anchors with no
+    /// verified emails configured. Capped server-side by
+    /// `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
+    pub verified_emails:
+        Option<Vec<crate::internet_identity::types::verified_email::VerifiedEmail>>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -248,6 +254,10 @@ pub struct OpenIDRegFinishArg {
     pub jwt: String,
     pub salt: [u8; 32],
     pub name: String,
+    /// SSO discovery domain the JWT was obtained through, or `None` for a
+    /// direct provider (Google / Microsoft / Apple). Selects which JWK source
+    /// verifies the JWT.
+    pub discovery_domain: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

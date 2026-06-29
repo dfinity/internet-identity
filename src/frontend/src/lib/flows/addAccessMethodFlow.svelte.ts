@@ -3,6 +3,7 @@ import { get } from "svelte/store";
 import { decodeJWT, requestJWT, selectAuthScopes } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { throwCanisterError } from "$lib/utils/utils";
+import { retryWhilePending } from "$lib/utils/openidPoll";
 import type {
   AuthnMethodData,
   OpenIdCredential,
@@ -16,9 +17,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
 export class AddAccessMethodFlow {
-  #view = $state<"chooseMethod" | "addPasskey" | "signInWithSso">(
-    "chooseMethod",
-  );
+  #view = $state<"chooseMethod" | "signInWithSso">("chooseMethod");
   #isSystemOverlayVisible = $state(false);
 
   get view() {
@@ -31,6 +30,7 @@ export class AddAccessMethodFlow {
 
   linkOpenIdAccount = async (
     config: OpenIdConfig,
+    discoveryDomain?: string,
   ): Promise<OpenIdCredential> => {
     const { actor, identityNumber, salt, nonce } = get(authenticatedStore);
 
@@ -56,9 +56,17 @@ export class AddAccessMethodFlow {
       // the same `(iss, aud)` on the identity, so the canister's
       // `OpenIdCredentialAlreadyRegistered` reply here is only hit when
       // the credential is linked to another identity. Treat it as-is.
-      await actor
-        .openid_credential_add(identityNumber, jwt, salt)
-        .then(throwCanisterError);
+      //
+      // For an SSO domain the add drives the discovery/JWKS fetch and reports
+      // `Pending` until the cache warms; retry until ready.
+      await retryWhilePending(() =>
+        actor.openid_credential_add(
+          identityNumber,
+          jwt,
+          salt,
+          discoveryDomain !== undefined ? [discoveryDomain] : [],
+        ),
+      ).then(throwCanisterError);
 
       const metadata: MetadataMapV2 = [];
       if (name !== undefined) {
@@ -114,10 +122,6 @@ export class AddAccessMethodFlow {
     return authnMethodData;
   };
 
-  continueWithPasskey = () => {
-    this.#view = "addPasskey";
-  };
-
   signInWithSso = () => {
     this.#view = "signInWithSso";
   };
@@ -138,7 +142,7 @@ export class AddAccessMethodFlow {
    * devices — no per-device FE bookkeeping needed.
    */
   linkSsoAccount = (result: SsoDiscoveryResult): Promise<OpenIdCredential> => {
-    const { clientId, discovery } = result;
+    const { clientId, discovery, domain } = result;
     const syntheticConfig: OpenIdConfig = {
       auth_uri: discovery.authorization_endpoint,
       jwks_uri: "",
@@ -151,6 +155,6 @@ export class AddAccessMethodFlow {
       client_id: clientId,
       seed_jwks: [],
     };
-    return this.linkOpenIdAccount(syntheticConfig);
+    return this.linkOpenIdAccount(syntheticConfig, domain);
   };
 }

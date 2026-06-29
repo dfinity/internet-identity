@@ -130,6 +130,7 @@ use storable::credential_id::StorableCredentialId;
 use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
 use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
+use storable::mcp_config::StorableMcpConfig;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
@@ -183,6 +184,8 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
+const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
+const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -228,6 +231,23 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
 /// periodic `jwks_uri` fetch, so a provider's keys survive canister upgrades
 /// and are available for JWT verification before the first post-upgrade fetch.
 const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
+
+/// Reverse index for MCP access: maps the principal II derives for an anchor's
+/// chosen account at the MCP server origin it connected (that anchor's standing
+/// MCP-server principal) to the anchor. Populated when the anchor enables MCP
+/// access; the `mcp_*_account_delegation` methods use it to authorize a caller
+/// (the MCP server, acting as that principal) and recover its anchor without an
+/// `anchor_number` parameter.
+const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX);
+
+/// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
+/// URL), keyed by anchor number. Written by the authenticated `mcp_set_config`
+/// method and read by the `/mcp` connect flow (verify-at-connect) and the
+/// Settings UI; persisting it on-chain is what makes the config sync across all
+/// of the identity's devices. Kept in its own map so it never touches anchor
+/// serialization.
+const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -370,11 +390,20 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_anchor_with_email_recovery_memory:
         StableBTreeMap<StorableEmailRecoveryAddressHash, StorableAnchorNumber, ManagedMemory<M>>,
 
+    lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID`].
+    pub(crate) lookup_anchor_with_mcp_principal_memory:
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+
     /// Memory wrapper used to report the size of the OpenID JWKS cache memory.
     openid_jwks_cache_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Persistent per-provider JWK cache, keyed by the provider's `issuer`.
     /// See [`OPENID_JWKS_CACHE_MEMORY_ID`].
     openid_jwks_cache_memory: StableBTreeMap<String, StorableJwks, ManagedMemory<M>>,
+
+    mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
+    mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -460,7 +489,10 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
+        let lookup_anchor_with_mcp_principal_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
+        let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -567,8 +599,16 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchor_with_email_recovery_memory: StableBTreeMap::init(
                 lookup_anchor_with_email_recovery_memory,
             ),
+            lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_mcp_principal_memory.clone(),
+            ),
+            lookup_anchor_with_mcp_principal_memory: StableBTreeMap::init(
+                lookup_anchor_with_mcp_principal_memory,
+            ),
             openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
+            mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
+            mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
         }
     }
 
@@ -753,6 +793,7 @@ impl<M: Memory + Clone> Storage<M> {
             // The following fields do not require merging.
             created_at_ns: _,
             name: _,
+            verified_emails: _,
         }) = previous_anchor_maybe
         {
             (
@@ -765,6 +806,9 @@ impl<M: Memory + Clone> Storage<M> {
             // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
             (vec![], vec![], vec![], vec![])
         };
+        // `storable_anchor.verified_emails` is not synced through any
+        // reverse-lookup index — verified emails are addressable only
+        // via the owning anchor.
 
         // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
         self.sync_anchor_with_openid_credential_index(
@@ -1037,6 +1081,55 @@ impl<M: Memory + Clone> Storage<M> {
         let principal = Principal::self_authenticating(pubkey);
         self.lookup_anchor_with_passkey_pubkey_hash_memory
             .get(&principal)
+    }
+
+    /// Recover the anchor that enabled MCP access for the given MCP-server
+    /// principal (the caller of the `mcp_*_account_delegation` methods).
+    pub fn lookup_anchor_with_mcp_principal(&self, principal: Principal) -> Option<AnchorNumber> {
+        self.lookup_anchor_with_mcp_principal_memory.get(&principal)
+    }
+
+    /// Record (enable) MCP access: bind an anchor's MCP-server principal to it.
+    ///
+    /// Like the passkey / recovery-phrase reverse indices, we refuse to
+    /// overwrite a principal already bound to a *different* anchor — defense in
+    /// depth against a cross-anchor takeover were the derived principal ever to
+    /// collide. Re-binding the same anchor is idempotent. Returns
+    /// `Err(other_anchor)` on a cross-anchor collision so the caller can surface
+    /// the failure rather than silently no-op.
+    pub fn set_anchor_mcp_principal(
+        &mut self,
+        principal: Principal,
+        anchor_number: AnchorNumber,
+    ) -> Result<(), AnchorNumber> {
+        if let Some(existing) = self.lookup_anchor_with_mcp_principal_memory.get(&principal) {
+            if existing != anchor_number {
+                return Err(existing);
+            }
+        }
+        self.lookup_anchor_with_mcp_principal_memory
+            .insert(principal, anchor_number);
+        Ok(())
+    }
+
+    /// Forget (disable) an anchor's MCP-server principal.
+    pub fn remove_anchor_mcp_principal(&mut self, principal: Principal) {
+        self.lookup_anchor_with_mcp_principal_memory
+            .remove(&principal);
+    }
+
+    /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
+    /// default (disabled, no server) for an anchor that never wrote one.
+    pub fn read_mcp_config(&self, anchor_number: AnchorNumber) -> StorableMcpConfig {
+        self.mcp_config_memory
+            .get(&anchor_number)
+            .unwrap_or_default()
+    }
+
+    /// Persist `anchor_number`'s trusted-MCP-server config (overwriting any
+    /// previous value), so it syncs across the identity's devices.
+    pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {
+        self.mcp_config_memory.insert(anchor_number, config);
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to
@@ -2241,6 +2334,14 @@ impl<M: Memory + Clone> Storage<M> {
                 "openid_jwks_cache".to_string(),
                 self.openid_jwks_cache_memory_wrapper.size(),
             ),
+            (
+                "lookup_anchor_with_mcp_principal_memory".to_string(),
+                self.lookup_anchor_with_mcp_principal_memory_wrapper.size(),
+            ),
+            (
+                "mcp_config_memory".to_string(),
+                self.mcp_config_memory_wrapper.size(),
+            ),
         ])
     }
 }
@@ -2279,7 +2380,7 @@ pub enum StorageError {
     /// Tried to bind a recovery email that's already on a different
     /// anchor. The "one anchor per address" invariant from design
     /// §8.2 is enforced at the storage layer; the caller surfaces
-    /// `EmailRecoveryError::AddressAlreadyRegistered`.
+    /// `EmailChallengeError::AddressAlreadyRegistered`.
     EmailRecoveryAddressAlreadyBound {
         existing_anchor: AnchorNumber,
     },

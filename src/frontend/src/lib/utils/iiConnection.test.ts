@@ -49,6 +49,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   captcha_config: [],
   openid_configs: [],
   sso_discoverable_domains: [],
+  sso_allow_any_domain: [],
   sso_credential_migration: [],
   register_rate_limit: [],
   related_origins: [
@@ -64,6 +65,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   dummy_auth: [],
   backend_canister_id: [],
   backend_origin: [],
+  enable_dnssec_email_recovery: [],
   doh_config: [],
   dnssec_config: [],
 };

@@ -6,7 +6,10 @@ use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
+use ic_cdk_macros::update;
+use ic_http_certification::{
+    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, Method, StatusCode,
+};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::InternetIdentityFrontendArgs;
 use serde_json::json;
@@ -14,9 +17,22 @@ use sha2::Digest;
 use std::io::Read;
 use std::{cell::RefCell, rc::Rc};
 
+mod callback;
+
+/// Subset of the init args needed to build response headers at request time.
+/// Asset headers are built once during certification with the args in hand;
+/// dynamically rendered responses (the POST /callback translator) construct
+/// their headers per request, so these args are retained here.
+#[derive(Default)]
+struct HeaderConfig {
+    related_origins: Option<Vec<String>>,
+    dev_csp: bool,
+}
+
 thread_local! {
     static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
     static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone())));
+    static HEADER_CONFIG: RefCell<HeaderConfig> = RefCell::new(HeaderConfig::default());
 }
 
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
@@ -37,6 +53,13 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
     let related_origins = args.related_origins.as_ref();
     let dev_csp = args.dev_csp.unwrap_or(false);
+
+    HEADER_CONFIG.with_borrow_mut(|config| {
+        *config = HeaderConfig {
+            related_origins: args.related_origins.clone(),
+            dev_csp,
+        };
+    });
 
     // Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -77,6 +100,23 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                  content: _,
              }| {
                 if content_type == ContentType::HTML {
+                    // The /mcp connect flow delivers the standing delegation to
+                    // the user's chosen remote (https) MCP server via a top-level
+                    // form-POST, so that landing page — and only that page —
+                    // needs `form-action` to allow https origins. Scoping the
+                    // relaxation to the /mcp asset keeps the SPA-wide policy tight
+                    // for every other route (/authorize, /cli, …), so an HTML
+                    // injection elsewhere still can't form-POST data cross-origin.
+                    let csp_override = if is_mcp_landing_path(&path) {
+                        Some(get_content_security_policy(
+                            integrity_hashes.clone(),
+                            related_origins,
+                            dev_csp,
+                            true,
+                        ))
+                    } else {
+                        None
+                    };
                     AssetConfig::File {
                         path,
                         content_type: Some("text/html".to_string()),
@@ -84,6 +124,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            csp_override,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -121,6 +162,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                             integrity_hashes.clone(),
                             related_origins,
                             dev_csp,
+                            None,
                             vec![headers],
                         ),
                         fallback_for: vec![],
@@ -142,10 +184,31 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     });
 }
 
+/// Headers for dynamically rendered responses, built from the retained
+/// [`HeaderConfig`] so they match the headers certified onto static assets.
+/// Pass `content_security_policy_override` to replace the SPA-wide policy for
+/// a response that needs its own (no inline-script integrity hashes are used
+/// here); pass `None` to inherit the SPA-wide policy.
+pub(crate) fn dynamic_response_headers(
+    content_security_policy_override: Option<String>,
+    additional_headers: Vec<HeaderField>,
+) -> Vec<HeaderField> {
+    HEADER_CONFIG.with_borrow(|config| {
+        get_asset_headers(
+            vec![],
+            config.related_origins.as_ref(),
+            config.dev_csp,
+            content_security_policy_override,
+            additional_headers,
+        )
+    })
+}
+
 fn get_asset_headers(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
+    content_security_policy_override: Option<String>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
     let credentials_allowlist = if let Some(related_origins) = related_origins {
@@ -175,10 +238,15 @@ fn get_asset_headers(
         // Reduces risk of drive-by downloads and serves as defense against MIME confusion attacks
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         // Content-Security-Policy (CSP)
-        // Comprehensive policy to prevent XSS attacks and data injection
+        // Comprehensive policy to prevent XSS attacks and data injection. A
+        // caller may override it for a response that needs its own policy
+        // (e.g. the callback landing page pins a single inline-script hash);
+        // otherwise the SPA-wide policy is computed from the integrity hashes.
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes, related_origins, dev_csp),
+            content_security_policy_override.unwrap_or_else(|| {
+                get_content_security_policy(integrity_hashes, related_origins, dev_csp, false)
+            }),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -236,6 +304,15 @@ fn get_asset_headers(
     headers
 }
 
+/// Whether `path` is one of the url_paths the prerendered `/mcp` connect page
+/// is certified at. A top-level `mcp.html` (adapter-static, `prerender = true`)
+/// is served at `/mcp`, `/mcp/`, and `/mcp/index.html` (see
+/// `asset_util::filepath_to_urlpaths`), so the `form-action` relaxation must
+/// cover all three. This is the *only* asset that gets the relaxed policy.
+fn is_mcp_landing_path(path: &str) -> bool {
+    matches!(path, "/mcp" | "/mcp/" | "/mcp/index.html")
+}
+
 /// Full content security policy delivered via HTTP response header.
 ///
 /// CSP directives explained:
@@ -271,6 +348,13 @@ fn get_asset_headers(
 ///   isn't allowlistable here; the `/cli` parser only accepts 127.0.0.1 to
 ///   match. `localhost` is also excluded (it can resolve off-loopback) — so a
 ///   form can never post to a remote origin.
+///   The SPA-wide policy is never broadened to `https:`. The `/mcp` connect
+///   page is the sole exception: it form-POSTs the standing delegation to the
+///   remote (https) MCP server the user chose, so that one asset is certified
+///   with a relaxed `form-action 'self' https:` (MCP is remote-only, so the
+///   loopback is not carried over; see `is_mcp_landing_path` and the
+///   `relax_form_action_to_https` parameter). Scoping the relaxation to that
+///   page keeps every other route tight against cross-origin form posts.
 ///
 /// style-src 'self' 'unsafe-inline':
 ///   Allow stylesheets from same origin and inline styles
@@ -298,6 +382,7 @@ fn get_content_security_policy(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
     dev_csp: bool,
+    relax_form_action_to_https: bool,
 ) -> String {
     let connect_src = if dev_csp {
         // Allow connecting via http for development purposes
@@ -330,13 +415,26 @@ fn get_content_security_policy(
         "'self'".to_string()
     };
 
+    // The SPA-wide `form-action` is same-origin + http loopback (the latter for
+    // the /cli flow). The /mcp connect page form-POSTs the standing delegation
+    // to the remote (https) MCP server the user chose, so it — and only it — is
+    // certified with `relax_form_action_to_https = true`, giving it
+    // `form-action 'self' https:`. MCP is remote-only, so the loopback is not
+    // carried over (see the certify loop and `is_mcp_landing_path`). Every other
+    // asset stays tight.
+    let form_action = if relax_form_action_to_https {
+        "'self' https:"
+    } else {
+        "'self' http://127.0.0.1:*"
+    };
+
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
          img-src 'self' data: https://*.googleusercontent.com;\
          script-src {script_src};\
          base-uri 'none';\
-         form-action 'self' http://127.0.0.1:*;\
+         form-action {form_action};\
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
@@ -473,6 +571,18 @@ fn extract_inline_scripts(content: String) -> Vec<String> {
 
 #[query]
 fn http_request(request: HttpRequest) -> HttpResponse {
+    if request.method() == Method::POST {
+        if callback::is_callback_post(&request) {
+            // Query responses can't certify dynamically rendered content;
+            // upgrade the IdP's form_post callback to update mode so the
+            // response is certified via consensus.
+            return HttpResponse::builder()
+                .with_status_code(StatusCode::OK)
+                .with_upgrade(true)
+                .build();
+        }
+        return method_not_allowed();
+    }
     ASSET_ROUTER.with_borrow(|asset_router| {
         if let Ok(response) = asset_router.serve_asset(
             &ic_cdk::api::data_certificate().expect("No data certificate available"),
@@ -485,6 +595,23 @@ fn http_request(request: HttpRequest) -> HttpResponse {
     })
 }
 
+#[update]
+fn http_request_update(request: HttpRequest) -> HttpResponse {
+    if callback::is_callback_post(&request) {
+        return callback::handle_form_post_callback(request.body());
+    }
+    method_not_allowed()
+}
+
+fn method_not_allowed() -> HttpResponse<'static> {
+    HttpResponse::builder()
+        .with_status_code(StatusCode::METHOD_NOT_ALLOWED)
+        // Only reached for non-/callback resources, which serve GET assets
+        // (POST is handled on /callback alone, via the query→update upgrade).
+        .with_headers(vec![("Allow".to_string(), "GET".to_string())])
+        .build()
+}
+
 // Order dependent: do not move above any exposed canister method!
 candid::export_service!();
 
@@ -492,7 +619,7 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use super::get_content_security_policy;
+    use super::{get_content_security_policy, is_mcp_landing_path};
     use crate::__export_service;
     use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
@@ -514,7 +641,7 @@ mod tests {
     #[test]
     fn csp_differs_between_dev_and_prod_for_connect_src_and_upgrade_insecure_requests() {
         // Dev CSP: allow http: in connect-src and omit upgrade-insecure-requests
-        let dev_csp = get_content_security_policy(Vec::new(), None, true);
+        let dev_csp = get_content_security_policy(Vec::new(), None, true, false);
 
         assert!(
             dev_csp.contains("connect-src 'self' https: http:"),
@@ -526,7 +653,7 @@ mod tests {
         );
 
         // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
-        let prod_csp = get_content_security_policy(Vec::new(), None, false);
+        let prod_csp = get_content_security_policy(Vec::new(), None, false, false);
 
         assert!(
             prod_csp.contains("connect-src 'self' https:"),
@@ -540,5 +667,56 @@ mod tests {
             prod_csp.contains("upgrade-insecure-requests;"),
             "prod CSP should include upgrade-insecure-requests, got: {prod_csp}"
         );
+    }
+
+    #[test]
+    fn csp_form_action_relaxed_only_for_mcp_landing() {
+        // The SPA-wide policy keeps form-action to same-origin + http loopback.
+        let tight = get_content_security_policy(Vec::new(), None, false, false);
+        assert!(
+            tight.contains("form-action 'self' http://127.0.0.1:*;"),
+            "default form-action should be self + loopback only, got: {tight}"
+        );
+        assert!(
+            !tight.contains("form-action 'self' http://127.0.0.1:* https:"),
+            "default form-action must not allow https:, got: {tight}"
+        );
+
+        // The /mcp landing page — and only it — relaxes form-action to https
+        // origins so the standing delegation can be form-POSTed to the MCP
+        // server. MCP is remote-only, so the loopback is dropped (not carried
+        // into the relaxed policy).
+        let relaxed = get_content_security_policy(Vec::new(), None, false, true);
+        assert!(
+            relaxed.contains("form-action 'self' https:;"),
+            "relaxed form-action should be self + https, got: {relaxed}"
+        );
+        assert!(
+            !relaxed.contains("127.0.0.1"),
+            "relaxed /mcp form-action must not carry the loopback, got: {relaxed}"
+        );
+    }
+
+    #[test]
+    fn only_mcp_landing_paths_get_relaxed_form_action() {
+        // The relaxation is gated on the prerendered /mcp asset's url_paths.
+        for path in ["/mcp", "/mcp/", "/mcp/index.html"] {
+            assert!(is_mcp_landing_path(path), "{path} should be an /mcp asset");
+        }
+        // Sibling/lookalike paths must stay on the tight SPA-wide policy.
+        for path in [
+            "/",
+            "/cli",
+            "/authorize",
+            "/mcp-foo",
+            "/mcpx",
+            "/manage/mcp",
+            "/foo/mcp",
+        ] {
+            assert!(
+                !is_mcp_landing_path(path),
+                "{path} must not get the relaxed policy"
+            );
+        }
     }
 }

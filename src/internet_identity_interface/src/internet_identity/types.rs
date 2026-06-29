@@ -23,19 +23,23 @@ mod api_v2;
 pub mod attributes;
 pub mod dnssec;
 pub mod doh;
+pub mod email_challenge;
 pub mod email_recovery;
 pub mod icrc3;
 pub mod openid;
 pub mod smtp;
 pub mod vc_mvp;
+pub mod verified_email;
 
 // re-export v2 types without the ::v2 prefix, so that this crate can be restructured once v1 is removed
 // without breaking clients
 pub use crate::internet_identity::types::dnssec::*;
 pub use crate::internet_identity::types::doh::*;
+pub use crate::internet_identity::types::email_challenge::*;
 pub use crate::internet_identity::types::email_recovery::*;
 pub use crate::internet_identity::types::openid::*;
 pub use crate::internet_identity::types::smtp::*;
+pub use crate::internet_identity::types::verified_email::*;
 pub use api_v2::*;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -284,6 +288,14 @@ pub struct InternetIdentityInit {
     /// `dfinity.org` (production) or `beta.dfinity.org` (everything else)
     /// keyed off `is_production`.
     pub sso_discoverable_domains: Option<Vec<String>>,
+    /// Deploy flag that opens the SSO discovery domain gate to *any* domain.
+    /// When `Some(true)`, `sso_discoverable_domains` (and its built-in
+    /// `is_production` defaults) no longer restrict which domains may be
+    /// discovered as SSO providers — every domain is accepted. `None` /
+    /// `Some(false)` leave the allowlist in force. The strict-`https` posture
+    /// is unaffected: a domain must still be on the explicit
+    /// `sso_discoverable_domains` list to serve discovery over plain `http`.
+    pub sso_allow_any_domain: Option<bool>,
     /// One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     /// `OpenIdCredential`s (see `docs/ongoing/openid-sso-prod-readiness.md`
     /// §8.6). When `Some`, a batched timer-driven migration stamps every
@@ -298,6 +310,10 @@ pub struct InternetIdentityInit {
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub backend_canister_id: Option<Principal>,
     pub backend_origin: Option<String>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. Defaults to
+    /// off (DoH-only); `Some(true)` re-enables it. Omitting it on upgrade
+    /// keeps the stored value.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC trust anchors for any feature that verifies DNS records
     /// against the IANA-rooted DNSSEC chain (currently the email-recovery
     /// DKIM/DMARC flow, see `docs/ongoing/email-recovery.md` §7.5).
@@ -318,10 +334,8 @@ pub struct InternetIdentityInit {
 
 /// One entry of the `sso_credential_migration` backfill (see
 /// `InternetIdentityInit::sso_credential_migration`). Maps the `(iss, aud)`
-/// pair of stored SSO credentials to the discovery domain (and optional
-/// human-readable name) they were registered through. Field names match the
-/// `discovered_oidc_configs` query output so the deployer can transcribe its
-/// result field-for-field before submitting the upgrade proposal.
+/// pair of a stored SSO credential to the discovery domain and optional
+/// human-readable name it resolves to.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoCredentialMigrationEntry {
     pub discovery_domain: String,
@@ -465,15 +479,34 @@ pub struct DiscoverableOidcConfig {
     pub discovery_domain: String,
 }
 
-/// Resolved SSO provider state returned by the `discovered_oidc_configs` query.
-/// Any field other than `discovery_domain` is `None` until the two-hop discovery
-/// completes for that domain.
+/// Fully resolved SSO discovery result returned by `discover_sso` /
+/// `discover_sso_query`. Carries everything the frontend needs to build the
+/// authorization request: the canister resolves it from the domain's two-hop
+/// discovery documents.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct OidcConfig {
+pub struct SsoDiscovery {
     pub discovery_domain: String,
-    pub client_id: Option<String>,
-    pub openid_configuration: Option<String>,
-    pub issuer: Option<String>,
+    pub client_id: String,
+    pub issuer: String,
+    pub authorization_endpoint: String,
+    pub scopes: Vec<String>,
+    /// Human-readable SSO label, if the domain published one in its
+    /// `ii-openid-configuration`.
+    pub name: Option<String>,
+}
+
+/// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
+/// fetch isn't a distinct state — it reads as `Pending` and the frontend times
+/// out — so the states are: resolved, in flight, or not allowed.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SsoDiscoveryState {
+    /// Discovery completed; the resolved configuration.
+    Resolved(SsoDiscovery),
+    /// Discovery is in flight (or not yet started) — drive it with
+    /// `discover_sso` and poll again.
+    Pending,
+    /// The domain is not on the canister's `sso_discoverable_domains` allowlist.
+    NotAllowed,
 }
 
 pub enum AuthorizationKey {
@@ -565,6 +598,24 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
+/// Result of `mcp_prepare_account_delegation`. The matching
+/// `mcp_get_account_delegation` must use the *same* account, so we return the
+/// resolved `account_number` for the server to thread back. When preparing, the
+/// MCP server may name an account explicitly (one of the anchor's accounts at
+/// `target_origin`) or leave it unset to use the anchor's default there; either
+/// way `account_number` reports the one actually used. (Accounts are per-origin,
+/// so this is an account at `target_origin` — the app being acted on — not the
+/// account the user picked at the MCP server's own origin when connecting.)
+/// Returning it also keeps `get` from independently re-resolving the *mutable*
+/// default and, if it changed in between, looking under a different account's
+/// seed and returning `NoSuchDelegation`.
+#[derive(CandidType, Deserialize)]
+pub struct McpPrepareDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    pub account_number: Option<AccountNumber>,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountDelegationError {
     Unauthorized(Principal),
@@ -575,6 +626,32 @@ pub enum AccountDelegationError {
 #[derive(CandidType, Debug, Deserialize)]
 pub enum CheckMaxAccountError {
     AccountLimitReached,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareSessionDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum SessionDelegationError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
+    NoSuchDelegation,
+}
+
+/// The identity's synced trusted-MCP-server configuration: a master toggle and
+/// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+/// anchor) so it follows the identity across all of its devices — unlike the
+/// device-local CLI-access toggle. Read by the Settings UI and by the `/mcp`
+/// connect flow, which verifies the connecting origin against it at connect
+/// time. `url` is kept verbatim so Settings can display/re-probe a path-based
+/// endpoint like `https://host/mcp`; trust matching is by origin.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Default)]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub url: Option<String>,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

@@ -175,6 +175,20 @@ Common options:
                             value (e.g. opt vec { record { ... } }, or
                             opt vec {} to clear all providers). Omit to leave
                             the current on-chain value untouched.
+  --be-extra-args-file <path>
+                            Merge extra InternetIdentityInit fields into the
+                            backend install arg, verbatim from a Candid-text
+                            file holding one or more `field = value;` lines
+                            (e.g. mcp_server_origin = opt "https://mcp.id.ai";).
+                            The escape hatch for any BE init field without a
+                            dedicated flag. Fields the script already sets are
+                            rejected; set those via their own path instead:
+                            backend_canister_id (from staging selection),
+                            backend_origin / related_origins (prompts),
+                            openid_configs (--openid-configs-file), and
+                            dnssec_config / doh_config
+                            (--update-email-recovery-init).
+                            Encoding is type-checked against the deployed wasm.
   -h, --help                Show this help
 EOF
 }
@@ -204,6 +218,12 @@ parse_common_args() {
     # to set on this upgrade. Empty = not passed = leave the field at `null`
     # (preserve the previously stored value).
     OPENID_CONFIGS_FILE=""
+    # Path to a Candid-text file holding extra `InternetIdentityInit` record
+    # fields (verbatim) to merge into the backend install arg — the escape
+    # hatch for any BE init field this script has no dedicated flag/prompt for
+    # (e.g. `mcp_server_origin`, `is_production`, `captcha_config`, …). Empty =
+    # not passed = the arg carries only the fields the script manages itself.
+    BE_EXTRA_ARGS_FILE=""
     REMAINING_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -349,6 +369,30 @@ parse_common_args() {
                     return 1
                 fi
                 OPENID_CONFIGS_FILE="$1"
+                shift
+                ;;
+            --be-extra-args-file)
+                shift
+                if [ $# -eq 0 ]; then
+                    echo "Error: --be-extra-args-file requires a path to a Candid-text file" >&2
+                    return 1
+                fi
+                if [ ! -f "$1" ]; then
+                    echo "Error: --be-extra-args-file: no such file: $1" >&2
+                    return 1
+                fi
+                if [ ! -r "$1" ]; then
+                    echo "Error: --be-extra-args-file: file is not readable: $1" >&2
+                    return 1
+                fi
+                # Reject empty / whitespace-only files now so the operator gets
+                # a clear message here rather than an opaque didc parse error at
+                # encode time.
+                if ! grep -q '[^[:space:]]' "$1"; then
+                    echo "Error: --be-extra-args-file: file is empty or contains only whitespace: $1" >&2
+                    return 1
+                fi
+                BE_EXTRA_ARGS_FILE="$1"
                 shift
                 ;;
             --)
@@ -687,8 +731,9 @@ EOF
 # FE_URL), the prompted backend_origin/related_origins, the
 # `--openid-configs-file` contents (when passed), and — when
 # `UPDATE_EMAIL_RECOVERY_INIT` is true — the `dnssec_config`/`doh_config`
-# knobs the email-recovery flow needs. Everything left unset stays untouched
-# on upgrade.
+# knobs the email-recovery flow needs. `--be-extra-args-file` appends any
+# further `InternetIdentityInit` fields verbatim (the escape hatch for fields
+# without a dedicated flag). Everything left unset stays untouched on upgrade.
 #
 # Output: Candid text on stdout.
 build_be_install_arg() {
@@ -728,6 +773,38 @@ EXTRA
         fi
     fi
 
+    # Operator-supplied extra `InternetIdentityInit` fields (--be-extra-args-file),
+    # appended verbatim after the fields the script manages. Re-read here (not at
+    # parse time) so a file that vanished or was emptied since fails loudly. We
+    # reject fields the script already emits: Candid forbids duplicate record
+    # fields, so emitting one here would either be a confusing didc error or, for
+    # the prompted/flagged fields, silently fight the operator's other input.
+    local extra_user=""
+    if [ -n "$BE_EXTRA_ARGS_FILE" ]; then
+        if ! extra_user="$(cat "$BE_EXTRA_ARGS_FILE")" \
+                || [ -z "${extra_user//[[:space:]]/}" ]; then
+            echo "Error: failed to read --be-extra-args-file (or it is now empty): $BE_EXTRA_ARGS_FILE" >&2
+            return 1
+        fi
+        local managed
+        for managed in backend_canister_id backend_origin related_origins \
+                       openid_configs dnssec_config doh_config; do
+            # Match the field name only as a record-field key: at a line start
+            # (ignoring leading whitespace) and followed by `=`. This avoids
+            # false positives on the same word appearing inside a value string.
+            if printf '%s\n' "$extra_user" \
+                    | grep -qE "^[[:space:]]*${managed}[[:space:]]*=" ; then
+                echo "Error: --be-extra-args-file sets '$managed', which this script already sets." >&2
+                echo "       Set it via its own path instead: backend_canister_id comes from the" >&2
+                echo "       staging selection (-sa/-sb/-sc/-sd / --staging); backend_origin and" >&2
+                echo "       related_origins from the prompts; openid_configs from" >&2
+                echo "       --openid-configs-file; dnssec_config / doh_config from" >&2
+                echo "       --update-email-recovery-init." >&2
+                return 1
+            fi
+        done
+    fi
+
     cat <<EOF
 (
   opt record {
@@ -736,6 +813,7 @@ EXTRA
     related_origins = $BE_RELATED_ORIGINS_ARG;
     openid_configs = $openid_configs_arg;
 $extra
+$extra_user
   }
 )
 EOF

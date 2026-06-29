@@ -124,6 +124,11 @@ pub struct PersistentState {
     // falls back to the built-in `is_production`-keyed defaults; `Some(vec)`
     // replaces them entirely.
     pub sso_discoverable_domains: Option<Vec<String>>,
+    // Deploy flag opening the SSO discovery domain gate to any domain. `None`/
+    // `Some(false)` keep `sso_discoverable_domains` (and its defaults) in force;
+    // `Some(true)` accepts every domain. Does not relax the strict-`https`
+    // requirement — see `openid::sso::is_allowed_discovery_domain`.
+    pub sso_allow_any_domain: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -136,6 +141,10 @@ pub struct PersistentState {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
+    /// Deploy flag for the legacy DNSSEC email-recovery path. `None`/`Some(false)`
+    /// => DoH-only; `Some(true)` re-enables it. Read via
+    /// `crate::email_recovery::dnssec_email_recovery_enabled`.
+    pub enable_dnssec_email_recovery: Option<bool>,
     /// DNSSEC verification config (trust anchors). Survives upgrades when an
     /// upgrade arg omits it. Consumed by the email-recovery DKIM/DMARC flow
     /// in later PRs and by any future feature that needs DNSSEC-verified
@@ -164,12 +173,14 @@ impl Default for PersistentState {
             new_flow_origins: None,
             openid_configs: None,
             sso_discoverable_domains: None,
+            sso_allow_any_domain: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
         }

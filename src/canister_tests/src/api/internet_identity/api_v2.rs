@@ -75,7 +75,7 @@ pub fn openid_identity_registration_finish(
         "openid_identity_registration_finish",
         (openid_arg.clone(),),
     )
-    .map(|(x,)| x)
+    .map(|(x,)| super::settled(x))
 }
 
 pub fn identity_authn_info(
@@ -372,6 +372,79 @@ pub fn get_accounts(
     .map(|(x,)| x)
 }
 
+pub fn get_default_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+) -> Result<Result<AccountInfo, GetDefaultAccountError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_default_account",
+        (identity_number, origin),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn set_default_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> Result<Result<AccountInfo, SetDefaultAccountError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "set_default_account",
+        (identity_number, origin, account_number),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_session_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareSessionDelegation, SessionDelegationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_session_delegation",
+        (anchor_number, session_key, max_ttl),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_session_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<Result<SignedDelegation, SessionDelegationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_session_delegation",
+        (anchor_number, session_key, expiration),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn update_account(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -388,6 +461,131 @@ pub fn update_account(
         sender,
         "update_account",
         (identity_number, origin, account_number, update),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_set_access(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    mcp_server_origin: FrontendHostname,
+    enabled: bool,
+) -> Result<Result<(), String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_set_access",
+        (identity_number, mcp_server_origin, enabled),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_access_enabled(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    mcp_server_origin: FrontendHostname,
+) -> Result<bool, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_access_enabled",
+        (identity_number, mcp_server_origin),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_get_accounts(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    target_origin: FrontendHostname,
+) -> Result<Result<Vec<AccountInfo>, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_get_accounts",
+        (target_origin,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_set_config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    config: McpConfig,
+) -> Result<Result<(), String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_set_config",
+        (identity_number, config),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_get_config(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<McpConfig, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_get_config",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_prepare_account_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<Result<McpPrepareDelegation, AccountDelegationError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_prepare_account_delegation",
+        (target_origin, account_number, session_key, max_ttl),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_get_account_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: u64,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "mcp_get_account_delegation",
+        (target_origin, account_number, session_key, expiration),
     )
     .map(|(x,)| x)
 }

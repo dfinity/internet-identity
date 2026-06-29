@@ -50,6 +50,15 @@ pub enum Operation {
     #[serde(rename = "remove_email_recovery")]
     RemoveEmailRecovery,
 
+    // Verified emails — parallel to email-recovery but used as
+    // attribute sources rather than recovery credentials. Same
+    // privacy rationale: anchor + timestamp on the surrounding entry,
+    // no address payload.
+    #[serde(rename = "add_verified_email")]
+    AddVerifiedEmail,
+    #[serde(rename = "remove_verified_email")]
+    RemoveVerifiedEmail,
+
     // Identity name, set for new users in new discoverable passkeys flow
     #[serde(rename = "add_name")]
     AddName,

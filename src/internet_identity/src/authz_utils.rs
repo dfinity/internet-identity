@@ -1,5 +1,6 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::ii_domain::IIDomain;
+use crate::session_delegation::expected_session_principal;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
@@ -10,6 +11,16 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, AuthorizationKey, IdentityNumber,
 };
 use std::fmt::{Display, Formatter};
+
+/// Outcome of [`check_session_authorization`]. The wrapped `Sealed` token has a
+/// private field, so a `CallerCapability` can only be built inside this module —
+/// making this function the only way to obtain scoped authorization.
+pub enum CallerCapability {
+    FullAuth(Sealed),
+    SessionScoped(Sealed),
+}
+
+pub struct Sealed(#[allow(dead_code)] ());
 
 #[derive(Debug)]
 pub enum IdentityUpdateError {
@@ -129,7 +140,7 @@ pub fn check_authorization(
     // stamps a delegation whose user_key is `der(canister_sig_key(seed))`
     // with `seed = H(salt || "email-recovery" || lowercase(address) ||
     // anchor)`. Re-derive the same principal for each bound credential
-    // and compare. See `crate::email_recovery::smtp::calculate_email_recovery_seed`.
+    // and compare. See `crate::email_inbound::smtp::calculate_email_recovery_seed`.
     //
     // If the canister salt hasn't been initialised yet, no recovery
     // delegation could have been stamped (the stamper awaits
@@ -140,7 +151,7 @@ pub fn check_authorization(
     let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
     if salt_initialised {
         for credential in &anchor.email_recovery {
-            let seed = crate::email_recovery::smtp::calculate_email_recovery_seed(
+            let seed = crate::email_inbound::smtp::calculate_email_recovery_seed(
                 &credential.address,
                 anchor_number,
             );
@@ -190,6 +201,24 @@ pub fn is_self_authenticating(principal: Principal) -> bool {
     let self_authenticating_bytes = self_authenticating.as_slice();
 
     principal_bytes.last() == self_authenticating_bytes.last()
+}
+
+/// Like [`check_authorization`], but also accepts the session-scoped
+/// principal derived for `anchor_number` (see [`crate::session_delegation`]).
+/// Endpoints opting into session callers go through this gate instead.
+pub fn check_session_authorization(
+    anchor_number: AnchorNumber,
+) -> Result<CallerCapability, AuthorizationError> {
+    if check_authorization(anchor_number).is_ok() {
+        return Ok(CallerCapability::FullAuth(Sealed(())));
+    }
+
+    let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
+    if salt_initialised && caller() == expected_session_principal(anchor_number) {
+        return Ok(CallerCapability::SessionScoped(Sealed(())));
+    }
+
+    Err(AuthorizationError::from(caller()))
 }
 
 #[cfg(test)]
