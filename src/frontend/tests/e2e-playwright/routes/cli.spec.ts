@@ -83,7 +83,9 @@ const enableCliAccessInSettings = async (
     .getByLabel("I'm using the official ICP CLI and I trust this device.")
     .check();
   await page.getByRole("button", { name: "Enable CLI access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Enabled on this device", { exact: true }),
+  ).toBeVisible();
 };
 
 test("cli.id.ai redirects to id.ai/cli, preserving the fragment", async ({

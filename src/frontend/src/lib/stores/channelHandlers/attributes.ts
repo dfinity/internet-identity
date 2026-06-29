@@ -74,39 +74,43 @@ const isOneClickSsoKey = (key: string, domain: string): boolean =>
   key === `sso:${domain}:name` || key === `sso:${domain}:email`;
 
 /** Resolve a single requested key against available attributes.
- *  An exact match (e.g. `openid:google:email` requested + available) yields
- *  a single scoped option. Otherwise the request is treated as unscoped
- *  (e.g. `email`) and matches every available key that shares the suffix,
- *  producing one option per matching scope. */
+ *  A scoped request (e.g. `openid:google:email`) matches only the exact
+ *  wire row. An unscoped request (e.g. `email`) fans out across every
+ *  source on the anchor: scoped rows from OIDC/SSO whose attribute-name
+ *  suffix matches, plus unscoped wire rows from verified emails (where
+ *  multiple rows can share the same `email` key with different
+ *  addresses). */
 const resolveKey = (
   requestedKey: string,
   available: Array<[string, Uint8Array | number[]]>,
   decoder: TextDecoder,
 ): AvailableAttribute[] => {
-  const exactMatch = available.find(([key]) => key === requestedKey);
-  if (exactMatch !== undefined) {
-    const rawValue = new Uint8Array(exactMatch[1]);
-    return [
-      {
-        key: requestedKey,
-        displayValue: decoder.decode(rawValue),
-        rawValue,
-        omitScope: false,
-      },
-    ];
+  const decodeRow = (
+    [key, value]: [string, Uint8Array | number[]],
+    omitScope: boolean,
+  ): AvailableAttribute => {
+    const rawValue = new Uint8Array(value);
+    return {
+      key,
+      displayValue: decoder.decode(rawValue),
+      rawValue,
+      omitScope,
+    };
+  };
+
+  // Scoped request (e.g. "openid:google:email"): exact match only.
+  const isScopedRequest = requestedKey.includes(":");
+  if (isScopedRequest) {
+    const exact = available.find(([key]) => key === requestedKey);
+    return exact === undefined ? [] : [decodeRow(exact, false)];
   }
 
-  return available
-    .filter(([key]) => key.endsWith(`:${requestedKey}`))
-    .map(([key, value]) => {
-      const rawValue = new Uint8Array(value);
-      return {
-        key,
-        displayValue: decoder.decode(rawValue),
-        rawValue,
-        omitScope: true,
-      };
-    });
+  // Unscoped request (e.g. "email"): fan out across every source.
+  const unscopedRows = available.filter(([key]) => key === requestedKey);
+  const scopedRows = available.filter(([key]) =>
+    key.endsWith(`:${requestedKey}`),
+  );
+  return [...unscopedRows, ...scopedRows].map((row) => decodeRow(row, true));
 };
 
 /**
@@ -275,6 +279,8 @@ type ConsentPipeline = {
   origin: string;
   unmappedOrigin: string;
   groups: AttributeGroup[];
+  recoveryAddresses: string[];
+  verifiedAddresses: string[];
 };
 
 /**
@@ -312,15 +318,27 @@ const resolveConsentPipeline = async (params: {
     // keys. Today it errors on anything it doesn't recognise, which would
     // reject mixed `["email", "favorite_color"]` requests outright — so for
     // now we ask for everything available on the anchor and filter below.
-    const available =
+    const availablePromise: Promise<Array<[string, Uint8Array | number[]]>> =
       requestedKeys.length > 0
-        ? await authenticated.actor
+        ? authenticated.actor
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
             })
             .then(throwCanisterError)
-        : [];
+        : Promise.resolve([]);
+    const [available, identityInfo] = await Promise.all([
+      availablePromise,
+      authenticated.actor
+        .identity_info(authenticated.identityNumber)
+        .then(throwCanisterError),
+    ]);
+    const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
+      (c: { address: string }) => c.address,
+    );
+    const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
+      (e: { address: string }) => e.address,
+    );
 
     return {
       accountNumberPromise,
@@ -328,6 +346,8 @@ const resolveConsentPipeline = async (params: {
       origin,
       unmappedOrigin,
       groups: resolveAttributeGroups(requestedKeys, available),
+      recoveryAddresses,
+      verifiedAddresses,
     };
   } catch (error) {
     console.error(error);
@@ -653,6 +673,9 @@ export const handleIcrc3ConsentAttributes =
           pipelinePromise.then((pipeline) => ({
             groups: pipeline?.groups ?? [],
             effectiveOrigin: pipeline?.origin ?? "",
+            requestedKeys,
+            recoveryAddresses: pipeline?.recoveryAddresses ?? [],
+            verifiedAddresses: pipeline?.verifiedAddresses ?? [],
           })),
         );
 
@@ -671,9 +694,17 @@ export const handleIcrc3ConsentAttributes =
           omit_scope: boolean;
         }>;
 
-        if (pipeline.groups.length === 0) {
-          // Nothing the dapp requested is available — certify an empty set
-          // and auto-resolve consent so the UI skips the empty picker view.
+        // Only unscoped email/verified_email; scoped keys are pinned to
+        // a source that the inline verify wizard can't satisfy.
+        const emailRequested = requestedKeys.some((key) => {
+          if (extractScope(key) !== undefined) return false;
+          const name = extractAttributeName(key);
+          return name === "email" || name === "verified_email";
+        });
+
+        if (pipeline.groups.length === 0 && !emailRequested) {
+          // Nothing to share and no inline "Verify an email" affordance —
+          // certify an empty set so the UI skips the empty picker view.
           attributeSpecs = [];
           attributeConsentStore.setConsent({ attributes: [] });
         } else {

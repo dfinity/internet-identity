@@ -23,6 +23,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 mod configured;
+
+#[cfg(test)]
+pub(crate) use configured::{clear_for_test, setup_for_test};
 mod jwks;
 mod provider;
 mod sso;

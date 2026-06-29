@@ -1,11 +1,11 @@
-import type { EmailRecoveryDiagnostics } from "$lib/generated/internet_identity_types";
+import type { EmailChallengeDiagnostics } from "$lib/generated/internet_identity_types";
 import { VERSION } from "$lib/legacy/environment";
 
 /**
  * Build a compact, copyable, strictly-public diagnostics blob for a
  * failed email-recovery attempt.
  *
- * The canister-sourced fields come from `EmailRecoveryDiagnostics`,
+ * The canister-sourced fields come from `EmailChallengeDiagnostics`,
  * which is curated to be non-sensitive (no email address, anchor,
  * principal, or inner error string — `reason_code` is the failing
  * variant's name only). The only FE-added field is the build id. The
@@ -18,7 +18,7 @@ import { VERSION } from "$lib/legacy/environment";
  * so only the build id is included.
  */
 export const buildDiagnosticsBlob = (
-  diag: EmailRecoveryDiagnostics | undefined,
+  diag: EmailChallengeDiagnostics | undefined,
 ): string => {
   const path =
     diag === undefined

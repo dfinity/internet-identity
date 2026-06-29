@@ -63,7 +63,6 @@ fn default_frontend_args() -> InternetIdentityFrontendArgs {
         dev_csp: None,
         featured_dashboard_apps: None,
         feature_flags: None,
-        mcp_server_origin: None,
     }
 }
 
