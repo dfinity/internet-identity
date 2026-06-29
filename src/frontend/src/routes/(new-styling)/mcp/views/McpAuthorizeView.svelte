@@ -44,13 +44,20 @@
   const HOUR = 60 * MINUTE;
   const DAY = 24 * HOUR;
   const WEEK = 7 * DAY;
-  // Session-duration presets (seconds), spanning the offered range: 10 minutes
-  // (the shortest, also the request's floor) to 1 week (the longest).
-  const PRESETS = [10 * MINUTE, HOUR, 8 * HOUR, DAY, WEEK];
+  // The session durations the picker offers, each with its label, spanning the
+  // allowed range: 10 minutes (the shortest, also the request's floor) to 1 week
+  // (the longest). `$derived` so the labels re-translate when the locale changes.
+  const presets = $derived([
+    { value: 10 * MINUTE, label: $t`10 minutes` },
+    { value: HOUR, label: $t`1 hour` },
+    { value: 8 * HOUR, label: $t`8 hours` },
+    { value: DAY, label: $t`1 day` },
+    { value: WEEK, label: $t`1 week` },
+  ]);
 
-  // Compact label for an arbitrary duration: the request can ask for any number
-  // of seconds within [10 min, 1 week], so the selected value isn't always one
-  // of the presets.
+  // Compact label for an off-preset duration: the request can ask for any number
+  // of seconds within [10 min, 1 week], so the selected value isn't always one of
+  // the presets (e.g. a 2-hour request shows "2h").
   const formatTtl = (seconds: number): string => {
     const parts: string[] = [];
     const d = Math.floor(seconds / DAY);
@@ -64,32 +71,20 @@
     return parts.length > 0 ? parts.join(" ") : "0s";
   };
 
-  const labelFor = (seconds: number): string => {
-    switch (seconds) {
-      case 10 * MINUTE:
-        return $t`10 minutes`;
-      case HOUR:
-        return $t`1 hour`;
-      case 8 * HOUR:
-        return $t`8 hours`;
-      case DAY:
-        return $t`1 day`;
-      case WEEK:
-        return $t`1 week`;
-      default:
-        return formatTtl(seconds);
-    }
-  };
-
   // Honor the exact requested duration (already clamped to the cap); the user can
   // still override it with one of the presets before connecting.
   let selectedTtlSeconds = $state(requestedTtlSeconds);
   const options = $derived(
-    PRESETS.map((seconds) => ({
-      value: seconds,
-      label: labelFor(seconds),
-      selected: seconds === selectedTtlSeconds,
+    presets.map((preset) => ({
+      ...preset,
+      selected: preset.value === selectedTtlSeconds,
     })),
+  );
+  // The trigger shows the selected preset's label, or the compact format when the
+  // selection is an off-preset (honoured) duration.
+  const selectedLabel = $derived(
+    presets.find((preset) => preset.value === selectedTtlSeconds)?.label ??
+      formatTtl(selectedTtlSeconds),
   );
 
   const handleAllowAccess = async (): Promise<void> => {
@@ -148,7 +143,7 @@
           class="btn btn-secondary btn-sm gap-2"
           disabled={isAuthorizing}
         >
-          <span>{labelFor(selectedTtlSeconds)}</span>
+          <span>{selectedLabel}</span>
           <ChevronDownIcon class="size-4" />
         </button>
       </Select>
