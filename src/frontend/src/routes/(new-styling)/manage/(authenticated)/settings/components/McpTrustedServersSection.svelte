@@ -188,9 +188,9 @@
 </script>
 
 <section
-  class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-5"
+  class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-4 sm:p-5"
 >
-  <div class="flex flex-row items-start gap-4">
+  <div class="flex flex-row items-start gap-3 sm:gap-4">
     <span
       class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
       aria-hidden="true"
@@ -198,28 +198,20 @@
       <McpIcon class="size-5" />
     </span>
 
-    <div class="flex flex-1 flex-col gap-2">
-      <div class="flex min-h-[1.5rem] flex-row items-center gap-2">
-        <h3 id={titleId} class="text-text-primary text-base font-semibold">
-          {$t`Trusted MCP server`}
-        </h3>
-        {#if enabled && trusted !== undefined}
-          <Badge color="success" size="sm" dot>
-            {$t`Enabled on all your devices`}
-          </Badge>
-        {/if}
-      </div>
-      <div
-        class="border-fg-warning-primary bg-bg-warning-primary text-fg-warning-primary my-1.5 flex flex-row items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium"
-      >
-        <TriangleAlertIcon class="size-4 shrink-0" />
-        <span>
-          {$t`Internet Identity MCP connectors are in preview. Use this feature at your own risk.`}
-        </span>
-      </div>
+    <div
+      class="flex min-h-[2.5rem] min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1"
+    >
+      <h3 id={titleId} class="text-text-primary text-base font-semibold">
+        {$t`Trusted MCP server`}
+      </h3>
+      {#if enabled && trusted !== undefined}
+        <Badge color="success" size="sm" dot>
+          {$t`Enabled on all your devices`}
+        </Badge>
+      {/if}
     </div>
 
-    <div class="flex h-6 shrink-0 items-center">
+    <div class="flex h-10 shrink-0 items-center">
       {#if loaded}
         <Toggle
           checked={enabled}
@@ -233,6 +225,15 @@
     </div>
   </div>
 
+  <div
+    class="border-fg-warning-primary bg-bg-warning-primary text-fg-warning-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium"
+  >
+    <TriangleAlertIcon class="size-4 shrink-0" />
+    <span>
+      {$t`Internet Identity MCP connectors are in preview. Use this feature at your own risk.`}
+    </span>
+  </div>
+
   {#if enabled}
     <p class="text-text-tertiary text-sm">
       <Trans>
@@ -244,7 +245,7 @@
 
     {#if trusted !== undefined}
       <div
-        class="border-border-secondary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-4 py-2.5"
+        class="border-border-secondary bg-bg-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2.5 sm:gap-3 sm:px-4"
       >
         <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
           <Ellipsis text={trusted} position="middle" />
@@ -304,11 +305,11 @@
         </p>
       {/if}
     {:else}
-      <div class="flex flex-row items-start gap-2">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
         <Input
           bind:value={urlInput}
           onkeydown={handleKeydown}
-          class="flex-1"
+          class="w-full min-w-0 sm:flex-1"
           placeholder="https://mcp.example.com/mcp"
           aria-label={$t`MCP server URL`}
           {error}
@@ -317,20 +318,18 @@
           autocapitalize="off"
           spellcheck={false}
         />
-        <Tooltip label={$t`Trust this server`}>
-          <button
-            class="btn btn-secondary h-11 shrink-0"
-            onclick={handleAdd}
-            disabled={urlInput.trim() === "" || saving}
-          >
-            {#if saving}
-              <ProgressRing class="size-5" />
-            {:else}
-              <PlusIcon class="size-5" />
-            {/if}
-            <span>{$t`Trust this server`}</span>
-          </button>
-        </Tooltip>
+        <button
+          class="btn btn-secondary h-11 w-full sm:w-auto sm:shrink-0"
+          onclick={handleAdd}
+          disabled={urlInput.trim() === "" || saving}
+        >
+          {#if saving}
+            <ProgressRing class="size-5" />
+          {:else}
+            <PlusIcon class="size-5" />
+          {/if}
+          <span>{$t`Trust this server`}</span>
+        </button>
       </div>
     {/if}
   {/if}
