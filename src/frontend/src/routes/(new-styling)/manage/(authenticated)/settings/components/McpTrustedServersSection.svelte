@@ -309,7 +309,7 @@
         <Input
           bind:value={urlInput}
           onkeydown={handleKeydown}
-          class="min-w-0 sm:flex-1"
+          class="w-full min-w-0 sm:flex-1"
           placeholder="https://mcp.example.com/mcp"
           aria-label={$t`MCP server URL`}
           {error}
@@ -319,7 +319,7 @@
           spellcheck={false}
         />
         <button
-          class="btn btn-secondary h-11 shrink-0"
+          class="btn btn-secondary h-11 w-full sm:w-auto sm:shrink-0"
           onclick={handleAdd}
           disabled={urlInput.trim() === "" || saving}
         >
