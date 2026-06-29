@@ -1129,7 +1129,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'mcp_access_enabled' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
+        [UserNumber, FrontendHostname],
         [IDL.Bool],
         ['query'],
       ),
@@ -1138,6 +1138,16 @@ export const idlFactory = ({ IDL }) => {
         [
           IDL.Variant({
             'Ok' : SignedDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'mcp_get_accounts' : IDL.Func(
+        [FrontendHostname],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(AccountInfo),
             'Err' : AccountDelegationError,
           }),
         ],
@@ -1160,7 +1170,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), IDL.Bool],
+        [UserNumber, FrontendHostname, IDL.Bool],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),

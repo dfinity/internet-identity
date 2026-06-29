@@ -3,9 +3,9 @@ import { test } from "../fixtures";
 import { addVirtualAuthenticator, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
- *  delegation acts as the user's chosen account at the MCP-server origin the
- *  request's callback identifies), but kept to exercise that the param is
- *  tolerated. */
+ *  delegation acts as the user's identity at the MCP-server origin the request's
+ *  callback identifies; the app account is chosen server-side per call), but kept
+ *  to exercise that the param is tolerated. */
 const APP = "nice-name.com";
 
 const signUp = async (page: Page): Promise<void> => {
@@ -293,7 +293,9 @@ test("Identity switcher shows while signing in and hides on the success screen",
 
 test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   test.slow();
-  const ttlMinutes = 60;
+  // A non-preset value (2 hours), in seconds, to exercise that an arbitrary
+  // requested TTL is honoured exactly — not snapped to a dropdown preset.
+  const ttlSeconds = 2 * 60 * 60;
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
@@ -302,18 +304,18 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   await mcp.trustServer(page);
 
   const before = Date.now();
-  await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlMinutes }));
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlSeconds }));
   await page.getByRole("button", { name: "Allow access" }).click();
 
   const expMillis = expirationMillis(await mcp.receivedDelegation);
-  const requestedMillis = ttlMinutes * 60 * 1000;
+  const requestedMillis = ttlSeconds * 1000;
   expect(expMillis - before).toBeGreaterThanOrEqual(requestedMillis - 60_000);
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-// The browser /mcp flow issues the standing credential for the user's chosen
-// account at the MCP *server* origin the callback identifies (not a per-request
-// app); per-app delegations are minted server-side by the
-// `mcp_prepare/get_account_delegation` canister methods. Principal-derivation
-// parity for those is canister logic, covered by the integration tests
-// (tests/integration/mcp.rs), not here.
+// The browser /mcp flow issues the standing credential for the user's identity
+// at the MCP *server* origin the callback identifies (not a per-request app, and
+// no account is chosen at connect); per-app delegations are minted server-side by
+// the `mcp_prepare/get_account_delegation` canister methods, with the app account
+// chosen there. Principal-derivation parity for those is canister logic, covered
+// by the integration tests (tests/integration/mcp.rs), not here.
