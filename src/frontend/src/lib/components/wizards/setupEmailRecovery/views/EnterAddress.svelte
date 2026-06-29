@@ -87,9 +87,8 @@
       </div>
       <div class="text-text-warning-primary text-sm">
         <Trans>
-          Recovery is best kept as a private mailbox, separate from the
-          addresses you share with apps — that way, losing access to one doesn't
-          lock you out of the other.
+          Keep your recovery email private and separate from emails you share
+          with apps.
         </Trans>
       </div>
     </div>

@@ -117,13 +117,13 @@
     </div>
     {#if count > 0}
       <button
-        class="btn btn-primary btn-sm shrink-0"
+        class="btn btn-primary btn-sm max-sm:btn-icon shrink-0"
         onclick={() => (showAddWizard = true)}
         disabled={isFull}
         aria-label={$t`Add an email`}
       >
         <PlusIcon class="size-4" aria-hidden="true" />
-        <span>{$t`Add an email`}</span>
+        <span class="max-sm:hidden">{$t`Add an email`}</span>
       </button>
     {/if}
   </div>
@@ -153,13 +153,13 @@
         <li
           class="bg-bg-secondary border-border-secondary relative flex flex-row items-center gap-3 rounded-xl border px-4 py-3"
         >
-          <div class="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
-            <div class="flex flex-row items-center gap-2.5">
-              <span
-                class="text-text-primary min-w-0 truncate text-sm font-semibold"
-              >
-                {entry.address}
-              </span>
+          <div class="flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden">
+            <span
+              class="text-text-primary min-w-0 truncate text-sm font-semibold"
+            >
+              {entry.address}
+            </span>
+            <div class="flex flex-row flex-wrap items-center gap-x-2.5 gap-y-1">
               <span
                 class="border-fg-success-primary bg-bg-success-primary text-text-success-primary inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
               >
@@ -169,18 +169,17 @@
                 ></span>
                 {$t`Verified`}
               </span>
+              <time
+                datetime={verifiedAt.toISOString()}
+                title={$formatDate(verifiedAt, {
+                  timeStyle: "short",
+                  dateStyle: "medium",
+                })}
+                class="text-text-tertiary text-sm"
+              >
+                {$formatRelative(verifiedAt, { style: "long" })}
+              </time>
             </div>
-            <time
-              datetime={verifiedAt.toISOString()}
-              title={$formatDate(verifiedAt, {
-                timeStyle: "short",
-                dateStyle: "medium",
-              })}
-              class="text-text-tertiary text-sm"
-            >
-              {$t`Verified`}
-              {$formatRelative(verifiedAt, { style: "long" })}
-            </time>
           </div>
           <button
             class="btn btn-tertiary btn-sm btn-icon relative z-10 shrink-0"
