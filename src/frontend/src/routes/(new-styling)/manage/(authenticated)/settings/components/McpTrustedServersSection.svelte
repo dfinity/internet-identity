@@ -188,9 +188,9 @@
 </script>
 
 <section
-  class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-5"
+  class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-4 sm:p-5"
 >
-  <div class="flex flex-row items-start gap-4">
+  <div class="flex flex-row items-start gap-3 sm:gap-4">
     <span
       class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
       aria-hidden="true"
@@ -198,8 +198,10 @@
       <McpIcon class="size-5" />
     </span>
 
-    <div class="flex flex-1 flex-col gap-2">
-      <div class="flex min-h-[1.5rem] flex-row items-center gap-2">
+    <div class="flex min-w-0 flex-1 flex-col gap-2">
+      <div
+        class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
+      >
         <h3 id={titleId} class="text-text-primary text-base font-semibold">
           {$t`Trusted MCP server`}
         </h3>
@@ -244,7 +246,7 @@
 
     {#if trusted !== undefined}
       <div
-        class="border-border-secondary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-4 py-2.5"
+        class="border-border-secondary bg-bg-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2.5 sm:gap-3 sm:px-4"
       >
         <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
           <Ellipsis text={trusted} position="middle" />
@@ -304,7 +306,7 @@
         </p>
       {/if}
     {:else}
-      <div class="flex flex-row items-start gap-2">
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
         <Input
           bind:value={urlInput}
           onkeydown={handleKeydown}
@@ -319,7 +321,7 @@
         />
         <Tooltip label={$t`Trust this server`}>
           <button
-            class="btn btn-secondary h-11 shrink-0"
+            class="btn btn-secondary h-11 w-full shrink-0 sm:w-auto"
             onclick={handleAdd}
             disabled={urlInput.trim() === "" || saving}
           >
