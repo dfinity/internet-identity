@@ -1,15 +1,16 @@
 //! Integration tests for the backend `/mcp` delegation path: an MCP server the
-//! user chooses to trust, acting as the principal II derives for an anchor's
-//! chosen account at that server's origin, fetches per-app account delegations
-//! without a per-app browser flow. The anchor is recovered from `caller()` via
-//! the opt-in index.
+//! user authorizes for their identity fetches per-app account delegations
+//! without a per-app browser flow. No account is chosen at connect (the
+//! connector isn't an app); the server is bound to the principal II derives for
+//! the anchor at the server's origin, recovered from `caller()` via the opt-in
+//! index, and picks the app account per call against the target origin.
 
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        create_account, mcp_access_enabled, mcp_get_account_delegation, mcp_get_config,
-        mcp_prepare_account_delegation, mcp_set_access, mcp_set_config, prepare_account_delegation,
-        set_default_account, AccountDelegationParams,
+        create_account, mcp_access_enabled, mcp_get_account_delegation, mcp_get_accounts,
+        mcp_get_config, mcp_prepare_account_delegation, mcp_set_access, mcp_set_config,
+        prepare_account_delegation, set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
@@ -75,7 +76,6 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
         principal_1(),
         anchor,
         MCP_ORIGIN.to_string(),
-        None,
         true,
     )
     .unwrap()
@@ -85,8 +85,7 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        None
+        MCP_ORIGIN.to_string()
     )
     .unwrap());
 
@@ -164,7 +163,6 @@ fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
         principal_1(),
         anchor,
         MCP_ORIGIN.to_string(),
-        None,
         true,
     )
     .unwrap()
@@ -250,7 +248,6 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         principal_1(),
         anchor,
         MCP_ORIGIN.to_string(),
-        None,
         true,
     )
     .unwrap()
@@ -273,7 +270,6 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         principal_1(),
         anchor,
         MCP_ORIGIN.to_string(),
-        None,
         false,
     )
     .unwrap()
@@ -283,8 +279,7 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        None
+        MCP_ORIGIN.to_string()
     )
     .unwrap());
     match mcp_prepare_account_delegation(&env, canister_id, mcp, target, None, session_key, None)
@@ -318,7 +313,6 @@ fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectRe
         principal_1(),
         anchor,
         MCP_ORIGIN.to_string(),
-        None,
         true,
     )
     .unwrap()
@@ -412,7 +406,6 @@ fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> 
         principal_1(),
         anchor,
         MCP_ORIGIN.to_string(),
-        None,
         true,
     )
     .unwrap()
@@ -458,6 +451,73 @@ fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> 
     )
     .unwrap()
     .is_ok());
+
+    Ok(())
+}
+
+/// The agent discovers the anchor's accounts at an app via `mcp_get_accounts`
+/// (authorized as the bound MCP principal) and then prepares a delegation for
+/// one of them — closing the loop with no out-of-band knowledge. An unrelated
+/// principal cannot list.
+#[test]
+fn mcp_lists_accounts_then_prepares_for_one() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+    let target = "https://some-app.com".to_string();
+
+    mcp_set_access(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+    )
+    .unwrap()
+    .unwrap();
+
+    // The user holds a named account at the target app (created via their device).
+    let created = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        target.clone(),
+        "work".to_string(),
+    )
+    .unwrap()
+    .unwrap()
+    .account_number;
+    assert!(created.is_some());
+
+    // The agent lists the anchor's accounts at the app as the bound MCP principal.
+    let accounts = mcp_get_accounts(&env, canister_id, mcp, target.clone())
+        .unwrap()
+        .unwrap();
+    assert!(accounts.iter().any(|a| a.account_number == created));
+
+    // It can then prepare a delegation for a listed account.
+    let prepared = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        created,
+        ByteBuf::from("k"),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(prepared.account_number, created);
+
+    // A principal that isn't bound to the anchor cannot list.
+    match mcp_get_accounts(&env, canister_id, principal_2(), target).unwrap() {
+        Err(AccountDelegationError::Unauthorized(p)) => assert_eq!(p, principal_2()),
+        Ok(_) => panic!("expected Unauthorized, got Ok"),
+        Err(e) => panic!("expected Unauthorized, got {e:?}"),
+    }
 
     Ok(())
 }

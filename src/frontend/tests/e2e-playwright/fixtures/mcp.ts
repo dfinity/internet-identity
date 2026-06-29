@@ -55,7 +55,7 @@ export type McpFixture = {
   /** Builds the `/mcp` authorize URL with the request params in the fragment. */
   buildAuthorizeUrl: (opts: {
     app: string;
-    ttlMinutes?: number;
+    ttlSeconds?: number;
     callbackUrl?: string;
   }) => string;
 };
@@ -158,7 +158,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
 
     const buildAuthorizeUrl = (opts: {
       app: string;
-      ttlMinutes?: number;
+      ttlSeconds?: number;
       callbackUrl?: string;
     }): string => {
       const fragment = new URLSearchParams();
@@ -166,8 +166,8 @@ export const test = base.extend<{ mcp: McpFixture }>({
       fragment.set("callback", opts.callbackUrl ?? callbackUrl);
       fragment.set("state", state);
       fragment.set("app", opts.app);
-      if (opts.ttlMinutes !== undefined) {
-        fragment.set("ttl", String(opts.ttlMinutes));
+      if (opts.ttlSeconds !== undefined) {
+        fragment.set("ttl", String(opts.ttlSeconds));
       }
       return `${II_URL}/mcp#${fragment.toString()}`;
     };
