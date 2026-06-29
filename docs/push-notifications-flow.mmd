@@ -1,0 +1,44 @@
+sequenceDiagram
+    autonumber
+    participant Dapp as dApp Canister
+    participant II as II Canister
+    participant Timer as II Timer
+    participant Push as Push Relay<br/>(Apple/Google/Mozilla)
+    participant SW as II Service Worker<br/>(on device)
+    participant Phone as Phone Screen
+
+    Dapp->>II: notify_user(in_app_principal,<br/>PushAlert{title, body})
+    activate II
+    Note over II: PRINCIPAL_INDEX[p]<br/>→ (anchor, hostname)
+    Note over II: APP_CONSENT[(anchor, host)]<br/>+ caller == allowed_caller
+    Note over II: DEVICE_SUBSCRIPTIONS[anchor]<br/>+ rate-limit decrement
+    Note over II: spool PendingNotification<br/>(notification_id, ttl 5min)
+
+    loop for each device
+        alt cold OR inflight_outcall_at set
+            Note over II: skip wakeup<br/>(notification still spooled)
+        else fresh + idle
+            Note over II: mark inflight_outcall_at = now<br/>enqueue wakeup job
+        end
+    end
+    II-->>Dapp: Ok(())
+    deactivate II
+
+    rect rgba(180, 180, 180, 0.15)
+        Note over Timer,Phone: ── async, only if any device was enqueued ──
+        Timer->>Timer: tick (~1s)
+        Timer->>Push: POST {device.endpoint}<br/>VAPID-signed, empty body
+        Push-->>SW: wake-up signal
+        activate SW
+        Note over SW: read ii-session-delegations<br/>from IndexedDB
+        SW->>II: get_pending_for_anchor()<br/>[update, anchor-authenticated]
+        activate II
+        Note over II: mark spool rows consumed<br/>clear inflight_outcall_at<br/>bump last_seen_at
+        II-->>SW: vec<PendingNotification>
+        deactivate II
+        loop for each notification
+            SW->>Phone: showNotification(hostname,<br/>{ body, tag: notification_id })
+        end
+        deactivate SW
+        Note over Phone: 📱 banner appears<br/>"FooApp: Bob sent you a message"
+    end
