@@ -136,7 +136,7 @@
     >
       <MailIcon class="text-fg-secondary size-7" aria-hidden="true" />
       <p aria-hidden="true" class="text-text-tertiary text-sm">
-        {$t`No emails yet.`}
+        {$t`No emails yet`}
       </p>
       <span
         aria-hidden="true"
