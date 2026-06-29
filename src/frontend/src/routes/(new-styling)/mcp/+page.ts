@@ -5,11 +5,14 @@ import { fromBase64URL } from "$lib/utils/utils";
 const DEFAULT_TTL_SECONDS = 60 * 60;
 /** Shortest TTL honoured: a request asking for less is clamped up to this, so a
  *  too-short value (e.g. a server still sending minutes-as-seconds) can't mint a
- *  uselessly-brief session. */
+ *  uselessly-brief session. Matches the smallest duration the picker offers. In
+ *  practice it shouldn't fire — the server is expected to send a sensible value
+ *  (e.g. `ttl=3600` for 1 hour) — but it bounds a misbehaving caller. */
 const MIN_TTL_SECONDS = 10 * 60;
-/** Largest TTL the request can ask for: the backend caps a delegation at 30 days
- *  (`MAX_EXPIRATION_PERIOD_NS`), so anything larger is clamped to this. */
-const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
+/** Largest TTL the request can ask for, matching the longest duration the picker
+ *  offers (1 week). Well within the backend's 30-day delegation cap
+ *  (`MAX_EXPIRATION_PERIOD_NS`), so the backend never clamps further. */
+const MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
@@ -34,7 +37,7 @@ export type McpParams =
       /** Opaque value echoed back to the MCP server so it can tie the delivered
        *  delegation to the request it started (CSRF protection). */
       state: string;
-      /** Requested delegation lifetime in seconds (clamped to [10 min, 30 days]). */
+      /** Requested delegation lifetime in seconds (clamped to [10 min, 1 week]). */
       ttlSeconds: number;
     }
   | { kind: "invalid" };
@@ -94,10 +97,9 @@ const parseState = (raw: string | null): string | undefined => {
 };
 
 // `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
-// the allowed range — at least 10 minutes, at most 30 days (the backend cap) —
-// so the exact requested duration is honoured within those bounds. An omitted
-// `ttl` uses the default, and a malformed one (non-numeric or <= 0) invalidates
-// the request.
+// the allowed range — at least 10 minutes, at most 1 week — so the exact
+// requested duration is honoured within those bounds. An omitted `ttl` uses the
+// default, and a malformed one (non-numeric or <= 0) invalidates the request.
 const parseTtl = (raw: string | null): number | undefined => {
   if (raw === null) {
     return DEFAULT_TTL_SECONDS;

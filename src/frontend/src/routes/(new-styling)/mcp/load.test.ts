@@ -3,7 +3,7 @@ import { load, type McpParams } from "./+page";
 
 const HOUR = 60 * 60;
 const MIN_TTL = 10 * 60;
-const MAX_TTL = 30 * 24 * 60 * 60;
+const MAX_TTL = 7 * 24 * 60 * 60;
 
 // A complete, valid fragment with an optional `ttl`. `public_key` is any
 // base64url-decodable string; the callback is an accepted https origin.
@@ -53,7 +53,7 @@ describe("/mcp load: ttl parsing", () => {
     }
   });
 
-  it("clamps an above-cap value down to 30 days", () => {
+  it("clamps an above-cap value down to 1 week", () => {
     const params = loadTtl(String(MAX_TTL + 1));
     expect(params.kind).toBe("valid");
     if (params.kind === "valid") {

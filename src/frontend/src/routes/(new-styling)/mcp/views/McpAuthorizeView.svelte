@@ -15,7 +15,7 @@
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
     /** Session duration the request asked for (seconds, already clamped to
-     *  [10 min, 30 days]); the initial selection, which the user can change. */
+     *  [10 min, 1 week]); the initial selection, which the user can change. */
     requestedTtlSeconds: number;
     /** Called once the selected identity is authenticated, with the chosen
      *  session duration (seconds), to connect. */
@@ -44,13 +44,12 @@
   const HOUR = 60 * MINUTE;
   const DAY = 24 * HOUR;
   const WEEK = 7 * DAY;
-  const MONTH = 30 * DAY;
-  // Session-duration presets (seconds). The backend caps a standing delegation
-  // at 30 days, so that's the longest offered.
-  const PRESETS = [HOUR, 8 * HOUR, DAY, WEEK, MONTH];
+  // Session-duration presets (seconds), spanning the offered range: 10 minutes
+  // (the shortest, also the request's floor) to 1 week (the longest).
+  const PRESETS = [10 * MINUTE, HOUR, 8 * HOUR, DAY, WEEK];
 
   // Compact label for an arbitrary duration: the request can ask for any number
-  // of seconds (within the 30-day cap), so the selected value isn't always one
+  // of seconds within [10 min, 1 week], so the selected value isn't always one
   // of the presets.
   const formatTtl = (seconds: number): string => {
     const parts: string[] = [];
@@ -67,6 +66,8 @@
 
   const labelFor = (seconds: number): string => {
     switch (seconds) {
+      case 10 * MINUTE:
+        return $t`10 minutes`;
       case HOUR:
         return $t`1 hour`;
       case 8 * HOUR:
@@ -75,8 +76,6 @@
         return $t`1 day`;
       case WEEK:
         return $t`1 week`;
-      case MONTH:
-        return $t`30 days`;
       default:
         return formatTtl(seconds);
     }

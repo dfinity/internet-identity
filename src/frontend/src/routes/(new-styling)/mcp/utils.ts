@@ -17,7 +17,7 @@ interface McpAuthorizeInput {
    *  always an https origin. Connecting binds the agent to this origin and the
    *  standing delegation acts as the user's identity there. */
   mcpServerOrigin: string;
-  /** Lifetime in seconds (already clamped to [10 min, 30-day backend cap]). */
+  /** Lifetime in seconds (already clamped to [10 min, 1 week]). */
   ttlSeconds: number;
   /** Callback URL (on the MCP server origin) the delegation chain is
    *  form-POSTed to. */
