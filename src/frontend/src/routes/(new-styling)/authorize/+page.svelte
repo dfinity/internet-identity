@@ -41,9 +41,11 @@
     DirectOpenIdEvents,
     directOpenIdFunnel,
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
-  import { createRedirectURL } from "$lib/utils/openID";
+  import {
+    createRedirectURL,
+    extractIdTokenFromCallback,
+  } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
-  import { anonymousActor } from "$lib/globals";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
 
   const { data }: PageProps = $props();
@@ -131,17 +133,14 @@
   };
 
   /**
-   * 1-click SSO equivalent of {@link initiateOpenId}: register the
-   * discovery domain with the canister, run two-hop discovery, then
-   * redirect through the same OpenID-redirect machinery as the direct
-   * flow. Distinct from the wizard `SignInWithSso` path only in that it
-   * has nothing to debounce or validate UI-side — the URL has already
-   * committed to a domain that's on the allowlist (gated in `+page.ts`).
+   * 1-click SSO equivalent of {@link initiateOpenId}: resolve the discovery
+   * domain via the canister, then redirect through the same OpenID-redirect
+   * machinery as the direct flow. Distinct from the wizard `SignInWithSso`
+   * path only in that it has nothing to debounce or validate UI-side — the URL
+   * has already committed to a domain that's on the allowlist (gated in
+   * `+page.ts`).
    */
   const initiateSso = async (domain: string) => {
-    await anonymousActor.add_discoverable_oidc_config({
-      discovery_domain: domain,
-    });
     const result = await discoverSsoConfig(domain);
     // Stash the SSO discovery domain so `resumeOpenId` knows the
     // returning JWT belongs to a 1-click SSO flow rather than a 1-click
@@ -165,22 +164,37 @@
 
   /** Process the OpenID callback and authorize. */
   const resumeOpenId = async () => {
-    const searchParams = new URLSearchParams(window.location.hash.slice(1));
+    // The canister's POST /callback landing page stashes the payload here
+    // before navigating to `/authorize?flow=openid-resume` in the same-tab
+    // flow. Single-use: remove it before anything else can throw.
+    const storedPayload = sessionStorage.getItem("ii-openid-callback-data");
+    sessionStorage.removeItem("ii-openid-callback-data");
     window.history.replaceState(
       undefined,
       "",
       window.location.origin + "/authorize",
     );
-    const redirectState = searchParams.get("state");
-    const jwt = searchParams.get("id_token");
     const openIdAuthorizeState = sessionStorage.getItem(
       "ii-openid-authorize-state",
     );
-    if (
-      openIdAuthorizeState === null ||
-      redirectState !== openIdAuthorizeState ||
-      jwt === null
-    ) {
+    // The callback landing page routes on this marker (present = resume
+    // in-app, absent = deliver to the opener); popups inherit a copy of
+    // sessionStorage in Chrome, so a stale marker would misroute a later
+    // popup sign-in from this tab.
+    sessionStorage.removeItem("ii-openid-authorize-state");
+    if (storedPayload === null || openIdAuthorizeState === null) {
+      return;
+    }
+    let jwt: string;
+    try {
+      jwt = extractIdTokenFromCallback(
+        JSON.parse(storedPayload),
+        openIdAuthorizeState,
+      );
+    } catch {
+      // A state mismatch, an IdP error report or a missing token is not
+      // recoverable here; fall back to the regular flow so the user can
+      // start sign-in again.
       return;
     }
     const authFlow = new AuthFlow({ trackLastUsed: false });
@@ -194,13 +208,11 @@
     sessionStorage.removeItem("ii-sso-1-click-domain");
     let config: OpenIdConfig | undefined;
     if (ssoDomain !== null) {
-      // SSO sign-in: there's no matching `openid_configs` entry to look
-      // up because the provider is registered as a `DiscoverableOidcConfig`
-      // on the canister, not a direct `OpenIdConfig`. Build a synthetic
-      // config from the JWT itself — `continueWithOpenId` only needs
-      // `name` (for analytics) and `client_id` / `issuer` here since
-      // the JWT is already in hand and the canister side picks the
-      // matching `DiscoverableProvider` by `(iss, aud)`.
+      // SSO sign-in: there's no matching `openid_configs` entry, so build a
+      // synthetic config from the JWT itself. `continueWithOpenId` only needs
+      // `name` (for analytics) and `client_id` / `issuer` here since the JWT is
+      // already in hand; `ssoDomain` is passed through so the canister verifies
+      // it against the SSO discovery for that domain.
       config = {
         auth_uri: "",
         jwks_uri: "",
@@ -235,7 +247,12 @@
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
     directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
-    const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+    const authFlowResult = await authFlow.continueWithOpenId(
+      config,
+      jwt,
+      undefined,
+      ssoDomain ?? undefined,
+    );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
       await authFlow.completeOpenIdRegistration(
@@ -412,6 +429,7 @@
 {#snippet continueContent()}
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
+    displayOrigin={$establishedChannelStore.origin}
     onAuthorize={handleAuthorize}
   />
 {/snippet}

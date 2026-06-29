@@ -22,12 +22,12 @@ const signUp = async (page: Page): Promise<void> => {
     name: "Continue with passkey",
   });
   const signUpToggle = page.getByRole("button", {
-    name: "Sign up",
+    name: "Create",
     exact: true,
   });
   // Wait for whichever entry the surface renders: /cli's mode="both" picker
   // exposes "Continue with passkey", while the homepage's mode="signin"
-  // picker exposes the "Sign up" toggle instead. We probe before branching,
+  // picker exposes the "Create" toggle instead. We probe before branching,
   // so the next .isVisible() needs at least one of them committed to the DOM.
   await continueWithPasskey.or(signUpToggle).first().waitFor();
   if (await continueWithPasskey.isVisible()) {
@@ -35,7 +35,7 @@ const signUp = async (page: Page): Promise<void> => {
     await page.getByRole("button", { name: "Create new identity" }).click();
   } else {
     await signUpToggle.click();
-    await page.getByRole("button", { name: "Sign up with passkey" }).click();
+    await page.getByRole("button", { name: "Create with passkey" }).click();
   }
   await page.getByLabel("Identity name").fill("Test User");
   await page.getByRole("button", { name: "Create identity" }).click();
@@ -83,7 +83,9 @@ const enableCliAccessInSettings = async (
     .getByLabel("I'm using the official ICP CLI and I trust this device.")
     .check();
   await page.getByRole("button", { name: "Enable CLI access" }).click();
-  await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Enabled on this device", { exact: true }),
+  ).toBeVisible();
 };
 
 test("cli.id.ai redirects to id.ai/cli, preserving the fragment", async ({

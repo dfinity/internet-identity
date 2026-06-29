@@ -48,14 +48,14 @@
     <p class="text-text-tertiary text-base font-medium">
       <Trans>
         Type the email address you registered as your recovery method. We'll ask
-        you to send a signed email from this inbox to confirm.
+        you to send an email from this inbox to confirm.
       </Trans>
     </p>
   </header>
   <Input
     label={$t`Email address`}
     bind:value={address}
-    placeholder="alice@example.com"
+    placeholder="you@example.com"
     type="email"
     autocomplete="off"
     autocorrect="off"

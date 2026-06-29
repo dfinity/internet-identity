@@ -1,3 +1,4 @@
+use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
@@ -6,11 +7,13 @@ use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
+use crate::storage::storable::verified_email::StorableVerifiedEmail;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::email_recovery::EmailRecoveryCredential;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
+use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -33,6 +36,8 @@ pub struct Anchor {
     /// is a `Vec` so the data model can carry multiple in the future
     /// without another schema bump.
     pub(crate) email_recovery: Vec<EmailRecoveryCredential>,
+    /// Capped by `MAX_VERIFIED_EMAILS_PER_ANCHOR`.
+    pub(crate) verified_emails: Vec<VerifiedEmail>,
     pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
     pub(crate) name: Option<String>,
     pub(crate) created_at: Option<Timestamp>,
@@ -134,24 +139,17 @@ impl From<Device> for DeviceDataWithoutAlias {
 
 impl From<OpenIdCredential> for OpenIdCredentialData {
     fn from(openid_credential: OpenIdCredential) -> Self {
-        // Prefer the SSO fields stamped on the stored credential. Fall back
-        // to the live `DISCOVERY_TASKS` lookup for credentials that haven't
-        // been stamped yet (written before the fields existed and not yet
-        // covered by the `sso_credential_migration` backfill, see
-        // `docs/ongoing/openid-sso-prod-readiness.md` §8.6). The fallback is
-        // removed once the migration has completed.
-        let (sso_domain, sso_name) = match openid_credential.sso_domain {
-            Some(domain) => (Some(domain), openid_credential.sso_name),
-            None => crate::openid::sso_fields_for(&openid_credential.iss, &openid_credential.aud),
-        };
+        // The `sso_credential_migration` backfill has completed, so every SSO
+        // credential carries its own `sso_domain` / `sso_name` stamp; read them
+        // directly (see `docs/ongoing/openid-sso-prod-readiness.md` §8.6).
         Self {
             iss: openid_credential.iss,
             sub: openid_credential.sub,
             aud: openid_credential.aud,
             last_usage_timestamp: openid_credential.last_usage_timestamp,
             metadata: openid_credential.metadata,
-            sso_domain,
-            sso_name,
+            sso_domain: openid_credential.sso_domain,
+            sso_name: openid_credential.sso_name,
         }
     }
 }
@@ -176,6 +174,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             devices,
             openid_credentials,
             email_recovery,
+            verified_emails,
             metadata,
             name,
             created_at,
@@ -187,6 +186,12 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             email_recovery
                 .into_iter()
                 .map(StorableEmailRecoveryCredential::from)
+                .collect(),
+        );
+        let verified_emails = Some(
+            verified_emails
+                .into_iter()
+                .map(StorableVerifiedEmail::from)
                 .collect(),
         );
 
@@ -427,6 +432,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 passkey_credentials,
                 recovery_keys,
                 email_recovery,
+                verified_emails,
             },
         )
     }
@@ -441,6 +447,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             passkey_credentials,
             recovery_keys,
             email_recovery,
+            verified_emails,
         } = storable_anchor;
 
         let name = name.clone();
@@ -453,6 +460,11 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             .unwrap_or_default()
             .into_iter()
             .map(EmailRecoveryCredential::from)
+            .collect();
+        let verified_emails = verified_emails
+            .unwrap_or_default()
+            .into_iter()
+            .map(VerifiedEmail::from)
             .collect();
 
         let mut devices = passkey_credentials
@@ -547,6 +559,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             created_at,
             openid_credentials,
             email_recovery,
+            verified_emails,
             devices,
             metadata,
         }
@@ -572,6 +585,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 name: None,
                 openid_credentials: vec![],
                 email_recovery: vec![],
+                verified_emails: vec![],
                 anchor_number,
                 devices,
                 metadata,
@@ -592,12 +606,19 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
             .into_iter()
             .map(EmailRecoveryCredential::from)
             .collect();
+        let verified_emails = storable_anchor
+            .verified_emails
+            .unwrap_or_default()
+            .into_iter()
+            .map(VerifiedEmail::from)
+            .collect();
 
         Anchor {
             anchor_number,
             devices,
             openid_credentials,
             email_recovery,
+            verified_emails,
             metadata,
             name,
             created_at,
@@ -615,6 +636,7 @@ impl Anchor {
             devices: vec![],
             openid_credentials: vec![],
             email_recovery: vec![],
+            verified_emails: vec![],
             metadata: None,
             name: None,
         }
@@ -850,6 +872,31 @@ impl Anchor {
         let index = self.openid_credential_index(key)?;
         self.openid_credentials.remove(index);
         Ok(())
+    }
+
+    /// Returns `true` when appended, `false` if already present or cap
+    /// reached. Never errors — the surrounding OIDC link must not fail
+    /// just because the verified-emails bucket is full.
+    pub fn mirror_verified_email_from_oidc(
+        &mut self,
+        address: &str,
+        verified_at_ns: Timestamp,
+    ) -> bool {
+        if self
+            .verified_emails
+            .iter()
+            .any(|e| e.address.eq_ignore_ascii_case(address))
+        {
+            return false;
+        }
+        if self.verified_emails.len() >= usize::from(MAX_VERIFIED_EMAILS_PER_ANCHOR) {
+            return false;
+        }
+        self.verified_emails.push(VerifiedEmail {
+            address: address.to_ascii_lowercase(),
+            verified_at: verified_at_ns,
+        });
+        true
     }
 
     pub fn update_openid_credential(

@@ -17,7 +17,8 @@
 
   interface Props {
     linkOpenIdAccount: (config: OpenIdConfig) => Promise<"cancelled" | void>;
-    continueWithPasskey: () => void;
+    createPasskey: () => Promise<"cancelled" | void>;
+    continueOnAnotherDevice: () => void;
     signInWithSso: () => void;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
@@ -25,7 +26,8 @@
 
   const {
     linkOpenIdAccount,
-    continueWithPasskey,
+    createPasskey,
+    continueOnAnotherDevice,
     signInWithSso,
     openIdCredentials = [],
     maxPasskeysReached,
@@ -33,6 +35,8 @@
 
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();
+  let isCreatingPasskey = $state(false);
+  let isPasskeyCancelled = $state(false);
 
   const isPasskeySupported = window.PublicKeyCredential !== undefined;
 
@@ -45,6 +49,18 @@
       cancelledProviderId = config.client_id;
       await waitFor(4000);
       cancelledProviderId = undefined;
+    }
+  };
+
+  const handleCreatePasskey = async () => {
+    isCreatingPasskey = true;
+    const result = await createPasskey();
+    isCreatingPasskey = false;
+
+    if (result === "cancelled") {
+      isPasskeyCancelled = true;
+      await waitFor(4000);
+      isPasskeyCancelled = false;
     }
   };
 
@@ -82,18 +98,27 @@
   {/if}
   <div class="flex flex-col items-stretch gap-3">
     <Tooltip
-      label={$t`You have reached the maximum number of passkeys`}
-      hidden={maxPasskeysReached !== true}
+      label={isPasskeyCancelled
+        ? $t`Interaction canceled. Please try again.`
+        : $t`You have reached the maximum number of passkeys`}
+      hidden={!isPasskeyCancelled && maxPasskeysReached !== true}
+      manual={isPasskeyCancelled}
     >
       <button
         class="btn btn-primary btn-xl h-14"
-        onclick={continueWithPasskey}
+        onclick={handleCreatePasskey}
         disabled={!isPasskeySupported ||
           authenticatingProviderId !== undefined ||
+          isCreatingPasskey ||
           maxPasskeysReached}
       >
-        <PasskeyIcon />
-        <span>{$t`Continue with passkey`}</span>
+        {#if isCreatingPasskey}
+          <ProgressRing />
+          <span>{$t`Creating passkey...`}</span>
+        {:else}
+          <PasskeyIcon />
+          <span>{$t`Continue with passkey`}</span>
+        {/if}
       </button>
     </Tooltip>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
@@ -132,8 +157,8 @@
       {/each}
       <!--
         SSO entry is always rendered alongside the named providers. The SSO
-        screen calls `add_discoverable_oidc_config` on submit; domains not on
-        the backend canary allowlist are rejected there.
+        screen resolves the domain via the canister; domains not on the backend
+        canary allowlist are rejected there.
       -->
       <button
         class="btn btn-secondary h-16 w-full flex-col gap-1.5 text-xs whitespace-normal"
@@ -145,6 +170,18 @@
         <span>{$t`SSO`}</span>
       </button>
     </div>
+  </div>
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-tertiary text-sm">
+      {$t`Add this identity to another device`}
+    </p>
+    <button
+      onclick={continueOnAnotherDevice}
+      disabled={authenticatingProviderId !== undefined || isCreatingPasskey}
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`URL | QR Code`}
+    </button>
   </div>
 </div>
 

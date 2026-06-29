@@ -209,12 +209,8 @@ class AddDialog {
     await this.#dialog
       .getByRole("button", { name: "Continue with passkey" })
       .click();
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: /Add a passkey|Add another passkey/,
-      }),
-    ).toBeVisible();
-    await this.#dialog.getByRole("button", { name: "Create passkey" }).click();
+    // The chooser triggers WebAuthn `create()` directly — no intermediate
+    // confirmation view. The virtual authenticator fulfils the prompt.
   }
 
   async assertPasskeyUnavailable(): Promise<void> {

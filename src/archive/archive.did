@@ -63,6 +63,11 @@ type Operation = variant {
     // without leaking the address itself.
     add_email_recovery;
     remove_email_recovery;
+    // Verified emails — parallel to email-recovery, same privacy
+    // rationale: no address payload, only the anchor + timestamp from
+    // the surrounding entry.
+    add_verified_email;
+    remove_verified_email;
     add_name;
     update_name;
     remove_name;

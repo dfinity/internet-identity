@@ -63,7 +63,6 @@ fn default_frontend_args() -> InternetIdentityFrontendArgs {
         dev_csp: None,
         featured_dashboard_apps: None,
         feature_flags: None,
-        mcp_server_origin: None,
     }
 }
 
@@ -363,4 +362,190 @@ fn verify_response_certification(
         min_certification_version as u8,
     )
     .unwrap_or_else(|e| panic!("validation failed: {e}"))
+}
+
+/// The HTTP gateway can only deliver certified responses for the IdP's
+/// form_post callback if the query handler upgrades the POST to update mode.
+#[test]
+fn frontend_canister_upgrades_callback_post_to_update() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id =
+        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
+
+    let request = HttpRequest {
+        method: "POST".to_string(),
+        url: "/callback".to_string(),
+        headers: vec![(
+            "Content-Type".to_string(),
+            "application/x-www-form-urlencoded".to_string(),
+        )],
+        body: ByteBuf::from(b"id_token=abc.def.ghi&state=c3RhdGU".to_vec()),
+        certificate_version: None,
+    };
+    let response = http_request(&env, canister_id, &request)?;
+
+    assert_eq!(response.upgrade, Some(true));
+    Ok(())
+}
+
+/// POSTs to anything but /callback don't trigger an upgrade (which would
+/// cost an update call) and are rejected right away.
+#[test]
+fn frontend_canister_rejects_post_to_other_paths() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id =
+        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
+
+    let request = HttpRequest {
+        method: "POST".to_string(),
+        url: "/authorize".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: None,
+    };
+    let response = http_request(&env, canister_id, &request)?;
+
+    assert_eq!(response.status_code, 405);
+    assert_ne!(response.upgrade, Some(true));
+    Ok(())
+}
+
+/// A valid form_post body is translated into the landing page that delivers
+/// the payload to the frontend, with the inline script hash-pinned in the
+/// response CSP.
+#[test]
+fn frontend_canister_translates_form_post_callback() -> Result<(), RejectResponse> {
+    const ID_TOKEN: &str = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJ0ZXN0In0.c2lnbmF0dXJl";
+    const STATE: &str = "Y2FsbGJhY2stc3RhdGU";
+    let env = env();
+    let canister_id =
+        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
+
+    let request = HttpRequest {
+        method: "POST".to_string(),
+        url: "/callback".to_string(),
+        headers: vec![(
+            "Content-Type".to_string(),
+            "application/x-www-form-urlencoded".to_string(),
+        )],
+        // `code` accompanies our `response_type=code id_token` request and is
+        // ignored by the handler.
+        body: ByteBuf::from(format!("code=4%2Fabc&id_token={ID_TOKEN}&state={STATE}").into_bytes()),
+        certificate_version: None,
+    };
+    let response = canister_tests::api::http_request_update(&env, canister_id, &request)?;
+
+    assert_eq!(response.status_code, 200);
+    verify_frontend_security_headers(&response.headers);
+    let body = std::str::from_utf8(&response.body).expect("Body is not valid UTF-8");
+    assert!(body.contains(&format!("\"id_token\":\"{ID_TOKEN}\"")));
+    assert!(body.contains(&format!("\"state\":\"{STATE}\"")));
+    assert!(body.contains("BroadcastChannel(\"redirect_callback\")"));
+    assert!(body.contains("sessionStorage.setItem(\"ii-openid-callback-data\""));
+
+    // The inline script must be pinned in the CSP with no permissive fallback
+    // so nothing else can run. The SPA-wide CSP is replaced, not appended, so
+    // there is exactly one CSP header.
+    let csps: Vec<&String> = response
+        .headers
+        .iter()
+        .filter(|(name, _)| name.to_lowercase() == "content-security-policy")
+        .map(|(_, value)| value)
+        .collect();
+    assert_eq!(csps.len(), 1, "expected exactly one CSP header");
+    let csp = csps[0];
+    assert!(csp.contains("script-src 'sha384-"));
+    assert!(!csp.contains("unsafe-inline"));
+    assert!(!csp.contains("unsafe-eval"));
+
+    let cache_control = response
+        .headers
+        .iter()
+        .find(|(name, _)| name.to_lowercase() == "cache-control")
+        .map(|(_, value)| value.clone());
+    assert_eq!(cache_control.as_deref(), Some("no-store"));
+    Ok(())
+}
+
+/// RFC 6749 error reports from the IdP travel through the same landing page
+/// so the frontend can surface them as `OAuthProviderError`.
+#[test]
+fn frontend_canister_translates_form_post_provider_error() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id =
+        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
+
+    let request = HttpRequest {
+        method: "POST".to_string(),
+        url: "/callback".to_string(),
+        headers: vec![],
+        body: ByteBuf::from(
+            b"error=access_denied&error_description=User+cancelled&state=c3RhdGU".to_vec(),
+        ),
+        certificate_version: None,
+    };
+    let response = canister_tests::api::http_request_update(&env, canister_id, &request)?;
+
+    assert_eq!(response.status_code, 200);
+    let body = std::str::from_utf8(&response.body).expect("Body is not valid UTF-8");
+    assert!(body.contains("\"error\":\"access_denied\""));
+    assert!(body.contains("\"error_description\":\"User cancelled\""));
+    Ok(())
+}
+
+/// Bodies that aren't a translatable callback redirect to the in-SPA error
+/// page rather than embedding any payload.
+#[test]
+fn frontend_canister_redirects_malformed_form_post() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id =
+        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
+
+    for body in [
+        &b"id_token=abc.def.ghi"[..],                  // missing state
+        &b"state=c3RhdGU"[..],                         // missing id_token and error
+        &b"id_token=<script>&state=c3RhdGU"[..],       // invalid token charset
+        &b"id_token=abc.def.ghi&state=bad state!"[..], // invalid state charset
+    ] {
+        let request = HttpRequest {
+            method: "POST".to_string(),
+            url: "/callback".to_string(),
+            headers: vec![],
+            body: ByteBuf::from(body.to_vec()),
+            certificate_version: None,
+        };
+        let response = canister_tests::api::http_request_update(&env, canister_id, &request)?;
+
+        assert_eq!(response.status_code, 303);
+        let location = response
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("location"))
+            .map(|(_, value)| value.as_str())
+            .expect("redirect must carry a Location header");
+        assert!(location.starts_with("/callback-error?reason="));
+        assert!(response.body.is_empty());
+    }
+    Ok(())
+}
+
+/// `http_request_update` only exists for the callback translation; anything
+/// else is rejected.
+#[test]
+fn frontend_canister_rejects_other_update_requests() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id =
+        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: None,
+    };
+    let response = canister_tests::api::http_request_update(&env, canister_id, &request)?;
+
+    assert_eq!(response.status_code, 405);
+    Ok(())
 }

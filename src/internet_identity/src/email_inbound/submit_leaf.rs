@@ -2,10 +2,10 @@
 //! methods that each accept the leaf and stamp the verdict on the
 //! pending challenge the FE polls (neither returns the verdict):
 //!
-//! - `email_recovery_submit_dkim_leaf(arg)` — the FE walked a
+//! - `email_challenge_submit_dkim_leaf(arg)` — the FE walked a
 //!   fully-signed DNSSEC resolution and submits the
 //!   `(hops, extra_chains)` bundle ([`submit_dkim_leaf`]).
-//! - `email_recovery_resolve_via_doh(nonce)` — the canister resolves
+//! - `email_challenge_resolve_via_doh(nonce)` — the canister resolves
 //!   the DKIM key over its own DoH path. Used for the pure-DoH (Gmail)
 //!   case and as the fallback when the FE can't walk DNSSEC because the
 //!   DKIM record CNAMEs into an unsigned zone ([`resolve_via_doh`]). The
@@ -48,12 +48,11 @@
 //!
 //! See design doc §8.4 / §8.5.
 
-use super::pending::{PendingKind, PendingStatus};
+use super::pending::{self, PendingKind, PendingStatus};
 use crate::doh::{DohError, DohRecord};
-use crate::email_recovery::pending;
 use crate::single_flight_cache::Cached;
-use internet_identity_interface::internet_identity::types::email_recovery::{
-    EmailRecoveryError, EmailRecoverySubmitDkimLeafArg,
+use internet_identity_interface::internet_identity::types::email_challenge::{
+    EmailChallengeError, EmailChallengeSubmitDkimLeafArg,
 };
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, DelegationChain, SessionKey, SignedRRset,
@@ -63,14 +62,14 @@ use internet_identity_interface::internet_identity::types::{
 /// "no policy published" strict-alignment fallback).
 type DkimAndDmarc = (Vec<u8>, Option<Vec<u8>>);
 
-/// Body of `email_recovery_submit_dkim_leaf(arg)` — the DNSSEC path.
+/// Body of `email_challenge_submit_dkim_leaf(arg)` — the DNSSEC path.
 /// The FE walked a fully-signed DNSSEC resolution for the leaf and
 /// submits the `(hops, extra_chains)` bundle here. **Accept-only:**
 /// returns `Ok(())` once the leaf is processed and the verdict written
 /// to the pending status, or `Err` for a call-level rejection (unknown
 /// nonce / not in `NeedDkimLeaf`). The verification verdict
 /// (`RegistrationSucceeded` / `RecoveryReady` / `Failed`) is read by
-/// polling `email_recovery_status(nonce)` — the single source of truth,
+/// polling `email_challenge_status(nonce)` — the single source of truth,
 /// shared with the asynchronous DoH paths.
 ///
 /// When the leaf's DKIM record CNAMEs into an *unsigned* zone the FE
@@ -78,10 +77,10 @@ type DkimAndDmarc = (Vec<u8>, Option<Vec<u8>>);
 /// `outbound.protection.outlook.com` / `live.com` case); it then calls
 /// the sibling `resolve_via_doh` instead of this method.
 pub async fn submit_dkim_leaf(
-    arg: EmailRecoverySubmitDkimLeafArg,
+    arg: EmailChallengeSubmitDkimLeafArg,
     now_secs: u64,
-) -> Result<(), EmailRecoveryError> {
-    let EmailRecoverySubmitDkimLeafArg {
+) -> Result<(), EmailChallengeError> {
+    let EmailChallengeSubmitDkimLeafArg {
         nonce,
         hops,
         extra_chains,
@@ -94,14 +93,14 @@ pub async fn submit_dkim_leaf(
     // returned to the FE; the verification verdict goes on the polled
     // status instead (single source of truth).
     let snapshot = pending::with_mut(&nonce, now_secs, |c| Snapshot::take(c))
-        .ok_or(EmailRecoveryError::NonceUnknown)??;
+        .ok_or(EmailChallengeError::NonceUnknown)??;
 
     let verification = run_submit(&hops, &extra_chains, &snapshot, now_secs);
     finalize(&nonce, &snapshot.material, verification, now_secs).await;
     Ok(())
 }
 
-/// Body of `email_recovery_resolve_via_doh(nonce)` — the DoH path. Used
+/// Body of `email_challenge_resolve_via_doh(nonce)` — the DoH path. Used
 /// for the pure-DoH (Gmail) case and as the fallback when the FE could not
 /// walk a fully-signed DNSSEC resolution because the DKIM record CNAMEs
 /// into an unsigned zone (`outlook.com` -> `outbound.protection.outlook.com`,
@@ -120,11 +119,11 @@ pub async fn submit_dkim_leaf(
 ///
 /// A domain the operator hasn't enabled lands as
 /// `Failed(DomainNotAllowlisted)`. Returns `Ok(())` and the verdict is read
-/// by polling `email_recovery_status`; `Err` is a call-level rejection
+/// by polling `email_challenge_status`; `Err` is a call-level rejection
 /// (unknown nonce).
-pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailRecoveryError> {
+pub fn resolve_via_doh(nonce: String, now_secs: u64) -> Result<(), EmailChallengeError> {
     let Some(mat) = pending::with_mut(&nonce, now_secs, |c| VerifyMaterial::take_for_doh(c))
-        .ok_or(EmailRecoveryError::NonceUnknown)??
+        .ok_or(EmailChallengeError::NonceUnknown)??
     else {
         // Nothing to do — the entry is already terminal (a concurrent poll
         // finished it) or carries no partial. The FE reads the verdict from
@@ -205,7 +204,7 @@ fn resolve_dkim_and_dmarc(
 async fn finalize(
     nonce: &str,
     mat: &VerifyMaterial,
-    verification: Result<(), EmailRecoveryError>,
+    verification: Result<(), EmailChallengeError>,
     now_secs: u64,
 ) {
     if let Err(e) = verification {
@@ -219,6 +218,20 @@ async fn finalize(
     match &mat.kind {
         SnapshotKind::Register { anchor } => {
             let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+            pending::with_mut(nonce, now_secs, |c| {
+                c.partial_verification = None;
+                c.status = match result {
+                    Ok(()) => PendingStatus::Succeeded,
+                    Err(e) => PendingStatus::Failed(e),
+                };
+            });
+        }
+        SnapshotKind::VerifyEmail { anchor } => {
+            let result = super::smtp::append_or_refresh_verified_email(
+                *anchor,
+                &mat.claimed_address,
+                now_secs,
+            );
             pending::with_mut(nonce, now_secs, |c| {
                 c.partial_verification = None;
                 c.status = match result {
@@ -289,8 +302,18 @@ struct Snapshot {
 
 #[derive(Clone, Debug)]
 enum SnapshotKind {
-    Register { anchor: AnchorNumber },
-    Recovery { session_pk: SessionKey },
+    Register {
+        anchor: AnchorNumber,
+    },
+    Recovery {
+        session_pk: SessionKey,
+    },
+    /// Verified-email flow — on success the verified `From:` is
+    /// appended to `Anchor.verified_emails` instead of being bound
+    /// as a recovery credential.
+    VerifyEmail {
+        anchor: AnchorNumber,
+    },
 }
 
 impl VerifyMaterial {
@@ -300,6 +323,7 @@ impl VerifyMaterial {
             PendingKind::Recover { session_pk } => SnapshotKind::Recovery {
                 session_pk: session_pk.clone(),
             },
+            PendingKind::VerifyEmail { anchor } => SnapshotKind::VerifyEmail { anchor: *anchor },
         }
     }
 
@@ -313,7 +337,7 @@ impl VerifyMaterial {
     /// - `Err(_)` — call-level rejection.
     fn take_for_doh(
         c: &super::pending::PendingChallenge,
-    ) -> Result<Option<VerifyMaterial>, EmailRecoveryError> {
+    ) -> Result<Option<VerifyMaterial>, EmailChallengeError> {
         match &c.status {
             PendingStatus::NeedDkimLeaf { .. } | PendingStatus::ResolvingDoh => {}
             // Email hasn't arrived yet, or it's already terminal.
@@ -341,24 +365,24 @@ impl Snapshot {
     /// Read the pending challenge under the brief borrow held by
     /// `pending::with_mut`; reject anything that's not "ready for a
     /// DKIM leaf". The closure returns
-    /// `Result<Snapshot, EmailRecoveryError>` so the caller surfaces
+    /// `Result<Snapshot, EmailChallengeError>` so the caller surfaces
     /// "wrong state" as a typed error instead of a silent no-op.
-    fn take(c: &super::pending::PendingChallenge) -> Result<Snapshot, EmailRecoveryError> {
+    fn take(c: &super::pending::PendingChallenge) -> Result<Snapshot, EmailChallengeError> {
         // Must be in the NeedDkimLeaf state — anything else means
         // either the email hasn't arrived yet, the entry is on the
         // DoH path, or it's already terminal.
         if !matches!(c.status, PendingStatus::NeedDkimLeaf { .. }) {
-            return Err(EmailRecoveryError::NoDkimLeafExpected);
+            return Err(EmailChallengeError::NoDkimLeafExpected);
         }
         let cached_root_dnskey = c
             .cached_root_dnskey
             .as_ref()
-            .ok_or(EmailRecoveryError::NoDkimLeafExpected)?
+            .ok_or(EmailChallengeError::NoDkimLeafExpected)?
             .clone();
         let partial = c
             .partial_verification
             .as_ref()
-            .ok_or(EmailRecoveryError::NoDkimLeafExpected)?;
+            .ok_or(EmailChallengeError::NoDkimLeafExpected)?;
         Ok(Snapshot {
             material: VerifyMaterial {
                 kind: VerifyMaterial::kind_from(c),
@@ -386,7 +410,7 @@ fn run_submit(
     extra_chains: &[DelegationChain],
     snapshot: &Snapshot,
     now_secs: u64,
-) -> Result<(), EmailRecoveryError> {
+) -> Result<(), EmailChallengeError> {
     // A genuine DNSSEC submission always carries at least the final
     // TXT hop. An empty `hops` set is malformed input on this path —
     // the FE that can't walk DNSSEC must call
@@ -395,7 +419,7 @@ fn run_submit(
     // (distinct from a non-empty chain that failed to validate, which
     // is `DkimLeafMismatch`), rather than relying on the hop walk below.
     if hops.is_empty() {
-        return Err(EmailRecoveryError::EmptyDkimLeafHops);
+        return Err(EmailChallengeError::EmptyDkimLeafHops);
     }
 
     // Step 1: re-validate the cached root DNSKEY against the trust
@@ -414,7 +438,7 @@ fn run_submit(
         &trust_anchors,
         now_secs,
     )
-    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+    .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
 
     // Step 2: extend the cached zone-keys map with any *new*
     // delegation chains the FE supplied. Empty for the Gmail-style
@@ -429,7 +453,7 @@ fn run_submit(
         &mut zones,
         now_secs,
     )
-    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+    .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
 
     // Step 3: walk the hops as a CNAME → … → TXT resolution
     // anchored at the canister-pinned `<selector>._domainkey.<d>.`
@@ -443,7 +467,7 @@ fn run_submit(
         snapshot.material.selector, snapshot.material.registered_domain
     );
     let expected_wire = crate::dnssec::wire::encode_dns_name_lowercase(&expected_fqdn)
-        .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+        .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
     let verified = crate::dnssec::verify_hops_with_clock(
         &hops_internal,
         &zones,
@@ -451,7 +475,7 @@ fn run_submit(
         crate::dnssec::TYPE_TXT,
         now_secs,
     )
-    .map_err(|_| EmailRecoveryError::DkimLeafMismatch)?;
+    .map_err(|_| EmailChallengeError::DkimLeafMismatch)?;
 
     let leaf_name = crate::dnssec::wire::decode_dns_name_lowercase(&verified.name.0);
 
@@ -460,7 +484,7 @@ fn run_submit(
     // DNSSEC path feeds the TXT it just authenticated through the hop
     // walk and the DMARC record cached at prepare time.
     let txt = crate::dnssec::wire::parse_txt_rdata(&verified.rdata).map_err(|_| {
-        EmailRecoveryError::EmailVerificationFailed("DNSSEC TXT RDATA truncated".into())
+        EmailChallengeError::EmailVerificationFailed("DNSSEC TXT RDATA truncated".into())
     })?;
     verify_dkim_key_against_partial(
         &txt,
@@ -483,7 +507,7 @@ fn run_submit(
 fn finalize_via_doh(
     nonce: String,
     mat: VerifyMaterial,
-    verification: Result<(), EmailRecoveryError>,
+    verification: Result<(), EmailChallengeError>,
     now_secs: u64,
 ) {
     match verification {
@@ -496,6 +520,20 @@ fn finalize_via_doh(
         Ok(()) => match &mat.kind {
             SnapshotKind::Register { anchor } => {
                 let result = super::smtp::bind_credential(*anchor, &mat.claimed_address, now_secs);
+                pending::with_mut(&nonce, now_secs, |c| {
+                    c.partial_verification = None;
+                    c.status = match result {
+                        Ok(()) => PendingStatus::Succeeded,
+                        Err(e) => PendingStatus::Failed(e),
+                    };
+                });
+            }
+            SnapshotKind::VerifyEmail { anchor } => {
+                let result = super::smtp::append_or_refresh_verified_email(
+                    *anchor,
+                    &mat.claimed_address,
+                    now_secs,
+                );
                 pending::with_mut(&nonce, now_secs, |c| {
                     c.partial_verification = None;
                     c.status = match result {
@@ -546,19 +584,19 @@ fn verify_dkim_key_against_partial(
     dmarc_txt: Option<&[u8]>,
     mat: &VerifyMaterial,
     context: &str,
-) -> Result<(), EmailRecoveryError> {
+) -> Result<(), EmailChallengeError> {
     // Step 4: parse the DKIM TXT, get the public key + key type.
     if dkim_txt.len() > super::MAX_DKIM_TXT_BYTES {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+        return Err(EmailChallengeError::EmailVerificationFailed(format!(
             "DKIM TXT record at {context:?} is {} bytes; refusing to admit",
             dkim_txt.len()
         )));
     }
     let txt_str = std::str::from_utf8(dkim_txt).map_err(|_| {
-        EmailRecoveryError::EmailVerificationFailed("DKIM TXT is not valid UTF-8".into())
+        EmailChallengeError::EmailVerificationFailed("DKIM TXT is not valid UTF-8".into())
     })?;
     let dns_record = crate::dkim::parse_dkim_txt(txt_str).map_err(|e| {
-        EmailRecoveryError::EmailVerificationFailed(format!("DKIM DNS record: {e}"))
+        EmailChallengeError::EmailVerificationFailed(format!("DKIM DNS record: {e}"))
     })?;
 
     // DNS-record-dependent DKIM tag contract (design §5.4). Routes
@@ -566,13 +604,13 @@ fn verify_dkim_key_against_partial(
     // `t=y` and AUID-alignment policies stay in lock-step across
     // pipelines. The trail the umbrella builds is the DoH-side
     // diagnostic; we discard it here because this path collapses
-    // every failure into a single `EmailRecoveryError`.
+    // every failure into a single `EmailChallengeError`.
     if let Err((reason, _trail)) = crate::dkim::enforce_dns_record_tag_contract(
         &mat.signing_auid,
         &mat.signing_domain,
         &dns_record,
     ) {
-        return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+        return Err(EmailChallengeError::EmailVerificationFailed(format!(
             "{reason:?}"
         )));
     }
@@ -598,27 +636,27 @@ fn verify_dkim_key_against_partial(
     match outcome {
         VerifyOutcome::Valid => {}
         VerifyOutcome::BadSignature => {
-            return Err(EmailRecoveryError::EmailVerificationFailed(
+            return Err(EmailChallengeError::EmailVerificationFailed(
                 "signature did not validate against public key".into(),
             ));
         }
         VerifyOutcome::MalformedKey(e) => {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            return Err(EmailChallengeError::EmailVerificationFailed(format!(
                 "malformed DKIM key: {e}"
             )));
         }
         VerifyOutcome::MalformedSignature(e) => {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            return Err(EmailChallengeError::EmailVerificationFailed(format!(
                 "malformed DKIM signature: {e}"
             )));
         }
         VerifyOutcome::AlgorithmMismatch => {
-            return Err(EmailRecoveryError::EmailVerificationFailed(
+            return Err(EmailChallengeError::EmailVerificationFailed(
                 "DKIM key type does not match signature algorithm".into(),
             ));
         }
         VerifyOutcome::RsaKeyTooSmall(bits) => {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            return Err(EmailChallengeError::EmailVerificationFailed(format!(
                 "RSA DKIM key only {bits} bits"
             )));
         }
@@ -634,16 +672,16 @@ fn verify_dkim_key_against_partial(
         .from_address_lc
         .rsplit_once('@')
         .map(|(_, d)| d.to_string())
-        .ok_or(EmailRecoveryError::AddressMismatch)?;
+        .ok_or(EmailChallengeError::AddressMismatch)?;
     if let Some(dmarc_bytes) = dmarc_txt {
         let dmarc_str = std::str::from_utf8(dmarc_bytes).map_err(|_| {
-            EmailRecoveryError::EmailVerificationFailed("DMARC TXT is not valid UTF-8".into())
+            EmailChallengeError::EmailVerificationFailed("DMARC TXT is not valid UTF-8".into())
         })?;
         let dmarc = crate::dmarc::parse_dmarc_txt(dmarc_str).map_err(|e| {
-            EmailRecoveryError::EmailVerificationFailed(format!("DMARC parse: {e}"))
+            EmailChallengeError::EmailVerificationFailed(format!("DMARC parse: {e}"))
         })?;
         if !crate::dmarc::aligns(&mat.signing_domain, &from_domain, dmarc.adkim) {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            return Err(EmailChallengeError::EmailVerificationFailed(format!(
                 "DKIM d={} does not align with From={} under adkim={:?}",
                 mat.signing_domain, from_domain, dmarc.adkim
             )));
@@ -651,7 +689,7 @@ fn verify_dkim_key_against_partial(
     } else {
         // No DMARC published — strict equality.
         if !mat.signing_domain.eq_ignore_ascii_case(&from_domain) {
-            return Err(EmailRecoveryError::EmailVerificationFailed(format!(
+            return Err(EmailChallengeError::EmailVerificationFailed(format!(
                 "no DMARC published; DKIM d={} must equal From={}",
                 mat.signing_domain, from_domain
             )));
@@ -665,7 +703,7 @@ fn verify_dkim_key_against_partial(
         .from_address_lc
         .eq_ignore_ascii_case(&mat.claimed_address)
     {
-        return Err(EmailRecoveryError::AddressMismatch);
+        return Err(EmailChallengeError::AddressMismatch);
     }
 
     Ok(())
@@ -673,7 +711,7 @@ fn verify_dkim_key_against_partial(
 
 // Tests for the DNS-record tag contract live alongside the umbrella
 // in `crate::dkim::tag_checks::tests`. The DNSSEC submit-side mapping
-// of `(VerificationFailReason, _) → EmailRecoveryError::
+// of `(VerificationFailReason, _) → EmailChallengeError::
 // EmailVerificationFailed` is a trivial one-liner; the DNSSEC-prepare
 // half of the same pattern (the `?` mapping inside
 // `prepare_partial_verification`) is exercised end-to-end by

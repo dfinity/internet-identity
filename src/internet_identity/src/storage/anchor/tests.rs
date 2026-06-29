@@ -230,6 +230,7 @@ fn should_prevent_mutation_when_invariants_are_violated() {
         ],
         openid_credentials: vec![],
         email_recovery: vec![],
+        verified_emails: vec![],
         metadata: None,
         name: None,
         created_at: None,
@@ -251,6 +252,7 @@ fn should_prevent_addition_when_invariants_are_violated() {
         ],
         openid_credentials: vec![],
         email_recovery: vec![],
+        verified_emails: vec![],
         metadata: None,
         name: None,
         created_at: None,
@@ -272,6 +274,7 @@ fn should_allow_removal_when_invariants_are_violated() {
         ],
         openid_credentials: vec![],
         email_recovery: vec![],
+        verified_emails: vec![],
         metadata: None,
         name: None,
         created_at: None,
@@ -1185,5 +1188,74 @@ mod from_conversion_tests {
 
         let recovery_keys = storable.recovery_keys.unwrap();
         assert_eq!(recovery_keys.len(), 0);
+    }
+}
+
+#[cfg(test)]
+mod mirror_verified_email_tests {
+    use super::*;
+    use crate::email_inbound::MAX_VERIFIED_EMAILS_PER_ANCHOR;
+    use internet_identity_interface::internet_identity::types::verified_email::VerifiedEmail;
+
+    #[test]
+    fn appends_new_address() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+
+        assert!(anchor.mirror_verified_email_from_oidc("user@example.com", 100));
+
+        let entries: Vec<&VerifiedEmail> = anchor.verified_emails.iter().collect();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].address, "user@example.com");
+        assert_eq!(entries[0].verified_at, 100);
+    }
+
+    #[test]
+    fn lowercases_address_on_append() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+
+        assert!(anchor.mirror_verified_email_from_oidc("User@Example.COM", 100));
+
+        assert_eq!(anchor.verified_emails[0].address, "user@example.com");
+    }
+
+    #[test]
+    fn skips_duplicate_case_insensitive_and_preserves_existing_timestamp() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+        anchor.verified_emails.push(VerifiedEmail {
+            address: "user@example.com".to_string(),
+            verified_at: 50,
+        });
+
+        assert!(!anchor.mirror_verified_email_from_oidc("USER@EXAMPLE.com", 999));
+
+        assert_eq!(anchor.verified_emails.len(), 1);
+        assert_eq!(
+            anchor.verified_emails[0].verified_at, 50,
+            "OIDC re-link must not refresh an existing entry's verified_at",
+        );
+    }
+
+    #[test]
+    fn skips_when_cap_reached() {
+        let cap = usize::from(MAX_VERIFIED_EMAILS_PER_ANCHOR);
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+        for i in 0..cap {
+            anchor.verified_emails.push(VerifiedEmail {
+                address: format!("user{i}@example.com"),
+                verified_at: i as u64,
+            });
+        }
+
+        assert!(!anchor.mirror_verified_email_from_oidc("new@example.com", 999));
+
+        assert_eq!(
+            anchor.verified_emails.len(),
+            cap,
+            "cap must hold; OIDC mirror must not exceed it",
+        );
+        assert!(anchor
+            .verified_emails
+            .iter()
+            .all(|e| e.address != "new@example.com"));
     }
 }
