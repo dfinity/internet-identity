@@ -159,7 +159,11 @@ type Delegation = record {
     targets : opt vec principal;
     // Restricts the kinds of calls the delegation permits: `"queries"`
     // restricts the sender to query calls (the IC rejects update calls
-    // authenticated through such a delegation). Absent means unrestricted.
+    // authenticated through such a delegation). Absent means unrestricted, per
+    // the interface spec. This describes the protocol field carried by a
+    // *returned* delegation; it is distinct from the `read_only` argument of
+    // `prepare_account_delegation` / `get_account_delegation`, which defaults to
+    // read-only when omitted (see those methods).
     permissions : opt text;
 };
 
