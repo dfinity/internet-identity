@@ -59,7 +59,10 @@ const TYPE_DNSKEY = 48;
 
 /**
  * Secure Entry Point flag in the DNSKEY Flags field (RFC 4034 §2.1.1 /
- * RFC 3757). Set on KSKs — the keys a parent DS can reference.
+ * RFC 3757). The bit is advisory — it does not bind which DNSKEY a
+ * parent DS may reference — but by convention it marks the KSK, and the
+ * canister verifier only treats a SEP key as DS-pinnable
+ * (`matching_ksks`). We select on it to mirror the canister.
  */
 const DNSKEY_FLAG_SEP = 0x0001;
 
@@ -431,9 +434,13 @@ async function fetchSignedRRsetEither(
  * with both (common: proton, many TLDs) otherwise hands us whichever
  * RRSIG the resolver returned first, and a ZSK one would be rejected
  * canister-side. The parent DS is not known at this point in the
- * bottom-up walk, but a DS only ever references a Secure Entry Point
- * key, so we bundle the RRSIG whose `key_tag` matches a SEP (KSK)
- * DNSKEY in this very RRset. `rrsetRecords` carries those DNSKEYs.
+ * bottom-up walk, but the canister only treats a DNSKEY as a
+ * DS-pinnable KSK when its SEP bit is set (`matching_ksks` filters on
+ * it), so we mirror that and bundle the RRSIG made by a SEP DNSKEY in
+ * this very RRset. The SEP bit is advisory in the protocol (a DS may
+ * reference a key regardless), but matching the canister's requirement
+ * is what keeps the bundle verifiable. `rrsetRecords` carries those
+ * DNSKEYs.
  *
  * For DS / TXT / CNAME hops the canister verifies under the already
  * trusted *full* zone DNSKEY set, so any supported covering RRSIG is
@@ -453,10 +460,15 @@ export function selectSupportedCoveringRrsig(
   rrsetRecords: DnsRR[] = [],
 ): DnsRR | undefined {
   // Covering, supported-algorithm candidates, kept in wire order.
+  // Require the full 18-byte RRSIG fixed header (RFC 4034 §3.1: type
+  // covered, algorithm, …, key_tag): the chosen record is fed straight
+  // into `parseRrsigRdata`, which throws below 18 bytes, and the DNSKEY
+  // path reads the key_tag at bytes 16-17. Dropping malformed short
+  // RRSIGs here keeps a broken/hostile resolver response from throwing
+  // mid-walk instead of falling back to DoH.
   const candidates = rrsigs.filter(
     (c) =>
-      // RRSIG RDATA layout: type-covered (2 bytes) | algorithm (1 byte) | …
-      c.rdata.length >= 3 &&
+      c.rdata.length >= 18 &&
       ((c.rdata[0] << 8) | c.rdata[1]) === matchedType &&
       SUPPORTED_DNSSEC_ALGORITHMS.has(c.rdata[2]),
   );
@@ -474,7 +486,7 @@ export function selectSupportedCoveringRrsig(
   // key_tag and match the RRSIG (algorithm at RDATA byte 2, key_tag at
   // bytes 16-17) on both. Matching by key_tag alone could bundle an
   // RRSIG no SEP key can verify, or one made by a non-SEP key whose tag
-  // happens to collide. Skip anything shorter than the fixed header.
+  // happens to collide.
   const sepKeyIds = new Set<number>(
     rrsetRecords
       .filter(
@@ -485,10 +497,10 @@ export function selectSupportedCoveringRrsig(
       // (algorithm << 16) | key_tag — DNSKEY algorithm is RDATA byte 3.
       .map((rr) => (rr.rdata[3] << 16) | dnsKeyTag(rr.rdata)),
   );
-  return candidates.find(
-    (c) =>
-      c.rdata.length >= 18 &&
-      sepKeyIds.has((c.rdata[2] << 16) | ((c.rdata[16] << 8) | c.rdata[17])),
+  // `candidates` already guarantees the 18-byte header, so reading the
+  // algorithm (byte 2) and key_tag (bytes 16-17) here is safe.
+  return candidates.find((c) =>
+    sepKeyIds.has((c.rdata[2] << 16) | ((c.rdata[16] << 8) | c.rdata[17])),
   );
 }
 

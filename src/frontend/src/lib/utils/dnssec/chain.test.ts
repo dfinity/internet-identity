@@ -10,24 +10,27 @@ const FLAG_ZONE = 0x0100;
 const FLAG_SEP = 0x0001;
 
 /**
- * Build a minimal RRSIG `DnsRR` carrying just the two fields the
- * selection reads: the covered type (RDATA bytes 0-1) and the
- * algorithm (RDATA byte 2). The rest of the RRSIG RDATA is irrelevant
- * to selection, so we pad with a single zero byte.
+ * Build a minimal RRSIG `DnsRR` carrying the fields selection reads:
+ * the covered type (RDATA bytes 0-1) and the algorithm (RDATA byte 2).
+ * Selection requires the full 18-byte RRSIG fixed header (RFC 4034
+ * §3.1) so the chosen record always parses, so we allocate that; the
+ * remaining header fields stay zero (irrelevant to non-DNSKEY
+ * selection).
  */
-const rrsig = (typeCovered: number, algorithm: number): DnsRR => ({
-  name: "example.com",
-  nameBytes: new Uint8Array([0]),
-  type: TYPE_RRSIG,
-  class_: 1,
-  ttl: 3600,
-  rdata: new Uint8Array([
-    (typeCovered >> 8) & 0xff,
-    typeCovered & 0xff,
-    algorithm,
-    0,
-  ]),
-});
+const rrsig = (typeCovered: number, algorithm: number): DnsRR => {
+  const rdata = new Uint8Array(18);
+  rdata[0] = (typeCovered >> 8) & 0xff;
+  rdata[1] = typeCovered & 0xff;
+  rdata[2] = algorithm;
+  return {
+    name: "example.com",
+    nameBytes: new Uint8Array([0]),
+    type: TYPE_RRSIG,
+    class_: 1,
+    ttl: 3600,
+    rdata,
+  };
+};
 
 describe("selectSupportedCoveringRrsig", () => {
   it("picks the supported algorithm when a zone double-signs (mailbox.org case)", () => {
@@ -80,6 +83,25 @@ describe("selectSupportedCoveringRrsig", () => {
       selectSupportedCoveringRrsig([short, rrsig(TYPE_TXT, 8)], TYPE_TXT)
         ?.rdata[2],
     ).toBe(8);
+  });
+
+  it("skips an RRSIG whose RDATA is shorter than the 18-byte fixed header", () => {
+    // Covering and a supported algorithm, but truncated below the
+    // 18-byte fixed header — `parseRrsigRdata` would throw on it
+    // downstream, so selection must drop it (→ undefined → DoH).
+    const r = new Uint8Array(17); // one byte short of the fixed header
+    r[0] = (TYPE_TXT >> 8) & 0xff;
+    r[1] = TYPE_TXT & 0xff;
+    r[2] = 8;
+    const truncated: DnsRR = {
+      name: "example.com",
+      nameBytes: new Uint8Array([0]),
+      type: TYPE_RRSIG,
+      class_: 1,
+      ttl: 3600,
+      rdata: r,
+    };
+    expect(selectSupportedCoveringRrsig([truncated], TYPE_TXT)).toBeUndefined();
   });
 });
 
