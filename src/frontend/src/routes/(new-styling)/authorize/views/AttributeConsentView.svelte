@@ -274,9 +274,11 @@
   };
 
   const handleOpenVerifyWizard = () => {
-    verifiedEmailConsentFunnel.trigger(
-      VerifiedEmailConsentEvents.VerifyClicked,
-    );
+    void prepared.then(({ emailRequested }) => {
+      if (emailRequested) {
+        verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.VerifyClicked);
+      }
+    });
     showVerifyWizard = true;
   };
 
