@@ -372,66 +372,75 @@ fn anchor_matches_dnskey(
 }
 
 /// Step 2 of the verification algorithm. Validate one delegation
-/// link: the parent zone's DNSKEY RRset signs the child's DS
-/// RRset, that DS RRset references a KSK in the child's DNSKEY
-/// RRset, and the child's DNSKEY RRset is itself signed by some
-/// key in that rrset (RFC 4035 §5).
+/// link: the parent zone's DNSKEY RRset signs the child's DS RRset,
+/// that DS RRset references a KSK in the child's DNSKEY RRset, and the
+/// child's DNSKEY RRset is signed by *that DS-pinned KSK* (RFC 4035
+/// §5.2).
 fn verify_link(
     link: &DelegationLink,
     parent_dnskey_rrset: &SignedRRset,
     now: u64,
 ) -> Result<(), DnssecError> {
-    // 2a — the DS RRset is signed by the parent zone's DNSKEY RRset.
+    // 2a — the DS RRset is signed by the parent zone's (already
+    //      trusted) DNSKEY RRset.
     verify_rrsig_under_dnskey_rrset(&link.child_ds, parent_dnskey_rrset)?;
     check_freshness(&link.child_ds, now)?;
 
-    // 2b — at least one of the child's DNSKEY KSKs has a digest
-    //      matching one of the parent's DS records. This is what
-    //      pins the chain of trust: `pick_matching_ksk` only looks
-    //      at DNSKEYs with the SEP bit set whose
-    //      `SHA-256(owner | rdata)` equals the DS digest, so an
-    //      attacker can't smuggle a self-signed extra DNSKEY into
-    //      the rrset and have it recognised as the trust anchor
-    //      here.
-    let _ = pick_matching_ksk(&link.child_dnskey, &link.child_ds.rdata)?;
+    // 2b — collect the child KSK(s) the parent's DS RRset commits to:
+    //      DNSKEYs with the SEP bit set whose `SHA-256(owner | rdata)`
+    //      equals a DS digest (RFC 4035 §5.2). A parent may publish a
+    //      DS for more than one KSK during a rollover, so this can
+    //      legitimately return several keys.
+    let ds_pinned_ksks = matching_ksks(&link.child_dnskey, &link.child_ds.rdata);
+    if ds_pinned_ksks.is_empty() {
+        return Err(DnssecError::DsMismatch);
+    }
 
-    // 2c — the child's DNSKEY RRset is signed by *some* key in
-    //      itself. We don't require the RRSIG to be the one made
-    //      by the DS-pinned KSK specifically: many real zones
-    //      (proton.me, proton.ch, …) publish a DNSKEY RRset signed
-    //      by both the KSK and the ZSK, and resolvers return
-    //      whichever RRSIG comes first. Either signature proves
-    //      the same fact — the zone operator authored this rrset
-    //      — and step 2b already pinned the DS-referenced KSK as
-    //      part of that rrset, so the chain of trust is intact
-    //      regardless of which RRSIG verifies here.
-    verify_rrsig_under_dnskey_rrset(&link.child_dnskey, &link.child_dnskey)?;
+    // 2c — the child's DNSKEY RRset must be signed by one of the
+    //      DS-pinned KSKs *specifically* (RFC 4035 §5.2), not merely
+    //      by some key present in the rrset. The DS→KSK binding only
+    //      propagates to the rest of the RRset (the ZSKs that hops are
+    //      later verified against) if the DS-pinned KSK is the key that
+    //      actually authored the RRset. Accepting any in-set key would
+    //      let an attacker append their own DNSKEY next to the genuine,
+    //      DS-matching KSK — whose public bytes are public DNS data —
+    //      self-sign the rrset with it, and have that injected key
+    //      admitted as a trusted signer for the zone.
+    //
+    //      A zone may sign its DNSKEY RRset with both the KSK and a
+    //      ZSK; in that case the bundle must carry the KSK's RRSIG (the
+    //      one whose `key_tag` matches the DS), since that is the
+    //      signature the DS chain authenticates. Supplying only the
+    //      ZSK's RRSIG is rejected here by design.
+    verify_rrsig_under_any_dnskey(&link.child_dnskey, ds_pinned_ksks.iter().copied())?;
     check_freshness(&link.child_dnskey, now)?;
     Ok(())
 }
 
-/// Find a KSK in `child_dnskey_rrset` whose DS-style digest matches
-/// one of the parent zone's published DS records (RFC 4035 §5.2).
-fn pick_matching_ksk<'a>(
+/// Collect every KSK in `child_dnskey_rrset` whose DS-style digest
+/// matches one of the parent zone's published DS records (RFC 4035
+/// §5.2). More than one can match during a KSK rollover, where the
+/// parent publishes a DS for both the outgoing and the incoming KSK.
+fn matching_ksks<'a>(
     child_dnskey_rrset: &'a SignedRRset,
     parent_ds_rdata: &[Vec<u8>],
-) -> Result<&'a [u8], DnssecError> {
+) -> Vec<&'a Vec<u8>> {
+    let mut matches = Vec::new();
     for dnskey in &child_dnskey_rrset.rdata {
         // Only KSKs (SEP bit set, RFC 4034 §2.1.1) can be referenced
         // by a DS in the parent. ZSKs are excluded structurally.
         if !is_sep(dnskey) {
             continue;
         }
-        for ds in parent_ds_rdata {
-            if ds.len() < DS_RDATA_HEADER_LEN {
-                continue;
-            }
-            if ds_matches_dnskey(&child_dnskey_rrset.name.0, dnskey, ds) {
-                return Ok(dnskey);
-            }
+        let pinned = parent_ds_rdata.iter().any(|ds| {
+            ds.len() >= DS_RDATA_HEADER_LEN
+                && ds_matches_dnskey(&child_dnskey_rrset.name.0, dnskey, ds)
+        });
+        if pinned {
+            matches.push(dnskey);
         }
     }
-    Err(DnssecError::DsMismatch)
+    matches
 }
 
 /// True iff this DNSKEY has the Secure Entry Point flag set
@@ -446,19 +455,19 @@ fn is_sep(dnskey_rdata: &[u8]) -> bool {
     flags & DNSKEY_FLAG_SEP != 0
 }
 
-/// Verify `rrset.rrsig` against any DNSKEY in `dnskey_rrset` whose
-/// algorithm and key_tag match the RRSIG (RFC 4034 §3.1.6).
+/// Verify `rrset.rrsig` against any DNSKEY in `candidate_dnskeys`
+/// whose algorithm and key_tag match the RRSIG (RFC 4034 §3.1.6).
 ///
-/// A DNSKEY RRset may legitimately contain several keys (KSK + one
-/// or more ZSKs; rollovers temporarily double up keys for the same
-/// role), so we try every candidate and only return the last error
-/// if none verified.
-fn verify_rrsig_under_dnskey_rrset(
+/// Several candidates can be supplied (a full DNSKEY RRset with a KSK
+/// plus one or more ZSKs, or the DS-pinned KSK subset during a
+/// rollover), so we try every candidate and only return the last
+/// error if none verified.
+fn verify_rrsig_under_any_dnskey<'a>(
     rrset: &SignedRRset,
-    dnskey_rrset: &SignedRRset,
+    candidate_dnskeys: impl IntoIterator<Item = &'a Vec<u8>>,
 ) -> Result<(), DnssecError> {
     let mut last_err = DnssecError::BadSignature;
-    for dnskey_rdata in &dnskey_rrset.rdata {
+    for dnskey_rdata in candidate_dnskeys {
         if dnskey_rdata.len() < DNSKEY_RDATA_HEADER_LEN {
             continue;
         }
@@ -474,6 +483,22 @@ fn verify_rrsig_under_dnskey_rrset(
         }
     }
     Err(last_err)
+}
+
+/// Verify `rrset.rrsig` against any DNSKEY in the already-trusted
+/// `dnskey_rrset` (RFC 4034 §3.1.6).
+///
+/// Used where the *entire* DNSKEY set is already trusted: the parent
+/// zone's set validating a child DS RRset (step 2a), and a zone's set
+/// validating a resolution hop. It must NOT be used for a child DNSKEY
+/// RRset's own self-signature — that has to be pinned to the DS-matched
+/// KSK via [`verify_rrsig_under_any_dnskey`] over [`matching_ksks`],
+/// otherwise an attacker-injected key in the set would be accepted.
+fn verify_rrsig_under_dnskey_rrset(
+    rrset: &SignedRRset,
+    dnskey_rrset: &SignedRRset,
+) -> Result<(), DnssecError> {
+    verify_rrsig_under_any_dnskey(rrset, &dnskey_rrset.rdata)
 }
 
 /// Verify a single RRSIG against a single DNSKEY: build the
@@ -687,13 +712,34 @@ mod tests {
     }
 
     #[test]
-    fn verifies_mailbox_org_chain() {
-        // RSA-SHA512 (algorithm 10) leaf + leaf-zone DNSKEY self-sig —
-        // real-data coverage for the mailbox.org case. The zone also
-        // publishes RSA/SHA-1 signatures, which the FE skips; the
-        // captured bundle carries the alg-10 RRSIGs. Chain:
-        // RSA-SHA256 root → RSA-SHA256 org → RSA-SHA512 mailbox.org.
-        assert_verifies(MAILBOX_ORG_CHAIN_JSON, TYPE_TXT);
+    fn rejects_mailbox_org_chain_ds_pinned_ksk_is_unsupported_rsa_sha1() {
+        // mailbox.org's leaf zone is DS-pinned to an RSA-SHA1
+        // (algorithm 7) KSK, which this verifier deliberately does not
+        // implement (collision-broken — see `signature.rs`). The only
+        // RRSIG over its DNSKEY RRset that we *can* verify is the ZSK's
+        // (algorithm 10, RSA-SHA512), and the captured bundle carries
+        // that alg-10 RRSIG rather than the KSK's alg-7 one.
+        //
+        // Per RFC 4035 §5.2 the DNSKEY RRset must be authenticated by
+        // the DS-matched key; with that key on an unsupported algorithm
+        // there is no supported authentication path, so the chain is
+        // correctly rejected and the FE falls back to the DoH path
+        // (design doc §7.6). Before the `verify_link` step-2c fix this
+        // chain validated by accepting the non-DS ZSK's self-signature
+        // — the exact hole the chain-of-trust bypass exploited.
+        let bundle = load_bundle(MAILBOX_ORG_CHAIN_JSON);
+        let anchors = load_anchors(IANA_ROOT_ANCHORS_JSON);
+        let req_name = first_hop_name(&bundle);
+        assert_eq!(
+            verify_bundle_with_clock(
+                &bundle,
+                &anchors,
+                &req_name,
+                TYPE_TXT,
+                frozen_now(MAILBOX_ORG_CHAIN_JSON),
+            ),
+            Err(DnssecError::BadSignature),
+        );
     }
 
     #[test]
@@ -909,5 +955,267 @@ mod tests {
         assert!(name_is_subdomain_of(b"\x07example\x03com\x00", b"\x00"));
         // Self under self
         assert!(name_is_subdomain_of(b"\x03com\x00", b"\x03com\x00"));
+    }
+}
+
+/// Regression coverage for the `verify_link` step-2c fix: a child
+/// DNSKEY RRset must be signed by the KSK its parent DS commits to —
+/// not by any key merely present in the rrset (RFC 4035 §5.2).
+///
+/// These build synthetic single-link chains (root → `example.com.`)
+/// with a self-contained Ed25519 signer rather than relying on a
+/// captured fixture, so the malicious case can be constructed exactly.
+#[cfg(test)]
+mod ds_pin_regression {
+    use super::super::canonical;
+    use super::super::types::{Rrsig, TYPE_DNSKEY, TYPE_DS};
+    use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+    use sha2::{Digest, Sha256};
+
+    const ALG_ED25519: u8 = 15;
+    const PROTOCOL_DNSSEC: u8 = 3;
+    /// DNSKEY Flags: ZONE bit (RFC 4034 §2.1.1).
+    const FLAG_ZONE: u16 = 0x0100;
+    /// DNSKEY Flags: Secure Entry Point bit — marks a KSK.
+    const FLAG_SEP: u16 = 0x0001;
+    const DIGEST_TYPE_SHA256: u8 = 2;
+
+    /// A test zone key. `rdata` already carries the chosen flags, so
+    /// its key_tag matches what the verifier computes for the DNSKEY as
+    /// published.
+    struct Key {
+        sk: SigningKey,
+        rdata: Vec<u8>,
+    }
+
+    impl Key {
+        fn new(seed: u8, flags: u16) -> Self {
+            let sk = SigningKey::from_bytes(&[seed; 32]);
+            let mut rdata = Vec::with_capacity(36);
+            rdata.extend_from_slice(&flags.to_be_bytes());
+            rdata.push(PROTOCOL_DNSSEC);
+            rdata.push(ALG_ED25519);
+            rdata.extend_from_slice(&sk.verifying_key().to_bytes());
+            Self { sk, rdata }
+        }
+        /// Key-Signing Key (SEP set): the kind a DS can reference.
+        fn ksk(seed: u8) -> Self {
+            Self::new(seed, FLAG_ZONE | FLAG_SEP)
+        }
+        /// Zone-Signing Key (SEP clear): cannot be DS-pinned.
+        fn zsk(seed: u8) -> Self {
+            Self::new(seed, FLAG_ZONE)
+        }
+        fn key_tag(&self) -> u16 {
+            dnskey_key_tag(&self.rdata)
+        }
+    }
+
+    fn wire(name: &str) -> Vec<u8> {
+        let mut out = Vec::new();
+        for label in name
+            .trim_end_matches('.')
+            .split('.')
+            .filter(|l| !l.is_empty())
+        {
+            out.push(label.len() as u8);
+            out.extend_from_slice(label.as_bytes());
+        }
+        out.push(0);
+        out
+    }
+
+    fn label_count(wire: &[u8]) -> u8 {
+        let mut i = 0;
+        let mut n = 0u8;
+        while i < wire.len() {
+            let l = wire[i] as usize;
+            if l == 0 {
+                break;
+            }
+            n += 1;
+            i += 1 + l;
+        }
+        n
+    }
+
+    /// DS RDATA committing to `key` as a child KSK (RFC 4034 §5.1):
+    /// `key_tag | algorithm | digest_type | SHA-256(owner | dnskey)`.
+    fn ds_for(owner: &[u8], key: &Key) -> Vec<u8> {
+        let mut input = canonical::canonicalize_name(owner);
+        input.extend_from_slice(&key.rdata);
+        let digest = Sha256::digest(&input);
+        let mut out = Vec::with_capacity(4 + digest.len());
+        out.extend_from_slice(&key.key_tag().to_be_bytes());
+        out.push(ALG_ED25519);
+        out.push(DIGEST_TYPE_SHA256);
+        out.extend_from_slice(&digest);
+        out
+    }
+
+    /// Build an RRset for `owner`/`rtype` carrying `rdata`, signed by
+    /// `signer` whose zone is `signer_name`.
+    fn signed(
+        owner: &[u8],
+        rtype: u16,
+        rdata: Vec<Vec<u8>>,
+        signer: &Key,
+        signer_name: &[u8],
+        now: u32,
+    ) -> SignedRRset {
+        let mut rr = SignedRRset {
+            name: DnsName(owner.to_vec()),
+            rtype,
+            rdata,
+            ttl: 3600,
+            rrsig: Rrsig {
+                type_covered: rtype,
+                algorithm: ALG_ED25519,
+                labels: label_count(owner),
+                original_ttl: 3600,
+                expiration: now + 3600,
+                inception: now.saturating_sub(3600),
+                key_tag: signer.key_tag(),
+                signer_name: DnsName(signer_name.to_vec()),
+                signature: Vec::new(),
+            },
+        };
+        let signed_data = canonical::build_signed_data(&rr);
+        rr.rrsig.signature = signer.sk.sign(&signed_data).to_bytes().to_vec();
+        rr
+    }
+
+    /// Assemble a one-link chain root → `example.com.`: the parent
+    /// (root) DNSKEY RRset and a `DelegationLink` whose `child_ds`
+    /// pins each key in `ds_keys` and whose `child_dnskey` carries
+    /// `dnskey_rdatas`, signed by `dnskey_signer`.
+    fn one_link(
+        root: &Key,
+        ds_keys: &[&Key],
+        dnskey_rdatas: Vec<Vec<u8>>,
+        dnskey_signer: &Key,
+        now: u32,
+    ) -> (SignedRRset, DelegationLink) {
+        let root_name = wire(".");
+        let zone = wire("example.com.");
+        let root_dnskey = signed(
+            &root_name,
+            TYPE_DNSKEY,
+            vec![root.rdata.clone()],
+            root,
+            &root_name,
+            now,
+        );
+        let ds_rdatas: Vec<Vec<u8>> = ds_keys.iter().map(|k| ds_for(&zone, k)).collect();
+        let child_ds = signed(&zone, TYPE_DS, ds_rdatas, root, &root_name, now);
+        let child_dnskey = signed(&zone, TYPE_DNSKEY, dnskey_rdatas, dnskey_signer, &zone, now);
+        (
+            root_dnskey,
+            DelegationLink {
+                child_ds,
+                child_dnskey,
+            },
+        )
+    }
+
+    const NOW: u32 = 1_000_000;
+
+    #[test]
+    fn ksk_signed_dnskey_rrset_validates() {
+        // DNSKEY RRset {KSK, ZSK} signed by the DS-pinned KSK — the
+        // ordinary, correct case. Must still validate after the fix.
+        let root = Key::ksk(1);
+        let ksk = Key::ksk(2);
+        let zsk = Key::zsk(3);
+        let (root_dnskey, link) = one_link(
+            &root,
+            &[&ksk],
+            vec![ksk.rdata.clone(), zsk.rdata.clone()],
+            &ksk,
+            NOW,
+        );
+        assert_eq!(verify_link(&link, &root_dnskey, NOW as u64), Ok(()));
+    }
+
+    #[test]
+    fn forged_dnskey_self_signature_by_injected_key_is_rejected() {
+        // THE BUG: DNSKEY RRset {genuine DS-pinned KSK, attacker key}
+        // self-signed by the attacker key. 2b still passes (the genuine
+        // KSK, whose public bytes are public DNS data, matches the DS),
+        // but 2c must now refuse because the rrset is not signed by the
+        // DS-pinned KSK. Pre-fix this returned Ok and admitted the
+        // attacker key as a trusted zone signer.
+        let root = Key::ksk(1);
+        let ksk = Key::ksk(2);
+        let attacker = Key::zsk(9);
+        let (root_dnskey, link) = one_link(
+            &root,
+            &[&ksk],
+            vec![ksk.rdata.clone(), attacker.rdata.clone()],
+            &attacker,
+            NOW,
+        );
+        assert_eq!(
+            verify_link(&link, &root_dnskey, NOW as u64),
+            Err(DnssecError::BadSignature),
+        );
+    }
+
+    #[test]
+    fn zsk_signed_dnskey_rrset_is_rejected() {
+        // DNSKEY RRset {KSK, ZSK} signed by the (supported-algorithm)
+        // ZSK rather than the DS-pinned KSK. Pre-fix this was accepted;
+        // per RFC 4035 §5.2 the bundle must carry the KSK's RRSIG, so
+        // it is now rejected. (This is the deliberate behavioural
+        // change a bundle assembler must account for.)
+        let root = Key::ksk(1);
+        let ksk = Key::ksk(2);
+        let zsk = Key::zsk(3);
+        let (root_dnskey, link) = one_link(
+            &root,
+            &[&ksk],
+            vec![ksk.rdata.clone(), zsk.rdata.clone()],
+            &zsk,
+            NOW,
+        );
+        assert_eq!(
+            verify_link(&link, &root_dnskey, NOW as u64),
+            Err(DnssecError::BadSignature),
+        );
+    }
+
+    #[test]
+    fn dnskey_rrset_with_no_ds_pinned_ksk_is_rejected() {
+        // DNSKEY RRset carrying only a non-DS-pinned key (no SEP key
+        // matches the DS). 2b finds nothing to pin → DsMismatch.
+        let root = Key::ksk(1);
+        let ksk = Key::ksk(2); // pinned by the DS, but absent from the rrset
+        let attacker = Key::zsk(9);
+        let (root_dnskey, link) =
+            one_link(&root, &[&ksk], vec![attacker.rdata.clone()], &attacker, NOW);
+        assert_eq!(
+            verify_link(&link, &root_dnskey, NOW as u64),
+            Err(DnssecError::DsMismatch),
+        );
+    }
+
+    #[test]
+    fn ksk_rollover_dnskey_rrset_signed_by_second_ds_pinned_ksk_validates() {
+        // Parent publishes a DS for two KSKs (a rollover); the DNSKEY
+        // RRset is signed by the second one. The fix must accept any
+        // DS-pinned KSK, not just the first match.
+        let root = Key::ksk(1);
+        let ksk_a = Key::ksk(2);
+        let ksk_b = Key::ksk(4);
+        let zsk = Key::zsk(3);
+        let (root_dnskey, link) = one_link(
+            &root,
+            &[&ksk_a, &ksk_b],
+            vec![ksk_a.rdata.clone(), ksk_b.rdata.clone(), zsk.rdata.clone()],
+            &ksk_b,
+            NOW,
+        );
+        assert_eq!(verify_link(&link, &root_dnskey, NOW as u64), Ok(()));
     }
 }
