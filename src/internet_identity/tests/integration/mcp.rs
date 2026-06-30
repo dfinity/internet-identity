@@ -153,10 +153,14 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
 
 /// A read-only access grant (`mcp_set_access` with `read_only = true`) makes the
 /// per-app delegations the server mints query-only: they carry
-/// `permissions = "queries"`, and the signature binds to it (an unrestricted
-/// lookup of the same key yields `NoSuchDelegation`). The standing delegation is
-/// untouched — read-only is a property of the grant, applied per minted
-/// delegation — so the server can still call the (update) prepare endpoint.
+/// `permissions = "queries"`, and the signed delegation verifies against that
+/// permissions-bound message. The standing delegation is untouched — read-only
+/// is a property of the grant, applied per minted delegation — so the server can
+/// still call the (update) prepare endpoint. (That the signature binds to the
+/// `permissions` value, i.e. a differing value yields `NoSuchDelegation`, is
+/// covered by `accounts::should_get_read_only_account_delegation_with_queries_permissions`,
+/// where the lookup takes an explicit `read_only` argument; the MCP path derives
+/// it from the persisted grant, so it has no per-call variant to contrast here.)
 #[test]
 fn mcp_read_only_grant_mints_queries_only_delegations() -> Result<(), RejectResponse> {
     let env = env();

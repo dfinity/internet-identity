@@ -649,7 +649,9 @@ pub fn verify_delegation(
 
     // The signed message is a signature domain separator
     // followed by the representation independent hash of a map with entries
-    // pubkey, expiration and targets (if any), using the respective values from the delegation.
+    // pubkey, expiration, targets (if any) and permissions (if any), using the
+    // respective values from the delegation. (The map is order-independent: the
+    // representation-independent hash sorts entries by the hash of their key.)
     // See https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication for details
     let mut key_value_pairs = vec![
         (
@@ -661,6 +663,17 @@ pub fn verify_delegation(
             Value::Number(signed_delegation.delegation.expiration),
         ),
     ];
+    if let Some(targets) = &signed_delegation.delegation.targets {
+        key_value_pairs.push((
+            "targets".to_string(),
+            Value::Array(
+                targets
+                    .iter()
+                    .map(|t| Value::Bytes(t.as_slice().to_vec()))
+                    .collect(),
+            ),
+        ));
+    }
     if let Some(permissions) = &signed_delegation.delegation.permissions {
         key_value_pairs.push((
             "permissions".to_string(),
