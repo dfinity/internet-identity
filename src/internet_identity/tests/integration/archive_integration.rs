@@ -58,12 +58,20 @@ mod deployment_tests {
         });
         let ii_canister = setup_ii(&env, arg);
         env.add_cycles(ii_canister, 150_000_000_000);
+        let balance_before = env.cycle_balance(ii_canister);
 
         let result = ii_api::deploy_archive(&env, ii_canister, &ARCHIVE_WASM)
             .expect("archive deployment failed");
 
         assert!(matches!(result, DeployArchiveResult::Success(_)));
-        assert_eq!(env.cycle_balance(ii_canister), 50_000_000_000);
+        // Deploying the archive spends exactly `canister_creation_cycles_cost`
+        // (100B) to create it. Assert the delta rather than an absolute balance:
+        // the latter is base-dependent, since newer PocketIC versions fund newly
+        // created canisters (II included) by default.
+        assert_eq!(
+            env.cycle_balance(ii_canister),
+            balance_before - 100_000_000_000
+        );
     }
 
     #[test]
