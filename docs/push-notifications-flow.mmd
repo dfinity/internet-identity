@@ -2,7 +2,6 @@ sequenceDiagram
     autonumber
     participant Dapp as dApp Canister
     participant II as II Canister
-    participant Timer as II Timer
     participant Push as Push Relay<br/>(Apple/Google/Mozilla)
     participant SW as II Service Worker<br/>(on device)
     participant Phone as Phone Screen
@@ -15,25 +14,30 @@ sequenceDiagram
     Note over II: spool PendingNotification<br/>(notification_id, ttl 5min)
 
     loop for each device
-        alt cold OR inflight_outcall_at set
-            Note over II: skip wakeup<br/>(notification still spooled)
-        else fresh + idle
-            Note over II: mark inflight_outcall_at = now<br/>enqueue wakeup job
+        alt inflight_outcall_at set
+            Note over II: skip wakeup<br/>(notification rides along<br/>on inflight outcall)
+        else idle
+            Note over II: mark inflight_outcall_at = now
+            II->>Push: POST {endpoint}<br/>VAPID-signed, empty body
+            Push-->>II: 201 / 410 / 5xx
+            alt 410 Gone
+                Note over II: delete subscription
+            else 5xx / 429
+                Note over II: clear inflight_outcall_at<br/>(no retry in PoC)
+            end
+            Push-->>SW: wake-up signal
         end
     end
     II-->>Dapp: Ok(())
     deactivate II
 
     rect rgba(180, 180, 180, 0.15)
-        Note over Timer,Phone: ── async, only if any device was enqueued ──
-        Timer->>Timer: tick (~1s)
-        Timer->>Push: POST {device.endpoint}<br/>VAPID-signed, empty body
-        Push-->>SW: wake-up signal
+        Note over SW,Phone: ── on the device, after the push wakeup ──
         activate SW
         Note over SW: read ii-session-delegations<br/>from IndexedDB
         SW->>II: get_pending_for_anchor()<br/>[update, anchor-authenticated]
         activate II
-        Note over II: mark spool rows consumed<br/>clear inflight_outcall_at<br/>bump last_seen_at
+        Note over II: mark spool rows consumed<br/>clear inflight_outcall_at
         II-->>SW: vec<PendingNotification>
         deactivate II
         loop for each notification
