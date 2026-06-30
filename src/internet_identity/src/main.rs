@@ -447,6 +447,7 @@ async fn prepare_delegation(
         None,
         session_key,
         max_time_to_live,
+        false,
         &ii_domain,
     )
     .await
@@ -475,6 +476,7 @@ fn get_delegation(
         None,
         session_key,
         expiration,
+        false,
     )
     .map(GetDelegationResponse::SignedDelegation)
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
@@ -580,6 +582,7 @@ async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    read_only: Option<bool>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
@@ -589,6 +592,13 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
+                // Default an omitted `read_only` argument to an unrestricted
+                // delegation: this preserves the original behavior for existing
+                // callers of the (pre-feature) 5-argument form, and matches the
+                // interface spec, where an absent `permissions` field means
+                // unrestricted ("all"). First-party callers always pass an
+                // explicit value (read-only by default in the CLI and MCP flows).
+                read_only.unwrap_or(false),
                 &ii_domain,
             )
             .await
@@ -604,6 +614,7 @@ fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    read_only: Option<bool>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
         Ok(_) => account_management::get_account_delegation(
@@ -612,6 +623,10 @@ fn get_account_delegation(
             account_number,
             session_key,
             expiration,
+            // See `prepare_account_delegation`: an omitted `read_only` argument
+            // means an unrestricted delegation (backwards-compatible with the
+            // original 5-argument form).
+            read_only.unwrap_or(false),
         ),
         Err(err) => Err(err.into()),
     }
@@ -630,9 +645,18 @@ fn mcp_set_access(
     anchor_number: AnchorNumber,
     mcp_server_origin: FrontendHostname,
     enabled: bool,
+    // When `opt true`, the per-app delegations this server can later obtain are
+    // restricted to query calls. Omitted (`null`) means full access, preserving
+    // the pre-feature behavior for callers that don't pass it.
+    read_only: Option<bool>,
 ) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_access(anchor_number, mcp_server_origin, enabled)
+    mcp::set_mcp_access(
+        anchor_number,
+        mcp_server_origin,
+        enabled,
+        read_only.unwrap_or(false),
+    )
 }
 
 /// Whether `anchor_number` has MCP access enabled at `mcp_server_origin`.
@@ -1949,6 +1973,7 @@ mod email_recovery_api {
                         pubkey: args.session_key,
                         expiration: args.expiration,
                         targets: None,
+                        permissions: None,
                     },
                     signature: serde_bytes::ByteBuf::from(signature),
                 })

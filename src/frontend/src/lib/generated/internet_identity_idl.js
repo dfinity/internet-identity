@@ -372,6 +372,7 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
   });
   const Delegation = IDL.Record({
+    'permissions' : IDL.Opt(IDL.Text),
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
     'expiration' : Timestamp,
@@ -984,6 +985,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           Timestamp,
+          IDL.Opt(IDL.Bool),
         ],
         [
           IDL.Variant({
@@ -1170,7 +1172,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Bool],
+        [UserNumber, FrontendHostname, IDL.Bool, IDL.Opt(IDL.Bool)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
@@ -1235,6 +1237,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           IDL.Opt(IDL.Nat64),
+          IDL.Opt(IDL.Bool),
         ],
         [
           IDL.Variant({

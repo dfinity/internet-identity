@@ -484,6 +484,26 @@ pub fn mcp_set_access(
     .map(|(x,)| x)
 }
 
+pub fn mcp_set_access_with_read_only(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    mcp_server_origin: FrontendHostname,
+    enabled: bool,
+    read_only: Option<bool>,
+) -> Result<Result<(), String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_set_access",
+        (identity_number, mcp_server_origin, enabled, read_only),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn mcp_access_enabled(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -659,6 +679,51 @@ pub fn get_account_delegation(
             params.account_number,
             params.session_key.clone(),
             expiration,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_account_delegation_with_read_only(
+    params: &AccountDelegationParams,
+    max_ttl: Option<u64>,
+    read_only: Option<bool>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, RejectResponse> {
+    call_candid_as(
+        params.env,
+        params.canister_id,
+        RawEffectivePrincipal::None,
+        params.sender,
+        "prepare_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            max_ttl,
+            read_only,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_delegation_with_read_only(
+    params: &AccountDelegationParams,
+    expiration: u64,
+    read_only: Option<bool>,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        params.env,
+        params.canister_id,
+        params.sender,
+        "get_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            expiration,
+            read_only,
         ),
     )
     .map(|(x,)| x)

@@ -103,6 +103,7 @@ pub fn get_session_delegation(
                     pubkey: session_key,
                     expiration,
                     targets: None,
+                    permissions: None,
                 },
                 signature: ByteBuf::from(signature),
             }),

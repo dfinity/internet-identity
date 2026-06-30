@@ -157,6 +157,10 @@ type Delegation = record {
     pubkey : PublicKey;
     expiration : Timestamp;
     targets : opt vec principal;
+    // Restricts the kinds of calls the delegation permits: `"queries"`
+    // restricts the sender to query calls (the IC rejects update calls
+    // authenticated through such a delegation). Absent means unrestricted.
+    permissions : opt text;
 };
 
 type SignedDelegation = record {
@@ -1779,7 +1783,13 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
-        max_ttl : opt nat64
+        max_ttl : opt nat64,
+        // When `opt true`, the prepared delegation restricts the session to
+        // query calls: it carries `permissions = "queries"`, which makes the
+        // IC reject update calls authenticated through it. Omitted (`null`) or
+        // `opt false` yields an unrestricted delegation — the original behavior,
+        // preserved for existing callers and matching the interface spec.
+        read_only : opt bool
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
     
     get_account_delegation : (
@@ -1787,7 +1797,10 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
-        expiration : Timestamp
+        expiration : Timestamp,
+        // Must match the value passed to `prepare_account_delegation` (including
+        // the omitted/`null` case, which means unrestricted).
+        read_only : opt bool
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 
     // Enable/disable the backend /mcp delegation path for an anchor at a given
@@ -1800,7 +1813,11 @@ service : (opt InternetIdentityInit) -> {
     mcp_set_access : (
         anchor_number : UserNumber,
         mcp_server_origin : FrontendHostname,
-        enabled : bool
+        enabled : bool,
+        // When `opt true`, the per-app delegations this server can later obtain
+        // are restricted to query calls (queries-only). Omitted (`null`) means
+        // full access.
+        read_only : opt bool
     ) -> (variant { Ok; Err : text });
 
     // Whether the anchor has MCP access enabled at mcp_server_origin.

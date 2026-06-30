@@ -25,6 +25,9 @@ interface CliAuthorizeInput {
   /** Single-use secret from the URL fragment, echoed back so the loopback
    *  server can tell this page's POST from a stray or forged local request. */
   nonce: string;
+  /** Whether to restrict the CLI's delegation to read-only (query calls). The
+   *  CLI flow defaults this to `true` (opt-out), reflected in the toggle. */
+  readOnly: boolean;
 }
 
 const derivationOrigin = (domain: string | undefined): string =>
@@ -57,6 +60,7 @@ export const cliAuthorize = async ({
   ttlMinutes,
   callback,
   nonce,
+  readOnly,
 }: CliAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
   const effectiveOrigin = derivationOrigin(domain);
@@ -76,6 +80,9 @@ export const cliAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
+      // Read-only when the user kept the (default-on) toggle; passed explicitly
+      // so the choice is honored regardless of the backend's omitted-arg default.
+      [readOnly],
     )
     .then(throwCanisterError);
 
@@ -87,6 +94,8 @@ export const cliAuthorize = async ({
         [],
         ephemeralPublicKey,
         expiration,
+        // Must match the value passed to `prepare_account_delegation` above.
+        [readOnly],
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

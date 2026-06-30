@@ -90,8 +90,11 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
-  const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
-    authorizationStore.authorize(accountNumber);
+  const handleAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    readOnly = false,
+  ) => {
+    authorizationStore.authorize(accountNumber, readOnly);
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {

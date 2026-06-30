@@ -130,6 +130,7 @@ use storable::credential_id::StorableCredentialId;
 use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
 use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
+use storable::mcp_access::StorableMcpAccess;
 use storable::mcp_config::StorableMcpConfig;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
@@ -184,8 +185,15 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
-const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
+// Index 25 held a `Principal -> AnchorNumber` MCP reverse index; index 27 held a
+// parallel read-only set. Both were superseded by the combined MCP access map
+// (index 28). MCP was preview-only, so the old regions are abandoned (any
+// preview grants are dropped and re-created on the next connect) rather than
+// migrated.
+// const DEPRECATED_LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
 const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
+// const DEPRECATED_LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX: u8 = 27u8;
+const MCP_ACCESS_MEMORY_INDEX: u8 = 28u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -232,15 +240,6 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
 /// and are available for JWT verification before the first post-upgrade fetch.
 const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
 
-/// Reverse index for MCP access: maps the principal II derives for an anchor's
-/// chosen account at the MCP server origin it connected (that anchor's standing
-/// MCP-server principal) to the anchor. Populated when the anchor enables MCP
-/// access; the `mcp_*_account_delegation` methods use it to authorize a caller
-/// (the MCP server, acting as that principal) and recover its anchor without an
-/// `anchor_number` parameter.
-const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
-    MemoryId::new(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX);
-
 /// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
 /// URL), keyed by anchor number. Written by the authenticated `mcp_set_config`
 /// method and read by the `/mcp` connect flow (verify-at-connect) and the
@@ -248,6 +247,14 @@ const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
 /// of the identity's devices. Kept in its own map so it never touches anchor
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
+
+/// MCP access grants, keyed by the principal II derives for an anchor's chosen
+/// account at the MCP server origin it connected (the standing MCP-server
+/// principal, recovered from `caller()`). The value
+/// ([`StorableMcpAccess`]) carries the anchor and the read-only restriction, so
+/// the `mcp_*_account_delegation` methods authorize a caller and recover both in
+/// a single lookup — the MCP server never passes an anchor number.
+const MCP_ACCESS_MEMORY_ID: MemoryId = MemoryId::new(MCP_ACCESS_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -390,11 +397,6 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_anchor_with_email_recovery_memory:
         StableBTreeMap<StorableEmailRecoveryAddressHash, StorableAnchorNumber, ManagedMemory<M>>,
 
-    lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// See [`LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID`].
-    pub(crate) lookup_anchor_with_mcp_principal_memory:
-        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
-
     /// Memory wrapper used to report the size of the OpenID JWKS cache memory.
     openid_jwks_cache_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Persistent per-provider JWK cache, keyed by the provider's `issuer`.
@@ -404,6 +406,11 @@ pub struct Storage<M: Memory> {
     mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
+
+    mcp_access_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// MCP access grants keyed by the standing MCP-server principal.
+    /// See [`MCP_ACCESS_MEMORY_ID`].
+    mcp_access_memory: StableBTreeMap<Principal, StorableMcpAccess, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -489,10 +496,9 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
-        let lookup_anchor_with_mcp_principal_memory =
-            memory_manager.get(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
+        let mcp_access_memory = memory_manager.get(MCP_ACCESS_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -599,16 +605,12 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchor_with_email_recovery_memory: StableBTreeMap::init(
                 lookup_anchor_with_email_recovery_memory,
             ),
-            lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper::new(
-                lookup_anchor_with_mcp_principal_memory.clone(),
-            ),
-            lookup_anchor_with_mcp_principal_memory: StableBTreeMap::init(
-                lookup_anchor_with_mcp_principal_memory,
-            ),
             openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
             mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
+            mcp_access_memory_wrapper: MemoryWrapper::new(mcp_access_memory.clone()),
+            mcp_access_memory: StableBTreeMap::init(mcp_access_memory),
         }
     }
 
@@ -1083,39 +1085,48 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&principal)
     }
 
-    /// Recover the anchor that enabled MCP access for the given MCP-server
-    /// principal (the caller of the `mcp_*_account_delegation` methods).
-    pub fn lookup_anchor_with_mcp_principal(&self, principal: Principal) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_mcp_principal_memory.get(&principal)
+    /// Look up the MCP access grant for the given MCP-server principal (the
+    /// caller of the `mcp_*_account_delegation` methods). The returned
+    /// [`StorableMcpAccess`] carries both the authorizing anchor and the
+    /// read-only restriction, so callers recover everything in one lookup.
+    pub fn lookup_mcp_access(&self, principal: Principal) -> Option<StorableMcpAccess> {
+        self.mcp_access_memory.get(&principal)
     }
 
-    /// Record (enable) MCP access: bind an anchor's MCP-server principal to it.
+    /// Record (enable) MCP access: bind an anchor's MCP-server principal to it,
+    /// with the chosen read-only restriction.
     ///
     /// Like the passkey / recovery-phrase reverse indices, we refuse to
     /// overwrite a principal already bound to a *different* anchor — defense in
     /// depth against a cross-anchor takeover were the derived principal ever to
-    /// collide. Re-binding the same anchor is idempotent. Returns
-    /// `Err(other_anchor)` on a cross-anchor collision so the caller can surface
-    /// the failure rather than silently no-op.
-    pub fn set_anchor_mcp_principal(
+    /// collide. Re-binding the same anchor is idempotent and updates `read_only`
+    /// in place, so the per-app delegations always reflect the latest connect
+    /// choice. Returns `Err(other_anchor)` on a cross-anchor collision so the
+    /// caller can surface the failure rather than silently no-op.
+    pub fn set_mcp_access(
         &mut self,
         principal: Principal,
         anchor_number: AnchorNumber,
+        read_only: bool,
     ) -> Result<(), AnchorNumber> {
-        if let Some(existing) = self.lookup_anchor_with_mcp_principal_memory.get(&principal) {
-            if existing != anchor_number {
-                return Err(existing);
+        if let Some(existing) = self.mcp_access_memory.get(&principal) {
+            if existing.anchor_number != anchor_number {
+                return Err(existing.anchor_number);
             }
         }
-        self.lookup_anchor_with_mcp_principal_memory
-            .insert(principal, anchor_number);
+        self.mcp_access_memory.insert(
+            principal,
+            StorableMcpAccess {
+                anchor_number,
+                read_only,
+            },
+        );
         Ok(())
     }
 
-    /// Forget (disable) an anchor's MCP-server principal.
-    pub fn remove_anchor_mcp_principal(&mut self, principal: Principal) {
-        self.lookup_anchor_with_mcp_principal_memory
-            .remove(&principal);
+    /// Forget (disable) an anchor's MCP-server principal and its grant.
+    pub fn remove_mcp_access(&mut self, principal: Principal) {
+        self.mcp_access_memory.remove(&principal);
     }
 
     /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
@@ -2335,12 +2346,12 @@ impl<M: Memory + Clone> Storage<M> {
                 self.openid_jwks_cache_memory_wrapper.size(),
             ),
             (
-                "lookup_anchor_with_mcp_principal_memory".to_string(),
-                self.lookup_anchor_with_mcp_principal_memory_wrapper.size(),
-            ),
-            (
                 "mcp_config_memory".to_string(),
                 self.mcp_config_memory_wrapper.size(),
+            ),
+            (
+                "mcp_access_memory".to_string(),
+                self.mcp_access_memory_wrapper.size(),
             ),
         ])
     }

@@ -144,6 +144,10 @@ pub struct Delegation {
     pub pubkey: PublicKey,
     pub expiration: Timestamp,
     pub targets: Option<Vec<Principal>>,
+    /// Restricts the kinds of calls the delegation permits: `"queries"`
+    /// restricts the sender to query calls (the IC rejects update calls
+    /// authenticated through such a delegation). `None` means unrestricted.
+    pub permissions: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

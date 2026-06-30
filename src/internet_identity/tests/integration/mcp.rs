@@ -9,8 +9,9 @@ use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
         create_account, mcp_access_enabled, mcp_get_account_delegation, mcp_get_accounts,
-        mcp_get_config, mcp_prepare_account_delegation, mcp_set_access, mcp_set_config,
-        prepare_account_delegation, set_default_account, AccountDelegationParams,
+        mcp_get_config, mcp_prepare_account_delegation, mcp_set_access,
+        mcp_set_access_with_read_only, mcp_set_config, prepare_account_delegation,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
@@ -124,6 +125,10 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     verify_delegation(&env, user_key.clone(), &signed, &env.root_key().unwrap());
     assert_eq!(signed.delegation.pubkey, session_key);
     assert_eq!(signed.delegation.expiration, expiration);
+    // This grant used the 3-argument `mcp_set_access` (no `read_only`), so the
+    // minted per-app delegation is unrestricted — the backwards-compatible
+    // default for callers that omit the flag.
+    assert_eq!(signed.delegation.permissions, None);
 
     // Parity: the MCP-minted delegation acts as the SAME principal the anchor's
     // default account at `target` gets via the regular account-delegation API.
@@ -146,6 +151,236 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
         Principal::self_authenticating(&user_key),
         Principal::self_authenticating(&regular_user_key),
     );
+
+    Ok(())
+}
+
+/// A read-only access grant (`mcp_set_access` with `read_only = true`) makes the
+/// per-app delegations the server mints query-only: they carry
+/// `permissions = "queries"`, and the signed delegation verifies against that
+/// permissions-bound message. The standing delegation is untouched — read-only
+/// is a property of the grant, applied per minted delegation — so the server can
+/// still call the (update) prepare endpoint. (That the signature binds to the
+/// `permissions` value, i.e. a differing value yields `NoSuchDelegation`, is
+/// covered by `accounts::should_get_read_only_account_delegation_with_queries_permissions`,
+/// where the lookup takes an explicit `read_only` argument; the MCP path derives
+/// it from the persisted grant, so it has no per-call variant to contrast here.)
+#[test]
+fn mcp_read_only_grant_mints_queries_only_delegations() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("mcp per-app session key");
+
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+
+    // Opt in with read-only restriction.
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+
+    let McpPrepareDelegation {
+        user_key,
+        expiration,
+        account_number,
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    let signed = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account_number,
+        session_key.clone(),
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+
+    // The minted per-app delegation is queries-only, and the signature verifies.
+    assert_eq!(
+        signed.delegation.permissions,
+        Some("queries".to_string()),
+        "a read-only MCP grant must mint queries-only per-app delegations"
+    );
+    verify_delegation(&env, user_key, &signed, &env.root_key().unwrap());
+
+    Ok(())
+}
+
+/// Without the read-only restriction (the default), the per-app delegations the
+/// server mints are unrestricted (`permissions` absent).
+#[test]
+fn mcp_full_access_grant_mints_unrestricted_delegations() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("mcp per-app session key");
+
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+
+    // Opt in without read-only (explicit `Some(false)`).
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(false),
+    )
+    .unwrap()
+    .unwrap();
+
+    let McpPrepareDelegation {
+        expiration,
+        account_number,
+        ..
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    let signed = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account_number,
+        session_key.clone(),
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(signed.delegation.permissions, None);
+
+    Ok(())
+}
+
+/// Re-granting access for the same MCP-server principal with a different
+/// `read_only` updates the persisted flag in place: a grant flipped from
+/// read-only to full access mints unrestricted per-app delegations thereafter.
+#[test]
+fn mcp_regrant_updates_read_only_in_place() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+
+    // First grant: read-only -> minted per-app delegation is queries-only.
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+    let session_key_ro = ByteBuf::from("mcp session key read-only");
+    let McpPrepareDelegation {
+        expiration,
+        account_number,
+        ..
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key_ro.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed_ro = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account_number,
+        session_key_ro,
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        signed_ro.delegation.permissions,
+        Some("queries".to_string()),
+    );
+
+    // Re-grant the SAME principal as full access; subsequent delegations are
+    // unrestricted (the persisted flag was updated in place, not appended).
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(false),
+    )
+    .unwrap()
+    .unwrap();
+    let session_key_full = ByteBuf::from("mcp session key full");
+    let McpPrepareDelegation {
+        expiration: expiration_full,
+        account_number: account_number_full,
+        ..
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key_full.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed_full = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        account_number_full,
+        session_key_full,
+        expiration_full,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(signed_full.delegation.permissions, None);
 
     Ok(())
 }
