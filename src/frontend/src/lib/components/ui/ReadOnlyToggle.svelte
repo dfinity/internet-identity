@@ -25,12 +25,7 @@
 </script>
 
 <div class={["flex flex-row items-center", className]}>
-  <Checkbox
-    bind:checked
-    label={$t`Read-only mode`}
-    size="sm"
-    {disabled}
-  />
+  <Checkbox bind:checked label={$t`Read-only mode`} size="sm" {disabled} />
   <Tooltip
     label={$t`Read-only mode`}
     description={$t`When enabled, the app can read your data but cannot make changes on your behalf: the Internet Computer rejects any call that would change state.`}

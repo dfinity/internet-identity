@@ -72,7 +72,11 @@
       {/if}
     </p>
 
-    <ReadOnlyToggle bind:checked={isReadOnlyMode} disabled={busy} class="mt-4" />
+    <ReadOnlyToggle
+      bind:checked={isReadOnlyMode}
+      disabled={busy}
+      class="mt-4"
+    />
 
     <button
       class="btn btn-primary btn-xl mt-6 w-full"
