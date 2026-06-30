@@ -281,6 +281,106 @@ fn mcp_full_access_grant_mints_unrestricted_delegations() -> Result<(), RejectRe
     Ok(())
 }
 
+/// Re-granting access for the same MCP-server principal with a different
+/// `read_only` updates the persisted flag in place: a grant flipped from
+/// read-only to full access mints unrestricted per-app delegations thereafter.
+#[test]
+fn mcp_regrant_updates_read_only_in_place() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+
+    // First grant: read-only -> minted per-app delegation is queries-only.
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+    let session_key_ro = ByteBuf::from("mcp session key read-only");
+    let McpPrepareDelegation {
+        expiration,
+        account_number,
+        ..
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key_ro.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed_ro = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account_number,
+        session_key_ro,
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        signed_ro.delegation.permissions,
+        Some("queries".to_string()),
+    );
+
+    // Re-grant the SAME principal as full access; subsequent delegations are
+    // unrestricted (the persisted flag was updated in place, not appended).
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(false),
+    )
+    .unwrap()
+    .unwrap();
+    let session_key_full = ByteBuf::from("mcp session key full");
+    let McpPrepareDelegation {
+        expiration: expiration_full,
+        account_number: account_number_full,
+        ..
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key_full.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed_full = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        account_number_full,
+        session_key_full,
+        expiration_full,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(signed_full.delegation.permissions, None);
+
+    Ok(())
+}
+
 /// A longer requested TTL is clamped to the 5-minute cap.
 #[test]
 fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
