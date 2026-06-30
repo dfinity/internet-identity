@@ -125,6 +125,10 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     verify_delegation(&env, user_key.clone(), &signed, &env.root_key().unwrap());
     assert_eq!(signed.delegation.pubkey, session_key);
     assert_eq!(signed.delegation.expiration, expiration);
+    // This grant used the 3-argument `mcp_set_access` (no `read_only`), so the
+    // minted per-app delegation is unrestricted — the backwards-compatible
+    // default for callers that omit the flag.
+    assert_eq!(signed.delegation.permissions, None);
 
     // Parity: the MCP-minted delegation acts as the SAME principal the anchor's
     // default account at `target` gets via the regular account-delegation API.
