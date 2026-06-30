@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { selectSupportedCoveringRrsig } from "./chain";
+import { dnsKeyTag } from "./rrsig";
 import type { DnsRR } from "./wire";
 
 const TYPE_RRSIG = 46;
 const TYPE_TXT = 16;
+const TYPE_DNSKEY = 48;
+const FLAG_ZONE = 0x0100;
+const FLAG_SEP = 0x0001;
 
 /**
  * Build a minimal RRSIG `DnsRR` carrying just the two fields the
@@ -76,5 +80,97 @@ describe("selectSupportedCoveringRrsig", () => {
       selectSupportedCoveringRrsig([short, rrsig(TYPE_TXT, 8)], TYPE_TXT)
         ?.rdata[2],
     ).toBe(8);
+  });
+});
+
+/**
+ * Build a DNSKEY `DnsRR`. The selection reads the Flags field (RDATA
+ * bytes 0-1, for the SEP bit) and computes the key tag over the whole
+ * RDATA; `marker` perturbs the public-key bytes so distinct keys get
+ * distinct tags.
+ */
+const dnskey = (flags: number, marker: number): DnsRR => ({
+  name: "example.com",
+  nameBytes: new Uint8Array([0]),
+  type: TYPE_DNSKEY,
+  class_: 1,
+  ttl: 3600,
+  // flags(2) | protocol(3) | algorithm(13) | pubkey(2, marker-derived)
+  rdata: new Uint8Array([
+    (flags >> 8) & 0xff,
+    flags & 0xff,
+    3,
+    13,
+    marker,
+    marker ^ 0xff,
+  ]),
+});
+
+/**
+ * Build an RRSIG `DnsRR` covering `typeCovered` with `algorithm`, whose
+ * `key_tag` (RDATA bytes 16-17, RFC 4034 §3.1.6) is `keyTag`. 19 bytes:
+ * the 18-byte fixed header + a single root signer-name octet.
+ */
+const rrsigForKey = (
+  typeCovered: number,
+  algorithm: number,
+  keyTag: number,
+): DnsRR => {
+  const rdata = new Uint8Array(19);
+  rdata[0] = (typeCovered >> 8) & 0xff;
+  rdata[1] = typeCovered & 0xff;
+  rdata[2] = algorithm;
+  rdata[16] = (keyTag >> 8) & 0xff;
+  rdata[17] = keyTag & 0xff;
+  return {
+    name: "example.com",
+    nameBytes: new Uint8Array([0]),
+    type: TYPE_RRSIG,
+    class_: 1,
+    ttl: 3600,
+    rdata,
+  };
+};
+
+describe("selectSupportedCoveringRrsig — DNSKEY RRset must be KSK-signed", () => {
+  it("bundles the KSK (SEP) self-signature over a ZSK's, regardless of order", () => {
+    // The canister authenticates the DNSKEY RRset under the DS-pinned
+    // KSK (RFC 4035 §5.2), so even when the ZSK's RRSIG is returned
+    // first we must bundle the SEP key's.
+    const ksk = dnskey(FLAG_ZONE | FLAG_SEP, 0xaa);
+    const zsk = dnskey(FLAG_ZONE, 0xbb);
+    const kskTag = dnsKeyTag(ksk.rdata);
+    expect(kskTag).not.toBe(dnsKeyTag(zsk.rdata));
+    const sigs = [
+      rrsigForKey(TYPE_DNSKEY, 13, dnsKeyTag(zsk.rdata)), // ZSK first
+      rrsigForKey(TYPE_DNSKEY, 13, kskTag), // KSK second
+    ];
+    const chosen = selectSupportedCoveringRrsig(sigs, TYPE_DNSKEY, [ksk, zsk]);
+    expect(chosen).toBeDefined();
+    expect(((chosen!.rdata[16] << 8) | chosen!.rdata[17]) >>> 0).toBe(kskTag);
+  });
+
+  it("returns undefined when only a ZSK signed the DNSKEY RRset", () => {
+    // No SEP-key signature to bundle → abandon DNSSEC, fall back to DoH.
+    const ksk = dnskey(FLAG_ZONE | FLAG_SEP, 0xaa);
+    const zsk = dnskey(FLAG_ZONE, 0xbb);
+    const sigs = [rrsigForKey(TYPE_DNSKEY, 13, dnsKeyTag(zsk.rdata))];
+    expect(
+      selectSupportedCoveringRrsig(sigs, TYPE_DNSKEY, [ksk, zsk]),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when the only SEP key signed with an unsupported algorithm (mailbox.org RSA-SHA1 KSK)", () => {
+    // KSK signs with RSA-SHA1 (7, unsupported); ZSK signs with a
+    // supported algorithm but is not DS-pinnable. Nothing usable.
+    const ksk = dnskey(FLAG_ZONE | FLAG_SEP, 0xaa);
+    const zsk = dnskey(FLAG_ZONE, 0xbb);
+    const sigs = [
+      rrsigForKey(TYPE_DNSKEY, 7, dnsKeyTag(ksk.rdata)),
+      rrsigForKey(TYPE_DNSKEY, 10, dnsKeyTag(zsk.rdata)),
+    ];
+    expect(
+      selectSupportedCoveringRrsig(sigs, TYPE_DNSKEY, [ksk, zsk]),
+    ).toBeUndefined();
   });
 });
