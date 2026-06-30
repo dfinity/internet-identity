@@ -484,6 +484,26 @@ pub fn mcp_set_access(
     .map(|(x,)| x)
 }
 
+pub fn mcp_set_access_with_read_only(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    mcp_server_origin: FrontendHostname,
+    enabled: bool,
+    read_only: Option<bool>,
+) -> Result<Result<(), String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_set_access",
+        (identity_number, mcp_server_origin, enabled, read_only),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn mcp_access_enabled(
     env: &PocketIc,
     canister_id: CanisterId,

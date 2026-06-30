@@ -9,8 +9,9 @@ use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
         create_account, mcp_access_enabled, mcp_get_account_delegation, mcp_get_accounts,
-        mcp_get_config, mcp_prepare_account_delegation, mcp_set_access, mcp_set_config,
-        prepare_account_delegation, set_default_account, AccountDelegationParams,
+        mcp_get_config, mcp_prepare_account_delegation, mcp_set_access,
+        mcp_set_access_with_read_only, mcp_set_config, prepare_account_delegation,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
@@ -146,6 +147,132 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
         Principal::self_authenticating(&user_key),
         Principal::self_authenticating(&regular_user_key),
     );
+
+    Ok(())
+}
+
+/// A read-only access grant (`mcp_set_access` with `read_only = true`) makes the
+/// per-app delegations the server mints query-only: they carry
+/// `permissions = "queries"`, and the signature binds to it (an unrestricted
+/// lookup of the same key yields `NoSuchDelegation`). The standing delegation is
+/// untouched — read-only is a property of the grant, applied per minted
+/// delegation — so the server can still call the (update) prepare endpoint.
+#[test]
+fn mcp_read_only_grant_mints_queries_only_delegations() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("mcp per-app session key");
+
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+
+    // Opt in with read-only restriction.
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+
+    let McpPrepareDelegation {
+        user_key,
+        expiration,
+        account_number,
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    let signed = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account_number,
+        session_key.clone(),
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+
+    // The minted per-app delegation is queries-only, and the signature verifies.
+    assert_eq!(
+        signed.delegation.permissions,
+        Some("queries".to_string()),
+        "a read-only MCP grant must mint queries-only per-app delegations"
+    );
+    verify_delegation(&env, user_key, &signed, &env.root_key().unwrap());
+
+    Ok(())
+}
+
+/// Without the read-only restriction (the default), the per-app delegations the
+/// server mints are unrestricted (`permissions` absent).
+#[test]
+fn mcp_full_access_grant_mints_unrestricted_delegations() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("mcp per-app session key");
+
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+
+    // Opt in without read-only (explicit `Some(false)`).
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(false),
+    )
+    .unwrap()
+    .unwrap();
+
+    let McpPrepareDelegation {
+        expiration,
+        account_number,
+        ..
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    let signed = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        account_number,
+        session_key.clone(),
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(signed.delegation.permissions, None);
 
     Ok(())
 }

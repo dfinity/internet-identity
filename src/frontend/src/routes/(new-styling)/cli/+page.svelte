@@ -167,7 +167,7 @@
     }
   });
 
-  const handleAuthorize = async (): Promise<void> => {
+  const handleAuthorize = async (readOnly: boolean): Promise<void> => {
     if (params.kind !== "valid") {
       return;
     }
@@ -206,6 +206,7 @@
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
         nonce: params.nonce,
+        readOnly,
       });
     } catch (error) {
       // Authentication and delegation errors are surfaced the same way as the

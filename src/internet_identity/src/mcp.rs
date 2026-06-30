@@ -82,14 +82,18 @@ pub fn set_mcp_access(
     anchor_number: AnchorNumber,
     mcp_server_origin: FrontendHostname,
     enabled: bool,
+    read_only: bool,
 ) -> Result<(), String> {
     let principal = mcp_principal_for(anchor_number, &mcp_server_origin);
     storage_borrow_mut(|storage| {
         if enabled {
             // Surface a cross-anchor collision instead of silently no-op'ing, so
-            // the caller learns the origin couldn't be bound.
+            // the caller learns the origin couldn't be bound. `read_only`
+            // restricts the per-app delegations this server can later obtain to
+            // query calls; the standing delegation it holds stays full-access so
+            // it can still call the (update) `mcp_prepare_account_delegation`.
             storage
-                .set_anchor_mcp_principal(principal, anchor_number)
+                .set_anchor_mcp_principal(principal, anchor_number, read_only)
                 .map_err(|existing| {
                     format!(
                         "MCP access could not be enabled: the principal for this \
@@ -178,6 +182,10 @@ pub async fn prepare_account_delegation(
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
     let anchor_number = caller_anchor()?;
+    // Whether this server's access grant restricts its per-app delegations to
+    // query calls, chosen by the user at connect time and persisted with the
+    // grant. Looked up by `caller()` (the same principal `caller_anchor` used).
+    let read_only = storage_borrow(|storage| storage.is_mcp_principal_read_only(caller()));
     let capped_ttl = Some(u64::min(
         max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
         MCP_MAX_EXPIRATION_PERIOD_NS,
@@ -191,9 +199,7 @@ pub async fn prepare_account_delegation(
         account_number,
         session_key,
         capped_ttl,
-        // MCP delegations are update-capable (unrestricted); the read-only
-        // restriction is a feature of the ICRC-34 authorize flow only.
-        false,
+        read_only,
         &None,
     )
     .await?;
@@ -216,13 +222,15 @@ pub fn get_account_delegation(
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     let anchor_number = caller_anchor()?;
+    // Must match the value `prepare_account_delegation` signed with, or the
+    // signature lookup fails: read the same persisted per-grant flag.
+    let read_only = storage_borrow(|storage| storage.is_mcp_principal_read_only(caller()));
     account_management::get_account_delegation(
         anchor_number,
         &target_origin,
         account_number,
         session_key,
         expiration,
-        // Unrestricted; must match `prepare_account_delegation` above.
-        false,
+        read_only,
     )
 }

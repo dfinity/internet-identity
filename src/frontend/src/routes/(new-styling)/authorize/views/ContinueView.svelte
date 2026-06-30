@@ -32,7 +32,7 @@
   } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
-  import Checkbox from "$lib/components/ui/Checkbox.svelte";
+  import ReadOnlyToggle from "$lib/components/ui/ReadOnlyToggle.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -571,29 +571,11 @@
       </button>
     </Tooltip>
   </div>
-  <div class="mt-4 flex flex-row items-center">
-    <Checkbox
-      bind:checked={isReadOnlyMode}
-      label={$t`Read-only mode`}
-      size="sm"
-      disabled={isAuthenticatingDefault}
-    />
-    <Tooltip
-      label={$t`Read-only mode`}
-      description={$t`When enabled, the app can read your data but cannot make changes on your behalf: the Internet Computer rejects any call that would change state.`}
-      direction="up"
-      align="end"
-      offset="0rem"
-      class="max-w-80"
-    >
-      <button
-        class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
-        aria-label={$t`More information about read-only mode`}
-      >
-        <HelpCircleIcon class="size-5" />
-      </button>
-    </Tooltip>
-  </div>
+  <ReadOnlyToggle
+    bind:checked={isReadOnlyMode}
+    disabled={isAuthenticatingDefault}
+    class="mt-4"
+  />
 </div>
 
 {#if authLastUsedFlow.systemOverlay}

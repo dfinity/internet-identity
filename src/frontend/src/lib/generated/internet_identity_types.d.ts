@@ -2127,7 +2127,7 @@ export interface _SERVICE {
    * they choose.
    */
   'mcp_set_access' : ActorMethod<
-    [UserNumber, FrontendHostname, boolean],
+    [UserNumber, FrontendHostname, boolean, [] | [boolean]],
     { 'Ok' : null } |
       { 'Err' : string }
   >,

@@ -1815,7 +1815,11 @@ service : (opt InternetIdentityInit) -> {
     mcp_set_access : (
         anchor_number : UserNumber,
         mcp_server_origin : FrontendHostname,
-        enabled : bool
+        enabled : bool,
+        // When `opt true`, the per-app delegations this server can later obtain
+        // are restricted to query calls (queries-only). Omitted (`null`) means
+        // full access.
+        read_only : opt bool
     ) -> (variant { Ok; Err : text });
 
     // Whether the anchor has MCP access enabled at mcp_server_origin.

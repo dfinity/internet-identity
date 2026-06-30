@@ -648,9 +648,18 @@ fn mcp_set_access(
     anchor_number: AnchorNumber,
     mcp_server_origin: FrontendHostname,
     enabled: bool,
+    // When `opt true`, the per-app delegations this server can later obtain are
+    // restricted to query calls. Omitted (`null`) means full access, preserving
+    // the pre-feature behavior for callers that don't pass it.
+    read_only: Option<bool>,
 ) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_access(anchor_number, mcp_server_origin, enabled)
+    mcp::set_mcp_access(
+        anchor_number,
+        mcp_server_origin,
+        enabled,
+        read_only.unwrap_or(false),
+    )
 }
 
 /// Whether `anchor_number` has MCP access enabled at `mcp_server_origin`.

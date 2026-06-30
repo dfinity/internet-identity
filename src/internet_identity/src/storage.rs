@@ -186,6 +186,7 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
 const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
 const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
+const LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX: u8 = 27u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -248,6 +249,15 @@ const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
 /// of the identity's devices. Kept in its own map so it never touches anchor
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
+
+/// Set of MCP-server principals whose access grant is restricted to read-only
+/// (query-only) delegations, keyed by the same principal as
+/// [`LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID`]. Membership means the
+/// `mcp_*_account_delegation` methods sign queries-only per-app delegations for
+/// that server. Kept as a separate map (rather than widening the reverse-index
+/// value) so existing grants need no migration: absent means full access.
+const LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -404,6 +414,13 @@ pub struct Storage<M: Memory> {
     mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
+
+    lookup_mcp_principal_read_only_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Read-only MCP-server principals. See [`LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_ID`].
+    /// The value is the binding anchor (for symmetry with the reverse index);
+    /// membership alone signals the read-only restriction.
+    lookup_mcp_principal_read_only_memory:
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -493,6 +510,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
+        let lookup_mcp_principal_read_only_memory =
+            memory_manager.get(LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -609,6 +628,12 @@ impl<M: Memory + Clone> Storage<M> {
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
             mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
+            lookup_mcp_principal_read_only_memory_wrapper: MemoryWrapper::new(
+                lookup_mcp_principal_read_only_memory.clone(),
+            ),
+            lookup_mcp_principal_read_only_memory: StableBTreeMap::init(
+                lookup_mcp_principal_read_only_memory,
+            ),
         }
     }
 
@@ -1101,6 +1126,7 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         principal: Principal,
         anchor_number: AnchorNumber,
+        read_only: bool,
     ) -> Result<(), AnchorNumber> {
         if let Some(existing) = self.lookup_anchor_with_mcp_principal_memory.get(&principal) {
             if existing != anchor_number {
@@ -1109,13 +1135,33 @@ impl<M: Memory + Clone> Storage<M> {
         }
         self.lookup_anchor_with_mcp_principal_memory
             .insert(principal, anchor_number);
+        // Record (or clear) the read-only restriction for this grant. Re-binding
+        // the same anchor with a different `read_only` updates it in place, so
+        // the per-app delegations always reflect the latest connect choice.
+        if read_only {
+            self.lookup_mcp_principal_read_only_memory
+                .insert(principal, anchor_number);
+        } else {
+            self.lookup_mcp_principal_read_only_memory
+                .remove(&principal);
+        }
         Ok(())
     }
 
-    /// Forget (disable) an anchor's MCP-server principal.
+    /// Forget (disable) an anchor's MCP-server principal, including any read-only
+    /// restriction recorded for it.
     pub fn remove_anchor_mcp_principal(&mut self, principal: Principal) {
         self.lookup_anchor_with_mcp_principal_memory
             .remove(&principal);
+        self.lookup_mcp_principal_read_only_memory
+            .remove(&principal);
+    }
+
+    /// Whether the given MCP-server principal's access grant is restricted to
+    /// read-only (query-only) per-app delegations. Absent means full access.
+    pub fn is_mcp_principal_read_only(&self, principal: Principal) -> bool {
+        self.lookup_mcp_principal_read_only_memory
+            .contains_key(&principal)
     }
 
     /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
@@ -2341,6 +2387,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "mcp_config_memory".to_string(),
                 self.mcp_config_memory_wrapper.size(),
+            ),
+            (
+                "lookup_mcp_principal_read_only_memory".to_string(),
+                self.lookup_mcp_principal_read_only_memory_wrapper.size(),
             ),
         ])
     }

@@ -1172,7 +1172,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Bool],
+        [UserNumber, FrontendHostname, IDL.Bool, IDL.Opt(IDL.Bool)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
