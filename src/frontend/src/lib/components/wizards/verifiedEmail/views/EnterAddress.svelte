@@ -58,7 +58,7 @@
     isDuplicate
       ? $t`You've already verified this email.`
       : isOpenidDuplicate
-        ? $t`This email is already linked through a sign-in provider.`
+        ? $t`This email is already linked through an OpenID provider.`
         : submitError,
   );
 

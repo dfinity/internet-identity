@@ -146,12 +146,12 @@
   // fresh list_available_attributes can surface as a picker.
   let displayGroups = $state<MergedGroup[]>([]);
 
-  // A group is "unscoped" iff its first option's key has no `openid:` /
-  // `sso:` scope. Single-source groups (one option) and scoped fan-outs
-  // both surface here; mergeGroups never mixes scoped + unscoped options
-  // inside a single group, so checking the first option is sufficient.
-  const isUnscopedGroup = (group: MergedGroup): boolean =>
-    extractScope(group.options[0].display.key) === undefined;
+  // A group is "unscoped" iff the original request carried no scope —
+  // tracked authoritatively by `MergedGroup.omitScope`. The wire keys of
+  // a group's options can still be scoped (an unscoped `email` request
+  // fans out into `openid:<issuer>:email` options); we must not infer
+  // scope from those keys.
+  const isUnscopedGroup = (group: MergedGroup): boolean => group.omitScope;
 
   // Stable partition: unscoped first, then scoped; relative order
   // within each tier preserved so we don't perturb the existing
