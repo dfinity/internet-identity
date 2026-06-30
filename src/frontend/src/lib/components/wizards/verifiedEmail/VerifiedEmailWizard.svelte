@@ -33,6 +33,7 @@
     addressLocked?: boolean;
     recoveryAddresses?: string[];
     verifiedAddresses?: string[];
+    openidAddresses?: string[];
     onSuccess: (address: string) => void;
   }
 
@@ -46,6 +47,7 @@
     addressLocked = false,
     recoveryAddresses = [],
     verifiedAddresses = [],
+    openidAddresses = [],
     onSuccess,
   }: Props = $props();
 
@@ -196,6 +198,7 @@
     {addressLocked}
     {recoveryAddresses}
     {verifiedAddresses}
+    {openidAddresses}
     initialError={stage.initialError}
   />
 {:else if stage.kind === "sending"}
