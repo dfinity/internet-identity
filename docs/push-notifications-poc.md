@@ -2,7 +2,7 @@
 
 **Status:** draft · PoC scope
 **Authors:** Mario, Claude
-**Last updated:** 2026-06-30 (rev: simplify for PoC — synchronous outcall, drop queue/timer, drop `last_seen_at`)
+**Last updated:** 2026-06-30 (rev: outcall via `ic_cdk::spawn` — dApp returns in ms, no queue, no timer)
 
 ## 1. Goal
 
@@ -49,6 +49,7 @@ sequenceDiagram
     autonumber
     participant Dapp as dApp Canister
     participant II as II Canister
+    participant Spawn as Spawned Future<br/>(ic_cdk::spawn)
     participant Push as Push Relay<br/>(Apple/Google/Mozilla)
     participant SW as II Service Worker<br/>(on device)
     participant Phone as Phone Screen
@@ -61,25 +62,31 @@ sequenceDiagram
     Note over II: spool PendingNotification<br/>(notification_id, ttl 5min)
 
     loop for each device
-        alt inflight_outcall_at set
+        alt inflight_outcall_at fresh
             Note over II: skip wakeup<br/>(notification rides along<br/>on inflight outcall)
-        else idle
+        else idle (or flag stale)
             Note over II: mark inflight_outcall_at = now
-            II->>Push: POST {endpoint}<br/>VAPID-signed, empty body
-            Push-->>II: 201 / 410 / 5xx
-            alt 410 Gone
-                Note over II: delete subscription
-            else 5xx / 429
-                Note over II: clear inflight_outcall_at<br/>(no retry in PoC)
-            end
-            Push-->>SW: wake-up signal
+            II->>Spawn: ic_cdk::spawn(send_push)
         end
     end
     II-->>Dapp: Ok(())
     deactivate II
+    Note right of Dapp: dApp's await resolves in ~ms
 
-    rect rgba(180, 180, 180, 0.15)
-        Note over SW,Phone: ── on the device, after the push wakeup ──
+    rect rgba(180, 180, 180, 0.1)
+        Note over Spawn,Phone: ── asynchronous, one future per spawned wakeup ──
+        activate Spawn
+        Spawn->>Push: POST {endpoint}<br/>VAPID-signed, empty body
+        Push-->>Spawn: 201 / 410 / 5xx
+        alt 410 Gone
+            Spawn->>II: delete_subscription
+        else 5xx / 429
+            Spawn->>II: clear_inflight (no retry in PoC)
+        else 201 success
+            Note over Spawn: leave inflight set;<br/>SW pull will clear it
+        end
+        deactivate Spawn
+        Push-->>SW: wake-up signal
         activate SW
         Note over SW: read ii-session-delegations<br/>from IndexedDB
         SW->>II: get_pending_for_anchor()<br/>[update, anchor-authenticated]
@@ -97,15 +104,14 @@ sequenceDiagram
 
 Things to call out from the diagram:
 
-- **The outcall fires inline in `notify_user`.** No timer, no queue.
-  The dApp's `await` blocks until every wakeup that needed firing has
-  been accepted (or rejected). With one fresh device, ~2-5 s; when
-  every device coalesces, ~ms.
+- **`notify_user` returns `Ok` *before* any HTTPS traffic leaves the
+  canister.** The outcall is detached via `ic_cdk::spawn`. dApp
+  latency is in ms, every time.
 - **The "for each device" alt block** is the §9 coalescing rule — if
-  a wakeup is already in flight to a device, the new notification
-  just rides along on it.
-- **`410 Gone` deletes the subscription** instead of being tracked
-  via a presence timestamp (§9, §14).
+  a wakeup is already in flight (and not stale by `INFLIGHT_TTL`), a
+  new notification just rides along on it.
+- **`410 Gone` deletes the subscription** — push-relay-driven cleanup,
+  no presence tracking (§9, §14).
 - **`get_pending_for_anchor` is an update, not a query** — it mutates
   spool + inflight state alongside returning the payload.
 - **One push wakeup → one update → N notifications rendered.** That's
@@ -138,8 +144,12 @@ struct DeviceSubscription {
     // Coalescing state — see §9.
     inflight_outcall_at: Option<u64>,  // Some(t) ⇒ a wakeup is in flight; new
                                        //          notifications just spool, no
-                                       //          new outcall fired.
+                                       //          new outcall fired. Stale flags
+                                       //          older than INFLIGHT_TTL count
+                                       //          as idle (trap recovery).
 }
+
+const INFLIGHT_TTL_NS: u64 = 5 * 60 * 1_000_000_000;  // 5 min
 ```
 
 The `p256dh` + `auth` fields are dead code in the PoC (we ship empty
@@ -147,10 +157,16 @@ push bodies, see §12). They're not auth material — the SW
 authenticates to II via the existing **session delegation** mechanism
 (see §13), not via a per-device key.
 
-`inflight_outcall_at` is the coalescing lever (§9). Liveness ("is this
-device still real?") is **not** tracked here — we rely on the push
-relay's response codes (`410 Gone` → delete subscription). This avoids
-turning the canister into a passive presence tracker.
+`inflight_outcall_at` is the coalescing lever (§9). The TTL exists
+because the outcall is fired in an `ic_cdk::spawn`ed future (§10) — if
+that future traps mid-`await`, the flag would otherwise stay set
+forever. After `INFLIGHT_TTL` a stranded flag is ignored and a fresh
+outcall can fire.
+
+Liveness ("is this device still real?") is **not** tracked here — we
+rely on the push relay's response codes (`410 Gone` → delete
+subscription). This avoids turning the canister into a passive presence
+tracker.
 
 ### `APP_CONSENT : (anchor, frontend_hostname) → AppConsent`
 
@@ -194,9 +210,9 @@ struct PendingNotification {
 }
 ```
 
-There is **no** notification queue or timer state — the outcall fires
-inline in `notify_user` (§9, §10). `PENDING_NOTIFICATIONS` is the only
-notification-bearing region.
+There is **no** notification queue or timer state — wakeups are
+detached via `ic_cdk::spawn` (§9, §10). `PENDING_NOTIFICATIONS` is the
+only notification-bearing region.
 
 ## 6. Types
 
@@ -300,7 +316,7 @@ fn inspect_message() {
 
 Read-only peek — no decrement. The decrement happens in the update.
 
-## 9. Cost model: synchronous outcall + per-device coalescing
+## 9. Cost model: spawn the outcall, coalesce per device
 
 The single dominant cost is the HTTPS outcall — ~50 M cycles and
 ~2-5 s per call, replicated, irreducible for offline delivery. Every
@@ -331,48 +347,51 @@ optimization that matters is **reducing the number of outcalls**.
 
 Implementation: `DeviceSubscription.inflight_outcall_at` is set when
 the outcall begins and cleared when the SW calls
-`get_pending_for_anchor`. While set, concurrent `notify_user` calls
-for the same device spool the payload but do **not** start a second
-outcall.
+`get_pending_for_anchor`. While set (and not yet past `INFLIGHT_TTL`),
+concurrent `notify_user` calls for the same device spool the payload
+but do **not** start a second outcall.
 
-### PoC architecture: outcall lives inline in `notify_user`
+### PoC architecture: outcall fires in `ic_cdk::spawn`
 
-For the PoC the HTTPS outcall fires **synchronously inside
-`notify_user`** — no queue, no timer, no spool of pending jobs to
-drain. The dApp's `await` blocks until every wakeup that needed firing
-has been accepted (or rejected) by its push relay.
+`notify_user` does the cheap state work (lookup, authz, spool, mark
+inflight) and then **`ic_cdk::spawn`s the outcall as a detached
+future**, returning `Ok(())` to the dApp before any HTTPS traffic
+leaves the canister. The dApp's `await` resolves in **milliseconds**,
+not seconds.
 
-Why this is fine:
+This is the same pattern `single_flight_cache` uses to detach its
+fills — small, native to the IC, no queue or timer state.
 
-- Notifications aren't on a user-blocking critical path; a few seconds
-  of dApp `await` is acceptable.
-- The coalescing lever lives in `inflight_outcall_at`, not in any
-  queue — bursts collapse without needing a timer.
-- It deletes a real chunk of complexity: no stable-memory queue
-  layout, no timer to re-arm post-upgrade, no spawned-future
-  coordination, no retry/backoff state machine.
+Why this beats both alternatives we considered:
 
-When we'd add the queue + timer back (production):
+| | dApp latency | Stable-memory plumbing | Retry / backoff |
+|---|---|---|---|
+| Synchronous outcall (earlier draft) | 2-5 s | none | inline error → caller |
+| Queue + timer (original draft) | ~ms | queue region + drain loop + `post_upgrade` re-arm | natural fit |
+| **`ic_cdk::spawn`** (this design) | **~ms** | **none** | none in PoC; trap recovery via TTL |
 
-- Sub-second `notify_user` even for fresh devices becomes a UX
-  requirement.
-- We want retry-with-backoff for transient relay failures.
-- We want to debounce — collapse N notifications over an explicit
-  window instead of only collapsing those that arrive while a single
-  outcall happens to be inflight.
+### Trap recovery — why `inflight_outcall_at` has a TTL
+
+A spawned future is fire-and-forget. If it traps mid-`await` (e.g.
+between marking inflight and getting an outcall result), the flag
+stays set. Without recovery, that device would be permanently
+"locked" against future wakeups.
+
+We solve this in the cheapest possible way: `inflight_outcall_at` is
+treated as **stale after `INFLIGHT_TTL` (5 min)**. A `notify_user`
+call sees a stale flag, ignores it, and fires fresh. The `post_upgrade`
+hook also sweeps stale flags as belt-and-braces.
 
 ### Dead-device cleanup via push-relay response codes
 
-Instead of tracking activity timestamps on each device (a passive
-presence channel that didn't exist before push), we let the push relay
-tell us when a subscription is dead:
+The spawned future inspects the relay's response:
 
-| Relay response | Action |
+| Relay response | Action in the spawned future |
 |---|---|
-| `201 Created` / `202 Accepted` | success — `inflight_outcall_at` is cleared when the SW pulls |
+| `201 Created` / `202 Accepted` | success — leave `inflight_outcall_at` set; SW pull clears it |
 | `410 Gone` / `404 Not Found` | **delete this `DeviceSubscription`** |
-| `429 Too Many Requests` | log; do not retry in PoC |
-| `5xx` | log; do not retry in PoC; clear `inflight_outcall_at` so a future notification can try again |
+| `429 Too Many Requests` | log; clear `inflight_outcall_at`; no retry in PoC |
+| `5xx` | log; clear `inflight_outcall_at`; no retry in PoC |
 
 The first push to a dead device costs one wasted outcall. After that
 the subscription is gone and we never try again. The PoC trades a
@@ -397,7 +416,7 @@ falls toward zero as burst size grows.**
 
 ```rust
 #[ic_cdk::update]
-async fn notify_user(p: Principal, alert: PushAlert) -> Result<(), NotifyError> {
+fn notify_user(p: Principal, alert: PushAlert) -> Result<(), NotifyError> {
     if alert.title.len() > MAX_TITLE || alert.body.len() > MAX_BODY {
         return Err(NotifyError::PayloadTooLarge);
     }
@@ -427,41 +446,48 @@ async fn notify_user(p: Principal, alert: PushAlert) -> Result<(), NotifyError> 
         expires_at: time() + TTL_NS,
     });
 
-    // Per-device coalescing (§9): one outcall in flight per device.
+    // Per-device coalescing (§9): at most one outcall in flight per device.
+    // A flag older than INFLIGHT_TTL is treated as stale (trap recovery).
+    let now = time();
     let to_wake: Vec<_> = devices
         .into_iter()
-        .filter(|d| d.inflight_outcall_at.is_none())
+        .filter(|d| {
+            d.inflight_outcall_at
+                .map_or(true, |t| now.saturating_sub(t) > INFLIGHT_TTL_NS)
+        })
         .collect();
-    let now = time();
     for d in &to_wake {
         storage::mark_inflight(&d.endpoint, now);
     }
 
-    // Fire wakeups in parallel inside this update; await all before returning.
-    let results = futures::future::join_all(
-        to_wake.iter().map(|d| send_push(d))
-    ).await;
-
-    // Apply relay response codes (delete dead subs, clear inflight on 5xx).
-    for (d, res) in to_wake.iter().zip(results) {
-        match res {
-            Ok(_)                       => { /* SW pull clears inflight */ }
-            Err(PushError::Gone)        => storage::delete_subscription(&d.endpoint),
-            Err(_)                      => storage::clear_inflight(&d.endpoint),
-        }
+    // Detach each wakeup into its own future. notify_user returns to the
+    // dApp before any HTTPS traffic leaves the canister.
+    for d in to_wake {
+        ic_cdk::spawn(async move {
+            match send_push(&d).await {
+                Ok(_)                  => { /* SW pull clears inflight */ }
+                Err(PushError::Gone)   => storage::delete_subscription(&d.endpoint),
+                Err(_)                 => storage::clear_inflight(&d.endpoint),
+            }
+        });
     }
     Ok(())
 }
 ```
 
-`notify_user` blocks on every wakeup. With one fresh device that's
-~2-5 s; with no fresh devices (everything already coalesced) it
-returns in ms. The synchronous-await shape is intentional — see §9
-for why the timer + queue isn't worth its complexity for the PoC.
+`notify_user` does only cheap stable-map ops — no `await` on the
+outcall. The dApp's call resolves in **milliseconds**, every time.
+Each wakeup runs in its own spawned future; their outcomes settle
+`inflight_outcall_at` and subscription liveness asynchronously.
 
-## 11. HTTPS outcall (inline in `notify_user`)
+The handler is no longer `async` — there is no point in the
+function where we suspend. `ic_cdk::spawn` schedules the futures
+without awaiting them here.
 
-Standard RFC 8030 Web Push, **empty body** for the PoC:
+## 11. HTTPS outcall (in the spawned future)
+
+Each `ic_cdk::spawn`ed future calls `send_push` once. Standard
+RFC 8030 Web Push, **empty body** for the PoC:
 
 ```rust
 async fn send_push(device: &DeviceSubscription) -> Result<(), PushError> {
@@ -496,11 +522,13 @@ async fn send_push(device: &DeviceSubscription) -> Result<(), PushError> {
 
 - **On `get_pending_for_anchor`** (the SW landed and picked up the
   notifications) — primary path.
-- **On `5xx` / `RateLimited` from the relay** — `notify_user` clears it
-  inline before returning, so a future notification can try afresh.
-- **On `post_upgrade`** — sweep flags older than ~5 min. Belt-and-
-  braces in case an outcall trapped at `await` without an `Err` path
-  running.
+- **On `5xx` / `RateLimited` from the relay** — the spawned future
+  clears it before exiting so a future notification can try afresh.
+- **On `INFLIGHT_TTL` expiry** (5 min) — the gate in `notify_user`
+  treats stale flags as idle. Trap recovery for a spawned future that
+  died mid-`await` without running its cleanup arm.
+- **On `post_upgrade`** — sweep flags older than `INFLIGHT_TTL` as
+  belt-and-braces.
 
 **Why empty body?**
 We don't want the push relay (FCM, Mozilla, Apple) to see the
@@ -649,8 +677,16 @@ Invariant maintenance:
 - Anchor deletion sweeps both maps + `DEVICE_SUBSCRIPTIONS[anchor]` +
   any in-flight `PENDING_NOTIFS` for that anchor.
 - `post_upgrade` sweeps `DeviceSubscription.inflight_outcall_at` flags
-  older than ~5 min — recovery for an outcall that trapped at
-  `await` without running its cleanup path.
+  older than `INFLIGHT_TTL` — belt-and-braces for a spawned future
+  that trapped at `await` without running its cleanup arm. The
+  in-handler `INFLIGHT_TTL` gate already handles this on the hot path;
+  the sweep just keeps storage tidy.
+
+`ic_cdk::spawn` futures themselves are **not** persisted across an
+upgrade — a future in flight when the canister upgrades simply dies.
+The TTL + sweep means a dropped wakeup costs us at most one
+"missed notification until the next one arrives," not a permanently
+locked device.
 
 ## 14. Privacy of the data
 
@@ -774,32 +810,36 @@ What happens, step by step:
 7. **Rate-limit decrement** or `Err(RateLimited)`.
 8. **Spool a `PendingNotification`** under a fresh `notification_id`.
 9. **Per-device coalescing gate (§9):** keep only devices whose
-   `inflight_outcall_at` is `None`. Mark each kept device inflight.
-   In a burst, this is where N notifications collapse to one outcall
-   per device — the rest spool and ride along on the inflight wakeup.
-10. **Fire wakeups in parallel** (`futures::join_all`) — for each
-    kept device, sign a VAPID JWT inline and POST an empty-body
-    request to its push endpoint. The dApp's `await` blocks here.
-11. **Per relay response**:
-    - `201/202` → success, leave `inflight_outcall_at` set (the SW
-      will clear it on pull).
-    - `404/410` → delete `DeviceSubscription` for that endpoint.
-    - `5xx`/`429` → clear `inflight_outcall_at` so a later
-      notification retries; no inline retry in PoC.
-12. **Return `Ok(())`** to the dApp. Total wall time: tens of ms if
-    every device was coalesced; ~2-5 s for the slowest fresh device.
+   `inflight_outcall_at` is unset or older than `INFLIGHT_TTL`. Mark
+   each kept device inflight. In a burst, this is where N
+   notifications collapse to one outcall per device — the rest spool
+   and ride along on the inflight wakeup.
+10. **`ic_cdk::spawn` one wakeup future per kept device.** Each
+    future signs a VAPID JWT and POSTs an empty body to that
+    device's push endpoint. `notify_user` does **not** `await` them.
+11. **Return `Ok(())`** to the dApp. Total wall time: **a few ms**,
+    regardless of whether any outcalls are about to run.
+
+Asynchronously, each spawned future:
+
+12. **Signs the VAPID JWT inline** (~10 M cycles, ~2 s via
+    management-canister ECDSA).
+13. **POSTs to the push relay**, awaits the response.
+14. **Applies the response code:**
+    - `201/202` → leave `inflight_outcall_at` set (SW pull will clear).
+    - `404/410` → delete the `DeviceSubscription`.
+    - `5xx`/`429` → clear `inflight_outcall_at`; no retry in PoC.
 
 Meanwhile, on the device:
 
-13. **Push service** (FCM / Mozilla / Apple) forwards the wakeup.
-14. **II's SW wakes up**, reads its session-delegation record from
+15. **Push relay** forwards the wakeup to the device's OS push system.
+16. **II's SW wakes up**, reads its session-delegation record from
     IndexedDB, calls II's `get_pending_for_anchor()` update.
-15. **`get_pending_for_anchor` handler** marks spool rows consumed,
-    clears `inflight_outcall_at` for every device of this anchor.
-    Returns the notifications.
-16. **SW renders** `self.registration.showNotification(title, { body })`
+17. **`get_pending_for_anchor` handler** marks spool rows consumed
+    and clears `inflight_outcall_at` for every device of this anchor.
+18. **SW renders** `self.registration.showNotification(title, { body })`
     for each pending notification.
-17. **Phone screen lights up.**
+19. **Phone screen lights up.**
 
 ## 18. Open questions
 
@@ -829,21 +869,28 @@ Meanwhile, on the device:
 
 ### Production hardening (deferred from the PoC, not "open")
 
-These were live in earlier drafts of this design and deliberately
-dropped to keep the PoC small. They're not unknowns — they're
-hardening steps with a clear shape for later:
+These were live in earlier drafts and deliberately dropped to keep the
+PoC small. They're not unknowns — they're hardening steps with a clear
+shape for later:
 
-- **Queue + timer** to keep `notify_user` returning in ms even when
-  fresh devices need a wakeup, plus retry-with-backoff for transient
-  relay failures and explicit debounce windows.
+- **Retry-with-backoff for transient relay failures.** Today a
+  `5xx`/`429` just clears `inflight_outcall_at` and waits for the next
+  notification. Production wants a bounded retry, which is the moment
+  a queue + timer earns its complexity — we'd spool a retry job with
+  exponential backoff. Until then, the next notification's wakeup
+  effectively bundles any missed earlier one.
+- **Explicit debounce windows.** Spawn-based coalescing only collapses
+  notifications that arrive while an outcall is in flight (≈ seconds).
+  A 30-second debounce window — "wait this long before firing the
+  wakeup so we can bundle in more" — also wants a timer.
 - **VAPID JWT caching** via the in-tree
   [`single_flight_cache`](../src/internet_identity/src/single_flight_cache.rs):
   key by push-relay origin, `fresh_for` ≈ 11 h, single-flight dedup,
   backoff on signing failure. Drops per-push signing cost from
-  ~10 M cycles to amortised ~0.
+  ~10 M cycles to amortised ~0. The spawned-future signing cost today
+  is ~10 M × spawned_outcalls per burst; the cache amortises this.
 - **RFC 8291 payload encryption** so the push relay never sees
-  plaintext, removing the doctor-pulls-from-spool latency on the
-  device.
+  plaintext, removing the SW-pulls-from-spool latency on the device.
 
 ## 19. Minimal first slice (1-day spike)
 
@@ -851,23 +898,29 @@ hardening steps with a clear shape for later:
 2. Add `upsert_subscription` (anchor-authenticated) +
    controllers-only `set_app_consent` backdoor for tests.
 3. Implement `notify_user`: validate → lookup → authz → rate limit →
-   spool → per-device coalescing gate → inline parallel outcalls →
-   apply response codes (410 → delete subscription, 5xx → clear
-   inflight). The per-device gate is the §9 mechanism — the
-   difference between a 1× and an N× outcall cost.
+   spool → per-device coalescing gate (skip if `inflight_outcall_at`
+   is set and fresher than `INFLIGHT_TTL`) → `ic_cdk::spawn` one
+   wakeup future per remaining device → return `Ok` immediately. The
+   spawned future signs VAPID, POSTs, then handles `410 Gone` (delete
+   subscription) / `5xx`/`429` (clear inflight). The per-device gate
+   is the §9 mechanism — the difference between a 1× and an N× outcall
+   cost.
 4. Implement `get_pending_for_anchor` update (anchor-authenticated
    via session delegation). Marks spool rows consumed and clears
    `inflight_outcall_at` for every device of the caller's anchor.
 5. Implement `inspect_message` gate.
 6. Implement VAPID signing inline (no cache) + the empty-body POST
    helper. Test against a mock receiver in `test_app`.
-7. PocketIC test: mint a session delegation for a test anchor,
+7. `post_upgrade` sweep of stale `inflight_outcall_at` flags.
+8. PocketIC test: mint a session delegation for a test anchor,
    `upsert_subscription`, set consent, call `notify_user` **five times
    in a row**, observe the mock receiver got **exactly one** POST
    (the §9 coalescing), then call `get_pending_for_anchor` under the
    session delegation and assert all five payloads come back in one
-   update.
+   update. Verify `notify_user` returned in <50 ms despite the
+   ~2-5 s outcall (spawn semantics).
 
-What's deliberately NOT in the spike: queue, timer, VAPID cache,
-retry/backoff, RFC 8291 encryption, error-variant unification. See
-§18 "Production hardening" for the shape they'd take.
+What's deliberately NOT in the spike: queue, timer, retry/backoff,
+debounce window, VAPID cache, RFC 8291 encryption, error-variant
+unification. See §18 "Production hardening" for the shape they'd
+take.

@@ -2,6 +2,7 @@ sequenceDiagram
     autonumber
     participant Dapp as dApp Canister
     participant II as II Canister
+    participant Spawn as Spawned Future<br/>(ic_cdk::spawn)
     participant Push as Push Relay<br/>(Apple/Google/Mozilla)
     participant SW as II Service Worker<br/>(on device)
     participant Phone as Phone Screen
@@ -14,25 +15,31 @@ sequenceDiagram
     Note over II: spool PendingNotification<br/>(notification_id, ttl 5min)
 
     loop for each device
-        alt inflight_outcall_at set
+        alt inflight_outcall_at fresh
             Note over II: skip wakeup<br/>(notification rides along<br/>on inflight outcall)
-        else idle
+        else idle (or flag stale)
             Note over II: mark inflight_outcall_at = now
-            II->>Push: POST {endpoint}<br/>VAPID-signed, empty body
-            Push-->>II: 201 / 410 / 5xx
-            alt 410 Gone
-                Note over II: delete subscription
-            else 5xx / 429
-                Note over II: clear inflight_outcall_at<br/>(no retry in PoC)
-            end
-            Push-->>SW: wake-up signal
+            II->>Spawn: ic_cdk::spawn(send_push)
         end
     end
     II-->>Dapp: Ok(())
     deactivate II
+    Note right of Dapp: dApp's await resolves in ~ms
 
-    rect rgba(180, 180, 180, 0.15)
-        Note over SW,Phone: ── on the device, after the push wakeup ──
+    rect rgba(180, 180, 180, 0.1)
+        Note over Spawn,Phone: ── asynchronous, one future per spawned wakeup ──
+        activate Spawn
+        Spawn->>Push: POST {endpoint}<br/>VAPID-signed, empty body
+        Push-->>Spawn: 201 / 410 / 5xx
+        alt 410 Gone
+            Spawn->>II: delete_subscription
+        else 5xx / 429
+            Spawn->>II: clear_inflight (no retry in PoC)
+        else 201 success
+            Note over Spawn: leave inflight set;<br/>SW pull will clear it
+        end
+        deactivate Spawn
+        Push-->>SW: wake-up signal
         activate SW
         Note over SW: read ii-session-delegations<br/>from IndexedDB
         SW->>II: get_pending_for_anchor()<br/>[update, anchor-authenticated]
