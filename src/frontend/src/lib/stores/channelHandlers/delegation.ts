@@ -104,10 +104,9 @@ export const handleDelegationRequest =
         // field (@icp-sdk/core); until then, restricted delegations fail
         // closed on the dapp side (the signature does not verify without
         // the field).
-        // Always send an explicit value: the backend defaults an omitted
-        // `read_only` argument to a read-only delegation (erring on the side of
-        // caution), so we pass `[false]` for normal authorizations to keep them
-        // unrestricted and `[true]` only when the user enabled read-only mode.
+        // Send an explicit value rather than relying on the backend's
+        // omitted-arg default: `[false]` for normal authorizations, `[true]`
+        // only when the user enabled read-only mode.
         const readOnly: [boolean] = [authorized.readOnly];
 
         const { user_key, expiration } = await actor

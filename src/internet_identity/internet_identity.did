@@ -159,11 +159,7 @@ type Delegation = record {
     targets : opt vec principal;
     // Restricts the kinds of calls the delegation permits: `"queries"`
     // restricts the sender to query calls (the IC rejects update calls
-    // authenticated through such a delegation). Absent means unrestricted, per
-    // the interface spec. This describes the protocol field carried by a
-    // *returned* delegation; it is distinct from the `read_only` argument of
-    // `prepare_account_delegation` / `get_account_delegation`, which defaults to
-    // read-only when omitted (see those methods).
+    // authenticated through such a delegation). Absent means unrestricted.
     permissions : opt text;
 };
 
@@ -1790,11 +1786,9 @@ service : (opt InternetIdentityInit) -> {
         max_ttl : opt nat64,
         // When `opt true`, the prepared delegation restricts the session to
         // query calls: it carries `permissions = "queries"`, which makes the
-        // IC reject update calls authenticated through it. When omitted
-        // (`null`), the delegation defaults to read-only (erring on the side of
-        // caution); pass `opt false` for an unrestricted delegation. Note this
-        // differs from the interface spec, where an absent `permissions` field
-        // means unrestricted.
+        // IC reject update calls authenticated through it. Omitted (`null`) or
+        // `opt false` yields an unrestricted delegation — the original behavior,
+        // preserved for existing callers and matching the interface spec.
         read_only : opt bool
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
     
@@ -1804,8 +1798,8 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
         expiration : Timestamp,
-        // Must match the value passed to `prepare_account_delegation`,
-        // including the omitted (`null`) case, which defaults to read-only.
+        // Must match the value passed to `prepare_account_delegation` (including
+        // the omitted/`null` case, which means unrestricted).
         read_only : opt bool
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 

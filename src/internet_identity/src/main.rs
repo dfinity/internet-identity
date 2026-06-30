@@ -592,15 +592,13 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
-                // Default an omitted `read_only` argument to a read-only
-                // (queries-only) delegation: when the caller does not specify,
-                // we err on the side of least privilege. This intentionally
-                // differs from the interface spec, where an absent `permissions`
-                // field means unrestricted ("all") for backward compatibility.
-                // First-party callers (the II frontend and the CLI flow) always
-                // pass an explicit value, so this default only affects callers
-                // that omit the argument entirely.
-                read_only.unwrap_or(true),
+                // Default an omitted `read_only` argument to an unrestricted
+                // delegation: this preserves the original behavior for existing
+                // callers of the (pre-feature) 5-argument form, and matches the
+                // interface spec, where an absent `permissions` field means
+                // unrestricted ("all"). First-party callers always pass an
+                // explicit value (read-only by default in the CLI and MCP flows).
+                read_only.unwrap_or(false),
                 &ii_domain,
             )
             .await
@@ -626,10 +624,9 @@ fn get_account_delegation(
             session_key,
             expiration,
             // See `prepare_account_delegation`: an omitted `read_only` argument
-            // defaults to a read-only (queries-only) delegation, erring on the
-            // side of caution rather than following the spec's unrestricted
-            // default for an absent `permissions` field.
-            read_only.unwrap_or(true),
+            // means an unrestricted delegation (backwards-compatible with the
+            // original 5-argument form).
+            read_only.unwrap_or(false),
         ),
         Err(err) => Err(err.into()),
     }

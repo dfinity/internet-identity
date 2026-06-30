@@ -559,12 +559,13 @@ fn should_get_read_only_account_delegation_with_queries_permissions() -> Result<
     Ok(())
 }
 
-/// Verifies that an omitted `read_only` argument defaults to a read-only
-/// (queries-only) account delegation: the backend errs on the side of caution
-/// when the caller does not specify, unlike the interface spec's unrestricted
-/// default for an absent `permissions` field.
+/// Verifies that an omitted `read_only` argument yields an unrestricted
+/// delegation (no `permissions` field): this preserves the original behavior
+/// for callers of the pre-feature 5-argument form and matches the interface
+/// spec's default for an absent `permissions` field.
 #[test]
-fn should_default_to_read_only_account_delegation_when_unspecified() -> Result<(), RejectResponse> {
+fn should_default_to_unrestricted_account_delegation_when_unspecified() -> Result<(), RejectResponse>
+{
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -581,23 +582,18 @@ fn should_default_to_read_only_account_delegation_when_unspecified() -> Result<(
         pub_session_key.clone(),
     );
 
+    // Omitting `read_only` (the plain helper sends the 5-argument form, as a
+    // pre-feature caller would) must yield an unrestricted delegation.
     let PrepareAccountDelegation {
         user_key,
         expiration,
-    } = prepare_account_delegation_with_read_only(&params, None, None)
+    } = prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    let signed_delegation = get_account_delegation(&params, expiration)
         .unwrap()
         .unwrap();
 
-    // Omitting `read_only` yields a queries-only delegation, retrievable by a
-    // lookup that likewise omits the argument.
-    let signed_delegation = get_account_delegation_with_read_only(&params, expiration, None)
-        .unwrap()
-        .unwrap();
-
-    assert_eq!(
-        signed_delegation.delegation.permissions,
-        Some("queries".to_string())
-    );
+    assert_eq!(signed_delegation.delegation.permissions, None);
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
 
