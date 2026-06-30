@@ -12,11 +12,14 @@ interface McpAuthorizeInput {
   authenticated: Authenticated;
   /** base64url-encoded DER session pubkey supplied by the MCP server. */
   publicKey: string;
-  /** Hostname of the app whose account the delegation acts as. */
-  app: string;
-  /** Lifetime in minutes. */
-  ttlMinutes: number;
-  /** Callback URL (on the configured MCP server origin) the delegation chain is
+  /** The MCP server origin, taken from the connect request's callback (e.g.
+   *  "https://mcp.id.ai"). MCP connections are to remote servers, so this is
+   *  always an https origin. Connecting binds the agent to this origin and the
+   *  standing delegation acts as the user's identity there. */
+  mcpServerOrigin: string;
+  /** Lifetime in seconds (already clamped to [10 min, 1 week]). */
+  ttlSeconds: number;
+  /** Callback URL (on the MCP server origin) the delegation chain is
    *  form-POSTed to. */
   callback: string;
   /** Opaque value from the request, echoed back so the MCP server can tie the
@@ -31,12 +34,12 @@ interface McpAuthorizeInput {
  * redirects the browser back to `/mcp` with a `status` so this page keeps
  * owning the UI.
  *
- * The chain is derived for the app's account: `get_default_account` resolves
- * the user's default account for the app origin, and that account number (which
- * may be the unreserved default or a specific one the user set) is what the
- * delegation is bound to — so the MCP server acts as the same account a normal
- * `/authorize` sign-in to the app would use, not the legacy anchor-seed
- * principal a blind `null` produces.
+ * Connecting authorizes the agent for the user's identity, not for a specific
+ * account: it binds the principal II derives for the anchor at the MCP server
+ * origin (`mcp_set_access`), which is the same principal the standing delegation
+ * below carries. No account is chosen here — the MCP server origin is the
+ * connector, not an app, and accounts are per-origin; the server selects an app
+ * account per call later via `mcp_prepare_account_delegation`.
  *
  * The canister only ever signs a delegation to a freshly-generated,
  * non-extractable browser key — never to the public_key from the URL fragment
@@ -46,20 +49,32 @@ interface McpAuthorizeInput {
 export const mcpAuthorize = async ({
   authenticated,
   publicKey,
-  app,
-  ttlMinutes,
+  mcpServerOrigin,
+  ttlSeconds,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
-  // Remap an app domain on a gateway (*.icp0.io / *.icp.net) to *.ic0.app so
-  // the principal matches the one /authorize derives for the same app.
-  const effectiveOrigin = remapToLegacyDomain(`https://${app}`);
-  const maxTimeToLiveNanos = BigInt(ttlMinutes) * BigInt(60) * BigInt(1e9);
 
-  const { account_number } = await actor
-    .get_default_account(identityNumber, effectiveOrigin)
-    .then(throwCanisterError);
+  // Bind and sign at the MCP server origin. Remap a gateway origin (*.icp0.io /
+  // *.icp.net) to *.ic0.app so the principal matches the one /authorize derives
+  // for that origin.
+  const effectiveOrigin = remapToLegacyDomain(mcpServerOrigin);
+  const maxTimeToLiveNanos = BigInt(ttlSeconds) * BigInt(1e9);
+
+  // Connecting is the opt-in: authorize this agent for the anchor at the MCP
+  // server origin so II honors the server's later on-demand per-app delegation
+  // calls. The backend binds the principal it derives for the anchor at this
+  // origin — exactly the principal the standing delegation below carries — and
+  // re-derives the same principal to revoke. Idempotent.
+  const accessResult = await actor.mcp_set_access(
+    identityNumber,
+    effectiveOrigin,
+    true,
+  );
+  if ("Err" in accessResult) {
+    throw new Error(accessResult.Err);
+  }
 
   const ephemeralIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
@@ -68,11 +83,13 @@ export const mcpAuthorize = async ({
     ephemeralIdentity.getPublicKey().toDer(),
   );
 
+  // The standing delegation is for the identity's default account at the MCP
+  // server origin (`[]`) — the same principal `mcp_set_access` bound above.
   const { user_key, expiration } = await actor
     .prepare_account_delegation(
       identityNumber,
       effectiveOrigin,
-      account_number,
+      [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
     )
@@ -83,7 +100,7 @@ export const mcpAuthorize = async ({
       .get_account_delegation(
         identityNumber,
         effectiveOrigin,
-        account_number,
+        [],
         ephemeralPublicKey,
         expiration,
       )
@@ -106,9 +123,10 @@ export const mcpAuthorize = async ({
     { previous: canisterChain },
   );
 
-  // Submit as a top-level navigation to the configured MCP server origin (the
-  // only origin allowed by the `form-action` CSP). The MCP server redirects
-  // back to /mcp with a status param.
+  // Submit as a top-level navigation to the MCP server's callback. The /mcp
+  // landing page's `form-action` CSP is `'self' https:`, matching the https
+  // callbacks the connect flow accepts. The MCP server redirects back to /mcp
+  // with a status param.
   const form = document.createElement("form");
   form.method = "POST";
   form.action = callback;

@@ -73,9 +73,7 @@
       {$t`Verify your email address`}
     </h1>
     <p class="text-text-tertiary text-base font-medium">
-      <Trans>
-        We'll ask you to send a signed email from this inbox to confirm.
-      </Trans>
+      <Trans>We'll ask you to send an email from this inbox to confirm.</Trans>
     </p>
   </header>
   <Input
@@ -98,13 +96,12 @@
       class="border-fg-warning-primary bg-bg-warning-primary flex flex-col gap-1 rounded-xl border p-4"
     >
       <div class="text-text-warning-primary text-sm font-semibold">
-        {$t`This is your recovery email — best not to share it`}
+        {$t`This is already your recovery email.`}
       </div>
       <div class="text-text-warning-primary text-sm">
         <Trans>
-          Verifying it here lets apps request it. Your recovery email is meant
-          to stay private so it can serve as a backup if you lose access to your
-          identity.
+          Please consider adding a different email that you may want to share
+          with apps.
         </Trans>
       </div>
     </div>

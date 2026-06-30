@@ -20,6 +20,7 @@ export interface AttributeConsentContext {
   effectiveOrigin: string;
   requestedKeys: string[];
   recoveryAddresses: string[];
+  verifiedAddresses: string[];
 }
 
 export interface AttributeConsent {

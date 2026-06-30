@@ -62,6 +62,7 @@ mod email_inbound;
 mod email_recovery;
 mod http;
 mod ii_domain;
+mod mcp;
 
 mod openid;
 mod session_delegation;
@@ -614,6 +615,99 @@ fn get_account_delegation(
         ),
         Err(err) => Err(err.into()),
     }
+}
+
+/// Enable or disable the backend `/mcp` delegation path for `anchor_number` at
+/// `mcp_server_origin`. Enabling binds the principal II derives for the anchor at
+/// that origin — the principal the MCP server's standing delegation carries — so
+/// it can later fetch per-app delegations as this anchor; disabling unbinds
+/// exactly that principal. No account is chosen here (accounts are per-origin and
+/// the connector isn't an app); the app account is selected per call on
+/// `mcp_prepare_account_delegation`. The origin comes from the connect request,
+/// so each user trusts the MCP server they choose.
+#[update]
+fn mcp_set_access(
+    anchor_number: AnchorNumber,
+    mcp_server_origin: FrontendHostname,
+    enabled: bool,
+) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    mcp::set_mcp_access(anchor_number, mcp_server_origin, enabled)
+}
+
+/// Whether `anchor_number` has MCP access enabled at `mcp_server_origin`.
+#[query]
+fn mcp_access_enabled(anchor_number: AnchorNumber, mcp_server_origin: FrontendHostname) -> bool {
+    if check_session_authorization(anchor_number).is_err() {
+        return false;
+    }
+    mcp::is_mcp_access_enabled(anchor_number, mcp_server_origin)
+}
+
+/// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
+/// trusted server URL). Persisted on-chain, so it follows the identity across
+/// devices. Read by the Settings UI and by the `/mcp` connect flow, which
+/// verifies the connecting origin against it at connect time. Returns the
+/// disabled, no-server default for an unauthorized caller or an anchor that
+/// never wrote a config.
+#[query]
+fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
+    if check_session_authorization(anchor_number).is_err() {
+        return McpConfig::default();
+    }
+    mcp::get_mcp_config(anchor_number)
+}
+
+/// Persist `anchor_number`'s trusted-MCP-server config so it syncs across the
+/// identity's devices. Authenticated as the identity (full authorization), so
+/// only the user — never a page that initiates a connect request — can change
+/// what their identity trusts.
+#[update]
+fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    mcp::set_mcp_config(anchor_number, config);
+    Ok(())
+}
+
+/// Called by the MCP server (authorized by `caller()` == the principal bound for
+/// its anchor at the connect-time `mcp_server_origin`): prepare a per-app
+/// delegation at `target_origin` for `account_number` — one of the anchor's
+/// accounts there (discover them with `mcp_get_accounts`), or the anchor's
+/// default account when `None`. `max_ttl` is the requested lifetime in ns,
+/// defaulting to and capped at 5 minutes. The resolved `account_number` is
+/// returned in `McpPrepareDelegation` to thread into `mcp_get_account_delegation`.
+#[update]
+async fn mcp_prepare_account_delegation(
+    target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<McpPrepareDelegation, AccountDelegationError> {
+    mcp::prepare_account_delegation(target_origin, account_number, session_key, max_ttl).await
+}
+
+/// Fetch the delegation prepared by `mcp_prepare_account_delegation`. The anchor
+/// is recovered from `caller()`; `account_number` and `expiration` must be the
+/// values returned by the matching prepare call, or this returns
+/// `NoSuchDelegation`.
+#[query]
+fn mcp_get_account_delegation(
+    target_origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, AccountDelegationError> {
+    mcp::get_account_delegation(target_origin, account_number, session_key, expiration)
+}
+
+/// Called by the MCP server (anchor recovered from `caller()`): list the anchor's
+/// accounts at `target_origin` so the agent can pick which `account_number` to
+/// request a delegation for.
+#[query]
+fn mcp_get_accounts(
+    target_origin: FrontendHostname,
+) -> Result<Vec<AccountInfo>, AccountDelegationError> {
+    mcp::get_accounts(target_origin)
 }
 
 #[update]

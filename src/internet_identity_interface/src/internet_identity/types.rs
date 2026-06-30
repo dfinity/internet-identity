@@ -247,12 +247,6 @@ pub struct InternetIdentityFrontendArgs {
     /// own init callback, and `?feature_flag_*` URL params take precedence.
     /// Names that don't match a known frontend flag are ignored by the frontend.
     pub feature_flags: Option<Vec<(String, bool)>>,
-    /// Origin of the trusted MCP server, e.g. "https://mcp.id.ai" (no trailing
-    /// slash). The `/mcp` delegation flow delivers the delegation to this origin
-    /// (and only this origin — it's added to the `form-action` CSP and the
-    /// `/mcp` page rejects callbacks on any other origin). When unset, the
-    /// `/mcp` flow is disabled.
-    pub mcp_server_origin: Option<String>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -600,6 +594,24 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
+/// Result of `mcp_prepare_account_delegation`. The matching
+/// `mcp_get_account_delegation` must use the *same* account, so we return the
+/// resolved `account_number` for the server to thread back. When preparing, the
+/// MCP server may name an account explicitly (one of the anchor's accounts at
+/// `target_origin`) or leave it unset to use the anchor's default there; either
+/// way `account_number` reports the one actually used. (Accounts are per-origin,
+/// so this is an account at `target_origin` — the app being acted on — not the
+/// account the user picked at the MCP server's own origin when connecting.)
+/// Returning it also keeps `get` from independently re-resolving the *mutable*
+/// default and, if it changed in between, looking under a different account's
+/// seed and returning `NoSuchDelegation`.
+#[derive(CandidType, Deserialize)]
+pub struct McpPrepareDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    pub account_number: Option<AccountNumber>,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountDelegationError {
     Unauthorized(Principal),
@@ -623,6 +635,19 @@ pub enum SessionDelegationError {
     InternalCanisterError(String),
     Unauthorized(Principal),
     NoSuchDelegation,
+}
+
+/// The identity's synced trusted-MCP-server configuration: a master toggle and
+/// the single MCP server URL the user trusts. Persisted on-chain (keyed by
+/// anchor) so it follows the identity across all of its devices — unlike the
+/// device-local CLI-access toggle. Read by the Settings UI and by the `/mcp`
+/// connect flow, which verifies the connecting origin against it at connect
+/// time. `url` is kept verbatim so Settings can display/re-probe a path-based
+/// endpoint like `https://host/mcp`; trust matching is by origin.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq, Default)]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub url: Option<String>,
 }
 
 #[derive(CandidType, Debug, Deserialize)]
