@@ -146,6 +146,21 @@
   // fresh list_available_attributes can surface as a picker.
   let displayGroups = $state<MergedGroup[]>([]);
 
+  // A group is "unscoped" iff its first option's key has no `openid:` /
+  // `sso:` scope. Single-source groups (one option) and scoped fan-outs
+  // both surface here; mergeGroups never mixes scoped + unscoped options
+  // inside a single group, so checking the first option is sufficient.
+  const isUnscopedGroup = (group: MergedGroup): boolean =>
+    extractScope(group.options[0].display.key) === undefined;
+
+  // Stable partition: unscoped first, then scoped; relative order
+  // within each tier preserved so we don't perturb the existing
+  // mergeGroups ordering for downstream rows.
+  const sortGroupsUnscopedFirst = (groups: MergedGroup[]): MergedGroup[] => [
+    ...groups.filter(isUnscopedGroup),
+    ...groups.filter((g) => !isUnscopedGroup(g)),
+  ];
+
   // For email-shaped groups, prefer the option whose displayed address
   // case-matches the saved last-shared email; fall back to index 0.
   const indexForSavedEmail = (
@@ -162,7 +177,7 @@
 
   const prepared = (async () => {
     const ctx = await context;
-    const groups = mergeGroups(ctx.groups);
+    const groups = sortGroupsUnscopedFirst(mergeGroups(ctx.groups));
     await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
     const savedEmail = lastSharedEmailsStore.get(
       $authenticatedStore.identityNumber,
@@ -182,6 +197,7 @@
       emailRequested: ctx.requestedKeys.some(isEmailKey),
       recoveryAddresses: ctx.recoveryAddresses,
       verifiedAddresses: ctx.verifiedAddresses,
+      openidAddresses: ctx.openidAddresses,
     };
   })();
 
@@ -225,8 +241,8 @@
           attributes: [],
         })
         .then(throwCanisterError);
-      const groups = mergeGroups(
-        resolveAttributeGroups(requestedKeys, available),
+      const groups = sortGroupsUnscopedFirst(
+        mergeGroups(resolveAttributeGroups(requestedKeys, available)),
       );
       await Promise.all(ssoDomainsIn(groups).map(discoverSsoName));
       selections.clear();
@@ -456,8 +472,9 @@
                   selectedIndex: index,
                 });
               }}
-              onVerifyNew={group.name === "email" ||
-              group.name === "verified_email"
+              onVerifyNew={(group.name === "email" ||
+                group.name === "verified_email") &&
+              isUnscopedGroup(group)
                 ? () => (showVerifyWizard = true)
                 : undefined}
             />
@@ -494,6 +511,7 @@
         resolveViaDoh={resolveEmailViaDoh}
         recoveryAddresses={data.recoveryAddresses}
         verifiedAddresses={data.verifiedAddresses}
+        openidAddresses={data.openidAddresses}
         onSuccess={(address) =>
           handleVerifySuccess(address, data.requestedKeys)}
       />
