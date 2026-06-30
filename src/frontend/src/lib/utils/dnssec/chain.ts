@@ -467,20 +467,28 @@ export function selectSupportedCoveringRrsig(
 
   // DNSKEY RRset: bundle the signature made by a SEP (KSK) key present
   // in this RRset, so the canister can validate it under the DS-pinned
-  // KSK. `key_tag` lives at RRSIG RDATA bytes 16-17 (RFC 4034 §3.1.6),
-  // so we need the full fixed header — skip anything shorter.
-  const sepKeyTags = new Set<number>(
+  // KSK. The canister matches DNSKEY candidates by *(algorithm,
+  // key_tag)* (`verify_rrsig_under_any_dnskey`), and `key_tag` — a
+  // 16-bit checksum (RFC 4034 §B) — can collide across algorithms. So
+  // we pair each SEP key's algorithm (DNSKEY RDATA byte 3) with its
+  // key_tag and match the RRSIG (algorithm at RDATA byte 2, key_tag at
+  // bytes 16-17) on both. Matching by key_tag alone could bundle an
+  // RRSIG no SEP key can verify, or one made by a non-SEP key whose tag
+  // happens to collide. Skip anything shorter than the fixed header.
+  const sepKeyIds = new Set<number>(
     rrsetRecords
       .filter(
         (rr) =>
-          rr.rdata.length >= 2 &&
+          rr.rdata.length >= 4 &&
           (((rr.rdata[0] << 8) | rr.rdata[1]) & DNSKEY_FLAG_SEP) !== 0,
       )
-      .map((rr) => dnsKeyTag(rr.rdata)),
+      // (algorithm << 16) | key_tag — DNSKEY algorithm is RDATA byte 3.
+      .map((rr) => (rr.rdata[3] << 16) | dnsKeyTag(rr.rdata)),
   );
   return candidates.find(
     (c) =>
-      c.rdata.length >= 18 && sepKeyTags.has((c.rdata[16] << 8) | c.rdata[17]),
+      c.rdata.length >= 18 &&
+      sepKeyIds.has((c.rdata[2] << 16) | ((c.rdata[16] << 8) | c.rdata[17])),
   );
 }
 
