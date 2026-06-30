@@ -12,44 +12,30 @@ sequenceDiagram
     Note over II: PRINCIPAL_INDEX[p]<br/>→ (anchor, hostname)
     Note over II: APP_CONSENT[(anchor, host)]<br/>+ caller == allowed_caller
     Note over II: DEVICE_SUBSCRIPTIONS[anchor]<br/>+ rate-limit decrement
-    Note over II: spool PendingNotification<br/>(notification_id, ttl 5min)
 
     loop for each device
-        alt inflight_outcall_at fresh
-            Note over II: skip wakeup<br/>(notification rides along<br/>on inflight outcall)
-        else idle (or flag stale)
-            Note over II: mark inflight_outcall_at = now
-            II->>Spawn: ic_cdk::spawn(send_push)
-        end
+        Note over II: RFC 8291 encrypt<br/>(ECDH × p256dh, HKDF + auth,<br/>AES-128-GCM)
+        II->>Spawn: ic_cdk::spawn(send_push)
     end
     II-->>Dapp: Ok(())
     deactivate II
     Note right of Dapp: dApp's await resolves in ~ms
 
     rect rgba(180, 180, 180, 0.1)
-        Note over Spawn,Phone: ── asynchronous, one future per spawned wakeup ──
+        Note over Spawn,Phone: ── asynchronous, one future per device ──
         activate Spawn
-        Spawn->>Push: POST {endpoint}<br/>VAPID-signed, empty body
+        Spawn->>Push: POST {endpoint}<br/>VAPID-signed, encrypted body
         Push-->>Spawn: 201 / 410 / 5xx
         alt 410 Gone
             Spawn->>II: delete_subscription
         else 5xx / 429
-            Spawn->>II: clear_inflight (no retry in PoC)
-        else 201 success
-            Note over Spawn: leave inflight set —<br/>SW pull will clear it
+            Note over Spawn: log; no retry in PoC
         end
         deactivate Spawn
-        Push-->>SW: wake-up signal
+        Push-->>SW: push event<br/>(ciphertext)
         activate SW
-        Note over SW: read ii-session-delegations<br/>from IndexedDB
-        SW->>II: get_pending_for_anchor()<br/>[update, anchor-authenticated]
-        activate II
-        Note over II: mark spool rows consumed<br/>clear inflight_outcall_at
-        II-->>SW: vec<PendingNotification>
-        deactivate II
-        loop for each notification
-            SW->>Phone: showNotification(hostname,<br/>{ body, tag: notification_id })
-        end
+        Note over SW: browser decrypts<br/>using device's keys
+        SW->>Phone: showNotification(hostname,<br/>{ body })
         deactivate SW
         Note over Phone: 📱 banner appears<br/>"FooApp: Bob sent you a message"
     end
