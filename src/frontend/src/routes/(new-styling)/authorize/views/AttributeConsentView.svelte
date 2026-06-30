@@ -276,7 +276,9 @@
   const handleOpenVerifyWizard = () => {
     void prepared.then(({ emailRequested }) => {
       if (emailRequested) {
-        verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.VerifyClicked);
+        verifiedEmailConsentFunnel.trigger(
+          VerifiedEmailConsentEvents.VerifyClicked,
+        );
       }
     });
     showVerifyWizard = true;
