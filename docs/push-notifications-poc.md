@@ -83,7 +83,7 @@ sequenceDiagram
         else 5xx / 429
             Spawn->>II: clear_inflight (no retry in PoC)
         else 201 success
-            Note over Spawn: leave inflight set;<br/>SW pull will clear it
+            Note over Spawn: leave inflight set —<br/>SW pull will clear it
         end
         deactivate Spawn
         Push-->>SW: wake-up signal
