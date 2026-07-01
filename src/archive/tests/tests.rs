@@ -51,9 +51,11 @@ fn should_expose_status() -> Result<(), RejectResponse> {
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let status = api::status(&env, canister_id)?;
     // The point of this test is that an anonymous caller can read the status
-    // (the `?` above). The exact cycle balance is a PocketIC default — newer
-    // versions fund freshly-created canisters — so assert the status exposes a
-    // funded balance rather than a hard-coded value.
+    // (the `?` above). The exact cycle balance is a PocketIC default: newer
+    // versions fund freshly-created canisters, so assert the status exposes a
+    // funded balance rather than a hard-coded value. `cycles` is a `candid::Nat`;
+    // we compare against the `0u8` primitive via `Nat: PartialOrd<u8>` because
+    // constructing an owned `Nat` for the comparison trips `clippy::cmp_owned`.
     assert!(status.canister_status.cycles > 0u8);
     Ok(())
 }
