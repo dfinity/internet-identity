@@ -9,6 +9,7 @@ import {
   extractIdTokenFromCallback,
   isOpenIdCancelError,
   OAuthProviderError,
+  appAccessScope,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
@@ -510,6 +511,62 @@ describe("createRedirectURL", () => {
     const redirectUri = url.searchParams.get("redirect_uri");
     expect(redirectUri).not.toBeNull();
     expect(new URL(redirectUri ?? "").pathname).toBe("/callback");
+  });
+
+  it("does not alter the scope when no appScope is given", () => {
+    const url = createRedirectURL(
+      {
+        clientId: "test-client",
+        authURL: "https://idp.example.com/authorize",
+        authScope: "openid profile email",
+      },
+      { nonce: "test-nonce" },
+    );
+    expect(url.searchParams.get("scope")).toBe("openid profile email");
+  });
+
+  it("appends the appScope to the requested scope when given", () => {
+    const url = createRedirectURL(
+      {
+        clientId: "test-client",
+        authURL: "https://idp.example.com/authorize",
+        authScope: "openid profile email",
+        appScope: "ii_app:try.id.ai",
+      },
+      { nonce: "test-nonce" },
+    );
+    expect(url.searchParams.get("scope")).toBe(
+      "openid profile email ii_app:try.id.ai",
+    );
+  });
+
+  it("ignores an empty appScope", () => {
+    const url = createRedirectURL(
+      {
+        clientId: "test-client",
+        authURL: "https://idp.example.com/authorize",
+        authScope: "openid profile email",
+        appScope: "",
+      },
+      { nonce: "test-nonce" },
+    );
+    expect(url.searchParams.get("scope")).toBe("openid profile email");
+  });
+});
+
+describe("appAccessScope", () => {
+  it("builds an ii_app scope from the origin's hostname", () => {
+    expect(appAccessScope("https://try.id.ai")).toBe("ii_app:try.id.ai");
+  });
+
+  it("drops scheme, port and path, keeping only the hostname", () => {
+    expect(appAccessScope("https://app.example.com:8443/path?q=1")).toBe(
+      "ii_app:app.example.com",
+    );
+  });
+
+  it("returns undefined for an invalid origin", () => {
+    expect(appAccessScope("not a url")).toBeUndefined();
   });
 });
 
