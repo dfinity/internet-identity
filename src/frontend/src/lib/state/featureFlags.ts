@@ -118,6 +118,14 @@ export const MIN_GUIDED_UPGRADE = createFeatureFlagStore(
   false,
 );
 
+/// Forward an app-access scope (`ii_app:<hostname>`) identifying the
+/// relying-party app to the org SSO/IdP during the OpenID authorization flow,
+/// so admins can apply per-app access policy. Off by default: an IdP that
+/// hasn't registered the scope rejects the sign-in with `invalid_scope`, so
+/// this must only be enabled against providers configured to accept it
+/// (prototype gate; a later revision sources the opt-in from discovery).
+export const SSO_APP_SCOPE = createFeatureFlagStore("SSO_APP_SCOPE", false);
+
 // Init callback shared by the email-recovery flags. Defaults the flag on for
 // the production and beta domains (`id.ai`, `beta.id.ai`) and leaves it off
 // everywhere else, but an explicit canister-config value always wins: when the
@@ -161,4 +169,5 @@ export default {
   MIN_GUIDED_UPGRADE,
   EMAIL_RECOVERY,
   EMAIL_RECOVERY_SETUP,
+  SSO_APP_SCOPE,
 } as Record<string, FeatureFlagStore>;

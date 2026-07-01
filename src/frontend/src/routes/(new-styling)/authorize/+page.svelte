@@ -47,6 +47,7 @@
   } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import { currentSsoAppScope } from "$lib/utils/ssoAppScope";
 
   const { data }: PageProps = $props();
 
@@ -105,8 +106,12 @@
     upgradeSuccess = true;
   };
 
-  /** Redirect to the OpenID provider. */
-  const initiateOpenId = (config: OpenIdConfig) => {
+  /**
+   * Redirect to the OpenID provider. `appScope`, when set, forwards the
+   * relying-party app identity to the IdP (SSO 1-click path only); the direct
+   * OpenID path leaves it undefined so nothing changes for Google/Apple/MS.
+   */
+  const initiateOpenId = (config: OpenIdConfig, appScope?: string) => {
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToOpenId, {
       openid_issuer: config.issuer,
     });
@@ -115,6 +120,7 @@
         clientId: config.client_id,
         authURL: config.auth_uri,
         authScope: config.auth_scope.join(" "),
+        appScope,
       },
       {
         nonce: $sessionStore.nonce,
@@ -159,7 +165,7 @@
       client_id: result.clientId,
       seed_jwks: [],
     };
-    initiateOpenId(syntheticConfig);
+    initiateOpenId(syntheticConfig, currentSsoAppScope());
   };
 
   /** Process the OpenID callback and authorize. */

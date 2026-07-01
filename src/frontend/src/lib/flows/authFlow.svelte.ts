@@ -42,6 +42,7 @@ import {
   selectAuthScopes,
 } from "$lib/utils/openID";
 import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+import { currentSsoAppScope } from "$lib/utils/ssoAppScope";
 import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
@@ -270,6 +271,7 @@ export class AuthFlow {
         clientId,
         authURL: discovery.authorization_endpoint,
         authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
+        appScope: currentSsoAppScope(),
       },
       undefined,
       domain,
