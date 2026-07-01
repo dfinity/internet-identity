@@ -12,19 +12,19 @@
     "dev": "vite"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.6",
-    "@wdio/cli": "8.32.3",
-    "@wdio/globals": "8.32.3",
-    "@wdio/local-runner": "8.32.3",
-    "@wdio/mocha-framework": "8.32.3",
-    "@wdio/spec-reporter": "^8.21.0",
-    "prettier": "^2.7.1",
-    "prettier-plugin-organize-imports": "^3.2.2",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.0.4",
+    "@types/mocha": "^10.0.10",
+    "@wdio/cli": "8.46.0",
+    "@wdio/globals": "8.46.0",
+    "@wdio/local-runner": "8.46.0",
+    "@wdio/mocha-framework": "8.46.0",
+    "@wdio/spec-reporter": "^8.43.0",
+    "prettier": "^2.8.8",
+    "prettier-plugin-organize-imports": "^3.2.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
     "vite": "^5.4.21"
   },
   "dependencies": {
-    "@icp-sdk/auth": "^4.1.0"
+    "@icp-sdk/auth": "^4.2.0"
   }
 }
