@@ -139,6 +139,9 @@ msgstr "Ajouter une méthode d’accès"
 msgid "Add another account"
 msgstr "Ajouter un autre compte"
 
+msgid "Add another identity"
+msgstr "Ajouter une autre identité"
+
 msgid "Add another method or sign in via recovery to remove"
 msgstr "Ajoutez une autre méthode ou connectez-vous via la récupération pour supprimer"
 
@@ -258,6 +261,9 @@ msgstr "Choisissez un compte"
 
 msgid "choose language to continue"
 msgstr "choisissez une langue pour continuer"
+
+msgid "Choose method"
+msgstr "Choisissez une méthode"
 
 msgid "Choose method to continue"
 msgstr "Choisissez une méthode pour continuer"
@@ -1119,11 +1125,17 @@ msgstr "Reconnectez-vous pour reprendre là où vous vous étiez arrêté."
 msgid "Sign in by sending a signed email from your inbox."
 msgstr "Connectez-vous en envoyant un e-mail signé depuis votre boîte de réception."
 
+msgid "Sign in or create an identity to access apps without passwords or sharing personal data."
+msgstr "Connectez-vous ou créez une identité pour accéder aux applications sans mot de passe ni partage de données personnelles."
+
 msgid "Sign in there."
 msgstr "Se connecter ici."
 
 msgid "Sign in to Internet Identity"
 msgstr "Se connecter à Internet Identity"
+
+msgid "Sign in to manage your identity"
+msgstr "Connectez-vous pour gérer votre identité"
 
 msgid "Sign in using familiar methods"
 msgstr "Se connecter avec des méthodes familières"
@@ -1230,6 +1242,9 @@ msgstr "La connexion SSO pour {domainInput} a échoué. Veuillez réessayer."
 
 msgid "Start over"
 msgstr "Recommencer"
+
+msgid "Still have an identity number?"
+msgstr "Vous avez encore un numéro d'identité ?"
 
 msgid "Still using an identity number?"
 msgstr "Vous utilisez encore un numéro d’identité ?"
@@ -1406,6 +1421,12 @@ msgstr "Pour confirmer votre identité, saisissez le code ci‑dessous sur votre
 msgid "to continue to {dappName}"
 msgstr "pour continuer vers {dappName}"
 
+msgid "to continue with <0>{application}</0>"
+msgstr "pour continuer avec <0>{application}</0>"
+
+msgid "to continue with this app"
+msgstr "pour continuer avec cette application"
+
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Pour continuer, créez une passkey afin de sécuriser votre identité et de simplifier vos futures connexions."
 
@@ -1486,6 +1507,9 @@ msgstr "Mettre à niveau"
 
 msgid "Upgrade again"
 msgstr "Mettre à niveau à nouveau"
+
+msgid "Upgrade completed successfully"
+msgstr "Mise à niveau effectuée avec succès"
 
 msgid "Upgrade identity"
 msgstr "Mettre à niveau l’identité"
