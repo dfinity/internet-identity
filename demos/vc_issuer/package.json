@@ -4,7 +4,7 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
-    "@dfinity/utils": "^4.0.2",
+    "@dfinity/utils": "^4.2.1",
     "@icp-sdk/auth": "^4.2.0",
     "@icp-sdk/core": "^4.2.3",
     "buffer": "^6.0.3",
