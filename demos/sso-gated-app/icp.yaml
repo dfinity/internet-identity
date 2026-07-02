@@ -16,17 +16,18 @@ canisters:
     settings:
       environment_variables:
         # The II canister principal whose signature the IC must have
-        # verified on the attribute bundle. This default is MAINNET
-        # Internet Identity — override it with the principal of the II
-        # instance you are actually testing against (e.g. a local or
-        # testnet deployment of the role-enforcement build).
-        trusted_attribute_signers: "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        # verified on the attribute bundle. Set to the `beta.id.ai` II
+        # canister (a mainnet canister running the role-enforcement
+        # build), so the app — also on mainnet — can verify its
+        # signatures and the enforcement feature is actually exercised.
+        trusted_attribute_signers: "fgte5-ciaaa-aaaad-aaatq-cai"
 
         # "Trusted domains": the exact origin(s) allowed to appear in
         # the bundle's `implicit:origin`. Matched verbatim (scheme +
         # host), comma-separated. This is where the app frontend is
-        # served from — here, the Cloudflare tunnel.
-        frontend_origins: "https://screenshot-parents-explosion-display.trycloudflare.com"
+        # served from — the current Cloudflare tunnel. Quick-tunnels get
+        # a new random name each run; update this if yours changes.
+        frontend_origins: "https://generators-analyzed-loaded-graduated.trycloudflare.com"
 
         # Org SSO domain(s) accepted for `sso:<domain>:*` keys.
         # REQUIRED for SSO enforcement: if unset, every SSO bundle is
