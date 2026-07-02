@@ -467,7 +467,9 @@ fn find_nonce_in(haystack: &str) -> Option<String> {
 }
 
 /// Match `haystack` against `{prefix}{hex}` **exactly** (after trimming
-/// surrounding whitespace), case-insensitive on the prefix.
+/// surrounding whitespace), case-insensitive throughout (the whole
+/// trimmed Subject is lowercased before matching, so both the prefix
+/// and the hex suffix are compared case-insensitively).
 ///
 /// This is deliberately an exact match, not a substring search. The
 /// nonce lives in the DKIM-signed `Subject`, and DKIM only proves *the
@@ -482,11 +484,12 @@ fn find_nonce_in(haystack: &str) -> Option<String> {
 /// genuine recovery email — composed fresh with the token as its
 /// Subject — is unaffected.
 fn find_nonce_with_prefix(haystack: &str, prefix: &str) -> Option<String> {
-    // Case-insensitive on the prefix: some mail clients title-case
+    // Case-insensitive throughout: some mail clients title-case
     // Subject content, so a user pasting the token may change its
-    // case. We strip the prefix off the lowercased, trimmed Subject
-    // and return the canister's canonical prefix + the lowercased hex
-    // suffix.
+    // case. We lowercase the whole trimmed Subject before matching —
+    // so the prefix match and the hex suffix are both case-insensitive
+    // — then return the canister's canonical prefix + the lowercased
+    // hex suffix.
     let lower = haystack.trim().to_ascii_lowercase();
     let suffix = lower.strip_prefix(&prefix.to_ascii_lowercase())?;
     // The suffix must be exactly the nonce's hex run and nothing else:
@@ -983,6 +986,17 @@ mod tests {
         assert_eq!(find_nonce_in(&format!("Automatic reply: {nonce}")), None);
         assert_eq!(find_nonce_in(&format!("{nonce} please verify")), None);
         assert_eq!(find_nonce_in(&format!("hello {nonce}")), None);
+
+        // The same exact-match rule governs the verified-email prefix,
+        // so guard that flow against the identical echo regression: the
+        // bare `II-Verify-` token matches, a `Re:`-prefixed echo does not.
+        let verify = format!(
+            "{}{}",
+            super::super::VERIFIED_EMAIL_NONCE_PREFIX,
+            "0123456789abcdef"
+        );
+        assert_eq!(find_nonce_in(&verify), Some(verify.clone()));
+        assert_eq!(find_nonce_in(&format!("Re: {verify}")), None);
     }
 
     #[test]
