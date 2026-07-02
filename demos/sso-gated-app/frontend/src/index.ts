@@ -12,6 +12,19 @@ const log = (msg: string): void => {
   $("output").textContent = msg;
 };
 
+// Read a required canister-id field, failing with a clear message
+// instead of the opaque `Principal "aaaaa-aa" … checksum` error that
+// `Principal.fromText("")` throws on an empty input.
+const requirePrincipal = (id: string, label: string): Principal => {
+  const raw = val(id);
+  if (raw === "") throw new Error(`${label} is required — fill it in first.`);
+  try {
+    return Principal.fromText(raw);
+  } catch {
+    throw new Error(`${label} is not a valid canister id: "${raw}"`);
+  }
+};
+
 // The inner delegation identity from the last successful sign-in. The
 // SSO session is recorded canister-side under this principal, so later
 // protected calls don't need to re-present the attribute bundle.
@@ -25,7 +38,7 @@ const makeActor = async (identity?: unknown) => {
   });
   return Actor.createActor(idlFactory, {
     agent,
-    canisterId: Principal.fromText(val("appCanisterId")),
+    canisterId: requirePrincipal("appCanisterId", "This app's canister id"),
   });
 };
 
@@ -62,7 +75,12 @@ const signInAndVerify = async (): Promise<void> => {
     const verifiedIdentity = new AttributesIdentity({
       inner: identity,
       attributes,
-      signer: { canisterId: Principal.fromText(val("signerCanisterId")) },
+      signer: {
+        canisterId: requirePrincipal(
+          "signerCanisterId",
+          "II canister id (signer)",
+        ),
+      },
     });
     const verifiedAgent = await HttpAgent.create({
       host: val("host"),
@@ -71,7 +89,7 @@ const signInAndVerify = async (): Promise<void> => {
     });
     const verifiedActor = Actor.createActor(idlFactory, {
       agent: verifiedAgent,
-      canisterId: Principal.fromText(val("appCanisterId")),
+      canisterId: requirePrincipal("appCanisterId", "This app's canister id"),
     });
 
     const result = (await verifiedActor._internet_identity_sign_in_finish()) as
@@ -127,6 +145,12 @@ const callProtected = async (): Promise<void> => {
 // JSON.stringify can't serialize the bigint in `verifiedAtNs`.
 const bigintReplacer = (_key: string, value: unknown): unknown =>
   typeof value === "bigint" ? value.toString() : value;
+
+// Prefill the app canister id from `?canisterId=` (or `?app=`) if present,
+// so a deep link can carry it instead of typing it in.
+const search = new URLSearchParams(location.search);
+const appIdFromUrl = search.get("canisterId") ?? search.get("app");
+if (appIdFromUrl) $<HTMLInputElement>("appCanisterId").value = appIdFromUrl;
 
 $("signInBtn").addEventListener("click", () => void signInAndVerify());
 $("callBtn").addEventListener("click", () => void callProtected());
