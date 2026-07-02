@@ -637,8 +637,7 @@ mod tests {
             .expect("payload should be a JSON object")
             .remove("hd")
             .expect("claim to drop should exist in the fixture");
-        let tampered_payload =
-            BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let tampered_payload = BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
         let tampered_jwt = format!("{header}.{tampered_payload}.{signature}");
 
         let result = verify_jwt(&tampered_jwt, &test_salt(), None);
