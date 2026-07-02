@@ -102,8 +102,9 @@ export const mcpAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
-      // Unrestricted: MCP delegations are update-capable. The backend defaults
-      // an omitted `read_only` to read-only, so pass `[false]` explicitly.
+      // Unrestricted: the standing delegation is update-capable so the MCP
+      // server can call the (update) prepare endpoint. Passed explicitly
+      // rather than relying on the backend's default for an omitted value.
       [false],
     )
     .then(throwCanisterError);
