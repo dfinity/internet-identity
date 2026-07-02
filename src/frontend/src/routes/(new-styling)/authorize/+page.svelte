@@ -165,7 +165,7 @@
       client_id: result.clientId,
       seed_jwks: [],
     };
-    initiateOpenId(syntheticConfig, currentSsoAppScope());
+    initiateOpenId(syntheticConfig, currentSsoAppScope(domain));
   };
 
   /** Process the OpenID callback and authorize. */

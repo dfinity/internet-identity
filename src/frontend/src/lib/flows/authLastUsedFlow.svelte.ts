@@ -127,7 +127,7 @@ export class AuthLastUsedFlow {
             authScope: selectAuthScopes(
               ssoResult.discovery.scopes_supported,
             ).join(" "),
-            appScope: currentSsoAppScope(),
+            appScope: currentSsoAppScope(domain),
           })),
           {
             nonce: get(sessionStore).nonce,

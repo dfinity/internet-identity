@@ -271,7 +271,7 @@ export class AuthFlow {
         clientId,
         authURL: discovery.authorization_endpoint,
         authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
-        appScope: currentSsoAppScope(),
+        appScope: currentSsoAppScope(domain),
       },
       undefined,
       domain,
