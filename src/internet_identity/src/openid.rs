@@ -607,6 +607,47 @@ mod tests {
         );
     }
 
+    /// A user can edit the token in their browser before it reaches the
+    /// canister (it travels IdP → callback → frontend → call argument), so
+    /// dropping an unwanted claim — e.g. a policy marker their org's IdP put
+    /// there — must be caught. The JWS signature covers the payload bytes;
+    /// this rebuilds `VALID_JWT` (which verifies as-is, see
+    /// `should_verify_configured_provider`) with one claim removed and the
+    /// original signature, and expects rejection.
+    #[test]
+    fn should_reject_tampered_claims() {
+        use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+        use base64::Engine;
+
+        configured::clear_for_test();
+        configured::setup_for_test(google_config(), test_certs());
+
+        let [header, payload, signature]: [&str; 3] = VALID_JWT
+            .split('.')
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("JWT should have three segments");
+        let decoded = BASE64_URL_SAFE_NO_PAD
+            .decode(payload)
+            .expect("payload should be base64url");
+        let mut claims: serde_json::Value =
+            serde_json::from_slice(&decoded).expect("payload should be JSON");
+        claims
+            .as_object_mut()
+            .expect("payload should be a JSON object")
+            .remove("hd")
+            .expect("claim to drop should exist in the fixture");
+        let tampered_payload =
+            BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let tampered_jwt = format!("{header}.{tampered_payload}.{signature}");
+
+        let result = verify_jwt(&tampered_jwt, &test_salt(), None);
+        assert!(
+            matches!(result, Err(OpenIDJWTVerificationError::GenericError(_))),
+            "tampered JWT must be rejected, got: {result:?}"
+        );
+    }
+
     #[test]
     fn should_replace_placeholders_in_issuer() {
         let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
