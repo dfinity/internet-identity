@@ -46,12 +46,27 @@ fn expiration_timestamp_ns(issued_at_timestamp_ns: Timestamp) -> Timestamp {
 ///
 /// `rp_origin` is the same value certified as `implicit:origin`, so the gate
 /// decision and the bundle's app binding can't diverge.
+/// Why the per-app SSO gate refused to certify `sso:<domain>`.
+#[derive(Debug, PartialEq)]
+enum SsoAccessDenial {
+    /// The app is access-controlled and the caller has no fresh role
+    /// grant for it (no `icp_role:<app>`, or the app-bound ceremony is
+    /// stale). Surfaced to the frontend as the typed
+    /// [`PrepareIcrc3AttributeError::SsoAppAccessDenied`] so it can show
+    /// a purposeful "no access to <app>" screen. `app` is the RP host.
+    NoAccess { app: String },
+    /// The gate couldn't be evaluated (e.g. the RP origin has no
+    /// determinable host). Fail closed; folded into the generic
+    /// `AttributeMismatch` problems rather than the typed denial.
+    Unevaluable(String),
+}
+
 fn check_sso_app_access(
     credential: &OpenIdCredential,
     rp_origin: &str,
     now_ns: u64,
     domain: &str,
-) -> Result<(), String> {
+) -> Result<(), SsoAccessDenial> {
     let Some(restricted_apps) = credential.restricted_apps() else {
         return Ok(());
     };
@@ -61,25 +76,21 @@ fn check_sso_app_access(
     else {
         // Only reached for orgs that opted in; fail closed rather than
         // certifying to an origin whose hostname can't be determined.
-        return Err(format!(
+        return Err(SsoAccessDenial::Unevaluable(format!(
             "Cannot determine the app hostname from origin `{rp_origin}` for the sso:{domain} access check"
-        ));
+        )));
     };
     if !restricted_apps.contains(&app_host) {
         return Ok(());
     }
+    // Both the stale-ceremony and the missing-role paths are "you don't
+    // have access to this app right now" from the caller's point of view,
+    // so they collapse to one `NoAccess`; the frontend message is the same.
     let fresh = credential
         .policy_refreshed_at_ns()
         .is_some_and(|refreshed| now_ns.saturating_sub(refreshed) <= OPENID_SESSION_DURATION_NS);
-    if !fresh {
-        return Err(format!(
-            "{app_host} is access-controlled by {domain}: sharing sso:{domain} attributes requires a recent {domain} sign-in"
-        ));
-    }
-    if !credential.has_granted_role_for(&app_host) {
-        return Err(format!(
-            "Access to {app_host} requires a role granted by {domain}"
-        ));
+    if !fresh || !credential.has_granted_role_for(&app_host) {
+        return Err(SsoAccessDenial::NoAccess { app: app_host });
     }
     Ok(())
 }
@@ -488,23 +499,35 @@ impl Anchor {
                         continue;
                     };
 
-                    // One gate verdict per domain: multiple requested
-                    // attributes under the same scope share it, so a denial
-                    // is reported once instead of once per spec.
-                    let allowed = *sso_gate_verdicts.entry(domain).or_insert_with(|| {
-                        match check_sso_app_access(
-                            credential,
-                            &gate_origin,
-                            issued_at_timestamp_ns,
-                            domain,
-                        ) {
-                            Ok(()) => true,
-                            Err(problem) => {
-                                problems.push(problem);
-                                false
-                            }
+                    // Per-app access gate, one verdict per domain (multiple
+                    // requested attributes under the same scope share it). A
+                    // `NoAccess` denial fails the whole request with a typed
+                    // error so the frontend can render "no access to <app>";
+                    // an `Unevaluable` denial folds into the generic problems.
+                    let allowed = match sso_gate_verdicts.entry(domain) {
+                        std::collections::btree_map::Entry::Occupied(entry) => *entry.get(),
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            let verdict = match check_sso_app_access(
+                                credential,
+                                &gate_origin,
+                                issued_at_timestamp_ns,
+                                domain,
+                            ) {
+                                Ok(()) => true,
+                                Err(SsoAccessDenial::NoAccess { app }) => {
+                                    return Err(PrepareIcrc3AttributeError::SsoAppAccessDenied {
+                                        app,
+                                        domain: domain.clone(),
+                                    });
+                                }
+                                Err(SsoAccessDenial::Unevaluable(problem)) => {
+                                    problems.push(problem);
+                                    false
+                                }
+                            };
+                            *entry.insert(verdict)
                         }
-                    });
+                    };
                     if !allowed {
                         continue;
                     }
@@ -859,7 +882,7 @@ mod tests {
             (NOW_NS - crate::openid::OPENID_SESSION_DURATION_NS - MINUTE).to_string()
         }
 
-        fn check(credential: &OpenIdCredential, origin: &str) -> Result<(), String> {
+        fn check(credential: &OpenIdCredential, origin: &str) -> Result<(), SsoAccessDenial> {
             check_sso_app_access(credential, origin, NOW_NS, SSO_DOMAIN)
         }
 
@@ -906,10 +929,11 @@ mod tests {
                 ),
                 (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
             ]);
-            let error = check(&credential, APP_ORIGIN).unwrap_err();
-            assert!(
-                error.contains("requires a role granted by org.com"),
-                "{error}"
+            assert_eq!(
+                check(&credential, APP_ORIGIN),
+                Err(SsoAccessDenial::NoAccess {
+                    app: "payroll.com".to_string()
+                })
             );
         }
 
@@ -940,8 +964,12 @@ mod tests {
                 ),
                 (POLICY_REFRESHED_AT_METADATA_KEY, &stale()),
             ]);
-            let error = check(&credential, APP_ORIGIN).unwrap_err();
-            assert!(error.contains("recent org.com sign-in"), "{error}");
+            assert_eq!(
+                check(&credential, APP_ORIGIN),
+                Err(SsoAccessDenial::NoAccess {
+                    app: "payroll.com".to_string()
+                })
+            );
         }
 
         #[test]
@@ -997,9 +1025,11 @@ mod tests {
         }
 
         #[test]
-        fn denial_is_reported_once_for_multiple_attributes() {
-            // Two attributes under one refused `sso:<domain>` scope must
-            // yield a single gate problem, not one per spec.
+        fn restricted_app_denial_surfaces_typed_error() {
+            // A refused `sso:<domain>` scope fails the whole request with the
+            // typed `SsoAppAccessDenied` (carrying the app host + SSO domain),
+            // not a generic `AttributeMismatch` — this is what lets the
+            // frontend render a purposeful "no access to <app>" screen.
             let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
             anchor.openid_credentials = vec![sso_credential(&[
                 (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
@@ -1023,13 +1053,13 @@ mod tests {
                 NOW_NS,
                 Account::synthetic(ANCHOR_NUMBER, APP_ORIGIN.to_string()),
             );
-            match result {
-                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-                    assert_eq!(problems.len(), 1, "expected one gate problem: {problems:?}");
-                    assert!(problems[0].contains("requires a role granted by org.com"));
-                }
-                _ => panic!("expected AttributeMismatch"),
-            }
+            assert_eq!(
+                result,
+                Err(PrepareIcrc3AttributeError::SsoAppAccessDenied {
+                    app: "payroll.com".to_string(),
+                    domain: SSO_DOMAIN.to_string(),
+                })
+            );
         }
     }
 

@@ -1440,6 +1440,15 @@ type PrepareIcrc3AttributeError = variant {
     AttributeMismatch : record {
         problems : vec text;
     };
+    // The caller authenticated through the org's SSO, but the IdP has not
+    // granted them access to this relying-party app, so the sso:<domain>
+    // attribute is withheld. Distinct from AttributeMismatch so the
+    // frontend can show a purposeful "no access to <app>" screen. `app` is
+    // the relying party's hostname; `domain` is the managing SSO domain.
+    SsoAppAccessDenied : record {
+        app : text;
+        domain : text;
+    };
 };
 
 type GetIcrc3AttributeRequest = record {

@@ -7,8 +7,10 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
 
+  // Messages for the plain string-valued channel errors. Data-carrying
+  // variants (e.g. `sso-app-access-denied`) are handled in `messages` below.
   const errorMessages: Record<
-    ChannelError,
+    Extract<ChannelError, string>,
     { title: string; description: string }
   > = {
     "unable-to-connect": {
@@ -46,7 +48,14 @@
   }
 
   const { error }: Props = $props();
-  const messages = $derived(errorMessages[error]);
+  const messages = $derived(
+    typeof error === "string"
+      ? errorMessages[error]
+      : {
+          title: $t`No access`,
+          description: $t`You don't have access to ${error.app}. Access to this app is managed by your organization — contact your administrator if you think this should be allowed.`,
+        },
+  );
 </script>
 
 <div class="flex min-h-dvh flex-col">

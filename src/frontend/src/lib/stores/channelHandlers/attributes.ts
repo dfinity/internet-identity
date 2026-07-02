@@ -16,7 +16,12 @@ import {
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
-import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
+import {
+  isCanisterError,
+  retryFor,
+  throwCanisterError,
+  waitForStore,
+} from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import {
@@ -422,6 +427,22 @@ const certifyAndSend = async (params: {
     });
   } catch (error) {
     console.error(error);
+    // A denied SSO app-access decision (II withheld the sso:<domain>
+    // attribute because the org IdP granted no role for this app) is a
+    // first-class outcome, not a generic failure — surface it so the UI
+    // can name the app instead of showing "something went wrong".
+    if (
+      isCanisterError<{ SsoAppAccessDenied?: { app: string; domain: string } }>(
+        error,
+      ) &&
+      "SsoAppAccessDenied" in error.raw
+    ) {
+      onError({
+        type: "sso-app-access-denied",
+        app: error.raw.SsoAppAccessDenied!.app,
+      });
+      return;
+    }
     onError("attributes-failed");
   }
 };
