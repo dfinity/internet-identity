@@ -314,7 +314,12 @@ fn submit(
         "{live_url}api/v2/canister/{}/{endpoint}",
         canister_id.to_text()
     );
-    let client = reqwest::blocking::Client::new();
+    // Bounded timeout so a stalled endpoint fails the test deterministically
+    // instead of hanging the suite.
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .expect("failed to build HTTP client");
     let response = client
         .post(url)
         .header("Content-Type", "application/cbor")
