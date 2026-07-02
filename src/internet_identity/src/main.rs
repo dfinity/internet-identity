@@ -2,6 +2,7 @@ use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
+use crate::delegation::DelegationAccess;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -447,7 +448,8 @@ async fn prepare_delegation(
         None,
         session_key,
         max_time_to_live,
-        false,
+        // The legacy endpoint has no read-only option.
+        DelegationAccess::Unrestricted,
         &ii_domain,
     )
     .await
@@ -476,7 +478,8 @@ fn get_delegation(
         None,
         session_key,
         expiration,
-        false,
+        // The legacy endpoint has no read-only option.
+        DelegationAccess::Unrestricted,
     )
     .map(GetDelegationResponse::SignedDelegation)
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
@@ -592,13 +595,12 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
-                // Default an omitted `read_only` argument to an unrestricted
-                // delegation: this preserves the original behavior for existing
-                // callers of the (pre-feature) 5-argument form, and matches the
-                // interface spec, where an absent `permissions` field means
-                // unrestricted ("all"). First-party callers always pass an
-                // explicit value (read-only by default in the CLI and MCP flows).
-                read_only.unwrap_or(false),
+                // An omitted `read_only` argument means unrestricted (see
+                // `DelegationAccess::from_read_only_arg`): this preserves the
+                // original behavior for callers of the (pre-feature) 5-argument
+                // form. First-party callers always pass an explicit value
+                // (read-only by default in the CLI and MCP flows).
+                DelegationAccess::from_read_only_arg(read_only),
                 &ii_domain,
             )
             .await
@@ -626,7 +628,7 @@ fn get_account_delegation(
             // See `prepare_account_delegation`: an omitted `read_only` argument
             // means an unrestricted delegation (backwards-compatible with the
             // original 5-argument form).
-            read_only.unwrap_or(false),
+            DelegationAccess::from_read_only_arg(read_only),
         ),
         Err(err) => Err(err.into()),
     }

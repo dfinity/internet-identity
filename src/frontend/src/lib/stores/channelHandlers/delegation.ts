@@ -1,3 +1,4 @@
+import { toReadOnlyArg } from "$lib/utils/accessLevel";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   DelegationParamsCodec,
@@ -105,9 +106,8 @@ export const handleDelegationRequest =
         // closed on the dapp side (the signature does not verify without
         // the field).
         // Send an explicit value rather than relying on the backend's
-        // omitted-arg default: `[false]` for normal authorizations, `[true]`
-        // only when the user enabled read-only mode.
-        const readOnly: [boolean] = [authorized.readOnly];
+        // omitted-arg default.
+        const readOnly = toReadOnlyArg(authorized.accessLevel);
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(

@@ -5,9 +5,7 @@ use crate::stats::event_stats::{
 use crate::{state, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
-use ic_canister_sig_creation::{
-    delegation_signature_msg, CanisterSigPublicKey, DELEGATION_SIG_DOMAIN,
-};
+use ic_canister_sig_creation::{CanisterSigPublicKey, DELEGATION_SIG_DOMAIN};
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
@@ -129,16 +127,21 @@ pub(crate) fn der_encode_canister_sig_key(seed: Vec<u8>) -> Vec<u8> {
     CanisterSigPublicKey::new(my_canister_id, seed).to_der()
 }
 
+/// Adds a delegation signature for `pk` to the signature map. `permissions`
+/// is the delegation's optional `permissions` field (folded into the signed
+/// message when present) — pass `access.permissions()` of a
+/// [`DelegationAccess`], or `None` for flows that never restrict.
 pub fn add_delegation_signature(
     sigs: &mut SignatureMap,
     pk: PublicKey,
     seed: &[u8],
     expiration: Timestamp,
+    permissions: Option<&str>,
 ) {
     let inputs = CanisterSigInputs {
         domain: DELEGATION_SIG_DOMAIN,
         seed,
-        message: &delegation_signature_msg(&pk, expiration, None),
+        message: &delegation_signature_msg_with_permissions(&pk, expiration, None, permissions),
     };
     sigs.add_signature(&inputs);
 }
@@ -147,6 +150,45 @@ pub fn add_delegation_signature(
 /// sender to query calls: the IC rejects update calls authenticated
 /// through such a delegation.
 pub const DELEGATION_PERMISSIONS_QUERIES: &str = "queries";
+
+/// The access level a delegation grants. Typed (rather than a bare bool) so
+/// call sites read as `DelegationAccess::ReadOnly`, not a blind `true`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DelegationAccess {
+    /// Update-capable: the delegation carries no `permissions` field.
+    Unrestricted,
+    /// Queries-only: the delegation carries `permissions = "queries"`, so the
+    /// IC rejects update calls authenticated through it.
+    ReadOnly,
+}
+
+impl DelegationAccess {
+    /// Maps a `read_only` flag (e.g. the persisted MCP grant field).
+    pub fn from_read_only(read_only: bool) -> Self {
+        if read_only {
+            DelegationAccess::ReadOnly
+        } else {
+            DelegationAccess::Unrestricted
+        }
+    }
+
+    /// Maps the endpoints' trailing `read_only : opt bool` candid argument.
+    /// An omitted argument means unrestricted: this preserves the original
+    /// behavior for callers of the pre-feature 5-argument form and matches
+    /// the interface spec's default for an absent `permissions` field.
+    /// First-party callers always pass an explicit value.
+    pub fn from_read_only_arg(read_only: Option<bool>) -> Self {
+        Self::from_read_only(read_only.unwrap_or(false))
+    }
+
+    /// The delegation's `permissions` field value for this access level.
+    pub fn permissions(self) -> Option<&'static str> {
+        match self {
+            DelegationAccess::Unrestricted => None,
+            DelegationAccess::ReadOnly => Some(DELEGATION_PERMISSIONS_QUERIES),
+        }
+    }
+}
 
 /// Like `ic_canister_sig_creation::delegation_signature_msg`, but
 /// additionally supports the delegation's optional `permissions` field
@@ -174,24 +216,6 @@ pub fn delegation_signature_msg_with_permissions(
         m.push(("permissions".into(), Value::String(permissions.to_string())));
     }
     representation_independent_hash(m.as_slice()).to_vec()
-}
-
-/// Like [`add_delegation_signature`], but restricts the delegation to the
-/// given permissions when `read_only` is `true`.
-pub fn add_delegation_signature_with_permissions(
-    sigs: &mut SignatureMap,
-    pk: PublicKey,
-    seed: &[u8],
-    expiration: Timestamp,
-    read_only: bool,
-) {
-    let permissions = read_only.then_some(DELEGATION_PERMISSIONS_QUERIES);
-    let inputs = CanisterSigInputs {
-        domain: DELEGATION_SIG_DOMAIN,
-        seed,
-        message: &delegation_signature_msg_with_permissions(&pk, expiration, None, permissions),
-    };
-    sigs.add_signature(&inputs);
 }
 
 pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {

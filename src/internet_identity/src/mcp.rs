@@ -23,7 +23,7 @@ use internet_identity_interface::internet_identity::types::{
 
 use crate::{
     account_management,
-    delegation::der_encode_canister_sig_key,
+    delegation::{der_encode_canister_sig_key, DelegationAccess},
     state::{storage_borrow, storage_borrow_mut},
     storage::account::{Account, AccountDelegationError, ReadAccountParams},
     storage::storable::mcp_access::StorableMcpAccess,
@@ -204,7 +204,7 @@ pub async fn prepare_account_delegation(
         account_number,
         session_key,
         capped_ttl,
-        read_only,
+        DelegationAccess::from_read_only(read_only),
         &None,
     )
     .await?;
@@ -238,6 +238,6 @@ pub fn get_account_delegation(
         account_number,
         session_key,
         expiration,
-        read_only,
+        DelegationAccess::from_read_only(read_only),
     )
 }

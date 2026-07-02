@@ -123,7 +123,8 @@ impl OpenIdCredential {
         let seed = calculate_delegation_seed(&self.key(), anchor_number);
 
         state::signature_map_mut(|sigs| {
-            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+            // Unrestricted: the OpenID flow has no read-only option.
+            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration, None);
         });
         update_root_hash();
 

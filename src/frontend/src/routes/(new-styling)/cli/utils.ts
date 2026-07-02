@@ -1,3 +1,4 @@
+import { toReadOnlyArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -25,9 +26,9 @@ interface CliAuthorizeInput {
   /** Single-use secret from the URL fragment, echoed back so the loopback
    *  server can tell this page's POST from a stray or forged local request. */
   nonce: string;
-  /** Whether to restrict the CLI's delegation to read-only (query calls). The
-   *  CLI flow defaults this to `true` (opt-out), reflected in the toggle. */
-  readOnly: boolean;
+  /** The access the CLI's delegation grants. The CLI flow defaults to
+   *  "read-only" (query calls only); "full-access" is the opt-in. */
+  accessLevel: AccessLevel;
 }
 
 const derivationOrigin = (domain: string | undefined): string =>
@@ -60,7 +61,7 @@ export const cliAuthorize = async ({
   ttlMinutes,
   callback,
   nonce,
-  readOnly,
+  accessLevel,
 }: CliAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
   const effectiveOrigin = derivationOrigin(domain);
@@ -80,9 +81,9 @@ export const cliAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
-      // Read-only when the user kept the (default-on) toggle; passed explicitly
-      // so the choice is honored regardless of the backend's omitted-arg default.
-      [readOnly],
+      // The user's choice (read-only by default); passed explicitly so it
+      // is honored regardless of the backend's omitted-arg default.
+      toReadOnlyArg(accessLevel),
     )
     .then(throwCanisterError);
 
@@ -95,7 +96,7 @@ export const cliAuthorize = async ({
         ephemeralPublicKey,
         expiration,
         // Must match the value passed to `prepare_account_delegation` above.
-        [readOnly],
+        toReadOnlyArg(accessLevel),
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

@@ -1,3 +1,4 @@
+import { toReadOnlyArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -24,7 +25,7 @@ interface McpAuthorizeInput {
    *  It is persisted with the access grant, NOT stamped on the standing
    *  delegation below (which must stay full-access so the server can still call
    *  the update endpoint `mcp_prepare_account_delegation`). */
-  readOnly: boolean;
+  accessLevel: AccessLevel;
   /** Callback URL (on the MCP server origin) the delegation chain is
    *  form-POSTed to. */
   callback: string;
@@ -57,7 +58,7 @@ export const mcpAuthorize = async ({
   publicKey,
   mcpServerOrigin,
   ttlSeconds,
-  readOnly,
+  accessLevel,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
@@ -73,14 +74,14 @@ export const mcpAuthorize = async ({
   // server origin so II honors the server's later on-demand per-app delegation
   // calls. The backend binds the principal it derives for the anchor at this
   // origin — exactly the principal the standing delegation below carries — and
-  // re-derives the same principal to revoke. Idempotent. `readOnly` is persisted
-  // with the grant: when set, the per-app delegations the server later obtains
-  // are query-only.
+  // re-derives the same principal to revoke. Idempotent. The access level is
+  // persisted with the grant: when read-only, the per-app delegations the
+  // server later obtains are query-only.
   const accessResult = await actor.mcp_set_access(
     identityNumber,
     effectiveOrigin,
     true,
-    [readOnly],
+    toReadOnlyArg(accessLevel),
   );
   if ("Err" in accessResult) {
     throw new Error(accessResult.Err);
@@ -105,7 +106,7 @@ export const mcpAuthorize = async ({
       // Unrestricted: the standing delegation is update-capable so the MCP
       // server can call the (update) prepare endpoint. Passed explicitly
       // rather than relying on the backend's default for an omitted value.
-      [false],
+      toReadOnlyArg("full-access"),
     )
     .then(throwCanisterError);
 
@@ -118,7 +119,7 @@ export const mcpAuthorize = async ({
         ephemeralPublicKey,
         expiration,
         // Unrestricted; must match `prepare_account_delegation` above.
-        [false],
+        toReadOnlyArg("full-access"),
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

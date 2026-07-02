@@ -32,7 +32,8 @@
   } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
-  import ReadOnlyToggle from "$lib/components/ui/ReadOnlyToggle.svelte";
+  import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -45,13 +46,13 @@
      *  (e.g. /mcp) can reuse this picker by passing the origin they connect to. */
     displayOrigin: string;
     /** Called when the user confirms with the default account or selects a
-     *  specific account. `readOnly` reflects the "Read-only mode" checkbox:
-     *  when `true`, the session delegation is restricted to query calls, so
-     *  the app can read on the user's behalf but cannot change state (the
+     *  specific account. `accessLevel` reflects the "Read-only mode" checkbox:
+     *  "read-only" restricts the session delegation to query calls, so the
+     *  app can read on the user's behalf but cannot change state (the
      *  Internet Computer rejects update calls authenticated through it). */
     onAuthorize: (
       accountNumber: Promise<bigint | undefined>,
-      readOnly?: boolean,
+      accessLevel: AccessLevel,
     ) => void;
     /** Replaces the default authorize header (app tile + "Continue to <app>"),
      *  letting /mcp render its own connect consent above the same picker. */
@@ -98,7 +99,8 @@
   >(null);
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
-  let isReadOnlyMode = $state(false);
+  // Authorizations default to full access; "Read-only mode" is the opt-in.
+  let accessLevel: AccessLevel = $state("full-access");
   let isMultipleAccountsEnabled = $state(
     readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
   );
@@ -194,7 +196,7 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      onAuthorize(accountNumberPromise, isReadOnlyMode);
+      onAuthorize(accountNumberPromise, accessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -209,7 +211,7 @@
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
-      onAuthorize(Promise.resolve(accountNumber), isReadOnlyMode);
+      onAuthorize(Promise.resolve(accountNumber), accessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -571,8 +573,9 @@
       </button>
     </Tooltip>
   </div>
-  <ReadOnlyToggle
-    bind:checked={isReadOnlyMode}
+  <AccessLevelToggle
+    bind:accessLevel
+    prompt="read-only"
     disabled={isAuthenticatingDefault}
     class="mt-4"
   />

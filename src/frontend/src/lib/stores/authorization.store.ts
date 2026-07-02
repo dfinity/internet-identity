@@ -1,4 +1,5 @@
 import { derived, type Readable, writable } from "svelte/store";
+import type { AccessLevel } from "$lib/utils/accessLevel";
 
 export type AuthorizationFlow =
   | { type: "1-click-openid"; issuer: string }
@@ -12,11 +13,11 @@ export type AuthorizationContext = {
 
 export type Authorized = {
   accountNumberPromise: Promise<bigint | undefined>;
-  /** Whether the user restricted this authorization to read-only access:
-   *  the session delegation will carry `permissions = "queries"`, which
-   *  makes the Internet Computer reject update calls authenticated through
-   *  it. Enforcement is protocol-level, not up to the app or canister. */
-  readOnly: boolean;
+  /** The access level the user granted: "read-only" means the session
+   *  delegation will carry `permissions = "queries"`, which makes the
+   *  Internet Computer reject update calls authenticated through it.
+   *  Enforcement is protocol-level, not up to the app or canister. */
+  accessLevel: AccessLevel;
 };
 
 const contextInternal = writable<AuthorizationContext | undefined>();
@@ -35,13 +36,14 @@ export const authorizationStore = {
   },
   /** Called by the UI when the user authorizes with a specific account.
    *  Accepts a promise so the animation can start immediately while the
-   *  account number resolves asynchronously. `readOnly` restricts the
-   *  session to read-only access (see {@link Authorized.readOnly}). */
+   *  account number resolves asynchronously. `accessLevel` is the access
+   *  the user granted (see {@link Authorized.accessLevel}); always passed
+   *  explicitly so call sites are self-describing. */
   authorize: (
     accountNumberPromise: Promise<bigint | undefined>,
-    readOnly = false,
+    accessLevel: AccessLevel,
   ): void => {
-    authorizedInternal.set({ accountNumberPromise, readOnly });
+    authorizedInternal.set({ accountNumberPromise, accessLevel });
   },
   subscribe: contextInternal.subscribe,
 };

@@ -3,7 +3,8 @@
   import McpHero from "../components/McpHero.svelte";
   import Select from "$lib/components/ui/Select.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import ReadOnlyToggle from "$lib/components/ui/ReadOnlyToggle.svelte";
+  import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import { ChevronDownIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -19,9 +20,9 @@
      *  [10 min, 1 week]); the initial selection, which the user can change. */
     requestedTtlSeconds: number;
     /** Called once the selected identity is authenticated, with the chosen
-     *  session duration (seconds) and whether the per-app delegations the server
-     *  obtains should be read-only (query-only), to connect. */
-    onAuthorize: (ttlSeconds: number, readOnly: boolean) => void;
+     *  session duration (seconds) and the access level the per-app delegations
+     *  the server obtains should grant, to connect. */
+    onAuthorize: (ttlSeconds: number, accessLevel: AccessLevel) => void;
   }
 
   const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
@@ -29,7 +30,7 @@
   // MCP connections default to read-only (opt-out): the server can read on the
   // user's behalf across their apps, but its per-app delegations are query-only
   // unless the user opts into full access by unchecking.
-  let isReadOnlyMode = $state(true);
+  let accessLevel: AccessLevel = $state("read-only");
 
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
@@ -108,7 +109,7 @@
         sessionStore.reset();
         await authLastUsedFlow.authenticate(selected);
       }
-      onAuthorize(selectedTtlSeconds, isReadOnlyMode);
+      onAuthorize(selectedTtlSeconds, accessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -155,8 +156,9 @@
         </button>
       </Select>
     </div>
-    <ReadOnlyToggle
-      bind:checked={isReadOnlyMode}
+    <AccessLevelToggle
+      bind:accessLevel
+      prompt="read-only"
       disabled={isAuthorizing}
       class="mb-6"
     />

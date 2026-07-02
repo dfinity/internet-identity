@@ -1,7 +1,8 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import ReadOnlyToggle from "$lib/components/ui/ReadOnlyToggle.svelte";
+  import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import CliHeader from "../components/CliHeader.svelte";
   import TerminalBlock from "../components/TerminalBlock.svelte";
   import { Trans } from "$lib/components/locale";
@@ -11,21 +12,21 @@
     /** Hostname of the app the CLI is being authorized for, or undefined for
      *  generic mode. */
     domain?: string;
-    onAuthorize: (readOnly: boolean) => Promise<void>;
+    onAuthorize: (accessLevel: AccessLevel) => Promise<void>;
   }
 
   const { domain, onAuthorize }: Props = $props();
 
   let busy = $state(false);
-  // CLI access defaults to read-only (opt-out): a linked CLI usually reads on
-  // the user's behalf, so it gets query-only access unless the user opts into
-  // full access by unchecking.
-  let isReadOnlyMode = $state(true);
+  // CLI access defaults to read-only: a linked CLI usually reads on the
+  // user's behalf, so it gets query-only access unless the user opts into
+  // full access by checking the "Full access" box.
+  let accessLevel: AccessLevel = $state("read-only");
 
   const handleClick = async () => {
     busy = true;
     try {
-      await onAuthorize(isReadOnlyMode);
+      await onAuthorize(accessLevel);
     } finally {
       busy = false;
     }
@@ -72,8 +73,9 @@
       {/if}
     </p>
 
-    <ReadOnlyToggle
-      bind:checked={isReadOnlyMode}
+    <AccessLevelToggle
+      bind:accessLevel
+      prompt="full-access"
       disabled={busy}
       class="mt-4"
     />

@@ -2,9 +2,8 @@
 use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
-        add_delegation_signature_with_permissions, check_frontend_length, delegation_bookkeeping,
-        delegation_signature_msg_with_permissions, der_encode_canister_sig_key,
-        DELEGATION_PERMISSIONS_QUERIES,
+        add_delegation_signature, check_frontend_length, delegation_bookkeeping,
+        delegation_signature_msg_with_permissions, der_encode_canister_sig_key, DelegationAccess,
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
@@ -301,7 +300,7 @@ pub async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
-    read_only: bool,
+    access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     state::ensure_salt_set().await;
@@ -326,12 +325,12 @@ pub async fn prepare_account_delegation(
     let seed = account.calculate_seed();
 
     state::signature_map_mut(|sigs| {
-        add_delegation_signature_with_permissions(
+        add_delegation_signature(
             sigs,
             session_key,
             seed.as_ref(),
             expiration,
-            read_only,
+            access.permissions(),
         );
     });
     update_root_hash();
@@ -355,7 +354,7 @@ pub fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
-    read_only: bool,
+    access: DelegationAccess,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     check_frontend_length(origin);
 
@@ -370,7 +369,7 @@ pub fn get_account_delegation(
             .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 
         state::assets_and_signatures(|certified_assets, sigs| {
-            let permissions = read_only.then_some(DELEGATION_PERMISSIONS_QUERIES);
+            let permissions = access.permissions();
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
                 seed: &account.calculate_seed(),

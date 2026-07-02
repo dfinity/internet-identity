@@ -83,4 +83,4 @@ getrandom = "0.2"
 # can carry the delegation `permissions` field yet. The endpoint is plain
 # HTTP on localhost, so reqwest needs no TLS backend.
 ed25519-dalek.workspace = true
-reqwest = { version = "0.12", default-features = false, features = ["blocking"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking"] }
