@@ -69,13 +69,13 @@ const provider = new oidc.Provider(issuer, {
   claims: {
     openid: ["sub", "name", "email", "preferred_username", "email_verified"],
   },
-  // Accept the app-access scope II forwards (e.g. `ii_app:try.id.ai`) so the
+  // Accept the app-access scope II forwards (e.g. `icp:try.id.ai`) so the
   // authorization request isn't rejected with `invalid_scope`. A real IdP
   // (Okta, etc.) would register these scopes and gate access on them via an
   // authorization-server policy; the test provider only needs to accept them
   // so the SSO flow completes end-to-end and tests can assert the scope was
   // forwarded.
-  dynamicScopes: [/^ii_app:[^\s]+$/],
+  dynamicScopes: [/^icp:[^\s]+$/],
   async findAccount(_, id) {
     return {
       accountId: id,

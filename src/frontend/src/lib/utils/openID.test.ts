@@ -531,12 +531,12 @@ describe("createRedirectURL", () => {
         clientId: "test-client",
         authURL: "https://idp.example.com/authorize",
         authScope: "openid profile email",
-        appScope: "ii_app:try.id.ai",
+        appScope: "icp:try.id.ai",
       },
       { nonce: "test-nonce" },
     );
     expect(url.searchParams.get("scope")).toBe(
-      "openid profile email ii_app:try.id.ai",
+      "openid profile email icp:try.id.ai",
     );
   });
 
@@ -555,13 +555,13 @@ describe("createRedirectURL", () => {
 });
 
 describe("appAccessScope", () => {
-  it("builds an ii_app scope from the origin's hostname", () => {
-    expect(appAccessScope("https://try.id.ai")).toBe("ii_app:try.id.ai");
+  it("builds an icp scope from the origin's hostname", () => {
+    expect(appAccessScope("https://try.id.ai")).toBe("icp:try.id.ai");
   });
 
   it("drops scheme, port and path, keeping only the hostname", () => {
     expect(appAccessScope("https://app.example.com:8443/path?q=1")).toBe(
-      "ii_app:app.example.com",
+      "icp:app.example.com",
     );
   });
 

@@ -155,19 +155,19 @@ export interface RequestConfig {
   // Optional, FedCM config URL
   configURL?: string;
   // Optional, extra scope identifying the relying-party app the user is
-  // signing in to (e.g. `ii_app:oisy.com`), appended to `authScope` in the
+  // signing in to (e.g. `icp:oisy.com`), appended to `authScope` in the
   // redirect flow so an org SSO/IdP can apply per-app access policy. Only set
   // for SSO providers that accept it; see `appAccessScope`.
   appScope?: string;
 }
 
 /** Prefix for the app-access scope forwarded to an org SSO/IdP. */
-export const SSO_APP_SCOPE_PREFIX = "ii_app:";
+export const SSO_APP_SCOPE_PREFIX = "icp:";
 
 /**
  * Build the app-access scope for the relying-party app identified by
  * `appOrigin` — the app's hostname prefixed with {@link SSO_APP_SCOPE_PREFIX},
- * e.g. `https://oisy.com` → `ii_app:oisy.com`. The hostname (not the full
+ * e.g. `https://oisy.com` → `icp:oisy.com`. The hostname (not the full
  * origin) keeps the value a clean, predictable scope token the org can
  * pre-register at its IdP. Returns `undefined` if `appOrigin` isn't a valid
  * URL.

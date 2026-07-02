@@ -118,7 +118,7 @@ export const MIN_GUIDED_UPGRADE = createFeatureFlagStore(
   false,
 );
 
-/// Forward an app-access scope (`ii_app:<hostname>`) identifying the
+/// Forward an app-access scope (`icp:<hostname>`) identifying the
 /// relying-party app to the org SSO/IdP during the OpenID authorization flow,
 /// so admins can apply per-app access policy. Off by default: an IdP that
 /// hasn't registered the scope rejects the sign-in with `invalid_scope`, so
