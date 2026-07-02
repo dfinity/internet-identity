@@ -80,6 +80,90 @@ struct Claims {
     email: Option<String>,
     name: Option<String>,
     email_verified: Option<EmailVerifiedClaim>,
+    // Optional org access-control policy claims, only retained for SSO
+    // providers (see `insert_policy_metadata`). Parsed leniently as raw JSON
+    // values: a misconfigured claim (wrong shape) must degrade to "claim
+    // absent" rather than fail every sign-in for the org.
+    icp_granted_roles: Option<serde_json::Value>,
+    icp_restricted_apps: Option<serde_json::Value>,
+}
+
+/// Upper bounds on the retained policy-claim lists (`icp_granted_roles` /
+/// `icp_restricted_apps`), so the org's IdP — which controls these claim
+/// values — can't inflate the stored credential. Far above any real org's
+/// per-user role count; groups-sourced claims cap at ~100 entries IdP-side
+/// anyway.
+const MAX_POLICY_CLAIM_VALUES: usize = 64;
+const MAX_POLICY_CLAIM_VALUE_LENGTH: usize = 128;
+
+/// The values of a policy claim, or `None` when the claim isn't a JSON
+/// array. Non-string entries are dropped rather than failing the claim.
+fn policy_string_list(value: &serde_json::Value) -> Option<Vec<String>> {
+    Some(
+        value
+            .as_array()?
+            .iter()
+            .filter_map(|entry| entry.as_str())
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
+/// Retain the org access-control policy claims from a verified SSO id_token
+/// as credential metadata (see the key docs in `openid.rs`):
+///
+/// - `icp_granted_roles`: kept as `icp_role:`-prefixed role-group names,
+///   lowercased (hostname matching is case-insensitive; qualifiers are
+///   opaque to the gate).
+/// - `icp_restricted_apps`: hostnames, lowercased; `icp_restricted:` marker
+///   prefixes (the groups-sourced variant) are stripped. **Presence of this
+///   claim — even as an empty list — is the org's opt-in** into per-app
+///   access control; a wrong-shaped claim degrades to absent (not opted in).
+/// - a refresh stamp with the verification time, giving the certification
+///   gate its freshness bound.
+fn insert_policy_metadata(
+    metadata: &mut HashMap<String, MetadataEntryV2>,
+    granted_roles: Option<&serde_json::Value>,
+    restricted_apps: Option<&serde_json::Value>,
+    now_ns: u64,
+) {
+    let encode = |values: &Vec<String>| {
+        MetadataEntryV2::String(serde_json::to_string(values).unwrap_or_else(|_| "[]".into()))
+    };
+    let mut stamped = false;
+    if let Some(roles) = granted_roles.and_then(policy_string_list) {
+        let roles: Vec<String> = roles
+            .into_iter()
+            .map(|role| role.to_lowercase())
+            .filter(|role| role.starts_with(super::ROLE_GROUP_PREFIX))
+            .filter(|role| role.len() <= MAX_POLICY_CLAIM_VALUE_LENGTH)
+            .take(MAX_POLICY_CLAIM_VALUES)
+            .collect();
+        metadata.insert(super::GRANTED_ROLES_METADATA_KEY.into(), encode(&roles));
+        stamped = true;
+    }
+    if let Some(apps) = restricted_apps.and_then(policy_string_list) {
+        let apps: Vec<String> = apps
+            .into_iter()
+            .map(|app| app.to_lowercase())
+            .map(
+                |app| match app.strip_prefix(super::RESTRICTED_MARKER_PREFIX) {
+                    Some(stripped) => stripped.to_owned(),
+                    None => app,
+                },
+            )
+            .filter(|app| !app.is_empty() && app.len() <= MAX_POLICY_CLAIM_VALUE_LENGTH)
+            .take(MAX_POLICY_CLAIM_VALUES)
+            .collect();
+        metadata.insert(super::RESTRICTED_APPS_METADATA_KEY.into(), encode(&apps));
+        stamped = true;
+    }
+    if stamped {
+        metadata.insert(
+            super::POLICY_REFRESHED_AT_METADATA_KEY.into(),
+            MetadataEntryV2::String(now_ns.to_string()),
+        );
+    }
 }
 
 /// What the resolver determined about a provider, independent of the JWK
@@ -169,6 +253,8 @@ pub(super) fn verify_and_build(
         email,
         name,
         email_verified,
+        icp_granted_roles,
+        icp_restricted_apps,
         aud: _,
         nonce: _,
         exp: _,
@@ -192,6 +278,18 @@ pub(super) fn verify_and_build(
     // Store issuer-specific claims (e.g. Microsoft's `tid`) in the metadata.
     for (key, value) in issuer_claims {
         metadata.insert(key, MetadataEntryV2::String(value));
+    }
+    // Retain the org access-control policy claims (SSO providers only —
+    // direct Google/Apple/Microsoft credentials never carry org policy).
+    // Inserted after the issuer-claims loop so the typed, filtered values
+    // always win over a same-named placeholder claim.
+    if matches!(descriptor.stamp, Stamp::Sso { .. }) {
+        insert_policy_metadata(
+            &mut metadata,
+            icp_granted_roles.as_ref(),
+            icp_restricted_apps.as_ref(),
+            time(),
+        );
     }
 
     let (sso_domain, sso_name) = match &descriptor.stamp {
@@ -621,11 +719,113 @@ mod tests {
                 email: None,
                 name: None,
                 email_verified: None,
+                icp_granted_roles: None,
+                icp_restricted_apps: None,
             },
             &test_salt(),
         );
         // `iat + window` overflows, which the verifier maps to `JWTExpired`
         // rather than panicking.
         assert_eq!(result, Err(OpenIDJWTVerificationError::JWTExpired));
+    }
+
+    mod policy_metadata_tests {
+        use super::*;
+        use serde_json::json;
+
+        const NOW_NS: u64 = 1_700_000_000_000_000_000;
+
+        fn entry(metadata: &HashMap<String, MetadataEntryV2>, key: &str) -> Option<String> {
+            match metadata.get(key)? {
+                MetadataEntryV2::String(value) => Some(value.clone()),
+                _ => None,
+            }
+        }
+
+        #[test]
+        fn retains_normalizes_and_stamps() {
+            let mut metadata = HashMap::new();
+            insert_policy_metadata(
+                &mut metadata,
+                // Mixed case is lowercased; non-`icp_role:` entries (a plain
+                // group that slipped past the IdP-side claim filter) are
+                // dropped.
+                Some(&json!(["icp_role:Payroll.com:Members", "engineering"])),
+                // Marker-group values are stripped to bare hostnames; plain
+                // hostnames pass through; everything is lowercased.
+                Some(&json!(["icp_restricted:Payroll.com", "finance.org.com"])),
+                NOW_NS,
+            );
+            assert_eq!(
+                entry(&metadata, crate::openid::GRANTED_ROLES_METADATA_KEY).unwrap(),
+                r#"["icp_role:payroll.com:members"]"#
+            );
+            assert_eq!(
+                entry(&metadata, crate::openid::RESTRICTED_APPS_METADATA_KEY).unwrap(),
+                r#"["payroll.com","finance.org.com"]"#
+            );
+            assert_eq!(
+                entry(&metadata, crate::openid::POLICY_REFRESHED_AT_METADATA_KEY).unwrap(),
+                NOW_NS.to_string()
+            );
+        }
+
+        #[test]
+        fn absent_claims_leave_no_entries() {
+            let mut metadata = HashMap::new();
+            insert_policy_metadata(&mut metadata, None, None, NOW_NS);
+            assert!(metadata.is_empty());
+        }
+
+        #[test]
+        fn wrong_shape_degrades_to_absent() {
+            // A misconfigured claim (non-array) must not brick sign-in or be
+            // retained — it reads as "org not opted in".
+            let mut metadata = HashMap::new();
+            insert_policy_metadata(
+                &mut metadata,
+                Some(&json!("icp_role:payroll.com")),
+                Some(&json!({"apps": ["payroll.com"]})),
+                NOW_NS,
+            );
+            assert!(metadata.is_empty());
+        }
+
+        #[test]
+        fn empty_restricted_list_is_still_an_opt_in() {
+            // Presence of the claim is the org's opt-in, even with nothing
+            // restricted (yet) — the stamp must be written so the gate can
+            // rely on freshness from the first restricted app onward.
+            let mut metadata = HashMap::new();
+            insert_policy_metadata(&mut metadata, None, Some(&json!([])), NOW_NS);
+            assert_eq!(
+                entry(&metadata, crate::openid::RESTRICTED_APPS_METADATA_KEY).unwrap(),
+                "[]"
+            );
+            assert!(entry(&metadata, crate::openid::POLICY_REFRESHED_AT_METADATA_KEY).is_some());
+        }
+
+        #[test]
+        fn non_string_entries_are_dropped_and_lists_are_capped() {
+            let many: Vec<serde_json::Value> = (0..100)
+                .map(|i| json!(format!("icp_restricted:app-{i}.org.com")))
+                .collect();
+            let mut metadata = HashMap::new();
+            insert_policy_metadata(
+                &mut metadata,
+                Some(&json!([42, null, "icp_role:payroll.com"])),
+                Some(&serde_json::Value::Array(many)),
+                NOW_NS,
+            );
+            assert_eq!(
+                entry(&metadata, crate::openid::GRANTED_ROLES_METADATA_KEY).unwrap(),
+                r#"["icp_role:payroll.com"]"#
+            );
+            let restricted: Vec<String> = serde_json::from_str(
+                &entry(&metadata, crate::openid::RESTRICTED_APPS_METADATA_KEY).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(restricted.len(), MAX_POLICY_CLAIM_VALUES);
+        }
     }
 }

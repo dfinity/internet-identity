@@ -1,5 +1,5 @@
 use crate::{
-    openid::{OpenIdCredential, OpenIdCredentialKey},
+    openid::{OpenIdCredential, OpenIdCredentialKey, OPENID_SESSION_DURATION_NS},
     state,
     storage::{account::Account, anchor::Anchor},
     update_root_hash, MINUTE_NS,
@@ -27,6 +27,61 @@ const ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 fn expiration_timestamp_ns(issued_at_timestamp_ns: Timestamp) -> Timestamp {
     issued_at_timestamp_ns.saturating_add(ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS)
+}
+
+/// Per-app access gate for `sso:<domain>` attribute certification, consuming
+/// the org policy claims retained from the last verified SSO id_token (see
+/// the metadata-key docs in `openid.rs`):
+///
+/// - Org not opted in (`icp_restricted_apps` claim absent) → certify as
+///   before.
+/// - App not in the org's restricted list → certify as before (flat org
+///   access is preserved for unrestricted apps).
+/// - Restricted app → require the policy claims to come from a **fresh**
+///   SSO ceremony (bounds revocation latency; a passkey session replaying
+///   stale claims is refused) **and** an org-granted role for the app in
+///   `icp_granted_roles`. Sessions without any app-bound ceremony — CLI,
+///   MCP, agents — carry no fresh policy stamp and are refused for
+///   restricted apps while keeping flat access elsewhere.
+///
+/// `rp_origin` is the same value certified as `implicit:origin`, so the gate
+/// decision and the bundle's app binding can't diverge.
+fn check_sso_app_access(
+    credential: &OpenIdCredential,
+    rp_origin: &str,
+    now_ns: u64,
+    domain: &str,
+) -> Result<(), String> {
+    let Some(restricted_apps) = credential.restricted_apps() else {
+        return Ok(());
+    };
+    let Some(app_host) = url::Url::parse(rp_origin)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_lowercase))
+    else {
+        // Only reached for orgs that opted in; fail closed rather than
+        // certifying to an origin whose hostname can't be determined.
+        return Err(format!(
+            "Cannot determine the app hostname from origin `{rp_origin}` for the sso:{domain} access check"
+        ));
+    };
+    if !restricted_apps.contains(&app_host) {
+        return Ok(());
+    }
+    let fresh = credential
+        .policy_refreshed_at_ns()
+        .is_some_and(|refreshed| now_ns.saturating_sub(refreshed) <= OPENID_SESSION_DURATION_NS);
+    if !fresh {
+        return Err(format!(
+            "{app_host} is access-controlled by {domain}: sharing sso:{domain} attributes requires a recent {domain} sign-in"
+        ));
+    }
+    if !credential.has_granted_role_for(&app_host) {
+        return Err(format!(
+            "Access to {app_host} requires a role granted by {domain}"
+        ));
+    }
+    Ok(())
 }
 
 impl Anchor {
@@ -377,6 +432,10 @@ impl Anchor {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
 
+        // The relying party's actual origin — the same value certified below
+        // as `implicit:origin` — consumed by the per-app access gate.
+        let gate_origin = unmapped_origin.clone().unwrap_or_else(|| origin.clone());
+
         for spec in &attribute_specs {
             match &spec.key.scope {
                 Some(AttributeScope::OpenId { issuer }) => {
@@ -424,6 +483,16 @@ impl Anchor {
                         problems.push(format!("No credential found for sso domain: {}", domain));
                         continue;
                     };
+
+                    if let Err(problem) = check_sso_app_access(
+                        credential,
+                        &gate_origin,
+                        issued_at_timestamp_ns,
+                        domain,
+                    ) {
+                        problems.push(problem);
+                        continue;
+                    }
 
                     // `verified_email` is intentionally not supported under `sso:`
                     // — surface it here as "not available" (ICRC-3 requires
@@ -731,6 +800,172 @@ mod tests {
                 attribute_name: name,
             },
             value: value.as_bytes().to_vec(),
+        }
+    }
+
+    mod sso_app_access_gate_tests {
+        use super::*;
+        use crate::openid::{
+            GRANTED_ROLES_METADATA_KEY, POLICY_REFRESHED_AT_METADATA_KEY,
+            RESTRICTED_APPS_METADATA_KEY,
+        };
+
+        const SSO_DOMAIN: &str = "org.com";
+        const APP_ORIGIN: &str = "https://payroll.com";
+        const NOW_NS: u64 = 1_700_000_000_000_000_000;
+        const MINUTE: u64 = 60_000_000_000;
+
+        fn sso_credential(entries: &[(&str, &str)]) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: "https://idp.org.com".to_string(),
+                sub: SUBJECT.to_string(),
+                aud: "client-123".to_string(),
+                last_usage_timestamp: None,
+                metadata: entries
+                    .iter()
+                    .map(|(key, value)| {
+                        (
+                            (*key).to_string(),
+                            MetadataEntryV2::String((*value).to_string()),
+                        )
+                    })
+                    .collect(),
+                sso_domain: Some(SSO_DOMAIN.to_string()),
+                sso_name: None,
+            }
+        }
+
+        fn fresh() -> String {
+            NOW_NS.to_string()
+        }
+
+        fn stale() -> String {
+            // One minute past the freshness window.
+            (NOW_NS - crate::openid::OPENID_SESSION_DURATION_NS - MINUTE).to_string()
+        }
+
+        fn check(credential: &OpenIdCredential, origin: &str) -> Result<(), String> {
+            check_sso_app_access(credential, origin, NOW_NS, SSO_DOMAIN)
+        }
+
+        #[test]
+        fn org_not_opted_in_certifies_as_before() {
+            // No policy claims at all — legacy behavior, no gate.
+            let credential = sso_credential(&[("email", "alice@org.com")]);
+            assert_eq!(check(&credential, APP_ORIGIN), Ok(()));
+        }
+
+        #[test]
+        fn unrestricted_app_certifies_without_role_or_freshness() {
+            // Opted in, but this app isn't restricted: flat org access is
+            // preserved even from a stale ceremony with no roles.
+            let credential = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["finance.org.com"]"#),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &stale()),
+            ]);
+            assert_eq!(check(&credential, APP_ORIGIN), Ok(()));
+        }
+
+        #[test]
+        fn restricted_app_with_fresh_role_certifies() {
+            for role in [
+                r#"["icp_role:payroll.com"]"#,
+                r#"["icp_role:payroll.com:members"]"#,
+            ] {
+                let credential = sso_credential(&[
+                    (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                    (GRANTED_ROLES_METADATA_KEY, role),
+                    (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
+                ]);
+                assert_eq!(check(&credential, APP_ORIGIN), Ok(()));
+            }
+        }
+
+        #[test]
+        fn restricted_app_without_role_is_refused() {
+            let credential = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (
+                    GRANTED_ROLES_METADATA_KEY,
+                    r#"["icp_role:finance.org.com:members"]"#,
+                ),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
+            ]);
+            let error = check(&credential, APP_ORIGIN).unwrap_err();
+            assert!(
+                error.contains("requires a role granted by org.com"),
+                "{error}"
+            );
+        }
+
+        #[test]
+        fn role_matching_is_by_segment_not_string_prefix() {
+            // `icp_role:payroll.com` must not be satisfied by a role for a
+            // hostname that merely extends it.
+            let credential = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (
+                    GRANTED_ROLES_METADATA_KEY,
+                    r#"["icp_role:payroll.com.evil:members"]"#,
+                ),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
+            ]);
+            assert!(check(&credential, APP_ORIGIN).is_err());
+        }
+
+        #[test]
+        fn restricted_app_with_stale_ceremony_is_refused_even_with_role() {
+            // The revocation bound: entitlements are only as fresh as the
+            // ceremony that carried them.
+            let credential = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (
+                    GRANTED_ROLES_METADATA_KEY,
+                    r#"["icp_role:payroll.com:members"]"#,
+                ),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &stale()),
+            ]);
+            let error = check(&credential, APP_ORIGIN).unwrap_err();
+            assert!(error.contains("recent org.com sign-in"), "{error}");
+        }
+
+        #[test]
+        fn restricted_app_without_stamp_is_refused() {
+            // Opted-in policy claims without a refresh stamp never certify
+            // for restricted apps (covers hand-crafted metadata states).
+            let credential = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (
+                    GRANTED_ROLES_METADATA_KEY,
+                    r#"["icp_role:payroll.com:members"]"#,
+                ),
+            ]);
+            assert!(check(&credential, APP_ORIGIN).is_err());
+        }
+
+        #[test]
+        fn unparsable_origin_fails_closed_only_when_opted_in() {
+            let opted_in = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
+            ]);
+            assert!(check(&opted_in, "not a url").is_err());
+
+            let not_opted_in = sso_credential(&[]);
+            assert_eq!(check(&not_opted_in, "not a url"), Ok(()));
+        }
+
+        #[test]
+        fn origin_hostname_matching_is_case_insensitive() {
+            let credential = sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (
+                    GRANTED_ROLES_METADATA_KEY,
+                    r#"["icp_role:payroll.com:members"]"#,
+                ),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
+            ]);
+            assert_eq!(check(&credential, "https://PAYROLL.com"), Ok(()));
         }
     }
 
