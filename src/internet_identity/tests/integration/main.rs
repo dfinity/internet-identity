@@ -12,6 +12,7 @@ mod archive_integration;
 mod attributes;
 mod config;
 mod delegation;
+mod delegation_ingress;
 mod email_recovery;
 mod http;
 mod mcp;

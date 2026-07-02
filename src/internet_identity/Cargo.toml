@@ -77,3 +77,9 @@ ic-response-verification.workspace = true
 proptest.workspace = true
 flate2 = "1.0"
 getrandom = "0.2"
+# Read-only delegation enforcement tests (`delegation_ingress.rs`): submit
+# real signed request envelopes to a `make_live` PocketIC endpoint. The
+# envelopes are hand-rolled (no ic-agent) because no released agent stack
+# can carry the delegation `permissions` field yet.
+ed25519-dalek = "2.2"
+reqwest = { version = "0.12", features = ["blocking"] }
