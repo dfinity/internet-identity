@@ -96,17 +96,13 @@ struct Claims {
 const MAX_POLICY_CLAIM_VALUES: usize = 64;
 const MAX_POLICY_CLAIM_VALUE_LENGTH: usize = 128;
 
-/// The values of a policy claim, or `None` when the claim isn't a JSON
-/// array. Non-string entries are dropped rather than failing the claim.
-fn policy_string_list(value: &serde_json::Value) -> Option<Vec<String>> {
-    Some(
-        value
-            .as_array()?
-            .iter()
-            .filter_map(|entry| entry.as_str())
-            .map(str::to_owned)
-            .collect(),
-    )
+/// Iterator over the string values of a policy claim, or `None` when the
+/// claim isn't a JSON array. Non-string entries are skipped rather than
+/// failing the claim. Lazy on purpose: the claim values are IdP-controlled,
+/// so the consumers below filter and `take(MAX_POLICY_CLAIM_VALUES)` off this
+/// iterator and only allocate for values they actually retain.
+fn policy_string_values(value: &serde_json::Value) -> Option<impl Iterator<Item = &str>> {
+    Some(value.as_array()?.iter().filter_map(|entry| entry.as_str()))
 }
 
 /// Retain the org access-control policy claims from a verified SSO id_token
@@ -131,21 +127,27 @@ fn insert_policy_metadata(
         MetadataEntryV2::String(serde_json::to_string(values).unwrap_or_else(|_| "[]".into()))
     };
     let mut stamped = false;
-    if let Some(roles) = granted_roles.and_then(policy_string_list) {
-        let roles: Vec<String> = roles
-            .into_iter()
-            .map(|role| role.to_lowercase())
-            .filter(|role| role.starts_with(super::ROLE_GROUP_PREFIX))
+    if let Some(values) = granted_roles.and_then(policy_string_values) {
+        let roles: Vec<String> = values
             .filter(|role| role.len() <= MAX_POLICY_CLAIM_VALUE_LENGTH)
+            .filter(|role| {
+                // Case-insensitive prefix check on the borrowed value, so
+                // dropped entries never allocate.
+                role.get(..super::ROLE_GROUP_PREFIX.len())
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(super::ROLE_GROUP_PREFIX))
+            })
+            .map(str::to_lowercase)
             .take(MAX_POLICY_CLAIM_VALUES)
             .collect();
         metadata.insert(super::GRANTED_ROLES_METADATA_KEY.into(), encode(&roles));
         stamped = true;
     }
-    if let Some(apps) = restricted_apps.and_then(policy_string_list) {
-        let apps: Vec<String> = apps
-            .into_iter()
-            .map(|app| app.to_lowercase())
+    if let Some(values) = restricted_apps.and_then(policy_string_values) {
+        let apps: Vec<String> = values
+            .filter(|app| {
+                app.len() <= MAX_POLICY_CLAIM_VALUE_LENGTH + super::RESTRICTED_MARKER_PREFIX.len()
+            })
+            .map(str::to_lowercase)
             .map(
                 |app| match app.strip_prefix(super::RESTRICTED_MARKER_PREFIX) {
                     Some(stripped) => stripped.to_owned(),

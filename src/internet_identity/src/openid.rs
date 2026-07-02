@@ -251,11 +251,14 @@ impl OpenIdCredential {
     /// role for `payroll.com` can't be satisfied by one for
     /// `payroll.com.evil`; hostnames can't contain `:`, which makes the
     /// parse unambiguous. Role qualifiers (`:members`, `:admins`, …) are
-    /// opaque to this gate.
+    /// opaque to this gate. `app_host` is normalized here (hostnames are
+    /// case-insensitive; stored roles are lowercased at retention), so
+    /// callers don't have to.
     pub fn has_granted_role_for(&self, app_host: &str) -> bool {
         let Some(roles) = self.read_policy_list(GRANTED_ROLES_METADATA_KEY) else {
             return false;
         };
+        let app_host = app_host.to_lowercase();
         let exact = format!("{ROLE_GROUP_PREFIX}{app_host}");
         let qualified = format!("{ROLE_GROUP_PREFIX}{app_host}:");
         roles

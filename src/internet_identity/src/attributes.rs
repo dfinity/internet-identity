@@ -435,6 +435,10 @@ impl Anchor {
         // The relying party's actual origin — the same value certified below
         // as `implicit:origin` — consumed by the per-app access gate.
         let gate_origin = unmapped_origin.clone().unwrap_or_else(|| origin.clone());
+        // Cached per-domain gate verdicts: an `sso:<domain>` scope always
+        // resolves to the same credential, so one verdict covers all of its
+        // requested attributes.
+        let mut sso_gate_verdicts: BTreeMap<&String, bool> = BTreeMap::new();
 
         for spec in &attribute_specs {
             match &spec.key.scope {
@@ -484,13 +488,24 @@ impl Anchor {
                         continue;
                     };
 
-                    if let Err(problem) = check_sso_app_access(
-                        credential,
-                        &gate_origin,
-                        issued_at_timestamp_ns,
-                        domain,
-                    ) {
-                        problems.push(problem);
+                    // One gate verdict per domain: multiple requested
+                    // attributes under the same scope share it, so a denial
+                    // is reported once instead of once per spec.
+                    let allowed = *sso_gate_verdicts.entry(domain).or_insert_with(|| {
+                        match check_sso_app_access(
+                            credential,
+                            &gate_origin,
+                            issued_at_timestamp_ns,
+                            domain,
+                        ) {
+                            Ok(()) => true,
+                            Err(problem) => {
+                                problems.push(problem);
+                                false
+                            }
+                        }
+                    });
+                    if !allowed {
                         continue;
                     }
 
@@ -966,6 +981,55 @@ mod tests {
                 (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
             ]);
             assert_eq!(check(&credential, "https://PAYROLL.com"), Ok(()));
+        }
+
+        #[test]
+        fn role_lookup_normalizes_mixed_case_hostnames() {
+            // `has_granted_role_for` normalizes its input itself, so callers
+            // passing a non-lowercased hostname still match the (lowercased)
+            // stored roles.
+            let credential = sso_credential(&[(
+                GRANTED_ROLES_METADATA_KEY,
+                r#"["icp_role:payroll.com:members"]"#,
+            )]);
+            assert!(credential.has_granted_role_for("PAYROLL.com"));
+            assert!(!credential.has_granted_role_for("FINANCE.org.com"));
+        }
+
+        #[test]
+        fn denial_is_reported_once_for_multiple_attributes() {
+            // Two attributes under one refused `sso:<domain>` scope must
+            // yield a single gate problem, not one per spec.
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = vec![sso_credential(&[
+                (RESTRICTED_APPS_METADATA_KEY, r#"["payroll.com"]"#),
+                (POLICY_REFRESHED_AT_METADATA_KEY, &fresh()),
+            ])];
+            let spec = |attribute_name| ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: Some(AttributeScope::Sso {
+                        domain: SSO_DOMAIN.to_string(),
+                    }),
+                    attribute_name,
+                },
+                value: None,
+                omit_scope: false,
+            };
+            let result = anchor.prepare_icrc3_attributes(
+                vec![spec(AttributeName::Email), spec(AttributeName::Name)],
+                vec![0; 32],
+                APP_ORIGIN.to_string(),
+                None,
+                NOW_NS,
+                Account::synthetic(ANCHOR_NUMBER, APP_ORIGIN.to_string()),
+            );
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert_eq!(problems.len(), 1, "expected one gate problem: {problems:?}");
+                    assert!(problems[0].contains("requires a role granted by org.com"));
+                }
+                _ => panic!("expected AttributeMismatch"),
+            }
         }
     }
 
