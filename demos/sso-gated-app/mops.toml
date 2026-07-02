@@ -1,0 +1,11 @@
+[package]
+name = "sso-gated-app"
+version = "0.1.0"
+description = "Relying-party test app that gates a resource on a certified Internet Identity SSO attribute."
+
+[dependencies]
+identity-attributes = "0.4.1"
+core = "2.5.0"
+
+[toolchain]
+moc = "1.6.0"

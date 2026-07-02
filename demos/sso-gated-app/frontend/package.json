@@ -1,0 +1,19 @@
+{
+  "name": "sso-gated-app-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@icp-sdk/auth": "^7.1.0",
+    "@icp-sdk/core": "^5.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.4.21"
+  }
+}
