@@ -261,7 +261,7 @@ jobs:
       - name: Install PocketIC server
         uses: dfinity/pocketic@main
         with:
-          pocket-ic-server-version: "9.0.3"
+          pocket-ic-server-version: "15.0.0"
       - name: "Run VC issuer canister tests"
         working-directory: demos/vc_issuer
         run: |
@@ -374,7 +374,7 @@ jobs:
       - name: Install PocketIC server
         uses: dfinity/pocketic@main
         with:
-          pocket-ic-server-version: "9.0.3"
+          pocket-ic-server-version: "15.0.0"
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
