@@ -3,6 +3,7 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { READ_ONLY_MODE } from "$lib/state/featureFlags";
   import CliHeader from "../components/CliHeader.svelte";
   import TerminalBlock from "../components/TerminalBlock.svelte";
   import { Trans } from "$lib/components/locale";
@@ -22,11 +23,16 @@
   // user's behalf, so it gets query-only access unless the user opts into
   // full access by checking the "Full access" box.
   let accessLevel: AccessLevel = $state("read-only");
+  // While the read-only feature is flagged off, the toggle is hidden and CLI
+  // access is full (the toggle's read-only default is unreachable).
+  const effectiveAccessLevel: AccessLevel = $derived(
+    $READ_ONLY_MODE ? accessLevel : "full-access",
+  );
 
   const handleClick = async () => {
     busy = true;
     try {
-      await onAuthorize(accessLevel);
+      await onAuthorize(effectiveAccessLevel);
     } finally {
       busy = false;
     }
@@ -73,12 +79,14 @@
       {/if}
     </p>
 
-    <AccessLevelToggle
-      bind:accessLevel
-      prompt="full-access"
-      disabled={busy}
-      class="mt-4"
-    />
+    {#if $READ_ONLY_MODE}
+      <AccessLevelToggle
+        bind:accessLevel
+        prompt="full-access"
+        disabled={busy}
+        class="mt-4"
+      />
+    {/if}
 
     <button
       class="btn btn-primary btn-xl mt-6 w-full"

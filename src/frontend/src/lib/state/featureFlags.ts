@@ -152,6 +152,18 @@ export const EMAIL_RECOVERY_SETUP = createFeatureFlagStore(
   enableOnIdAiDomains("EMAIL_RECOVERY_SETUP"),
 );
 
+/// Gates the read-only ("queries-only") access option in the sign-in flows
+/// (`/continue`, `/cli`, `/mcp`). Kept OFF by default — including on id.ai /
+/// beta.id.ai — because a queries-only delegation carries `permissions =
+/// "queries"` in its canister-signed message, and no released agent stack
+/// (`ic-agent` / `ic-transport-types` / `@icp-sdk/core`) round-trips that
+/// field yet: the field is dropped when the delegation is re-serialized into
+/// the request envelope, so the replica recomputes a different hash and
+/// canister-signature verification fails ("sig not found in the signature
+/// tree"). With the flag off, all flows send full access. Flip this on once
+/// the agent stack preserves the delegation `permissions` field.
+export const READ_ONLY_MODE = createFeatureFlagStore("READ_ONLY_MODE", false);
+
 export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
@@ -161,4 +173,5 @@ export default {
   MIN_GUIDED_UPGRADE,
   EMAIL_RECOVERY,
   EMAIL_RECOVERY_SETUP,
+  READ_ONLY_MODE,
 } as Record<string, FeatureFlagStore>;

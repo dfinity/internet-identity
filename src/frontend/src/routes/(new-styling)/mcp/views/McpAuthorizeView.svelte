@@ -5,6 +5,7 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { READ_ONLY_MODE } from "$lib/state/featureFlags";
   import { ChevronDownIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -31,6 +32,11 @@
   // user's behalf across their apps, but its per-app delegations are query-only
   // unless the user opts into full access by unchecking.
   let accessLevel: AccessLevel = $state("read-only");
+  // While the read-only feature is flagged off, the toggle is hidden and the
+  // connection is full access (the toggle's read-only default is unreachable).
+  const effectiveAccessLevel: AccessLevel = $derived(
+    $READ_ONLY_MODE ? accessLevel : "full-access",
+  );
 
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
@@ -109,7 +115,7 @@
         sessionStore.reset();
         await authLastUsedFlow.authenticate(selected);
       }
-      onAuthorize(selectedTtlSeconds, accessLevel);
+      onAuthorize(selectedTtlSeconds, effectiveAccessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -156,12 +162,14 @@
         </button>
       </Select>
     </div>
-    <AccessLevelToggle
-      bind:accessLevel
-      prompt="read-only"
-      disabled={isAuthorizing}
-      class="mb-6"
-    />
+    {#if $READ_ONLY_MODE}
+      <AccessLevelToggle
+        bind:accessLevel
+        prompt="read-only"
+        disabled={isAuthorizing}
+        class="mb-6"
+      />
+    {/if}
     <button
       class="btn btn-primary w-full gap-2"
       onclick={handleAllowAccess}
