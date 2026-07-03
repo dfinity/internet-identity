@@ -39,3 +39,43 @@ impl Storable for StorableMcpAccess {
 
     const BOUND: Bound = Bound::Unbounded;
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// The grant must round-trip: a decode that loses or flips `read_only`
+    /// would silently change the privilege of every delegation the MCP
+    /// server mints after an upgrade.
+    #[test]
+    fn should_round_trip_mcp_access() {
+        for read_only in [false, true] {
+            let access = StorableMcpAccess {
+                anchor_number: 10_000,
+                read_only,
+            };
+            let decoded = StorableMcpAccess::from_bytes(access.to_bytes());
+            assert_eq!(access, decoded);
+        }
+    }
+
+    /// Pins the serialized layout (minicbor map, `0 => anchor_number`,
+    /// `1 => read_only`). Renumbering the fields would decode existing
+    /// grants wrongly; this test makes that a visible failure instead.
+    #[test]
+    fn should_keep_stable_wire_format() {
+        let access = StorableMcpAccess {
+            anchor_number: 10_000,
+            read_only: true,
+        };
+        assert_eq!(
+            access.to_bytes().as_ref(),
+            [0xa2, 0x00, 0x19, 0x27, 0x10, 0x01, 0xf5],
+            "serialized layout changed; existing grants would decode wrongly"
+        );
+        let decoded = StorableMcpAccess::from_bytes(Cow::Borrowed(&[
+            0xa2, 0x00, 0x19, 0x27, 0x10, 0x01, 0xf5,
+        ]));
+        assert_eq!(decoded, access);
+    }
+}

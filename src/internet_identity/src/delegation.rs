@@ -228,3 +228,45 @@ pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
         ));
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const SESSION_PUBKEY: &[u8] = b"test session public key";
+    const EXPIRATION: Timestamp = 1_700_000_000_000_000_000;
+
+    /// Without `permissions`, the message must be byte-identical to the
+    /// upstream helper's: legacy (unrestricted) delegations must keep
+    /// verifying against signatures produced before this feature existed.
+    #[test]
+    fn should_match_upstream_msg_when_permissions_absent() {
+        assert_eq!(
+            delegation_signature_msg_with_permissions(SESSION_PUBKEY, EXPIRATION, None, None),
+            ic_canister_sig_creation::delegation_signature_msg(SESSION_PUBKEY, EXPIRATION, None),
+        );
+    }
+
+    /// Pins the signable of a queries-only delegation: the representation-
+    /// independent hash of `{pubkey, expiration, permissions: "queries"}`
+    /// (the canister signature then covers the delegation signature domain
+    /// separator plus these bytes). Agents and the replica recompute this
+    /// independently, so any drift in the composition silently invalidates
+    /// every read-only delegation — this test makes drift a visible failure
+    /// and doubles as a reference vector for agent implementers.
+    #[test]
+    fn should_pin_queries_permissions_msg() {
+        let msg = delegation_signature_msg_with_permissions(
+            SESSION_PUBKEY,
+            EXPIRATION,
+            None,
+            Some(DELEGATION_PERMISSIONS_QUERIES),
+        );
+        assert_eq!(
+            hex::encode(&msg),
+            "061d792a31da1cedbbb4ed1a4234c12645d021e6a81ef1598bbe27124f33a4c6",
+            "queries-only delegation signable changed; \
+             existing read-only delegations would stop verifying"
+        );
+    }
+}

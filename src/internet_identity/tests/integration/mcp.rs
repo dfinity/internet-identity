@@ -794,6 +794,82 @@ fn mcp_config_round_trips_and_persists_across_upgrade() -> Result<(), RejectResp
     Ok(())
 }
 
+/// A read-only access grant survives a canister upgrade: the grant (and its
+/// `read_only` restriction) lives in stable memory, so per-app delegations
+/// the server mints after the upgrade are still queries-only. Losing the
+/// flag would fail OPEN — silently minting unrestricted delegations for a
+/// grant the user restricted.
+#[test]
+fn mcp_read_only_grant_persists_across_upgrade() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+
+    let mcp = mcp_server_principal(&env, canister_id, anchor);
+    mcp_set_access_with_read_only(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string(),
+        true,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    // The grant is still present...
+    assert!(mcp_access_enabled(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        MCP_ORIGIN.to_string()
+    )
+    .unwrap());
+
+    // ...and still read-only: a freshly minted per-app delegation carries
+    // `permissions = "queries"` and verifies against that message.
+    let session_key = ByteBuf::from("post-upgrade session key");
+    let McpPrepareDelegation {
+        user_key,
+        expiration,
+        account_number,
+    } = mcp_prepare_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed = mcp_get_account_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        account_number,
+        session_key,
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        signed.delegation.permissions,
+        Some("queries".to_string()),
+        "the read-only restriction did not survive the upgrade"
+    );
+    verify_delegation(&env, user_key, &signed, &env.root_key().unwrap());
+
+    Ok(())
+}
+
 /// Only the authenticated identity can change what it trusts. An unrelated
 /// caller's write is rejected and an unrelated caller's read returns the
 /// (safe) default rather than leaking the real config.

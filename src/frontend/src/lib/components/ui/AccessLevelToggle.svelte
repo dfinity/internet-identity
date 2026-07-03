@@ -4,7 +4,11 @@
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { t } from "$lib/stores/locale.store";
-  import type { AccessLevel } from "$lib/utils/accessLevel";
+  import {
+    isToggleChecked,
+    toggledAccessLevel,
+    type AccessLevel,
+  } from "$lib/utils/accessLevel";
 
   interface Props {
     /** The chosen access level (bindable). "read-only" restricts the session
@@ -43,13 +47,8 @@
 <div class={["flex flex-row items-center", className]}>
   <Checkbox
     bind:checked={
-      () => accessLevel === prompt,
-      (checked: boolean) =>
-        (accessLevel = checked
-          ? prompt
-          : prompt === "read-only"
-            ? "full-access"
-            : "read-only")
+      () => isToggleChecked(accessLevel, prompt),
+      (checked: boolean) => (accessLevel = toggledAccessLevel(checked, prompt))
     }
     {label}
     size="sm"

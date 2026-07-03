@@ -15,3 +15,19 @@ export type AccessLevel = "read-only" | "full-access";
 export const toReadOnlyArg = (accessLevel: AccessLevel): [boolean] => [
   accessLevel === "read-only",
 ];
+
+/** Whether an access-level toggle's checkbox is ticked: the box offers
+ *  `prompt` as the opt-in, so it is ticked exactly when the current level
+ *  *is* the prompted one. */
+export const isToggleChecked = (
+  accessLevel: AccessLevel,
+  prompt: AccessLevel,
+): boolean => accessLevel === prompt;
+
+/** The access level after (un)ticking an access-level toggle: ticking
+ *  selects the prompted level, unticking falls back to the other one. */
+export const toggledAccessLevel = (
+  checked: boolean,
+  prompt: AccessLevel,
+): AccessLevel =>
+  checked ? prompt : prompt === "read-only" ? "full-access" : "read-only";

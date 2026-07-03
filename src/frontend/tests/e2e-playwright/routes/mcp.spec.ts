@@ -243,6 +243,12 @@ test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  // MCP connections default to read-only: the "Read-only mode" checkbox must
+  // start ticked, so the server's per-app delegations are queries-only unless
+  // the user opts out.
+  await expect(
+    page.getByRole("checkbox", { name: "Read-only mode" }),
+  ).toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
   const body = await mcp.receivedDelegation;
