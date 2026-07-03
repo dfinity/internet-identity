@@ -585,7 +585,7 @@ async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
-    access: Option<AccessLevel>,
+    permissions: Option<Permissions>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
@@ -595,12 +595,12 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
-                // An omitted `access` argument means unrestricted (see
-                // `impl From<Option<AccessLevel>> for DelegationAccess`): this
+                // An omitted `permissions` argument means unrestricted (see
+                // `impl From<Option<Permissions>> for DelegationAccess`): this
                 // preserves the original behavior for callers of the
                 // (pre-feature) form. First-party callers always pass an explicit
-                // value (read-only by default in the CLI and MCP flows).
-                DelegationAccess::from(access),
+                // value (queries-only by default in the CLI and MCP flows).
+                DelegationAccess::from(permissions),
                 &ii_domain,
             )
             .await
@@ -616,7 +616,7 @@ fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
-    access: Option<AccessLevel>,
+    permissions: Option<Permissions>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
         Ok(_) => account_management::get_account_delegation(
@@ -625,10 +625,10 @@ fn get_account_delegation(
             account_number,
             session_key,
             expiration,
-            // See `prepare_account_delegation`: an omitted `access` argument
-            // means an unrestricted delegation (backwards-compatible with the
-            // original form).
-            DelegationAccess::from(access),
+            // See `prepare_account_delegation`: an omitted `permissions`
+            // argument means an unrestricted delegation (backwards-compatible
+            // with the original form).
+            DelegationAccess::from(permissions),
         ),
         Err(err) => Err(err.into()),
     }
@@ -647,14 +647,14 @@ fn mcp_set_access(
     anchor_number: AnchorNumber,
     mcp_server_origin: FrontendHostname,
     enabled: bool,
-    // `opt read_only` restricts the per-app delegations this server can later
-    // obtain to query calls. Omitted (`null`) means full access, preserving the
-    // pre-feature behavior for callers that don't pass it.
-    access: Option<AccessLevel>,
+    // `opt (queries)` restricts the per-app delegations this server can later
+    // obtain to query calls. Omitted (`null`) or `opt (all)` means full access,
+    // preserving the pre-feature behavior for callers that don't pass it.
+    permissions: Option<Permissions>,
 ) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    // The grant persists a bool; derive it from the requested access level.
-    let read_only = DelegationAccess::from(access) == DelegationAccess::ReadOnly;
+    // The grant persists a bool; derive it from the requested permissions.
+    let read_only = DelegationAccess::from(permissions) == DelegationAccess::ReadOnly;
     mcp::set_mcp_access(anchor_number, mcp_server_origin, enabled, read_only)
 }
 

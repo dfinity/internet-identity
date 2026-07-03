@@ -1,4 +1,4 @@
-import type { AccessLevel as CandidAccessLevel } from "$lib/generated/internet_identity_types";
+import type { Permissions } from "$lib/generated/internet_identity_types";
 
 /** The access level a session delegation grants. `"read-only"` restricts the
  *  delegation to query calls (it carries `permissions = "queries"`), so the
@@ -11,13 +11,12 @@ import type { AccessLevel as CandidAccessLevel } from "$lib/generated/internet_i
  *  `authorize(account, true)`. */
 export type AccessLevel = "read-only" | "full-access";
 
-/** The candid `access : opt AccessLevel` argument for this access level.
+/** The candid `permissions : opt Permissions` argument for this access level,
+ *  mapping to the ICP protocol's permission values (`queries` / `all`).
  *  Always explicit (never `[]`) so first-party calls don't rely on the
  *  backend's omitted-argument default. */
-export const toAccessLevelArg = (
-  accessLevel: AccessLevel,
-): [CandidAccessLevel] => [
-  accessLevel === "read-only" ? { read_only: null } : { full_access: null },
+export const toPermissionsArg = (accessLevel: AccessLevel): [Permissions] => [
+  accessLevel === "read-only" ? { queries: null } : { all: null },
 ];
 
 /** Whether an access-level toggle's checkbox is ticked: the box offers

@@ -486,13 +486,13 @@ pub fn mcp_set_access(
 
 /// Test-ergonomics converter: the `*_with_read_only` helpers take an
 /// `Option<bool>` (None = omit the arg = unrestricted) and map it to the
-/// canister's `access : opt AccessLevel` argument.
-fn access_arg(read_only: Option<bool>) -> Option<AccessLevel> {
+/// canister's `permissions : opt Permissions` argument.
+fn permissions_arg(read_only: Option<bool>) -> Option<Permissions> {
     read_only.map(|ro| {
         if ro {
-            AccessLevel::ReadOnly
+            Permissions::Queries
         } else {
-            AccessLevel::FullAccess
+            Permissions::All
         }
     })
 }
@@ -516,7 +516,7 @@ pub fn mcp_set_access_with_read_only(
             identity_number,
             mcp_server_origin,
             enabled,
-            access_arg(read_only),
+            permissions_arg(read_only),
         ),
     )
     .map(|(x,)| x)
@@ -719,7 +719,7 @@ pub fn prepare_account_delegation_with_read_only(
             params.account_number,
             params.session_key.clone(),
             max_ttl,
-            access_arg(read_only),
+            permissions_arg(read_only),
         ),
     )
     .map(|(x,)| x)
@@ -741,7 +741,7 @@ pub fn get_account_delegation_with_read_only(
             params.account_number,
             params.session_key.clone(),
             expiration,
-            access_arg(read_only),
+            permissions_arg(read_only),
         ),
     )
     .map(|(x,)| x)

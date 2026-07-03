@@ -70,11 +70,11 @@ describe("cliAuthorize access-level wiring", () => {
       [],
       expect.anything(),
       [BigInt(TTL_MINUTES) * BigInt(60) * BigInt(1_000_000_000)],
-      [{ read_only: null }],
+      [{ queries: null }],
     );
     // `get` must echo the same value or the signature lookup fails.
     expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([
-      { read_only: null },
+      { queries: null },
     ]);
   });
 
@@ -83,10 +83,10 @@ describe("cliAuthorize access-level wiring", () => {
     await authorize(actor, "full-access");
 
     expect(actor.prepare_account_delegation.mock.calls[0][5]).toEqual([
-      { full_access: null },
+      { all: null },
     ]);
     expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([
-      { full_access: null },
+      { all: null },
     ]);
   });
 });

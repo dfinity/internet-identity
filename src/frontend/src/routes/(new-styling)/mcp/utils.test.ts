@@ -71,7 +71,7 @@ describe("mcpAuthorize access-level wiring", () => {
       IDENTITY_NUMBER,
       MCP_ORIGIN,
       true,
-      [{ read_only: null }],
+      [{ queries: null }],
     );
     // ...but the standing delegation must stay update-capable, or the MCP
     // server could never call the (update) prepare endpoint again.
@@ -81,10 +81,10 @@ describe("mcpAuthorize access-level wiring", () => {
       [],
       expect.anything(),
       [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
-      [{ full_access: null }],
+      [{ all: null }],
     );
     expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([
-      { full_access: null },
+      { all: null },
     ]);
   });
 
@@ -96,10 +96,10 @@ describe("mcpAuthorize access-level wiring", () => {
       IDENTITY_NUMBER,
       MCP_ORIGIN,
       true,
-      [{ full_access: null }],
+      [{ all: null }],
     );
     expect(actor.prepare_account_delegation.mock.calls[0][5]).toEqual([
-      { full_access: null },
+      { all: null },
     ]);
   });
 });

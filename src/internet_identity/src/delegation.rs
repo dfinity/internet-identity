@@ -182,23 +182,23 @@ impl DelegationAccess {
     }
 }
 
-impl From<AccessLevel> for DelegationAccess {
-    fn from(access: AccessLevel) -> Self {
-        match access {
-            AccessLevel::FullAccess => DelegationAccess::Unrestricted,
-            AccessLevel::ReadOnly => DelegationAccess::ReadOnly,
+impl From<Permissions> for DelegationAccess {
+    fn from(permissions: Permissions) -> Self {
+        match permissions {
+            Permissions::All => DelegationAccess::Unrestricted,
+            Permissions::Queries => DelegationAccess::ReadOnly,
         }
     }
 }
 
-impl From<Option<AccessLevel>> for DelegationAccess {
-    /// Maps the endpoints' trailing `access : opt AccessLevel` candid argument.
-    /// An omitted argument means unrestricted: this preserves the original
-    /// behavior for callers of the pre-feature form and matches the interface
-    /// spec's default for an absent `permissions` field. First-party callers
-    /// always pass an explicit value.
-    fn from(access: Option<AccessLevel>) -> Self {
-        access.map_or(DelegationAccess::Unrestricted, DelegationAccess::from)
+impl From<Option<Permissions>> for DelegationAccess {
+    /// Maps the endpoints' trailing `permissions : opt Permissions` candid
+    /// argument. An omitted argument means unrestricted: this preserves the
+    /// original behavior for callers of the pre-feature form and matches the
+    /// interface spec's default for an absent `permissions` field. First-party
+    /// callers always pass an explicit value.
+    fn from(permissions: Option<Permissions>) -> Self {
+        permissions.map_or(DelegationAccess::Unrestricted, DelegationAccess::from)
     }
 }
 
