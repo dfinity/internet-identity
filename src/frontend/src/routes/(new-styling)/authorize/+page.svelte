@@ -22,6 +22,7 @@
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
   import {
@@ -90,8 +91,11 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
-  const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
-    authorizationStore.authorize(accountNumber);
+  const handleAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+  ) => {
+    authorizationStore.authorize(accountNumber, accessLevel);
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -259,7 +263,8 @@
         name ?? email?.split("@")[0] ?? $t`${config.name} user`,
       );
     }
-    authorizationStore.authorize(Promise.resolve(undefined));
+    // 1-click OpenID flow: no access-level toggle, always full access.
+    authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
 

@@ -1,3 +1,4 @@
+import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -19,6 +20,12 @@ interface McpAuthorizeInput {
   mcpServerOrigin: string;
   /** Lifetime in seconds (already clamped to [10 min, 1 week]). */
   ttlSeconds: number;
+  /** Whether the per-app delegations this server can later obtain should be
+   *  read-only (query-only). The MCP flow defaults this to `true` (opt-out).
+   *  It is persisted with the access grant, NOT stamped on the standing
+   *  delegation below (which must stay full-access so the server can still call
+   *  the update endpoint `mcp_prepare_account_delegation`). */
+  accessLevel: AccessLevel;
   /** Callback URL (on the MCP server origin) the delegation chain is
    *  form-POSTed to. */
   callback: string;
@@ -51,6 +58,7 @@ export const mcpAuthorize = async ({
   publicKey,
   mcpServerOrigin,
   ttlSeconds,
+  accessLevel,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
@@ -66,11 +74,14 @@ export const mcpAuthorize = async ({
   // server origin so II honors the server's later on-demand per-app delegation
   // calls. The backend binds the principal it derives for the anchor at this
   // origin — exactly the principal the standing delegation below carries — and
-  // re-derives the same principal to revoke. Idempotent.
+  // re-derives the same principal to revoke. Idempotent. The access level is
+  // persisted with the grant: when read-only, the per-app delegations the
+  // server later obtains are query-only.
   const accessResult = await actor.mcp_set_access(
     identityNumber,
     effectiveOrigin,
     true,
+    toPermissionsArg(accessLevel),
   );
   if ("Err" in accessResult) {
     throw new Error(accessResult.Err);
@@ -92,6 +103,10 @@ export const mcpAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
+      // Unrestricted: the standing delegation is update-capable so the MCP
+      // server can call the (update) prepare endpoint. Passed explicitly
+      // rather than relying on the backend's default for an omitted value.
+      toPermissionsArg("full-access"),
     )
     .then(throwCanisterError);
 
@@ -103,6 +118,8 @@ export const mcpAuthorize = async ({
         [],
         ephemeralPublicKey,
         expiration,
+        // Unrestricted; must match `prepare_account_delegation` above.
+        toPermissionsArg("full-access"),
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

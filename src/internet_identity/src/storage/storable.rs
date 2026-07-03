@@ -14,6 +14,7 @@ pub mod discrepancy_counter;
 pub mod email_recovery_address_hash;
 pub mod email_recovery_credential;
 pub mod fixed_anchor;
+pub mod mcp_access;
 pub mod mcp_config;
 pub mod metadata_v2;
 pub mod openid_credential;

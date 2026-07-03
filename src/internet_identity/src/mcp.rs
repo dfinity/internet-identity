@@ -23,9 +23,10 @@ use internet_identity_interface::internet_identity::types::{
 
 use crate::{
     account_management,
-    delegation::der_encode_canister_sig_key,
+    delegation::{der_encode_canister_sig_key, DelegationAccess},
     state::{storage_borrow, storage_borrow_mut},
     storage::account::{Account, AccountDelegationError, ReadAccountParams},
+    storage::storable::mcp_access::StorableMcpAccess,
     storage::storable::mcp_config::StorableMcpConfig,
 };
 
@@ -82,14 +83,18 @@ pub fn set_mcp_access(
     anchor_number: AnchorNumber,
     mcp_server_origin: FrontendHostname,
     enabled: bool,
+    read_only: bool,
 ) -> Result<(), String> {
     let principal = mcp_principal_for(anchor_number, &mcp_server_origin);
     storage_borrow_mut(|storage| {
         if enabled {
             // Surface a cross-anchor collision instead of silently no-op'ing, so
-            // the caller learns the origin couldn't be bound.
+            // the caller learns the origin couldn't be bound. `read_only`
+            // restricts the per-app delegations this server can later obtain to
+            // query calls; the standing delegation it holds stays full-access so
+            // it can still call the (update) `mcp_prepare_account_delegation`.
             storage
-                .set_anchor_mcp_principal(principal, anchor_number)
+                .set_mcp_access(principal, anchor_number, read_only)
                 .map_err(|existing| {
                     format!(
                         "MCP access could not be enabled: the principal for this \
@@ -97,7 +102,7 @@ pub fn set_mcp_access(
                     )
                 })
         } else {
-            storage.remove_anchor_mcp_principal(principal);
+            storage.remove_mcp_access(principal);
             Ok(())
         }
     })
@@ -133,13 +138,16 @@ pub fn is_mcp_access_enabled(
     mcp_server_origin: FrontendHostname,
 ) -> bool {
     let principal = mcp_principal_for(anchor_number, &mcp_server_origin);
-    storage_borrow(|storage| storage.lookup_anchor_with_mcp_principal(principal))
+    storage_borrow(|storage| storage.lookup_mcp_access(principal))
+        .map(|access| access.anchor_number)
         == Some(anchor_number)
 }
 
-/// Recover the anchor that authorized the calling MCP-server principal.
-fn caller_anchor() -> Result<AnchorNumber, AccountDelegationError> {
-    storage_borrow(|storage| storage.lookup_anchor_with_mcp_principal(caller()))
+/// Recover the access grant that authorized the calling MCP-server principal:
+/// the anchor it acts for and whether its per-app delegations are read-only.
+/// One lookup keyed on `caller()` — the MCP server never passes an anchor.
+fn caller_access() -> Result<StorableMcpAccess, AccountDelegationError> {
+    storage_borrow(|storage| storage.lookup_mcp_access(caller()))
         .ok_or(AccountDelegationError::Unauthorized(caller()))
 }
 
@@ -150,7 +158,7 @@ fn caller_anchor() -> Result<AnchorNumber, AccountDelegationError> {
 pub fn get_accounts(
     target_origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, AccountDelegationError> {
-    let anchor_number = caller_anchor()?;
+    let anchor_number = caller_access()?.anchor_number;
     Ok(
         account_management::get_accounts_for_origin(anchor_number, &target_origin)
             .iter()
@@ -177,7 +185,12 @@ pub async fn prepare_account_delegation(
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    let anchor_number = caller_anchor()?;
+    // One lookup yields both the authorizing anchor and whether this grant's
+    // per-app delegations are restricted to query calls (chosen at connect).
+    let StorableMcpAccess {
+        anchor_number,
+        read_only,
+    } = caller_access()?;
     let capped_ttl = Some(u64::min(
         max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
         MCP_MAX_EXPIRATION_PERIOD_NS,
@@ -191,6 +204,7 @@ pub async fn prepare_account_delegation(
         account_number,
         session_key,
         capped_ttl,
+        DelegationAccess::from_read_only(read_only),
         &None,
     )
     .await?;
@@ -212,12 +226,18 @@ pub fn get_account_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    let anchor_number = caller_anchor()?;
+    // Read the same grant `prepare_account_delegation` used: `read_only` must
+    // match what it signed with, or the signature lookup fails.
+    let StorableMcpAccess {
+        anchor_number,
+        read_only,
+    } = caller_access()?;
     account_management::get_account_delegation(
         anchor_number,
         &target_origin,
         account_number,
         session_key,
         expiration,
+        DelegationAccess::from_read_only(read_only),
     )
 }

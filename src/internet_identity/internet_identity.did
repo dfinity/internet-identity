@@ -157,7 +157,20 @@ type Delegation = record {
     pubkey : PublicKey;
     expiration : Timestamp;
     targets : opt vec principal;
+    // Restricts the kinds of calls the delegation permits: `"queries"`
+    // restricts the sender to query calls (the IC rejects update calls
+    // authenticated through such a delegation). Absent means unrestricted.
+    permissions : opt text;
 };
+
+// The delegation permissions a caller requests, mirroring the ICP protocol's
+// request-delegation `permissions` values. `queries` yields a queries-only
+// delegation (the issued `Delegation` carries `permissions = "queries"`);
+// `all` yields an unrestricted, update-capable delegation. Passed as an
+// optional argument; an absent argument means `all`, preserving the
+// pre-feature behavior and matching the interface spec's default for an
+// absent `permissions` field.
+type Permissions = variant { queries; all };
 
 type SignedDelegation = record {
     delegation : Delegation;
@@ -1779,15 +1792,24 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
-        max_ttl : opt nat64
+        max_ttl : opt nat64,
+        // `opt (queries)` restricts the prepared delegation to query calls: it
+        // carries `permissions = "queries"`, which makes the IC reject update
+        // calls authenticated through it. Omitted (`null`) or `opt (all)`
+        // yields an unrestricted delegation — the original behavior, preserved
+        // for existing callers and matching the interface spec.
+        permissions : opt Permissions
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
-    
+
     get_account_delegation : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
-        expiration : Timestamp
+        expiration : Timestamp,
+        // Must match the value passed to `prepare_account_delegation` (including
+        // the omitted/`null` case, which means unrestricted).
+        permissions : opt Permissions
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 
     // Enable/disable the backend /mcp delegation path for an anchor at a given
@@ -1800,7 +1822,11 @@ service : (opt InternetIdentityInit) -> {
     mcp_set_access : (
         anchor_number : UserNumber,
         mcp_server_origin : FrontendHostname,
-        enabled : bool
+        enabled : bool,
+        // `opt (queries)` restricts the per-app delegations this server can
+        // later obtain to query calls. Omitted (`null`) or `opt (all)` means
+        // full access.
+        permissions : opt Permissions
     ) -> (variant { Ok; Err : text });
 
     // Whether the anchor has MCP access enabled at mcp_server_origin.

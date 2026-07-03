@@ -3,7 +3,7 @@ use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
-        der_encode_canister_sig_key,
+        delegation_signature_msg_with_permissions, der_encode_canister_sig_key, DelegationAccess,
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
@@ -17,9 +17,7 @@ use crate::{
     },
     update_root_hash,
 };
-use ic_canister_sig_creation::{
-    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
-};
+use ic_canister_sig_creation::{signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN};
 use ic_cdk::{api::time, caller};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::{
@@ -302,6 +300,7 @@ pub async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    access: DelegationAccess,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     state::ensure_salt_set().await;
@@ -326,7 +325,13 @@ pub async fn prepare_account_delegation(
     let seed = account.calculate_seed();
 
     state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+        add_delegation_signature(
+            sigs,
+            session_key,
+            seed.as_ref(),
+            expiration,
+            access.permissions(),
+        );
     });
     update_root_hash();
 
@@ -349,6 +354,7 @@ pub fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    access: DelegationAccess,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     check_frontend_length(origin);
 
@@ -363,10 +369,16 @@ pub fn get_account_delegation(
             .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 
         state::assets_and_signatures(|certified_assets, sigs| {
+            let permissions = access.permissions();
             let inputs = CanisterSigInputs {
                 domain: DELEGATION_SIG_DOMAIN,
                 seed: &account.calculate_seed(),
-                message: &delegation_signature_msg(&session_key, expiration, None),
+                message: &delegation_signature_msg_with_permissions(
+                    &session_key,
+                    expiration,
+                    None,
+                    permissions,
+                ),
             };
             match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
                 Ok(signature) => Ok(SignedDelegation {
@@ -374,6 +386,7 @@ pub fn get_account_delegation(
                         pubkey: session_key,
                         expiration,
                         targets: None,
+                        permissions: permissions.map(str::to_string),
                     },
                     signature: ByteBuf::from(signature),
                 }),
