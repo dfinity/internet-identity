@@ -293,6 +293,93 @@ fn mcp_rejects_unregistered_callers() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Every server-facing `mcp_*` method is reachable *only* via the registered
+/// session key. With a live session in place, a caller that is not that key —
+/// the identity's own owner principal, an unrelated principal, or a
+/// never-registered session key — is `Unauthorized` on `mcp_get_accounts`,
+/// `mcp_prepare_delegation`, and `mcp_get_delegation` alike, and the rejection
+/// names that caller. This locks in the single-gate invariant
+/// (`authorize_mcp_session`) across the whole server-facing surface, so a new
+/// method on that surface can't quietly ship without the check.
+#[test]
+fn mcp_server_facing_methods_reject_non_session_callers() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("per-app session key");
+
+    // A live session exists; none of the callers probed below hold it.
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, expiration) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
+
+    // Sanity: the real session key IS authorized, so a blanket reject below
+    // would be a false negative rather than the gate doing its job.
+    assert!(mcp_get_accounts(&env, canister_id, mcp, target.clone())
+        .unwrap()
+        .is_ok());
+
+    // Callers that are not the session key: the anchor's own owner principal
+    // (even the user can't drive the server-facing methods directly), an
+    // unrelated principal, and a session key that was never registered.
+    let non_session_callers = [
+        principal_1(),
+        principal_2(),
+        Principal::self_authenticating(ByteBuf::from("never registered")),
+    ];
+
+    for caller in non_session_callers {
+        assert!(
+            matches!(
+                mcp_get_accounts(&env, canister_id, caller, target.clone()).unwrap(),
+                Err(AccountDelegationError::Unauthorized(p)) if p == caller
+            ),
+            "mcp_get_accounts admitted a non-session caller: {caller}"
+        );
+        assert!(
+            matches!(
+                mcp_prepare_delegation(
+                    &env,
+                    canister_id,
+                    caller,
+                    target.clone(),
+                    None,
+                    session_key.clone(),
+                    None,
+                )
+                .unwrap(),
+                Err(AccountDelegationError::Unauthorized(p)) if p == caller
+            ),
+            "mcp_prepare_delegation admitted a non-session caller: {caller}"
+        );
+        assert!(
+            matches!(
+                mcp_get_delegation(
+                    &env,
+                    canister_id,
+                    caller,
+                    target.clone(),
+                    None,
+                    session_key.clone(),
+                    expiration,
+                )
+                .unwrap(),
+                Err(AccountDelegationError::Unauthorized(p)) if p == caller
+            ),
+            "mcp_get_delegation admitted a non-session caller: {caller}"
+        );
+    }
+
+    Ok(())
+}
+
 /// The grant expires: the session can mint before its expiration, not after.
 #[test]
 fn mcp_grant_expires() -> Result<(), RejectResponse> {

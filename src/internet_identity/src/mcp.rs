@@ -9,11 +9,14 @@
 //! via [`register`]: a grant `session principal -> (anchor, expiry, read_only)`
 //! in the grant map, mirrored by a per-anchor forward pointer in the synced
 //! [`StorableMcpConfig`]. No delegation is minted for the server itself, and
-//! no account is chosen at connect. The MCP server then calls
-//! [`get_accounts`] / [`prepare_delegation`] / [`get_delegation`] signed with
-//! that session key; we recover the anchor from `caller()`'s grant (checking
-//! expiry), so no `anchor_number` parameter is needed — being the right
-//! caller is the authorization.
+//! no account is chosen at connect. The MCP server then calls the
+//! server-facing methods ([`McpSession::get_accounts`] /
+//! [`McpSession::prepare_delegation`] / [`McpSession::get_delegation`]) signed
+//! with that session key. Those operations live on [`McpSession`], a
+//! capability obtainable *only* from [`authorize_mcp_session`] — the single
+//! gate that recovers the anchor from `caller()`'s grant and checks expiry. So
+//! being the right caller (the registered session key) is the only way to
+//! reach them, and no `anchor_number` parameter is needed or trusted.
 //!
 //! Read-only is a property of the whole session: `read_only` is chosen once at
 //! connect ([`register`]) and applied to every per-app delegation the session
@@ -219,27 +222,70 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) {
     });
 }
 
-/// The calling MCP server's live session grant: present in the grant map, not
-/// expired, and its identity's MCP toggle still on. Everything the
-/// server-facing methods need for authorization — being the right caller is
-/// the authorization. The returned grant also carries `read_only`, applied to
-/// the per-app delegations prepare/get mint.
-fn caller_grant() -> Result<StorableMcpGrant, AccountDelegationError> {
+/// A live MCP session: proof that the current `caller()` is the MCP server
+/// signing with the session key its user registered. Every server-facing
+/// `mcp_*` operation ([`get_accounts`](Self::get_accounts),
+/// [`prepare_delegation`](Self::prepare_delegation),
+/// [`get_delegation`](Self::get_delegation)) is a method here, and the wrapped
+/// grant is private, so an `McpSession` can be obtained *only* from
+/// [`authorize_mcp_session`] / [`authorize_mcp_session_for_update`]. That makes
+/// "these methods are reachable only via the registered session key" a
+/// type-level invariant that holds across the `main.rs` endpoint boundary: an
+/// endpoint cannot construct an `McpSession`, so it cannot skip the caller
+/// check, and any newly added server-facing method — being a method on this
+/// capability — inherits the same gate for free. The grant also carries the
+/// session's `anchor_number` (recovered here, never taken from a call
+/// argument) and its `read_only` flag (applied to every per-app delegation the
+/// session mints).
+pub struct McpSession {
+    grant: StorableMcpGrant,
+}
+
+/// The single authorization gate for the server-facing `mcp_*` methods, and
+/// the only constructor of [`McpSession`]. Succeeds exactly when `caller()` is
+/// the self-authenticating principal of a session key that is
+///   * present in the grant map — looking the caller up there *is* the proof
+///     it signed with that key: the IC derives an ingress message's caller as
+///     `self_authenticating(sender_pubkey)`, and the map is keyed by
+///     `self_authenticating(session_key)`, so only the key's holder can match;
+///   * not past its grant's expiry; and
+///   * still under an enabled trusted-server config (defense in depth: the
+///     grant is already deleted eagerly on disable / URL-change in
+///     [`set_mcp_config`], but re-checking here means a regression in that
+///     eager path can't leave a disabled identity's session usable).
+///
+/// Every other caller — the user's own authenticated principal, another
+/// identity's session key, an anonymous or opaque principal — gets
+/// [`Unauthorized`](AccountDelegationError::Unauthorized). This is pure (no
+/// writes), so it is safe on the query path; the update path uses
+/// [`authorize_mcp_session_for_update`], which additionally GCs an expired
+/// grant.
+pub fn authorize_mcp_session() -> Result<McpSession, AccountDelegationError> {
     let caller = caller();
     let grant = storage_borrow(|storage| storage.lookup_mcp_grant(caller))
         .ok_or(AccountDelegationError::Unauthorized(caller))?;
     if grant.expires_at_ns <= time() {
         return Err(AccountDelegationError::Unauthorized(caller));
     }
-    // Defense in depth: the master toggle is re-checked on every call even
-    // though disabling already deletes the grant eagerly (see
-    // [`set_mcp_config`]), so a future regression in the eager path can't
-    // leave a disabled identity's session usable.
     let enabled = storage_borrow(|storage| storage.read_mcp_config(grant.anchor_number).enabled);
     if !enabled {
         return Err(AccountDelegationError::Unauthorized(caller));
     }
-    Ok(grant)
+    Ok(McpSession { grant })
+}
+
+/// [`authorize_mcp_session`] for the update path: identical authorization, but
+/// on failure it also deletes the caller's grant if it has expired, so expired
+/// sessions don't linger until the next connect. Queries can't persist writes,
+/// so they use the pure gate and only refuse.
+pub fn authorize_mcp_session_for_update() -> Result<McpSession, AccountDelegationError> {
+    match authorize_mcp_session() {
+        Ok(session) => Ok(session),
+        Err(err) => {
+            cleanup_expired_grant(caller());
+            Err(err)
+        }
+    }
 }
 
 /// Lazily delete `principal`'s grant if it has expired (clearing the owning
@@ -263,99 +309,97 @@ fn cleanup_expired_grant(principal: Principal) {
     });
 }
 
-/// `mcp_get_accounts`: list the calling MCP server's anchor's accounts at
-/// `target_origin`, so the agent can discover which `account_number` values it
-/// may request a delegation for via [`prepare_delegation`]. Authorized like
-/// prepare/get — the anchor is recovered from `caller()`'s grant, never passed.
-pub fn get_accounts(
-    target_origin: FrontendHostname,
-) -> Result<Vec<AccountInfo>, AccountDelegationError> {
-    let anchor_number = caller_grant()?.anchor_number;
-    Ok(
-        account_management::get_accounts_for_origin(anchor_number, &target_origin)
-            .iter()
-            .map(|account| account.to_info())
-            .collect(),
-    )
-}
+impl McpSession {
+    /// `mcp_get_accounts`: list this session's anchor's accounts at
+    /// `target_origin`, so the agent can discover which `account_number`
+    /// values it may request a delegation for via
+    /// [`prepare_delegation`](Self::prepare_delegation). The anchor is the
+    /// session's (recovered from the caller's grant), never passed in.
+    pub fn get_accounts(
+        &self,
+        target_origin: FrontendHostname,
+    ) -> Result<Vec<AccountInfo>, AccountDelegationError> {
+        Ok(
+            account_management::get_accounts_for_origin(self.grant.anchor_number, &target_origin)
+                .iter()
+                .map(|account| account.to_info())
+                .collect(),
+        )
+    }
 
-/// `mcp_prepare_delegation`: mint a ≤1-hour account delegation for the calling
-/// MCP server at `target_origin`, as `account_number` — one of the anchor's
-/// accounts at that origin when given explicitly (discover them with
-/// [`get_accounts`]), or the anchor's default account there when `None`.
-/// (Accounts are per-origin, so this is an account at `target_origin`, the app
-/// being acted on; no account is chosen at connect. An `account_number` that
-/// isn't the anchor's at `target_origin` is rejected as `Unauthorized`.) The
-/// delegation never outlives the session grant, and is restricted to query
-/// calls when the session was registered read-only.
-///
-/// Returns the resolved `account_number` so the server can thread the *same*
-/// account into [`get_delegation`]: the default account at an origin is
-/// mutable, so if `get` re-resolved it independently and it had changed in
-/// between, it would look under a different account's seed and `NoSuchDelegation`.
-pub async fn prepare_delegation(
-    target_origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-    session_key: SessionKey,
-    max_ttl: Option<u64>,
-) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    let grant = match caller_grant() {
-        Ok(grant) => grant,
-        Err(err) => {
-            // This is the update path, so take the chance to delete the grant
-            // if the caller was an expired session.
-            cleanup_expired_grant(caller());
-            return Err(err);
-        }
-    };
-    let anchor_number = grant.anchor_number;
-    // Cap at 1 hour; the grant expiry is passed as an *absolute* cap so the
-    // delegation can't outlive the session even by the time an await spans.
-    let capped_ttl = Some(u64::min(
-        max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
-        MCP_MAX_EXPIRATION_PERIOD_NS,
-    ));
-    // An explicit account wins; otherwise act as the anchor's default at the app.
-    let account_number =
-        account_number.or_else(|| default_account_number(anchor_number, &target_origin));
-    let prepared = account_management::prepare_account_delegation(
-        anchor_number,
-        target_origin,
-        account_number,
-        session_key,
-        capped_ttl,
-        Some(grant.expires_at_ns),
-        DelegationAccess::from_read_only(grant.read_only),
-        &None,
-    )
-    .await?;
-    Ok(McpPrepareDelegation {
-        user_key: prepared.user_key,
-        expiration: prepared.expiration,
-        account_number,
-    })
-}
+    /// `mcp_prepare_delegation`: mint a ≤1-hour account delegation for this
+    /// session at `target_origin`, as `account_number` — one of the anchor's
+    /// accounts at that origin when given explicitly (discover them with
+    /// [`get_accounts`](Self::get_accounts)), or the anchor's default account
+    /// there when `None`. (Accounts are per-origin, so this is an account at
+    /// `target_origin`, the app being acted on; no account is chosen at
+    /// connect. An `account_number` that isn't the anchor's at `target_origin`
+    /// is rejected as `Unauthorized`.) The delegation never outlives the
+    /// session grant, and is restricted to query calls when the session was
+    /// registered read-only.
+    ///
+    /// Returns the resolved `account_number` so the server can thread the
+    /// *same* account into [`get_delegation`](Self::get_delegation): the
+    /// default account at an origin is mutable, so if `get` re-resolved it
+    /// independently and it had changed in between, it would look under a
+    /// different account's seed and `NoSuchDelegation`.
+    pub async fn prepare_delegation(
+        self,
+        target_origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        session_key: SessionKey,
+        max_ttl: Option<u64>,
+    ) -> Result<McpPrepareDelegation, AccountDelegationError> {
+        let anchor_number = self.grant.anchor_number;
+        // Cap at 1 hour; the grant expiry is passed as an *absolute* cap so the
+        // delegation can't outlive the session even by the time an await spans.
+        let capped_ttl = Some(u64::min(
+            max_ttl.unwrap_or(MCP_MAX_EXPIRATION_PERIOD_NS),
+            MCP_MAX_EXPIRATION_PERIOD_NS,
+        ));
+        // An explicit account wins; otherwise act as the anchor's default at the app.
+        let account_number =
+            account_number.or_else(|| default_account_number(anchor_number, &target_origin));
+        let prepared = account_management::prepare_account_delegation(
+            anchor_number,
+            target_origin,
+            account_number,
+            session_key,
+            capped_ttl,
+            Some(self.grant.expires_at_ns),
+            DelegationAccess::from_read_only(self.grant.read_only),
+            &None,
+        )
+        .await?;
+        Ok(McpPrepareDelegation {
+            user_key: prepared.user_key,
+            expiration: prepared.expiration,
+            account_number,
+        })
+    }
 
-/// `mcp_get_delegation`: fetch the signed delegation prepared above.
-/// `account_number` must be the value returned by the matching
-/// [`prepare_delegation`], so `get` reads the same account `prepare` signed
-/// for (see the note there); the caller is still authorized only for its own
-/// anchor (recovered from `caller()`'s grant), so it can only fetch what it
-/// prepared. The grant's `read_only` must match what `prepare` signed with,
-/// since the access level is folded into the delegation signature.
-pub fn get_delegation(
-    target_origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-    session_key: SessionKey,
-    expiration: Timestamp,
-) -> Result<SignedDelegation, AccountDelegationError> {
-    let grant = caller_grant()?;
-    account_management::get_account_delegation(
-        grant.anchor_number,
-        &target_origin,
-        account_number,
-        session_key,
-        expiration,
-        DelegationAccess::from_read_only(grant.read_only),
-    )
+    /// `mcp_get_delegation`: fetch the signed delegation prepared above.
+    /// `account_number` must be the value returned by the matching
+    /// [`prepare_delegation`](Self::prepare_delegation), so `get` reads the
+    /// same account `prepare` signed for (see the note there); the caller is
+    /// still authorized only for its own anchor (recovered from `caller()`'s
+    /// grant), so it can only fetch what it prepared. The grant's `read_only`
+    /// must match what `prepare` signed with, since the access level is folded
+    /// into the delegation signature.
+    pub fn get_delegation(
+        &self,
+        target_origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> Result<SignedDelegation, AccountDelegationError> {
+        account_management::get_account_delegation(
+            self.grant.anchor_number,
+            &target_origin,
+            account_number,
+            session_key,
+            expiration,
+            DelegationAccess::from_read_only(self.grant.read_only),
+        )
+    }
 }

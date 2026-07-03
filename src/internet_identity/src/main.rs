@@ -690,14 +690,18 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
     Ok(())
 }
 
-/// Called by the MCP server, signed with its registered session key
-/// (authorized by `caller()`'s unexpired grant): prepare a per-app delegation
-/// at `target_origin` for `account_number` — one of the anchor's accounts
-/// there (discover them with `mcp_get_accounts`), or the anchor's default
-/// account when `None`. `max_ttl` is the requested lifetime in ns, defaulting
-/// to and capped at 1 hour, and never outliving the session grant. The
-/// resolved `account_number` is returned in `McpPrepareDelegation` to thread
-/// into `mcp_get_delegation`.
+/// Called by the MCP server, signed with its registered session key: prepare a
+/// per-app delegation at `target_origin` for `account_number` — one of the
+/// anchor's accounts there (discover them with `mcp_get_accounts`), or the
+/// anchor's default account when `None`. `max_ttl` is the requested lifetime in
+/// ns, defaulting to and capped at 1 hour, and never outliving the session
+/// grant. The resolved `account_number` is returned in `McpPrepareDelegation`
+/// to thread into `mcp_get_delegation`.
+///
+/// `mcp::authorize_mcp_session_for_update` is the authorization gate: it
+/// admits only the caller holding a live session grant (the registered session
+/// key) and hands back the `McpSession` the operation runs on, so there is no
+/// way to reach `prepare_delegation` without it.
 #[update]
 async fn mcp_prepare_delegation(
     target_origin: FrontendHostname,
@@ -705,13 +709,16 @@ async fn mcp_prepare_delegation(
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    mcp::prepare_delegation(target_origin, account_number, session_key, max_ttl).await
+    mcp::authorize_mcp_session_for_update()?
+        .prepare_delegation(target_origin, account_number, session_key, max_ttl)
+        .await
 }
 
 /// Fetch the delegation prepared by `mcp_prepare_delegation`. The anchor is
 /// recovered from `caller()`'s grant; `account_number` and `expiration` must
 /// be the values returned by the matching prepare call, or this returns
-/// `NoSuchDelegation`.
+/// `NoSuchDelegation`. Gated by `mcp::authorize_mcp_session` (the registered
+/// session key), like the other server-facing methods.
 #[query]
 fn mcp_get_delegation(
     target_origin: FrontendHostname,
@@ -719,17 +726,23 @@ fn mcp_get_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    mcp::get_delegation(target_origin, account_number, session_key, expiration)
+    mcp::authorize_mcp_session()?.get_delegation(
+        target_origin,
+        account_number,
+        session_key,
+        expiration,
+    )
 }
 
 /// Called by the MCP server (anchor recovered from `caller()`): list the anchor's
 /// accounts at `target_origin` so the agent can pick which `account_number` to
-/// request a delegation for.
+/// request a delegation for. Gated by `mcp::authorize_mcp_session` (the
+/// registered session key), like the other server-facing methods.
 #[query]
 fn mcp_get_accounts(
     target_origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, AccountDelegationError> {
-    mcp::get_accounts(target_origin)
+    mcp::authorize_mcp_session()?.get_accounts(target_origin)
 }
 
 #[update]
