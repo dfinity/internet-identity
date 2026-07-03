@@ -100,7 +100,10 @@
   >(null);
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
-  // Authorizations default to full access; "Read-only mode" is the opt-in.
+  // When READ_ONLY_MODE is enabled, authorizations default to full access and
+  // "Read-only mode" is the opt-in. While the flag is off (the current
+  // default), the toggle below is hidden and `effectiveAccessLevel` forces
+  // full access, so this state is never surfaced to the user.
   let accessLevel: AccessLevel = $state("full-access");
   // While the read-only feature is flagged off, the toggle is hidden and every
   // authorization is full access regardless of the (unreachable) toggle state.

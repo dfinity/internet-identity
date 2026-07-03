@@ -19,9 +19,11 @@
   const { domain, onAuthorize }: Props = $props();
 
   let busy = $state(false);
-  // CLI access defaults to read-only: a linked CLI usually reads on the
-  // user's behalf, so it gets query-only access unless the user opts into
-  // full access by checking the "Full access" box.
+  // When READ_ONLY_MODE is enabled, CLI access defaults to read-only (a linked
+  // CLI usually reads on the user's behalf, so it gets query-only access unless
+  // the user opts into full access via the "Full access" box). While the flag
+  // is off (the current default), the toggle is hidden and `effectiveAccessLevel`
+  // forces full access, so this default is unreachable.
   let accessLevel: AccessLevel = $state("read-only");
   // While the read-only feature is flagged off, the toggle is hidden and CLI
   // access is full (the toggle's read-only default is unreachable).

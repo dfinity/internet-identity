@@ -28,9 +28,11 @@
 
   const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
 
-  // MCP connections default to read-only (opt-out): the server can read on the
-  // user's behalf across their apps, but its per-app delegations are query-only
-  // unless the user opts into full access by unchecking.
+  // When READ_ONLY_MODE is enabled, MCP connections default to read-only
+  // (opt-out): the server can read across the user's apps, but its per-app
+  // delegations are query-only unless the user unchecks. While the flag is off
+  // (the current default), the toggle is hidden and `effectiveAccessLevel`
+  // forces full access, so this default is unreachable.
   let accessLevel: AccessLevel = $state("read-only");
   // While the read-only feature is flagged off, the toggle is hidden and the
   // connection is full access (the toggle's read-only default is unreachable).
