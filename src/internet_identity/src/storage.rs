@@ -169,11 +169,8 @@ const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
 // const DEPRECATED_STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
 // const DEPRECATED_LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 // const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX_OLD: u8 = 12u8;
-// Held the II-derived standing-delegation principals of the pre-registration
-// MCP design; superseded by the session-grant map at index 27. Abandoning the
-// memory (rather than reusing it with the new value type) also de-authorizes
-// every legacy binding at upgrade.
-// const DEPRECATED_LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
+// (The abandoned MCP indexes 25/27/28 are documented with the current
+// MCP_GRANT_MEMORY_INDEX below.)
 
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
