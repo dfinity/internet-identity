@@ -9,9 +9,10 @@
 
   // Messages for the plain string-valued channel errors. Data-carrying
   // variants (e.g. `sso-app-access-denied`) are handled in `messages` below.
+  // `details` is an optional second paragraph rendered below `description`.
   const errorMessages: Record<
     Extract<ChannelError, string>,
-    { title: string; description: string }
+    { title: string; description: string; details?: string }
   > = {
     "unable-to-connect": {
       title: $t`Unable to connect`,
@@ -53,7 +54,8 @@
       ? errorMessages[error]
       : {
           title: $t`No access`,
-          description: $t`You don't have access to ${error.app}. Access to this app is managed by your organization — contact your administrator if you think this should be allowed.`,
+          description: $t`You don't have access to ${error.app}.`,
+          details: $t`Access to this app is managed by your organization. Please contact your administrator if you think this should be allowed.`,
         },
   );
 </script>
@@ -71,9 +73,19 @@
       <h1 class="text-text-primary mb-3 text-2xl font-medium">
         {messages.title}
       </h1>
-      <p class="text-text-tertiary mb-6 text-base font-medium">
+      <p
+        class={[
+          "text-text-tertiary text-base font-medium",
+          messages.details !== undefined ? "mb-3" : "mb-6",
+        ]}
+      >
         {messages.description}
       </p>
+      {#if messages.details !== undefined}
+        <p class="text-text-tertiary mb-6 text-base font-medium">
+          {messages.details}
+        </p>
+      {/if}
       <button class="btn btn-secondary" onclick={() => window.close()}>
         <RotateCcwIcon class="size-4" />
         <span>{$t`Return to app`}</span>
