@@ -83,7 +83,10 @@
   // against the canister at connect time (`handleAuthorize`), moving to the
   // untrusted screen if it isn't. The terminal `close` phase is reached from
   // `handleAuthorize` once the session is registered — the whole flow runs on
-  // this page, there is no redirect-back.
+  // this page. There is no redirect-back unless the *trusted server* asks for
+  // one: a `finish_url` in its key response (validated same-origin with the
+  // callback) sends the tab there instead of the close screen, letting the
+  // server finish its own flow (e.g. hand an OAuth code to an MCP client).
   const initialPhase = (): Phase => {
     if (!requestValid) {
       return { kind: "invalid" };
@@ -191,7 +194,7 @@
           phase = { kind: "untrusted" };
           return;
         }
-        await mcpAuthorize({
+        const finishUrl = await mcpAuthorize({
           authenticated,
           ttlSeconds,
           accessLevel,
@@ -199,7 +202,17 @@
           state: request.state,
         });
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);
+        // The session is registered either way: reach the terminal close
+        // screen first, so the page is in the truthful state even when the
+        // navigation below never replaces the document (a 204 or attachment
+        // response) or when the user comes Back to a bfcache-restored page —
+        // rather than stranding them on the connecting spinner.
         phase = { kind: "close" };
+        if (finishUrl !== undefined) {
+          // The trusted server asked to finish the flow on its side (already
+          // validated same-origin with the callback): hand it the tab.
+          window.location.assign(finishUrl);
+        }
       } catch (error) {
         // Return to the connect screen so the user can retry.
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Error);

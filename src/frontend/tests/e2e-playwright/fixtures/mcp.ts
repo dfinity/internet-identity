@@ -37,11 +37,19 @@ export type McpFixture = {
   state: string;
   mcpOrigin: string;
   callbackUrl: string;
+  /** Where the stand-in sends the browser after the connect once
+   *  `enableFinishRedirect()` is called: a landing page on its own origin,
+   *  like a real server completing its own (e.g. OAuth) flow. */
+  finishUrl: string;
   completion: Promise<McpCompletion>;
   /** Every completion received so far, in order (for multi-connect tests). */
   completions: McpCompletion[];
   /** Sets what the MCP server stand-in does on its next callback request. */
   setNextOutcome: (outcome: McpOutcome) => void;
+  /** Makes the key response carry `finish_url`, so the connect flow hands the
+   *  tab back to the server (at `finishUrl`) instead of showing the close
+   *  screen. Off by default — most tests assert the close screen. */
+  enableFinishRedirect: () => void;
   /**
    * Trusts this fixture's MCP origin for the signed-up identity by driving the
    * Settings UI — the trusted server is now the identity's synced (on-chain)
@@ -85,6 +93,12 @@ export const test = base.extend<{ mcp: McpFixture }>({
     // it started.
     const state = toBase64URL(crypto.getRandomValues(new Uint8Array(32)));
     const callbackUrl = `${MCP_SERVER_ORIGIN}/callback`;
+    const finishUrl = `${MCP_SERVER_ORIGIN}/oauth/finish?sid=fixture`;
+
+    let finishRedirect = false;
+    const enableFinishRedirect = (): void => {
+      finishRedirect = true;
+    };
 
     let resolveCompletion: (body: McpCompletion) => void = () => undefined;
     const completion = new Promise<McpCompletion>((resolve) => {
@@ -103,6 +117,20 @@ export const test = base.extend<{ mcp: McpFixture }>({
         if (request.method() === "OPTIONS") {
           // CORS preflight for the JSON POSTs.
           await route.fulfill({ status: 204, headers: CORS_HEADERS });
+          return;
+        }
+        if (request.method() === "GET") {
+          // A navigation to the finish URL: the browser was handed back to
+          // the server after the connect. Serve the landing page.
+          if (request.url() === finishUrl) {
+            await route.fulfill({
+              status: 200,
+              headers: { "content-type": "text/html" },
+              body: "<h1>Connection complete</h1>",
+            });
+            return;
+          }
+          await route.fulfill({ status: 404 });
           return;
         }
         let body: Record<string, unknown> = {};
@@ -133,11 +161,16 @@ export const test = base.extend<{ mcp: McpFixture }>({
           });
           return;
         }
-        // Key request: serve this connection's session public key.
+        // Key request: serve this connection's session public key, plus the
+        // finish redirect when enabled — exactly the response shape a real
+        // server completing its own flow (e.g. OAuth) would send.
         await route.fulfill({
           status: 200,
           headers: { ...CORS_HEADERS, "content-type": "application/json" },
-          body: JSON.stringify({ public_key: publicKey }),
+          body: JSON.stringify({
+            public_key: publicKey,
+            ...(finishRedirect ? { finish_url: finishUrl } : {}),
+          }),
         });
       });
     };
@@ -203,9 +236,11 @@ export const test = base.extend<{ mcp: McpFixture }>({
       state,
       mcpOrigin: MCP_SERVER_ORIGIN,
       callbackUrl,
+      finishUrl,
       completion,
       completions,
       setNextOutcome,
+      enableFinishRedirect,
       trustServer,
       installInterceptor,
       buildAuthorizeUrl,

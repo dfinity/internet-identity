@@ -252,6 +252,36 @@ test("Allow access registers the server's session key", async ({
   ).toBeVisible();
 });
 
+test("A finish_url from the server hands the tab back to it after connecting", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  // The server asks for the browser back after the connect (its key response
+  // carries `finish_url`) — how a real server completes its own flow, e.g.
+  // minting the OAuth code for an MCP client and redirecting back to it.
+  mcp.enableFinishRedirect();
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // The session registers and completion is reported like any connect...
+  const completion = await mcp.completion;
+  expect(completion.state).toBe(mcp.state);
+  // ...but instead of II's close screen, the tab lands on the server's
+  // finish URL.
+  await page.waitForURL(mcp.finishUrl);
+  await expect(
+    page.getByRole("heading", { name: "Connection complete" }),
+  ).toBeVisible();
+});
+
 test("Identity switcher shows while signing in and hides on the success screen", async ({
   page,
   mcp,

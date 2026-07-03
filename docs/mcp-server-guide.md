@@ -29,7 +29,11 @@ sequenceDiagram
     F->>C: mcp_register(anchor, session_key, ttl) [user-authenticated]
     C-->>F: {expiration} — grant bound: principal to anchor
     F-)M: POST callback {state, expiration} (best effort)
-    F-->>U: "You're signed in"
+    alt key response carried finish_url
+        F->>M: browser navigates to finish_url — finish your flow (e.g. OAuth code redirect)
+    else
+        F-->>U: "You're signed in"
+    end
     end
 
     rect rgb(240, 248, 244)
@@ -90,7 +94,12 @@ POST <callback>            Content-Type: application/json
 {"state": "<state>"}
 ```
 
-Respond `200 {"public_key": "<base64url, unpadded, DER-encoded public key>"}`.
+Respond:
+
+```
+200 {"public_key": "<base64url, unpadded, DER-encoded public key>",
+     "finish_url": "<optional: absolute https URL on your origin>"}
+```
 
 Generate a **fresh keypair per user-connection** — Ed25519 recommended (e.g.
 agent-js `Ed25519KeyIdentity`). The registered principal is
@@ -98,6 +107,12 @@ agent-js `Ed25519KeyIdentity`). The registered principal is
 key reused across users makes the second registration fail. An unknown,
 already-used, or expired `state` must get a non-2xx response — the connect
 flow then errors out and **nothing is registered**.
+
+`finish_url` asks II to hand the connecting tab back to you once the session
+is registered (see (c) below). It must be an **absolute https URL on the same
+origin as the callback** — anything else fails the connect before anything is
+registered. Omit it (`null` and `""` also count as omitted) and the II tab
+simply shows its own success screen.
 
 **b) Completion notification** — best effort, after II registers the key
 (distinguish from (a) by the `expiration` field):
@@ -112,7 +127,51 @@ string because u64 nanoseconds overflow JSON numbers). You must tolerate never
 receiving this call (e.g. network failure after registration succeeded): fall
 back to attempting a signed call — success means you are registered.
 
-There is no redirect back to II; the II tab finishes on its own.
+**c) Finish redirect** — only if your key response carried `finish_url`:
+after registering the session and sending (b), II navigates the connecting
+tab to your `finish_url`. Use it to complete a flow of your own around the
+connect; without it the II tab finishes on its own and never redirects.
+
+- **Ordering:** II awaits (b) before navigating, so you normally hear about
+  the registration first — but (b) is best effort, so the browser can arrive
+  without it. Treat arrival at `finish_url` as a UX signal, not as proof of
+  registration: verify via (b), or by making a signed `mcp_get_accounts` call
+  and checking for the `Ok` variant. (Check the candid result, not the
+  transport status: an unregistered key gets `Err Unauthorized(principal)`
+  delivered inside a _successful_ query response.)
+- Tie the request to the pending connection yourself (e.g. an unguessable id
+  in the `finish_url` query — II passes the URL through untouched).
+
+### Serving MCP clients over OAuth
+
+Real-world remote MCP clients (claude.ai, Claude Desktop, Cursor, VS Code,
+the MCP Inspector) authenticate per the MCP auth spec: **OAuth 2.1
+authorization code + PKCE**, discovered via RFC 9728 protected-resource
+metadata and RFC 8414 AS metadata, with RFC 7591 dynamic client registration.
+The device grant is not part of that profile — clients won't use it. The II
+connect slots into the code flow as your "identity provider" leg, with
+`finish_url` closing the loop:
+
+1. `GET /oauth/authorize` — validate `client_id` + exact `redirect_uri`,
+   store a pending auth `{code_challenge, state, resource}`, and 302 the
+   browser to the II connect link (§1) with a fresh server-side `state`.
+2. Your callback (§2a) answers the key request with a fresh keypair **and a
+   `finish_url`** carrying the pending-auth id.
+3. `GET <finish_url>` — confirm the session registered (see (c)), mint the
+   authorization code, and 302 to the client's `redirect_uri` with
+   `code` + the client's original `state`.
+4. `POST /oauth/token` — exchange code + PKCE verifier for tokens. Issue
+   short-lived access tokens plus a refresh token: refresh succeeds while the
+   II grant lives, and once it expires or the user revokes (§4) the refresh
+   failure makes the client cleanly re-prompt.
+
+Advertise what you actually implement (`authorization_endpoint`,
+`response_types_supported: ["code"]`, `grant_types_supported` including
+`authorization_code` and `refresh_token`), don't rewrite clients' requested
+grant types at registration, persist DCR client registrations across deploys
+(clients cache their `client_id`), exempt `/oauth/*` and `/.well-known/*`
+from bearer-token middleware, and return proper AS error codes
+(`invalid_client`, `invalid_request`) from the authorize endpoint.
 
 ### Read-only sessions
 

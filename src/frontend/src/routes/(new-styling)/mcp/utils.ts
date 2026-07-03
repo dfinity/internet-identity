@@ -24,8 +24,24 @@ interface McpAuthorizeInput {
 }
 
 /** The key-request response: the server's session public key for this
- *  connection, DER-encoded and base64url. */
-const parsePublicKey = (body: unknown): Uint8Array => {
+ *  connection (DER-encoded, base64url), plus an optional `finish_url` the
+ *  browser should be sent to once the session is registered — this is how a
+ *  server completes a flow of its own around the connect (e.g. minting the
+ *  OAuth authorization code for an MCP client and redirecting back to it).
+ *
+ *  `finish_url` is only honoured on the *callback's* origin — the trusted
+ *  server the user consented to, per their synced config. It arrives over the
+ *  same origin-attested channel as the key (the callback response, never the
+ *  connect link), and the same-origin requirement keeps the invariant that II
+ *  only ever navigates to the trusted origin; where the server redirects from
+ *  there is its own (standard OAuth) responsibility. Origin equality also
+ *  rules out non-https schemes (`javascript:` etc. have no matching origin).
+ *  A `finish_url` that fails these checks fails the connect — before anything
+ *  is registered — rather than silently completing without the redirect. */
+const parseKeyResponse = (
+  body: unknown,
+  callback: string,
+): { sessionKey: Uint8Array; finishUrl: string | undefined } => {
   if (
     typeof body !== "object" ||
     body === null ||
@@ -34,7 +50,34 @@ const parsePublicKey = (body: unknown): Uint8Array => {
   ) {
     throw new Error("The MCP server's key response is missing `public_key`.");
   }
-  return fromBase64URL(body.public_key);
+  const sessionKey = fromBase64URL(body.public_key);
+  // `null` and `""` count as absent, not as errors: they're how common server
+  // stacks serialize an omitted optional (serde `Option::None`, a Go string
+  // zero-value, Python `None`), and "no redirect" is the only thing an absent
+  // value can mean — there's nothing to navigate to, so nothing to fail.
+  if (
+    !("finish_url" in body) ||
+    body.finish_url === undefined ||
+    body.finish_url === null ||
+    body.finish_url === ""
+  ) {
+    return { sessionKey, finishUrl: undefined };
+  }
+  if (typeof body.finish_url !== "string") {
+    throw new Error("The MCP server's `finish_url` is not a string.");
+  }
+  let finishUrl;
+  try {
+    finishUrl = new URL(body.finish_url);
+  } catch {
+    throw new Error("The MCP server's `finish_url` is not a valid URL.");
+  }
+  if (finishUrl.origin !== new URL(callback).origin) {
+    throw new Error(
+      "The MCP server's `finish_url` is not on the server's own origin.",
+    );
+  }
+  return { sessionKey, finishUrl: finishUrl.href };
 };
 
 /**
@@ -56,8 +99,11 @@ const parsePublicKey = (body: unknown): Uint8Array => {
  * trusted server's cooperation.
  *
  * A resolved promise means the session is registered and the server was (best
- * effort) notified; unlike the old delegation form-POST flow, the page stays
- * put and shows the terminal screen itself.
+ * effort) notified. Resolves with the server's validated `finish_url` when it
+ * supplied one in the key response (the caller then navigates the tab there,
+ * letting the server finish a flow of its own — e.g. hand an OAuth code back
+ * to an MCP client), and with `undefined` otherwise (the page stays put and
+ * shows the terminal screen itself).
  */
 export const mcpAuthorize = async ({
   authenticated,
@@ -65,7 +111,7 @@ export const mcpAuthorize = async ({
   accessLevel,
   callback,
   state,
-}: McpAuthorizeInput): Promise<void> => {
+}: McpAuthorizeInput): Promise<string | undefined> => {
   const { identityNumber, actor } = authenticated;
 
   // Ask the trusted server for its session public key for this connect. A
@@ -81,7 +127,12 @@ export const mcpAuthorize = async ({
       `The MCP server rejected the connect request (HTTP ${keyResponse.status}).`,
     );
   }
-  const sessionKey = parsePublicKey(await keyResponse.json());
+  // Parsing also validates any `finish_url` (same-origin with the trusted
+  // callback), so a misbehaving response aborts here — nothing registered.
+  const { sessionKey, finishUrl } = parseKeyResponse(
+    await keyResponse.json(),
+    callback,
+  );
 
   // One authenticated call registers the session: the backend binds the key's
   // self-authenticating principal to the identity (replacing any previous
@@ -101,7 +152,11 @@ export const mcpAuthorize = async ({
 
   // Tell the server its session is live and when it expires (ns since epoch,
   // as a string — the value overflows JSON numbers). Best effort: on failure
-  // the server discovers success on its first signed call.
+  // the server discovers success on its first signed call. Sent (and awaited)
+  // before any `finish_url` navigation, so the server normally hears about
+  // the registration before the browser arrives — but a server must not rely
+  // on that ordering, since this notification can fail while the navigation
+  // still happens.
   try {
     await fetch(callback, {
       method: "POST",
@@ -111,4 +166,6 @@ export const mcpAuthorize = async ({
   } catch {
     // Deliberately ignored; see above.
   }
+
+  return finishUrl;
 };
