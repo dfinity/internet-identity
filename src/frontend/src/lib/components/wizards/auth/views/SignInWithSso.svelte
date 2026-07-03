@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { HelpCircleIcon } from "@lucide/svelte";
+  import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import {
     validateDomain,
@@ -11,6 +14,12 @@
   } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
   import { OAuthProviderError } from "$lib/utils/openID";
+  import {
+    readAppScopeConsent,
+    writeAppScopeConsent,
+  } from "$lib/utils/ssoAppScope";
+  import { SSO_APP_SCOPE } from "$lib/state/featureFlags";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
 
@@ -52,6 +61,26 @@
    * Safari, which blocks `window.open` calls that follow an `await`.
    */
   let preparedResult = $state<SsoDiscoveryResult>();
+
+  /**
+   * The relying-party origin an app-access scope would disclose to the IdP.
+   * Only set in the authorize flow — this view is also rendered outside it
+   * (e.g. `/login`, add-access-method), where there's no app to disclose and
+   * the consent checkbox is hidden.
+   */
+  const appOrigin = $derived($authorizationStore?.effectiveOrigin);
+  const showAppScopeConsent = $derived(
+    $SSO_APP_SCOPE && appOrigin !== undefined,
+  );
+  /**
+   * Whether to tell the IdP which app the user is signing in to (the
+   * `icp:<hostname>` scope). Unchecked by default — disclosing the app to the
+   * org's IdP relaxes II's cross-app unlinkability, so it's strictly opt-in.
+   * Re-initialized from the persisted per-(SSO domain, app) choice once
+   * discovery resolves, and persisted on submit so the ceremony-less re-auth
+   * paths (returning-user continue, 1-click) honor it.
+   */
+  let shareAppWithIdp = $state(false);
 
   /**
    * True when `preparedResult`'s `(issuer, client_id)` already matches a
@@ -197,6 +226,9 @@
         const result = await discoverSsoConfig(trimmed, controller.signal);
         if (matchesCurrent()) {
           preparedResult = result;
+          if (appOrigin !== undefined) {
+            shareAppWithIdp = readAppScopeConsent(result.domain, appOrigin);
+          }
         }
       } catch (e) {
         // Cancelled by a fresher keystroke — silently drop, keyed on
@@ -221,6 +253,12 @@
     }
     isSubmitting = true;
     try {
+      // Persist the disclosure choice before the sign-in kicks off:
+      // `continueWithSso → currentSsoAppScope` reads it back synchronously
+      // to decide whether the request carries the app scope.
+      if (showAppScopeConsent && appOrigin !== undefined) {
+        writeAppScopeConsent(preparedResult.domain, appOrigin, shareAppWithIdp);
+      }
       // IMPORTANT: no `await` before `continueWithSso`. The popup is
       // opened synchronously inside `continueWithSso → requestJWT →
       // requestWithPopup → redirectInPopup → window.open`. Any await
@@ -279,6 +317,32 @@
       {error}
       aria-label={$t`Company domain`}
     />
+    {#if showAppScopeConsent}
+      <div class="flex flex-row items-center">
+        <Checkbox
+          size="sm"
+          bind:checked={shareAppWithIdp}
+          disabled={isSubmitting}
+          label={$t`Tell your identity provider which app you're signing in to`}
+        />
+        <Tooltip
+          label={$t`Sharing app info`}
+          description={$t`Some IdPs may need to know which app you are signing in to before granting access.`}
+          direction="up"
+          align="end"
+          offset="0rem"
+          class="max-w-80"
+        >
+          <button
+            type="button"
+            class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
+            aria-label={$t`More information about telling your identity provider which app you're signing in to`}
+          >
+            <HelpCircleIcon class="size-5" />
+          </button>
+        </Tooltip>
+      </div>
+    {/if}
     {#if isAlreadyLinked}
       <p class="text-text-tertiary text-sm">
         {$t`This SSO is already linked to your identity.`}

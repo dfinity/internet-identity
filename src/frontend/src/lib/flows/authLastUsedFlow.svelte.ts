@@ -16,6 +16,7 @@ import {
   selectAuthScopes,
 } from "$lib/utils/openID";
 import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+import { currentSsoAppScope } from "$lib/utils/ssoAppScope";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
 import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
@@ -126,6 +127,7 @@ export class AuthLastUsedFlow {
             authScope: selectAuthScopes(
               ssoResult.discovery.scopes_supported,
             ).join(" "),
+            appScope: currentSsoAppScope(domain),
           })),
           {
             nonce: get(sessionStore).nonce,

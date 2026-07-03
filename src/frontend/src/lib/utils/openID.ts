@@ -154,7 +154,31 @@ export interface RequestConfig {
   authScope: string;
   // Optional, FedCM config URL
   configURL?: string;
+  // Optional, extra scope identifying the relying-party app the user is
+  // signing in to (e.g. `icp:oisy.com`), appended to `authScope` in the
+  // redirect flow so an org SSO/IdP can apply per-app access policy. Only set
+  // for SSO providers that accept it; see `appAccessScope`.
+  appScope?: string;
 }
+
+/** Prefix for the app-access scope forwarded to an org SSO/IdP. */
+export const SSO_APP_SCOPE_PREFIX = "icp:";
+
+/**
+ * Build the app-access scope for the relying-party app identified by
+ * `appOrigin` — the app's hostname prefixed with {@link SSO_APP_SCOPE_PREFIX},
+ * e.g. `https://oisy.com` → `icp:oisy.com`. The hostname (not the full
+ * origin) keeps the value a clean, predictable scope token the org can
+ * pre-register at its IdP. Returns `undefined` if `appOrigin` isn't a valid
+ * URL.
+ */
+export const appAccessScope = (appOrigin: string): string | undefined => {
+  try {
+    return `${SSO_APP_SCOPE_PREFIX}${new URL(appOrigin).hostname}`;
+  } catch {
+    return undefined;
+  }
+};
 
 export interface RequestOptions {
   // Nonce created from a principal with `createAnonymousNonce`
@@ -278,7 +302,15 @@ export const createRedirectURL = (
   authURL.searchParams.set("response_mode", "form_post");
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
-  authURL.searchParams.set("scope", config.authScope);
+  // Append the app-access scope, when present, so the IdP learns which
+  // relying-party app the user is signing in to. Kept out of `authScope`
+  // (which is the provider's advertised OIDC scopes) so the two concerns stay
+  // separate and the app scope is only added where a caller opted in.
+  const scope =
+    config.appScope !== undefined && config.appScope.length > 0
+      ? `${config.authScope} ${config.appScope}`
+      : config.authScope;
+  authURL.searchParams.set("scope", scope);
   authURL.searchParams.set("state", state);
   authURL.searchParams.set("nonce", options.nonce);
   if (options.mediation === "required" && options.loginHint === undefined) {
