@@ -45,16 +45,17 @@ beforeEach(() => {
   // `mcp_register` are what's under test.
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init?: RequestInit) => {
+    vi.fn((_url: string, init?: RequestInit) => {
       const body = JSON.parse((init?.body as string) ?? "{}") as {
         expiration?: string;
       };
-      if (body.expiration !== undefined) {
-        return new Response("{}", { status: 200 });
-      }
-      return new Response(JSON.stringify({ public_key: SERVER_PUBKEY }), {
-        status: 200,
-      });
+      const response =
+        body.expiration !== undefined
+          ? new Response("{}", { status: 200 })
+          : new Response(JSON.stringify({ public_key: SERVER_PUBKEY }), {
+              status: 200,
+            });
+      return Promise.resolve(response);
     }),
   );
 });
