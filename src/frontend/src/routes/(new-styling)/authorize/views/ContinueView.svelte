@@ -34,6 +34,7 @@
   import { slide, fade, scale } from "svelte/transition";
   import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { READ_ONLY_MODE } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -99,8 +100,16 @@
   >(null);
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
-  // Authorizations default to full access; "Read-only mode" is the opt-in.
+  // When READ_ONLY_MODE is enabled, authorizations default to full access and
+  // "Read-only mode" is the opt-in. While the flag is off (the current
+  // default), the toggle below is hidden and `effectiveAccessLevel` forces
+  // full access, so this state is never surfaced to the user.
   let accessLevel: AccessLevel = $state("full-access");
+  // While the read-only feature is flagged off, the toggle is hidden and every
+  // authorization is full access regardless of the (unreachable) toggle state.
+  const effectiveAccessLevel: AccessLevel = $derived(
+    $READ_ONLY_MODE ? accessLevel : "full-access",
+  );
   let isMultipleAccountsEnabled = $state(
     readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
   );
@@ -196,7 +205,7 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      onAuthorize(accountNumberPromise, accessLevel);
+      onAuthorize(accountNumberPromise, effectiveAccessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -211,7 +220,7 @@
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
-      onAuthorize(Promise.resolve(accountNumber), accessLevel);
+      onAuthorize(Promise.resolve(accountNumber), effectiveAccessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -573,12 +582,14 @@
       </button>
     </Tooltip>
   </div>
-  <AccessLevelToggle
-    bind:accessLevel
-    prompt="read-only"
-    disabled={isAuthenticatingDefault}
-    class="mt-4"
-  />
+  {#if $READ_ONLY_MODE}
+    <AccessLevelToggle
+      bind:accessLevel
+      prompt="read-only"
+      disabled={isAuthenticatingDefault}
+      class="mt-4"
+    />
+  {/if}
 </div>
 
 {#if authLastUsedFlow.systemOverlay}
