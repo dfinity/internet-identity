@@ -7,6 +7,54 @@ time); the server then signs `mcp_*` canister calls with that key — no
 delegation chains are delivered or handled. Per-app delegations (up to 1 hour)
 are minted on demand through `mcp_prepare_delegation` / `mcp_get_delegation`.
 
+## Lifecycle at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User / browser
+    participant M as MCP server
+    participant F as II frontend /mcp
+    participant C as II canister
+    participant App as Target app
+
+    rect rgb(244, 244, 250)
+    note over U,C: Phase 1 — connect handshake (once per session)
+    M->>U: redirect to /mcp#callback, state, ttl
+    U->>F: open /mcp, authenticate and consent (pick TTL)
+    F->>C: mcp_get_config(anchor)
+    C-->>F: enabled + trusted URL (verify callback origin)
+    F->>M: POST callback {state}
+    M-->>F: 200 {public_key} — fresh keypair for this connection
+    F->>C: mcp_register(anchor, session_key, ttl) [user-authenticated]
+    C-->>F: {expiration} — grant bound: principal to anchor
+    F-)M: POST callback {state, expiration} (best effort)
+    F-->>U: "You're signed in"
+    end
+
+    rect rgb(240, 248, 244)
+    note over M,App: Phase 2 — acting for the user (repeat until expiry)
+    M->>C: mcp_get_accounts(target_origin) [signed by session key]
+    C-->>M: [AccountInfo]
+    M->>C: mcp_prepare_delegation(target, account?, app_key, ttl <= 1h)
+    C-->>M: {user_key, expiration, account_number}
+    M->>C: mcp_get_delegation(target, account_number, app_key, expiration)
+    C-->>M: SignedDelegation
+    M->>App: call as user (chain: user_key to app_key)
+    App-->>M: response
+    end
+
+    rect rgb(252, 244, 244)
+    note over U,C: End of life — grant expires, or the user revokes in Settings
+    opt user revokes early
+        U->>C: mcp_set_config(disable / change URL) — grant deleted
+    end
+    M->>C: mcp_* (signed by session key)
+    C-->>M: Err Unauthorized(principal)
+    note over M: session over → prompt a fresh connect with a new key
+    end
+```
+
 ## 1. Connect link
 
 Send the user's browser to:
