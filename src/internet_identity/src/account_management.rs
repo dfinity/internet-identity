@@ -302,6 +302,7 @@ pub async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    max_expiration: Option<Timestamp>,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     state::ensure_salt_set().await;
@@ -322,7 +323,13 @@ pub async fn prepare_account_delegation(
         max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
         crate::delegation::MAX_EXPIRATION_PERIOD_NS,
     );
-    let expiration = time().saturating_add(session_duration_ns);
+    // `max_expiration` is an *absolute* cap (e.g. the MCP session grant's
+    // expiry): a relative TTL computed by the caller before the await above
+    // could drift past it by however much time the await spans.
+    let expiration = u64::min(
+        time().saturating_add(session_duration_ns),
+        max_expiration.unwrap_or(u64::MAX),
+    );
     let seed = account.calculate_seed();
 
     state::signature_map_mut(|sigs| {

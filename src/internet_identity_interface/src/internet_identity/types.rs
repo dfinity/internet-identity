@@ -594,17 +594,17 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
-/// Result of `mcp_prepare_account_delegation`. The matching
-/// `mcp_get_account_delegation` must use the *same* account, so we return the
-/// resolved `account_number` for the server to thread back. When preparing, the
-/// MCP server may name an account explicitly (one of the anchor's accounts at
-/// `target_origin`) or leave it unset to use the anchor's default there; either
-/// way `account_number` reports the one actually used. (Accounts are per-origin,
-/// so this is an account at `target_origin` — the app being acted on — not the
-/// account the user picked at the MCP server's own origin when connecting.)
-/// Returning it also keeps `get` from independently re-resolving the *mutable*
-/// default and, if it changed in between, looking under a different account's
-/// seed and returning `NoSuchDelegation`.
+/// Result of `mcp_prepare_delegation`. The matching `mcp_get_delegation` must
+/// use the *same* account, so we return the resolved `account_number` for the
+/// server to thread back. When preparing, the MCP server may name an account
+/// explicitly (one of the anchor's accounts at `target_origin`) or leave it
+/// unset to use the anchor's default there; either way `account_number`
+/// reports the one actually used. (Accounts are per-origin, so this is an
+/// account at `target_origin` — the app being acted on; no account is chosen
+/// when connecting the MCP server.) Returning it also keeps `get` from
+/// independently re-resolving the *mutable* default and, if it changed in
+/// between, looking under a different account's seed and returning
+/// `NoSuchDelegation`.
 #[derive(CandidType, Deserialize)]
 pub struct McpPrepareDelegation {
     pub user_key: UserKey,
@@ -648,6 +648,15 @@ pub enum SessionDelegationError {
 pub struct McpConfig {
     pub enabled: bool,
     pub url: Option<String>,
+}
+
+/// Result of `mcp_register`: the expiration (nanoseconds since the epoch) of
+/// the MCP session grant just registered. Every server-facing `mcp_*` call
+/// returns `Unauthorized` once it passes; the server reconnects through a new
+/// consent flow.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct McpRegistration {
+    pub expiration: Timestamp,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

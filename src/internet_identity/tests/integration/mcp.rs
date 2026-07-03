@@ -1,25 +1,27 @@
-//! Integration tests for the backend `/mcp` delegation path: an MCP server the
-//! user authorizes for their identity fetches per-app account delegations
-//! without a per-app browser flow. No account is chosen at connect (the
-//! connector isn't an app); the server is bound to the principal II derives for
-//! the anchor at the server's origin, recovered from `caller()` via the opt-in
-//! index, and picks the app account per call against the target origin.
+//! Integration tests for the backend `/mcp` path: an MCP server the user
+//! authorizes for their identity fetches per-app account delegations without a
+//! per-app browser flow. No account is chosen at connect (the connector isn't
+//! an app); the server's own session-key principal is registered as a grant
+//! via `mcp_register`, recovered from `caller()` on every server-facing call
+//! (checking expiry), and the app account is picked per call against the
+//! target origin. At most one session exists per identity, and changing the
+//! synced config (disable, or a different trusted URL) revokes it.
 
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        create_account, mcp_access_enabled, mcp_get_account_delegation, mcp_get_accounts,
-        mcp_get_config, mcp_prepare_account_delegation, mcp_set_access, mcp_set_config,
-        prepare_account_delegation, set_default_account, AccountDelegationParams,
+        create_account, mcp_get_accounts, mcp_get_config, mcp_get_delegation,
+        mcp_prepare_delegation, mcp_register, mcp_set_config, prepare_account_delegation,
+        set_default_account, AccountDelegationParams,
     },
     flows,
     framework::{
-        env, install_ii_canister_with_arg, principal_1, principal_2, time, upgrade_ii_canister,
-        verify_delegation, II_WASM,
+        device_data_2, env, install_ii_canister_with_arg, principal_1, principal_2, time,
+        upgrade_ii_canister, verify_delegation, II_WASM,
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountDelegationError, AnchorNumber, McpConfig, McpPrepareDelegation, PrepareAccountDelegation,
+    AccountDelegationError, AnchorNumber, McpConfig, McpPrepareDelegation,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -27,37 +29,72 @@ use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 const MCP_ORIGIN: &str = "https://mcp.id.ai";
-/// The backend caps MCP-minted delegations at 5 minutes.
-const MCP_MAX_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
+/// The backend caps MCP-minted per-app delegations at 1 hour.
+const MCP_MAX_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
+/// The backend clamps session-grant lifetimes to [10 min, 30 days].
+const GRANT_MIN_TTL_NS: u64 = 10 * 60 * 1_000_000_000;
+const GRANT_MAX_TTL_NS: u64 = 30 * 24 * 60 * 60 * 1_000_000_000;
+/// Grant lifetime used by tests that don't probe the bounds: 1 day.
+const GRANT_TTL_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
 
-// The `/mcp` path is no longer gated by a global config; the trusted origin is
-// supplied per opt-in. So a plain install suffices.
+// The `/mcp` path is not gated by a global config; each identity trusts the
+// server it chooses via its synced config. So a plain install suffices.
 fn install_with_mcp(env: &PocketIc) -> Principal {
     install_ii_canister_with_arg(env, II_WASM.clone(), None)
 }
 
-/// The principal II derives for `anchor`'s default account at `MCP_ORIGIN` — the
-/// principal the MCP server's standing delegation carries, and the caller the
-/// `mcp_*_account_delegation` methods authorize. Derived exactly as the canister
-/// does: the `user_key` of the anchor's default-account delegation for that
-/// origin, made self-authenticating.
-fn mcp_server_principal(env: &PocketIc, canister_id: Principal, anchor: AnchorNumber) -> Principal {
-    let params = AccountDelegationParams::new(
+/// Set the identity's synced config to trust `MCP_ORIGIN` — the precondition
+/// for registering a session (and the lever that later revokes it).
+fn trust_mcp_server(
+    env: &PocketIc,
+    canister_id: Principal,
+    sender: Principal,
+    anchor: AnchorNumber,
+) {
+    mcp_set_config(
         env,
         canister_id,
-        principal_1(),
+        sender,
         anchor,
-        MCP_ORIGIN.to_string(),
-        None,
-        ByteBuf::from("mcp standing session key"),
-    );
-    let PrepareAccountDelegation { user_key, .. } =
-        prepare_account_delegation(&params, None).unwrap().unwrap();
-    Principal::self_authenticating(user_key)
+        McpConfig {
+            enabled: true,
+            url: Some(format!("{MCP_ORIGIN}/mcp")),
+        },
+    )
+    .unwrap()
+    .unwrap();
 }
 
-/// The happy path: an opted-in anchor's MCP server mints a per-app delegation by
-/// caller alone (no `anchor_number` arg), capped at 5 min, acting as the same
+/// Register `session_key` as the anchor's MCP session (called as the user,
+/// like the `/mcp` connect flow does after consent) and return the session
+/// principal the server now calls with — the self-authenticating principal of
+/// the key, exactly as the canister derives it — plus the grant expiration.
+fn register_session(
+    env: &PocketIc,
+    canister_id: Principal,
+    sender: Principal,
+    anchor: AnchorNumber,
+    session_key: &ByteBuf,
+    grant_ttl_ns: u64,
+) -> (Principal, u64) {
+    let registration = mcp_register(
+        env,
+        canister_id,
+        sender,
+        anchor,
+        session_key.clone(),
+        grant_ttl_ns,
+    )
+    .unwrap()
+    .unwrap();
+    (
+        Principal::self_authenticating(session_key),
+        registration.expiration,
+    )
+}
+
+/// The happy path: a registered session mints a per-app delegation by caller
+/// alone (no `anchor_number` arg), capped at 1 hour, acting as the same
 /// principal the anchor's default account at that app gets via the regular API.
 #[test]
 fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectResponse> {
@@ -67,34 +104,23 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("mcp per-app session key");
 
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
-
-    // Opt in: bind the MCP-server principal to the anchor.
-    mcp_set_access(
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, grant_expiration) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
-    )
-    .unwrap()
-    .unwrap();
-    assert!(mcp_access_enabled(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        MCP_ORIGIN.to_string()
-    )
-    .unwrap());
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
+    assert_eq!(grant_expiration, time(&env) + GRANT_TTL_NS);
 
     // Mint the per-app delegation as the MCP server — no anchor_number passed.
     let McpPrepareDelegation {
         user_key,
         expiration,
         account_number,
-    } = mcp_prepare_account_delegation(
+    } = mcp_prepare_delegation(
         &env,
         canister_id,
         mcp,
@@ -106,11 +132,11 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     .unwrap()
     .unwrap();
 
-    // Default TTL is the 5-minute cap.
+    // Default TTL is the 1-hour cap.
     assert_eq!(expiration, time(&env) + MCP_MAX_TTL_NS);
 
     // `get` is handed back the same account `prepare` resolved.
-    let signed = mcp_get_account_delegation(
+    let signed = mcp_get_delegation(
         &env,
         canister_id,
         mcp,
@@ -150,32 +176,30 @@ fn mcp_mints_per_app_delegation_authorized_by_caller() -> Result<(), RejectRespo
     Ok(())
 }
 
-/// A longer requested TTL is clamped to the 5-minute cap.
+/// A longer requested TTL is clamped to the 1-hour cap.
 #[test]
-fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
+fn mcp_delegation_ttl_capped_at_1_hour() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
-    mcp_set_access(
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
-    )
-    .unwrap()
-    .unwrap();
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
 
-    let prepared = mcp_prepare_account_delegation(
+    let prepared = mcp_prepare_delegation(
         &env,
         canister_id,
         mcp,
         "https://some-app.com".to_string(),
         None,
         ByteBuf::from("k"),
-        Some(Duration::from_secs(3600).as_nanos() as u64), // request 1 hour
+        Some(Duration::from_secs(2 * 3600).as_nanos() as u64), // request 2 hours
     )
     .unwrap()
     .unwrap();
@@ -184,22 +208,56 @@ fn mcp_delegation_ttl_capped_at_5_minutes() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Callers that aren't bound to an anchor — never opted in, or an unrelated
-/// principal — are rejected.
+/// A per-app delegation never outlives the session grant: with less than an
+/// hour of grant left, the delegation expires exactly when the grant does.
+#[test]
+fn mcp_delegation_never_outlives_the_grant() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    // The whole grant lasts 10 minutes — shorter than the 1-hour delegation cap.
+    let (mcp, grant_expiration) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_MIN_TTL_NS,
+    );
+
+    let prepared = mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        "https://some-app.com".to_string(),
+        None,
+        ByteBuf::from("k"),
+        None, // default request would be the 1-hour cap
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(prepared.expiration, grant_expiration);
+
+    Ok(())
+}
+
+/// Callers that hold no grant — a never-registered session key, or an
+/// unrelated principal — are rejected.
 #[test]
 fn mcp_rejects_unregistered_callers() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
-    let anchor = flows::register_anchor(&env, canister_id);
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
+    flows::register_anchor(&env, canister_id);
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("k");
 
-    // Not opted in yet.
-    match mcp_prepare_account_delegation(
+    // A session key that was never registered.
+    let unregistered = Principal::self_authenticating(ByteBuf::from("never registered"));
+    match mcp_prepare_delegation(
         &env,
         canister_id,
-        mcp,
+        unregistered,
         target.clone(),
         None,
         session_key.clone(),
@@ -207,13 +265,13 @@ fn mcp_rejects_unregistered_callers() -> Result<(), RejectResponse> {
     )
     .unwrap()
     {
-        Err(AccountDelegationError::Unauthorized(p)) => assert_eq!(p, mcp),
+        Err(AccountDelegationError::Unauthorized(p)) => assert_eq!(p, unregistered),
         Ok(_) => panic!("expected Unauthorized, got Ok"),
         Err(e) => panic!("expected Unauthorized, got {e:?}"),
     }
 
     // An unrelated principal is rejected too.
-    match mcp_prepare_account_delegation(
+    match mcp_prepare_delegation(
         &env,
         canister_id,
         principal_2(),
@@ -232,27 +290,25 @@ fn mcp_rejects_unregistered_callers() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Disabling access revokes the MCP server: it can mint while enabled, not after.
+/// The grant expires: the session can mint before its expiration, not after.
 #[test]
-fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
+fn mcp_grant_expires() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("k");
 
-    mcp_set_access(
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
-    )
-    .unwrap()
-    .unwrap();
-    assert!(mcp_prepare_account_delegation(
+        &ByteBuf::from("mcp server session key"),
+        GRANT_MIN_TTL_NS, // 10 minutes
+    );
+    assert!(mcp_prepare_delegation(
         &env,
         canister_id,
         mcp,
@@ -264,31 +320,423 @@ fn mcp_disabling_access_revokes_the_caller() -> Result<(), RejectResponse> {
     .unwrap()
     .is_ok());
 
-    mcp_set_access(
+    env.advance_time(Duration::from_secs(11 * 60));
+    match mcp_prepare_delegation(&env, canister_id, mcp, target, None, session_key, None).unwrap() {
+        Err(AccountDelegationError::Unauthorized(_)) => {}
+        Ok(_) => panic!("expected Unauthorized after grant expiry, got Ok"),
+        Err(e) => panic!("expected Unauthorized after grant expiry, got {e:?}"),
+    }
+
+    Ok(())
+}
+
+/// Disabling MCP in the synced config revokes the session — and re-enabling
+/// does not resurrect it: the user reconnects through a fresh consent flow.
+#[test]
+fn mcp_disabling_config_revokes_the_session() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("k");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        false,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
+    assert!(mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None
+    )
+    .unwrap()
+    .is_ok());
+
+    // Un-toggle (same URL): the grant is deleted in the same message.
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: Some(format!("{MCP_ORIGIN}/mcp")),
+        },
     )
     .unwrap()
     .unwrap();
-    assert!(!mcp_access_enabled(
+    match mcp_prepare_delegation(
         &env,
         canister_id,
-        principal_1(),
-        anchor,
-        MCP_ORIGIN.to_string()
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
     )
-    .unwrap());
-    match mcp_prepare_account_delegation(&env, canister_id, mcp, target, None, session_key, None)
-        .unwrap()
+    .unwrap()
     {
         Err(AccountDelegationError::Unauthorized(_)) => {}
         Ok(_) => panic!("expected Unauthorized after disabling, got Ok"),
         Err(e) => panic!("expected Unauthorized after disabling, got {e:?}"),
     }
+
+    // Toggling back on restores nothing — the session is gone until the user
+    // reconnects.
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    match mcp_prepare_delegation(&env, canister_id, mcp, target, None, session_key, None).unwrap() {
+        Err(AccountDelegationError::Unauthorized(_)) => {}
+        Ok(_) => panic!("expected Unauthorized after re-enable, got Ok"),
+        Err(e) => panic!("expected Unauthorized after re-enable, got {e:?}"),
+    }
+
+    Ok(())
+}
+
+/// Changing the trusted server URL revokes the session: the previous server's
+/// key must not survive a change of trust.
+#[test]
+fn mcp_changing_server_url_revokes_the_session() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("k");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
+    assert!(mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None
+    )
+    .unwrap()
+    .is_ok());
+
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: true,
+            url: Some("https://other-mcp.example.com/mcp".to_string()),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    match mcp_prepare_delegation(&env, canister_id, mcp, target, None, session_key, None).unwrap() {
+        Err(AccountDelegationError::Unauthorized(_)) => {}
+        Ok(_) => panic!("expected Unauthorized after URL change, got Ok"),
+        Err(e) => panic!("expected Unauthorized after URL change, got {e:?}"),
+    }
+
+    Ok(())
+}
+
+/// At most one session per identity: registering a new session key replaces
+/// the previous grant immediately.
+#[test]
+fn mcp_registration_replaces_previous_session() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("k");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (first, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("first session key"),
+        GRANT_TTL_NS,
+    );
+    let (second, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("second session key"),
+        GRANT_TTL_NS,
+    );
+
+    match mcp_prepare_delegation(
+        &env,
+        canister_id,
+        first,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    {
+        Err(AccountDelegationError::Unauthorized(_)) => {}
+        Ok(_) => panic!("expected the replaced session to be Unauthorized, got Ok"),
+        Err(e) => panic!("expected the replaced session to be Unauthorized, got {e:?}"),
+    }
+    assert!(
+        mcp_prepare_delegation(&env, canister_id, second, target, None, session_key, None)
+            .unwrap()
+            .is_ok()
+    );
+
+    Ok(())
+}
+
+/// Registration requires a live trusted-server config (enabled + URL set) —
+/// that coupling is what makes config-driven revocation cover every session —
+/// and is gated to the identity itself.
+#[test]
+fn mcp_register_requires_enabled_config() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let session_key = ByteBuf::from("mcp server session key");
+
+    // No config written at all.
+    assert!(mcp_register(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        session_key.clone(),
+        GRANT_TTL_NS
+    )
+    .unwrap()
+    .is_err());
+
+    // Disabled config with a URL.
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: false,
+            url: Some(format!("{MCP_ORIGIN}/mcp")),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(mcp_register(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        session_key.clone(),
+        GRANT_TTL_NS
+    )
+    .unwrap()
+    .is_err());
+
+    // Enabled config without a URL.
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: true,
+            url: None,
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(mcp_register(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        session_key.clone(),
+        GRANT_TTL_NS
+    )
+    .unwrap()
+    .is_err());
+
+    // An unrelated caller cannot register a session for the anchor even with a
+    // live config.
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    assert!(mcp_register(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor,
+        session_key,
+        GRANT_TTL_NS
+    )
+    .unwrap()
+    .is_err());
+
+    Ok(())
+}
+
+/// One key serves one identity: a session key with a live grant for another
+/// anchor is rejected (without echoing whose it is). Once that grant expires
+/// the key can be re-registered by the other anchor — and the first anchor's
+/// stale config pointer must not damage the new owner's session.
+#[test]
+fn mcp_register_rejects_a_key_registered_to_another_identity() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor_1 = flows::register_anchor(&env, canister_id);
+    let anchor_2 = flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    let shared_key = ByteBuf::from("shared session key");
+    let target = "https://some-app.com".to_string();
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor_1);
+    trust_mcp_server(&env, canister_id, principal_2(), anchor_2);
+
+    // Anchor 1 registers the key with a 10-minute grant.
+    let (mcp, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor_1,
+        &shared_key,
+        GRANT_MIN_TTL_NS,
+    );
+
+    // While that grant is live, anchor 2 cannot register the same key — and
+    // the error must not leak whose it is.
+    let err = mcp_register(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor_2,
+        shared_key.clone(),
+        GRANT_TTL_NS,
+    )
+    .unwrap()
+    .unwrap_err();
+    assert!(!err.contains(&anchor_1.to_string()));
+
+    // Once anchor 1's grant expires, anchor 2 can take the key over.
+    env.advance_time(Duration::from_secs(11 * 60));
+    register_session(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor_2,
+        &shared_key,
+        GRANT_TTL_NS,
+    );
+
+    // Anchor 1's config still points at the same principal from before the
+    // takeover; revoking through it must not delete anchor 2's session.
+    mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor_1,
+        McpConfig {
+            enabled: false,
+            url: Some(format!("{MCP_ORIGIN}/mcp")),
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        None,
+        ByteBuf::from("k"),
+        None
+    )
+    .unwrap()
+    .is_ok());
+
+    Ok(())
+}
+
+/// Requested grant lifetimes are clamped to [10 min, 30 days], mirroring the
+/// frontend, so the backend never trusts the frontend for the bounds.
+#[test]
+fn mcp_grant_ttl_is_clamped() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    // Over the 30-day cap: clamped down.
+    let (_, expiration) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("long key"),
+        GRANT_MAX_TTL_NS + GRANT_TTL_NS,
+    );
+    assert_eq!(expiration, time(&env) + GRANT_MAX_TTL_NS);
+
+    // Under the 10-minute floor: clamped up.
+    let (_, expiration) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("short key"),
+        1,
+    );
+    assert_eq!(expiration, time(&env) + GRANT_MIN_TTL_NS);
+
+    Ok(())
+}
+
+/// The grant lives in stable memory: a registered session keeps working
+/// across a canister upgrade (an upgrade must not disconnect agents).
+#[test]
+fn mcp_grant_persists_across_upgrade() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    assert!(mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        "https://some-app.com".to_string(),
+        None,
+        ByteBuf::from("k"),
+        None
+    )
+    .unwrap()
+    .is_ok());
 
     Ok(())
 }
@@ -303,24 +751,22 @@ fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectRe
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("k");
 
-    mcp_set_access(
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
-    )
-    .unwrap()
-    .unwrap();
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
 
     // Prepare without naming an account resolves the default at `target`
     // (None = the synthetic default, since none is reserved yet) and reports it.
-    let prepared = mcp_prepare_account_delegation(
+    let prepared = mcp_prepare_delegation(
         &env,
         canister_id,
         mcp,
@@ -358,7 +804,7 @@ fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectRe
     .unwrap();
 
     // `get` with the account `prepare` returned still finds the delegation...
-    assert!(mcp_get_account_delegation(
+    assert!(mcp_get_delegation(
         &env,
         canister_id,
         mcp,
@@ -372,7 +818,7 @@ fn mcp_get_uses_prepared_account_despite_default_change() -> Result<(), RejectRe
     // ...while the now-current (changed) default has nothing prepared for it,
     // which is exactly the divergence the old re-resolving `get` would have hit.
     assert!(matches!(
-        mcp_get_account_delegation(
+        mcp_get_delegation(
             &env,
             canister_id,
             mcp,
@@ -396,20 +842,18 @@ fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> 
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
     let target = "https://some-app.com".to_string();
     let session_key = ByteBuf::from("k");
 
-    mcp_set_access(
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
-    )
-    .unwrap()
-    .unwrap();
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
 
     // A specific account the user holds at the target app.
     let account = create_account(
@@ -426,7 +870,7 @@ fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> 
     assert!(account.is_some());
 
     // Naming it explicitly mints for exactly that account and echoes it back.
-    let prepared = mcp_prepare_account_delegation(
+    let prepared = mcp_prepare_delegation(
         &env,
         canister_id,
         mcp,
@@ -440,7 +884,7 @@ fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> 
     assert_eq!(prepared.account_number, account);
 
     // `get` resolves that same account's delegation.
-    assert!(mcp_get_account_delegation(
+    assert!(mcp_get_delegation(
         &env,
         canister_id,
         mcp,
@@ -456,27 +900,25 @@ fn mcp_prepares_for_an_explicitly_named_account() -> Result<(), RejectResponse> 
 }
 
 /// The agent discovers the anchor's accounts at an app via `mcp_get_accounts`
-/// (authorized as the bound MCP principal) and then prepares a delegation for
-/// one of them — closing the loop with no out-of-band knowledge. An unrelated
-/// principal cannot list.
+/// (authorized as the registered session principal) and then prepares a
+/// delegation for one of them — closing the loop with no out-of-band
+/// knowledge. An unrelated principal cannot list.
 #[test]
 fn mcp_lists_accounts_then_prepares_for_one() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
-    let mcp = mcp_server_principal(&env, canister_id, anchor);
     let target = "https://some-app.com".to_string();
 
-    mcp_set_access(
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
         &env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
-    )
-    .unwrap()
-    .unwrap();
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
 
     // The user holds a named account at the target app (created via their device).
     let created = create_account(
@@ -492,14 +934,14 @@ fn mcp_lists_accounts_then_prepares_for_one() -> Result<(), RejectResponse> {
     .account_number;
     assert!(created.is_some());
 
-    // The agent lists the anchor's accounts at the app as the bound MCP principal.
+    // The agent lists the anchor's accounts at the app as the session principal.
     let accounts = mcp_get_accounts(&env, canister_id, mcp, target.clone())
         .unwrap()
         .unwrap();
     assert!(accounts.iter().any(|a| a.account_number == created));
 
     // It can then prepare a delegation for a listed account.
-    let prepared = mcp_prepare_account_delegation(
+    let prepared = mcp_prepare_delegation(
         &env,
         canister_id,
         mcp,
@@ -512,7 +954,7 @@ fn mcp_lists_accounts_then_prepares_for_one() -> Result<(), RejectResponse> {
     .unwrap();
     assert_eq!(prepared.account_number, created);
 
-    // A principal that isn't bound to the anchor cannot list.
+    // A principal that holds no grant cannot list.
     match mcp_get_accounts(&env, canister_id, principal_2(), target).unwrap() {
         Err(AccountDelegationError::Unauthorized(p)) => assert_eq!(p, principal_2()),
         Ok(_) => panic!("expected Unauthorized, got Ok"),

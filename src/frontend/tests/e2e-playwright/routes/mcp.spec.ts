@@ -3,9 +3,8 @@ import { test } from "../fixtures";
 import { addVirtualAuthenticator, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
- *  delegation acts as the user's identity at the MCP-server origin the request's
- *  callback identifies; the app account is chosen server-side per call), but kept
- *  to exercise that the param is tolerated. */
+ *  session is registered for the user's identity; the app account is chosen
+ *  server-side per call), but kept to exercise that the param is tolerated. */
 const APP = "nice-name.com";
 
 const signUp = async (page: Page): Promise<void> => {
@@ -28,23 +27,10 @@ const signUp = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "Create identity" }).click();
 };
 
-/** Returns the chain's first-delegation expiration in milliseconds since epoch. */
-const expirationMillis = (body: unknown): number => {
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("delegations" in body) ||
-    !Array.isArray(body.delegations) ||
-    body.delegations.length === 0
-  ) {
-    throw new Error("delegation chain missing or empty");
-  }
-  const expiration: unknown = body.delegations[0]?.delegation?.expiration;
-  if (typeof expiration !== "string") {
-    throw new Error("delegation expiration missing");
-  }
-  return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
-};
+/** Converts the completion's grant expiration (ns since epoch, decimal string)
+ *  to milliseconds since epoch. */
+const expirationMillis = (expiration: string): number =>
+  Number(BigInt(expiration) / BigInt(1_000_000));
 
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
@@ -55,8 +41,8 @@ test("Invalid params show the error screen", async ({ page }) => {
 
 test("A non-https callback is rejected", async ({ page, mcp }) => {
   // MCP connections are to remote servers only, so callbacks must be https. A
-  // plain-http (or loopback) origin is rejected up front — the /mcp
-  // `form-action` CSP wouldn't allow posting the delegation there anyway.
+  // plain-http (or loopback) origin is rejected up front, before the connect
+  // flow would talk to it.
   await page.goto(
     mcp.buildAuthorizeUrl({
       app: APP,
@@ -233,7 +219,10 @@ test("Returning user lands on the connect screen immediately", async ({
   ).toBeVisible();
 });
 
-test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
+test("Allow access registers the server's session key", async ({
+  page,
+  mcp,
+}) => {
   test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
@@ -245,22 +234,13 @@ test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  const body = await mcp.receivedDelegation;
-  expect(body).toMatchObject({
-    delegations: expect.any(Array),
-    publicKey: expect.any(String),
-  });
-  // Rooted at the user's principal: canister-signed delegation to the ephemeral
-  // browser key, then the ephemeral key's sub-delegation to the MCP server's
-  // public key.
-  if (
-    typeof body === "object" &&
-    body !== null &&
-    "delegations" in body &&
-    Array.isArray(body.delegations)
-  ) {
-    expect(body.delegations.length).toBe(2);
-  }
+  // The connect flow fetched the server's session key, registered it with the
+  // backend, and reported completion: the state echo plus the grant expiration
+  // (ns since epoch as a decimal string). No delegation chain travels anywhere.
+  const completion = await mcp.completion;
+  expect(completion.state).toBe(mcp.state);
+  expect(completion.expiration).toMatch(/^\d+$/);
+  expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
@@ -307,15 +287,16 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlSeconds }));
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  const expMillis = expirationMillis(await mcp.receivedDelegation);
+  const expMillis = expirationMillis((await mcp.completion).expiration);
   const requestedMillis = ttlSeconds * 1000;
   expect(expMillis - before).toBeGreaterThanOrEqual(requestedMillis - 60_000);
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-// The browser /mcp flow issues the standing credential for the user's identity
-// at the MCP *server* origin the callback identifies (not a per-request app, and
-// no account is chosen at connect); per-app delegations are minted server-side by
-// the `mcp_prepare/get_account_delegation` canister methods, with the app account
-// chosen there. Principal-derivation parity for those is canister logic, covered
-// by the integration tests (tests/integration/mcp.rs), not here.
+// The browser /mcp flow registers the MCP server's session key for the user's
+// identity (fetched from the callback the request identifies — not a
+// per-request app, and no account is chosen at connect); per-app delegations
+// are minted server-side by the `mcp_prepare/get_delegation` canister methods,
+// with the app account chosen there. Grant semantics (expiry, revocation,
+// replacement) are canister logic, covered by the integration tests
+// (tests/integration/mcp.rs), not here.

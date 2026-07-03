@@ -15,6 +15,7 @@ pub mod email_recovery_address_hash;
 pub mod email_recovery_credential;
 pub mod fixed_anchor;
 pub mod mcp_config;
+pub mod mcp_grant;
 pub mod metadata_v2;
 pub mod openid_credential;
 pub mod openid_credential_key;

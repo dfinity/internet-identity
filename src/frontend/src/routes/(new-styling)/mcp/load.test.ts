@@ -3,13 +3,13 @@ import { load, type McpParams } from "./+page";
 
 const HOUR = 60 * 60;
 const MIN_TTL = 10 * 60;
-const MAX_TTL = 7 * 24 * 60 * 60;
+const MAX_TTL = 30 * 24 * 60 * 60;
 
-// A complete, valid fragment with an optional `ttl`. `public_key` is any
-// base64url-decodable string; the callback is an accepted https origin.
+// A complete, valid fragment with an optional `ttl`. The callback is an
+// accepted https origin; no key material travels in the fragment (the
+// server's session key is fetched from the callback after consent).
 const fragment = (ttl?: string): string => {
   const params = new URLSearchParams();
-  params.set("public_key", "AAAA");
   params.set("callback", "https://mcp.example.com/cb");
   params.set("state", "opaque-state");
   if (ttl !== undefined) {
@@ -20,12 +20,14 @@ const fragment = (ttl?: string): string => {
 
 // `load` is synchronous here; the `PageLoad` signature widens the return to
 // MaybePromise<void | ...>, so narrow it back for the assertions.
-const loadTtl = (ttl?: string): McpParams =>
+const loadParams = (fragmentString: string): McpParams =>
   (
     load({
-      url: new URL(`https://id.ai/mcp#${fragment(ttl)}`),
+      url: new URL(`https://id.ai/mcp#${fragmentString}`),
     } as Parameters<typeof load>[0]) as { params: McpParams }
   ).params;
+
+const loadTtl = (ttl?: string): McpParams => loadParams(fragment(ttl));
 
 describe("/mcp load: ttl parsing", () => {
   it("defaults to 1 hour when ttl is omitted", () => {
@@ -53,7 +55,7 @@ describe("/mcp load: ttl parsing", () => {
     }
   });
 
-  it("clamps an above-cap value down to 1 week", () => {
+  it("clamps an above-cap value down to 30 days", () => {
     const params = loadTtl(String(MAX_TTL + 1));
     expect(params.kind).toBe("valid");
     if (params.kind === "valid") {
@@ -68,5 +70,29 @@ describe("/mcp load: ttl parsing", () => {
   it("rejects a non-positive ttl", () => {
     expect(loadTtl("0").kind).toBe("invalid");
     expect(loadTtl("-5").kind).toBe("invalid");
+  });
+});
+
+describe("/mcp load: request validation", () => {
+  it("rejects a fragment without a callback", () => {
+    const params = new URLSearchParams();
+    params.set("state", "opaque-state");
+    expect(loadParams(params.toString()).kind).toBe("invalid");
+  });
+
+  it("rejects a fragment without a state", () => {
+    const params = new URLSearchParams();
+    params.set("callback", "https://mcp.example.com/cb");
+    expect(loadParams(params.toString()).kind).toBe("invalid");
+  });
+
+  it("tolerates (and ignores) a legacy public_key param", () => {
+    const params = new URLSearchParams(fragment());
+    params.set("public_key", "AAAA");
+    const parsed = loadParams(params.toString());
+    expect(parsed.kind).toBe("valid");
+    if (parsed.kind === "valid") {
+      expect("publicKey" in parsed).toBe(false);
+    }
   });
 });

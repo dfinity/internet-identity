@@ -1,147 +1,104 @@
 import type { Authenticated } from "$lib/stores/authentication.store";
-import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import { remapToLegacyDomain } from "$lib/utils/iiConnection";
-import {
-  fromBase64URL,
-  retryFor,
-  throwCanisterError,
-  transformSignedDelegation,
-} from "$lib/utils/utils";
+import { fromBase64URL } from "$lib/utils/utils";
 
 interface McpAuthorizeInput {
   authenticated: Authenticated;
-  /** base64url-encoded DER session pubkey supplied by the MCP server. */
-  publicKey: string;
-  /** The MCP server origin, taken from the connect request's callback (e.g.
-   *  "https://mcp.id.ai"). MCP connections are to remote servers, so this is
-   *  always an https origin. Connecting binds the agent to this origin and the
-   *  standing delegation acts as the user's identity there. */
-  mcpServerOrigin: string;
-  /** Lifetime in seconds (already clamped to [10 min, 1 week]). */
+  /** Lifetime in seconds for the session grant (already clamped to
+   *  [10 min, 30 days]; the backend clamps again). */
   ttlSeconds: number;
-  /** Callback URL (on the MCP server origin) the delegation chain is
-   *  form-POSTed to. */
+  /** Callback URL on the MCP server origin (e.g. "https://mcp.id.ai/callback").
+   *  MCP connections are to remote servers, so this is always https, and its
+   *  origin has been verified against the identity's synced trusted-server
+   *  config before this runs. The connect flow talks to it twice: once to
+   *  fetch the server's session public key, once to report completion. */
   callback: string;
-  /** Opaque value from the request, echoed back so the MCP server can tie the
-   *  delivered delegation to the request it started. */
+  /** Opaque value the server issued for this connect, included in both
+   *  callback requests so the server can tie them to the request it started. */
   state: string;
 }
 
+/** The key-request response: the server's session public key for this
+ *  connection, DER-encoded and base64url. */
+const parsePublicKey = (body: unknown): Uint8Array => {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("public_key" in body) ||
+    typeof body.public_key !== "string"
+  ) {
+    throw new Error("The MCP server's key response is missing `public_key`.");
+  }
+  return fromBase64URL(body.public_key);
+};
+
 /**
- * Builds a two-hop delegation chain rooted at the user's identity and ending at
- * the MCP server's public key, then delivers it to the MCP server's callback
- * via a top-level form-POST navigation. The MCP server reads the post and
- * redirects the browser back to `/mcp` with a `status` so this page keeps
- * owning the UI.
+ * Connects the MCP server by registering its session key with the backend:
+ * fetch the server's session public key from its callback, register it via
+ * `mcp_register` (binding the key's principal to the identity with the
+ * user-chosen expiry), and report completion back to the callback. No
+ * delegation is minted for the server itself — its capability is the grant,
+ * which the backend checks on every `mcp_*` call and which Settings revokes
+ * via `mcp_set_config`.
  *
- * Connecting authorizes the agent for the user's identity, not for a specific
- * account: it binds the principal II derives for the anchor at the MCP server
- * origin (`mcp_set_access`), which is the same principal the standing delegation
- * below carries. No account is chosen here — the MCP server origin is the
- * connector, not an app, and accounts are per-origin; the server selects an app
- * account per call later via `mcp_prepare_account_delegation`.
+ * The key is fetched over an origin-attested channel: this code only ever
+ * contacts the *trusted* origin's callback (verified against the synced
+ * config by the caller), and the server only answers for a `state` it issued.
+ * Nothing from the unauthenticated connect link is ever registered — an
+ * attacker-crafted link yields no key (unknown state) and so registers
+ * nothing, preserving the property that a session only materializes with the
+ * trusted server's cooperation.
  *
- * The canister only ever signs a delegation to a freshly-generated,
- * non-extractable browser key — never to the public_key from the URL fragment
- * (which is attacker-controllable). The MCP server's public key only enters the
- * chain via a sub-delegation signed by the ephemeral key.
+ * A resolved promise means the session is registered and the server was (best
+ * effort) notified; unlike the old delegation form-POST flow, the page stays
+ * put and shows the terminal screen itself.
  */
 export const mcpAuthorize = async ({
   authenticated,
-  publicKey,
-  mcpServerOrigin,
   ttlSeconds,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
 
-  // Bind and sign at the MCP server origin. Remap a gateway origin (*.icp0.io /
-  // *.icp.net) to *.ic0.app so the principal matches the one /authorize derives
-  // for that origin.
-  const effectiveOrigin = remapToLegacyDomain(mcpServerOrigin);
-  const maxTimeToLiveNanos = BigInt(ttlSeconds) * BigInt(1e9);
-
-  // Connecting is the opt-in: authorize this agent for the anchor at the MCP
-  // server origin so II honors the server's later on-demand per-app delegation
-  // calls. The backend binds the principal it derives for the anchor at this
-  // origin — exactly the principal the standing delegation below carries — and
-  // re-derives the same principal to revoke. Idempotent.
-  const accessResult = await actor.mcp_set_access(
-    identityNumber,
-    effectiveOrigin,
-    true,
-  );
-  if ("Err" in accessResult) {
-    throw new Error(accessResult.Err);
-  }
-
-  const ephemeralIdentity = await ECDSAKeyIdentity.generate({
-    extractable: false,
+  // Ask the trusted server for its session public key for this connect. A
+  // non-2xx answer (e.g. a state it never issued) aborts before anything is
+  // registered.
+  const keyResponse = await fetch(callback, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state }),
   });
-  const ephemeralPublicKey = new Uint8Array(
-    ephemeralIdentity.getPublicKey().toDer(),
+  if (!keyResponse.ok) {
+    throw new Error(
+      `The MCP server rejected the connect request (HTTP ${keyResponse.status}).`,
+    );
+  }
+  const sessionKey = parsePublicKey(await keyResponse.json());
+
+  // One authenticated call registers the session: the backend binds the key's
+  // self-authenticating principal to the identity (replacing any previous
+  // session — at most one at a time) until the chosen expiry.
+  const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
+  const result = await actor.mcp_register(
+    identityNumber,
+    sessionKey,
+    grantTtlNanos,
   );
+  if ("Err" in result) {
+    throw new Error(result.Err);
+  }
+  const { expiration } = result.Ok;
 
-  // The standing delegation is for the identity's default account at the MCP
-  // server origin (`[]`) — the same principal `mcp_set_access` bound above.
-  const { user_key, expiration } = await actor
-    .prepare_account_delegation(
-      identityNumber,
-      effectiveOrigin,
-      [],
-      ephemeralPublicKey,
-      [maxTimeToLiveNanos],
-    )
-    .then(throwCanisterError);
-
-  const canisterChain = await retryFor(5, () =>
-    actor
-      .get_account_delegation(
-        identityNumber,
-        effectiveOrigin,
-        [],
-        ephemeralPublicKey,
-        expiration,
-      )
-      .then(throwCanisterError)
-      .then(transformSignedDelegation)
-      .then((delegation) =>
-        DelegationChain.fromDelegations([delegation], new Uint8Array(user_key)),
-      ),
-  );
-
-  // Sub-delegate from the ephemeral key to the MCP server's public key. The
-  // expiration matches the canister-signed delegation so the chain expires as a
-  // whole.
-  const mcpPubKey = fromBase64URL(publicKey);
-  const expirationDate = new Date(Number(expiration / BigInt(1_000_000)));
-  const chain = await DelegationChain.create(
-    ephemeralIdentity,
-    { toDer: () => mcpPubKey },
-    expirationDate,
-    { previous: canisterChain },
-  );
-
-  // Submit as a top-level navigation to the MCP server's callback. The /mcp
-  // landing page's `form-action` CSP is `'self' https:`, matching the https
-  // callbacks the connect flow accepts. The MCP server redirects back to /mcp
-  // with a status param.
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = callback;
-  const delegationInput = document.createElement("input");
-  delegationInput.type = "hidden";
-  delegationInput.name = "delegation";
-  delegationInput.value = JSON.stringify(chain.toJSON());
-  form.appendChild(delegationInput);
-  // Echo the state so the MCP server can match this delivery to the request it
-  // started.
-  const stateInput = document.createElement("input");
-  stateInput.type = "hidden";
-  stateInput.name = "state";
-  stateInput.value = state;
-  form.appendChild(stateInput);
-  document.body.appendChild(form);
-  form.submit();
+  // Tell the server its session is live and when it expires (ns since epoch,
+  // as a string — the value overflows JSON numbers). Best effort: on failure
+  // the server discovers success on its first signed call.
+  try {
+    await fetch(callback, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state, expiration: expiration.toString() }),
+    });
+  } catch {
+    // Deliberately ignored; see above.
+  }
 };

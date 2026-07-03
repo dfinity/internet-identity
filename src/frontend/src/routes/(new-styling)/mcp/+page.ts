@@ -1,7 +1,6 @@
 import type { PageLoad } from "./$types";
-import { fromBase64URL } from "$lib/utils/utils";
 
-/** Default delegation lifetime in seconds when the request omits `ttl`. */
+/** Default grant lifetime in seconds when the request omits `ttl`. */
 const DEFAULT_TTL_SECONDS = 60 * 60;
 /** Shortest TTL honoured: a request asking for less is clamped up to this, so a
  *  too-short value (e.g. a server still sending minutes-as-seconds) can't mint a
@@ -10,62 +9,39 @@ const DEFAULT_TTL_SECONDS = 60 * 60;
  *  (e.g. `ttl=3600` for 1 hour) — but it bounds a misbehaving caller. */
 const MIN_TTL_SECONDS = 10 * 60;
 /** Largest TTL the request can ask for, matching the longest duration the picker
- *  offers (1 week). Well within the backend's 30-day delegation cap
- *  (`MAX_EXPIRATION_PERIOD_NS`), so the backend never clamps further. */
-const MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
+ *  offers (30 days) and the backend's grant cap, so the backend never clamps
+ *  further. */
+const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
- * browser to. `valid` carries the validated request — the session public key to
- * delegate to, the callback to post the delegation back to, the single-use
- * `state` echoed back to the MCP server, and the delegation TTL (`ttl`, in
- * seconds). The MCP server the user connects is identified by the callback's
- * origin (each user trusts whichever server they connect); no account is chosen
- * here (it's per-app, picked server-side at delegation time). `invalid` means
- * the fragment was missing or malformed.
+ * browser to. `valid` carries the validated request — the callback on the MCP
+ * server the connect flow talks to, the single-use `state` included in those
+ * requests so the server can tie them to the connect it started, and the
+ * requested session-grant TTL (`ttl`, in seconds). The MCP server the user
+ * connects is identified by the callback's origin (each user trusts whichever
+ * server they connect); no key material travels in the fragment — the server's
+ * session public key is fetched from the trusted callback after consent — and
+ * no account is chosen here (it's per-app, picked server-side at delegation
+ * time). `invalid` means the fragment was missing or malformed.
  *
  * Whether the callback origin is one the connect flow accepts (https only — MCP
  * connections are to remote servers) is checked in the page component, which
- * shows a clean invalid screen and mirrors the `form-action` CSP.
+ * shows a clean invalid screen.
  */
 export type McpParams =
   | {
       kind: "valid";
-      /** base64url-encoded DER session pubkey supplied by the MCP server. */
-      publicKey: string;
       callback: string;
-      /** Opaque value echoed back to the MCP server so it can tie the delivered
-       *  delegation to the request it started (CSRF protection). */
+      /** Opaque value the server issued for this connect; included in the
+       *  key-request and completion calls so the server can tie them to the
+       *  request it started (CSRF protection). */
       state: string;
-      /** Requested delegation lifetime in seconds (clamped to [10 min, 1 week]). */
+      /** Requested session-grant lifetime in seconds (clamped to
+       *  [10 min, 30 days]). */
       ttlSeconds: number;
     }
   | { kind: "invalid" };
-
-/**
- * Outcome the MCP server redirects back with after receiving the delegation.
- * `success` and `error` arrive on their own on a fresh page load.
- */
-export type McpStatus = "success" | "error";
-
-const parseStatus = (raw: string | null): McpStatus | undefined => {
-  if (raw === "success" || raw === "error") {
-    return raw;
-  }
-  return undefined;
-};
-
-const parseBase64Url = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  try {
-    fromBase64URL(raw);
-    return raw;
-  } catch {
-    return undefined;
-  }
-};
 
 /**
  * Structural callback check: must be an absolute http(s) URL. The stricter
@@ -97,7 +73,7 @@ const parseState = (raw: string | null): string | undefined => {
 };
 
 // `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
-// the allowed range — at least 10 minutes, at most 1 week — so the exact
+// the allowed range — at least 10 minutes, at most 30 days — so the exact
 // requested duration is honoured within those bounds. An omitted `ttl` uses the
 // default, and a malformed one (non-numeric or <= 0) invalidates the request.
 const parseTtl = (raw: string | null): number | undefined => {
@@ -114,32 +90,29 @@ const parseTtl = (raw: string | null): number | undefined => {
   );
 };
 
-export const load: PageLoad = ({
-  url,
-}): { params: McpParams; status: McpStatus | undefined } => {
+export const load: PageLoad = ({ url }): { params: McpParams } => {
   // The MCP server redirects the browser here with the request in the URL
-  // fragment (never sent to the server, so the session key and callback stay
-  // out of II's request logs; the address-bar copy is cleared in `+page.svelte`
-  // via `replaceState`). Reading `url.hash` relies on this universal `load`
+  // fragment (never sent to the server, so the callback and state stay out of
+  // II's request logs; the address-bar copy is cleared in `+page.svelte` via
+  // `replaceState`). Reading `url.hash` relies on this universal `load`
   // re-running client-side; with `adapter-static` it's empty during prerender.
+  // A legacy `public_key` param is ignored: the session key is fetched from
+  // the trusted server's callback, never taken from the (attacker-craftable)
+  // link.
   const params = new URLSearchParams(url.hash.slice(1));
 
-  const status = parseStatus(params.get("status"));
-  const publicKey = parseBase64Url(params.get("public_key"));
   const callback = parseCallback(params.get("callback"));
   const state = parseState(params.get("state"));
   const ttlSeconds = parseTtl(params.get("ttl"));
 
   if (
-    publicKey === undefined ||
     callback === undefined ||
     state === undefined ||
     ttlSeconds === undefined
   ) {
-    return { params: { kind: "invalid" }, status };
+    return { params: { kind: "invalid" } };
   }
   return {
-    params: { kind: "valid", publicKey, callback, state, ttlSeconds },
-    status,
+    params: { kind: "valid", callback, state, ttlSeconds },
   };
 };

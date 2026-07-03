@@ -465,38 +465,21 @@ pub fn update_account(
     .map(|(x,)| x)
 }
 
-pub fn mcp_set_access(
+pub fn mcp_register(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    mcp_server_origin: FrontendHostname,
-    enabled: bool,
-) -> Result<Result<(), String>, RejectResponse> {
+    session_key: SessionKey,
+    grant_ttl_ns: u64,
+) -> Result<Result<McpRegistration, String>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "mcp_set_access",
-        (identity_number, mcp_server_origin, enabled),
-    )
-    .map(|(x,)| x)
-}
-
-pub fn mcp_access_enabled(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    sender: Principal,
-    identity_number: IdentityNumber,
-    mcp_server_origin: FrontendHostname,
-) -> Result<bool, RejectResponse> {
-    query_candid_as(
-        env,
-        canister_id,
-        sender,
-        "mcp_access_enabled",
-        (identity_number, mcp_server_origin),
+        "mcp_register",
+        (identity_number, session_key, grant_ttl_ns),
     )
     .map(|(x,)| x)
 }
@@ -551,7 +534,7 @@ pub fn mcp_get_config(
     .map(|(x,)| x)
 }
 
-pub fn mcp_prepare_account_delegation(
+pub fn mcp_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -565,13 +548,13 @@ pub fn mcp_prepare_account_delegation(
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "mcp_prepare_account_delegation",
+        "mcp_prepare_delegation",
         (target_origin, account_number, session_key, max_ttl),
     )
     .map(|(x,)| x)
 }
 
-pub fn mcp_get_account_delegation(
+pub fn mcp_get_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -584,7 +567,7 @@ pub fn mcp_get_account_delegation(
         env,
         canister_id,
         sender,
-        "mcp_get_account_delegation",
+        "mcp_get_delegation",
         (target_origin, account_number, session_key, expiration),
     )
     .map(|(x,)| x)

@@ -17,7 +17,6 @@
   import McpHero from "./components/McpHero.svelte";
   import McpAuthorizeView from "./views/McpAuthorizeView.svelte";
   import McpCloseWindowView from "./views/McpCloseWindowView.svelte";
-  import McpErrorView from "./views/McpErrorView.svelte";
   import McpInvalidView from "./views/McpInvalidView.svelte";
   import McpUntrustedView from "./views/McpUntrustedView.svelte";
   import McpConnectingView from "./views/McpConnectingView.svelte";
@@ -32,15 +31,13 @@
 
   const { data }: PageProps = $props();
   const params = $derived(data.params);
-  const status = $derived(data.status);
 
   // The MCP server the user is connecting is identified by the origin of the
   // request's callback: each user trusts whichever (remote) server they connect.
-  // The standing delegation is delivered there via a top-level form-POST, so we
-  // only accept callbacks the /mcp `form-action` CSP allows — MCP is remote-only,
-  // so any https origin (a plain-http or loopback callback is rejected). A
-  // disallowed (or unparsable) callback yields `undefined` → the invalid screen,
-  // rather than a silent CSP block at submit time.
+  // The connect flow fetches the server's session key from that callback and
+  // reports completion to it — MCP is remote-only, so only https callbacks are
+  // accepted (a plain-http or loopback callback is rejected). A disallowed (or
+  // unparsable) callback yields `undefined` → the invalid screen.
   const mcpServer = $derived(
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
@@ -50,24 +47,16 @@
   );
 
   onMount(() => {
-    // A redirect back from the MCP server carries an outcome `status`; a fresh
-    // entry carries the request itself.
-    if (status === "success") {
-      mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);
-    } else if (status === "error") {
-      mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Error);
+    mcpAuthorizeFunnel.init();
+    if (!requestValid) {
+      mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestInvalid);
+      mcpAuthorizeFunnel.close();
     } else {
-      mcpAuthorizeFunnel.init();
-      if (!requestValid) {
-        mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestInvalid);
-        mcpAuthorizeFunnel.close();
-      } else {
-        mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestReceived);
-      }
+      mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.RequestReceived);
     }
 
-    // Drop the URL fragment once parsed so the public_key, callback, and status
-    // don't sit in the address bar after the user lands here.
+    // Drop the URL fragment once parsed so the callback and state don't sit in
+    // the address bar after the user lands here.
     if (window.location.hash !== "") {
       window.history.replaceState(
         null,
@@ -83,24 +72,18 @@
     | { kind: "untrusted" }
     | { kind: "connecting" }
     | { kind: "close" }
-    | { kind: "invalid" }
-    | { kind: "error" };
+    | { kind: "invalid" };
 
-  // The phase the page opens on. Outcomes the MCP server redirects back with
-  // take priority; otherwise a returning user with a previously-used identity
-  // opens on the connect screen, and a user with no last-used identity starts in
-  // the sign-in method wizard. Whether the server is actually trusted is the
-  // identity's synced (on-chain) config, which can only be read once
+  // The phase the page opens on: a returning user with a previously-used
+  // identity opens on the connect screen, and a user with no last-used identity
+  // starts in the sign-in method wizard. Whether the server is actually trusted
+  // is the identity's synced (on-chain) config, which can only be read once
   // authenticated — so we show the connect screen optimistically and verify it
   // against the canister at connect time (`handleAuthorize`), moving to the
-  // untrusted screen if it isn't.
+  // untrusted screen if it isn't. The terminal `close` phase is reached from
+  // `handleAuthorize` once the session is registered — the whole flow runs on
+  // this page, there is no redirect-back.
   const initialPhase = (): Phase => {
-    if (status === "success") {
-      return { kind: "close" };
-    }
-    if (status === "error") {
-      return { kind: "error" };
-    }
     if (!requestValid) {
       return { kind: "invalid" };
     }
@@ -131,9 +114,9 @@
     );
   });
 
-  // Manage the live sign-in phases (wizard → connect). Terminal and
-  // redirect-outcome phases (close, error, invalid) are owned by the initial
-  // outcome and never re-evaluated here. Switching identity only *selects* (it
+  // Manage the live sign-in phases (wizard → connect). Terminal phases (close,
+  // invalid) are owned by `handleAuthorize` / the initial request check and
+  // never re-evaluated here. Switching identity only *selects* (it
   // doesn't authenticate), so we leave the wizard only once the chosen identity
   // has actually authenticated — and only once `selected` is populated, since
   // sign-up authenticates and *then* selects, and the reused picker reads
@@ -167,8 +150,9 @@
   });
 
   // Invoked by the reused account picker once it has authenticated the selected
-  // identity and resolved the chosen account. Connecting performs the opt-in
-  // (`mcp_set_access`) and delivers the standing delegation to the MCP server.
+  // identity and resolved the chosen account. Connecting fetches the server's
+  // session key from its callback and registers it with the backend
+  // (`mcp_register`) — the whole flow completes on this page.
   const handleAuthorize = (ttlSeconds: number): void => {
     const server = mcpServer;
     if (params.kind !== "valid" || server === undefined) {
@@ -176,10 +160,10 @@
     }
     const request = params;
     mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Confirmed);
-    // Show a loading screen while we verify trust and (if trusted) prepare and
-    // form-POST the standing delegation: the picker's own button spinner stops
-    // once it hands off here, and the verify + `mcpAuthorize` calls run several
-    // canister calls before navigating away.
+    // Show a loading screen while we verify trust and (if trusted) fetch the
+    // server's key, register it, and notify the server: the picker's own button
+    // spinner stops once it hands off here, and those steps span several
+    // network round trips.
     phase = { kind: "connecting" };
     void (async () => {
       try {
@@ -191,7 +175,8 @@
         // The identity's synced trusted-server config is the source of truth:
         // connect only when this identity has MCP enabled and trusts this
         // server's origin. Verifying here (post-authentication) means the result
-        // is the same on every device, regardless of any local state.
+        // is the same on every device, regardless of any local state — and the
+        // backend re-checks it when registering.
         const config = await readMcpConfig(
           authenticated.actor,
           authenticated.identityNumber,
@@ -201,19 +186,17 @@
           phase = { kind: "untrusted" };
           return;
         }
-        // On success `mcpAuthorize` navigates the browser to the MCP server,
-        // which redirects back here with a status — so a resolved promise means
-        // the chain was built and submitted, not that we stay on this page.
         await mcpAuthorize({
           authenticated,
-          publicKey: request.publicKey,
-          mcpServerOrigin: server.origin,
           ttlSeconds,
           callback: request.callback,
           state: request.state,
         });
+        mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);
+        phase = { kind: "close" };
       } catch (error) {
         // Return to the connect screen so the user can retry.
+        mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Error);
         phase = { kind: "authorize" };
         handleError(error);
       }
@@ -260,8 +243,6 @@
 
 {#if phase.kind === "invalid"}
   <McpInvalidView />
-{:else if phase.kind === "error"}
-  <McpErrorView />
 {:else if phase.kind === "wizard" && mcpServer !== undefined}
   <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
     <AuthPanel>
