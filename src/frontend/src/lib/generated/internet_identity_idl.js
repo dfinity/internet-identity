@@ -372,6 +372,7 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
   });
   const Delegation = IDL.Record({
+    'permissions' : IDL.Opt(IDL.Text),
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
     'expiration' : Timestamp,
@@ -798,6 +799,10 @@ export const idlFactory = ({ IDL }) => {
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
   });
+  const Permissions = IDL.Variant({
+    'queries' : IDL.Null,
+    'all' : IDL.Null,
+  });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -985,6 +990,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           Timestamp,
+          IDL.Opt(Permissions),
         ],
         [
           IDL.Variant({
@@ -1166,7 +1172,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_register' : IDL.Func(
-        [UserNumber, SessionKey, IDL.Nat64],
+        [UserNumber, SessionKey, IDL.Nat64, IDL.Opt(Permissions)],
         [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
       ),
@@ -1231,6 +1237,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           IDL.Opt(IDL.Nat64),
+          IDL.Opt(Permissions),
         ],
         [
           IDL.Variant({

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import type { PageProps } from "./$types";
   import {
     isAuthenticatedStore,
@@ -152,8 +153,12 @@
   // Invoked by the reused account picker once it has authenticated the selected
   // identity and resolved the chosen account. Connecting fetches the server's
   // session key from its callback and registers it with the backend
-  // (`mcp_register`) — the whole flow completes on this page.
-  const handleAuthorize = (ttlSeconds: number): void => {
+  // (`mcp_register`, with the chosen access level) — the whole flow completes
+  // on this page.
+  const handleAuthorize = (
+    ttlSeconds: number,
+    accessLevel: AccessLevel,
+  ): void => {
     const server = mcpServer;
     if (params.kind !== "valid" || server === undefined) {
       return;
@@ -189,6 +194,7 @@
         await mcpAuthorize({
           authenticated,
           ttlSeconds,
+          accessLevel,
           callback: request.callback,
           state: request.state,
         });

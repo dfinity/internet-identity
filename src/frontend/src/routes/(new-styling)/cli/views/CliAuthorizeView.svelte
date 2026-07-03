@@ -1,6 +1,8 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import CliHeader from "../components/CliHeader.svelte";
   import TerminalBlock from "../components/TerminalBlock.svelte";
   import { Trans } from "$lib/components/locale";
@@ -10,17 +12,21 @@
     /** Hostname of the app the CLI is being authorized for, or undefined for
      *  generic mode. */
     domain?: string;
-    onAuthorize: () => Promise<void>;
+    onAuthorize: (accessLevel: AccessLevel) => Promise<void>;
   }
 
   const { domain, onAuthorize }: Props = $props();
 
   let busy = $state(false);
+  // CLI access defaults to read-only: a linked CLI usually reads on the
+  // user's behalf, so it gets query-only access unless the user opts into
+  // full access by checking the "Full access" box.
+  let accessLevel: AccessLevel = $state("read-only");
 
   const handleClick = async () => {
     busy = true;
     try {
-      await onAuthorize();
+      await onAuthorize(accessLevel);
     } finally {
       busy = false;
     }
@@ -59,13 +65,20 @@
 
     <p class="text-text-secondary mt-4 text-[13px] leading-normal text-pretty">
       {#if isAppMode}
-        <Trans>The CLI gets full access to your account in this app.</Trans>
+        <Trans>The CLI uses your account in this app.</Trans>
       {:else}
         <Trans>
           The CLI gets its own account, separate from your other apps.
         </Trans>
       {/if}
     </p>
+
+    <AccessLevelToggle
+      bind:accessLevel
+      prompt="full-access"
+      disabled={busy}
+      class="mt-4"
+    />
 
     <button
       class="btn btn-primary btn-xl mt-6 w-full"

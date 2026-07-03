@@ -190,8 +190,18 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
+// Indexes 25, 27 and 28 held earlier MCP maps: a `Principal -> AnchorNumber`
+// reverse index (25), a parallel read-only set (27), and a combined
+// `Principal -> {anchor, read_only}` access map (28). All were superseded by
+// the session-grant map at index 29 (`Principal -> {anchor, expiry, read_only}`,
+// keyed by the MCP server's own session-key principal). MCP was preview-only,
+// so the old regions are abandoned (any preview grants are dropped and
+// re-created on the next connect) rather than migrated.
+// const DEPRECATED_LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
 const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
-const MCP_GRANT_MEMORY_INDEX: u8 = 27u8;
+// const DEPRECATED_LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX: u8 = 27u8;
+// const DEPRECATED_MCP_ACCESS_MEMORY_INDEX: u8 = 28u8;
+const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -239,11 +249,11 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
 const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
 
 /// MCP session grants: maps an MCP server's session-key principal to the
-/// grant ([`StorableMcpGrant`]: the anchor that registered it + expiry).
-/// Written by the authenticated `mcp_register` method; the server-facing
-/// `mcp_*` methods authorize a caller by looking up its grant here (and
-/// checking expiry), recovering the anchor without an `anchor_number`
-/// parameter. Bounded at one entry per anchor via
+/// grant ([`StorableMcpGrant`]: the anchor that registered it, the expiry, and
+/// whether its per-app delegations are read-only). Written by the authenticated
+/// `mcp_register` method; the server-facing `mcp_*` methods authorize a caller
+/// by looking up its grant here (and checking expiry), recovering the anchor
+/// without an `anchor_number` parameter. Bounded at one entry per anchor via
 /// [`StorableMcpConfig::session_principal`].
 const MCP_GRANT_MEMORY_ID: MemoryId = MemoryId::new(MCP_GRANT_MEMORY_INDEX);
 

@@ -22,6 +22,13 @@ pub struct StorableMcpGrant {
     /// nothing once `time()` reaches this.
     #[n(1)]
     pub expires_at_ns: u64,
+    /// Whether the per-app delegations this session mints are restricted to
+    /// query calls (queries-only). Chosen once at connect (`mcp_register`) and
+    /// applied to every delegation the session mints — read-only is a property
+    /// of the whole MCP session, not a per-call flag. Both `prepare` and `get`
+    /// read it, since the access level is folded into the delegation signature.
+    #[n(2)]
+    pub read_only: bool,
 }
 
 impl Storable for StorableMcpGrant {
@@ -44,11 +51,14 @@ mod tests {
 
     #[test]
     fn should_roundtrip_through_storable() {
-        let grant = StorableMcpGrant {
-            anchor_number: 10_000,
-            expires_at_ns: 1_234_567_890_000_000_000,
-        };
-        let decoded = StorableMcpGrant::from_bytes(grant.to_bytes());
-        assert_eq!(decoded, grant);
+        for read_only in [false, true] {
+            let grant = StorableMcpGrant {
+                anchor_number: 10_000,
+                expires_at_ns: 1_234_567_890_000_000_000,
+                read_only,
+            };
+            let decoded = StorableMcpGrant::from_bytes(grant.to_bytes());
+            assert_eq!(decoded, grant);
+        }
     }
 }

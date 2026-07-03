@@ -2,6 +2,7 @@ use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
+use crate::delegation::DelegationAccess;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -448,6 +449,8 @@ async fn prepare_delegation(
         session_key,
         max_time_to_live,
         None,
+        // The legacy endpoint has no read-only option.
+        DelegationAccess::Unrestricted,
         &ii_domain,
     )
     .await
@@ -476,6 +479,8 @@ fn get_delegation(
         None,
         session_key,
         expiration,
+        // The legacy endpoint has no read-only option.
+        DelegationAccess::Unrestricted,
     )
     .map(GetDelegationResponse::SignedDelegation)
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
@@ -581,6 +586,7 @@ async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
+    permissions: Option<Permissions>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
@@ -591,6 +597,12 @@ async fn prepare_account_delegation(
                 session_key,
                 max_ttl,
                 None,
+                // An omitted `permissions` argument means unrestricted (see
+                // `impl From<Option<Permissions>> for DelegationAccess`): this
+                // preserves the original behavior for callers of the
+                // (pre-feature) form. First-party callers always pass an explicit
+                // value (queries-only by default in the CLI and MCP flows).
+                DelegationAccess::from(permissions),
                 &ii_domain,
             )
             .await
@@ -606,6 +618,7 @@ fn get_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
+    permissions: Option<Permissions>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
         Ok(_) => account_management::get_account_delegation(
@@ -614,6 +627,10 @@ fn get_account_delegation(
             account_number,
             session_key,
             expiration,
+            // See `prepare_account_delegation`: an omitted `permissions`
+            // argument means an unrestricted delegation (backwards-compatible
+            // with the original form).
+            DelegationAccess::from(permissions),
         ),
         Err(err) => Err(err.into()),
     }
@@ -630,15 +647,21 @@ fn get_account_delegation(
 ///
 /// At most one session per identity: registering replaces any previous grant.
 /// Requires the identity's MCP config to be enabled with a trusted server set,
-/// so every session stays revocable via `mcp_set_config`.
+/// so every session stays revocable via `mcp_set_config`. `permissions` sets
+/// the session's read-only restriction: `opt (queries)` makes every per-app
+/// delegation it later mints queries-only; omitted (`null`) or `opt (all)`
+/// means full, update-capable access.
 #[update]
 fn mcp_register(
     anchor_number: AnchorNumber,
     session_key: SessionKey,
     grant_ttl_ns: u64,
+    permissions: Option<Permissions>,
 ) -> Result<McpRegistration, String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::register(anchor_number, session_key, grant_ttl_ns)
+    // The grant persists a bool; derive it from the requested permissions.
+    let read_only = DelegationAccess::from(permissions) == DelegationAccess::ReadOnly;
+    mcp::register(anchor_number, session_key, grant_ttl_ns, read_only)
 }
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
@@ -1948,6 +1971,7 @@ mod email_recovery_api {
                         pubkey: args.session_key,
                         expiration: args.expiration,
                         targets: None,
+                        permissions: None,
                     },
                     signature: serde_bytes::ByteBuf::from(signature),
                 })

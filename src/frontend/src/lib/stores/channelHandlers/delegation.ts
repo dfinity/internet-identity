@@ -1,3 +1,4 @@
+import { toPermissionsArg } from "$lib/utils/accessLevel";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   DelegationParamsCodec,
@@ -95,6 +96,19 @@ export const handleDelegationRequest =
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
+        // When the user enabled "Read-only mode" during authorization, the
+        // delegation is restricted to query calls via its `permissions`
+        // field, which the IC enforces (update calls are rejected).
+        //
+        // NOTE: carrying the restricted delegation back to the relying
+        // party requires the agent library to round-trip the `permissions`
+        // field (@icp-sdk/core); until then, restricted delegations fail
+        // closed on the dapp side (the signature does not verify without
+        // the field).
+        // Send an explicit value rather than relying on the backend's
+        // omitted-arg default.
+        const permissions = toPermissionsArg(authorized.accessLevel);
+
         const { user_key, expiration } = await actor
           .prepare_account_delegation(
             identityNumber,
@@ -102,6 +116,7 @@ export const handleDelegationRequest =
             accountNumber !== undefined ? [accountNumber] : [],
             sessionPublicKey,
             params.maxTimeToLive !== undefined ? [params.maxTimeToLive] : [],
+            permissions,
           )
           .then(throwCanisterError);
 
@@ -113,6 +128,7 @@ export const handleDelegationRequest =
               accountNumber !== undefined ? [accountNumber] : [],
               sessionPublicKey,
               expiration,
+              permissions,
             )
             .then(throwCanisterError)
             .then(transformSignedDelegation)

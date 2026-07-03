@@ -1,3 +1,4 @@
+import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { fromBase64URL } from "$lib/utils/utils";
 
@@ -6,6 +7,11 @@ interface McpAuthorizeInput {
   /** Lifetime in seconds for the session grant (already clamped to
    *  [10 min, 30 days]; the backend clamps again). */
   ttlSeconds: number;
+  /** Whether the whole session is read-only: when read-only, every per-app
+   *  delegation the server later mints is restricted to query calls. Chosen
+   *  once at connect and passed to `mcp_register`, which persists it on the
+   *  grant — read-only is a property of the session, not a per-call flag. */
+  accessLevel: AccessLevel;
   /** Callback URL on the MCP server origin (e.g. "https://mcp.id.ai/callback").
    *  MCP connections are to remote servers, so this is always https, and its
    *  origin has been verified against the identity's synced trusted-server
@@ -35,10 +41,11 @@ const parsePublicKey = (body: unknown): Uint8Array => {
  * Connects the MCP server by registering its session key with the backend:
  * fetch the server's session public key from its callback, register it via
  * `mcp_register` (binding the key's principal to the identity with the
- * user-chosen expiry), and report completion back to the callback. No
- * delegation is minted for the server itself — its capability is the grant,
- * which the backend checks on every `mcp_*` call and which Settings revokes
- * via `mcp_set_config`.
+ * user-chosen expiry and access level), and report completion back to the
+ * callback. No delegation is minted for the server itself — its capability is
+ * the grant, which the backend checks on every `mcp_*` call and which Settings
+ * revokes via `mcp_set_config`. A read-only `accessLevel` makes every per-app
+ * delegation the session later mints query-only.
  *
  * The key is fetched over an origin-attested channel: this code only ever
  * contacts the *trusted* origin's callback (verified against the synced
@@ -55,6 +62,7 @@ const parsePublicKey = (body: unknown): Uint8Array => {
 export const mcpAuthorize = async ({
   authenticated,
   ttlSeconds,
+  accessLevel,
   callback,
   state,
 }: McpAuthorizeInput): Promise<void> => {
@@ -77,12 +85,14 @@ export const mcpAuthorize = async ({
 
   // One authenticated call registers the session: the backend binds the key's
   // self-authenticating principal to the identity (replacing any previous
-  // session — at most one at a time) until the chosen expiry.
+  // session — at most one at a time) until the chosen expiry, and persists the
+  // access level so every per-app delegation this session mints inherits it.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
   const result = await actor.mcp_register(
     identityNumber,
     sessionKey,
     grantTtlNanos,
+    toPermissionsArg(accessLevel),
   );
   if ("Err" in result) {
     throw new Error(result.Err);

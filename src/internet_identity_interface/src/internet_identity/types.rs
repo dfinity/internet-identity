@@ -139,11 +139,33 @@ pub struct ChallengeAttempt {
     pub key: ChallengeKey,
 }
 
+/// The delegation permissions a caller requests, mirroring the ICP protocol's
+/// request-delegation `permissions` values. Passed as an optional argument to
+/// `prepare_account_delegation` / `get_account_delegation` / `mcp_set_access`;
+/// an omitted argument means `All` (unrestricted), preserving the pre-feature
+/// behavior and matching the interface spec's default for an absent
+/// `permissions` field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CandidType, Deserialize)]
+pub enum Permissions {
+    /// Queries-only: the issued delegation carries `permissions = "queries"`,
+    /// so the IC rejects update calls authenticated through it.
+    #[serde(rename = "queries")]
+    Queries,
+    /// Unrestricted, update-capable: the issued delegation carries no
+    /// `permissions` field (the protocol's `"all"` default).
+    #[serde(rename = "all")]
+    All,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct Delegation {
     pub pubkey: PublicKey,
     pub expiration: Timestamp,
     pub targets: Option<Vec<Principal>>,
+    /// Restricts the kinds of calls the delegation permits: `"queries"`
+    /// restricts the sender to query calls (the IC rejects update calls
+    /// authenticated through such a delegation). `None` means unrestricted.
+    pub permissions: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

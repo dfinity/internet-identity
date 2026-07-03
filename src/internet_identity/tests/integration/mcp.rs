@@ -69,6 +69,8 @@ fn trust_mcp_server(
 /// like the `/mcp` connect flow does after consent) and return the session
 /// principal the server now calls with — the self-authenticating principal of
 /// the key, exactly as the canister derives it — plus the grant expiration.
+/// Registers an unrestricted (not read-only) session; the read-only path has
+/// its own test.
 fn register_session(
     env: &PocketIc,
     canister_id: Principal,
@@ -84,6 +86,7 @@ fn register_session(
         anchor,
         session_key.clone(),
         grant_ttl_ns,
+        None,
     )
     .unwrap()
     .unwrap();
@@ -523,7 +526,8 @@ fn mcp_register_requires_enabled_config() -> Result<(), RejectResponse> {
         principal_1(),
         anchor,
         session_key.clone(),
-        GRANT_TTL_NS
+        GRANT_TTL_NS,
+        None
     )
     .unwrap()
     .is_err());
@@ -547,7 +551,8 @@ fn mcp_register_requires_enabled_config() -> Result<(), RejectResponse> {
         principal_1(),
         anchor,
         session_key.clone(),
-        GRANT_TTL_NS
+        GRANT_TTL_NS,
+        None
     )
     .unwrap()
     .is_err());
@@ -571,7 +576,8 @@ fn mcp_register_requires_enabled_config() -> Result<(), RejectResponse> {
         principal_1(),
         anchor,
         session_key.clone(),
-        GRANT_TTL_NS
+        GRANT_TTL_NS,
+        None
     )
     .unwrap()
     .is_err());
@@ -585,7 +591,8 @@ fn mcp_register_requires_enabled_config() -> Result<(), RejectResponse> {
         principal_2(),
         anchor,
         session_key,
-        GRANT_TTL_NS
+        GRANT_TTL_NS,
+        None
     )
     .unwrap()
     .is_err());
@@ -628,6 +635,7 @@ fn mcp_register_rejects_a_key_registered_to_another_identity() -> Result<(), Rej
         anchor_2,
         shared_key.clone(),
         GRANT_TTL_NS,
+        None,
     )
     .unwrap()
     .unwrap_err();
@@ -1038,6 +1046,101 @@ fn mcp_config_is_gated_to_the_identity() -> Result<(), RejectResponse> {
         mcp_get_config(&env, canister_id, principal_1(), anchor).unwrap(),
         config
     );
+
+    Ok(())
+}
+
+/// Read-only is a property of the whole session: registering with
+/// `read_only = true` makes every per-app delegation the session mints
+/// queries-only (it carries `permissions = "queries"`), while an unrestricted
+/// session's delegations carry no `permissions` field. The choice is made once
+/// at `mcp_register` and stored on the grant — there is no per-call variant.
+#[test]
+fn mcp_read_only_grant_mints_queries_only_delegations() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("per-app session key");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    // Register a read-only session (read_only = Some(true)).
+    let server_key = ByteBuf::from("mcp server session key");
+    mcp_register(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        server_key.clone(),
+        GRANT_TTL_NS,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+    let mcp = Principal::self_authenticating(&server_key);
+
+    // Every delegation the session mints is queries-only.
+    let prepared = mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed = mcp_get_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        prepared.account_number,
+        session_key.clone(),
+        prepared.expiration,
+    )
+    .unwrap()
+    .unwrap();
+    verify_delegation(&env, prepared.user_key, &signed, &env.root_key().unwrap());
+    assert_eq!(signed.delegation.permissions, Some("queries".to_string()));
+
+    // Contrast: an unrestricted session (the default helper) mints delegations
+    // with no `permissions` restriction.
+    let anchor_2 = flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    trust_mcp_server(&env, canister_id, principal_2(), anchor_2);
+    let (mcp_2, _) = register_session(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor_2,
+        &ByteBuf::from("full-access server key"),
+        GRANT_TTL_NS,
+    );
+    let prepared_2 = mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp_2,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed_2 = mcp_get_delegation(
+        &env,
+        canister_id,
+        mcp_2,
+        target,
+        prepared_2.account_number,
+        session_key,
+        prepared_2.expiration,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(signed_2.delegation.permissions, None);
 
     Ok(())
 }

@@ -114,6 +114,19 @@ back to attempting a signed call — success means you are registered.
 
 There is no redirect back to II; the II tab finishes on its own.
 
+### Read-only sessions
+
+At consent the user picks an access level (the connect screen defaults to
+**read-only**). II records it on the grant and applies it to _every_ per-app
+delegation your session mints: a read-only session's delegations carry
+`permissions = "queries"`, so the IC rejects update calls made through them —
+enforcement is protocol-level, not up to the target app. You don't choose this
+per call and can't widen it; it's fixed for the session's lifetime. If your
+server needs to make update calls on the user's behalf, surface that so the
+user leaves read-only off. (This is set via the `permissions` argument to
+`mcp_register`, which the II frontend fills from the consent screen — your
+server never passes it.)
+
 ## 3. Calling Internet Identity
 
 Sign directly with the session key (a plain identity, no `DelegationChain`):

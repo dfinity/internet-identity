@@ -1,4 +1,5 @@
 import { derived, type Readable, writable } from "svelte/store";
+import type { AccessLevel } from "$lib/utils/accessLevel";
 
 export type AuthorizationFlow =
   | { type: "1-click-openid"; issuer: string }
@@ -12,6 +13,11 @@ export type AuthorizationContext = {
 
 export type Authorized = {
   accountNumberPromise: Promise<bigint | undefined>;
+  /** The access level the user granted: "read-only" means the session
+   *  delegation will carry `permissions = "queries"`, which makes the
+   *  Internet Computer reject update calls authenticated through it.
+   *  Enforcement is protocol-level, not up to the app or canister. */
+  accessLevel: AccessLevel;
 };
 
 const contextInternal = writable<AuthorizationContext | undefined>();
@@ -30,9 +36,14 @@ export const authorizationStore = {
   },
   /** Called by the UI when the user authorizes with a specific account.
    *  Accepts a promise so the animation can start immediately while the
-   *  account number resolves asynchronously. */
-  authorize: (accountNumberPromise: Promise<bigint | undefined>): void => {
-    authorizedInternal.set({ accountNumberPromise });
+   *  account number resolves asynchronously. `accessLevel` is the access
+   *  the user granted (see {@link Authorized.accessLevel}); always passed
+   *  explicitly so call sites are self-describing. */
+  authorize: (
+    accountNumberPromise: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+  ): void => {
+    authorizedInternal.set({ accountNumberPromise, accessLevel });
   },
   subscribe: contextInternal.subscribe,
 };

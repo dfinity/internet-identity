@@ -465,6 +465,19 @@ pub fn update_account(
     .map(|(x,)| x)
 }
 
+/// Test-ergonomics converter: `read_only` as `Option<bool>` (None = omit the
+/// arg = unrestricted) mapped to the canister's `permissions : opt Permissions`
+/// argument.
+fn permissions_arg(read_only: Option<bool>) -> Option<Permissions> {
+    read_only.map(|ro| {
+        if ro {
+            Permissions::Queries
+        } else {
+            Permissions::All
+        }
+    })
+}
+
 pub fn mcp_register(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -472,6 +485,7 @@ pub fn mcp_register(
     identity_number: IdentityNumber,
     session_key: SessionKey,
     grant_ttl_ns: u64,
+    read_only: Option<bool>,
 ) -> Result<Result<McpRegistration, String>, RejectResponse> {
     call_candid_as(
         env,
@@ -479,7 +493,12 @@ pub fn mcp_register(
         RawEffectivePrincipal::None,
         sender,
         "mcp_register",
-        (identity_number, session_key, grant_ttl_ns),
+        (
+            identity_number,
+            session_key,
+            grant_ttl_ns,
+            permissions_arg(read_only),
+        ),
     )
     .map(|(x,)| x)
 }
@@ -642,6 +661,51 @@ pub fn get_account_delegation(
             params.account_number,
             params.session_key.clone(),
             expiration,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_account_delegation_with_read_only(
+    params: &AccountDelegationParams,
+    max_ttl: Option<u64>,
+    read_only: Option<bool>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, RejectResponse> {
+    call_candid_as(
+        params.env,
+        params.canister_id,
+        RawEffectivePrincipal::None,
+        params.sender,
+        "prepare_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            max_ttl,
+            permissions_arg(read_only),
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_delegation_with_read_only(
+    params: &AccountDelegationParams,
+    expiration: u64,
+    read_only: Option<bool>,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        params.env,
+        params.canister_id,
+        params.sender,
+        "get_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            expiration,
+            permissions_arg(read_only),
         ),
     )
     .map(|(x,)| x)

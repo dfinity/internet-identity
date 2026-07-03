@@ -3,6 +3,8 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 
 export type Aaguid = Uint8Array | number[];
+export type Permissions = { 'queries' : null } |
+  { 'all' : null };
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -375,6 +377,12 @@ export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'NameTooLong' : null };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
+  /**
+   * Restricts the kinds of calls the delegation permits: `"queries"`
+   * restricts the sender to query calls (the IC rejects update calls
+   * authenticated through such a delegation). Absent means unrestricted.
+   */
+  'permissions' : [] | [string],
   'pubkey' : PublicKey,
   'targets' : [] | [Array<Principal>],
   'expiration' : Timestamp,
@@ -1920,7 +1928,14 @@ export interface _SERVICE {
    */
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
   'get_account_delegation' : ActorMethod<
-    [UserNumber, FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
+    [
+      UserNumber,
+      FrontendHostname,
+      [] | [AccountNumber],
+      SessionKey,
+      Timestamp,
+      [] | [Permissions],
+    ],
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
   >,
@@ -2122,7 +2137,7 @@ export interface _SERVICE {
    * server set, so every session stays revocable via mcp_set_config.
    */
   'mcp_register' : ActorMethod<
-    [UserNumber, SessionKey, bigint],
+    [UserNumber, SessionKey, bigint, [] | [Permissions]],
     { 'Ok' : McpRegistration } |
       { 'Err' : string }
   >,
@@ -2185,6 +2200,7 @@ export interface _SERVICE {
       [] | [AccountNumber],
       SessionKey,
       [] | [bigint],
+      [] | [Permissions],
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }

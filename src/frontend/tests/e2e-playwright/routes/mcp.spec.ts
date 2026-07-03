@@ -232,6 +232,12 @@ test("Allow access registers the server's session key", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  // MCP connections default to read-only: the "Read-only mode" checkbox must
+  // start ticked, so the server's per-app delegations are queries-only unless
+  // the user opts out.
+  await expect(
+    page.getByRole("checkbox", { name: "Read-only mode" }),
+  ).toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
   // The connect flow fetched the server's session key, registered it with the

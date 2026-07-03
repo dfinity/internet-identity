@@ -6,14 +6,19 @@
 //! server's callback (an origin-attested channel — the frontend only ever
 //! contacts the origin the identity's synced config trusts, so nothing from
 //! the unauthenticated connect link is ever registered) and registers it here
-//! via [`register`]: a grant `session principal -> (anchor, expiry)` in the
-//! grant map, mirrored by a per-anchor forward pointer in the synced
+//! via [`register`]: a grant `session principal -> (anchor, expiry, read_only)`
+//! in the grant map, mirrored by a per-anchor forward pointer in the synced
 //! [`StorableMcpConfig`]. No delegation is minted for the server itself, and
 //! no account is chosen at connect. The MCP server then calls
 //! [`get_accounts`] / [`prepare_delegation`] / [`get_delegation`] signed with
 //! that session key; we recover the anchor from `caller()`'s grant (checking
 //! expiry), so no `anchor_number` parameter is needed — being the right
 //! caller is the authorization.
+//!
+//! Read-only is a property of the whole session: `read_only` is chosen once at
+//! connect ([`register`]) and applied to every per-app delegation the session
+//! mints (via [`crate::delegation::DelegationAccess`]), restricting them to
+//! query calls.
 //!
 //! Session lifecycle: at most one live session per identity — registering
 //! replaces the previous grant through the config's forward pointer — and a
@@ -34,6 +39,7 @@ use internet_identity_interface::internet_identity::types::{
 
 use crate::{
     account_management,
+    delegation::DelegationAccess,
     state::{storage_borrow, storage_borrow_mut},
     storage::account::{Account, AccountDelegationError, ReadAccountParams},
     storage::storable::mcp_config::StorableMcpConfig,
@@ -86,15 +92,18 @@ fn default_account_number(
 /// method); the key itself comes from the trusted server's callback, fetched
 /// by the II frontend after user consent — never from the connect link.
 ///
-/// `grant_ttl_ns` is clamped to [10 min, 30 days]. Registering while a
-/// session is live replaces it (at most one session per identity), so the
-/// previous key stops being authorized in the same message. A key holding a
-/// live grant for a *different* identity is rejected — one key serves one
-/// identity — without echoing whose it is.
+/// `grant_ttl_ns` is clamped to [10 min, 30 days]. `read_only` restricts every
+/// per-app delegation this session mints to query calls (chosen at connect,
+/// applied for the whole session). Registering while a session is live
+/// replaces it (at most one session per identity), so the previous key stops
+/// being authorized in the same message. A key holding a live grant for a
+/// *different* identity is rejected — one key serves one identity — without
+/// echoing whose it is.
 pub fn register(
     anchor_number: AnchorNumber,
     session_key: SessionKey,
     grant_ttl_ns: u64,
+    read_only: bool,
 ) -> Result<McpRegistration, String> {
     if session_key.is_empty() {
         return Err("MCP registration failed: empty session key.".to_string());
@@ -143,6 +152,7 @@ pub fn register(
             StorableMcpGrant {
                 anchor_number,
                 expires_at_ns,
+                read_only,
             },
         );
         config.session_principal = Some(principal.as_slice().to_vec());
@@ -212,7 +222,8 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) {
 /// The calling MCP server's live session grant: present in the grant map, not
 /// expired, and its identity's MCP toggle still on. Everything the
 /// server-facing methods need for authorization — being the right caller is
-/// the authorization.
+/// the authorization. The returned grant also carries `read_only`, applied to
+/// the per-app delegations prepare/get mint.
 fn caller_grant() -> Result<StorableMcpGrant, AccountDelegationError> {
     let caller = caller();
     let grant = storage_borrow(|storage| storage.lookup_mcp_grant(caller))
@@ -275,7 +286,8 @@ pub fn get_accounts(
 /// (Accounts are per-origin, so this is an account at `target_origin`, the app
 /// being acted on; no account is chosen at connect. An `account_number` that
 /// isn't the anchor's at `target_origin` is rejected as `Unauthorized`.) The
-/// delegation additionally never outlives the session grant.
+/// delegation never outlives the session grant, and is restricted to query
+/// calls when the session was registered read-only.
 ///
 /// Returns the resolved `account_number` so the server can thread the *same*
 /// account into [`get_delegation`]: the default account at an origin is
@@ -313,6 +325,7 @@ pub async fn prepare_delegation(
         session_key,
         capped_ttl,
         Some(grant.expires_at_ns),
+        DelegationAccess::from_read_only(grant.read_only),
         &None,
     )
     .await?;
@@ -328,19 +341,21 @@ pub async fn prepare_delegation(
 /// [`prepare_delegation`], so `get` reads the same account `prepare` signed
 /// for (see the note there); the caller is still authorized only for its own
 /// anchor (recovered from `caller()`'s grant), so it can only fetch what it
-/// prepared.
+/// prepared. The grant's `read_only` must match what `prepare` signed with,
+/// since the access level is folded into the delegation signature.
 pub fn get_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    let anchor_number = caller_grant()?.anchor_number;
+    let grant = caller_grant()?;
     account_management::get_account_delegation(
-        anchor_number,
+        grant.anchor_number,
         &target_origin,
         account_number,
         session_key,
         expiration,
+        DelegationAccess::from_read_only(grant.read_only),
     )
 }
