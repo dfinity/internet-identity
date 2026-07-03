@@ -70,17 +70,23 @@ describe("cliAuthorize access-level wiring", () => {
       [],
       expect.anything(),
       [BigInt(TTL_MINUTES) * BigInt(60) * BigInt(1_000_000_000)],
-      [true],
+      [{ read_only: null }],
     );
     // `get` must echo the same value or the signature lookup fails.
-    expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([true]);
+    expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([
+      { read_only: null },
+    ]);
   });
 
   it("requests an unrestricted delegation for full access, explicitly", async () => {
     const actor = makeActor();
     await authorize(actor, "full-access");
 
-    expect(actor.prepare_account_delegation.mock.calls[0][5]).toEqual([false]);
-    expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([false]);
+    expect(actor.prepare_account_delegation.mock.calls[0][5]).toEqual([
+      { full_access: null },
+    ]);
+    expect(actor.get_account_delegation.mock.calls[0][5]).toEqual([
+      { full_access: null },
+    ]);
   });
 });

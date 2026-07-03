@@ -3,6 +3,8 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 
 export type Aaguid = Uint8Array | number[];
+export type AccessLevel = { 'full_access' : null } |
+  { 'read_only' : null };
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -1926,7 +1928,7 @@ export interface _SERVICE {
       [] | [AccountNumber],
       SessionKey,
       Timestamp,
-      [] | [boolean],
+      [] | [AccessLevel],
     ],
     { 'Ok' : SignedDelegation } |
       { 'Err' : AccountDelegationError }
@@ -2127,7 +2129,7 @@ export interface _SERVICE {
    * they choose.
    */
   'mcp_set_access' : ActorMethod<
-    [UserNumber, FrontendHostname, boolean, [] | [boolean]],
+    [UserNumber, FrontendHostname, boolean, [] | [AccessLevel]],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
@@ -2188,7 +2190,7 @@ export interface _SERVICE {
       [] | [AccountNumber],
       SessionKey,
       [] | [bigint],
-      [] | [boolean],
+      [] | [AccessLevel],
     ],
     { 'Ok' : PrepareAccountDelegation } |
       { 'Err' : AccountDelegationError }

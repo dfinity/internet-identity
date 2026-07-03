@@ -163,6 +163,15 @@ type Delegation = record {
     permissions : opt text;
 };
 
+// The access level a caller requests for an issued delegation.
+// `full_access` yields an unrestricted, update-capable delegation;
+// `read_only` yields a queries-only delegation (the issued `Delegation`
+// carries `permissions = "queries"`). Passed as an optional argument;
+// an absent argument means `full_access`, preserving the pre-feature
+// behavior and matching the interface spec's default for an absent
+// `permissions` field.
+type AccessLevel = variant { full_access; read_only };
+
 type SignedDelegation = record {
     delegation : Delegation;
     signature : blob;
@@ -1784,14 +1793,14 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
         max_ttl : opt nat64,
-        // When `opt true`, the prepared delegation restricts the session to
-        // query calls: it carries `permissions = "queries"`, which makes the
-        // IC reject update calls authenticated through it. Omitted (`null`) or
-        // `opt false` yields an unrestricted delegation — the original behavior,
-        // preserved for existing callers and matching the interface spec.
-        read_only : opt bool
+        // `opt read_only` restricts the prepared delegation to query calls: it
+        // carries `permissions = "queries"`, which makes the IC reject update
+        // calls authenticated through it. Omitted (`null`) or `opt full_access`
+        // yields an unrestricted delegation — the original behavior, preserved
+        // for existing callers and matching the interface spec.
+        access : opt AccessLevel
     ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
-    
+
     get_account_delegation : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
@@ -1800,7 +1809,7 @@ service : (opt InternetIdentityInit) -> {
         expiration : Timestamp,
         // Must match the value passed to `prepare_account_delegation` (including
         // the omitted/`null` case, which means unrestricted).
-        read_only : opt bool
+        access : opt AccessLevel
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 
     // Enable/disable the backend /mcp delegation path for an anchor at a given
@@ -1814,10 +1823,10 @@ service : (opt InternetIdentityInit) -> {
         anchor_number : UserNumber,
         mcp_server_origin : FrontendHostname,
         enabled : bool,
-        // When `opt true`, the per-app delegations this server can later obtain
-        // are restricted to query calls (queries-only). Omitted (`null`) means
+        // `opt read_only` restricts the per-app delegations this server can
+        // later obtain to query calls (queries-only). Omitted (`null`) means
         // full access.
-        read_only : opt bool
+        access : opt AccessLevel
     ) -> (variant { Ok; Err : text });
 
     // Whether the anchor has MCP access enabled at mcp_server_origin.

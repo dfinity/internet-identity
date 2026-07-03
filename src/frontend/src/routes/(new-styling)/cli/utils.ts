@@ -1,4 +1,4 @@
-import { toReadOnlyArg, type AccessLevel } from "$lib/utils/accessLevel";
+import { toAccessLevelArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -83,7 +83,7 @@ export const cliAuthorize = async ({
       [maxTimeToLiveNanos],
       // The user's choice (read-only by default); passed explicitly so it
       // is honored regardless of the backend's omitted-arg default.
-      toReadOnlyArg(accessLevel),
+      toAccessLevelArg(accessLevel),
     )
     .then(throwCanisterError);
 
@@ -96,7 +96,7 @@ export const cliAuthorize = async ({
         ephemeralPublicKey,
         expiration,
         // Must match the value passed to `prepare_account_delegation` above.
-        toReadOnlyArg(accessLevel),
+        toAccessLevelArg(accessLevel),
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

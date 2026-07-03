@@ -1,4 +1,4 @@
-import { toReadOnlyArg } from "$lib/utils/accessLevel";
+import { toAccessLevelArg } from "$lib/utils/accessLevel";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   DelegationParamsCodec,
@@ -107,7 +107,7 @@ export const handleDelegationRequest =
         // the field).
         // Send an explicit value rather than relying on the backend's
         // omitted-arg default.
-        const readOnly = toReadOnlyArg(authorized.accessLevel);
+        const access = toAccessLevelArg(authorized.accessLevel);
 
         const { user_key, expiration } = await actor
           .prepare_account_delegation(
@@ -116,7 +116,7 @@ export const handleDelegationRequest =
             accountNumber !== undefined ? [accountNumber] : [],
             sessionPublicKey,
             params.maxTimeToLive !== undefined ? [params.maxTimeToLive] : [],
-            readOnly,
+            access,
           )
           .then(throwCanisterError);
 
@@ -128,7 +128,7 @@ export const handleDelegationRequest =
               accountNumber !== undefined ? [accountNumber] : [],
               sessionPublicKey,
               expiration,
-              readOnly,
+              access,
             )
             .then(throwCanisterError)
             .then(transformSignedDelegation)

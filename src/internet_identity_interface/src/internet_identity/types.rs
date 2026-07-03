@@ -139,6 +139,22 @@ pub struct ChallengeAttempt {
     pub key: ChallengeKey,
 }
 
+/// The access level a caller requests for an issued delegation. Passed as an
+/// optional argument to `prepare_account_delegation` / `get_account_delegation`
+/// / `mcp_set_access`; an omitted argument means `FullAccess` (unrestricted),
+/// preserving the pre-feature behavior and matching the interface spec's
+/// default for an absent `permissions` field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CandidType, Deserialize)]
+pub enum AccessLevel {
+    /// Update-capable: the issued delegation carries no `permissions` field.
+    #[serde(rename = "full_access")]
+    FullAccess,
+    /// Queries-only: the issued delegation carries `permissions = "queries"`,
+    /// so the IC rejects update calls authenticated through it.
+    #[serde(rename = "read_only")]
+    ReadOnly,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct Delegation {
     pub pubkey: PublicKey,

@@ -1,17 +1,17 @@
 import {
   isToggleChecked,
-  toReadOnlyArg,
+  toAccessLevelArg,
   toggledAccessLevel,
   type AccessLevel,
 } from "./accessLevel";
 
-describe("toReadOnlyArg", () => {
-  it("maps read-only to an explicit [true]", () => {
-    expect(toReadOnlyArg("read-only")).toEqual([true]);
+describe("toAccessLevelArg", () => {
+  it("maps read-only to an explicit read_only variant", () => {
+    expect(toAccessLevelArg("read-only")).toEqual([{ read_only: null }]);
   });
 
-  it("maps full-access to an explicit [false]", () => {
-    expect(toReadOnlyArg("full-access")).toEqual([false]);
+  it("maps full-access to an explicit full_access variant", () => {
+    expect(toAccessLevelArg("full-access")).toEqual([{ full_access: null }]);
   });
 });
 

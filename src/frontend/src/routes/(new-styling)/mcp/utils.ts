@@ -1,4 +1,4 @@
-import { toReadOnlyArg, type AccessLevel } from "$lib/utils/accessLevel";
+import { toAccessLevelArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -81,7 +81,7 @@ export const mcpAuthorize = async ({
     identityNumber,
     effectiveOrigin,
     true,
-    toReadOnlyArg(accessLevel),
+    toAccessLevelArg(accessLevel),
   );
   if ("Err" in accessResult) {
     throw new Error(accessResult.Err);
@@ -106,7 +106,7 @@ export const mcpAuthorize = async ({
       // Unrestricted: the standing delegation is update-capable so the MCP
       // server can call the (update) prepare endpoint. Passed explicitly
       // rather than relying on the backend's default for an omitted value.
-      toReadOnlyArg("full-access"),
+      toAccessLevelArg("full-access"),
     )
     .then(throwCanisterError);
 
@@ -119,7 +119,7 @@ export const mcpAuthorize = async ({
         ephemeralPublicKey,
         expiration,
         // Unrestricted; must match `prepare_account_delegation` above.
-        toReadOnlyArg("full-access"),
+        toAccessLevelArg("full-access"),
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)

@@ -163,7 +163,8 @@ pub enum DelegationAccess {
 }
 
 impl DelegationAccess {
-    /// Maps a `read_only` flag (e.g. the persisted MCP grant field).
+    /// Maps a `read_only` flag (e.g. the persisted MCP grant field, which is
+    /// stored as a bool).
     pub fn from_read_only(read_only: bool) -> Self {
         if read_only {
             DelegationAccess::ReadOnly
@@ -172,21 +173,32 @@ impl DelegationAccess {
         }
     }
 
-    /// Maps the endpoints' trailing `read_only : opt bool` candid argument.
-    /// An omitted argument means unrestricted: this preserves the original
-    /// behavior for callers of the pre-feature 5-argument form and matches
-    /// the interface spec's default for an absent `permissions` field.
-    /// First-party callers always pass an explicit value.
-    pub fn from_read_only_arg(read_only: Option<bool>) -> Self {
-        Self::from_read_only(read_only.unwrap_or(false))
-    }
-
     /// The delegation's `permissions` field value for this access level.
     pub fn permissions(self) -> Option<&'static str> {
         match self {
             DelegationAccess::Unrestricted => None,
             DelegationAccess::ReadOnly => Some(DELEGATION_PERMISSIONS_QUERIES),
         }
+    }
+}
+
+impl From<AccessLevel> for DelegationAccess {
+    fn from(access: AccessLevel) -> Self {
+        match access {
+            AccessLevel::FullAccess => DelegationAccess::Unrestricted,
+            AccessLevel::ReadOnly => DelegationAccess::ReadOnly,
+        }
+    }
+}
+
+impl From<Option<AccessLevel>> for DelegationAccess {
+    /// Maps the endpoints' trailing `access : opt AccessLevel` candid argument.
+    /// An omitted argument means unrestricted: this preserves the original
+    /// behavior for callers of the pre-feature form and matches the interface
+    /// spec's default for an absent `permissions` field. First-party callers
+    /// always pass an explicit value.
+    fn from(access: Option<AccessLevel>) -> Self {
+        access.map_or(DelegationAccess::Unrestricted, DelegationAccess::from)
     }
 }
 

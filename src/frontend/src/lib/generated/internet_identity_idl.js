@@ -798,6 +798,10 @@ export const idlFactory = ({ IDL }) => {
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
   });
+  const AccessLevel = IDL.Variant({
+    'full_access' : IDL.Null,
+    'read_only' : IDL.Null,
+  });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -985,7 +989,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           Timestamp,
-          IDL.Opt(IDL.Bool),
+          IDL.Opt(AccessLevel),
         ],
         [
           IDL.Variant({
@@ -1172,7 +1176,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Bool, IDL.Opt(IDL.Bool)],
+        [UserNumber, FrontendHostname, IDL.Bool, IDL.Opt(AccessLevel)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
@@ -1237,7 +1241,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           IDL.Opt(IDL.Nat64),
-          IDL.Opt(IDL.Bool),
+          IDL.Opt(AccessLevel),
         ],
         [
           IDL.Variant({
