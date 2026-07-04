@@ -232,12 +232,12 @@ test("Allow access registers the server's session key", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // MCP connections default to read-only: the "Read-only mode" checkbox must
-  // start ticked, so the server's per-app delegations are queries-only unless
-  // the user opts out.
+  // MCP connections default to read-only: the "Full access" checkbox is the
+  // opt-in and must start unchecked, so the server's per-app delegations are
+  // queries-only unless the user ticks it (same shape as the CLI flow).
   await expect(
-    page.getByRole("checkbox", { name: "Read-only mode" }),
-  ).toBeChecked();
+    page.getByRole("checkbox", { name: "Full access" }),
+  ).not.toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
   // The connect flow fetched the server's session key, registered it with the
@@ -248,8 +248,8 @@ test("Allow access registers the server's session key", async ({
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
   expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
-  // Read-only is the default (the checkbox above was checked), so the server is
-  // told this session is queries-only up front — no probe delegation needed.
+  // Read-only is the default (the "Full access" box was left unchecked), so the
+  // server is told this session is queries-only up front — no probe delegation.
   expect(completion.permissions).toBe("queries");
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),

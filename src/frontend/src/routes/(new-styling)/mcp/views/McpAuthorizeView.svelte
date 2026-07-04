@@ -27,9 +27,12 @@
 
   const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
 
-  // MCP connections default to read-only (opt-out): the server can read on the
-  // user's behalf across their apps, but its per-app delegations are query-only
-  // unless the user opts into full access by unchecking.
+  // MCP connections default to read-only: the server can read on the user's
+  // behalf across their apps, but its per-app delegations are query-only unless
+  // the user opts into full access. The opt-in is a "Full access" checkbox that
+  // starts unchecked (prompt = the non-default level), matching the CLI and
+  // authorize flows — the toggle is designed for an initially-unchecked opt-in,
+  // so read-only is expressed as the default value, not a pre-ticked box.
   let accessLevel: AccessLevel = $state("read-only");
 
   // Connecting authorizes this agent for the user's identity — no account is
@@ -160,7 +163,7 @@
     </div>
     <AccessLevelToggle
       bind:accessLevel
-      prompt="read-only"
+      prompt="full-access"
       disabled={isAuthorizing}
       class="mb-6"
     />
