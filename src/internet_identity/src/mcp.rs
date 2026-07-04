@@ -249,10 +249,17 @@ pub struct McpSession {
 ///     `self_authenticating(sender_pubkey)`, and the map is keyed by
 ///     `self_authenticating(session_key)`, so only the key's holder can match;
 ///   * not past its grant's expiry; and
-///   * still under an enabled trusted-server config (defense in depth: the
-///     grant is already deleted eagerly on disable / URL-change in
-///     [`set_mcp_config`], but re-checking here means a regression in that
-///     eager path can't leave a disabled identity's session usable).
+///   * still the identity's *current* session under a live trusted-server
+///     config: enabled, a trusted URL set, and the config's forward pointer
+///     naming the caller. This re-checks on the read path everything the
+///     write paths already maintain transactionally (registration requires
+///     an enabled config with a URL and sets the pointer in the same message;
+///     disable / URL-change / replacement delete the grant in the same
+///     message), so it is behavior-neutral today — pure defense in depth: a
+///     future regression in any write path can't leave a revoked, disabled,
+///     or superseded session usable, because the one-session-per-identity
+///     invariant is enforced here too, not just assumed from write-path
+///     discipline.
 ///
 /// Every other caller — the user's own authenticated principal, another
 /// identity's session key, an anonymous or opaque principal — gets
@@ -267,8 +274,12 @@ pub fn authorize_mcp_session() -> Result<McpSession, AccountDelegationError> {
     if grant.expires_at_ns <= time() {
         return Err(AccountDelegationError::Unauthorized(caller));
     }
-    let enabled = storage_borrow(|storage| storage.read_mcp_config(grant.anchor_number).enabled);
-    if !enabled {
+    let config = storage_borrow(|storage| storage.read_mcp_config(grant.anchor_number));
+    let is_current_session = config
+        .session_principal
+        .as_deref()
+        .is_some_and(|bytes| bytes == caller.as_slice());
+    if !config.enabled || config.url.is_none() || !is_current_session {
         return Err(AccountDelegationError::Unauthorized(caller));
     }
     Ok(McpSession { grant })

@@ -328,7 +328,16 @@ pub async fn prepare_account_delegation(
     );
     // `max_expiration` is an *absolute* cap (e.g. the MCP session grant's
     // expiry): a relative TTL computed by the caller before the await above
-    // could drift past it by however much time the await spans.
+    // could drift past it by however much time the await spans. By the same
+    // token the cap itself can already have passed once the await resolves
+    // (the caller checked it *before* awaiting) — refuse rather than sign a
+    // delegation that is already expired on arrival, which would read as
+    // success while wasting a signature-map entry on an unusable delegation.
+    // For the MCP path this is exactly the session-over signal: the grant
+    // expired mid-call.
+    if max_expiration.is_some_and(|cap| cap <= time()) {
+        return Err(AccountDelegationError::Unauthorized(caller()));
+    }
     let expiration = u64::min(
         time().saturating_add(session_duration_ns),
         max_expiration.unwrap_or(u64::MAX),
