@@ -232,12 +232,12 @@ test("Allow access registers the server's session key", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // MCP connections default to read-only: the "Full access" checkbox is the
-  // opt-in and must start unchecked, so the server's per-app delegations are
-  // queries-only unless the user ticks it (same shape as the CLI flow).
+  // The read-only feature is flagged off, so the access-level toggle is
+  // hidden and the connection is full access (a queries-only delegation would
+  // fail closed in every current agent — see the READ_ONLY_MODE flag).
   await expect(
-    page.getByRole("checkbox", { name: "Full access" }),
-  ).not.toBeChecked();
+    page.getByRole("checkbox", { name: "Read-only mode" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Allow access" }).click();
 
   // The connect flow fetched the server's session key, registered it with the
@@ -248,9 +248,11 @@ test("Allow access registers the server's session key", async ({
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
   expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
-  // Read-only is the default (the "Full access" box was left unchecked), so the
-  // server is told this session is queries-only up front — no probe delegation.
-  expect(completion.permissions).toBe("queries");
+  // With READ_ONLY_MODE flagged off the session is full access, and the server
+  // is told so up front via the completion's `permissions` field ("all") — no
+  // probe delegation needed. (The read-only value "queries" is exercised by the
+  // utils unit tests, which drive mcpAuthorize directly with the flag's effect.)
+  expect(completion.permissions).toBe("all");
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();

@@ -36,11 +36,12 @@ test("Authorize by signing in with an existing passkey", async ({
     await authPage
       .getByRole("button", { name: "Sign in with passkey" })
       .click();
-    // Authorizations default to full access: the "Read-only mode" checkbox
-    // is the opt-in and must start unticked.
+    // The read-only feature is flagged off, so the access-level toggle is
+    // hidden and authorizations are full access (a queries-only delegation
+    // would fail closed in every current agent — see the READ_ONLY_MODE flag).
     await expect(
       authPage.getByRole("checkbox", { name: "Read-only mode" }),
-    ).not.toBeChecked();
+    ).toHaveCount(0);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
