@@ -148,9 +148,11 @@ Real-world remote MCP clients (claude.ai, Claude Desktop, Cursor, VS Code,
 the MCP Inspector) authenticate per the MCP auth spec: **OAuth 2.1
 authorization code + PKCE**, discovered via RFC 9728 protected-resource
 metadata and RFC 8414 AS metadata, with RFC 7591 dynamic client registration.
-The device grant is not part of that profile — clients won't use it. The II
-connect slots into the code flow as your "identity provider" leg, with
-`finish_url` closing the loop:
+The RFC 8628 device grant is **not** part of that profile — no current client
+uses it, and it adds a device-code phishing surface with none of the PKCE
+binding the rest of the flow relies on, so prefer to omit it. The II connect
+slots into the code flow as your "identity provider" leg, with `finish_url`
+closing the loop:
 
 1. `GET /oauth/authorize` — validate `client_id` + exact `redirect_uri`,
    store a pending auth `{code_challenge, state, resource}`, and 302 the
@@ -160,31 +162,59 @@ connect slots into the code flow as your "identity provider" leg, with
 3. `GET <finish_url>` — confirm the session registered (see (c)), mint the
    authorization code, and 302 to the client's `redirect_uri` with
    `code` + the client's original `state`.
-4. `POST /oauth/token` — exchange code + PKCE verifier for tokens. Issue
-   short-lived access tokens plus a refresh token: refresh succeeds while the
-   II grant lives, and once it expires or the user revokes (§4) the refresh
-   failure makes the client cleanly re-prompt.
+4. `POST /oauth/token` — exchange code + PKCE verifier for a bearer token.
+   Bound its lifetime by the grant — never issue a token that outlives the
+   grant. Refresh tokens are **optional**: they enable silent renewal but only
+   pay off alongside server-side persistence (a restart wipes them too) and add
+   no security over the grant, which is the hard, user-revocable ceiling either
+   way. Without them the client re-runs the browser flow when the token
+   expires; the `error="invalid_token"` challenge (below) lets it prompt inline.
+
+**Bind the browser session across the flow.** The `state` you place in the II
+connect link travels back to the client in the redirect, so it cannot by itself
+prove that the browser completing `/oauth/finish` is the one that started
+`/oauth/authorize`. Without a binding there is a code-injection / session-
+fixation takeover: an attacker registers a client (open DCR) with their own
+`redirect_uri` + PKCE, starts `/oauth/authorize`, lifts the resulting II connect
+link, and phishes it to a victim who already trusts your origin — II's consent
+screen names only **your server's origin**, never the OAuth client, so nothing
+warns the victim. On their consent you would mint a code for the _attacker's_
+pending auth and 302 it to the attacker's `redirect_uri`, handing them a token
+for the victim's identity. Prevent it: set a server-side session cookie at
+`/oauth/authorize` and require it at `/oauth/finish` before minting the code, so
+only the initiating browser can complete the flow. (II cannot help here — its
+trust model only ever identifies your origin, not the client.)
 
 Advertise what you actually implement (`authorization_endpoint`,
-`response_types_supported: ["code"]`, `grant_types_supported` including
-`authorization_code` and `refresh_token`), don't rewrite clients' requested
-grant types at registration, persist DCR client registrations across deploys
-(clients cache their `client_id`), exempt `/oauth/*` and `/.well-known/*`
-from bearer-token middleware, and return proper AS error codes
-(`invalid_client`, `invalid_request`) from the authorize endpoint.
+`response_types_supported: ["code"]`, `grant_types_supported` containing
+`authorization_code`, plus `refresh_token` only if you issue them), don't
+rewrite clients' requested grant types at registration, persist DCR client
+registrations across deploys (clients cache their `client_id`), exempt
+`/oauth/*` and `/.well-known/*` from bearer-token middleware, and return proper
+AS error codes (`invalid_client`, `invalid_request`) from the authorize
+endpoint.
 
 ### Read-only sessions
 
-At consent the user picks an access level (the connect screen defaults to
-**read-only**). II records it on the grant and applies it to _every_ per-app
+At consent the user picks an access level, and **the connect screen defaults to
+read-only** — so unless the user deliberately opts out, you get a read-only
+session. II records the level on the grant and applies it to _every_ per-app
 delegation your session mints: a read-only session's delegations carry
-`permissions = "queries"`, so the IC rejects update calls made through them —
-enforcement is protocol-level, not up to the target app. You don't choose this
-per call and can't widen it; it's fixed for the session's lifetime. If your
-server needs to make update calls on the user's behalf, surface that so the
-user leaves read-only off. (This is set via the `permissions` argument to
-`mcp_register`, which the II frontend fills from the consent screen — your
-server never passes it.)
+`permissions = "queries"`, so the IC rejects update calls made through them at
+ingress — enforcement is protocol-level, not up to the target app. This
+includes **every management-canister call** (create/install/start/stop/
+uninstall/delete, and even `canister_status` and cycles reads are update
+calls), so that entire class of tools is inert under the default session. You
+don't choose this per call and can't widen it; it's fixed for the session.
+
+The access level is **not in the connect handshake** (`mcp_register` takes it
+as an `opt permissions` argument the II frontend fills from the consent screen;
+your server never passes or receives it). So to know it up front — rather than
+discovering it through an opaque ingress rejection — mint one delegation and
+inspect the `permissions` field on the returned `SignedDelegation`: `queries`
+means read-only, absent means full access. If your server needs update access,
+detect this and tell the user to reconnect with read-only off, instead of
+surfacing raw IC rejections.
 
 ## 3. Calling Internet Identity
 
@@ -196,7 +226,7 @@ mcp_get_accounts : (target_origin : text)
 
 mcp_prepare_delegation : (
     target_origin : text,
-    account_number : opt nat64,   // from mcp_get_accounts; null = default account
+    account_number : opt nat64,   // from mcp_get_accounts; null = the anchor's default there
     session_key : blob,           // per-app key YOU generate for this target app
     max_ttl : opt nat64           // ns; default and cap: 1 hour
   ) -> (variant { Ok : McpPrepareDelegation; Err : AccountDelegationError });
@@ -210,6 +240,39 @@ mcp_get_delegation : (
 ```
 
 Per-app delegations are capped at 1 hour and never outlive the grant.
+
+`account_number = null` selects the anchor's **current default account** at the
+origin (the user can change which account that is; it is not a fixed identity).
+Because the default is mutable, `prepare` returns the `account_number` it
+actually resolved — echo that exact value into `get`; re-deriving your own would
+risk `NoSuchDelegation` if the default changed in between.
+
+### Account principals and `target_origin`
+
+The principal a per-app delegation acts as is derived from `target_origin` — a
+**domain**, not an account you name. Pass a bare `https://<host>` (no path,
+port, or trailing slash). II applies one internal remap before deriving:
+`*.icp0.io` and `*.icp.net` gateway origins fold to the legacy `*.ic0.app` (so a
+dapp reached through either gateway gets one stable principal); every other
+origin is used as-is. A non-bare origin (with a path/port/trailing slash)
+bypasses the remap and derives a _different_ principal, so normalize to the bare
+origin yourself.
+
+Because derivation is domain-based, the resulting principal is **not guaranteed
+to equal the one the same user gets signing into the app in a browser.** A dapp
+can declare a custom _derivation origin_ via
+`/.well-known/ii-alternative-origins` — e.g. `app.example.com` deriving
+principals as `<canister>.ic0.app`.
+A browser honors that; the `mcp_*` methods don't expose it, so from
+`target_origin` alone the server derives from the visible domain and lands on a
+different principal — `mcp_get_accounts` then shows only the default/empty set,
+and delegations act as an identity the user has never used there. If a user says
+"this account/balance isn't what I see in my browser," this is the likely cause:
+the app uses a custom derivation origin the server can't discover from the
+domain. Surface that explanation, and offer to reconcile it — e.g. look up the
+app's `ii-alternative-origins` (a web search or a direct fetch) and retry with
+the declared derivation origin as `target_origin`. Resolving it automatically is
+a planned enhancement, not current behavior.
 
 ## 4. Session lifecycle
 
