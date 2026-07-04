@@ -96,6 +96,30 @@ describe("mcpAuthorize access-level wiring", () => {
   });
 });
 
+describe("mcpAuthorize completion notification", () => {
+  /** The body of the completion POST (the callback fetch that carries
+   *  `expiration`), parsed from the recorded fetch calls. */
+  const completionBody = (): { expiration: string; permissions: string } => {
+    const call = vi
+      .mocked(fetch)
+      .mock.calls.find(([, init]) =>
+        ((init?.body as string) ?? "").includes("expiration"),
+      );
+    if (call === undefined) throw new Error("no completion POST was sent");
+    return JSON.parse(call[1]?.body as string);
+  };
+
+  it("reports the access level so the server learns read-only up front", async () => {
+    await authorize(makeActor(), "read-only");
+    expect(completionBody().permissions).toBe("queries");
+  });
+
+  it("reports full access as `all`", async () => {
+    await authorize(makeActor(), "full-access");
+    expect(completionBody().permissions).toBe("all");
+  });
+});
+
 describe("mcpAuthorize finish_url handling", () => {
   it("resolves undefined when the server sends no finish_url", async () => {
     await expect(authorize(makeActor(), "read-only")).resolves.toBeUndefined();

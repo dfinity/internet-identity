@@ -1,4 +1,8 @@
-import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
+import {
+  toPermissionsArg,
+  toPermissionsString,
+  type AccessLevel,
+} from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { fromBase64URL } from "$lib/utils/utils";
 
@@ -150,18 +154,25 @@ export const mcpAuthorize = async ({
   }
   const { expiration } = result.Ok;
 
-  // Tell the server its session is live and when it expires (ns since epoch,
-  // as a string — the value overflows JSON numbers). Best effort: on failure
-  // the server discovers success on its first signed call. Sent (and awaited)
-  // before any `finish_url` navigation, so the server normally hears about
-  // the registration before the browser arrives — but a server must not rely
-  // on that ordering, since this notification can fail while the navigation
-  // still happens.
+  // Tell the server its session is live: when it expires (ns since epoch, as a
+  // string — the value overflows JSON numbers) and the access level the user
+  // chose (`permissions`, "queries" | "all"), so it learns read-only up front
+  // instead of inferring it from a minted delegation. Best effort: on failure
+  // the server discovers success on its first signed call, and can still read
+  // the access level off any delegation's `permissions`. Sent (and awaited)
+  // before any `finish_url` navigation, so the server normally hears about the
+  // registration before the browser arrives — but a server must not rely on
+  // that ordering, since this notification can fail while the navigation still
+  // happens.
   try {
     await fetch(callback, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state, expiration: expiration.toString() }),
+      body: JSON.stringify({
+        state,
+        expiration: expiration.toString(),
+        permissions: toPermissionsString(accessLevel),
+      }),
     });
   } catch {
     // Deliberately ignored; see above.

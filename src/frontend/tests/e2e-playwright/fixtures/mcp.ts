@@ -15,9 +15,14 @@ type McpOutcome = "success" | "error";
 const MCP_SERVER_ORIGIN = "https://mcp.id.ai";
 
 /** The completion notification the connect flow POSTs once the session is
- *  registered: the state echo plus the grant expiration (ns since epoch, as a
- *  decimal string — the value overflows JSON numbers). */
-export type McpCompletion = { state: string; expiration: string };
+ *  registered: the state echo, the grant expiration (ns since epoch, as a
+ *  decimal string — the value overflows JSON numbers), and the session's
+ *  access level (`permissions`: "queries" = read-only, "all" = full). */
+export type McpCompletion = {
+  state: string;
+  expiration: string;
+  permissions: string;
+};
 
 /**
  * Stands in for a remote MCP server. Unlike the CLI loopback fixture there's
@@ -151,7 +156,11 @@ export const test = base.extend<{ mcp: McpFixture }>({
         }
         if (typeof body.expiration === "string") {
           // Completion notification: the session is registered.
-          const received = { state, expiration: body.expiration };
+          const received = {
+            state,
+            expiration: body.expiration,
+            permissions: String(body.permissions),
+          };
           completions.push(received);
           resolveCompletion(received);
           await route.fulfill({

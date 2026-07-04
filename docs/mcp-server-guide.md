@@ -119,13 +119,18 @@ simply shows its own success screen.
 
 ```
 POST <callback>
-{"state": "<state>", "expiration": "<grant expiry, ns since epoch, decimal string>"}
+{"state": "<state>",
+ "expiration": "<grant expiry, ns since epoch, decimal string>",
+ "permissions": "queries" | "all"}
 ```
 
 Respond with any 2xx; mark the connection live and store `expiration` (a
-string because u64 nanoseconds overflow JSON numbers). You must tolerate never
-receiving this call (e.g. network failure after registration succeeded): fall
-back to attempting a signed call — success means you are registered.
+string because u64 nanoseconds overflow JSON numbers) and `permissions` (the
+session's access level — `"queries"` = read-only, `"all"` = full; see
+[Read-only sessions](#read-only-sessions)). You must tolerate never receiving
+this call (e.g. network failure after registration succeeded): fall back to
+attempting a signed call — success means you are registered — and to reading
+the access level off any minted delegation's `permissions` field.
 
 **c) Finish redirect** — only if your key response carried `finish_url`:
 after registering the session and sending (b), II navigates the connecting
@@ -207,14 +212,15 @@ uninstall/delete, and even `canister_status` and cycles reads are update
 calls), so that entire class of tools is inert under the default session. You
 don't choose this per call and can't widen it; it's fixed for the session.
 
-The access level is **not in the connect handshake** (`mcp_register` takes it
-as an `opt permissions` argument the II frontend fills from the consent screen;
-your server never passes or receives it). So to know it up front — rather than
-discovering it through an opaque ingress rejection — mint one delegation and
-inspect the `permissions` field on the returned `SignedDelegation`: `queries`
-means read-only, absent means full access. If your server needs update access,
-detect this and tell the user to reconnect with read-only off, instead of
-surfacing raw IC rejections.
+To know the level up front — rather than discovering it through an opaque
+ingress rejection — read the `permissions` field of the completion notification
+(§2b): `"queries"` = read-only, `"all"` = full. That POST is best-effort, so if
+it never arrives, fall back to inspecting the `permissions` field on the first
+`SignedDelegation` you mint (`queries` = read-only, absent = full). Either way,
+if your server needs update access and the session is read-only, tell the user
+to reconnect with read-only off instead of surfacing raw IC rejections. (You
+never pass the level yourself — `mcp_register` takes it as an `opt permissions`
+argument the II frontend fills from the consent screen.)
 
 ## 3. Calling Internet Identity
 

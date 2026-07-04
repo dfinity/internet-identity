@@ -19,6 +19,14 @@ export const toPermissionsArg = (accessLevel: AccessLevel): [Permissions] => [
   accessLevel === "read-only" ? { queries: null } : { all: null },
 ];
 
+/** The access level as the ICP permission string (`"queries"` / `"all"`) — the
+ *  same vocabulary a minted delegation's `permissions` field uses. Sent to the
+ *  MCP server in the connect completion notification so it learns the session's
+ *  access level up front, without minting a probe delegation to inspect it. */
+export const toPermissionsString = (
+  accessLevel: AccessLevel,
+): "queries" | "all" => (accessLevel === "read-only" ? "queries" : "all");
+
 /** Whether an access-level toggle's checkbox is ticked: the box offers
  *  `prompt` as the opt-in, so it is ticked exactly when the current level
  *  *is* the prompted one. */

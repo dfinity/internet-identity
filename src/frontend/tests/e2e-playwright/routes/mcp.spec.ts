@@ -241,12 +241,16 @@ test("Allow access registers the server's session key", async ({
   await page.getByRole("button", { name: "Allow access" }).click();
 
   // The connect flow fetched the server's session key, registered it with the
-  // backend, and reported completion: the state echo plus the grant expiration
-  // (ns since epoch as a decimal string). No delegation chain travels anywhere.
+  // backend, and reported completion: the state echo, the grant expiration
+  // (ns since epoch as a decimal string), and the access level the user chose.
+  // No delegation chain travels anywhere.
   const completion = await mcp.completion;
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
   expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
+  // Read-only is the default (the checkbox above was checked), so the server is
+  // told this session is queries-only up front — no probe delegation needed.
+  expect(completion.permissions).toBe("queries");
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
