@@ -72,7 +72,7 @@
     | { kind: "authorize" }
     | { kind: "untrusted" }
     | { kind: "connecting" }
-    | { kind: "close" }
+    | { kind: "close"; redirecting: boolean }
     | { kind: "invalid" };
 
   // The phase the page opens on: a returning user with a previously-used
@@ -207,7 +207,7 @@
         // navigation below never replaces the document (a 204 or attachment
         // response) or when the user comes Back to a bfcache-restored page —
         // rather than stranding them on the connecting spinner.
-        phase = { kind: "close" };
+        phase = { kind: "close", redirecting: finishUrl !== undefined };
         if (finishUrl !== undefined) {
           // The trusted server asked to finish the flow on its side (already
           // validated same-origin with the callback): hand it the tab.
@@ -291,7 +291,7 @@
 {:else if phase.kind === "connecting" && mcpServer !== undefined}
   <McpConnectingView mcpServer={mcpServer.host} />
 {:else if phase.kind === "close"}
-  <McpCloseWindowView />
+  <McpCloseWindowView redirecting={phase.redirecting} />
 {/if}
 
 <ManageHandoff

@@ -2,12 +2,23 @@
   import { CheckIcon } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { t } from "$lib/stores/locale.store";
+
+  interface Props {
+    /** Whether the tab is being redirected back to the agent — true when the
+     *  trusted server returned a `finish_url`. When false this is the resting
+     *  screen and there's nothing to redirect to. */
+    redirecting: boolean;
+  }
+
+  const { redirecting }: Props = $props();
 </script>
 
 <!--
-  Centered, card-less "you're done" page. Once the MCP server has accepted the
-  delegation there's nothing actionable here; the user just closes the tab and
-  returns to their MCP client.
+  Centered, card-less success page shown once the MCP server's session key has
+  been registered with the backend. When the trusted server returned a
+  `finish_url` the tab is being sent back to the agent to finish the flow, so we
+  say a redirect is underway; otherwise there's nothing to redirect to and this
+  is the resting screen, so we just confirm the sign-in.
 -->
 <div class="flex flex-col items-center gap-5 px-6 text-center">
   <FeaturedIcon size="lg" variant="success">
@@ -17,6 +28,10 @@
     {$t`You're signed in`}
   </h1>
   <p class="text-text-tertiary text-base">
-    {$t`You can close this window.`}
+    {#if redirecting}
+      {$t`Redirecting back to the agent…`}
+    {:else}
+      {$t`You can return to your agent.`}
+    {/if}
   </p>
 </div>
