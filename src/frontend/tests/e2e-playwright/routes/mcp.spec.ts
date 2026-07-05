@@ -288,6 +288,68 @@ test("A finish_url from the server hands the tab back to it after connecting", a
   ).toBeVisible();
 });
 
+test("The finish_secret never leaks to logs, errors, or other requests", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  // The server's key response carries a finish_url whose query holds a one-time
+  // finish_secret (the H3 "Consent-Bound Completion" credential the server hands
+  // only to the consenting browser). II must navigate the tab to that URL and
+  // surface the secret nowhere else: not to the console, not through an uncaught
+  // error, and not on any outbound request but the finish navigation itself.
+  // Anything else would leak the credential to a log/telemetry sink an attacker
+  // (or a bug report) could read — which is exactly what P2 forbids. This covers
+  // the +page.svelte funnel/error surface the utils unit test can't reach.
+  await addVirtualAuthenticator(page);
+  mcp.enableFinishRedirect();
+  const secret = mcp.finishSecret;
+
+  // Attach the observers before anything loads, so nothing is missed. The
+  // finish navigation (a GET to /oauth/finish) is the one place the secret is
+  // meant to appear, so it's excluded; every other request — URL and body — is
+  // inspected.
+  const consoleLeaks: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.text().includes(secret)) consoleLeaks.push(msg.text());
+  });
+  const errorLeaks: string[] = [];
+  page.on("pageerror", (error) => {
+    if (error.message.includes(secret)) errorLeaks.push(error.message);
+  });
+  const requestLeaks: string[] = [];
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.includes("/oauth/finish")) {
+      return;
+    }
+    if (url.includes(secret) || (request.postData() ?? "").includes(secret)) {
+      requestLeaks.push(`${request.method()} ${url}`);
+    }
+  });
+
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // Drive the full connect through to the finish navigation — the secret has
+  // now flowed through the key response, +page.svelte, and the redirect.
+  await mcp.completion;
+  await page.waitForURL(mcp.finishUrl);
+  await expect(
+    page.getByRole("heading", { name: "Connection complete" }),
+  ).toBeVisible();
+
+  expect(consoleLeaks).toEqual([]);
+  expect(errorLeaks).toEqual([]);
+  expect(requestLeaks).toEqual([]);
+});
+
 test("Identity switcher shows while signing in and hides on the success screen", async ({
   page,
   mcp,

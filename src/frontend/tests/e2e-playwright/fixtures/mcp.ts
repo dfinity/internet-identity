@@ -44,8 +44,14 @@ export type McpFixture = {
   callbackUrl: string;
   /** Where the stand-in sends the browser after the connect once
    *  `enableFinishRedirect()` is called: a landing page on its own origin,
-   *  like a real server completing its own (e.g. OAuth) flow. */
+   *  like a real server completing its own (e.g. OAuth) flow. Its query
+   *  carries the one-time `finish_secret` (as a real server's would) so a
+   *  test can assert that secret never leaks to a log/telemetry sink. */
   finishUrl: string;
+  /** The one-time secret embedded in `finishUrl`'s query (the `fs` param):
+   *  the H3 "Consent-Bound Completion" credential the server delivers only to
+   *  the consenting browser. Exposed so the leak test can grep for it. */
+  finishSecret: string;
   completion: Promise<McpCompletion>;
   /** Every completion received so far, in order (for multi-connect tests). */
   completions: McpCompletion[];
@@ -98,7 +104,12 @@ export const test = base.extend<{ mcp: McpFixture }>({
     // it started.
     const state = toBase64URL(crypto.getRandomValues(new Uint8Array(32)));
     const callbackUrl = `${MCP_SERVER_ORIGIN}/callback`;
-    const finishUrl = `${MCP_SERVER_ORIGIN}/oauth/finish?sid=fixture`;
+    // A distinctive one-time secret in the finish URL's query, standing in for
+    // the H3 `finish_secret` the server delivers only to the consenting
+    // browser. Kept greppable so the leak test can assert it never reaches a
+    // console/telemetry/outbound sink other than the finish navigation itself.
+    const finishSecret = "fs-DO-NOT-LEAK-7f2a91c4";
+    const finishUrl = `${MCP_SERVER_ORIGIN}/oauth/finish?sid=fixture&fs=${finishSecret}`;
 
     let finishRedirect = false;
     const enableFinishRedirect = (): void => {
@@ -246,6 +257,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
       mcpOrigin: MCP_SERVER_ORIGIN,
       callbackUrl,
       finishUrl,
+      finishSecret,
       completion,
       completions,
       setNextOutcome,
