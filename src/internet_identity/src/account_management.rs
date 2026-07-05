@@ -342,6 +342,13 @@ pub async fn prepare_account_delegation(
         time().saturating_add(session_duration_ns),
         max_expiration.unwrap_or(u64::MAX),
     );
+    // The metrics duration is the delegation's *effective* lifetime: the
+    // absolute `max_expiration` cap can shorten it below the requested
+    // `session_duration_ns` (e.g. an MCP grant near expiry). With no cap the two
+    // are equal, so this matches the regular path exactly while keeping the
+    // recorded duration honest when the cap binds. `time()` is stable here (no
+    // await since it was read for `expiration`).
+    let effective_duration_ns = expiration.saturating_sub(time());
     let seed = account.calculate_seed();
 
     state::signature_map_mut(|sigs| {
@@ -360,7 +367,7 @@ pub async fn prepare_account_delegation(
         storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
     });
 
-    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
+    delegation_bookkeeping(origin, ii_domain.clone(), effective_duration_ns);
 
     Ok(PrepareAccountDelegation {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
