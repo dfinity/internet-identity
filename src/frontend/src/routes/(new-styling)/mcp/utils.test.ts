@@ -208,3 +208,66 @@ describe("mcpAuthorize finish_url handling", () => {
     expect(actor.mcp_register).not.toHaveBeenCalled();
   });
 });
+
+// Two properties the server-side H3 mitigation ("Consent-Bound Completion")
+// relies on from the II frontend. They hold today; these tests pin them so a
+// future refactor of the connect flow can't silently regress them.
+//   P1  — the key request is issued exactly once per connect and never
+//         auto-retried (a single-use connect-state means a retry would either
+//         brick the user or reopen the attacker race; recovery is a fresh
+//         connect, not a retry).
+//   P2  — finish_url (which carries the server's one-time finish_secret) is
+//         never written to a log/telemetry sink by the frontend.
+describe("H3 preconditions the fix depends on", () => {
+  /** Callback POSTs that are key requests (no `expiration` in the body), as
+   *  opposed to the completion notification (which carries `expiration`). */
+  const keyRequestCount = (): number =>
+    vi.mocked(fetch).mock.calls.filter(([, init]) => {
+      const body = JSON.parse((init?.body as string) ?? "{}") as {
+        expiration?: string;
+      };
+      return body.expiration === undefined;
+    }).length;
+
+  it("P1: issues exactly one key request per connect", async () => {
+    await authorize(makeActor(), "read-only");
+    expect(keyRequestCount()).toBe(1);
+  });
+
+  it("P1: does not retry the key request (or register) when the server rejects it", async () => {
+    // A rejected key request aborts the connect; there is no retry loop, and
+    // nothing is registered — the only recovery is a fresh /oauth/authorize
+    // (new connect-state), never a retry of the same one.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("", { status: 403 }))),
+    );
+    const actor = makeActor();
+
+    await expect(authorize(actor, "read-only")).rejects.toThrow(
+      /rejected the connect request/,
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(actor.mcp_register).not.toHaveBeenCalled();
+  });
+
+  it("P2: never writes finish_url (which carries finish_secret) to the console", async () => {
+    const SECRET = "fs-DO-NOT-LOG-9f83k2";
+    stubFetch({
+      public_key: SERVER_PUBKEY,
+      finish_url: `${MCP_ORIGIN}/oauth/finish?fs=${SECRET}`,
+    });
+    const methods = ["log", "info", "warn", "error", "debug"] as const;
+    const spies = methods.map((m) =>
+      vi.spyOn(console, m).mockImplementation(() => undefined),
+    );
+
+    // Returns the finish_url to the caller (which navigates to it) — but must
+    // not emit it to any console sink along the way.
+    await expect(authorize(makeActor(), "read-only")).resolves.toContain(
+      SECRET,
+    );
+    const logged = spies.flatMap((s) => s.mock.calls.flat()).join(" ");
+    expect(logged).not.toContain(SECRET);
+  });
+});
