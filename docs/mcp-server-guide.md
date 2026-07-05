@@ -144,8 +144,9 @@ connect; without it the II tab finishes on its own and never redirects.
   and checking for the `Ok` variant. (Check the candid result, not the
   transport status: an unregistered key gets `Err Unauthorized(principal)`
   delivered inside a _successful_ query response.)
-- Tie the request to the pending connection yourself (e.g. an unguessable id
-  in the `finish_url` query — II passes the URL through untouched).
+- Tie the request to the pending connection via the `finish_url` query — II
+  passes the URL through untouched, which is exactly how the one-time
+  `finish_secret` reaches `/oauth/finish` (see "Consent-Bound Completion").
 
 ### Serving MCP clients over OAuth
 
@@ -159,14 +160,21 @@ binding the rest of the flow relies on, so prefer to omit it. The II connect
 slots into the code flow as your "identity provider" leg, with `finish_url`
 closing the loop:
 
-1. `GET /oauth/authorize` — validate `client_id` + exact `redirect_uri`,
-   store a pending auth `{code_challenge, state, resource}`, and 302 the
-   browser to the II connect link (§1) with a fresh server-side `state`.
+1. `GET /oauth/authorize` — validate `client_id` + exact `redirect_uri` +
+   PKCE, create a pending auth `{code_challenge, oauth_state, resource}`, set
+   an initiator cookie (`sid`, `HttpOnly; Secure; SameSite=Lax`) referencing
+   it, and 302 the browser to the II connect link (§1) with a fresh,
+   single-use `connect_state` as the link's `state`.
 2. Your callback (§2a) answers the key request with a fresh keypair **and a
-   `finish_url`** carrying the pending-auth id.
-3. `GET <finish_url>` — confirm the session registered (see (c)), mint the
-   authorization code, and 302 to the client's `redirect_uri` with
-   `code` + the client's original `state`.
+   `finish_url` carrying a one-time `finish_secret` in its query** (see
+   "Consent-Bound Completion" below). Mint the keypair and `finish_secret`
+   and mark `connect_state` consumed in one atomic step, on the _first_ POST
+   for that `connect_state`; reject any later POST for it.
+3. `GET <finish_url>` — mint the authorization code only once the browser
+   proves it is both the initiator (the `sid` cookie) and the consenter (the
+   matching `finish_secret`), and the session is provably registered (see
+   (c)); then 302 to the client's `redirect_uri` with `code` + the client's
+   original `state`.
 4. `POST /oauth/token` — exchange code + PKCE verifier for a bearer token.
    Bound its lifetime by the grant — never issue a token that outlives the
    grant. Refresh tokens are **optional**: they enable silent renewal but only
@@ -175,20 +183,47 @@ closing the loop:
    way. Without them the client re-runs the browser flow when the token
    expires; the `error="invalid_token"` challenge (below) lets it prompt inline.
 
-**Bind the browser session across the flow.** The `state` you place in the II
-connect link travels back to the client in the redirect, so it cannot by itself
-prove that the browser completing `/oauth/finish` is the one that started
-`/oauth/authorize`. Without a binding there is a code-injection / session-
-fixation takeover: an attacker registers a client (open DCR) with their own
-`redirect_uri` + PKCE, starts `/oauth/authorize`, lifts the resulting II connect
-link, and phishes it to a victim who already trusts your origin — II's consent
-screen names only **your server's origin**, never the OAuth client, so nothing
-warns the victim. On their consent you would mint a code for the _attacker's_
-pending auth and 302 it to the attacker's `redirect_uri`, handing them a token
-for the victim's identity. Prevent it: set a server-side session cookie at
-`/oauth/authorize` and require it at `/oauth/finish` before minting the code, so
-only the initiating browser can complete the flow. (II cannot help here — its
-trust model only ever identifies your origin, not the client.)
+**Consent-Bound Completion: bind the code to whoever actually consented.** The
+`connect_state` in the II link travels back to the client in the redirect, and
+a cookie alone binds only `authorize`↔`finish` to one browser — neither binds
+the code to the browser that performed the II consent. Without that binding a
+split-browser takeover remains: an attacker registers a client (open DCR) with
+their own `redirect_uri` + PKCE, starts `/oauth/authorize`, lifts the resulting
+II connect link, and phishes it to a victim who already trusts your origin —
+II's consent screen names only **your server's origin**, never the OAuth
+client, so nothing warns the victim. The victim consents (registering _their_
+session under the attacker's pending auth); the attacker, still holding the
+`sid` cookie, completes `/oauth/finish` and redeems a token for the victim's
+identity.
+
+Close it by requiring **two independent proofs** at `/oauth/finish` before
+minting a code: the `sid` cookie (proves _initiator_) **and** the
+`finish_secret` (proves _consenter_ — it is disclosed only in the key-request
+response, which runs in the consenting browser, and rides through to
+`/oauth/finish` inside `finish_url`). Because `connect_state` is single-use, the
+key request — and thus the `finish_secret` — reaches exactly one browser; only
+in the legitimate same-browser flow can one user-agent hold both proofs, so a
+code can never be minted for an identity other than the one operating the
+initiating client. This rests on II issuing **exactly one key request per
+connect and never auto-retrying it**: II drops the link's `state` after parsing
+and issues a single, non-retried `fetch`, so a failed connect must restart at
+`/oauth/authorize` with a new `connect_state` — never re-drive the same one. Do
+not add a client- or server-side retry of the key request.
+
+Two supporting requirements keep the proof intact. Treat the session as
+**registered only on proof of an on-chain grant** — a signed `mcp_get_accounts`
+returning `Ok` (see (c)), never a bare completion POST, which any
+`connect_state`-knower can forge. And keep `finish_secret` **leak-free**: carry
+it in the query string (not a path segment), set `Referrer-Policy: no-referrer`
+on `/oauth/finish`, and keep it out of logs, metrics, and error bodies.
+
+Consent-Bound Completion closes this for every client transport, including
+loopback. It does **not** by itself close the _same-browser_ variant (the
+attacker induces the victim's own browser to both initiate and consent) toward
+a **hosted** `redirect_uri`; that residual needs hosted-redirect allow-listing.
+Loopback/native clients — whose redirect resolves on the consenter's own
+machine — are safe either way. (II cannot help with any of this: its trust
+model only ever identifies your origin, not the OAuth client.)
 
 Advertise what you actually implement (`authorization_endpoint`,
 `response_types_supported: ["code"]`, `grant_types_supported` containing
