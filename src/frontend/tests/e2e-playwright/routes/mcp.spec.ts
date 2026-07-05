@@ -32,6 +32,22 @@ const signUp = async (page: Page): Promise<void> => {
 const expirationMillis = (expiration: string): number =>
   Number(BigInt(expiration) / BigInt(1_000_000));
 
+/** Turn the `READ_ONLY_MODE` feature flag on before anything loads, so the
+ *  connect screen shows the access-level toggle (read-only by default). The
+ *  key shape mirrors `LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name` in
+ *  featureFlags.ts; hardcoded here so a prefix change fails the test loudly. */
+const enableReadOnlyMode = (page: Page): Promise<void> =>
+  page.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        "ii-localstorage-feature-flags__READ_ONLY_MODE",
+        JSON.stringify(true),
+      );
+    } catch {
+      // localStorage may be locked in some test contexts.
+    }
+  });
+
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
   await expect(
@@ -395,6 +411,142 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   const requestedMillis = ttlSeconds * 1000;
   expect(expMillis - before).toBeGreaterThanOrEqual(requestedMillis - 60_000);
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
+});
+
+test("A connect failure returns to the connect screen instead of stranding the user", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  // The server rejects the key request (a `state` it never issued, a transient
+  // 5xx, ...). The connect must surface the error and return to the connect
+  // screen — not hang on the connecting spinner, and never reach the success
+  // screen — so the user can retry (handleAuthorize's catch re-opens authorize).
+  mcp.setNextOutcome("error");
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // The failure is surfaced...
+  await expect(page.getByText(/rejected the connect request/)).toBeVisible();
+  // ...the connect screen is back (retry is possible)...
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
+  // ...and no session was reported as registered.
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toHaveCount(0);
+});
+
+test("Removing the trusted server in Settings blocks connecting", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page); // leaves the page on Settings, server trusted
+
+  // Remove the server: the server row (and its Remove button) give way to the
+  // URL input again — the revoke path the fixture's add-only helper never hits.
+  await page.getByRole("button", { name: "Remove this server" }).click();
+  await expect(page.getByLabel("MCP server URL")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Remove this server" }),
+  ).toHaveCount(0);
+
+  // Trust is re-verified against the synced config at connect time, so with no
+  // trusted server the connect lands on the untrusted screen.
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+});
+
+test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  // Turn the feature off for this identity. The URL stays saved on-chain, but
+  // the config is no longer `enabled`, so trust is off.
+  await page.getByRole("switch", { name: "Trusted MCP server" }).uncheck();
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+});
+
+test("With read-only mode enabled, the connect defaults to a queries-only session", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await enableReadOnlyMode(page);
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  // With the flag on, the access-level toggle is shown and read-only is the
+  // default (opt-out).
+  const readOnly = page.getByRole("checkbox", { name: "Read-only mode" });
+  await expect(readOnly).toBeVisible();
+  await expect(readOnly).toBeChecked();
+
+  await page.getByRole("button", { name: "Allow access" }).click();
+  // The server is told the session is read-only up front (`permissions`),
+  // which is what makes every per-app delegation queries-only.
+  const completion = await mcp.completion;
+  expect(completion.permissions).toBe("queries");
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+});
+
+test("Unchecking read-only mode connects with full access", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await enableReadOnlyMode(page);
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  const readOnly = page.getByRole("checkbox", { name: "Read-only mode" });
+  await expect(readOnly).toBeChecked();
+  await readOnly.uncheck();
+
+  await page.getByRole("button", { name: "Allow access" }).click();
+  // Opting out of read-only flips `effectiveAccessLevel` to full access.
+  const completion = await mcp.completion;
+  expect(completion.permissions).toBe("all");
 });
 
 // The browser /mcp flow registers the MCP server's session key for the user's
