@@ -95,4 +95,55 @@ describe("/mcp load: request validation", () => {
       expect("publicKey" in parsed).toBe(false);
     }
   });
+
+  it("rejects a present-but-empty callback or state", () => {
+    // `callback=` / `state=` parse as "" (not null) from URLSearchParams; the
+    // guards must treat empty the same as absent.
+    const emptyCallback = new URLSearchParams(fragment());
+    emptyCallback.set("callback", "");
+    expect(loadParams(emptyCallback.toString()).kind).toBe("invalid");
+
+    const emptyState = new URLSearchParams(fragment());
+    emptyState.set("state", "");
+    expect(loadParams(emptyState.toString()).kind).toBe("invalid");
+  });
+});
+
+describe("/mcp load: callback validation", () => {
+  const withCallback = (callback: string): McpParams => {
+    const params = new URLSearchParams(fragment());
+    params.set("callback", callback);
+    return loadParams(params.toString());
+  };
+
+  it("rejects a malformed (non-URL) callback", () => {
+    expect(withCallback("not a url").kind).toBe("invalid");
+    expect(withCallback("mcp.example.com/cb").kind).toBe("invalid");
+    expect(withCallback("/cb").kind).toBe("invalid");
+  });
+
+  it("rejects a non-http(s) callback scheme", () => {
+    for (const callback of [
+      "javascript:alert(1)",
+      "data:text/html,hi",
+      "ws://mcp.example.com/cb",
+      "ftp://mcp.example.com/cb",
+      "file:///etc/passwd",
+    ]) {
+      expect(withCallback(callback).kind).toBe("invalid");
+    }
+  });
+
+  it("accepts an http callback structurally (the https-only gate is the component's)", () => {
+    // The load/component split: `load` is a structural check only (absolute
+    // http(s) URL) because it also runs at prerender; the stricter https-only
+    // remote gate (`parseMcpServerUrl`) runs in the component, which shows the
+    // invalid screen. This pins the split so a refactor moving the https check
+    // out of the component doesn't silently drop it from both layers.
+    const parsed = withCallback("http://mcp.example.com/cb");
+    expect(parsed.kind).toBe("valid");
+    if (parsed.kind === "valid") {
+      expect(parsed.callback).toBe("http://mcp.example.com/cb");
+    }
+  });
 });

@@ -73,6 +73,16 @@ describe("parseMcpServerUrl", () => {
       expect(parseMcpServerUrl(raw)).toBeUndefined();
     }
   });
+
+  it("derives origin/host from the real host, not embedded userinfo", () => {
+    // https://mcp.id.ai@evil.example.com/ actually points at evil.example.com;
+    // the origin (what trust matching uses) and host (what the consent screen
+    // shows) must both name the real host, so the userinfo can't spoof either.
+    const parsed = parseMcpServerUrl("https://mcp.id.ai@evil.example.com/mcp");
+    expect(parsed?.origin).toBe("https://evil.example.com");
+    expect(parsed?.host).toBe("evil.example.com");
+    expect(parsed?.origin).not.toContain("mcp.id.ai");
+  });
 });
 
 describe("probeMcpServer", () => {
@@ -143,6 +153,21 @@ describe("probeMcpServer", () => {
     route((url, method) => {
       if (method === "GET" && url.includes("/.well-known/"))
         return metadataDoc("https://mcp.id.ai/other");
+      if (method === "POST") return new Response("nope", { status: 200 });
+      return undefined;
+    });
+    await expect(probeMcpServer(RESOURCE)).resolves.toBe(false);
+  });
+
+  it("rejects metadata without an authorization_servers array (RFC 9728 requires both fields)", async () => {
+    // A resource match alone is not enough: an II-usable MCP server is
+    // OAuth-protected, so the metadata must also name authorization servers.
+    route((url, method) => {
+      if (method === "GET" && url.includes("/.well-known/"))
+        return new Response(JSON.stringify({ resource: RESOURCE }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
       if (method === "POST") return new Response("nope", { status: 200 });
       return undefined;
     });

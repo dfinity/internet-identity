@@ -207,6 +207,89 @@ describe("mcpAuthorize finish_url handling", () => {
     );
     expect(actor.mcp_register).not.toHaveBeenCalled();
   });
+
+  it("rejects a non-string finish_url before registering anything", async () => {
+    // Present but not a string (e.g. a number or object) is a misbehaving
+    // server, not an omitted optional — fail the connect up front.
+    for (const finish_url of [42, { url: "https://mcp.id.ai" }, true]) {
+      const actor = makeActor();
+      stubFetch({ public_key: SERVER_PUBKEY, finish_url });
+      await expect(authorize(actor, "read-only")).rejects.toThrow(
+        /not a string/,
+      );
+      expect(actor.mcp_register).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("mcpAuthorize failure paths", () => {
+  it("rejects a key response without a usable public_key, registering nothing", async () => {
+    // Missing key and non-string key are both a misbehaving (or wrong) server;
+    // the connect must abort before anything binds to the identity.
+    for (const keyBody of [
+      {},
+      { public_key: 42 },
+      { public_key: null },
+    ] as Record<string, unknown>[]) {
+      const actor = makeActor();
+      stubFetch(keyBody);
+      await expect(authorize(actor, "read-only")).rejects.toThrow(
+        /missing `public_key`/,
+      );
+      expect(actor.mcp_register).not.toHaveBeenCalled();
+    }
+  });
+
+  it("propagates an mcp_register refusal and sends no completion POST", async () => {
+    // A backend refusal (untrusted config, key bound to another identity, ...)
+    // fails the connect: the error surfaces to the caller, and the server must
+    // NOT be told the session is live — no completion POST follows the key
+    // request.
+    const actor = makeActor();
+    actor.mcp_register.mockResolvedValue({
+      Err: "MCP is not enabled for this identity",
+    });
+
+    await expect(authorize(actor, "full-access")).rejects.toThrow(
+      /not enabled for this identity/,
+    );
+    // Exactly one callback fetch: the key request. No completion.
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("still resolves (best effort) when the completion POST fails", async () => {
+    // The completion notification is advisory: the session is already
+    // registered, so a network failure on the POST must not fail the connect —
+    // and a finish_url from the key response must still be handed back for
+    // navigation.
+    const finishUrl = `${MCP_ORIGIN}/oauth/finish?sid=xyz`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        const body = JSON.parse((init?.body as string) ?? "{}") as {
+          expiration?: string;
+        };
+        // Key request succeeds; completion POST dies on the network.
+        return body.expiration === undefined
+          ? Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  public_key: SERVER_PUBKEY,
+                  finish_url: finishUrl,
+                }),
+                { status: 200 },
+              ),
+            )
+          : Promise.reject(new TypeError("network down"));
+      }),
+    );
+    const actor = makeActor();
+
+    await expect(authorize(actor, "read-only")).resolves.toBe(finishUrl);
+    expect(actor.mcp_register).toHaveBeenCalledOnce();
+    // Both fetches were attempted: key request + the failed completion.
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
 });
 
 // Two properties the server-side H3 mitigation ("Consent-Bound Completion")

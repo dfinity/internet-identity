@@ -1231,3 +1231,212 @@ fn mcp_read_only_grant_mints_queries_only_delegations() -> Result<(), RejectResp
 
     Ok(())
 }
+
+/// Expiry must hold on the pure QUERY gate too, not only on the update path:
+/// `mcp_get_accounts` / `mcp_get_delegation` are queries authorized by
+/// `authorize_mcp_session` directly, while the existing expiry test drives
+/// `mcp_prepare_delegation` through the update wrapper. A regression that
+/// moved the expiry check into the update-only wrapper would let an expired
+/// session keep reading accounts and fetching signed delegations — this pins
+/// the query gate independently.
+#[test]
+fn mcp_query_methods_reject_expired_grant() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("k");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_MIN_TTL_NS, // 10 minutes
+    );
+    // While live: prepare once (so a delegation exists to fetch) and confirm
+    // both queries answer.
+    let prepared = mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(mcp_get_accounts(&env, canister_id, mcp, target.clone())
+        .unwrap()
+        .is_ok());
+
+    env.advance_time(Duration::from_secs(11 * 60));
+    // Queries read the certified time of the last executed round, so tick once
+    // for the advanced clock to reach the query gate (the update-path expiry
+    // test observes the advance via the update call's own round instead).
+    env.tick();
+
+    // Both query methods refuse the expired session — including fetching a
+    // delegation that was validly prepared while the grant was live.
+    assert!(matches!(
+        mcp_get_accounts(&env, canister_id, mcp, target.clone()).unwrap(),
+        Err(AccountDelegationError::Unauthorized(p)) if p == mcp
+    ));
+    assert!(matches!(
+        mcp_get_delegation(
+            &env,
+            canister_id,
+            mcp,
+            target,
+            prepared.account_number,
+            session_key,
+            prepared.expiration,
+        )
+        .unwrap(),
+        Err(AccountDelegationError::Unauthorized(p)) if p == mcp
+    ));
+
+    Ok(())
+}
+
+/// `get` fails closed on every mismatched lookup input, not just the account:
+/// the signature is stored under (seed, session_key, expiration, permissions),
+/// so a wrong `expiration` or a wrong per-app `session_key` must yield
+/// `NoSuchDelegation` — never a delegation minted for different parameters.
+/// (The mismatched-account case is covered by
+/// `mcp_get_uses_prepared_account_despite_default_change`.)
+#[test]
+fn mcp_get_delegation_rejects_mismatched_expiration_and_session_key(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("per-app session key");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let (mcp, _) = register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        &ByteBuf::from("mcp server session key"),
+        GRANT_TTL_NS,
+    );
+    let prepared = mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    // Wrong expiration (off by one nanosecond) finds nothing.
+    assert!(matches!(
+        mcp_get_delegation(
+            &env,
+            canister_id,
+            mcp,
+            target.clone(),
+            prepared.account_number,
+            session_key.clone(),
+            prepared.expiration + 1,
+        )
+        .unwrap(),
+        Err(AccountDelegationError::NoSuchDelegation)
+    ));
+    // Wrong per-app session key finds nothing.
+    assert!(matches!(
+        mcp_get_delegation(
+            &env,
+            canister_id,
+            mcp,
+            target.clone(),
+            prepared.account_number,
+            ByteBuf::from("a different per-app key"),
+            prepared.expiration,
+        )
+        .unwrap(),
+        Err(AccountDelegationError::NoSuchDelegation)
+    ));
+    // Sanity: the exact prepared triple resolves.
+    assert!(mcp_get_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        prepared.account_number,
+        session_key,
+        prepared.expiration,
+    )
+    .unwrap()
+    .is_ok());
+
+    Ok(())
+}
+
+/// A read-only grant stays read-only across a canister upgrade: the persisted
+/// `read_only` flag on the stored grant — not just the grant's existence —
+/// must survive, so delegations minted after the upgrade still carry
+/// `permissions = "queries"`. Composes the persistence test (grant survives)
+/// with the read-only test (queries-only minting), which individually don't
+/// cover the flag's persistence.
+#[test]
+fn mcp_read_only_grant_stays_queries_only_across_upgrade() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    let target = "https://some-app.com".to_string();
+    let session_key = ByteBuf::from("per-app session key");
+
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+    let server_key = ByteBuf::from("mcp server session key");
+    mcp_register(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        server_key.clone(),
+        GRANT_TTL_NS,
+        Some(true),
+    )
+    .unwrap()
+    .unwrap();
+    let mcp = Principal::self_authenticating(&server_key);
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    let prepared = mcp_prepare_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target.clone(),
+        None,
+        session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+    let signed = mcp_get_delegation(
+        &env,
+        canister_id,
+        mcp,
+        target,
+        prepared.account_number,
+        session_key,
+        prepared.expiration,
+    )
+    .unwrap()
+    .unwrap();
+    verify_delegation(&env, prepared.user_key, &signed, &env.root_key().unwrap());
+    assert_eq!(signed.delegation.permissions, Some("queries".to_string()));
+
+    Ok(())
+}

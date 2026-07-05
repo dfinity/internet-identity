@@ -611,16 +611,16 @@ mod tests {
             "dev CSP should not include upgrade-insecure-requests, got: {dev_csp}"
         );
 
-        // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
+        // Prod CSP: disallow http: in connect-src and include
+        // upgrade-insecure-requests. The trailing `;` pins the WHOLE
+        // directive: the fetch-based /mcp connect flow relies on connect-src
+        // being exactly self + https, and a bare substring check would let any
+        // extra scheme-source (ws:, http:, ...) slip in unnoticed.
         let prod_csp = get_content_security_policy(Vec::new(), None, false);
 
         assert!(
-            prod_csp.contains("connect-src 'self' https:"),
-            "prod CSP should allow https: in connect-src, got: {prod_csp}"
-        );
-        assert!(
-            !prod_csp.contains("connect-src 'self' https: http:"),
-            "prod CSP should not allow http: in connect-src, got: {prod_csp}"
+            prod_csp.contains("connect-src 'self' https:;"),
+            "prod CSP connect-src should be exactly 'self' https:, got: {prod_csp}"
         );
         assert!(
             prod_csp.contains("upgrade-insecure-requests;"),
@@ -630,17 +630,17 @@ mod tests {
 
     #[test]
     fn csp_form_action_stays_tight_on_every_asset() {
-        // form-action is same-origin + http loopback everywhere: the /mcp
-        // connect flow talks to the MCP server via fetch (connect-src), so no
-        // route needs — or gets — cross-origin form posts.
-        let csp = get_content_security_policy(Vec::new(), None, false);
-        assert!(
-            csp.contains("form-action 'self' http://127.0.0.1:*;"),
-            "form-action should be self + loopback only, got: {csp}"
-        );
-        assert!(
-            !csp.contains("form-action 'self' http://127.0.0.1:* https:"),
-            "form-action must not allow https:, got: {csp}"
-        );
+        // form-action is same-origin + http loopback everywhere — in prod AND
+        // dev CSP: the /mcp connect flow talks to the MCP server via fetch
+        // (connect-src), so no route needs — or gets — cross-origin form
+        // posts. The trailing `;` pins the whole directive, so a broadening
+        // (e.g. re-adding https: for a form POST) fails in either mode.
+        for dev_csp in [false, true] {
+            let csp = get_content_security_policy(Vec::new(), None, dev_csp);
+            assert!(
+                csp.contains("form-action 'self' http://127.0.0.1:*;"),
+                "form-action should be self + loopback only (dev_csp={dev_csp}), got: {csp}"
+            );
+        }
     }
 }
