@@ -32,22 +32,6 @@ const signUp = async (page: Page): Promise<void> => {
 const expirationMillis = (expiration: string): number =>
   Number(BigInt(expiration) / BigInt(1_000_000));
 
-/** Turn the `READ_ONLY_MODE` feature flag on before anything loads, so the
- *  connect screen shows the access-level toggle (read-only by default). The
- *  key shape mirrors `LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name` in
- *  featureFlags.ts; hardcoded here so a prefix change fails the test loudly. */
-const enableReadOnlyMode = (page: Page): Promise<void> =>
-  page.addInitScript(() => {
-    try {
-      window.localStorage.setItem(
-        "ii-localstorage-feature-flags__READ_ONLY_MODE",
-        JSON.stringify(true),
-      );
-    } catch {
-      // localStorage may be locked in some test contexts.
-    }
-  });
-
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
   await expect(
@@ -248,12 +232,9 @@ test("Allow access registers the server's session key", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // The MCP flow always shows the access-level toggle, defaulting to read-only
-  // (opt-out): the "Read-only mode" box is shown checked. That choice is
-  // persisted with the access grant and applies to the per-app delegations the
-  // server later obtains; the standing delegation posted here stays full access
-  // (so the server can still call the update prepare endpoint), so this two-hop
-  // chain is unaffected by the toggle.
+  // The MCP connect flow always shows the access-level toggle and defaults to
+  // read-only (opt-out): the "Read-only mode" box is shown checked. Left
+  // checked, the connect is read-only.
   await expect(
     page.getByRole("checkbox", { name: "Read-only mode" }),
   ).toBeChecked();
@@ -267,11 +248,10 @@ test("Allow access registers the server's session key", async ({
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
   expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
-  // With READ_ONLY_MODE flagged off the session is full access, and the server
-  // is told so up front via the completion's `permissions` field ("all") — no
-  // probe delegation needed. (The read-only value "queries" is exercised by the
-  // utils unit tests, which drive mcpAuthorize directly with the flag's effect.)
-  expect(completion.permissions).toBe("all");
+  // Left at the read-only default, the server is told so up front via the
+  // completion's `permissions` field ("queries"). The full-access path (after
+  // unchecking the toggle) has its own test below.
+  expect(completion.permissions).toBe("queries");
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
@@ -498,43 +478,14 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
   ).toBeVisible();
 });
 
-test("With read-only mode enabled, the connect defaults to a queries-only session", async ({
-  page,
-  mcp,
-}) => {
-  test.slow();
-  await addVirtualAuthenticator(page);
-  await enableReadOnlyMode(page);
-  await mcp.installInterceptor(page);
-  await page.goto(II_URL);
-  await signUp(page);
-  await page.waitForURL(II_URL + "/manage");
-  await mcp.trustServer(page);
-
-  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // With the flag on, the access-level toggle is shown and read-only is the
-  // default (opt-out).
-  const readOnly = page.getByRole("checkbox", { name: "Read-only mode" });
-  await expect(readOnly).toBeVisible();
-  await expect(readOnly).toBeChecked();
-
-  await page.getByRole("button", { name: "Allow access" }).click();
-  // The server is told the session is read-only up front (`permissions`),
-  // which is what makes every per-app delegation queries-only.
-  const completion = await mcp.completion;
-  expect(completion.permissions).toBe("queries");
-  await expect(
-    page.getByRole("heading", { name: "You're signed in" }),
-  ).toBeVisible();
-});
-
 test("Unchecking read-only mode connects with full access", async ({
   page,
   mcp,
 }) => {
+  // The read-only default (queries-only) connect is covered by "Allow access
+  // registers the server's session key"; this exercises the opt-out path.
   test.slow();
   await addVirtualAuthenticator(page);
-  await enableReadOnlyMode(page);
   await mcp.installInterceptor(page);
   await page.goto(II_URL);
   await signUp(page);
@@ -547,7 +498,8 @@ test("Unchecking read-only mode connects with full access", async ({
   await readOnly.uncheck();
 
   await page.getByRole("button", { name: "Allow access" }).click();
-  // Opting out of read-only flips `effectiveAccessLevel` to full access.
+  // Unchecking the toggle switches the session to full access, which the
+  // server is told up front via the completion's `permissions` field.
   const completion = await mcp.completion;
   expect(completion.permissions).toBe("all");
 });
