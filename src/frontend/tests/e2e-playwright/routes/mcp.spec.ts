@@ -248,12 +248,15 @@ test("Allow access registers the server's session key", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // The read-only feature is flagged off, so the access-level toggle is
-  // hidden and the connection is full access (a queries-only delegation would
-  // fail closed in every current agent — see the READ_ONLY_MODE flag).
+  // The MCP flow always shows the access-level toggle, defaulting to read-only
+  // (opt-out): the "Read-only mode" box is shown checked. That choice is
+  // persisted with the access grant and applies to the per-app delegations the
+  // server later obtains; the standing delegation posted here stays full access
+  // (so the server can still call the update prepare endpoint), so this two-hop
+  // chain is unaffected by the toggle.
   await expect(
     page.getByRole("checkbox", { name: "Read-only mode" }),
-  ).toHaveCount(0);
+  ).toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
   // The connect flow fetched the server's session key, registered it with the
