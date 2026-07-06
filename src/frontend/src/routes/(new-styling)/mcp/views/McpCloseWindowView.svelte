@@ -2,12 +2,39 @@
   import { CheckIcon } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { t } from "$lib/stores/locale.store";
+  import { onMount } from "svelte";
+
+  interface Props {
+    /** Whether the tab is being redirected back to the agent — true when the
+     *  trusted server returned a `finish_url`. When false this is the resting
+     *  screen and there's nothing to redirect to. */
+    redirecting: boolean;
+  }
+
+  const { redirecting }: Props = $props();
+
+  // A successful redirect replaces the document (and unmounts this view) within
+  // a moment. If we're still mounted after a few seconds the navigation never
+  // took — a `finish_url` that doesn't replace the document (204/attachment) or
+  // a bfcache back-navigation to this restored page — so reveal a way out
+  // rather than leaving the user on a "Redirecting…" message that never ends.
+  let redirectStalled = $state(false);
+  onMount(() => {
+    if (!redirecting) {
+      return;
+    }
+    const timer = setTimeout(() => (redirectStalled = true), 5000);
+    return () => clearTimeout(timer);
+  });
 </script>
 
 <!--
-  Centered, card-less "you're done" page. Once the MCP server has accepted the
-  delegation there's nothing actionable here; the user just closes the tab and
-  returns to their MCP client.
+  Centered, card-less success page shown once the MCP server's session key has
+  been registered with the backend. When the trusted server returned a
+  `finish_url` the tab is being sent back to the agent to finish the flow, so we
+  say a redirect is underway (with a fallback hint if it stalls); otherwise
+  there's nothing to redirect to and this is the resting screen, so we just
+  confirm the sign-in.
 -->
 <div class="flex flex-col items-center gap-5 px-6 text-center">
   <FeaturedIcon size="lg" variant="success">
@@ -16,7 +43,18 @@
   <h1 class="text-text-primary text-2xl font-medium">
     {$t`You're signed in`}
   </h1>
-  <p class="text-text-tertiary text-base">
-    {$t`You can close this window.`}
-  </p>
+  <div class="flex flex-col items-center gap-1">
+    <p class="text-text-tertiary text-base">
+      {#if redirecting}
+        {$t`Redirecting back to the agent…`}
+      {:else}
+        {$t`You can return to your agent.`}
+      {/if}
+    </p>
+    {#if redirecting && redirectStalled}
+      <p class="text-text-tertiary text-sm">
+        {$t`If nothing happens, you can return to your agent.`}
+      </p>
+    {/if}
+  </div>
 </div>

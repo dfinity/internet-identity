@@ -448,6 +448,7 @@ async fn prepare_delegation(
         None,
         session_key,
         max_time_to_live,
+        None,
         // The legacy endpoint has no read-only option.
         DelegationAccess::Unrestricted,
         &ii_domain,
@@ -595,6 +596,7 @@ async fn prepare_account_delegation(
                 account_number,
                 session_key,
                 max_ttl,
+                None,
                 // An omitted `permissions` argument means unrestricted (see
                 // `impl From<Option<Permissions>> for DelegationAccess`): this
                 // preserves the original behavior for callers of the
@@ -634,37 +636,32 @@ fn get_account_delegation(
     }
 }
 
-/// Enable or disable the backend `/mcp` delegation path for `anchor_number` at
-/// `mcp_server_origin`. Enabling binds the principal II derives for the anchor at
-/// that origin — the principal the MCP server's standing delegation carries — so
-/// it can later fetch per-app delegations as this anchor; disabling unbinds
-/// exactly that principal. No account is chosen here (accounts are per-origin and
-/// the connector isn't an app); the app account is selected per call on
-/// `mcp_prepare_account_delegation`. The origin comes from the connect request,
-/// so each user trusts the MCP server they choose.
+/// Register the trusted MCP server's session key for `anchor_number`: grant
+/// the key's self-authenticating principal access to the server-facing
+/// `mcp_*` methods until the grant expires (`grant_ttl_ns` clamped to
+/// [10 min, 30 days]). Called by the `/mcp` connect flow after user consent,
+/// with a key the frontend fetched from the *trusted* server's callback —
+/// never taken from the unauthenticated connect link. No account is chosen
+/// here (accounts are per-origin and the connector isn't an app); the app
+/// account is selected per call on `mcp_prepare_delegation`.
+///
+/// At most one session per identity: registering replaces any previous grant.
+/// Requires the identity's MCP config to be enabled with a trusted server set,
+/// so every session stays revocable via `mcp_set_config`. `permissions` sets
+/// the session's read-only restriction: `opt (queries)` makes every per-app
+/// delegation it later mints queries-only; omitted (`null`) or `opt (all)`
+/// means full, update-capable access.
 #[update]
-fn mcp_set_access(
+fn mcp_register(
     anchor_number: AnchorNumber,
-    mcp_server_origin: FrontendHostname,
-    enabled: bool,
-    // `opt (queries)` restricts the per-app delegations this server can later
-    // obtain to query calls. Omitted (`null`) or `opt (all)` means full access,
-    // preserving the pre-feature behavior for callers that don't pass it.
+    session_key: SessionKey,
+    grant_ttl_ns: u64,
     permissions: Option<Permissions>,
-) -> Result<(), String> {
+) -> Result<McpRegistration, String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
     // The grant persists a bool; derive it from the requested permissions.
     let read_only = DelegationAccess::from(permissions) == DelegationAccess::ReadOnly;
-    mcp::set_mcp_access(anchor_number, mcp_server_origin, enabled, read_only)
-}
-
-/// Whether `anchor_number` has MCP access enabled at `mcp_server_origin`.
-#[query]
-fn mcp_access_enabled(anchor_number: AnchorNumber, mcp_server_origin: FrontendHostname) -> bool {
-    if check_session_authorization(anchor_number).is_err() {
-        return false;
-    }
-    mcp::is_mcp_access_enabled(anchor_number, mcp_server_origin)
+    mcp::register(anchor_number, session_key, grant_ttl_ns, read_only)
 }
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
@@ -684,7 +681,8 @@ fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
 /// Persist `anchor_number`'s trusted-MCP-server config so it syncs across the
 /// identity's devices. Authenticated as the identity (full authorization), so
 /// only the user — never a page that initiates a connect request — can change
-/// what their identity trusts.
+/// what their identity trusts. Disabling MCP or changing the trusted server
+/// URL revokes the identity's active MCP session in the same message.
 #[update]
 fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
@@ -692,45 +690,59 @@ fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), 
     Ok(())
 }
 
-/// Called by the MCP server (authorized by `caller()` == the principal bound for
-/// its anchor at the connect-time `mcp_server_origin`): prepare a per-app
-/// delegation at `target_origin` for `account_number` — one of the anchor's
-/// accounts there (discover them with `mcp_get_accounts`), or the anchor's
-/// default account when `None`. `max_ttl` is the requested lifetime in ns,
-/// defaulting to and capped at 5 minutes. The resolved `account_number` is
-/// returned in `McpPrepareDelegation` to thread into `mcp_get_account_delegation`.
+/// Called by the MCP server, signed with its registered session key: prepare a
+/// per-app delegation at `target_origin` for `account_number` — one of the
+/// anchor's accounts there (discover them with `mcp_get_accounts`), or the
+/// anchor's default account when `None`. `max_ttl` is the requested lifetime in
+/// ns, defaulting to and capped at 1 hour, and never outliving the session
+/// grant. The resolved `account_number` is returned in `McpPrepareDelegation`
+/// to thread into `mcp_get_delegation`.
+///
+/// `mcp::authorize_mcp_session_for_update` is the authorization gate: it
+/// admits only the caller holding a live session grant (the registered session
+/// key) and hands back the `McpSession` the operation runs on, so there is no
+/// way to reach `prepare_delegation` without it.
 #[update]
-async fn mcp_prepare_account_delegation(
+async fn mcp_prepare_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
 ) -> Result<McpPrepareDelegation, AccountDelegationError> {
-    mcp::prepare_account_delegation(target_origin, account_number, session_key, max_ttl).await
+    mcp::authorize_mcp_session_for_update()?
+        .prepare_delegation(target_origin, account_number, session_key, max_ttl)
+        .await
 }
 
-/// Fetch the delegation prepared by `mcp_prepare_account_delegation`. The anchor
-/// is recovered from `caller()`; `account_number` and `expiration` must be the
-/// values returned by the matching prepare call, or this returns
-/// `NoSuchDelegation`.
+/// Fetch the delegation prepared by `mcp_prepare_delegation`. The anchor is
+/// recovered from `caller()`'s grant; `account_number` and `expiration` must
+/// be the values returned by the matching prepare call, or this returns
+/// `NoSuchDelegation`. Gated by `mcp::authorize_mcp_session` (the registered
+/// session key), like the other server-facing methods.
 #[query]
-fn mcp_get_account_delegation(
+fn mcp_get_delegation(
     target_origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    mcp::get_account_delegation(target_origin, account_number, session_key, expiration)
+    mcp::authorize_mcp_session()?.get_delegation(
+        target_origin,
+        account_number,
+        session_key,
+        expiration,
+    )
 }
 
 /// Called by the MCP server (anchor recovered from `caller()`): list the anchor's
 /// accounts at `target_origin` so the agent can pick which `account_number` to
-/// request a delegation for.
+/// request a delegation for. Gated by `mcp::authorize_mcp_session` (the
+/// registered session key), like the other server-facing methods.
 #[query]
 fn mcp_get_accounts(
     target_origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, AccountDelegationError> {
-    mcp::get_accounts(target_origin)
+    mcp::authorize_mcp_session()?.get_accounts(target_origin)
 }
 
 #[update]

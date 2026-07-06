@@ -3,9 +3,8 @@ import { test } from "../fixtures";
 import { addVirtualAuthenticator, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
- *  delegation acts as the user's identity at the MCP-server origin the request's
- *  callback identifies; the app account is chosen server-side per call), but kept
- *  to exercise that the param is tolerated. */
+ *  session is registered for the user's identity; the app account is chosen
+ *  server-side per call), but kept to exercise that the param is tolerated. */
 const APP = "nice-name.com";
 
 const signUp = async (page: Page): Promise<void> => {
@@ -28,23 +27,10 @@ const signUp = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "Create identity" }).click();
 };
 
-/** Returns the chain's first-delegation expiration in milliseconds since epoch. */
-const expirationMillis = (body: unknown): number => {
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("delegations" in body) ||
-    !Array.isArray(body.delegations) ||
-    body.delegations.length === 0
-  ) {
-    throw new Error("delegation chain missing or empty");
-  }
-  const expiration: unknown = body.delegations[0]?.delegation?.expiration;
-  if (typeof expiration !== "string") {
-    throw new Error("delegation expiration missing");
-  }
-  return Number(BigInt(`0x${expiration}`) / BigInt(1_000_000));
-};
+/** Converts the completion's grant expiration (ns since epoch, decimal string)
+ *  to milliseconds since epoch. */
+const expirationMillis = (expiration: string): number =>
+  Number(BigInt(expiration) / BigInt(1_000_000));
 
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
@@ -55,8 +41,8 @@ test("Invalid params show the error screen", async ({ page }) => {
 
 test("A non-https callback is rejected", async ({ page, mcp }) => {
   // MCP connections are to remote servers only, so callbacks must be https. A
-  // plain-http (or loopback) origin is rejected up front — the /mcp
-  // `form-action` CSP wouldn't allow posting the delegation there anyway.
+  // plain-http (or loopback) origin is rejected up front, before the connect
+  // flow would talk to it.
   await page.goto(
     mcp.buildAuthorizeUrl({
       app: APP,
@@ -233,7 +219,10 @@ test("Returning user lands on the connect screen immediately", async ({
   ).toBeVisible();
 });
 
-test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
+test("Allow access registers the server's session key", async ({
+  page,
+  mcp,
+}) => {
   test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
@@ -243,36 +232,121 @@ test("Allow access posts a two-hop delegation chain", async ({ page, mcp }) => {
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // The MCP flow always shows the access-level toggle, defaulting to read-only
-  // (opt-out): the "Read-only mode" box is shown checked. That choice is
-  // persisted with the access grant and applies to the per-app delegations the
-  // server later obtains; the standing delegation posted here stays full access
-  // (so the server can still call the update prepare endpoint), so this two-hop
-  // chain is unaffected by the toggle.
+  // The MCP connect flow always shows the access-level toggle and defaults to
+  // read-only (opt-out): the "Read-only mode" box is shown checked. Left
+  // checked, the connect is read-only.
   await expect(
     page.getByRole("checkbox", { name: "Read-only mode" }),
   ).toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  const body = await mcp.receivedDelegation;
-  expect(body).toMatchObject({
-    delegations: expect.any(Array),
-    publicKey: expect.any(String),
-  });
-  // Rooted at the user's principal: canister-signed delegation to the ephemeral
-  // browser key, then the ephemeral key's sub-delegation to the MCP server's
-  // public key.
-  if (
-    typeof body === "object" &&
-    body !== null &&
-    "delegations" in body &&
-    Array.isArray(body.delegations)
-  ) {
-    expect(body.delegations.length).toBe(2);
-  }
+  // The connect flow fetched the server's session key, registered it with the
+  // backend, and reported completion: the state echo, the grant expiration
+  // (ns since epoch as a decimal string), and the access level the user chose.
+  // No delegation chain travels anywhere.
+  const completion = await mcp.completion;
+  expect(completion.state).toBe(mcp.state);
+  expect(completion.expiration).toMatch(/^\d+$/);
+  expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
+  // Left at the read-only default, the server is told so up front via the
+  // completion's `permissions` field ("queries"). The full-access path (after
+  // unchecking the toggle) has its own test below.
+  expect(completion.permissions).toBe("queries");
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
+});
+
+test("A finish_url from the server hands the tab back to it after connecting", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  // The server asks for the browser back after the connect (its key response
+  // carries `finish_url`) — how a real server completes its own flow, e.g.
+  // minting the OAuth code for an MCP client and redirecting back to it.
+  mcp.enableFinishRedirect();
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // The session registers and completion is reported like any connect...
+  const completion = await mcp.completion;
+  expect(completion.state).toBe(mcp.state);
+  // ...but instead of II's close screen, the tab lands on the server's
+  // finish URL.
+  await page.waitForURL(mcp.finishUrl);
+  await expect(
+    page.getByRole("heading", { name: "Connection complete" }),
+  ).toBeVisible();
+});
+
+test("The finish_secret never leaks to logs, errors, or other requests", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  // The server's key response carries a finish_url whose query holds a one-time
+  // finish_secret (the H3 "Consent-Bound Completion" credential the server hands
+  // only to the consenting browser). II must navigate the tab to that URL and
+  // surface the secret nowhere else: not to the console, not through an uncaught
+  // error, and not on any outbound request but the finish navigation itself.
+  // Anything else would leak the credential to a log/telemetry sink an attacker
+  // (or a bug report) could read — which is exactly what P2 forbids. This covers
+  // the +page.svelte funnel/error surface the utils unit test can't reach.
+  await addVirtualAuthenticator(page);
+  mcp.enableFinishRedirect();
+  const secret = mcp.finishSecret;
+
+  // Attach the observers before anything loads, so nothing is missed. The
+  // finish navigation (a GET to /oauth/finish) is the one place the secret is
+  // meant to appear, so it's excluded; every other request — URL and body — is
+  // inspected.
+  const consoleLeaks: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.text().includes(secret)) consoleLeaks.push(msg.text());
+  });
+  const errorLeaks: string[] = [];
+  page.on("pageerror", (error) => {
+    if (error.message.includes(secret)) errorLeaks.push(error.message);
+  });
+  const requestLeaks: string[] = [];
+  page.on("request", (request) => {
+    const url = request.url();
+    if (url.includes("/oauth/finish")) {
+      return;
+    }
+    if (url.includes(secret) || (request.postData() ?? "").includes(secret)) {
+      requestLeaks.push(`${request.method()} ${url}`);
+    }
+  });
+
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // Drive the full connect through to the finish navigation — the secret has
+  // now flowed through the key response, +page.svelte, and the redirect.
+  await mcp.completion;
+  await page.waitForURL(mcp.finishUrl);
+  await expect(
+    page.getByRole("heading", { name: "Connection complete" }),
+  ).toBeVisible();
+
+  expect(consoleLeaks).toEqual([]);
+  expect(errorLeaks).toEqual([]);
+  expect(requestLeaks).toEqual([]);
 });
 
 test("Identity switcher shows while signing in and hides on the success screen", async ({
@@ -316,15 +390,124 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
   await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlSeconds }));
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  const expMillis = expirationMillis(await mcp.receivedDelegation);
+  const expMillis = expirationMillis((await mcp.completion).expiration);
   const requestedMillis = ttlSeconds * 1000;
   expect(expMillis - before).toBeGreaterThanOrEqual(requestedMillis - 60_000);
   expect(expMillis - before).toBeLessThanOrEqual(requestedMillis + 60_000);
 });
 
-// The browser /mcp flow issues the standing credential for the user's identity
-// at the MCP *server* origin the callback identifies (not a per-request app, and
-// no account is chosen at connect); per-app delegations are minted server-side by
-// the `mcp_prepare/get_account_delegation` canister methods, with the app account
-// chosen there. Principal-derivation parity for those is canister logic, covered
-// by the integration tests (tests/integration/mcp.rs), not here.
+test("A connect failure returns to the connect screen instead of stranding the user", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  // The server rejects the key request (a `state` it never issued, a transient
+  // 5xx, ...). The connect must surface the error and return to the connect
+  // screen — not hang on the connecting spinner, and never reach the success
+  // screen — so the user can retry (handleAuthorize's catch re-opens authorize).
+  mcp.setNextOutcome("error");
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // The failure is surfaced...
+  await expect(page.getByText(/rejected the connect request/)).toBeVisible();
+  // ...the connect screen is back (retry is possible)...
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
+  // ...and no session was reported as registered.
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toHaveCount(0);
+});
+
+test("Removing the trusted server in Settings blocks connecting", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page); // leaves the page on Settings, server trusted
+
+  // Remove the server: the server row (and its Remove button) give way to the
+  // URL input again — the revoke path the fixture's add-only helper never hits.
+  await page.getByRole("button", { name: "Remove this server" }).click();
+  await expect(page.getByLabel("MCP server URL")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Remove this server" }),
+  ).toHaveCount(0);
+
+  // Trust is re-verified against the synced config at connect time, so with no
+  // trusted server the connect lands on the untrusted screen.
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+});
+
+test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  // Turn the feature off for this identity. The URL stays saved on-chain, but
+  // the config is no longer `enabled`, so trust is off.
+  await page.getByRole("switch", { name: "Trusted MCP server" }).uncheck();
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await page.getByRole("button", { name: "Allow access" }).click();
+  await expect(
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+});
+
+test("Unchecking read-only mode connects with full access", async ({
+  page,
+  mcp,
+}) => {
+  // The read-only default (queries-only) connect is covered by "Allow access
+  // registers the server's session key"; this exercises the opt-out path.
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  const readOnly = page.getByRole("checkbox", { name: "Read-only mode" });
+  await expect(readOnly).toBeChecked();
+  await readOnly.uncheck();
+
+  await page.getByRole("button", { name: "Allow access" }).click();
+  // Unchecking the toggle switches the session to full access, which the
+  // server is told up front via the completion's `permissions` field.
+  const completion = await mcp.completion;
+  expect(completion.permissions).toBe("all");
+});
+
+// The browser /mcp flow registers the MCP server's session key for the user's
+// identity (fetched from the callback the request identifies — not a
+// per-request app, and no account is chosen at connect); per-app delegations
+// are minted server-side by the `mcp_prepare/get_delegation` canister methods,
+// with the app account chosen there. Grant semantics (expiry, revocation,
+// replacement) are canister logic, covered by the integration tests
+// (tests/integration/mcp.rs), not here.

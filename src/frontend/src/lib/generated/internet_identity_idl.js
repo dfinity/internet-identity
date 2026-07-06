@@ -637,6 +637,7 @@ export const idlFactory = ({ IDL }) => {
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
   });
+  const McpRegistration = IDL.Record({ 'expiration' : Timestamp });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -1134,21 +1135,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DeviceKeyWithAnchor)],
         ['query'],
       ),
-    'mcp_access_enabled' : IDL.Func(
-        [UserNumber, FrontendHostname],
-        [IDL.Bool],
-        ['query'],
-      ),
-    'mcp_get_account_delegation' : IDL.Func(
-        [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
-        [
-          IDL.Variant({
-            'Ok' : SignedDelegation,
-            'Err' : AccountDelegationError,
-          }),
-        ],
-        ['query'],
-      ),
     'mcp_get_accounts' : IDL.Func(
         [FrontendHostname],
         [
@@ -1160,7 +1146,17 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
-    'mcp_prepare_account_delegation' : IDL.Func(
+    'mcp_get_delegation' : IDL.Func(
+        [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'mcp_prepare_delegation' : IDL.Func(
         [
           FrontendHostname,
           IDL.Opt(AccountNumber),
@@ -1175,9 +1171,9 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Bool, IDL.Opt(Permissions)],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+    'mcp_register' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Nat64, IDL.Opt(Permissions)],
+        [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
       ),
     'mcp_set_config' : IDL.Func(

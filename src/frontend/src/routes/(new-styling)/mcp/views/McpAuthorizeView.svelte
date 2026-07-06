@@ -17,7 +17,7 @@
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
     /** Session duration the request asked for (seconds, already clamped to
-     *  [10 min, 1 week]); the initial selection, which the user can change. */
+     *  [10 min, 30 days]); the initial selection, which the user can change. */
     requestedTtlSeconds: number;
     /** Called once the selected identity is authenticated, with the chosen
      *  session duration (seconds) and the access level the per-app delegations
@@ -53,19 +53,21 @@
   const DAY = 24 * HOUR;
   const WEEK = 7 * DAY;
   // The session durations the picker offers, each with its label, spanning the
-  // allowed range: 10 minutes (the shortest, also the request's floor) to 1 week
-  // (the longest). `$derived` so the labels re-translate when the locale changes.
+  // allowed range: 10 minutes (the shortest, also the request's floor) to 30
+  // days (the longest, the backend's grant cap). `$derived` so the labels
+  // re-translate when the locale changes.
   const presets = $derived([
     { value: 10 * MINUTE, label: $t`10 minutes` },
     { value: HOUR, label: $t`1 hour` },
     { value: 8 * HOUR, label: $t`8 hours` },
     { value: DAY, label: $t`1 day` },
     { value: WEEK, label: $t`1 week` },
+    { value: 30 * DAY, label: $t`30 days` },
   ]);
 
   // Compact label for an off-preset duration: the request can ask for any number
-  // of seconds within [10 min, 1 week], so the selected value isn't always one of
-  // the presets (e.g. a 2-hour request shows "2h").
+  // of seconds within [10 min, 30 days], so the selected value isn't always one
+  // of the presets (e.g. a 2-hour request shows "2h").
   const formatTtl = (seconds: number): string => {
     const parts: string[] = [];
     const d = Math.floor(seconds / DAY);

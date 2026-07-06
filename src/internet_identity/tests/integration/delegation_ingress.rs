@@ -34,16 +34,16 @@
 
 use candid::{Encode, Principal};
 use canister_tests::api::internet_identity::api_v2::{
-    get_account_delegation_with_read_only, mcp_get_account_delegation,
-    mcp_prepare_account_delegation, mcp_set_access_with_read_only, prepare_account_delegation,
-    prepare_account_delegation_with_read_only, AccountDelegationParams,
+    get_account_delegation_with_read_only, mcp_get_delegation, mcp_prepare_delegation,
+    mcp_register, mcp_set_config, prepare_account_delegation_with_read_only,
+    AccountDelegationParams,
 };
 use canister_tests::flows;
 use canister_tests::framework::*;
 use ed25519_dalek::{Signer, SigningKey};
 use ic_representation_independent_hash::{representation_independent_hash, Value};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, McpPrepareDelegation, PrepareAccountDelegation, SignedDelegation,
+    AnchorNumber, McpConfig, McpPrepareDelegation, PrepareAccountDelegation, SignedDelegation,
 };
 use pocket_ic::{PocketIc, Time};
 use serde_bytes::ByteBuf;
@@ -119,9 +119,9 @@ fn mint_account_delegation(
     }
 }
 
-/// Mints a per-app delegation through the `/mcp` flow: the anchor grants a
-/// (read-only) access to its MCP-server principal, which then mints the
-/// delegation onto our session key.
+/// Mints a per-app delegation through the `/mcp` flow: the anchor trusts an
+/// MCP server and registers its session key (with a read-only choice), which
+/// then mints the delegation onto our session key.
 fn mint_mcp_delegation(
     env: &PocketIc,
     canister_id: Principal,
@@ -129,43 +129,46 @@ fn mint_mcp_delegation(
     read_only: bool,
 ) -> DelegatedSession {
     const MCP_ORIGIN: &str = "https://mcp.id.ai";
+    // 1 day, within the [10 min, 30 days] grant bounds.
+    const GRANT_TTL_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
     let anchor = flows::register_anchor(env, canister_id);
     let (session_key, session_pubkey_der) = session_key_pair(seed);
 
-    // The MCP server's own principal: the anchor's default-account principal
-    // at the MCP origin (as derived by the canister).
-    let standing_params = AccountDelegationParams::new(
+    // Trust the MCP server for this anchor (precondition for registering).
+    mcp_set_config(
         env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        None,
-        ByteBuf::from("mcp standing session key"),
-    );
-    let PrepareAccountDelegation { user_key, .. } =
-        prepare_account_delegation(&standing_params, None)
-            .unwrap()
-            .unwrap();
-    let mcp = Principal::self_authenticating(user_key);
+        McpConfig {
+            enabled: true,
+            url: Some(format!("{MCP_ORIGIN}/mcp")),
+        },
+    )
+    .unwrap()
+    .unwrap();
 
-    mcp_set_access_with_read_only(
+    // Register the MCP server's own session key, with the read-only choice —
+    // read-only is a property of the whole session.
+    let server_key = ByteBuf::from("mcp server session key");
+    mcp_register(
         env,
         canister_id,
         principal_1(),
         anchor,
-        MCP_ORIGIN.to_string(),
-        true,
+        server_key.clone(),
+        GRANT_TTL_NS,
         Some(read_only),
     )
     .unwrap()
     .unwrap();
+    let mcp = Principal::self_authenticating(&server_key);
 
     let McpPrepareDelegation {
         user_key,
         expiration,
         account_number,
-    } = mcp_prepare_account_delegation(
+    } = mcp_prepare_delegation(
         env,
         canister_id,
         mcp,
@@ -176,7 +179,7 @@ fn mint_mcp_delegation(
     )
     .unwrap()
     .unwrap();
-    let signed_delegation = mcp_get_account_delegation(
+    let signed_delegation = mcp_get_delegation(
         env,
         canister_id,
         mcp,

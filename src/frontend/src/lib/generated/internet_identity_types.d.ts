@@ -1152,17 +1152,23 @@ export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
  */
 export interface McpConfig { 'url' : [] | [string], 'enabled' : boolean }
 /**
- * Result of mcp_prepare_account_delegation. Carries the account_number the
- * canister used (the one named in the request, or the anchor's default account
- * at target_origin when none was named) so the MCP server can thread the same
- * account into mcp_get_account_delegation — the default is mutable, so
- * re-resolving it in `get` could otherwise diverge and yield NoSuchDelegation.
+ * Result of mcp_prepare_delegation. Carries the account_number the canister
+ * used (the one named in the request, or the anchor's default account at
+ * target_origin when none was named) so the MCP server can thread the same
+ * account into mcp_get_delegation — the default is mutable, so re-resolving
+ * it in `get` could otherwise diverge and yield NoSuchDelegation.
  */
 export interface McpPrepareDelegation {
   'user_key' : UserKey,
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
 }
+/**
+ * Result of mcp_register: the expiration (ns since epoch) of the MCP session
+ * grant just registered. Every server-facing mcp_* call returns Unauthorized
+ * once it passes; the server reconnects through a new consent flow.
+ */
+export interface McpRegistration { 'expiration' : Timestamp }
 /**
  * Map with some variants for the value type.
  * Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
@@ -2071,23 +2077,9 @@ export interface _SERVICE {
     [] | [DeviceKeyWithAnchor]
   >,
   /**
-   * Whether the anchor has MCP access enabled at mcp_server_origin.
-   */
-  'mcp_access_enabled' : ActorMethod<[UserNumber, FrontendHostname], boolean>,
-  /**
-   * Fetch the delegation prepared above; the anchor is recovered from caller().
-   * account_number and expiration must be the values returned by the matching
-   * mcp_prepare_account_delegation, else this returns NoSuchDelegation.
-   */
-  'mcp_get_account_delegation' : ActorMethod<
-    [FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
-    { 'Ok' : SignedDelegation } |
-      { 'Err' : AccountDelegationError }
-  >,
-  /**
-   * Called by the MCP server (anchor recovered from caller()): list the anchor's
-   * accounts at target_origin so the agent can pick which account_number to
-   * request a delegation for via mcp_prepare_account_delegation.
+   * Called by the MCP server (anchor recovered from caller()'s grant): list
+   * the anchor's accounts at target_origin so the agent can pick which
+   * account_number to request a delegation for via mcp_prepare_delegation.
    */
   'mcp_get_accounts' : ActorMethod<
     [FrontendHostname],
@@ -2103,40 +2095,58 @@ export interface _SERVICE {
    */
   'mcp_get_config' : ActorMethod<[UserNumber], McpConfig>,
   /**
-   * Called by the MCP server, authorized by caller() == the principal bound for
-   * its anchor at the connect-time mcp_server_origin; the anchor is recovered
-   * from the caller. Mints a per-app delegation at target_origin. account_number
+   * Fetch the delegation prepared above; the anchor is recovered from
+   * caller()'s grant. account_number and expiration must be the values
+   * returned by the matching mcp_prepare_delegation, else this returns
+   * NoSuchDelegation.
+   */
+  'mcp_get_delegation' : ActorMethod<
+    [FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AccountDelegationError }
+  >,
+  /**
+   * Called by the MCP server, signed with its registered session key and
+   * authorized by caller()'s unexpired grant; the anchor is recovered from
+   * the caller. Mints a per-app delegation at target_origin. account_number
    * names one of the anchor's accounts there to act as (discover them with
    * mcp_get_accounts), and null uses the anchor's default account there; an
    * account_number that isn't the anchor's at target_origin is rejected as
    * Unauthorized. max_ttl is the requested lifetime in ns, defaulting to and
-   * capped at 5 minutes. The resolved account_number is returned in
-   * McpPrepareDelegation so it can be threaded into mcp_get_account_delegation
-   * (the default account at an origin is mutable).
+   * capped at 1 hour, and never outliving the session grant. The resolved
+   * account_number is returned in McpPrepareDelegation so it can be threaded
+   * into mcp_get_delegation (the default account at an origin is mutable).
    */
-  'mcp_prepare_account_delegation' : ActorMethod<
+  'mcp_prepare_delegation' : ActorMethod<
     [FrontendHostname, [] | [AccountNumber], SessionKey, [] | [bigint]],
     { 'Ok' : McpPrepareDelegation } |
       { 'Err' : AccountDelegationError }
   >,
   /**
-   * Enable/disable the backend /mcp delegation path for an anchor at a given
-   * MCP server origin. Enabling binds the principal II derives for the anchor
-   * at that origin; disabling unbinds exactly that principal. No account is
-   * chosen here (accounts are per-origin and the connector isn't an app) — the
-   * app account is selected per call on mcp_prepare_account_delegation. The
-   * origin comes from the connect request, so each user trusts the MCP server
-   * they choose.
+   * Register the trusted MCP server's session key for the anchor: grant the
+   * key's self-authenticating principal access to the server-facing mcp_*
+   * methods until the grant expires (grant_ttl_ns clamped to [10 min, 30
+   * days]). Called by the /mcp connect flow after user consent, with a key
+   * the frontend fetched from the *trusted* server's callback — never taken
+   * from the unauthenticated connect link. No account is chosen here
+   * (accounts are per-origin and the connector isn't an app) — the app
+   * account is selected per call on mcp_prepare_delegation.
+   *
+   * At most one session per identity: registering replaces any previous
+   * grant. Requires the identity's MCP config to be enabled with a trusted
+   * server set, so every session stays revocable via mcp_set_config.
    */
-  'mcp_set_access' : ActorMethod<
-    [UserNumber, FrontendHostname, boolean, [] | [Permissions]],
-    { 'Ok' : null } |
+  'mcp_register' : ActorMethod<
+    [UserNumber, SessionKey, bigint, [] | [Permissions]],
+    { 'Ok' : McpRegistration } |
       { 'Err' : string }
   >,
   /**
    * Persist the identity's trusted-MCP-server config so it syncs across the
    * identity's devices. Authenticated as the identity, so only the user — never
    * a page that initiates a connect request — can change what it trusts.
+   * Disabling MCP or changing the trusted server URL revokes the identity's
+   * active MCP session in the same message.
    */
   'mcp_set_config' : ActorMethod<
     [UserNumber, McpConfig],
