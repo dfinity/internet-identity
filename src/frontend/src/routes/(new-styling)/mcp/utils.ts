@@ -120,11 +120,16 @@ export const mcpAuthorize = async ({
 
   // Ask the trusted server for its session public key for this connect. A
   // non-2xx answer (e.g. a state it never issued) aborts before anything is
-  // registered.
+  // registered. `redirect: "error"` makes a 307/308 a hard failure rather than
+  // silently re-POSTing the single-use `state` to a redirected origin; `omit`
+  // keeps ambient credentials off this cross-origin call (mirrors the
+  // fail-closed fetches elsewhere, e.g. validateDerivationOrigin).
   const keyResponse = await fetch(callback, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ state }),
+    redirect: "error",
+    credentials: "omit",
   });
   if (!keyResponse.ok) {
     throw new Error(
@@ -173,6 +178,10 @@ export const mcpAuthorize = async ({
         expiration: expiration.toString(),
         permissions: toPermissionsString(accessLevel),
       }),
+      // Same fail-closed posture as the key request: never let a redirect
+      // forward the completion payload to another origin.
+      redirect: "error",
+      credentials: "omit",
     });
   } catch {
     // Deliberately ignored; see above.

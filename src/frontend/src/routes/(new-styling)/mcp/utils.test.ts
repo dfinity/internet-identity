@@ -292,6 +292,25 @@ describe("mcpAuthorize failure paths", () => {
   });
 });
 
+describe("callback fetch hardening", () => {
+  it("issues both callback requests with redirect: error and credentials: omit", async () => {
+    // A 307/308 from the server must not silently re-POST the single-use
+    // `state` (key request) or the completion payload to a redirected origin,
+    // and no ambient credentials ride these cross-origin calls.
+    stubFetch({
+      public_key: SERVER_PUBKEY,
+      finish_url: `${MCP_ORIGIN}/oauth/finish`,
+    });
+    await authorize(makeActor(), "read-only");
+
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls.length).toBeGreaterThanOrEqual(2); // key request + completion
+    for (const [, init] of calls) {
+      expect(init).toMatchObject({ redirect: "error", credentials: "omit" });
+    }
+  });
+});
+
 // Two properties the server-side H3 mitigation ("Consent-Bound Completion")
 // relies on from the II frontend. They hold today; these tests pin them so a
 // future refactor of the connect flow can't silently regress them.
