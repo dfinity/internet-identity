@@ -143,6 +143,12 @@ test("Generic CLI sign-in posts a two-hop delegation chain to the loopback callb
   await addVirtualAuthenticator(page);
   await page.goto(await cli.resolveAuthorizeUrl(page));
   await signUp(page);
+  // The read-only feature is flagged off, so the access-level toggle is
+  // hidden and CLI sign-in is full access (a queries-only delegation would
+  // fail closed in every current agent — see the READ_ONLY_MODE flag).
+  await expect(page.getByRole("checkbox", { name: "Full access" })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   const body = await cli.receivedDelegation;

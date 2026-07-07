@@ -3,40 +3,64 @@ import { test as base, type Page } from "@playwright/test";
 import { toBase64URL } from "../../../src/lib/utils/utils";
 import { II_URL } from "../utils";
 
-/** What the MCP server stand-in does on its next form POST. */
+/** What the MCP server stand-in does on its next callback request. */
 type McpOutcome = "success" | "error";
 
 /**
  * A stand-in MCP server origin. There's no global `mcp_server_origin` config
  * any more: the connect flow takes the MCP server origin from the request's
  * callback, accepting any https origin (MCP connections are to remote servers).
- * This is just a valid https origin to drive the flow with; the `/mcp` page's
- * `form-action` CSP allows posting the delegation to it.
+ * This is just a valid https origin to drive the flow with.
  */
 const MCP_SERVER_ORIGIN = "https://mcp.id.ai";
 
+/** The completion notification the connect flow POSTs once the session is
+ *  registered: the state echo, the grant expiration (ns since epoch, as a
+ *  decimal string — the value overflows JSON numbers), and the session's
+ *  access level (`permissions`: "queries" = read-only, "all" = full). */
+export type McpCompletion = {
+  state: string;
+  expiration: string;
+  permissions: string;
+};
+
 /**
- * Stands in for a remote MCP server. Unlike the CLI loopback fixture there's no
- * real HTTP server: the callback is a public https origin, so the delegation
- * arrives as a top-level form-POST navigation to it. We intercept that
- * navigation with `page.route` (which catches it before the network, so no
- * server or DNS for `mcp.id.ai` is needed), read the posted delegation, and
- * fulfill a 303 redirect back to `/mcp` with a `status` — exactly what a real
- * MCP server would do.
+ * Stands in for a remote MCP server. Unlike the CLI loopback fixture there's
+ * no real HTTP server: the callback is a public https origin, and the connect
+ * flow talks to it with JSON `fetch`es. We intercept those with `page.route`
+ * (which catches them before the network, so no server or DNS for `mcp.id.ai`
+ * is needed) and answer exactly like a real MCP server would: the key request
+ * (`{state}`) gets this connection's session public key, and the completion
+ * notification (`{state, expiration}`) gets a 200. A request with a state the
+ * server never issued gets a 403 — nothing is registered then.
  *
- * `receivedDelegation` resolves with the delegation chain JSON once the flow
- * successfully posts it.
+ * `completion` resolves with the completion body once the flow reports the
+ * session registered.
  */
 export type McpFixture = {
   publicKey: string;
   state: string;
   mcpOrigin: string;
   callbackUrl: string;
-  receivedDelegation: Promise<unknown>;
-  /** Every delegation received so far, in order (for multi-post tests). */
-  receivedDelegations: unknown[];
-  /** Sets what the MCP server stand-in does on its next form POST. */
+  /** Where the stand-in sends the browser after the connect once
+   *  `enableFinishRedirect()` is called: a landing page on its own origin,
+   *  like a real server completing its own (e.g. OAuth) flow. Its query
+   *  carries the one-time `finish_secret` (as a real server's would) so a
+   *  test can assert that secret never leaks to a log/telemetry sink. */
+  finishUrl: string;
+  /** The one-time secret embedded in `finishUrl`'s query (the `fs` param):
+   *  the H3 "Consent-Bound Completion" credential the server delivers only to
+   *  the consenting browser. Exposed so the leak test can grep for it. */
+  finishSecret: string;
+  completion: Promise<McpCompletion>;
+  /** Every completion received so far, in order (for multi-connect tests). */
+  completions: McpCompletion[];
+  /** Sets what the MCP server stand-in does on its next callback request. */
   setNextOutcome: (outcome: McpOutcome) => void;
+  /** Makes the key response carry `finish_url`, so the connect flow hands the
+   *  tab back to the server (at `finishUrl`) instead of showing the close
+   *  screen. Off by default — most tests assert the close screen. */
+  enableFinishRedirect: () => void;
   /**
    * Trusts this fixture's MCP origin for the signed-up identity by driving the
    * Settings UI — the trusted server is now the identity's synced (on-chain)
@@ -47,9 +71,8 @@ export type McpFixture = {
    */
   trustServer: (page: Page) => Promise<void>;
   /**
-   * Installs the form-POST interceptor on `page`. Must be called before the
-   * flow submits the delegation. Reads the posted `delegation`/`state` and
-   * redirects the browser back to `/mcp` with the configured outcome status.
+   * Installs the callback interceptor on `page`. Must be called before the
+   * flow contacts the server (i.e. before "Allow access").
    */
   installInterceptor: (page: Page) => Promise<void>;
   /** Builds the `/mcp` authorize URL with the request params in the fragment. */
@@ -60,6 +83,15 @@ export type McpFixture = {
   }) => string;
 };
 
+// The connect flow's callback requests are cross-origin JSON `fetch`es, so the
+// stand-in must answer the CORS preflight and mark its responses readable —
+// exactly what a real MCP server has to do.
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST",
+  "access-control-allow-headers": "content-type",
+};
+
 export const test = base.extend<{ mcp: McpFixture }>({
   // eslint-disable-next-line no-empty-pattern -- playwright fixtures require the destructure
   mcp: async ({}, use) => {
@@ -67,16 +99,28 @@ export const test = base.extend<{ mcp: McpFixture }>({
     const publicKey = toBase64URL(
       new Uint8Array(identity.getPublicKey().toDer()),
     );
-    // Opaque value the MCP server puts in the request and the frontend echoes
-    // back in its POST so the server can tie the delivery to the request.
+    // Opaque value the MCP server puts in the request and the frontend sends
+    // back in its callback requests so the server can tie them to the request
+    // it started.
     const state = toBase64URL(crypto.getRandomValues(new Uint8Array(32)));
     const callbackUrl = `${MCP_SERVER_ORIGIN}/callback`;
+    // A distinctive one-time secret in the finish URL's query, standing in for
+    // the H3 `finish_secret` the server delivers only to the consenting
+    // browser. Kept greppable so the leak test can assert it never reaches a
+    // console/telemetry/outbound sink other than the finish navigation itself.
+    const finishSecret = "fs-DO-NOT-LEAK-7f2a91c4";
+    const finishUrl = `${MCP_SERVER_ORIGIN}/oauth/finish?sid=fixture&fs=${finishSecret}`;
 
-    let resolveDelegation: (body: unknown) => void = () => undefined;
-    const receivedDelegation = new Promise<unknown>((resolve) => {
-      resolveDelegation = resolve;
+    let finishRedirect = false;
+    const enableFinishRedirect = (): void => {
+      finishRedirect = true;
+    };
+
+    let resolveCompletion: (body: McpCompletion) => void = () => undefined;
+    const completion = new Promise<McpCompletion>((resolve) => {
+      resolveCompletion = resolve;
     });
-    const receivedDelegations: unknown[] = [];
+    const completions: McpCompletion[] = [];
 
     let nextOutcome: McpOutcome = "success";
     const setNextOutcome = (outcome: McpOutcome): void => {
@@ -84,34 +128,70 @@ export const test = base.extend<{ mcp: McpFixture }>({
     };
 
     const installInterceptor = async (page: Page): Promise<void> => {
-      const redirectTo = (status: McpOutcome): string => {
-        const url = new URL("/mcp", II_URL);
-        url.hash = new URLSearchParams({ status }).toString();
-        return url.toString();
-      };
-
       await page.route(`${MCP_SERVER_ORIGIN}/**`, async (route) => {
-        let location: string;
-        const posted = new URLSearchParams(route.request().postData() ?? "");
-        if (nextOutcome === "error" || posted.get("state") !== state) {
-          // On an "error" outcome, or if the frontend didn't echo the request
-          // state (a real MCP server would reject this), redirect back with an
-          // error so the test fails loudly instead of `receivedDelegation`
-          // hanging forever.
-          location = redirectTo("error");
-        } else {
-          const delegation = posted.get("delegation");
-          let parsed: unknown;
-          try {
-            parsed = delegation === null ? null : JSON.parse(delegation);
-          } catch {
-            parsed = delegation;
-          }
-          receivedDelegations.push(parsed);
-          resolveDelegation(parsed);
-          location = redirectTo("success");
+        const request = route.request();
+        if (request.method() === "OPTIONS") {
+          // CORS preflight for the JSON POSTs.
+          await route.fulfill({ status: 204, headers: CORS_HEADERS });
+          return;
         }
-        await route.fulfill({ status: 303, headers: { location } });
+        if (request.method() === "GET") {
+          // A navigation to the finish URL: the browser was handed back to
+          // the server after the connect. Serve the landing page.
+          if (request.url() === finishUrl) {
+            await route.fulfill({
+              status: 200,
+              headers: { "content-type": "text/html" },
+              body: "<h1>Connection complete</h1>",
+            });
+            return;
+          }
+          await route.fulfill({ status: 404 });
+          return;
+        }
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(request.postData() ?? "{}") as Record<
+            string,
+            unknown
+          >;
+        } catch {
+          // Leave `body` empty; the state check below rejects the request.
+        }
+        if (nextOutcome === "error" || body.state !== state) {
+          // On an "error" outcome, or a state this server never issued (a real
+          // MCP server must reject that), answer 403 — the flow errors out and
+          // nothing is registered.
+          await route.fulfill({ status: 403, headers: CORS_HEADERS });
+          return;
+        }
+        if (typeof body.expiration === "string") {
+          // Completion notification: the session is registered.
+          const received = {
+            state,
+            expiration: body.expiration,
+            permissions: String(body.permissions),
+          };
+          completions.push(received);
+          resolveCompletion(received);
+          await route.fulfill({
+            status: 200,
+            headers: { ...CORS_HEADERS, "content-type": "application/json" },
+            body: "{}",
+          });
+          return;
+        }
+        // Key request: serve this connection's session public key, plus the
+        // finish redirect when enabled — exactly the response shape a real
+        // server completing its own flow (e.g. OAuth) would send.
+        await route.fulfill({
+          status: 200,
+          headers: { ...CORS_HEADERS, "content-type": "application/json" },
+          body: JSON.stringify({
+            public_key: publicKey,
+            ...(finishRedirect ? { finish_url: finishUrl } : {}),
+          }),
+        });
       });
     };
 
@@ -162,7 +242,6 @@ export const test = base.extend<{ mcp: McpFixture }>({
       callbackUrl?: string;
     }): string => {
       const fragment = new URLSearchParams();
-      fragment.set("public_key", publicKey);
       fragment.set("callback", opts.callbackUrl ?? callbackUrl);
       fragment.set("state", state);
       fragment.set("app", opts.app);
@@ -177,9 +256,12 @@ export const test = base.extend<{ mcp: McpFixture }>({
       state,
       mcpOrigin: MCP_SERVER_ORIGIN,
       callbackUrl,
-      receivedDelegation,
-      receivedDelegations,
+      finishUrl,
+      finishSecret,
+      completion,
+      completions,
       setNextOutcome,
+      enableFinishRedirect,
       trustServer,
       installInterceptor,
       buildAuthorizeUrl,

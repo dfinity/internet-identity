@@ -131,6 +131,7 @@ use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter}
 use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::mcp_config::StorableMcpConfig;
+use storable::mcp_grant::StorableMcpGrant;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
@@ -168,6 +169,8 @@ const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
 // const DEPRECATED_STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
 // const DEPRECATED_LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 // const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX_OLD: u8 = 12u8;
+// (The abandoned MCP indexes 25/27/28 are documented with the current
+// MCP_GRANT_MEMORY_INDEX below.)
 
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
@@ -184,8 +187,18 @@ const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_INDEX: u8 = 23u8;
 const OPENID_JWKS_CACHE_MEMORY_INDEX: u8 = 24u8;
-const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
+// Indexes 25, 27 and 28 held earlier MCP maps: a `Principal -> AnchorNumber`
+// reverse index (25), a parallel read-only set (27), and a combined
+// `Principal -> {anchor, read_only}` access map (28). All were superseded by
+// the session-grant map at index 29 (`Principal -> {anchor, expiry, read_only}`,
+// keyed by the MCP server's own session-key principal). MCP was preview-only,
+// so the old regions are abandoned (any preview grants are dropped and
+// re-created on the next connect) rather than migrated.
+// const DEPRECATED_LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX: u8 = 25u8;
 const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
+// const DEPRECATED_LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX: u8 = 27u8;
+// const DEPRECATED_MCP_ACCESS_MEMORY_INDEX: u8 = 28u8;
+const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -232,14 +245,14 @@ const LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID: MemoryId =
 /// and are available for JWT verification before the first post-upgrade fetch.
 const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_MEMORY_INDEX);
 
-/// Reverse index for MCP access: maps the principal II derives for an anchor's
-/// chosen account at the MCP server origin it connected (that anchor's standing
-/// MCP-server principal) to the anchor. Populated when the anchor enables MCP
-/// access; the `mcp_*_account_delegation` methods use it to authorize a caller
-/// (the MCP server, acting as that principal) and recover its anchor without an
-/// `anchor_number` parameter.
-const LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID: MemoryId =
-    MemoryId::new(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_INDEX);
+/// MCP session grants: maps an MCP server's session-key principal to the
+/// grant ([`StorableMcpGrant`]: the anchor that registered it, the expiry, and
+/// whether its per-app delegations are read-only). Written by the authenticated
+/// `mcp_register` method; the server-facing `mcp_*` methods authorize a caller
+/// by looking up its grant here (and checking expiry), recovering the anchor
+/// without an `anchor_number` parameter. Bounded at one entry per anchor via
+/// [`StorableMcpConfig::session_principal`].
+const MCP_GRANT_MEMORY_ID: MemoryId = MemoryId::new(MCP_GRANT_MEMORY_INDEX);
 
 /// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
 /// URL), keyed by anchor number. Written by the authenticated `mcp_set_config`
@@ -390,10 +403,9 @@ pub struct Storage<M: Memory> {
     pub(crate) lookup_anchor_with_email_recovery_memory:
         StableBTreeMap<StorableEmailRecoveryAddressHash, StorableAnchorNumber, ManagedMemory<M>>,
 
-    lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// See [`LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID`].
-    pub(crate) lookup_anchor_with_mcp_principal_memory:
-        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+    mcp_grant_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`MCP_GRANT_MEMORY_ID`].
+    pub(crate) mcp_grant_memory: StableBTreeMap<Principal, StorableMcpGrant, ManagedMemory<M>>,
 
     /// Memory wrapper used to report the size of the OpenID JWKS cache memory.
     openid_jwks_cache_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
@@ -489,8 +501,7 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
-        let lookup_anchor_with_mcp_principal_memory =
-            memory_manager.get(LOOKUP_ANCHOR_WITH_MCP_PRINCIPAL_MEMORY_ID);
+        let mcp_grant_memory = memory_manager.get(MCP_GRANT_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
 
@@ -599,12 +610,8 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchor_with_email_recovery_memory: StableBTreeMap::init(
                 lookup_anchor_with_email_recovery_memory,
             ),
-            lookup_anchor_with_mcp_principal_memory_wrapper: MemoryWrapper::new(
-                lookup_anchor_with_mcp_principal_memory.clone(),
-            ),
-            lookup_anchor_with_mcp_principal_memory: StableBTreeMap::init(
-                lookup_anchor_with_mcp_principal_memory,
-            ),
+            mcp_grant_memory_wrapper: MemoryWrapper::new(mcp_grant_memory.clone()),
+            mcp_grant_memory: StableBTreeMap::init(mcp_grant_memory),
             openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
@@ -1083,39 +1090,24 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&principal)
     }
 
-    /// Recover the anchor that enabled MCP access for the given MCP-server
-    /// principal (the caller of the `mcp_*_account_delegation` methods).
-    pub fn lookup_anchor_with_mcp_principal(&self, principal: Principal) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_mcp_principal_memory.get(&principal)
+    /// Look up the MCP session grant registered for `principal` (the caller
+    /// of the server-facing `mcp_*` methods). Callers are responsible for
+    /// checking `expires_at_ns`; the map itself never authorizes anything.
+    pub fn lookup_mcp_grant(&self, principal: Principal) -> Option<StorableMcpGrant> {
+        self.mcp_grant_memory.get(&principal)
     }
 
-    /// Record (enable) MCP access: bind an anchor's MCP-server principal to it.
-    ///
-    /// Like the passkey / recovery-phrase reverse indices, we refuse to
-    /// overwrite a principal already bound to a *different* anchor — defense in
-    /// depth against a cross-anchor takeover were the derived principal ever to
-    /// collide. Re-binding the same anchor is idempotent. Returns
-    /// `Err(other_anchor)` on a cross-anchor collision so the caller can surface
-    /// the failure rather than silently no-op.
-    pub fn set_anchor_mcp_principal(
-        &mut self,
-        principal: Principal,
-        anchor_number: AnchorNumber,
-    ) -> Result<(), AnchorNumber> {
-        if let Some(existing) = self.lookup_anchor_with_mcp_principal_memory.get(&principal) {
-            if existing != anchor_number {
-                return Err(existing);
-            }
-        }
-        self.lookup_anchor_with_mcp_principal_memory
-            .insert(principal, anchor_number);
-        Ok(())
+    /// Insert (or replace) the MCP session grant keyed by `principal`. The
+    /// one-session-per-anchor invariant and the cross-anchor collision policy
+    /// live in [`crate::mcp`], which mutates this map only together with the
+    /// owning anchor's [`StorableMcpConfig::session_principal`] pointer.
+    pub fn insert_mcp_grant(&mut self, principal: Principal, grant: StorableMcpGrant) {
+        self.mcp_grant_memory.insert(principal, grant);
     }
 
-    /// Forget (disable) an anchor's MCP-server principal.
-    pub fn remove_anchor_mcp_principal(&mut self, principal: Principal) {
-        self.lookup_anchor_with_mcp_principal_memory
-            .remove(&principal);
+    /// Remove the MCP session grant keyed by `principal`.
+    pub fn remove_mcp_grant(&mut self, principal: Principal) {
+        self.mcp_grant_memory.remove(&principal);
     }
 
     /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
@@ -2335,8 +2327,8 @@ impl<M: Memory + Clone> Storage<M> {
                 self.openid_jwks_cache_memory_wrapper.size(),
             ),
             (
-                "lookup_anchor_with_mcp_principal_memory".to_string(),
-                self.lookup_anchor_with_mcp_principal_memory_wrapper.size(),
+                "mcp_grant_memory".to_string(),
+                self.mcp_grant_memory_wrapper.size(),
             ),
             (
                 "mcp_config_memory".to_string(),
