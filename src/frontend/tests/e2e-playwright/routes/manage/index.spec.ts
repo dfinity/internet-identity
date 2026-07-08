@@ -31,14 +31,17 @@ test.describe("Session re-authentication", () => {
     // Resume real time before re-authenticating: `fastForward` only fires
     // timers due at the moment it's called, so any timer scheduled *during*
     // the re-authentication network flow below (e.g. IC agent retry/backoff)
-    // would otherwise never fire and hang the test indefinitely.
+    // would otherwise never fire under a still-frozen clock.
     await page.clock.resume();
 
     // Click sign in to re-authenticate
     await dialog.getByRole("button", { name: "Sign in" }).click();
 
-    // Dialog should close after successful re-auth
-    await expect(dialog).toBeHidden();
+    // Dialog should close after successful re-auth. Re-authentication makes a
+    // real IC call (device-key lookup) plus a WebAuthn assertion, which can
+    // comfortably exceed the default 5s expect timeout under CI load; give it
+    // more headroom rather than tightly coupling the test to call latency.
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
 
     // User should still be on the manage page
     await managePage.assertVisible();
