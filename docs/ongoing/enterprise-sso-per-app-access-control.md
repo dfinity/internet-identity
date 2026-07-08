@@ -475,16 +475,25 @@ freshness rather than the login.
 
 ## 11. Build order
 
-1. **Access canister + gate.** The access canister (`allow`, state, admin authz) and the mint-time gate
-   in II core, with the cached restricted-origins hint.
-2. **Admin panel.** The id.ai admin surface (served by the FE canister, calling the
-   access canister): manage restricted apps, groups (synced, or defined by membership / attribute
-   rule), root/delegated admins, per-org SCIM token, audit log.
-3. **Signing proxy.** SCIM ingestion — Okta, Entra, OneLogin (users + groups) and Google
-   (users + attributes).
+Walking-skeleton first: build the thinnest slice that exercises the whole login → gate →
+allow/deny path, then thicken each part — riskiest first. The riskiest change is the
+mint-time gate inside **II core**, so it is proven on day one.
 
-Each step is usable on its own — step 1 enforces once policy exists; steps 2–3 make policy
-and directory data manageable and complete.
+1. **Walking skeleton — thinnest end-to-end.** The access canister (`allow`, `upsert_*`, and
+   minimal directory/policy state) plus the II-core mint-time gate. **Seed one org's directory
+   and one restricted-app policy by direct candid calls** — no proxy, no UI. Validate that an
+   in-group user reaches a restricted dapp, an out-of-group user is denied, and
+   unenrolled/unrestricted logins are untouched. This is the minimum working end-to-end and
+   de-risks the II-core change before anything else is built.
+2. **Real ingestion — the signing proxy** for one IdP (Okta). Replace the hand-seeded
+   directory with live SCIM push, so membership is real and current.
+3. **Admin surface — the id.ai panel** (served by the FE canister, calling the access
+   canister). Replace candid-call authoring with the UI: restricted apps, groups (synced, or
+   defined by membership / attribute rule), root/delegated admins, per-org SCIM token, audit
+   log.
+
+Then breadth (beyond the minimum): more IdPs (Entra, OneLogin), Google manual/attribute-rule
+groups, and delegated admins.
 
 ---
 
