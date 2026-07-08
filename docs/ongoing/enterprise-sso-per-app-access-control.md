@@ -15,7 +15,7 @@ re-litigate that; it specifies the single implementation chosen.
 | **IdP** | The org's corporate identity system (Okta, Microsoft Entra ID, OneLogin, Google Workspace). |
 | **id_token** | The signed OIDC JWT the IdP issues for a login; II verifies it against the IdP's JWKS. |
 | **`sub`** | The IdP's stable, opaque identifier for the human. |
-| **SCIM** (RFC 7643/7644) | Protocol by which an IdP *pushes* user/group changes to a service provider. Google has no SCIM push — it is polled via its Directory API instead. |
+| **SCIM** (RFC 7643/7644) | Protocol by which an IdP *pushes* user/group changes to a service provider. Google's SCIM push provisions **users only** (no groups/memberships), so Google group membership is read via its Directory API pull instead. |
 | **Anchor** | The user's II identity number. |
 | **Mint** | Issuance of a delegation for `(anchor, dapp-origin)` at the end of an SSO login. |
 | **Certified attribute** | A canister-signed statement about a user (e.g. an email), verifiable by a relying party via an II-supplied library. |
@@ -266,7 +266,7 @@ sequenceDiagram
     Sat->>Sat: verify caller == trusted proxy principal
     Sat-->>PX: ok
     PX-->>IdP: 201 SCIM resource
-    Note over PX,Sat: Google has no SCIM push, so the proxy PULLS on a timer
+    Note over PX,Sat: Google SCIM omits groups, so the proxy PULLS membership via Directory API
     PX->>IdP: Directory API list users/groups
     IdP-->>PX: users, groups
     PX->>Sat: upsert (org) [signed ingress]
@@ -275,8 +275,8 @@ sequenceDiagram
 The proxy is **stateless** (the satellite is the store): terminate the IdP's TLS, check the
 per-org bearer, translate SCIM to/from candid (and pull Google), sign, forward. It must be
 SCIM-compliant enough for the IdP (ServiceProviderConfig, PATCH semantics, resource ids).
-Okta, OneLogin and Entra push via SCIM; Google, which has no SCIM push, is polled via its
-Directory API.
+Okta, OneLogin and Entra push users and groups via SCIM; Google's SCIM push is user-only
+(no groups/memberships), so the proxy reads Google group membership via the Directory API.
 
 | Path into the IC | Legitimacy proof | Trusts boundary layer? |
 | --- | --- | --- |
