@@ -15,7 +15,7 @@ re-litigate that; it specifies the single implementation chosen.
 | **IdP** | The org's corporate identity system (Okta, Microsoft Entra ID, OneLogin, Google Workspace). |
 | **id_token** | The signed OIDC JWT the IdP issues for a login; II verifies it against the IdP's JWKS. |
 | **`sub`** | The IdP's stable, opaque identifier for the human. |
-| **SCIM** (RFC 7643/7644) | Protocol by which an IdP *pushes* user/group changes to a service provider. Google's SCIM push provisions **users only** (no groups/memberships), so Google group membership is read via its Directory API pull instead. |
+| **SCIM** (RFC 7643/7644) | Protocol by which an IdP *pushes* user/group changes to a service provider. Okta, Entra and OneLogin push users **and** groups; Google pushes **users only** (with attributes), so Google groups are defined in the admin panel (§5). |
 | **Anchor** | The user's II identity number. |
 | **Mint** | Issuance of a delegation for `(anchor, dapp-origin)` at the end of an SSO login. |
 | **Certified attribute** | A canister-signed statement about a user (e.g. an email), verifiable by a relying party via an II-supplied library. |
@@ -76,7 +76,8 @@ change to identity derivation** and no re-key.
 
 - An IT admin can express **"users in group X may access app Y"** for dapps reached through
   II SSO.
-- Works across Okta, Entra ID, OneLogin (SCIM push) and Google Workspace (Directory pull).
+- Works across Okta, Entra ID, and OneLogin (users + groups via SCIM push) and Google
+  Workspace (users via SCIM; groups defined in the admin panel — see §5).
 - No custom configuration pushed onto the org's IdP beyond a standard SSO connection and
   standard SCIM provisioning.
 - Enforcement is **fail-closed** and happens where II controls it.
@@ -161,7 +162,6 @@ graph TB
     User(("Org user"))
 
     IdP -- "SCIM push (bearer + TLS)" --> Proxy
-    IdP -. "Directory pull (Google)" .-> Proxy
     Proxy -- "signed ingress: upsert user/group" --> Sat
     User -- "sign in" --> FE
     FE -- "OIDC ceremony" --> IdP
@@ -185,14 +185,18 @@ bounded by sync rather than the login (§10).
 ## 5. Enterprise Access satellite canister
 
 A single multi-tenant canister, under the same controller/governance as II core, holds all
-per-org state and answers the gate.
+per-org state and answers the gate. Groups arrive via SCIM (Okta, Entra, OneLogin) or are
+defined in the admin panel — by explicit membership, or by a rule over synced user
+attributes (e.g. `department == Finance`) — which is how Google orgs get groups, since
+Google's SCIM pushes users with attributes but no groups.
 
 ### 5.1 State (per org, keyed by verified SSO domain)
 
 ```
 directory:
-  users:  { subject -> { emails, external_id, active } }
-  groups: { group_id -> { display_name, members: set<subject> } }
+  users:  { subject -> { emails, attributes, external_id, active } }
+  groups: { group_id -> { display_name, source, members: set<subject> } }
+                        // source = synced (SCIM) | manual | attribute-rule
 policy:
   restricted_apps: { origin -> set<group_id> }   // only restricted apps appear
 admins:
@@ -266,31 +270,26 @@ sequenceDiagram
     Sat->>Sat: verify caller == trusted proxy principal
     Sat-->>PX: ok
     PX-->>IdP: 201 SCIM resource
-    Note over PX,Sat: Google SCIM omits groups, so the proxy PULLS membership via Directory API
-    PX->>IdP: Directory API list users/groups
-    IdP-->>PX: users, groups
-    PX->>Sat: upsert (org) [signed ingress]
 ```
 
 The proxy is **stateless** (the satellite is the store): terminate the IdP's TLS, check the
-per-org bearer, translate SCIM to/from candid (and pull Google), sign, forward. It must be
-SCIM-compliant enough for the IdP (ServiceProviderConfig, PATCH semantics, resource ids).
-Okta, OneLogin and Entra push users and groups via SCIM; Google's SCIM push is user-only
-(no groups/memberships), so the proxy reads Google group membership via the Directory API.
+per-org bearer, translate SCIM to/from candid, sign, forward. It must be SCIM-compliant
+enough for the IdP (ServiceProviderConfig, PATCH semantics, resource ids). Okta, Entra and
+OneLogin push users and groups via SCIM; Google pushes users (with attributes) only, so
+Google groups are defined in the admin panel (§5).
 
 | Path into the IC | Legitimacy proof | Trusts boundary layer? |
 | --- | --- | --- |
 | id_token (identity) | IdP signature vs JWKS | No |
 | SCIM push straight into a canister | shared bearer the gateway sees | Yes |
 | SCIM push via signing proxy | proxy's IC signature | No |
-| Directory pull (outcall) | replica's own TLS to the IdP | No |
 
 **Residual trust:** the proxy holds a key the satellite trusts for directory writes. Scope
 its principal to directory writes only, rotate it, audit every write. This is first-party
 trust in one component we run — strictly better than trusting the boundary layer. Hosting is
-a single shared `scim.id.ai`; orgs run nothing. The per-org SCIM bearers and the Google
-service-account credential live in the proxy, never in a canister; the trusted proxy
-principal is a satellite config value, rotated by II's controller.
+a single shared `scim.id.ai`; orgs run nothing. The per-org SCIM bearers live in the proxy,
+never in a canister; the trusted proxy principal is a satellite config value, rotated by II's
+controller.
 
 ---
 
@@ -354,7 +353,7 @@ sync can neither lock out nor escalate past root; root is the recovery path, and
 SCIM-derived is fully revocable by root.
 
 **Admin identity is email, not groups.** `email` (+ `email_verified`) is the one signal
-present, verified, and config-free on every IdP including Google. Groups-for-admin would
+present, verified, and config-free on every major IdP. Groups-for-admin would
 reintroduce the very claim dependency we avoid (§1.2), in the worst place (a bad group filter
 could lock out all admins). Admin sets are small and explicit, so an email list fits.
 
@@ -434,16 +433,17 @@ the admin panel), so internal group names are never exposed in a public file.
 ## 10. Freshness & revocation
 
 - **Identity** is fresh every login (signed token). Unchanged.
-- **Membership** is as fresh as the directory sync (SCIM push is near-real-time; the Google
-  pull runs on a timer). The satellite tracks a per-org **staleness TTL**; beyond it,
-  restricted-app decisions fail closed rather than trust stale grants.
+- **Membership** is as fresh as the SCIM sync (near-real-time). The satellite tracks a
+  per-org **staleness TTL**; beyond it, restricted-app decisions fail closed rather than
+  trust stale grants.
+- For **Google**, users and their attributes sync via SCIM, but groups are admin-defined —
+  so membership changes when an admin edits a group, and attribute-rule groups re-evaluate
+  as user attributes sync.
 - Root admins can hard-revoke immediately, independent of sync (§8).
 
 This is the deliberate cost of sourcing membership from a directory rather than a token
 claim: stronger coverage and a real group picker, in exchange for revocation bounded by sync
-freshness rather than the login. A high-sensitivity app that cannot tolerate sync lag can
-additionally have the satellite do a live IdP check at gate time, at the cost of latency and
-an IdP credential.
+freshness rather than the login.
 
 ---
 
@@ -452,8 +452,10 @@ an IdP credential.
 1. **Satellite + gate.** The satellite (`allow`, state, admin authz) and the mint-time gate
    in II core, with the cached restricted-origins hint.
 2. **Admin panel.** The id.ai admin surface (served by the FE canister, calling the
-   satellite): manage restricted apps, root/delegated admins, per-org SCIM token, audit log.
-3. **Signing proxy.** SCIM ingestion for Okta/Entra/OneLogin plus the Google Directory pull.
+   satellite): manage restricted apps, groups (synced, or defined by membership / attribute
+   rule), root/delegated admins, per-org SCIM token, audit log.
+3. **Signing proxy.** SCIM ingestion — Okta, Entra, OneLogin (users + groups) and Google
+   (users + attributes).
 
 Each step is usable on its own — step 1 enforces once policy exists; steps 2–3 make policy
 and directory data manageable and complete.
