@@ -28,6 +28,12 @@ test.describe("Session re-authentication", () => {
       dialog.getByText("Sign in again to continue where you left off."),
     ).toBeVisible();
 
+    // Resume real time before re-authenticating: `fastForward` only fires
+    // timers due at the moment it's called, so any timer scheduled *during*
+    // the re-authentication network flow below (e.g. IC agent retry/backoff)
+    // would otherwise never fire and hang the test indefinitely.
+    await page.clock.resume();
+
     // Click sign in to re-authenticate
     await dialog.getByRole("button", { name: "Sign in" }).click();
 
