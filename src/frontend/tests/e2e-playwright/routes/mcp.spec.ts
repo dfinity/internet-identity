@@ -518,7 +518,13 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
 
   // Turn the feature off for this identity. The URL stays saved on-chain, but
   // the config is no longer `enabled`, so trust is off.
-  await page.getByRole("switch", { name: "Trusted MCP server" }).uncheck();
+  const toggle = page.getByRole("switch", { name: "Trusted MCP server" });
+  await toggle.uncheck();
+  // The toggle flips the UI optimistically but disables itself while the
+  // canister write is in flight (`disabled={saving}`), re-enabling only once
+  // the write resolves. Wait for that before navigating, so the connect below
+  // reads the persisted (disabled) config rather than racing the write.
+  await expect(toggle).toBeEnabled();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await page.getByRole("button", { name: "Allow access" }).click();
