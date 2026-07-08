@@ -48,13 +48,16 @@ Provider-neutral; the concrete per-IdP clicks are in the next section.
    authorization-server access policy, depending on the provider.
 3. **Publish the hop-1 doc** at `GET /.well-known/ii-openid-configuration` on
    your org domain, over **public HTTPS** with **CORS**
-   (`Access-Control-Allow-Origin: *`), pointing `openid_configuration` at your
-   IdP's discovery URL:
+   (`Access-Control-Allow-Origin: *`). Set `openid_configuration` to your IdP's
+   **full OIDC discovery document URL** — the complete
+   `…/.well-known/openid-configuration` URL from your provider's section below,
+   used verbatim. It already ends in `/.well-known/openid-configuration`, so
+   don't append another one:
 
    ```json
    {
      "client_id": "<your-client-id>",
-     "openid_configuration": "https://<idp-discovery-url>/.well-known/openid-configuration",
+     "openid_configuration": "<full OIDC discovery URL, e.g. https://<org>.okta.com/oauth2/default/.well-known/openid-configuration>",
      "name": "Acme SSO"
    }
    ```
@@ -63,13 +66,18 @@ Provider-neutral; the concrete per-IdP clicks are in the next section.
    HTTPS), then on `id.ai` / `beta.id.ai` choose SSO, enter the discovery
    domain, wait for **Continue**, and complete the IdP login.
 
-> **No domain allowlisting needed (SSO is now GA).** Any bare-authority
-> discovery host served over HTTPS just works — you don't register your domain
-> anywhere. The `sso_discoverable_domains` allowlist was a **canary gate used
-> before the feature went GA**; the deployments now run with
-> `sso_allow_any_domain` on, which supersedes it. That flag does **not** relax
-> the HTTPS rule — only explicitly-allowlisted hosts may serve discovery over
-> plain `http` (e.g. `localhost` in e2e).
+> **Domain allowlisting — not needed on the hosted deployments.** When the
+> target canister has the `sso_allow_any_domain` deploy flag enabled — as the
+> hosted `id.ai` / `beta.id.ai` deployments do — any bare-authority discovery
+> host served over HTTPS just works, with no domain registration. That flag
+> does **not** relax the HTTPS rule — only explicitly-allowlisted hosts may
+> serve discovery over plain `http` (e.g. `localhost` in e2e).
+>
+> The flag defaults to `false`, though. On a canister without it (a local or
+> self-hosted II), the `sso_discoverable_domains` allowlist still gates
+> discovery: an II admin adds your domain via an upgrade arg (the vec fully
+> replaces the previous list; entries are lowercased). This allowlist was the
+> original **canary gate** used before SSO went generally available.
 
 ## Provider setup (the concrete clicks for steps 1–3)
 
