@@ -16,10 +16,11 @@ interface McpAuthorizeInput {
    *  once at connect and passed to `mcp_register`, which persists it on the
    *  grant — read-only is a property of the session, not a per-call flag. */
   accessLevel: AccessLevel;
-  /** Callback URL on the MCP server origin (e.g. "https://mcp.id.ai/callback").
-   *  MCP connections are to remote servers, so this is always https, and its
-   *  origin has been verified against the identity's synced trusted-server
-   *  config before this runs. The connect flow talks to it twice: once to
+  /** The trusted server's pinned connect endpoint: its origin plus a fixed
+   *  well-known path, derived by the caller from the identity's synced
+   *  trusted-server config (see `connectCallbackUrl`) — never taken from the
+   *  (attacker-craftable) connect link, whose callback path is dropped. Always
+   *  https (the configured URL is). The connect flow talks to it twice: once to
    *  fetch the server's session public key, once to report completion. */
   callback: string;
   /** Opaque value the server issued for this connect, included in both

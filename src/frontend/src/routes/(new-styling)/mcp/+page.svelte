@@ -12,7 +12,11 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
-  import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
+  import {
+    readMcpConfig,
+    isOriginTrusted,
+    connectCallbackUrl,
+  } from "$lib/utils/mcpConfig";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
@@ -194,11 +198,25 @@
           phase = { kind: "untrusted" };
           return;
         }
+        // Contact the trusted server only at its pinned connect endpoint
+        // (origin + fixed path), derived from the synced config — never the
+        // callback path carried in the (attacker-craftable) connect link. The
+        // link's callback is used only for its origin (the untrusted check
+        // above and the connect-screen host); its path is deliberately dropped
+        // so a crafted link can't point II at an arbitrary path on the trusted
+        // origin. `isOriginTrusted` implies this is defined; the guard is
+        // defensive (and narrows the type).
+        const callback = connectCallbackUrl(config);
+        if (callback === undefined) {
+          mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.ServerUntrusted);
+          phase = { kind: "untrusted" };
+          return;
+        }
         const finishUrl = await mcpAuthorize({
           authenticated,
           ttlSeconds,
           accessLevel,
-          callback: request.callback,
+          callback,
           state: request.state,
         });
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);

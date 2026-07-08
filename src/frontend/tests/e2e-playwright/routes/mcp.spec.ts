@@ -257,6 +257,55 @@ test("Allow access registers the server's session key", async ({
   ).toBeVisible();
 });
 
+test("A tampered callback path is ignored: II uses the pinned connect endpoint", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await mcp.installInterceptor(page);
+  // An attacker-controlled path on the *trusted* origin that, if II ever fetched
+  // it, would hand back a key of the attacker's choosing (the reported phishing
+  // vector: a planted/echoing path on the trusted origin). Registered after the
+  // fixture's catch-all so it would win for this exact path if contacted.
+  let attackerPathHit = false;
+  await page.route(`${mcp.mcpOrigin}/attacker-echo`, async (route) => {
+    attackerPathHit = true;
+    await route.fulfill({
+      status: 200,
+      headers: {
+        "access-control-allow-origin": "*",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ public_key: "AAAA" }),
+    });
+  });
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  // Same trusted origin (so the connect proceeds), but an attacker-chosen path
+  // in the connect link.
+  await page.goto(
+    mcp.buildAuthorizeUrl({
+      app: APP,
+      callbackUrl: `${mcp.mcpOrigin}/attacker-echo`,
+    }),
+  );
+  await page.getByRole("button", { name: "Allow access" }).click();
+
+  // The connect completes against the server's real key, fetched from the pinned
+  // endpoint (origin + fixed path). The attacker's path is never contacted, so a
+  // planted key there can't be registered.
+  const completion = await mcp.completion;
+  expect(completion.state).toBe(mcp.state);
+  expect(attackerPathHit).toBe(false);
+  await expect(
+    page.getByRole("heading", { name: "You're signed in" }),
+  ).toBeVisible();
+});
+
 test("A finish_url from the server hands the tab back to it after connecting", async ({
   page,
   mcp,
