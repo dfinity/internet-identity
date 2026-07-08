@@ -155,7 +155,12 @@ const endRedirectSession = async (
   });
   const responseDelegationChain = DelegationChain.fromDelegations(
     authResponse.delegations.map(({ delegation, signature }) => ({
-      delegation: new Delegation(delegation.pubkey, delegation.expiration),
+      delegation: new Delegation(
+        delegation.pubkey,
+        delegation.expiration,
+        delegation.targets,
+        delegation.permissions,
+      ),
       signature: new Uint8Array(signature) as Signature,
     })),
     authResponse.userPublicKey,

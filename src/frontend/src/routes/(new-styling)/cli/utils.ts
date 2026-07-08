@@ -1,6 +1,7 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import type { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
   fromBase64URL,
@@ -112,7 +113,7 @@ export const cliAuthorize = async ({
   const expirationDate = new Date(Number(expiration / BigInt(1_000_000)));
   const chain = await DelegationChain.create(
     ephemeralIdentity,
-    { toDer: () => cliPubKey },
+    { toDer: () => cliPubKey as DerEncodedPublicKey },
     expirationDate,
     { previous: canisterChain },
   );

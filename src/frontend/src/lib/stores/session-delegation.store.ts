@@ -87,7 +87,7 @@ export const actorForIdentity = async (
     const agent = HttpAgent.createSync({ ...agentOptions, identity });
     // Best-effort prefetch to speed up query verification; the query path
     // fetches lazily if this fails, so a rejection here is non-fatal.
-    void agent.fetchSubnetKeys(canisterId).catch(() => {});
+    void agent.fetchSubnetKeys({ canisterId }).catch(() => {});
     return Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,

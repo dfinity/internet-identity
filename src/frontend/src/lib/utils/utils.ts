@@ -371,6 +371,14 @@ export const transformSignedDelegation = (
       Uint8Array.from(signed_delegation.delegation.pubkey),
       signed_delegation.delegation.expiration,
       undefined,
+      // The candid `permissions : opt text` (`[] | [string]`, e.g.
+      // `["queries"]` for a read-only delegation) maps 1:1 onto the agent
+      // library's `permissions?: string`. Indexing the opt tuple at [0]
+      // yields `string | undefined`. Carrying it here is required for
+      // restricted delegations to verify: the canister signature covers
+      // this field, so dropping it makes the replica recompute a different
+      // hash and reject the delegation.
+      signed_delegation.delegation.permissions[0],
     ),
     signature: Uint8Array.from(
       signed_delegation.signature,

@@ -100,11 +100,11 @@ export const handleDelegationRequest =
         // delegation is restricted to query calls via its `permissions`
         // field, which the IC enforces (update calls are rejected).
         //
-        // NOTE: carrying the restricted delegation back to the relying
-        // party requires the agent library to round-trip the `permissions`
-        // field (@icp-sdk/core); until then, restricted delegations fail
-        // closed on the dapp side (the signature does not verify without
-        // the field).
+        // The restricted delegation is now carried back to the relying party
+        // intact: the encoded ICRC-34 result includes the `permissions` field
+        // (see `DelegationResultSchema`), and `@icp-sdk/core` (>= 6) round-trips
+        // it through `Delegation`, so a JS relying party recomputes the same
+        // canister-signed hash and the signature verifies.
         // Send an explicit value rather than relying on the backend's
         // omitted-arg default.
         const permissions = toPermissionsArg(authorized.accessLevel);

@@ -52,7 +52,7 @@ export const authenticationStore: AuthenticationStore = {
     const agent = HttpAgent.createSync(agentOptions);
     // Fetch subnet keys to speed up queries during authentication,
     // this avoids having to fetch them later on user interaction.
-    void agent.fetchSubnetKeys(canisterId);
+    void agent.fetchSubnetKeys({ canisterId });
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,
