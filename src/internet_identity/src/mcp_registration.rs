@@ -18,9 +18,10 @@
 //! under full user authorization, and recovered from `caller()` at
 //! [`register_v2`] time. So the server can neither register a session for a
 //! different anchor nor upgrade a read-only session to full access, and II never
-//! binds a key it merely received. The entry is deleted on the first successful
-//! [`register_v2`] (single-use); a boundary retry with the same `S` is served
-//! idempotently from the grant that first call created.
+//! binds a key it merely received. The entry is retained after the first
+//! successful [`register_v2`], marked `used` and bound to that key, so the
+//! delegation is single-use: a boundary retry is idempotent only for the same
+//! caller (`P_reg`) and the same key, and any other reuse is rejected.
 
 use crate::authz_utils::check_authorization;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
