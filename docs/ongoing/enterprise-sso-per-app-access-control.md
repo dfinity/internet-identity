@@ -97,7 +97,7 @@ client_id**. Because every downstream dapp collapses into the one II client, the
 per-app policy engine has nothing per-app to bind to. Recovering *who* is possible;
 recovering *under what conditions* (device posture, per-app MFA step-up) per downstream
 dapp is not, short of giving each dapp its own OIDC client — which breaks portability and
-fragments identity (see §2.3, Option A). Every commercial broker (WorkOS, Stytch, Auth0,
+fragments identity. Every commercial broker (WorkOS, Stytch, Auth0,
 Clerk) faces the same collapse and makes the same choice: keep the IdP vanilla, hold the
 authorization model on their own side.
 
@@ -133,9 +133,9 @@ design needs no changes to identity derivation. (This is why we do not pursue pe
   OIDC. Membership comes from the synced directory instead. The id_token's only job is to
   prove *identity*.
 - **Re-implementing the IdP's policy engine.** II performs a membership-set decision, not
-  device/network/risk/time conditions. Orgs needing those use the advanced mode (§12.1).
-- **Per-app OIDC clients as the default.** Kept as a documented advanced mode (§12.1), not
-  the portable core.
+  device/network/risk/time conditions.
+- **Per-app OIDC clients.** Out of scope — they break portability (Google can't express
+  per-OIDC-client assignment) and would move `aud` into the identity, forcing a re-key.
 - **Being the directory of record.** II mirrors what the org's IdP already holds; it is not
   a user store.
 
@@ -143,7 +143,6 @@ design needs no changes to identity derivation. (This is why we do not pursue pe
 
 | Option | Mechanism | Verdict |
 | --- | --- | --- |
-| **A** | Per-app OIDC clients + native IdP app-assignment | Advanced mode — full native policy, but 3/4 IdPs (no Google), a per-app `client_id` map to author, and an identity re-key. See §12.1. |
 | **B** | Standard groups claim + group→app map on our side | Portable starting point; but the *claim* is the fragile part (§2.2). |
 | **C** | Directory sync (SCIM / Google API) into our side | The full-coverage endpoint; heavier build. |
 | **D** | IdP-centric custom claims (custom auth server, custom scopes) | Rejected — Okta-only, paid SKU, magic-string fragility, opposite of industry practice. |
@@ -166,7 +165,8 @@ proxy**.
 - II core: trusted for identity, delegation issuance, and id_token verification.
 - The satellite canister and the signing proxy: trusted **within their scope** (access
   decisions and directory ingestion respectively), under the same governance as II. In the
-  TCB for *access decisions*, never for identity or key material.
+  trusted computing base (TCB) for *access decisions* only — never for identity or key
+  material.
 
 **Untrusted parties**
 
@@ -536,7 +536,7 @@ Extended additively; existing SSO deployments keep working.
   - The satellite tracks a per-org **sync staleness TTL**; beyond it, restricted-app
     decisions fail closed (deny) rather than trust stale grants.
   - For high-sensitivity apps, a future **on-demand re-check** against the IdP at gate time
-    can bypass sync lag (§12.3).
+    can bypass sync lag (§12.2).
 - Root admins can hard-revoke immediately, independent of sync (§8).
 
 This is the conscious cost of sourcing membership from a directory rather than a token claim
@@ -572,27 +572,17 @@ gantt
 
 ## 12. Future work
 
-### 12.1 Advanced mode — per-app OIDC clients (Option A)
-
-For orgs that require **IdP-native** per-app policy — device posture, network zones, per-app
-MFA step-up, IdP-side audit — a documented advanced mode where each restricted dapp gets its
-own OIDC client in the org's IdP, gated by native app-assignment. II routes to the app's
-`client_id` (from a map in the well-known) and verifies `aud`. Costs: 3/4 IdPs (Google can't
-express per-OIDC-client assignment), a `client_id` map to author, and an identity re-key to
-`(iss, sub, sso_domain)` so per-app clients don't fragment the user. Complementary to the
-default, not a replacement.
-
-### 12.2 Satellite topology
+### 12.1 Satellite topology
 
 Start multi-tenant. Per-org sharding (a canister per enterprise) later, for isolation, data
 residency, or scale, with II routing to the right canister id.
 
-### 12.3 On-demand freshness
+### 12.2 On-demand freshness
 
 For high-sensitivity apps, a live IdP check (Graph / Directory API via outcall) at gate time,
 bypassing sync lag at the cost of latency and an IdP credential.
 
-### 12.4 Certified role/permission attributes
+### 12.3 Certified role/permission attributes
 
 Beyond coarse gating, mint `sso:<domain>:roles` as certified attributes for apps that want
 fine-grained in-app RBAC via the II-supplied lib — the layered model (II gates coarsely at
@@ -611,7 +601,6 @@ mint; the dapp enforces finely on certified roles).
   the trusted proxy principal is rotated.
 - **Google credential custody:** where the Directory-API service-account credential lives
   for the pull connector.
-- **Advanced mode:** is §12.1 in scope for v1 or strictly future?
 
 ---
 
