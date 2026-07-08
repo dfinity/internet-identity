@@ -246,6 +246,26 @@ service : {
 `upsert_*` asserts `caller == trusted proxy principal`; admin calls verify an II-signed
 `CertifiedEmail`, never a raw claim (§8).
 
+### 5.4 Deployment model
+
+**Default — II-owned, multi-tenant.** II operates one satellite and one shared proxy
+(`scim.id.ai`). Orgs run nothing: they point their IdP at the proxy and manage policy in the
+admin panel. This is the only model most enterprises will adopt (few operate IC canisters),
+and it lets security fixes ship uniformly. Its cost: **II becomes the data processor for
+every org's directory** (users, groups, attributes) — broad, sensitive PII — so per-tenant
+isolation, minimized stored attributes, encryption at rest, and clear DPAs are required.
+
+**Escape hatch — org-owned satellite.** A sovereignty- or residency-constrained org may run
+its **own** satellite; it declares the canister id in its well-known (§9), and II routes
+`allow` there, trusting it **only for that org's verified domain**. Benefits: the org's
+directory PII never touches II (II sees only allow/deny), and a bug is physically isolated to
+that org. Costs: the org must operate a canister, II must support an interface range, and
+security fixes can't be pushed to it. Blast radius is bounded — a rogue org satellite can
+only affect its own users' access (delegations are per `(anchor, origin)`).
+
+The proxy follows the satellite's owner: II-owned satellite → shared `scim.id.ai`; org-owned
+satellite → the org runs its own proxy signing into its own satellite.
+
 ---
 
 ## 6. Signing proxy — directory ingestion
@@ -424,9 +444,15 @@ the admin panel), so internal group names are never exposed in a public file.
   "name": "Org",
 
   // new: root admins (email only; standard claim, all IdPs, no IdP config)
-  "admins": { "emails": ["it@org.com", "sec@org.com"] }
+  "admins": { "emails": ["it@org.com", "sec@org.com"] },
+
+  // optional: self-hosted satellite (§5.4). Omit to use II's multi-tenant satellite.
+  "access_satellite": "aaaaa-aa"
 }
 ```
+
+`access_satellite` is optional: when absent, II uses its own multi-tenant satellite; when
+present, II routes `allow` to the declared canister, scoped to this verified domain (§5.4).
 
 ---
 
