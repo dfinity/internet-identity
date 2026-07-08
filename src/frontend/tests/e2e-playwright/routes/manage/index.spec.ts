@@ -28,11 +28,20 @@ test.describe("Session re-authentication", () => {
       dialog.getByText("Sign in again to continue where you left off."),
     ).toBeVisible();
 
-    // Resume real time before re-authenticating: `fastForward` only fires
-    // timers due at the moment it's called, so any timer scheduled *during*
-    // the re-authentication network flow below (e.g. IC agent retry/backoff)
-    // would otherwise never fire under a still-frozen clock.
+    // Resume real time before re-authenticating so any timer scheduled
+    // *during* the re-authentication network flow below (e.g. IC agent
+    // retry/backoff) fires normally instead of staying frozen.
     await page.clock.resume();
+
+    // `resume()` only keeps time flowing *from* the fast-forwarded point —
+    // it doesn't undo the 25-minute jump, so `Date.now()` stays permanently
+    // ~25 minutes ahead of the replica's real clock. The re-authentication
+    // below makes a real IC call, whose ingress expiry is computed from
+    // `Date.now()`; with that offset the replica rejects it outright as
+    // "expiry too far in the future" (its acceptance window is only ~5
+    // minutes), no matter how long the test waits. Snap the clock back to
+    // the real wall-clock time so that call computes a valid expiry.
+    await page.clock.setSystemTime(Date.now());
 
     // Click sign in to re-authenticate
     await dialog.getByRole("button", { name: "Sign in" }).click();
