@@ -270,6 +270,22 @@ test("A tampered callback path is ignored: II uses the pinned connect endpoint",
   // fixture's catch-all so it would win for this exact path if contacted.
   let attackerPathHit = false;
   await page.route(`${mcp.mcpOrigin}/attacker-echo`, async (route) => {
+    // A CORS-correct stub. The real connect fetch is a cross-origin POST with a
+    // JSON content-type, so the browser preflights: answer OPTIONS with the
+    // preflight headers (204). Only the actual request flips the flag, so a
+    // regression that fetched this path fails on the `attackerPathHit`
+    // assertion cleanly rather than stalling on a rejected preflight.
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "POST",
+          "access-control-allow-headers": "content-type",
+        },
+      });
+      return;
+    }
     attackerPathHit = true;
     await route.fulfill({
       status: 200,
@@ -295,15 +311,17 @@ test("A tampered callback path is ignored: II uses the pinned connect endpoint",
   );
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  // The connect completes against the server's real key, fetched from the pinned
-  // endpoint (origin + fixed path). The attacker's path is never contacted, so a
-  // planted key there can't be registered.
-  const completion = await mcp.completion;
-  expect(completion.state).toBe(mcp.state);
-  expect(attackerPathHit).toBe(false);
+  // The connect completes against the server's real key from the pinned
+  // endpoint and reaches the terminal screen. Assert the flag before awaiting
+  // the fixture-resolved completion: the heading resolves whether or not a
+  // regression occurred, so a regression fails fast on `attackerPathHit` here
+  // instead of hanging on a completion misdirected to the attacker path.
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
   ).toBeVisible();
+  expect(attackerPathHit).toBe(false);
+  const completion = await mcp.completion;
+  expect(completion.state).toBe(mcp.state);
 });
 
 test("A finish_url from the server hands the tab back to it after connecting", async ({
