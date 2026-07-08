@@ -10,13 +10,13 @@ import { Funnel } from "./Funnel";
  *     mcp-authorize--server-untrusted (callback origin not on the chosen
  *                                      identity's trusted-server list)
  *     mcp-authorize--confirmed       (user clicked Allow access)
- *       mcp-authorize--success       (MCP server redirected back status=success)
- *       mcp-authorize--error         (MCP server redirected back status=error)
+ *       mcp-authorize--success       (session registered; terminal screen shown)
+ *       mcp-authorize--error         (key fetch or registration failed)
  * end-mcp-authorize
  *
- * The flow navigates away to the MCP server and back, so the success and error
- * events fire on a fresh page load — Plausible correlates them with the start
- * by visitor session, not by JS lifetime.
+ * The whole flow runs on this page (fetch the server's key, register it,
+ * notify the server), so success and error fire in the same JS lifetime as
+ * the start — no cross-load correlation needed.
  */
 export const McpAuthorizeEvents = {
   RequestInvalid: "request-invalid",

@@ -898,7 +898,14 @@ pub(super) async fn stamp_recovery_delegation(
     let seed: Hash = calculate_email_recovery_seed(&snapshot.claimed_address, anchor_number);
 
     state::signature_map_mut(|sigs| {
-        crate::delegation::add_delegation_signature(sigs, session_pk.clone(), &seed, expiration);
+        // Unrestricted: email-recovery delegations have no read-only option.
+        crate::delegation::add_delegation_signature(
+            sigs,
+            session_pk.clone(),
+            &seed,
+            expiration,
+            None,
+        );
     });
     crate::update_root_hash();
 

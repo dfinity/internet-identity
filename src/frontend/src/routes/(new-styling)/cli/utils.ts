@@ -1,3 +1,4 @@
+import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
@@ -25,6 +26,9 @@ interface CliAuthorizeInput {
   /** Single-use secret from the URL fragment, echoed back so the loopback
    *  server can tell this page's POST from a stray or forged local request. */
   nonce: string;
+  /** The access the CLI's delegation grants. The CLI flow defaults to
+   *  "read-only" (query calls only); "full-access" is the opt-in. */
+  accessLevel: AccessLevel;
 }
 
 const derivationOrigin = (domain: string | undefined): string =>
@@ -57,6 +61,7 @@ export const cliAuthorize = async ({
   ttlMinutes,
   callback,
   nonce,
+  accessLevel,
 }: CliAuthorizeInput): Promise<void> => {
   const { identityNumber, actor } = authenticated;
   const effectiveOrigin = derivationOrigin(domain);
@@ -76,6 +81,9 @@ export const cliAuthorize = async ({
       [],
       ephemeralPublicKey,
       [maxTimeToLiveNanos],
+      // The user's choice (read-only by default); passed explicitly so it
+      // is honored regardless of the backend's omitted-arg default.
+      toPermissionsArg(accessLevel),
     )
     .then(throwCanisterError);
 
@@ -87,6 +95,8 @@ export const cliAuthorize = async ({
         [],
         ephemeralPublicKey,
         expiration,
+        // Must match the value passed to `prepare_account_delegation` above.
+        toPermissionsArg(accessLevel),
       )
       .then(throwCanisterError)
       .then(transformSignedDelegation)
