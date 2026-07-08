@@ -102,9 +102,12 @@ export const handleDelegationRequest =
         //
         // The restricted delegation is now carried back to the relying party
         // intact: the encoded ICRC-34 result includes the `permissions` field
-        // (see `DelegationResultSchema`), and `@icp-sdk/core` (>= 6) round-trips
-        // it through `Delegation`, so a JS relying party recomputes the same
-        // canister-signed hash and the signature verifies.
+        // (see `DelegationResultSchema`), and `@icp-sdk/core` (>= 6) can
+        // represent it on a `Delegation` instance. `permissions` is a
+        // non-standard ICRC-34 extension, though, so the relying party's own
+        // signer/client must also read it out of the delegation result and
+        // pass it into the `Delegation` it reconstructs; only then does it
+        // recompute the same canister-signed hash and the signature verify.
         // Send an explicit value rather than relying on the backend's
         // omitted-arg default.
         const permissions = toPermissionsArg(authorized.accessLevel);
