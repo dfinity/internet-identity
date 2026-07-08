@@ -39,6 +39,17 @@ pub struct StorableMcpRegistration {
     /// bounds how long a stale entry lingers before it can be pruned.
     #[n(3)]
     pub expires_at_ns: u64,
+    /// Whether this registration delegation has already been redeemed. Retained
+    /// (rather than deleted) after a successful `mcp_register_v2` so a boundary
+    /// retry can be recognized and answered — but only for the same caller
+    /// (`P_reg`, the map key) and the same key (see `registered_key`).
+    #[n(4)]
+    pub used: bool,
+    /// The session key `S` bound on the first successful redemption (empty until
+    /// then). A retry is idempotent only when it presents this exact key; a
+    /// different key with a `used` entry is rejected (single-use).
+    #[n(5)]
+    pub registered_key: Vec<u8>,
 }
 
 impl Storable for StorableMcpRegistration {
@@ -61,12 +72,18 @@ mod tests {
 
     #[test]
     fn should_roundtrip_through_storable() {
-        for read_only in [false, true] {
+        for (read_only, used, registered_key) in [
+            (false, false, vec![]),
+            (true, false, vec![]),
+            (true, true, b"bound session key".to_vec()),
+        ] {
             let entry = StorableMcpRegistration {
                 anchor_number: 10_000,
                 read_only,
                 grant_ttl_ns: 24 * 60 * 60 * 1_000_000_000,
                 expires_at_ns: 1_234_567_890_000_000_000,
+                used,
+                registered_key,
             };
             let decoded = StorableMcpRegistration::from_bytes(entry.to_bytes());
             assert_eq!(decoded, entry);

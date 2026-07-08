@@ -784,13 +784,7 @@ async fn prepare_mcp_registration_delegation(
     permissions: Option<Permissions>,
     max_ttl: Option<u64>,
 ) -> Result<PrepareMcpRegistrationDelegation, String> {
-    mcp_registration::prepare(
-        anchor_number,
-        registration_key,
-        permissions,
-        max_ttl.unwrap_or(0),
-    )
-    .await
+    mcp_registration::prepare(anchor_number, registration_key, permissions, max_ttl).await
 }
 
 /// Fetch the signed registration delegation prepared above, to deliver to the

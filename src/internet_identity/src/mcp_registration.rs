@@ -46,6 +46,12 @@ use sha2::{Digest, Sha256};
 /// or abandoned entry is useful.
 pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 90 * 1_000_000_000;
 
+/// Default session-grant lifetime when the caller omits `max_ttl`: 1 hour,
+/// matching the frontend's default connect TTL. `mcp::register` still clamps to
+/// [10 min, 30 days]. Named explicitly (rather than falling through to the clamp
+/// minimum) so an omitted argument has a documented, unsurprising meaning.
+pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
+
 /// Seed for the registration principal `P_reg`. Folds a fixed-length hash of the
 /// registration key `X` into the per-anchor seed, so `P_reg` is unique per
 /// connect (each connect has a fresh `X`) without a separate nonce. A dedicated
@@ -94,11 +100,15 @@ pub async fn prepare(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
     permissions: Option<Permissions>,
-    grant_ttl_ns: u64,
+    max_ttl: Option<u64>,
 ) -> Result<PrepareMcpRegistrationDelegation, String> {
     check_authorization(anchor_number)
         .map_err(|err| format!("{} could not be authenticated.", err.principal))?;
     state::ensure_salt_set().await;
+
+    // Session-grant lifetime the user chose at connect; an omitted value means
+    // the documented default, not the clamp minimum. `mcp::register` clamps.
+    let grant_ttl_ns = max_ttl.unwrap_or(DEFAULT_MCP_GRANT_TTL_NS);
 
     let now = time();
     let expiration = now.saturating_add(MCP_REGISTRATION_DELEGATION_TTL_NS);
@@ -137,6 +147,8 @@ pub async fn prepare(
                 read_only,
                 grant_ttl_ns,
                 expires_at_ns: expiration,
+                used: false,
+                registered_key: vec![],
             },
         );
     });
@@ -189,51 +201,74 @@ pub fn get(
 
 /// `mcp_register_v2`: bind the MCP server's long-lived session key `S` to the
 /// consenting anchor. Authenticated by the `P_reg -> X` chain (so `caller()` is
-/// `P_reg`); the anchor and read-only choice come from the index entry, never
-/// from an argument. Single-use: the entry is deleted on success, and a boundary
-/// retry with the same `S` is served idempotently from the resulting grant.
+/// `P_reg`); the anchor and read-only choice come from the index entry keyed by
+/// `caller()`, never from an argument.
+///
+/// Authorization is the index lookup on `caller()`: a caller with no entry gets
+/// a clean error (there is no fallback that would answer for an arbitrary,
+/// possibly-someone-else's session key). The entry is retained after a
+/// successful bind, marked `used` with the bound key, so a boundary retry is
+/// idempotent *only* for the same caller and the same key; a used entry
+/// presented with a different key is rejected (single-use).
 pub fn register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
     let caller = caller();
     let now = time();
 
-    match state::storage_borrow(|storage| storage.lookup_mcp_registration(caller)) {
-        Some(entry) if entry.expires_at_ns > now => {
-            // First redemption. Bind S with the recorded anchor + read-only
-            // choice (config/one-session-per-anchor invariants live in
-            // `mcp::register`), then delete the entry to make the chain
-            // single-use.
-            let registration = crate::mcp::register(
-                entry.anchor_number,
-                session_key,
-                entry.grant_ttl_ns,
-                entry.read_only,
-            )?;
-            state::storage_borrow_mut(|storage| storage.remove_mcp_registration(caller));
-            Ok(McpRegistrationV2 {
-                expiration: registration.expiration,
-                permissions: permissions_of(entry.read_only),
-            })
-        }
-        Some(_) => {
-            // Expired: clean it up and report it gone.
-            state::storage_borrow_mut(|storage| storage.remove_mcp_registration(caller));
-            Err("MCP registration failed: the registration delegation has expired.".to_string())
-        }
-        None => {
-            // No live entry: either already used (single-use spent) or a boundary
-            // retry of a call that already committed. Serve the retry idempotently
-            // from the grant the first call created, keyed by S's principal.
-            let principal = Principal::self_authenticating(&session_key);
-            match state::storage_borrow(|storage| storage.lookup_mcp_grant(principal)) {
-                Some(grant) if grant.expires_at_ns > now => Ok(McpRegistrationV2 {
-                    expiration: grant.expires_at_ns,
-                    permissions: permissions_of(grant.read_only),
-                }),
-                _ => Err(
-                    "MCP registration failed: no registration delegation for this caller."
-                        .to_string(),
-                ),
-            }
-        }
+    let entry = state::storage_borrow(|storage| storage.lookup_mcp_registration(caller))
+        .ok_or_else(|| {
+            "MCP registration failed: no registration delegation for this caller.".to_string()
+        })?;
+
+    if entry.expires_at_ns <= now {
+        // Expired: clean it up and report it gone.
+        state::storage_borrow_mut(|storage| storage.remove_mcp_registration(caller));
+        return Err(
+            "MCP registration failed: the registration delegation has expired.".to_string(),
+        );
     }
+
+    if entry.used {
+        // Already redeemed. Idempotent only for the same key by the same caller;
+        // reflect the current grant so a boundary retry gets a truthful answer.
+        if entry.registered_key.as_slice() != &session_key[..] {
+            return Err(
+                "MCP registration failed: this registration delegation was already used."
+                    .to_string(),
+            );
+        }
+        let principal = Principal::self_authenticating(&session_key);
+        return match state::storage_borrow(|storage| storage.lookup_mcp_grant(principal)) {
+            Some(grant) if grant.expires_at_ns > now => Ok(McpRegistrationV2 {
+                expiration: grant.expires_at_ns,
+                permissions: permissions_of(entry.read_only),
+            }),
+            // Registered, but the grant is no longer live (e.g. the user revoked
+            // the trusted server since). Report it rather than re-binding.
+            _ => Err("MCP registration failed: the session grant is no longer live.".to_string()),
+        };
+    }
+
+    // First redemption. Bind S with the recorded anchor + read-only choice
+    // (config / one-session-per-anchor invariants live in `mcp::register`), then
+    // mark the entry used so the delegation is single-use.
+    let registration = crate::mcp::register(
+        entry.anchor_number,
+        session_key.clone(),
+        entry.grant_ttl_ns,
+        entry.read_only,
+    )?;
+    state::storage_borrow_mut(|storage| {
+        storage.insert_mcp_registration(
+            caller,
+            StorableMcpRegistration {
+                used: true,
+                registered_key: session_key.into_vec(),
+                ..entry
+            },
+        );
+    });
+    Ok(McpRegistrationV2 {
+        expiration: registration.expiration,
+        permissions: permissions_of(entry.read_only),
+    })
 }
