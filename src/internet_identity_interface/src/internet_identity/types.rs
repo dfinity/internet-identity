@@ -681,6 +681,28 @@ pub struct McpRegistration {
     pub expiration: Timestamp,
 }
 
+/// Result of `prepare_mcp_registration_delegation`: the canister-signature
+/// public key the `P_reg -> X` registration delegation chain is rooted at, and
+/// the (short) expiration of that delegation. The frontend fetches the signed
+/// delegation with `get_mcp_registration_delegation` and delivers the chain to
+/// the trusted MCP server, which redeems it via `mcp_register_v2`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareMcpRegistrationDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+/// Result of `mcp_register_v2`: the expiration (ns since epoch) of the MCP
+/// session grant just registered, plus the access level the user chose at
+/// connect (`queries` = read-only, `all` = full). The server reads `permissions`
+/// to learn the read-only state up front — with the v2 flow there is no
+/// completion POST carrying it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct McpRegistrationV2 {
+    pub expiration: Timestamp,
+    pub permissions: Permissions,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub enum AccountNameValidationError {
     NameTooLong,

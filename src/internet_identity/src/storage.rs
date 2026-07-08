@@ -132,6 +132,7 @@ use storable::email_recovery_address_hash::StorableEmailRecoveryAddressHash;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::mcp_config::StorableMcpConfig;
 use storable::mcp_grant::StorableMcpGrant;
+use storable::mcp_registration::StorableMcpRegistration;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
@@ -199,6 +200,7 @@ const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
 // const DEPRECATED_LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX: u8 = 27u8;
 // const DEPRECATED_MCP_ACCESS_MEMORY_INDEX: u8 = 28u8;
 const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
+const MCP_REGISTRATION_MEMORY_INDEX: u8 = 30u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -253,6 +255,13 @@ const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_ME
 /// without an `anchor_number` parameter. Bounded at one entry per anchor via
 /// [`StorableMcpConfig::session_principal`].
 const MCP_GRANT_MEMORY_ID: MemoryId = MemoryId::new(MCP_GRANT_MEMORY_INDEX);
+
+/// Pending MCP registration delegations ([`StorableMcpRegistration`]), keyed by
+/// the registration principal `P_reg` (the `caller()` of `mcp_register_v2`).
+/// Entries are minted by `prepare_mcp_registration_delegation` and deleted on
+/// the first successful `mcp_register_v2` (single-use); a short expiry bounds
+/// how long an abandoned entry lingers.
+const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMORY_INDEX);
 
 /// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
 /// URL), keyed by anchor number. Written by the authenticated `mcp_set_config`
@@ -407,6 +416,11 @@ pub struct Storage<M: Memory> {
     /// See [`MCP_GRANT_MEMORY_ID`].
     pub(crate) mcp_grant_memory: StableBTreeMap<Principal, StorableMcpGrant, ManagedMemory<M>>,
 
+    mcp_registration_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// See [`MCP_REGISTRATION_MEMORY_ID`].
+    pub(crate) mcp_registration_memory:
+        StableBTreeMap<Principal, StorableMcpRegistration, ManagedMemory<M>>,
+
     /// Memory wrapper used to report the size of the OpenID JWKS cache memory.
     openid_jwks_cache_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Persistent per-provider JWK cache, keyed by the provider's `issuer`.
@@ -502,6 +516,7 @@ impl<M: Memory + Clone> Storage<M> {
         let lookup_anchor_with_email_recovery_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_EMAIL_RECOVERY_MEMORY_ID);
         let mcp_grant_memory = memory_manager.get(MCP_GRANT_MEMORY_ID);
+        let mcp_registration_memory = memory_manager.get(MCP_REGISTRATION_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
 
@@ -612,6 +627,8 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             mcp_grant_memory_wrapper: MemoryWrapper::new(mcp_grant_memory.clone()),
             mcp_grant_memory: StableBTreeMap::init(mcp_grant_memory),
+            mcp_registration_memory_wrapper: MemoryWrapper::new(mcp_registration_memory.clone()),
+            mcp_registration_memory: StableBTreeMap::init(mcp_registration_memory),
             openid_jwks_cache_memory_wrapper: MemoryWrapper::new(openid_jwks_cache_memory.clone()),
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
@@ -1108,6 +1125,30 @@ impl<M: Memory + Clone> Storage<M> {
     /// Remove the MCP session grant keyed by `principal`.
     pub fn remove_mcp_grant(&mut self, principal: Principal) {
         self.mcp_grant_memory.remove(&principal);
+    }
+
+    /// Look up the pending MCP registration entry keyed by `principal` (the
+    /// registration principal `P_reg`). Callers check `expires_at_ns`; the map
+    /// itself never authorizes anything.
+    pub fn lookup_mcp_registration(&self, principal: Principal) -> Option<StorableMcpRegistration> {
+        self.mcp_registration_memory.get(&principal)
+    }
+
+    /// Insert (or replace) the pending MCP registration entry keyed by
+    /// `principal`. Written by `prepare_mcp_registration_delegation` under user
+    /// authorization; consumed (and removed) by `mcp_register_v2`.
+    pub fn insert_mcp_registration(
+        &mut self,
+        principal: Principal,
+        registration: StorableMcpRegistration,
+    ) {
+        self.mcp_registration_memory.insert(principal, registration);
+    }
+
+    /// Remove the pending MCP registration entry keyed by `principal`. Called on
+    /// the first successful `mcp_register_v2` (making the delegation single-use).
+    pub fn remove_mcp_registration(&mut self, principal: Principal) {
+        self.mcp_registration_memory.remove(&principal);
     }
 
     /// Read `anchor_number`'s synced trusted-MCP-server config. Returns the
@@ -2329,6 +2370,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "mcp_grant_memory".to_string(),
                 self.mcp_grant_memory_wrapper.size(),
+            ),
+            (
+                "mcp_registration_memory".to_string(),
+                self.mcp_registration_memory_wrapper.size(),
             ),
             (
                 "mcp_config_memory".to_string(),

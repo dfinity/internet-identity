@@ -64,6 +64,7 @@ mod email_recovery;
 mod http;
 mod ii_domain;
 mod mcp;
+mod mcp_registration;
 
 mod openid;
 mod session_delegation;
@@ -767,6 +768,52 @@ fn get_session_delegation(
     internet_identity_interface::internet_identity::types::SessionDelegationError,
 > {
     session_delegation::get_session_delegation(anchor_number, session_key, expiration)
+}
+
+/// Mint a single-use MCP *registration* delegation `P_reg -> registration_key`
+/// (see [`mcp_registration`]). Authenticated as the identity (full
+/// authorization): only the consenting user can create one. `registration_key`
+/// is the key the trusted MCP server generated for this browser session;
+/// `permissions` records the read-only choice and `max_ttl` the requested
+/// session-grant lifetime — both are applied later at `mcp_register_v2`, so the
+/// server cannot alter them.
+#[update]
+async fn prepare_mcp_registration_delegation(
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    permissions: Option<Permissions>,
+    max_ttl: Option<u64>,
+) -> Result<PrepareMcpRegistrationDelegation, String> {
+    mcp_registration::prepare(
+        anchor_number,
+        registration_key,
+        permissions,
+        max_ttl.unwrap_or(0),
+    )
+    .await
+}
+
+/// Fetch the signed registration delegation prepared above, to deliver to the
+/// trusted MCP server. Authenticated as the identity, like the prepare call.
+#[query]
+fn get_mcp_registration_delegation(
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, String> {
+    mcp_registration::get(anchor_number, registration_key, expiration)
+}
+
+/// Called by the trusted MCP server, authenticated by the registration
+/// delegation chain (so `caller()` is the registration principal): bind the
+/// server's long-lived session key `session_key` to the anchor recorded at
+/// prepare time, with the recorded read-only choice. Single-use; a boundary
+/// retry with the same key is served idempotently. Returns the grant expiration
+/// and the access level. Registration is only possible while the identity's MCP
+/// config is enabled with a trusted server set (enforced in [`mcp::register`]).
+#[update]
+fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
+    mcp_registration::register_v2(session_key)
 }
 
 #[query]

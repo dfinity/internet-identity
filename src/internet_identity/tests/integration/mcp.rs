@@ -10,9 +10,10 @@
 use candid::Principal;
 use canister_tests::{
     api::internet_identity::api_v2::{
-        create_account, mcp_get_accounts, mcp_get_config, mcp_get_delegation,
-        mcp_prepare_delegation, mcp_register, mcp_set_config, prepare_account_delegation,
-        set_default_account, AccountDelegationParams,
+        create_account, get_mcp_registration_delegation, mcp_get_accounts, mcp_get_config,
+        mcp_get_delegation, mcp_prepare_delegation, mcp_register, mcp_register_v2, mcp_set_config,
+        prepare_account_delegation, prepare_mcp_registration_delegation, set_default_account,
+        AccountDelegationParams,
     },
     flows,
     framework::{
@@ -21,7 +22,7 @@ use canister_tests::{
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountDelegationError, AnchorNumber, McpConfig, McpPrepareDelegation,
+    AccountDelegationError, AnchorNumber, McpConfig, McpPrepareDelegation, Permissions,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use pretty_assertions::assert_eq;
@@ -1309,8 +1310,8 @@ fn mcp_query_methods_reject_expired_grant() -> Result<(), RejectResponse> {
 /// (The mismatched-account case is covered by
 /// `mcp_get_uses_prepared_account_despite_default_change`.)
 #[test]
-fn mcp_get_delegation_rejects_mismatched_expiration_and_session_key(
-) -> Result<(), RejectResponse> {
+fn mcp_get_delegation_rejects_mismatched_expiration_and_session_key() -> Result<(), RejectResponse>
+{
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
@@ -1437,6 +1438,132 @@ fn mcp_read_only_grant_stays_queries_only_across_upgrade() -> Result<(), RejectR
     .unwrap();
     verify_delegation(&env, prepared.user_key, &signed, &env.root_key().unwrap());
     assert_eq!(signed.delegation.permissions, Some("queries".to_string()));
+
+    Ok(())
+}
+
+/// Phase-2 registration delegation, happy path. The user consents by minting a
+/// `P_reg -> X` registration delegation (`prepare` + `get`); the delegation is a
+/// valid II canister signature over `X`; the MCP server then redeems it —
+/// authenticated as `P_reg` (the chain root) — via `mcp_register_v2` to bind its
+/// long-lived session key `S`. The anchor and the read-only choice come from the
+/// index recorded at prepare (never from a `register_v2` argument), so the echo
+/// back confirms the recovery, and the resulting grant authorizes the
+/// server-facing `mcp_*` methods.
+#[test]
+fn mcp_register_v2_binds_session_via_registration_delegation() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    // The MCP server's per-browser-session registration key X, delivered to the
+    // II frontend. The user consents (full auth) by minting the delegation.
+    let registration_key = ByteBuf::from("mcp registration key X");
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        registration_key.clone(),
+        Some(true), // read-only session
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .unwrap();
+
+    // The frontend fetches the signed P_reg -> X delegation; it is a valid II
+    // canister signature over exactly that key.
+    let signed = get_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        registration_key.clone(),
+        prepared.expiration,
+    )
+    .unwrap()
+    .unwrap();
+    verify_delegation(
+        &env,
+        prepared.user_key.clone(),
+        &signed,
+        &env.root_key().unwrap(),
+    );
+    assert_eq!(signed.delegation.pubkey, registration_key);
+    assert_eq!(signed.delegation.permissions, None);
+
+    // The MCP server redeems the delegation as P_reg, registering its session
+    // key S. read-only is echoed from the index (the server never passed it).
+    let p_reg = Principal::self_authenticating(&prepared.user_key);
+    let server_key = ByteBuf::from("mcp server session key S");
+    let registration = mcp_register_v2(&env, canister_id, p_reg, server_key.clone())
+        .unwrap()
+        .unwrap();
+    assert_eq!(registration.permissions, Permissions::Queries);
+
+    // The grant is live and bound to `anchor` (recovered from the index): the
+    // session key S now reaches the server-facing methods.
+    let accounts = mcp_get_accounts(
+        &env,
+        canister_id,
+        Principal::self_authenticating(&server_key),
+        MCP_ORIGIN.to_string(),
+    )
+    .unwrap();
+    assert!(
+        accounts.is_ok(),
+        "the registered session should be authorized: {accounts:?}"
+    );
+
+    Ok(())
+}
+
+/// The registration delegation is single-use, and a boundary retry with the
+/// same session key is idempotent. Once consumed it can neither register a
+/// different key nor be replayed for a new one.
+#[test]
+fn mcp_register_v2_is_single_use_and_idempotent() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    let registration_key = ByteBuf::from("mcp registration key X");
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        registration_key.clone(),
+        Some(false), // full access
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .unwrap();
+    let p_reg = Principal::self_authenticating(&prepared.user_key);
+    let server_key = ByteBuf::from("mcp server session key S");
+
+    // First redemption succeeds (full access).
+    let first = mcp_register_v2(&env, canister_id, p_reg, server_key.clone())
+        .unwrap()
+        .unwrap();
+    assert_eq!(first.permissions, Permissions::All);
+
+    // A boundary retry with the SAME key is served idempotently from the grant.
+    let retry = mcp_register_v2(&env, canister_id, p_reg, server_key.clone())
+        .unwrap()
+        .unwrap();
+    assert_eq!(retry.expiration, first.expiration);
+    assert_eq!(retry.permissions, first.permissions);
+
+    // The spent delegation cannot register a DIFFERENT key.
+    let other_key = ByteBuf::from("different session key S2");
+    let reused = mcp_register_v2(&env, canister_id, p_reg, other_key).unwrap();
+    assert!(
+        reused.is_err(),
+        "a consumed registration delegation must not register a new key: {reused:?}"
+    );
 
     Ok(())
 }
