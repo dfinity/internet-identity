@@ -770,14 +770,16 @@ fn get_session_delegation(
     session_delegation::get_session_delegation(anchor_number, session_key, expiration)
 }
 
-/// Mint a single-use MCP *registration* delegation `P_reg -> registration_key`
-/// (see [`mcp_registration`]). Authenticated as the identity (full
-/// authorization): only the consenting user can create one. `registration_key`
-/// is an ephemeral key the II frontend generates for this connect (browser-held
-/// — never a key taken from the connect link; the frontend extends the chain to
-/// the MCP server's key browser-side); `permissions` records the read-only
-/// choice and `max_ttl` the requested session-grant lifetime — both are applied
-/// later at `mcp_register_v2`, so the server cannot alter them.
+/// Mint an MCP *registration* delegation `P_reg -> registration_key` (see
+/// [`mcp_registration`]). Authenticated as the identity (full authorization):
+/// only the consenting user can create one. `registration_key` is an ephemeral
+/// key the II frontend generates for this connect (browser-held — never a key
+/// taken from the connect link; the frontend extends the chain to the MCP
+/// server's key browser-side). The consent — the anchor, `permissions`
+/// (read-only choice), `max_ttl` (requested session-grant lifetime), and the
+/// trusted server URL from the synced config — is folded into the seed that
+/// derives `P_reg`, so `mcp_register_v2` can authenticate it by derivation
+/// rather than storage, and the server cannot alter any of it.
 #[update]
 async fn prepare_mcp_registration_delegation(
     anchor_number: AnchorNumber,
@@ -789,26 +791,41 @@ async fn prepare_mcp_registration_delegation(
 }
 
 /// Fetch the signed registration delegation prepared above, to deliver to the
-/// trusted MCP server. Authenticated as the identity, like the prepare call.
+/// trusted MCP server. Takes the same consent parameters as the prepare call
+/// because the seed is re-derived from arguments (nothing is stored).
+/// Authenticated as the identity, like the prepare call.
 #[query]
 fn get_mcp_registration_delegation(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
+    permissions: Option<Permissions>,
+    max_ttl: Option<u64>,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, String> {
-    mcp_registration::get(anchor_number, registration_key, expiration)
+    mcp_registration::get(
+        anchor_number,
+        registration_key,
+        permissions,
+        max_ttl,
+        expiration,
+    )
 }
 
 /// Called by the trusted MCP server, authenticated by the registration
 /// delegation chain (so `caller()` is the registration principal): bind the
-/// server's long-lived session key `session_key` to the anchor recorded at
-/// prepare time, with the recorded read-only choice. Single-use; a boundary
-/// retry with the same key is served idempotently. Returns the grant expiration
-/// and the access level. Registration is only possible while the identity's MCP
-/// config is enabled with a trusted server set (enforced in [`mcp::register`]).
+/// server's long-lived `session_key` to `anchor_number`. The presented
+/// parameters are authorized by derive-and-compare — the seed re-derived from
+/// them (and the anchor's current trusted-server config) must land exactly on
+/// `caller()` — so a tuple the user never consented to is rejected. Returns
+/// the grant expiration and the access level.
 #[update]
-fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
-    mcp_registration::register_v2(session_key)
+fn mcp_register_v2(
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    permissions: Option<Permissions>,
+    max_ttl: Option<u64>,
+) -> Result<McpRegistrationV2, String> {
+    mcp_registration::register_v2(anchor_number, session_key, permissions, max_ttl)
 }
 
 #[query]

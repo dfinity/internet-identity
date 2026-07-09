@@ -1924,14 +1924,18 @@ service : (opt InternetIdentityInit) -> {
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : SessionDelegationError }) query;
 
-    // Mint a single-use MCP registration delegation (P_reg -> registration_key).
+    // Mint a short-lived MCP registration delegation (P_reg -> registration_key).
     // Authenticated as the identity (only the consenting user can create one).
     // registration_key is an ephemeral key the II frontend generates for this
     // connect (browser-held — the canister never delegates to a key taken from
     // the connect link; the frontend extends the chain to the server's key
-    // browser-side); permissions records the read-only choice and max_ttl the
-    // requested session-grant lifetime — both applied at mcp_register_v2 so the
-    // server cannot alter them.
+    // browser-side). Nothing is stored: the registration principal P_reg is
+    // derived from the anchor, the consent parameters (permissions, resolved
+    // max_ttl) and the identity's current trusted-server URL, so mcp_register_v2
+    // can re-derive and compare instead of looking anything up. permissions
+    // records the read-only choice and max_ttl the requested session-grant
+    // lifetime — folded into the derivation, so the server must echo them
+    // unchanged and cannot alter them.
     prepare_mcp_registration_delegation : (
         anchor_number : UserNumber,
         registration_key : SessionKey,
@@ -1941,20 +1945,30 @@ service : (opt InternetIdentityInit) -> {
 
     // Fetch the signed registration delegation prepared above, to deliver to the
     // trusted MCP server. Authenticated as the identity, like the prepare call.
+    // permissions and max_ttl must be the values passed to the prepare call
+    // (they determine the derived registration principal).
     get_mcp_registration_delegation : (
         anchor_number : UserNumber,
         registration_key : SessionKey,
+        permissions : opt Permissions,
+        max_ttl : opt nat64,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : text }) query;
 
     // Called by the trusted MCP server, authenticated by the registration
-    // delegation chain (caller() is the registration principal): bind the
-    // server's long-lived session_key to the anchor recorded at prepare time,
-    // with the recorded read-only choice. Single-use; a boundary retry with the
-    // same key is served idempotently. Only possible while the identity's MCP
-    // config is enabled with a trusted server set.
+    // delegation chain: bind the server's long-lived session_key to the anchor,
+    // with the consented read-only choice and grant lifetime. The arguments must
+    // echo what the user consented to: the canister re-derives the registration
+    // principal from (anchor_number, permissions, max_ttl, current trusted-server
+    // URL) and rejects unless it equals caller() — so a mismatched echo, a
+    // disabled config or a changed trusted server all fail. Usable until the
+    // registration delegation expires (~5 min); re-registration within that
+    // window replaces the anchor's single MCP session.
     mcp_register_v2 : (
-        session_key : SessionKey
+        anchor_number : UserNumber,
+        session_key : SessionKey,
+        permissions : opt Permissions,
+        max_ttl : opt nat64
     ) -> (variant { Ok : McpRegistrationV2; Err : text });
 
     get_default_account : (
