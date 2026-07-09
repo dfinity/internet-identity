@@ -5,6 +5,9 @@
 **Prior work:** The *"id.ai · Enterprise SSO — Per-app SSO access control"* option review
 (2026-07-03) surveyed four approaches and their IdP trade-offs. This document does not
 re-litigate that; it specifies the single implementation chosen.
+**Companion:** `enterprise-sso-idp-side-gating.md` specifies an independent, complementary
+layer that gates on the **IdP side** (native app-assignment, no id.ai infrastructure). The
+two layers are composable and selected per app.
 
 ---
 
@@ -504,5 +507,6 @@ groups, and delegated admins.
 - Delegation derivation: `src/internet_identity/src/delegation.rs`.
 - Certified attributes: `src/internet_identity/src/attributes.rs`.
 - SCIM: RFC 7643 (schema), RFC 7644 (protocol).
+- Companion design: `enterprise-sso-idp-side-gating.md` (the IdP-side gating layer).
 - Companion design in this directory: `email-recovery.md` (canister-side verification and
   ingestion patterns).
