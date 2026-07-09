@@ -3,8 +3,6 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 
 export type Aaguid = Uint8Array | number[];
-export type Permissions = { 'queries' : null } |
-  { 'all' : null };
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -662,6 +660,14 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
+/**
+ * Email-recovery types
+ * ====================
+ * See `docs/ongoing/email-recovery.md` for the full design. Covers
+ * both halves of the flow: setup (binding a recovery email to an
+ * anchor) and recovery (proving control of a previously-bound
+ * address to obtain a signed delegation).
+ */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -797,6 +803,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -1266,6 +1276,17 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+/**
+ * The delegation permissions a caller requests, mirroring the ICP protocol's
+ * request-delegation `permissions` values. `queries` yields a queries-only
+ * delegation (the issued `Delegation` carries `permissions = "queries"`);
+ * `all` yields an unrestricted, update-capable delegation. Passed as an
+ * optional argument; an absent argument means `all`, preserving the
+ * pre-feature behavior and matching the interface spec's default for an
+ * absent `permissions` field.
+ */
+export type Permissions = { 'all' : null } |
+  { 'queries' : null };
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1595,7 +1616,18 @@ export interface SsoDiscovery {
   'name' : [] | [string],
   'authorization_endpoint' : string,
   'issuer' : string,
+  /**
+   * The client the target origin passed to `get_sso_discovery` must run its
+   * ceremony against under IdP-side per-app gating: the per-app client when
+   * the origin is listed in `app_clients`, the primary client when unlisted
+   * and `gate_all_apps` is off, or `null` when unlisted and `gate_all_apps`
+   * is on (origin denied). Mirrors `client_id` when no origin was supplied.
+   */
+  'resolved_client_id' : [] | [string],
   'discovery_domain' : string,
+  /**
+   * The org's primary OIDC client (the one meant for II itself).
+   */
   'client_id' : string,
 }
 /**
@@ -1817,6 +1849,13 @@ export interface _SERVICE {
    * `get_sso_discovery` (query) and, while it reads `Pending`, drives the
    * on-demand two-hop discovery fetch with `discover_sso` (update); once the
    * fetch completes the query returns `Resolved` with the config.
+   * 
+   * The optional second argument is the target dapp origin: when supplied,
+   * the resolved config's `resolved_client_id` reports the client that origin
+   * must run its SSO ceremony against under IdP-side per-app gating (the
+   * per-app client if listed in `app_clients`, the primary client if not, or
+   * `null` when denied under `gate_all_apps`). Omitting it mirrors the
+   * primary `client_id`.
    */
   'discover_sso' : ActorMethod<[string], undefined>,
   'email_challenge_diagnostics' : ActorMethod<
@@ -1979,7 +2018,10 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : SessionDelegationError }
   >,
-  'get_sso_discovery' : ActorMethod<[string], SsoDiscoveryState>,
+  'get_sso_discovery' : ActorMethod<
+    [string, [] | [FrontendHostname]],
+    SsoDiscoveryState
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -2131,7 +2173,7 @@ export interface _SERVICE {
    * from the unauthenticated connect link. No account is chosen here
    * (accounts are per-origin and the connector isn't an app) — the app
    * account is selected per call on mcp_prepare_delegation.
-   *
+   * 
    * At most one session per identity: registering replaces any previous
    * grant. Requires the identity's MCP config to be enabled with a trusted
    * server set, so every session stays revocable via mcp_set_config.
@@ -2285,6 +2327,28 @@ export interface _SERVICE {
    * insensitive), and 550 (mailbox unavailable) for everything else.
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  'sso_get_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, Timestamp, string, FrontendHostname],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
+  >,
+  /**
+   * SSO sign-in — the IdP-side per-app gating path. Mints an SSO-session
+   * delegation only if the JWT's `aud` matches the client the target origin
+   * resolves to (per-app / primary / denied); the delegation's seed binds
+   * `(iss, sub, sso_domain, origin, anchor)`. `openid_prepare_delegation` is
+   * left unchanged (direct providers). A cold discovery/JWKS cache yields
+   * `Pending` (re-call to keep the fetch moving), exactly like the openid
+   * pair. The trailing args are the SSO discovery domain and the target dapp
+   * origin.
+   */
+  'sso_prepare_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, string, FrontendHostname],
+    { 'Ok' : OpenIdPrepareDelegationResponse } |
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
+  >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<

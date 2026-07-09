@@ -17,7 +17,16 @@ export interface SsoDiscoveryResult {
    * provenance rather than by the underlying IdP's issuer.
    */
   domain: string;
+  /** The org's primary OIDC client (the one meant for II itself). */
   clientId: string;
+  /**
+   * The client the ceremony must run against for the target dapp origin under
+   * IdP-side per-app gating: the per-app client if the origin is gated, the
+   * primary client otherwise. Equals {@link clientId} when no origin was passed
+   * to {@link discoverSsoConfig}. An origin denied by `gate_all_apps` surfaces
+   * as a {@link DomainNotConfiguredError} rather than a result.
+   */
+  resolvedClientId: string;
   /**
    * Human-readable name for the SSO, if the domain publishes one. Used by the
    * consent UI to render `sso:<domain>:<key>` attribute rows with a friendly
@@ -37,9 +46,9 @@ export interface SsoDiscoveryResult {
  * (`timeout`).
  */
 export class DomainNotConfiguredError extends Error {
-  readonly reason: "rejected" | "timeout";
+  readonly reason: "rejected" | "timeout" | "origin-denied";
 
-  constructor(reason: "rejected" | "timeout") {
+  constructor(reason: "rejected" | "timeout" | "origin-denied") {
     super(`SSO discovery failed (${reason})`);
     this.name = "DomainNotConfiguredError";
     this.reason = reason;
@@ -108,16 +117,32 @@ export const validateDomain = (domain: string): string => {
   return trimmed;
 };
 
-const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => ({
-  domain: discovery.discovery_domain,
-  clientId: discovery.client_id,
-  name: discovery.name[0],
-  discovery: {
-    issuer: discovery.issuer,
-    authorization_endpoint: discovery.authorization_endpoint,
-    scopes_supported: discovery.scopes,
-  },
-});
+/**
+ * Shape a resolved `SsoDiscovery` into an {@link SsoDiscoveryResult}.
+ *
+ * @throws {DomainNotConfiguredError} with reason `origin-denied` when a target
+ *   origin was supplied but the canister reports no `resolved_client_id` — the
+ *   origin is denied under `gate_all_apps`.
+ */
+const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => {
+  // `resolved_client_id` is `[]` only when an origin was supplied and denied
+  // (`gate_all_apps`). Without an origin it always mirrors `client_id`.
+  const resolvedClientId = discovery.resolved_client_id[0];
+  if (resolvedClientId === undefined) {
+    throw new DomainNotConfiguredError("origin-denied");
+  }
+  return {
+    domain: discovery.discovery_domain,
+    clientId: discovery.client_id,
+    resolvedClientId,
+    name: discovery.name[0],
+    discovery: {
+      issuer: discovery.issuer,
+      authorization_endpoint: discovery.authorization_endpoint,
+      scopes_supported: discovery.scopes,
+    },
+  };
+};
 
 // Wrap the abort check in a function so each call returns a fresh `boolean`.
 // Reading `signal?.aborted` inline narrows it to `false` for the rest of the
@@ -131,22 +156,34 @@ const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
  * with `discover_sso` (update) and polls again. An optional `signal` cancels
  * the poll (the input debounce drops a stale lookup when the user keeps typing).
  *
+ * When `origin` is supplied, the resolved result's `resolvedClientId` is the
+ * client the ceremony must run against for that dapp origin under IdP-side
+ * per-app gating (the per-app client if the origin is gated, the primary client
+ * otherwise). An origin denied by `gate_all_apps` throws a
+ * {@link DomainNotConfiguredError} with reason `origin-denied`.
+ *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
  * @throws {DomainNotConfiguredError} when the domain isn't allowed
- *   (`NotAllowed`) or the resolution times out.
+ *   (`NotAllowed`), the origin is denied (`origin-denied`), or the resolution
+ *   times out.
  */
 export const discoverSsoConfig = async (
   domain: string,
   signal?: AbortSignal,
+  origin?: string,
 ): Promise<SsoDiscoveryResult> => {
   const validatedDomain = validateDomain(domain);
+  const originArg: [] | [string] = origin !== undefined ? [origin] : [];
 
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     if (isAborted(signal)) {
       throw new Error("SSO discovery aborted");
     }
     // Read the discovery state via the cheap query.
-    const state = await anonymousActor.get_sso_discovery(validatedDomain);
+    const state = await anonymousActor.get_sso_discovery(
+      validatedDomain,
+      originArg,
+    );
     if ("Resolved" in state) {
       return toResult(state.Resolved);
     }

@@ -387,6 +387,7 @@ export const idlFactory = ({ IDL }) => {
     'anchor_number' : UserNumber,
     'timestamp' : Timestamp,
   });
+  const Permissions = IDL.Variant({ 'all' : IDL.Null, 'queries' : IDL.Null });
   const AccountDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
@@ -525,6 +526,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Opt(IDL.Text),
     'authorization_endpoint' : IDL.Text,
     'issuer' : IDL.Text,
+    'resolved_client_id' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Text,
     'client_id' : IDL.Text,
   });
@@ -799,10 +801,6 @@ export const idlFactory = ({ IDL }) => {
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
   });
-  const Permissions = IDL.Variant({
-    'queries' : IDL.Null,
-    'all' : IDL.Null,
-  });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -1066,7 +1064,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'get_sso_discovery' : IDL.Func([IDL.Text], [SsoDiscoveryState], ['query']),
+    'get_sso_discovery' : IDL.Func(
+        [IDL.Text, IDL.Opt(FrontendHostname)],
+        [SsoDiscoveryState],
+        ['query'],
+      ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
     'identity_authn_info' : IDL.Func(
         [IdentityNumber],
@@ -1304,6 +1306,28 @@ export const idlFactory = ({ IDL }) => {
         [SmtpRequest],
         [SmtpResponse],
         ['query'],
+      ),
+    'sso_get_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, Timestamp, IDL.Text, FrontendHostname],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : OpenIdDelegationError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        ['query'],
+      ),
+    'sso_prepare_delegation' : IDL.Func(
+        [JWT, Salt, SessionKey, IDL.Text, FrontendHostname],
+        [
+          IDL.Variant({
+            'Ok' : OpenIdPrepareDelegationResponse,
+            'Err' : OpenIdDelegationError,
+            'Pending' : IDL.Null,
+          }),
+        ],
+        [],
       ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),

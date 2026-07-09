@@ -359,6 +359,7 @@ impl Anchor {
     /// - If `spec.value` is `Some`, validates it matches the stored value.
     /// - Computes the certified key: if `omit_scope` is true, uses just the attribute name
     ///   (e.g., `"email"`); otherwise uses the full key (e.g., `"openid:https://...:email"`).
+    #[allow(clippy::too_many_arguments)]
     pub fn prepare_icrc3_attributes(
         &self,
         attribute_specs: Vec<ValidatedAttributeSpec>,
@@ -373,6 +374,12 @@ impl Anchor {
         unmapped_origin: Option<String>,
         issued_at_timestamp_ns: u64,
         account: Account,
+        // The SSO domain this session signed in through, if the caller is the
+        // SSO-session principal for this origin (IdP-side per-app gating, §6.3).
+        // `sso:<domain>` attributes are certified only when this matches the
+        // requested domain — a passkey / `openid_prepare_delegation` session
+        // passes `None` and gets no SSO attributes.
+        sso_session_domain: Option<String>,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
         let mut problems = Vec::new();
@@ -414,6 +421,16 @@ impl Anchor {
                     insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
                 }
                 Some(AttributeScope::Sso { domain }) => {
+                    // SSO attributes require an SSO sign-in for this exact domain
+                    // (§6.3): only the SSO-session principal may certify them, so
+                    // an anchor that merely *has* an SSO access method shares none
+                    // from a passkey / `openid_prepare_delegation` session.
+                    if sso_session_domain.as_deref() != Some(domain.as_str()) {
+                        problems.push(format!(
+                            "sso:{domain} attributes require an SSO sign-in through that domain"
+                        ));
+                        continue;
+                    }
                     let credential = self.openid_credentials.iter().find(|c| {
                         c.matched_attribute_scope()
                             == Some(AttributeScope::Sso {
@@ -1896,6 +1913,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -1934,6 +1952,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -1971,6 +1990,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -2002,6 +2022,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
 
             match result {
@@ -2420,6 +2441,10 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                // Simulate an SSO session for this domain so the request
+                // reaches the `verified_email`-not-available branch (rather
+                // than being refused for lacking an SSO session).
+                Some(SSO_DOMAIN.to_string()),
             );
             match res {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2469,6 +2494,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match res {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2694,6 +2720,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2731,6 +2758,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2766,6 +2794,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
+                None,
             );
             match result {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -2808,6 +2837,7 @@ mod tests {
                     None,
                     1_000_000_000,
                     account,
+                    None,
                 )
             }));
             // Reaching the panic (signature store) means the matcher

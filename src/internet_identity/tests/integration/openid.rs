@@ -1348,3 +1348,517 @@ fn number_of_openid_credentials(
 
     Ok(openid_credentials.len())
 }
+
+// ===========================================================================
+// IdP-side per-app SSO gating
+// (docs/ongoing/enterprise-sso-idp-side-gating.md)
+//
+// These drive the new `sso_prepare_delegation` / `sso_get_delegation` gate path
+// end to end against a mocked well-known that declares `app_clients` /
+// `gate_all_apps` / `stable_identifier_claim`. Tokens are signed with the
+// shared fake-JWT builder so their `aud` can be set to a per-app client.
+// ===========================================================================
+mod sso_gating {
+    use super::*;
+    use crate::attributes::{build_fake_google_jwt_and_jwks, FakeJwtInput};
+    use canister_tests::api::internet_identity::api_v2::{
+        prepare_account_delegation, AccountDelegationParams,
+    };
+    use internet_identity_interface::internet_identity::types::attributes::{
+        AttributeSpec, PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
+    };
+    use internet_identity_interface::internet_identity::types::{
+        AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+        AuthnMethodSecuritySettings, PublicKeyAuthn, SsoDiscoveryState,
+    };
+
+    const GATE_DOMAIN: &str = "gate.example.org";
+    const GATE_ISSUER: &str = "https://idp.gate.example.org";
+    const PRIMARY_CLIENT: &str = "primary-client-id";
+    const PER_APP_CLIENT: &str = "per-app-client-id";
+    const GATED_ORIGIN: &str = "https://payroll.example";
+    const UNGATED_ORIGIN: &str = "https://public.example";
+    const PRIMARY_SUB: &str = "sso-primary-sub-0001";
+    /// Entra-style pairwise (per-client) sub for the gated login: differs from
+    /// the primary credential's sub, bridged via the `oid` aux lookup (§6.5).
+    const PER_APP_SUB: &str = "entra-pairwise-sub-0002";
+    const STABLE_OID: &str = "entra-oid-stable-0003";
+    const TEST_TIME_MS: u64 = 1_800_000_000_000;
+
+    fn test_salt() -> [u8; 32] {
+        [42u8; 32]
+    }
+
+    // Deterministic caller: the fake JWT binds its nonce to SHA256(salt ||
+    // principal), so we reuse a fixed pubkey/principal (from the attributes
+    // integration tests) as both the anchor's passkey and the JWT caller.
+    fn test_pubkey() -> Vec<u8> {
+        vec![
+            48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38,
+            32, 1, 33, 88, 32, 252, 182, 240, 218, 160, 61, 178, 176, 17, 228, 185, 84, 148, 45,
+            86, 216, 171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129, 211, 34,
+            88, 32, 158, 197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38, 255,
+            65, 92, 234, 229, 245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+        ]
+    }
+
+    fn test_principal() -> Principal {
+        Principal::from_slice(&[
+            211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174,
+            66, 201, 203, 1, 102, 109, 20, 75, 2,
+        ])
+    }
+
+    fn test_authn_method() -> AuthnMethodData {
+        AuthnMethodData {
+            authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+                pubkey: ByteBuf::from(test_pubkey()),
+            }),
+            metadata: Default::default(),
+            security_settings: AuthnMethodSecuritySettings {
+                protection: AuthnMethodProtection::Unprotected,
+                purpose: AuthnMethodPurpose::Authentication,
+            },
+            last_authentication: None,
+        }
+    }
+
+    /// Build a JWT (and matching JWKS) for the gate issuer with the given `aud` /
+    /// `sub` and optional extra claims (e.g. `oid`).
+    fn token(aud: &str, sub: &str, extra_claims: &[(&str, &str)]) -> (String, String) {
+        let iat = (TEST_TIME_MS / 1_000) - 300;
+        build_fake_google_jwt_and_jwks(FakeJwtInput {
+            salt: &test_salt(),
+            principal: &test_principal(),
+            issuer: GATE_ISSUER,
+            aud,
+            sub,
+            email: "user@gate.example.org",
+            name: "Gate User",
+            email_verified: true,
+            iat_secs: iat,
+            exp_secs: iat + 3_600,
+            extra_claims,
+        })
+    }
+
+    /// Assemble the well-known (`app_clients` map JSON, gate flag, stable claim).
+    fn well_known(app_clients_json: &str, gate_all_apps: bool, stable_claim: &str) -> String {
+        format!(
+            r#"{{"client_id":"{PRIMARY_CLIENT}","openid_configuration":"{GATE_ISSUER}/.well-known/openid-configuration","name":"Gate","app_clients":{app_clients_json},"gate_all_apps":{gate_all_apps},"stable_identifier_claim":"{stable_claim}"}}"#
+        )
+    }
+
+    /// The three mocked outcalls (hop-1 well-known, hop-2 OIDC discovery, JWKS).
+    fn responses(well_known_json: String, jwks_json: String) -> Vec<(String, String)> {
+        vec![
+            (
+                format!("https://{GATE_DOMAIN}/.well-known/ii-openid-configuration"),
+                well_known_json,
+            ),
+            (
+                format!("{GATE_ISSUER}/.well-known/openid-configuration"),
+                format!(
+                    r#"{{"issuer":"{GATE_ISSUER}","jwks_uri":"{GATE_ISSUER}/jwks","authorization_endpoint":"{GATE_ISSUER}/authorize","scopes_supported":["openid","email","profile"]}}"#
+                ),
+            ),
+            (format!("{GATE_ISSUER}/jwks"), jwks_json),
+        ]
+    }
+
+    fn install(env: &PocketIc) -> Principal {
+        let args = InternetIdentityInit {
+            sso_discoverable_domains: Some(vec![GATE_DOMAIN.to_string()]),
+            canister_creation_cycles_cost: Some(0),
+            ..Default::default()
+        };
+        install_ii_canister_with_arg_and_cycles(
+            env,
+            II_WASM.clone(),
+            Some(args),
+            10_000_000_000_000,
+        )
+    }
+
+    /// Register an anchor with the test passkey and link its **primary** SSO
+    /// credential (the identity all per-app clients collapse to). Warms the
+    /// discovery cache with `responses`.
+    fn register_with_primary_credential(
+        env: &PocketIc,
+        canister_id: Principal,
+        responses: &[(String, String)],
+        primary_jwt: &str,
+    ) -> u64 {
+        let identity_number =
+            create_identity_with_authn_method(env, canister_id, &test_authn_method());
+        sync_time(env, TEST_TIME_MS);
+        drive_sso_until_ready(env, responses, || {
+            api::openid_credential_add_with_discovery(
+                env,
+                canister_id,
+                test_principal(),
+                identity_number,
+                primary_jwt,
+                &test_salt(),
+                Some(GATE_DOMAIN),
+            )
+            .unwrap()
+        })
+        .expect("primary SSO credential add failed");
+        identity_number
+    }
+
+    fn expect_ready<T, E: std::fmt::Debug>(result: Result<T, E>) -> T {
+        result.expect("expected a settled Ok SSO delegation")
+    }
+
+    /// Linchpin: whether an origin is gated (per-app client) or ungated (primary
+    /// client), the login resolves to the **same anchor**, so the dapp principal
+    /// `f(account, origin)` is identical. Also checks the gated SSO session can
+    /// mint that origin's account delegation, matching a passkey session's.
+    #[test]
+    fn gated_and_ungated_resolve_to_same_dapp_principal() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+
+        let identity_number =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+
+        // Gated login: the per-app token (aud = per-app client) at the gated
+        // origin passes the gate and resolves to the primary anchor.
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(gated.anchor_number, identity_number);
+
+        // Ungated login: the primary token at an unlisted origin resolves to the
+        // same anchor via the primary client.
+        let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(ungated.anchor_number, identity_number);
+
+        // The dapp principal for the gated origin, minted by the gated SSO
+        // session, equals the one a normal (passkey) session mints — proving
+        // `f(account, origin)` is independent of the gate.
+        let sso_session_principal = Principal::self_authenticating(gated.user_key.as_ref());
+        let sso_params = AccountDelegationParams::new(
+            &env,
+            canister_id,
+            sso_session_principal,
+            identity_number,
+            GATED_ORIGIN.to_string(),
+            None,
+            session_key.clone(),
+        );
+        let via_sso = prepare_account_delegation(&sso_params, None)?
+            .expect("gated SSO session must mint the account delegation");
+
+        let passkey_params = AccountDelegationParams::new(
+            &env,
+            canister_id,
+            test_principal(),
+            identity_number,
+            GATED_ORIGIN.to_string(),
+            None,
+            session_key.clone(),
+        );
+        let via_passkey = prepare_account_delegation(&passkey_params, None)?
+            .expect("passkey session mints the account delegation");
+
+        assert_eq!(
+            via_sso.user_key, via_passkey.user_key,
+            "same dapp principal f(account, origin) regardless of the login path"
+        );
+
+        Ok(())
+    }
+
+    /// A token minted for the primary (or any other) client is refused at a
+    /// gated origin: the gate is mint-or-refuse, so no SSO delegation exists and
+    /// the origin-scoped calls have no principal to authenticate with.
+    #[test]
+    fn refused_gate_mints_no_delegation() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+
+        // Present the PRIMARY token at the gated origin (which requires the
+        // per-app client). The gate refuses — verification fails.
+        let result = drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(result, Err(OpenIdDelegationError::JwtVerificationFailed)),
+            "gate must refuse a token minted for a different client, got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// A passkey (non-SSO) session gets no `sso:<domain>` attributes, while the
+    /// SSO session that signed in through that domain does.
+    #[test]
+    fn passkey_session_gets_no_sso_attributes() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        let identity_number =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let sso_attr = format!("sso:{GATE_DOMAIN}:email");
+        let request = |origin: &str| PrepareIcrc3AttributeRequest {
+            identity_number,
+            origin: origin.to_string(),
+            unmapped_origin: None,
+            account_number: None,
+            attributes: vec![AttributeSpec {
+                key: sso_attr.clone(),
+                value: None,
+                omit_scope: false,
+            }],
+            nonce: vec![7u8; 32],
+        };
+
+        // Passkey session -> refused (no SSO sign-in for this domain).
+        let passkey = api::prepare_icrc3_attributes(
+            &env,
+            canister_id,
+            test_principal(),
+            request(GATED_ORIGIN),
+        )?;
+        assert!(
+            matches!(
+                passkey,
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { .. })
+            ),
+            "passkey session must not obtain sso:<domain> attributes, got {passkey:?}"
+        );
+
+        // SSO session -> the attribute is certified.
+        let session_key = ByteBuf::from("dapp session key");
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        let sso_session_principal = Principal::self_authenticating(gated.user_key.as_ref());
+        let sso = api::prepare_icrc3_attributes(
+            &env,
+            canister_id,
+            sso_session_principal,
+            request(GATED_ORIGIN),
+        )?;
+        assert!(
+            sso.is_ok(),
+            "SSO session must certify sso:<domain> attributes, got {sso:?}"
+        );
+        Ok(())
+    }
+
+    /// `gate_all_apps: true` denies an origin absent from `app_clients`.
+    #[test]
+    fn gate_all_apps_denies_unlisted_origin() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        // Gate everything: only the explicitly listed origin is servable.
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, true, "sub"), jwks);
+        register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+        let result = drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            result.is_err(),
+            "gate_all_apps must deny an unlisted origin, got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// Entra-style org (`stable_identifier_claim = "oid"`, pairwise `sub`): a
+    /// first gated login before any normal login can't resolve (§6.5) and must
+    /// prompt a normal sign-in first; after the normal login populates the aux
+    /// index, the gated login resolves to the same anchor.
+    #[test]
+    fn entra_oid_first_gated_needs_normal_then_resolves() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+        let identity_number =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+        // Pairwise per-app token: its sub differs from the primary credential's.
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
+
+        // First gated login, before any normal (primary) login populated the
+        // aux index: no anchor resolves -> "sign in normally first".
+        let first = drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(first, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "first gated login (non-sub) must need a normal login first, got {first:?}"
+        );
+
+        // A normal (primary) login carries both the primary sub and the oid,
+        // populating the aux index.
+        let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(normal.anchor_number, identity_number);
+
+        // Now the gated login bridges (iss, oid) -> primary sub and resolves.
+        let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(
+            resolved.anchor_number, identity_number,
+            "gated login resolves to the primary anchor after aux is populated"
+        );
+        Ok(())
+    }
+
+    /// `get_sso_discovery` reports the per-origin `resolved_client_id`: the
+    /// per-app client for a listed origin, the primary for an unlisted one.
+    #[test]
+    fn get_sso_discovery_reports_resolved_client_id() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let resolved = |origin: Option<&str>| match api::get_sso_discovery_for_origin(
+            &env,
+            canister_id,
+            GATE_DOMAIN,
+            origin,
+        )
+        .unwrap()
+        {
+            SsoDiscoveryState::Resolved(d) => d,
+            other => panic!("expected Resolved, got {other:?}"),
+        };
+
+        // Listed (gated) origin -> per-app client.
+        assert_eq!(
+            resolved(Some(GATED_ORIGIN)).resolved_client_id,
+            Some(PER_APP_CLIENT.to_string())
+        );
+        // Unlisted origin -> primary client.
+        assert_eq!(
+            resolved(Some(UNGATED_ORIGIN)).resolved_client_id,
+            Some(PRIMARY_CLIENT.to_string())
+        );
+        // No origin -> mirrors the primary client.
+        assert_eq!(
+            resolved(None).resolved_client_id,
+            Some(PRIMARY_CLIENT.to_string())
+        );
+        Ok(())
+    }
+}

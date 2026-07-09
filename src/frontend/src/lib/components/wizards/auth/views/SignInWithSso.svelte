@@ -10,6 +10,7 @@
     DomainNotConfiguredError,
   } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import { OAuthProviderError } from "$lib/utils/openID";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
@@ -29,9 +30,17 @@
      * flow, where reusing an already-linked credential is the point.
      */
     openIdCredentials?: OpenIdCredential[];
+    /**
+     * The target dapp origin, set only in the authorize (dapp sign-in) flow.
+     * Passed to SSO discovery so `get_sso_discovery` returns this origin's
+     * `resolved_client_id` (IdP-side per-app gating) — the ceremony then runs
+     * against the per-app client for a gated origin.
+     */
+    origin?: string;
   }
 
-  const { continueWithSso, goBack, openIdCredentials }: Props = $props();
+  const { continueWithSso, goBack, openIdCredentials, origin }: Props =
+    $props();
 
   /**
    * Debounce delay before kicking off the (network-heavy) two-hop lookup.
@@ -94,7 +103,18 @@
     e: unknown,
     domainInput: string,
   ): string | undefined => {
+    if (e instanceof SsoNormalLoginRequiredError) {
+      // A gated dapp whose org uses a non-`sub` stable identifier (e.g. Entra
+      // `oid`): the first gated login can't be bridged to an existing identity
+      // until the user has signed in normally once (§6.5).
+      return $t`Sign in to ${domainInput} normally once before using this app, then try again.`;
+    }
     if (e instanceof DomainNotConfiguredError) {
+      if (e.reason === "origin-denied") {
+        // The org's admin has gated this dapp off (not in `app_clients` under
+        // `gate_all_apps`), so no client can serve this origin.
+        return $t`Your organization hasn't granted this app access via ${domainInput}.`;
+      }
       if (e.reason === "timeout") {
         // The domain IS on II's allowlist, but discovery never resolved.
         // A failed or unreachable discovery fetch surfaces here too — the
@@ -194,7 +214,11 @@
       // cancellation isn't a user error.
       const matchesCurrent = () => trimmed === domain.trim().toLowerCase();
       try {
-        const result = await discoverSsoConfig(trimmed, controller.signal);
+        const result = await discoverSsoConfig(
+          trimmed,
+          controller.signal,
+          origin,
+        );
         if (matchesCurrent()) {
           preparedResult = result;
         }

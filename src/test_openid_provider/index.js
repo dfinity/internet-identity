@@ -56,10 +56,34 @@ const redirectUris = (
 const ssoName = process.env.OIDC_SSO_NAME ?? `Test SSO ${port}`;
 
 const accountClaims = new Map();
+
+// IdP-side per-app SSO gating (docs/ongoing/enterprise-sso-idp-side-gating.md):
+// the `client_id` a dedicated gated dapp runs its ceremony against. Registered
+// alongside the primary `internet_identity` client so a gated login can obtain
+// a token whose `aud` is this per-app client.
+const PER_APP_CLIENT_ID = "ii-per-app-gated-client";
+
+// Mutable per-app gating config surfaced in the ii-openid-configuration
+// well-known. Tests set it via `POST /sso-config` (see fixtures/sso.ts):
+//   { "app_clients": { "<origin>": "<client_id>" }, "gate_all_apps": <bool>,
+//     "stable_identifier_claim": "<claim>" }
+let ssoGating = {
+  app_clients: {},
+  gate_all_apps: false,
+  stable_identifier_claim: "sub",
+};
+
 const provider = new oidc.Provider(issuer, {
   clients: [
     {
       client_id: "internet_identity",
+      client_secret: "secret", // Not used but required here
+      redirect_uris: redirectUris,
+      response_types: ["code id_token"],
+      grant_types: ["implicit", "authorization_code"],
+    },
+    {
+      client_id: PER_APP_CLIENT_ID,
       client_secret: "secret", // Not used but required here
       redirect_uris: redirectUris,
       response_types: ["code id_token"],
@@ -133,6 +157,18 @@ app.post("/account/:id/claims", express.json(), async (req, res) => {
   res.status(201).send();
 });
 
+// Configure IdP-side per-app gating (app_clients / gate_all_apps /
+// stable_identifier_claim) surfaced in the ii-openid-configuration well-known.
+// Tests POST the fields they want to set; omitted fields keep their defaults.
+app.post("/sso-config", express.json(), (req, res) => {
+  ssoGating = {
+    app_clients: req.body.app_clients ?? {},
+    gate_all_apps: req.body.gate_all_apps ?? false,
+    stable_identifier_claim: req.body.stable_identifier_claim ?? "sub",
+  };
+  res.status(200).json(ssoGating);
+});
+
 // Endpoint for SSO discoverability
 app.get("/.well-known/ii-openid-configuration", (req, res) => {
   res.status(200).json({
@@ -142,6 +178,10 @@ app.get("/.well-known/ii-openid-configuration", (req, res) => {
     // screen as `<name> email:` etc., so e2e tests can verify the
     // prefix branch instead of the bare-domain fallback.
     name: ssoName,
+    // IdP-side per-app gating (inert unless a test sets it via /sso-config).
+    app_clients: ssoGating.app_clients,
+    gate_all_apps: ssoGating.gate_all_apps,
+    stable_identifier_claim: ssoGating.stable_identifier_claim,
   });
 });
 

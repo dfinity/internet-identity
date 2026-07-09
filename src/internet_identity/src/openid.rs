@@ -336,19 +336,37 @@ pub fn discover_sso(domain: &str) {
 
 /// Read the state of `domain`'s SSO discovery: the resolved config, still
 /// pending, or not on the allowlist.
-pub fn get_sso_discovery(domain: &str) -> SsoDiscoveryState {
+///
+/// When `origin` is `Some`, `resolved_client_id` reports the client the target
+/// origin must run its ceremony against (IdP-side per-app gating, §6): the
+/// per-app client if the origin is listed in `app_clients`, the primary client
+/// if unlisted and `gate_all_apps` is off, or `None` when unlisted and
+/// `gate_all_apps` is on (origin denied). Without an `origin` it mirrors the
+/// primary `client_id`.
+pub fn get_sso_discovery(domain: &str, origin: Option<&str>) -> SsoDiscoveryState {
     if !sso::is_allowed_discovery_domain(domain) {
         return SsoDiscoveryState::NotAllowed;
     }
     match sso::peek_discovery(domain) {
-        Cached::Ready(cfg) => SsoDiscoveryState::Resolved(SsoDiscovery {
-            discovery_domain: domain.to_ascii_lowercase(),
-            client_id: cfg.client_id,
-            issuer: cfg.issuer,
-            authorization_endpoint: cfg.authorization_endpoint,
-            scopes: cfg.scopes,
-            name: cfg.name,
-        }),
+        Cached::Ready(cfg) => {
+            let resolved_client_id = match origin {
+                None => Some(cfg.client_id.clone()),
+                Some(origin) => match cfg.resolve_client_for_origin(origin) {
+                    sso::ClientResolution::PerApp(client)
+                    | sso::ClientResolution::Primary(client) => Some(client),
+                    sso::ClientResolution::NotAllowed => None,
+                },
+            };
+            SsoDiscoveryState::Resolved(SsoDiscovery {
+                discovery_domain: domain.to_ascii_lowercase(),
+                client_id: cfg.client_id,
+                issuer: cfg.issuer,
+                authorization_endpoint: cfg.authorization_endpoint,
+                scopes: cfg.scopes,
+                name: cfg.name,
+                resolved_client_id,
+            })
+        }
         Cached::Pending => SsoDiscoveryState::Pending,
     }
 }
@@ -504,6 +522,318 @@ fn salt() -> [u8; 32] {
 #[cfg(test)]
 fn salt() -> [u8; 32] {
     [0; 32]
+}
+
+// ===========================================================================
+// IdP-side per-app SSO gating (see docs/ongoing/enterprise-sso-idp-side-gating.md)
+//
+// A dedicated `sso_prepare_delegation` / `sso_get_delegation` pair carries the
+// SSO sign-in. `openid_prepare_delegation` / `openid_get_delegation` are left
+// byte-identical (direct providers + the pre-feature flow). The gate is
+// mint-or-refuse: `verify_sso_jwt` enforces `jwt.aud == the origin's declared
+// client`, and the minted delegation's seed binds `(iss, sub, sso_domain,
+// origin, anchor)`. The origin-scoped calls recompute that principal
+// (`matching_sso_session`), so a refused gate leaves nothing to authenticate
+// with. Identity always resolves to the primary client.
+// ===========================================================================
+
+/// Tighter session lifetime for the SSO sign-in path so certified SSO
+/// attributes reflect a *recent* SSO ceremony, independent of the general /
+/// passkey session lifetime (§6.3).
+pub const SSO_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
+
+/// Verified + gated SSO login. `credential.aud` is the **resolved** client (the
+/// per-app client for a gated origin, else the primary); `primary_client_id` is
+/// always the org's primary client, on which identity is keyed (§6.1).
+#[derive(Debug)]
+pub struct SsoVerification {
+    pub credential: OpenIdCredential,
+    pub primary_client_id: String,
+    /// True when the origin is listed in `app_clients` (served by a per-app
+    /// client); false when it resolved to the primary client.
+    pub gated: bool,
+    pub stable_identifier_claim: String,
+    /// The cross-client-stable identifier, extracted when
+    /// `stable_identifier_claim != "sub"` (§6.5). `None` when the claim is
+    /// `sub` (the credential's own `sub` is already stable).
+    pub stable_id: Option<String>,
+}
+
+// In-heap auxiliary lookup `(iss, stable_id) -> primary sub` for orgs whose
+// stable identifier isn't `sub` (Entra `oid`, §6.5). Additive, non-persistent
+// (rebuilt on the users' next primary login after an upgrade); a miss fails
+// safe (no anchor found → the user signs in normally first). Never a
+// migration and never mutates a stored credential/key.
+thread_local! {
+    static SSO_STABLE_ID_INDEX: std::cell::RefCell<HashMap<(String, String), String>> =
+        std::cell::RefCell::new(HashMap::new());
+}
+
+fn aux_stable_id_insert(iss: &str, stable_id: &str, primary_sub: &str) {
+    SSO_STABLE_ID_INDEX.with_borrow_mut(|m| {
+        m.insert(
+            (iss.to_string(), stable_id.to_string()),
+            primary_sub.to_string(),
+        );
+    });
+}
+
+fn aux_stable_id_lookup(iss: &str, stable_id: &str) -> Option<String> {
+    SSO_STABLE_ID_INDEX.with_borrow(|m| m.get(&(iss.to_string(), stable_id.to_string())).cloned())
+}
+
+/// Extract a single string claim from a JWT's raw claims (used for the
+/// configured `stable_identifier_claim`). `None` if absent or non-string.
+fn extract_string_claim(jwt: &str, claim: &str) -> Option<String> {
+    let (_, _, claims_bytes) = decode_iss_aud_claims(jwt).ok()?;
+    let value = serde_json::from_slice::<serde_json::Value>(&claims_bytes).ok()?;
+    value.get(claim)?.as_str().map(str::to_string)
+}
+
+/// Verify an SSO JWT for `(discovery_domain, origin)` and enforce the gate
+/// (§6.2). `Ok(Cached::Pending)` means discovery / JWKS isn't cached yet — an
+/// update must drive it via [`prefetch_sso`], then retry.
+///
+/// **The gate is mint-or-refuse:** the JWT's `aud` must equal the client the
+/// origin resolves to (per-app if listed, primary if not, DENY under
+/// `gate_all_apps`). A wrong `aud` fails verification, so no delegation is ever
+/// minted for a token issued for a different app.
+pub fn verify_sso_jwt(
+    jwt: &str,
+    salt: &[u8; 32],
+    discovery_domain: &str,
+    origin: &str,
+) -> Result<Cached<SsoVerification>, OpenIDJWTVerificationError> {
+    if !sso::is_allowed_discovery_domain(discovery_domain) {
+        return Err(OpenIDJWTVerificationError::GenericError(format!(
+            "SSO discovery domain not allowed: {discovery_domain}"
+        )));
+    }
+    let cfg = match sso::peek_discovery(discovery_domain) {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(cfg) => cfg,
+    };
+
+    // THE GATE: resolve the origin to its declared client, then require the
+    // JWT's aud to match it (enforced inside `verify_and_build`).
+    let (expected_client, gated) = match cfg.resolve_client_for_origin(origin) {
+        sso::ClientResolution::PerApp(client) => (client, true),
+        sso::ClientResolution::Primary(client) => (client, false),
+        sso::ClientResolution::NotAllowed => {
+            return Err(OpenIDJWTVerificationError::GenericError(format!(
+                "origin '{origin}' is denied for domain '{discovery_domain}' (gate_all_apps)"
+            )));
+        }
+    };
+
+    let keys = match sso::read_jwks(&cfg.jwks_uri) {
+        Cached::Pending => return Ok(Cached::Pending),
+        Cached::Ready(keys) => keys,
+    };
+
+    let descriptor = verify::Descriptor {
+        issuer: cfg.issuer.clone(),
+        client_id: expected_client.clone(),
+        stamp: verify::Stamp::Sso {
+            domain: discovery_domain.to_string(),
+            name: cfg.name.clone(),
+        },
+    };
+    let credential = verify::verify_and_build(jwt, &descriptor, &keys, salt)?;
+
+    let stable_id = if cfg.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM {
+        None
+    } else {
+        extract_string_claim(jwt, &cfg.stable_identifier_claim)
+    };
+
+    Ok(Cached::Ready(SsoVerification {
+        credential,
+        primary_client_id: cfg.client_id,
+        gated,
+        stable_identifier_claim: cfg.stable_identifier_claim,
+        stable_id,
+    }))
+}
+
+/// The primary-client-keyed identity a verified SSO login resolves to (§6.1):
+/// the `(iss, sub, aud)` of the org's primary credential, with the token's
+/// metadata + SSO stamp. Anchor resolution and any credential refresh happen at
+/// the call site (`sso_prepare_delegation` in `main.rs`).
+pub struct SsoPrimaryIdentity {
+    /// Primary-keyed credential: `aud` == primary client, `sub` == the primary
+    /// credential's sub (the stable id for `sub` orgs; bridged via the aux
+    /// lookup otherwise).
+    pub credential: OpenIdCredential,
+}
+
+/// Resolve a verified SSO login to the primary identity (§6.1, §6.5). Does not
+/// touch storage; the caller looks the anchor up by `credential.key()`.
+///
+/// `Err(NoSuchAnchor)` for a non-`sub` gated login whose stable id has no aux
+/// entry yet — the user must sign in normally (primary) first (§6.5).
+pub fn resolve_primary_identity(
+    verification: &SsoVerification,
+) -> Result<SsoPrimaryIdentity, OpenIdDelegationError> {
+    let is_sub = verification.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM;
+    let primary_sub = if is_sub {
+        // `sub` is stable: the token's sub is the primary credential's sub.
+        verification.credential.sub.clone()
+    } else {
+        let stable_id = verification.stable_id.clone().ok_or(
+            // A non-`sub` org whose token omits the configured stable claim
+            // can't be resolved to a stable identity.
+            OpenIdDelegationError::JwtVerificationFailed,
+        )?;
+        if verification.gated {
+            // Per-app login: bridge (iss, stable_id) -> primary sub via the aux
+            // index. A miss fails safe (§6.5).
+            aux_stable_id_lookup(&verification.credential.iss, &stable_id)
+                .ok_or(OpenIdDelegationError::NoSuchAnchor)?
+        } else {
+            // Primary login: the token's sub *is* the primary sub, and it also
+            // carries the alternate stable id — so it populates the aux index.
+            aux_stable_id_insert(
+                &verification.credential.iss,
+                &stable_id,
+                &verification.credential.sub,
+            );
+            verification.credential.sub.clone()
+        }
+    };
+
+    let credential = OpenIdCredential {
+        aud: verification.primary_client_id.clone(),
+        sub: primary_sub,
+        ..verification.credential.clone()
+    };
+    Ok(SsoPrimaryIdentity { credential })
+}
+
+/// Seed for an SSO-session delegation, binding `(iss, sub, sso_domain, origin,
+/// anchor)` (§6.2). A dedicated domain separator and length-prefixed fields
+/// keep it disjoint from every [`calculate_delegation_seed`] output, so an SSO
+/// session principal can never collide with an OpenID-credential principal.
+fn calculate_sso_delegation_seed(
+    iss: &str,
+    sub: &str,
+    sso_domain: &str,
+    origin: &str,
+    anchor_number: AnchorNumber,
+) -> Hash {
+    fn write_field(blob: &mut Vec<u8>, data: &[u8]) {
+        blob.extend_from_slice(&(data.len() as u64).to_be_bytes());
+        blob.extend_from_slice(data);
+    }
+    let mut blob: Vec<u8> = Vec::new();
+    blob.extend_from_slice(b"ii-sso-per-app-delegation");
+    write_field(&mut blob, &salt());
+    write_field(&mut blob, iss.as_bytes());
+    write_field(&mut blob, sub.as_bytes());
+    write_field(&mut blob, sso_domain.as_bytes());
+    write_field(&mut blob, origin.as_bytes());
+    write_field(&mut blob, &anchor_number.to_be_bytes());
+
+    let mut hasher = Sha256::new();
+    hasher.update(blob);
+    hasher.finalize().into()
+}
+
+/// The self-authenticating principal of an SSO-session delegation.
+pub fn sso_session_principal(
+    iss: &str,
+    sub: &str,
+    sso_domain: &str,
+    origin: &str,
+    anchor_number: AnchorNumber,
+) -> Principal {
+    let seed = calculate_sso_delegation_seed(iss, sub, sso_domain, origin, anchor_number);
+    let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
+    Principal::self_authenticating(public_key)
+}
+
+/// Mint an SSO-session delegation seeded `(iss, sub, sso_domain, origin,
+/// anchor)` with the tighter SSO expiry.
+pub async fn prepare_sso_delegation(
+    iss: &str,
+    sub: &str,
+    sso_domain: &str,
+    origin: &str,
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+) -> (UserKey, Timestamp) {
+    state::ensure_salt_set().await;
+    let expiration = time().saturating_add(SSO_SESSION_DURATION_NS);
+    let seed = calculate_sso_delegation_seed(iss, sub, sso_domain, origin, anchor_number);
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration, None);
+    });
+    update_root_hash();
+    (
+        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        expiration,
+    )
+}
+
+/// Fetch a previously minted SSO-session delegation (query side).
+pub fn get_sso_delegation(
+    iss: &str,
+    sub: &str,
+    sso_domain: &str,
+    origin: &str,
+    anchor_number: AnchorNumber,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, OpenIdDelegationError> {
+    let seed = calculate_sso_delegation_seed(iss, sub, sso_domain, origin, anchor_number);
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let inputs = CanisterSigInputs {
+            domain: DELEGATION_SIG_DOMAIN,
+            seed: &seed,
+            message: &delegation_signature_msg(&session_key, expiration, None),
+        };
+        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
+            Ok(signature) => Ok(SignedDelegation {
+                delegation: Delegation {
+                    pubkey: session_key,
+                    expiration,
+                    targets: None,
+                    permissions: None,
+                },
+                signature: ByteBuf::from(signature),
+            }),
+            Err(_) => Err(OpenIdDelegationError::NoSuchDelegation),
+        }
+    })
+}
+
+/// Config-free cert-time check (§6.3): if `caller` is the SSO-session principal
+/// for one of `credentials` at `origin`, return that credential's `sso_domain`.
+/// Only SSO credentials (`sso_domain.is_some()`) participate, and the match is
+/// exact — a passkey / `openid_prepare_delegation` session yields a different
+/// principal, so it matches nothing and gets no SSO attributes.
+pub fn matching_sso_session<'a>(
+    credentials: impl Iterator<Item = &'a OpenIdCredential>,
+    anchor_number: AnchorNumber,
+    origin: &str,
+    caller: Principal,
+) -> Option<String> {
+    for credential in credentials {
+        let Some(sso_domain) = credential.sso_domain.as_ref() else {
+            continue;
+        };
+        let principal = sso_session_principal(
+            &credential.iss,
+            &credential.sub,
+            sso_domain,
+            origin,
+            anchor_number,
+        );
+        if principal == caller {
+            return Some(sso_domain.clone());
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -663,5 +993,169 @@ mod tests {
             effective_issuer,
             "https://login.microsoftonline.com/{tid/v2.0"
         );
+    }
+
+    // ── IdP-side per-app SSO gating ──────────────────────────────────────
+
+    const SSO_DOMAIN: &str = "example.org";
+    const PER_APP_CLIENT: &str = "0oaPAYROLL";
+    const GATED_ORIGIN: &str = "https://payroll.com";
+
+    /// A discovery config whose primary client is `TEST_AUD` (so `VALID_JWT`,
+    /// which carries `aud == TEST_AUD`, verifies as a primary/ungated login) and
+    /// whose issuer matches the JWT's Google issuer.
+    fn sso_gate_config(
+        app_clients: Vec<sso::AppClient>,
+        gate_all_apps: bool,
+    ) -> sso::DiscoveredConfig {
+        sso::DiscoveredConfig {
+            issuer: "https://accounts.google.com".to_string(),
+            client_id: TEST_AUD.to_string(),
+            jwks_uri: "https://accounts.google.com/jwks".to_string(),
+            authorization_endpoint: "https://accounts.google.com/authorize".to_string(),
+            scopes: vec!["openid".to_string()],
+            name: Some("Example".to_string()),
+            app_clients,
+            gate_all_apps,
+            stable_identifier_claim: "sub".to_string(),
+        }
+    }
+
+    #[test]
+    fn sso_gate_ungated_login_mints() {
+        // Ungated origin (not in app_clients, gate off) resolves to the primary
+        // client; `VALID_JWT`'s aud == primary, so the gate passes and a
+        // credential is built, stamped with the SSO domain.
+        sso::test_setup_discovery(SSO_DOMAIN, sso_gate_config(vec![], false), test_certs());
+        match verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, "https://public.app") {
+            Ok(Cached::Ready(v)) => {
+                assert_eq!(v.credential.aud, TEST_AUD);
+                assert_eq!(v.credential.sso_domain, Some(SSO_DOMAIN.to_string()));
+                assert!(!v.gated);
+            }
+            other => panic!("expected Ready verification, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sso_gate_refuses_token_minted_for_another_app() {
+        // The gated origin's declared per-app client differs from the token's
+        // aud (a token minted for the primary / another client). The gate is
+        // mint-or-refuse: verification fails, so no delegation can be minted.
+        let app_clients = vec![sso::AppClient {
+            key: sso::AppClientKey::Cleartext(GATED_ORIGIN.to_string()),
+            client_id: PER_APP_CLIENT.to_string(),
+        }];
+        sso::test_setup_discovery(
+            SSO_DOMAIN,
+            sso_gate_config(app_clients, false),
+            test_certs(),
+        );
+        assert!(verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, GATED_ORIGIN).is_err());
+    }
+
+    #[test]
+    fn sso_gate_all_apps_denies_unlisted_origin() {
+        sso::test_setup_discovery(SSO_DOMAIN, sso_gate_config(vec![], true), test_certs());
+        assert!(
+            verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, "https://unlisted.app").is_err()
+        );
+    }
+
+    #[test]
+    fn sso_session_seed_binds_all_inputs() {
+        // The SSO-session seed binds (iss, sub, sso_domain, origin, anchor):
+        // changing any input changes the seed, so a session minted for one
+        // (domain, origin) can never authenticate another. (`sso_session_principal`
+        // / `matching_sso_session` wrap this seed; they call `ic_cdk::id()` and
+        // are exercised end-to-end in the integration tests.)
+        let base = calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, GATED_ORIGIN, 42);
+        // Same inputs -> same seed.
+        assert_eq!(
+            base,
+            calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, GATED_ORIGIN, 42)
+        );
+        // Each field is load-bearing.
+        assert_ne!(
+            base,
+            calculate_sso_delegation_seed("iss2", "sub", SSO_DOMAIN, GATED_ORIGIN, 42)
+        );
+        assert_ne!(
+            base,
+            calculate_sso_delegation_seed("iss", "sub2", SSO_DOMAIN, GATED_ORIGIN, 42)
+        );
+        assert_ne!(
+            base,
+            calculate_sso_delegation_seed("iss", "sub", "other.org", GATED_ORIGIN, 42)
+        );
+        assert_ne!(
+            base,
+            calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, "https://other.app", 42)
+        );
+        assert_ne!(
+            base,
+            calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, GATED_ORIGIN, 43)
+        );
+        // Distinct from the OpenID/direct-credential seed for the same identity —
+        // the domain separator keeps SSO-session principals disjoint.
+        let openid_seed = calculate_delegation_seed(
+            &("iss".to_string(), "sub".to_string(), "aud".to_string()),
+            42,
+        );
+        assert_ne!(base, openid_seed);
+    }
+
+    fn sso_verification(
+        gated: bool,
+        claim: &str,
+        sub: &str,
+        stable_id: Option<&str>,
+    ) -> SsoVerification {
+        SsoVerification {
+            credential: OpenIdCredential {
+                iss: "https://idp".to_string(),
+                sub: sub.to_string(),
+                aud: if gated { "per-app" } else { "primary" }.to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::new(),
+                sso_domain: Some(SSO_DOMAIN.to_string()),
+                sso_name: None,
+            },
+            primary_client_id: "primary".to_string(),
+            gated,
+            stable_identifier_claim: claim.to_string(),
+            stable_id: stable_id.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn resolve_primary_identity_sub_uses_token_sub() {
+        let v = sso_verification(true, "sub", "sub-123", None);
+        let identity = resolve_primary_identity(&v).expect("sub resolves directly");
+        assert_eq!(identity.credential.sub, "sub-123");
+        assert_eq!(identity.credential.aud, "primary");
+    }
+
+    #[test]
+    fn resolve_primary_identity_non_sub_gated_needs_normal_login_first() {
+        SSO_STABLE_ID_INDEX.with_borrow_mut(|m| m.clear());
+        // First gated login for an Entra-style (oid) org, before any primary
+        // login populated the aux index: no anchor can be resolved (§6.5).
+        let gated = sso_verification(true, "oid", "per-app-sub", Some("oid-1"));
+        assert!(matches!(
+            resolve_primary_identity(&gated),
+            Err(OpenIdDelegationError::NoSuchAnchor)
+        ));
+
+        // A normal (primary) login carries both the primary sub and the stable
+        // id, populating the aux index.
+        let primary = sso_verification(false, "oid", "primary-sub", Some("oid-1"));
+        let identity = resolve_primary_identity(&primary).expect("primary login resolves");
+        assert_eq!(identity.credential.sub, "primary-sub");
+
+        // Now the gated login bridges (iss, oid) -> primary sub.
+        let identity =
+            resolve_primary_identity(&gated).expect("gated resolves after aux populated");
+        assert_eq!(identity.credential.sub, "primary-sub");
     }
 }

@@ -21,6 +21,8 @@ const DISCOVERY: SsoDiscovery = {
   authorization_endpoint: "https://dfinity.okta.com/oauth2/v1/authorize",
   scopes: ["openid", "profile", "email"],
   name: ["DFINITY"],
+  // No origin supplied -> mirrors the primary client_id.
+  resolved_client_id: ["dfinity-sso-client-id"],
 };
 
 describe("ssoDiscovery", () => {
@@ -105,6 +107,7 @@ describe("ssoDiscovery", () => {
       expect(result).toEqual({
         domain: "dfinity.org",
         clientId: "dfinity-sso-client-id",
+        resolvedClientId: "dfinity-sso-client-id",
         name: "DFINITY",
         discovery: {
           issuer: "https://dfinity.okta.com",
@@ -113,8 +116,57 @@ describe("ssoDiscovery", () => {
           scopes_supported: ["openid", "profile", "email"],
         },
       });
+      // No origin was supplied, so the query was called with an empty origin.
+      expect(anonymousActor.get_sso_discovery).toHaveBeenCalledWith(
+        "dfinity.org",
+        [],
+      );
       // Already resolved, so no update was needed to drive a fetch.
       expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
+    });
+
+    it("passes the target origin and returns the per-app resolvedClientId", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+        Resolved: {
+          ...DISCOVERY,
+          // Gated origin -> a dedicated per-app client.
+          resolved_client_id: ["per-app-client-id"],
+        },
+      });
+
+      const result = await discoverSsoConfig(
+        "dfinity.org",
+        undefined,
+        "https://payroll.example",
+      );
+
+      expect(result.resolvedClientId).toBe("per-app-client-id");
+      // The primary client is still reported separately.
+      expect(result.clientId).toBe("dfinity-sso-client-id");
+      expect(anonymousActor.get_sso_discovery).toHaveBeenCalledWith(
+        "dfinity.org",
+        ["https://payroll.example"],
+      );
+    });
+
+    it("throws DomainNotConfiguredError(origin-denied) when the origin is gated off", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+        Resolved: {
+          ...DISCOVERY,
+          // Origin denied under gate_all_apps -> no resolved client.
+          resolved_client_id: [],
+        },
+      });
+
+      const error = await discoverSsoConfig(
+        "dfinity.org",
+        undefined,
+        "https://denied.example",
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(DomainNotConfiguredError);
+      if (error instanceof DomainNotConfiguredError) {
+        expect(error.reason).toBe("origin-denied");
+      }
     });
 
     it("throws DomainNotConfiguredError(rejected) when the query reads NotAllowed", async () => {

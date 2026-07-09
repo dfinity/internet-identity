@@ -19,6 +19,7 @@
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import {
     lastUsedIdentitiesStore,
     type LastUsedIdentity,
@@ -46,6 +47,11 @@
     // verbatim to PickAuthenticationMethod.
     switchModeTitle?: string;
     switchModeAction?: string;
+    // The target dapp origin, set only in the authorize (dapp sign-in) flow.
+    // Threaded into SSO discovery so `get_sso_discovery` returns the origin's
+    // `resolved_client_id` (IdP-side per-app gating), and into the SSO sign-in
+    // so it runs through `sso_prepare_delegation` bound to this origin.
+    ssoOrigin?: string;
     children?: Snippet<[boolean?]>;
   }
 
@@ -57,6 +63,7 @@
     passkeyLabel,
     switchModeTitle,
     switchModeAction,
+    ssoOrigin,
     children,
   }: Props = $props();
 
@@ -289,7 +296,11 @@
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
-      const authResult = await authFlow.continueWithSso(ssoResult, mode);
+      const authResult = await authFlow.continueWithSso(
+        ssoResult,
+        mode,
+        ssoOrigin,
+      );
       if (authResult === undefined) {
         if (authFlow.view === "openIdNotConnected") {
           pendingSsoRegistration = true;
@@ -324,6 +335,11 @@
     } catch (error) {
       if (isOpenIdCancelError(error)) {
         return "cancelled";
+      }
+      // A gated dapp login for a not-yet-bridged non-`sub` identity: let
+      // SignInWithSso surface the "sign in normally first" copy inline.
+      if (error instanceof SsoNormalLoginRequiredError) {
+        throw error;
       }
       onError(error);
     } finally {
@@ -420,6 +436,7 @@
     <SignInWithSso
       continueWithSso={handleContinueWithSso}
       goBack={authFlow.chooseMethod}
+      origin={ssoOrigin}
     />
   {:else if authFlow.view === "openIdNotConnected"}
     <IdentityNotConnected

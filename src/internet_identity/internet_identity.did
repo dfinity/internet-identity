@@ -488,11 +488,18 @@ type OpenIdConfig = record {
 // from the domain's two-hop discovery documents, on demand and cached.
 type SsoDiscovery = record {
     discovery_domain : text;
+    // The org's primary OIDC client (the one meant for II itself).
     client_id : text;
     issuer : text;
     authorization_endpoint : text;
     scopes : vec text;
     name : opt text;
+    // The client the target origin passed to `get_sso_discovery` must run its
+    // ceremony against under IdP-side per-app gating: the per-app client when
+    // the origin is listed in `app_clients`, the primary client when unlisted
+    // and `gate_all_apps` is off, or `null` when unlisted and `gate_all_apps`
+    // is on (origin denied). Mirrors `client_id` when no origin was supplied.
+    resolved_client_id : opt text;
 };
 
 // State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
@@ -1658,8 +1665,26 @@ service : (opt InternetIdentityInit) -> {
     // `get_sso_discovery` (query) and, while it reads `Pending`, drives the
     // on-demand two-hop discovery fetch with `discover_sso` (update); once the
     // fetch completes the query returns `Resolved` with the config.
+    //
+    // The optional second argument is the target dapp origin: when supplied,
+    // the resolved config's `resolved_client_id` reports the client that origin
+    // must run its SSO ceremony against under IdP-side per-app gating (the
+    // per-app client if listed in `app_clients`, the primary client if not, or
+    // `null` when denied under `gate_all_apps`). Omitting it mirrors the
+    // primary `client_id`.
     discover_sso : (text) -> ();
-    get_sso_discovery : (text) -> (SsoDiscoveryState) query;
+    get_sso_discovery : (text, opt FrontendHostname) -> (SsoDiscoveryState) query;
+
+    // SSO sign-in — the IdP-side per-app gating path. Mints an SSO-session
+    // delegation only if the JWT's `aud` matches the client the target origin
+    // resolves to (per-app / primary / denied); the delegation's seed binds
+    // `(iss, sub, sso_domain, origin, anchor)`. `openid_prepare_delegation` is
+    // left unchanged (direct providers). A cold discovery/JWKS cache yields
+    // `Pending` (re-call to keep the fetch moving), exactly like the openid
+    // pair. The trailing args are the SSO discovery domain and the target dapp
+    // origin.
+    sso_prepare_delegation : (JWT, Salt, SessionKey, text, FrontendHostname) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
+    sso_get_delegation : (JWT, Salt, SessionKey, Timestamp, text, FrontendHostname) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
     // ===================================================================
     // Email-challenge protocol (shared inbound-DKIM primitive)

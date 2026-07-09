@@ -11,6 +11,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { t } from "$lib/stores/locale.store";
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { GUIDED_UPGRADE, MIN_GUIDED_UPGRADE } from "$lib/state/featureFlags";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { XIcon } from "@lucide/svelte";
@@ -145,12 +146,25 @@
    * `+page.ts`).
    */
   const initiateSso = async (domain: string) => {
-    const result = await discoverSsoConfig(domain);
+    // The dapp origin (already the remapped effective origin used for the
+    // account delegation) so the gate resolves the per-app client and binds
+    // the SSO session to the exact origin the delegation is minted for.
+    const dappOrigin = get(authorizationStore)?.effectiveOrigin;
+    const result = await discoverSsoConfig(domain, undefined, dappOrigin);
     // Stash the SSO discovery domain so `resumeOpenId` knows the
     // returning JWT belongs to a 1-click SSO flow rather than a 1-click
     // OpenID one. The flow type drives which auto-approve allowlist the
-    // attribute consent handler bypasses.
+    // attribute consent handler bypasses. Also stash the dapp origin and
+    // whether it's gated so the resume redeems through the SSO gate path.
     sessionStorage.setItem("ii-sso-1-click-domain", domain);
+    if (dappOrigin !== undefined) {
+      sessionStorage.setItem("ii-sso-1-click-origin", dappOrigin);
+      sessionStorage.setItem(
+        "ii-sso-1-click-gated",
+        // A per-app (gated) client differs from the org's primary client.
+        String(result.resolvedClientId !== result.clientId),
+      );
+    }
     const syntheticConfig: OpenIdConfig = {
       auth_uri: result.discovery.authorization_endpoint,
       jwks_uri: "",
@@ -160,7 +174,9 @@
       email_verification: [],
       issuer: result.discovery.issuer,
       auth_scope: selectAuthScopes(result.discovery.scopes_supported),
-      client_id: result.clientId,
+      // Route the ceremony to the client the origin resolves to under IdP-side
+      // per-app gating (the per-app client for a gated dapp, else the primary).
+      client_id: result.resolvedClientId,
       seed_jwks: [],
     };
     initiateOpenId(syntheticConfig);
@@ -210,6 +226,17 @@
     // marker can't leak into a subsequent direct-OpenID round-trip.
     const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
     sessionStorage.removeItem("ii-sso-1-click-domain");
+    // The dapp origin + gated flag stashed by `initiateSso`, used to redeem the
+    // SSO sign-in through the gate path (`sso_prepare_delegation`) bound to the
+    // dapp origin. Absent when discovery ran without an effective origin.
+    const ssoOrigin = sessionStorage.getItem("ii-sso-1-click-origin");
+    sessionStorage.removeItem("ii-sso-1-click-origin");
+    const ssoGated = sessionStorage.getItem("ii-sso-1-click-gated") === "true";
+    sessionStorage.removeItem("ii-sso-1-click-gated");
+    const sso =
+      ssoDomain !== null && ssoOrigin !== null
+        ? { origin: ssoOrigin, gated: ssoGated }
+        : undefined;
     let config: OpenIdConfig | undefined;
     if (ssoDomain !== null) {
       // SSO sign-in: there's no matching `openid_configs` entry, so build a
@@ -256,6 +283,7 @@
       jwt,
       undefined,
       ssoDomain ?? undefined,
+      sso,
     );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {

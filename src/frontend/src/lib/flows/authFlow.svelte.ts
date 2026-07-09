@@ -6,6 +6,7 @@ import {
   authenticateWithJWT,
   authenticateWithPasskey,
   authenticateWithSession,
+  authenticateWithSso,
 } from "$lib/utils/authentication";
 import { frontendCanisterConfig, canisterId } from "$lib/globals";
 import {
@@ -250,6 +251,10 @@ export class AuthFlow {
   continueWithSso = async (
     ssoResult: SsoDiscoveryResult,
     mode: AuthMode = this.#mode,
+    // The target dapp origin, when signing in to a dapp (the authorize flow).
+    // Present -> sign in via the SSO path (`sso_prepare_delegation`) bound to
+    // this origin. Absent (management / non-dapp flows) -> the openid path.
+    dappOrigin?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -263,16 +268,30 @@ export class AuthFlow {
       }
     | undefined
   > => {
-    const { clientId, discovery, domain, name: ssoName } = ssoResult;
+    const { resolvedClientId, clientId, discovery, domain, name: ssoName } =
+      ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
+    // Route the ceremony to the client the origin resolves to under IdP-side
+    // per-app gating: the per-app client for a gated dapp origin, else the
+    // primary. `resolvedClientId` equals the primary `clientId` when the
+    // discovery was performed without a target origin.
+    const sso =
+      dappOrigin !== undefined
+        ? {
+            origin: dappOrigin,
+            // A per-app (gated) client differs from the org's primary client.
+            gated: resolvedClientId !== clientId,
+          }
+        : undefined;
     const result = await this.#openIdJwtSignIn(
       {
-        clientId,
+        clientId: resolvedClientId,
         authURL: discovery.authorization_endpoint,
         authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
       },
       undefined,
       domain,
+      sso,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -402,6 +421,10 @@ export class AuthFlow {
     existingJwt?: string,
     mode: AuthMode = this.#mode,
     discoveryDomain?: string,
+    // Set for the 1-click SSO resume (a dapp sign-in): redeem the returning
+    // JWT through the SSO gate path bound to this dapp origin instead of the
+    // openid path. Unused by direct providers.
+    sso?: { origin: string; gated: boolean },
   ): Promise<
     | {
         identityNumber: bigint;
@@ -427,6 +450,7 @@ export class AuthFlow {
       },
       existingJwt,
       discoveryDomain,
+      sso,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -496,6 +520,10 @@ export class AuthFlow {
     requestConfig: RequestConfig,
     existingJwt?: string,
     discoveryDomain?: string,
+    // When set (a dapp SSO sign-in), redeem the JWT through the SSO gate path
+    // (`sso_prepare_delegation`) bound to this origin instead of the openid
+    // path. `discoveryDomain` is always present alongside it.
+    sso?: { origin: string; gated: boolean },
   ): Promise<
     | {
         type: "signIn";
@@ -535,12 +563,25 @@ export class AuthFlow {
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-        discoveryDomain,
-      });
+      // A dapp SSO sign-in redeems through the gate path bound to the dapp
+      // origin; every other flow (direct providers, management SSO) keeps the
+      // untouched openid path.
+      const { identity, identityNumber } =
+        sso !== undefined && discoveryDomain !== undefined
+          ? await authenticateWithSso({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+              origin: sso.origin,
+              gated: sso.gated,
+            })
+          : await authenticateWithJWT({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+            });
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       await authenticationStore.set({
         identity,

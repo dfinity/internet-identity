@@ -15,6 +15,23 @@ export const SSO_OPENID_PORT = 11107;
  */
 export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 
+/**
+ * The per-app OIDC client the test provider registers for IdP-side per-app
+ * gating (mirrors `PER_APP_CLIENT_ID` in `src/test_openid_provider/index.js`).
+ * A gated dapp origin maps to this client in the well-known's `app_clients`.
+ */
+export const SSO_PER_APP_CLIENT_ID = "ii-per-app-gated-client";
+
+/** Configuration for the test provider's IdP-side per-app gating. */
+export interface SsoGatingConfig {
+  /** `origin -> client_id` map served in the well-known's `app_clients`. */
+  appClients?: Record<string, string>;
+  /** Default-deny an origin absent from `appClients`. */
+  gateAllApps?: boolean;
+  /** Cross-client-stable identifier claim (default `sub`). */
+  stableIdentifierClaim?: string;
+}
+
 type SsoEntryMode = "signin" | "signup" | "both";
 
 const ssoEntryLabel = (mode: SsoEntryMode): string =>
@@ -40,10 +57,33 @@ export const test = base.extend<{
     domain?: string,
     mode?: SsoEntryMode,
   ) => Promise<Page>;
+  /**
+   * Configure the test provider's IdP-side per-app gating. Sets the
+   * `app_clients` / `gate_all_apps` / `stable_identifier_claim` fields the
+   * `ii-openid-configuration` well-known serves, so a test can turn a dapp
+   * origin into a gated one (or default-deny). The change propagates once II's
+   * discovery cache refreshes; e2e canisters use short cache windows.
+   *
+   * Auto-resets to un-gated defaults after each test so the change never leaks.
+   */
+  configureSsoGating: (config: SsoGatingConfig) => Promise<void>;
 }>({
-  // Playwright requires fixture functions to start with an object
-  // destructuring pattern even when nothing is consumed; the empty
-  // pattern would normally trip the no-empty-pattern lint rule.
+  configureSsoGating: async ({ request }, use) => {
+    const post = (body: unknown) =>
+      request.post(`http://${SSO_DISCOVERY_DOMAIN}/sso-config`, {
+        data: body,
+      });
+    await use(async (config: SsoGatingConfig) => {
+      const response = await post({
+        app_clients: config.appClients ?? {},
+        gate_all_apps: config.gateAllApps ?? false,
+        stable_identifier_claim: config.stableIdentifierClaim ?? "sub",
+      });
+      expect(response.ok()).toBe(true);
+    });
+    // Reset to un-gated defaults so gating never leaks into later tests.
+    await post({ app_clients: {}, gate_all_apps: false });
+  },
   // eslint-disable-next-line no-empty-pattern
   openSsoPopup: async ({}, use) => {
     await use(

@@ -384,7 +384,69 @@ pub fn get_sso_discovery(
     canister_id: CanisterId,
     domain: &str,
 ) -> Result<types::SsoDiscoveryState, RejectResponse> {
-    query_candid(env, canister_id, "get_sso_discovery", (domain,)).map(|(x,)| x)
+    get_sso_discovery_for_origin(env, canister_id, domain, None)
+}
+
+/// Like [`get_sso_discovery`] but supplies the target dapp origin so the
+/// resolved config reports the per-origin `resolved_client_id` (IdP-side per-app
+/// gating).
+pub fn get_sso_discovery_for_origin(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    domain: &str,
+    origin: Option<&str>,
+) -> Result<types::SsoDiscoveryState, RejectResponse> {
+    query_candid(env, canister_id, "get_sso_discovery", (domain, origin)).map(|(x,)| x)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn sso_prepare_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    discovery_domain: &str,
+    origin: &str,
+) -> Result<
+    types::OpenIdResult<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "sso_prepare_delegation",
+        (jwt, salt, session_key, discovery_domain, origin),
+    )
+    .map(|(x,)| x)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn sso_get_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    jwt: &str,
+    salt: &[u8; 32],
+    session_key: &types::SessionKey,
+    expiration: &types::Timestamp,
+    discovery_domain: &str,
+    origin: &str,
+) -> Result<
+    types::OpenIdResult<types::SignedDelegation, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "sso_get_delegation",
+        (jwt, salt, session_key, expiration, discovery_domain, origin),
+    )
+    .map(|(x,)| x)
 }
 
 /// Collapse an [`OpenIdResult`](types::OpenIdResult) to a plain `Result` for
@@ -655,10 +717,7 @@ pub fn email_recovery_credential_prepare_add(
     identity_number: IdentityNumber,
     dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
-    Result<
-        types::email_challenge::EmailChallenge,
-        types::email_challenge::EmailChallengeError,
-    >,
+    Result<types::email_challenge::EmailChallenge, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     call_candid_as(
@@ -694,10 +753,7 @@ pub fn email_recovery_prepare_delegation(
     dns_input: types::email_challenge::EmailChallengeDnsInput,
     session_key: types::SessionKey,
 ) -> Result<
-    Result<
-        types::email_challenge::EmailChallenge,
-        types::email_challenge::EmailChallengeError,
-    >,
+    Result<types::email_challenge::EmailChallenge, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     call_candid(
@@ -779,10 +835,7 @@ pub fn verified_email_prepare_add(
     identity_number: IdentityNumber,
     dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
-    Result<
-        types::email_challenge::EmailChallenge,
-        types::email_challenge::EmailChallengeError,
-    >,
+    Result<types::email_challenge::EmailChallenge, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     call_candid_as(
