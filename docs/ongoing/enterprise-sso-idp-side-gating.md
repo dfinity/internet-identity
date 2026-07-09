@@ -197,6 +197,13 @@ org's web root.
   `gate_all_apps: true` lets an org lock II SSO down to an explicit set of dapps.
 - **Declared client set** = the primary `client_id` plus every `app_clients` value; the
   allowlist used by the identity-resolution safety check (§6, §7).
+- **Bounded: at most 100 `app_clients` per org** (aligns with II's `MAX_ATTRIBUTES_PER_REQUEST`
+  and the discovery byte cap; keeps the O(n) hashed-key scan per login trivial). Real orgs gate
+  a handful — 100 is generous headroom. A well-known exceeding it is **rejected, not
+  truncated** — truncation could silently drop a gated origin into the `gate_all_apps: false`
+  open fallback. The parsed map lives in II's **in-heap** SSO discovery cache (not stable
+  memory), shared across up to `SSO_CACHE_MAX_ENTRIES` (5000) domains, so 100/org also bounds
+  aggregate heap; `DISCOVERY_MAX_RESPONSE_BYTES` is sized to fit.
 
 ### 5.1 Optional: hashed origins
 
@@ -231,13 +238,19 @@ the primary client.** The token's `aud` is checked against the origin's declared
 then discarded for identity — the anchor is resolved as if the login had used the primary
 client. A per-app login therefore creates no credential and no access method.
 
-`wellknown(sso_domain)` below is II core's cached copy of the org's well-known (populated by
-`discover_sso`), not a fresh fetch.
+`wellknown(sso_domain)` below is II core's **in-heap** cached copy of the org's well-known
+(populated by `discover_sso`), not a fresh fetch. The cache is transient — empty after an
+upgrade and evictable — so a miss must return `Pending` (re-drive discovery), never be read as
+"this origin has no per-app client." Only a *loaded* config with the origin absent is
+"unlisted."
 
 ```
 fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
     let claims = verify_id_token(jwt);              // iss, sub, aud, nonce, exp, JWKS — unchanged
-    let wk = wellknown(sso_domain);                 // II core's cached copy
+    let wk = match wellknown(sso_domain) {          // II core's IN-HEAP discovery cache
+        Cached(c) => c,
+        Cold      => return Pending,                // cold/post-upgrade/evicted: re-drive discover_sso.
+    };                                              // NEVER read a cold cache as "no app_clients" (would fail open)
 
     // --- gate: the token must be for THIS origin's client ---
     let expected = match wk.client_for(origin) {    // app_clients lookup (cleartext or hashed, §5.1)
