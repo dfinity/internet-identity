@@ -407,39 +407,37 @@ resolution in II core (§6).
 
 ---
 
-## 10. Build order (stacked PRs)
+## 10. Implementation
 
-Each PR stacks on the previous. There is **no stable-memory migration** — identity keying,
-the delegation seed, and the public API are all unchanged (§6).
+One PR — it's a single cohesive feature, and with **no stable-memory migration** (identity
+keying, delegation seed, and public API all unchanged, §6) there's nothing to stage. The gate
+is **inert until an org opts in** by adding `app_clients` to its well-known, so merging changes
+nothing for anyone until configured — no big-bang risk. (If a dark launch is ever wanted, a
+feature flag inside the one PR does it; a separate "plumbing" PR isn't needed.)
 
 > **Security invariant:** the `aud` gate alone does **not** stop a rogue discovery domain (the
 > attacker controls their own well-known). A gated dapp's isolation comes from verifying the
 > **certified `sso_domain`** (§7) — which dapps already do via the existing `sso:<domain>`
-> certified-attribute lib. So no new lib work is required; the requirement is that a gated dapp
-> actually checks `sso:<domain>`, not the `aud` gate on its own.
+> certified-attribute lib. No new lib work; the requirement is that a gated dapp actually
+> checks `sso:<domain>`, not the `aud` gate on its own.
 
-**PR 1 — BE plumbing: config parsing + `oid` capture + aux index.** No enforcement; invisible.
-- Parse `app_clients` / `gate_all_apps` / `stable_identifier_claim` into the cached discovery
-  config (§5).
-- When `stable_identifier_claim != "sub"` (currently Entra `oid`), decode that claim and keep
-  the additive `(iss, <stable id>) -> (iss, sub)` aux lookup, populated at login (§6.1).
-  Shipping first lets it pre-populate from normal logins, so entries exist before gating turns
-  on. Additive only — no migration.
+Contents:
+- **Config:** parse `app_clients` / `gate_all_apps` / `stable_identifier_claim` into the cached
+  discovery config (§5); `get_sso_discovery` resolves the per-origin client.
+- **Identity:** resolve the anchor on the primary client (`aud` -> primary, §6); when
+  `stable_identifier_claim != "sub"` (currently Entra `oid`), decode that claim and keep the
+  additive `(iss, <stable id>) -> (iss, sub)` aux lookup (§6.1). No stored-key change, no seed
+  change, no migration.
+- **Gate + routing:** the frontend routes the ceremony to the per-origin client; the BE
+  enforces `aud == declared-client-for-origin` (no fallback) and `gate_all_apps` default-deny;
+  cold cache -> `Pending` (§6). The certified `sso_domain` is already surfaced via the existing
+  `sso:<domain>` path.
+- **Tests:** assigned user reaches the gated dapp as the same identity/access method as default
+  SSO; unassigned user denied at the IdP; cross-app token rejected; wrong `sso:<domain>`
+  rejected; `gate_all_apps` default-deny holds.
 
-**PR 2 — Gate + routing + identity (enforcement turns on).**
-- `get_sso_discovery` resolves the per-origin client; the frontend routes the ceremony to it.
-- BE gate: `aud == declared-client-for-origin`, no fallback; identity resolved on the primary
-  client (`aud` -> primary); cold cache -> `Pending` (§6). No stored-key change, no seed change.
-- The certified `sso_domain` is already surfaced per login via the existing `sso:<domain>`
-  attribute path — no change needed here.
-- Tests (with the code): an assigned user reaches the gated dapp with the same identity (and
-  single access method) as their default SSO; an unassigned user is denied at the IdP; a token
-  for one gated app can't open another; a login carrying the wrong `sso:<domain>` is rejected;
-  the `gate_all_apps` default-deny path holds.
-
-That's the whole implementation: two PRs, no canister beyond II core, no proxy, no panel, no
-migration, no new dapp lib. (Admin setup and dapp-integration docs are tracked separately, not
-in this stack.)
+No canister beyond II core, no proxy, no panel, no migration, no new dapp lib. Admin/dapp docs
+are tracked separately, not in this PR.
 
 ---
 
