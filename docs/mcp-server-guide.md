@@ -279,12 +279,22 @@ model only ever identifies your origin, not the OAuth client.)
 
 Advertise what you actually implement (`authorization_endpoint`,
 `response_types_supported: ["code"]`, `grant_types_supported` containing
-`authorization_code`, plus `refresh_token` only if you issue them), don't
-rewrite clients' requested grant types at registration, persist DCR client
-registrations across deploys (clients cache their `client_id`), exempt
-`/oauth/*` and `/.well-known/*` from bearer-token middleware, and return proper
-AS error codes (`invalid_client`, `invalid_request`) from the authorize
-endpoint.
+`authorization_code`, plus `refresh_token` only if you issue them). At DCR,
+handle requested `grant_types` by **intersecting them with what you support
+and returning the resulting set in the registration response** (RFC 7591
+makes the response authoritative — a client that asked for `refresh_token`
+must be able to see it wasn't granted). Two failure modes to avoid: rejecting
+a registration because the requested set isn't exactly yours, or replacing it
+with a server default that drops `authorization_code` — clients request
+`["authorization_code", "refresh_token"]` optimistically and must come away
+able to run the code flow. Never echo a grant type you don't implement; if
+the intersection loses `authorization_code` (or is empty), fail with
+`invalid_client_metadata` instead of registering a client that can't complete
+any flow, and keep the response consistent with `grant_types_supported`.
+Persist DCR client registrations across deploys (clients cache their
+`client_id`), exempt `/oauth/*` and `/.well-known/*` from bearer-token
+middleware, and return proper AS error codes (`invalid_client`,
+`invalid_request`) from the authorize endpoint.
 
 ### Read-only sessions
 
