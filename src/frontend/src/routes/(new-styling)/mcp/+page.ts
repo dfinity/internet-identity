@@ -1,4 +1,5 @@
 import type { PageLoad } from "./$types";
+import { z } from "zod";
 import { fromBase64URL } from "$lib/utils/utils";
 
 /** Default grant lifetime in seconds when the request omits `ttl`. */
@@ -57,69 +58,61 @@ export type McpParams =
   | { kind: "invalid" };
 
 /**
- * Structural callback check: must be an absolute http(s) URL. The stricter
- * "is this an origin the connect flow accepts" check (https only) happens in
- * the component, alongside the consent UI — keeping this `load` minimal since
- * it also runs at prerender.
+ * The whole fragment, validated and normalized in one schema. Absent params
+ * arrive as `null` (from `URLSearchParams.get`), so any field typed plain
+ * `z.string()` treats absence as invalid.
  */
-const parseCallback = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return undefined;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    return undefined;
-  }
-  return raw;
-};
-
-const parseState = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  return raw;
-};
-
-// The server's registration public key `X` (DER, base64url). Kept verbatim as
-// the base64url string (decoded to bytes at connect time); this just validates
-// it is present and actually base64url-decodable, so a malformed key
-// invalidates the request up front rather than throwing mid-connect.
-const parseRegistrationKey = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  try {
-    if (fromBase64URL(raw).length === 0) {
-      return undefined;
+const McpRequestSchema = z.object({
+  // The server's registration public key `X` (DER, base64url). Kept verbatim
+  // as the base64url string (decoded to bytes at connect time); this just
+  // validates it is present and actually base64url-decodable, so a malformed
+  // key invalidates the request up front rather than throwing mid-connect.
+  registration_key: z.string().refine((raw) => {
+    try {
+      return fromBase64URL(raw).length > 0;
+    } catch {
+      return false;
     }
-  } catch {
-    return undefined;
-  }
-  return raw;
-};
-
-// `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
-// the allowed range — at least 10 minutes, at most 30 days — so the exact
-// requested duration is honoured within those bounds. An omitted `ttl` uses the
-// default, and a malformed one (non-numeric or <= 0) invalidates the request.
-const parseTtl = (raw: string | null): number | undefined => {
-  if (raw === null) {
-    return DEFAULT_TTL_SECONDS;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return undefined;
-  }
-  return Math.min(
-    Math.max(Math.floor(parsed), MIN_TTL_SECONDS),
-    MAX_TTL_SECONDS,
-  );
-};
+  }),
+  // Structural callback check: must be an absolute http(s) URL. The stricter
+  // "is this an origin the connect flow accepts" check (https only) happens in
+  // the component, alongside the consent UI — keeping this `load` minimal
+  // since it also runs at prerender.
+  callback: z.string().refine((raw) => {
+    try {
+      const url = new URL(raw);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }),
+  state: z.string().min(1),
+  // `ttl` is a lifetime in seconds. Any positive value is accepted and clamped
+  // to the allowed range — at least 10 minutes, at most 30 days — so the exact
+  // requested duration is honoured within those bounds. An omitted `ttl` uses
+  // the default, and a malformed one (non-numeric or <= 0) invalidates the
+  // request.
+  ttl: z
+    .string()
+    .nullable()
+    .transform((raw, ctx) => {
+      if (raw === null) {
+        return DEFAULT_TTL_SECONDS;
+      }
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ttl must be a positive number of seconds",
+        });
+        return z.NEVER;
+      }
+      return Math.min(
+        Math.max(Math.floor(parsed), MIN_TTL_SECONDS),
+        MAX_TTL_SECONDS,
+      );
+    }),
+});
 
 export const load: PageLoad = ({ url }): { params: McpParams } => {
   // The MCP server redirects the browser here with the request in the URL
@@ -132,20 +125,23 @@ export const load: PageLoad = ({ url }): { params: McpParams } => {
   // (attacker-craftable) link.
   const params = new URLSearchParams(url.hash.slice(1));
 
-  const registrationKey = parseRegistrationKey(params.get("registration_key"));
-  const callback = parseCallback(params.get("callback"));
-  const state = parseState(params.get("state"));
-  const ttlSeconds = parseTtl(params.get("ttl"));
-
-  if (
-    registrationKey === undefined ||
-    callback === undefined ||
-    state === undefined ||
-    ttlSeconds === undefined
-  ) {
+  const request = McpRequestSchema.safeParse({
+    registration_key: params.get("registration_key"),
+    callback: params.get("callback"),
+    state: params.get("state"),
+    ttl: params.get("ttl"),
+  });
+  if (!request.success) {
     return { params: { kind: "invalid" } };
   }
+  const { registration_key, callback, state, ttl } = request.data;
   return {
-    params: { kind: "valid", registrationKey, callback, state, ttlSeconds },
+    params: {
+      kind: "valid",
+      registrationKey: registration_key,
+      callback,
+      state,
+      ttlSeconds: ttl,
+    },
   };
 };
