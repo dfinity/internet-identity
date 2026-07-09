@@ -12,6 +12,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
+  import { fromBase64URL } from "$lib/utils/utils";
   import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
   import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
   import { get } from "svelte/store";
@@ -36,12 +37,12 @@
 
   // The MCP server the user is connecting is identified by the origin of the
   // request's callback: each user trusts whichever (remote) server they connect.
-  // The connect flow fetches the server's session key from that callback and
-  // reports completion to it — once the callback has been matched against the
-  // allow-list the server declares on its origin (see `matchDeclaredCallback`
-  // in `handleAuthorize`). MCP is remote-only, so only https callbacks are
-  // accepted (a plain-http or loopback callback is rejected). A disallowed (or
-  // unparsable) callback yields `undefined` → the invalid screen.
+  // The connect flow delivers the registration delegation to that callback —
+  // once it has been matched against the allow-list the server declares on its
+  // origin (see `matchDeclaredCallback` in `handleAuthorize`). MCP is
+  // remote-only, so only https callbacks are accepted (a plain-http or loopback
+  // callback is rejected). A disallowed (or unparsable) callback yields
+  // `undefined` → the invalid screen.
   const mcpServer = $derived(
     params.kind === "valid" ? parseMcpServerUrl(params.callback) : undefined,
   );
@@ -84,12 +85,12 @@
   // is the identity's synced (on-chain) config, which can only be read once
   // authenticated — so we show the connect screen optimistically and verify it
   // against the canister at connect time (`handleAuthorize`), moving to the
-  // untrusted screen if it isn't. The terminal `close` phase is reached from
-  // `handleAuthorize` once the session is registered — the whole flow runs on
-  // this page. There is no redirect-back unless the *trusted server* asks for
-  // one: a `finish_url` in its key response (validated same-origin with the
-  // callback) sends the tab there instead of the close screen, letting the
-  // server finish its own flow (e.g. hand an OAuth code to an MCP client).
+  // untrusted screen if it isn't. Once the registration delegation is minted,
+  // `handleAuthorize` hands the tab to the server's declared callback
+  // (carrying the delegation in the fragment): the server redeems it and
+  // finishes its own flow (e.g. hands an OAuth code to an MCP client). The
+  // terminal `close` phase is set first so the page is truthful if that
+  // navigation never replaces the document or the user comes Back to it.
   const initialPhase = (): Phase => {
     if (!requestValid) {
       return { kind: "invalid" };
@@ -157,10 +158,10 @@
   });
 
   // Invoked by the reused account picker once it has authenticated the selected
-  // identity and resolved the chosen account. Connecting fetches the server's
-  // session key from its callback and registers it with the backend
-  // (`mcp_register`, with the chosen access level) — the whole flow completes
-  // on this page.
+  // identity and resolved the chosen account. Connecting mints a single-use
+  // registration delegation for the server's per-connect key (recording the
+  // anchor and chosen access level on the backend) and hands the tab to the
+  // server's declared callback, which redeems it (`mcp_register_v2`).
   const handleAuthorize = (
     ttlSeconds: number,
     accessLevel: AccessLevel,
@@ -171,10 +172,9 @@
     }
     const request = params;
     mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Confirmed);
-    // Show a loading screen while we verify trust and (if trusted) fetch the
-    // server's key, register it, and notify the server: the picker's own button
-    // spinner stops once it hands off here, and those steps span several
-    // network round trips.
+    // Show a loading screen while we verify trust and (if trusted) mint the
+    // registration delegation: the picker's own button spinner stops once it
+    // hands off here, and those steps span several canister round trips.
     phase = { kind: "connecting" };
     void (async () => {
       try {
@@ -197,7 +197,7 @@
           phase = { kind: "untrusted" };
           return;
         }
-        // Contact the trusted server only at a callback it *declares*: the
+        // Deliver to the trusted server only at a callback it *declares*: the
         // server hosts an allow-list at a fixed well-known path on its origin
         // (/.well-known/ii-auth-callbacks), and the link's callback must
         // exact-match a declared entry. The (attacker-craftable) link only
@@ -205,30 +205,31 @@
         // point II at an arbitrary path on the trusted origin (a planted
         // file, a reflecting or redirecting route). An undeclared callback,
         // or an unreachable/invalid allow-list, throws: the connect fails
-        // closed into the catch below, before anything is registered.
+        // closed into the catch below, before anything is minted.
         const callback = await matchDeclaredCallback(
           server.origin,
           request.callback,
         );
-        const finishUrl = await mcpAuthorize({
+        const deliveryUrl = await mcpAuthorize({
           authenticated,
           ttlSeconds,
           accessLevel,
           callback,
           state: request.state,
+          // The server's public per-connect key `X` from the link (validated
+          // base64url in `load`); II mints a `P_reg -> X` delegation for it.
+          registrationKey: fromBase64URL(request.registrationKey),
         });
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);
-        // The session is registered either way: reach the terminal close
+        // The registration delegation is minted: reach the terminal close
         // screen first, so the page is in the truthful state even when the
-        // navigation below never replaces the document (a 204 or attachment
-        // response) or when the user comes Back to a bfcache-restored page —
-        // rather than stranding them on the connecting spinner.
-        phase = { kind: "close", redirecting: finishUrl !== undefined };
-        if (finishUrl !== undefined) {
-          // The trusted server asked to finish the flow on its side (already
-          // validated same-origin with the callback): hand it the tab.
-          window.location.assign(finishUrl);
-        }
+        // navigation below never replaces the document or the user comes Back
+        // to a bfcache-restored page — rather than stranding them on the
+        // connecting spinner. Then hand the tab to the server's declared
+        // callback with the delegation in the fragment; the server redeems it
+        // (mcp_register_v2) and finishes its own flow.
+        phase = { kind: "close", redirecting: true };
+        window.location.assign(deliveryUrl);
       } catch (error) {
         // Return to the connect screen so the user can retry.
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Error);

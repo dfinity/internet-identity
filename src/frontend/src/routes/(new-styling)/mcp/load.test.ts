@@ -5,11 +5,16 @@ const HOUR = 60 * 60;
 const MIN_TTL = 10 * 60;
 const MAX_TTL = 30 * 24 * 60 * 60;
 
+// A valid base64url registration key (the server's public per-connect key `X`).
+const REGISTRATION_KEY = "cmVnaXN0cmF0aW9uLWtleQ";
+
 // A complete, valid fragment with an optional `ttl`. The callback is an
-// accepted https origin; no key material travels in the fragment (the
-// server's session key is fetched from the callback after consent).
+// accepted https origin; the only key material is the server's *public*
+// registration key (II mints a `P_reg -> X` delegation for it — nothing secret
+// travels in the fragment).
 const fragment = (ttl?: string): string => {
   const params = new URLSearchParams();
+  params.set("registration_key", REGISTRATION_KEY);
   params.set("callback", "https://mcp.example.com/cb");
   params.set("state", "opaque-state");
   if (ttl !== undefined) {
@@ -74,19 +79,44 @@ describe("/mcp load: ttl parsing", () => {
 });
 
 describe("/mcp load: request validation", () => {
+  it("surfaces the registration key verbatim on a valid request", () => {
+    const parsed = loadTtl();
+    expect(parsed.kind).toBe("valid");
+    if (parsed.kind === "valid") {
+      expect(parsed.registrationKey).toBe(REGISTRATION_KEY);
+    }
+  });
+
+  it("rejects a fragment without a registration_key", () => {
+    const params = new URLSearchParams(fragment());
+    params.delete("registration_key");
+    expect(loadParams(params.toString()).kind).toBe("invalid");
+  });
+
+  it("rejects a present-but-empty or undecodable registration_key", () => {
+    const empty = new URLSearchParams(fragment());
+    empty.set("registration_key", "");
+    expect(loadParams(empty.toString()).kind).toBe("invalid");
+
+    const garbage = new URLSearchParams(fragment());
+    // `*` is outside the base64url alphabet, so decoding throws → invalid.
+    garbage.set("registration_key", "***not-base64***");
+    expect(loadParams(garbage.toString()).kind).toBe("invalid");
+  });
+
   it("rejects a fragment without a callback", () => {
-    const params = new URLSearchParams();
-    params.set("state", "opaque-state");
+    const params = new URLSearchParams(fragment());
+    params.delete("callback");
     expect(loadParams(params.toString()).kind).toBe("invalid");
   });
 
   it("rejects a fragment without a state", () => {
-    const params = new URLSearchParams();
-    params.set("callback", "https://mcp.example.com/cb");
+    const params = new URLSearchParams(fragment());
+    params.delete("state");
     expect(loadParams(params.toString()).kind).toBe("invalid");
   });
 
-  it("tolerates (and ignores) a legacy public_key param", () => {
+  it("tolerates (and ignores) an unknown extra param", () => {
     const params = new URLSearchParams(fragment());
     params.set("public_key", "AAAA");
     const parsed = loadParams(params.toString());

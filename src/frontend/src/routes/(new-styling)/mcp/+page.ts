@@ -1,4 +1,5 @@
 import type { PageLoad } from "./$types";
+import { fromBase64URL } from "$lib/utils/utils";
 
 /** Default grant lifetime in seconds when the request omits `ttl`. */
 const DEFAULT_TTL_SECONDS = 60 * 60;
@@ -15,18 +16,22 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
- * browser to. `valid` carries the validated request — the callback on the MCP
- * server the connect flow talks to, the single-use `state` included in those
- * requests so the server can tie them to the connect it started, and the
- * requested session-grant TTL (`ttl`, in seconds). The MCP server the user
- * connects is identified by the callback's *origin* (each user trusts whichever
- * server they connect); the callback itself is only honoured after it
- * exact-matches the allow-list the server declares at a fixed well-known path
- * on that origin (see `matchDeclaredCallback`), so a crafted link can't point
- * II at an arbitrary path on the trusted origin — the link only selects among
- * the server-declared callbacks. No key material travels in the fragment, and
- * no account is chosen here (it's per-app, picked server-side at delegation
- * time). `invalid` means the fragment was missing or malformed.
+ * browser to. `valid` carries the validated request — the MCP server's
+ * registration public key (`registration_key`, the per-connect key `X` the
+ * server generated for this browser session), the callback identifying the
+ * server, the single-use `state` the server echoes back so it can tie the
+ * delivered delegation to the connect it started, and the requested
+ * session-grant TTL (`ttl`, in seconds). The MCP server the user connects is
+ * identified by the callback's *origin* (each user trusts whichever server they
+ * connect); II mints a single-use registration delegation `P_reg -> X` and
+ * delivers it to the callback only after it exact-matches the allow-list the
+ * server declares at a fixed well-known path on that origin (see
+ * `matchDeclaredCallback`), so a crafted link can't point II at an arbitrary
+ * path on the trusted origin — the link only selects among the server-declared
+ * callbacks. The only key material in the fragment is the server's own public
+ * `registration_key` (never a secret), and no account is chosen here (it's
+ * per-app, picked server-side at delegation time). `invalid` means the fragment
+ * was missing or malformed.
  *
  * Whether the callback origin is one the connect flow accepts (https only — MCP
  * connections are to remote servers) is checked in the page component, which
@@ -35,10 +40,15 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 export type McpParams =
   | {
       kind: "valid";
+      /** The MCP server's registration public key `X` (DER, base64url) for this
+       *  connect. II mints a single-use `P_reg -> X` delegation for it, so the
+       *  server can bind its long-lived session key by redeeming that chain
+       *  (`mcp_register_v2`) — nothing secret rides this public key. */
+      registrationKey: string;
       callback: string;
-      /** Opaque value the server issued for this connect; included in the
-       *  key-request and completion calls so the server can tie them to the
-       *  request it started (CSRF protection). */
+      /** Opaque value the server issued for this connect; delivered back
+       *  alongside the registration delegation so the server can tie it to the
+       *  connect it started (CSRF protection). */
       state: string;
       /** Requested session-grant lifetime in seconds (clamped to
        *  [10 min, 30 days]). */
@@ -75,6 +85,24 @@ const parseState = (raw: string | null): string | undefined => {
   return raw;
 };
 
+// The server's registration public key `X` (DER, base64url). Kept verbatim as
+// the base64url string (decoded to bytes at connect time); this just validates
+// it is present and actually base64url-decodable, so a malformed key
+// invalidates the request up front rather than throwing mid-connect.
+const parseRegistrationKey = (raw: string | null): string | undefined => {
+  if (raw === null || raw === "") {
+    return undefined;
+  }
+  try {
+    if (fromBase64URL(raw).length === 0) {
+      return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return raw;
+};
+
 // `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
 // the allowed range — at least 10 minutes, at most 30 days — so the exact
 // requested duration is honoured within those bounds. An omitted `ttl` uses the
@@ -99,16 +127,18 @@ export const load: PageLoad = ({ url }): { params: McpParams } => {
   // II's request logs; the address-bar copy is cleared in `+page.svelte` via
   // `replaceState`). Reading `url.hash` relies on this universal `load`
   // re-running client-side; with `adapter-static` it's empty during prerender.
-  // A legacy `public_key` param is ignored: the session key is fetched from
-  // the trusted server's callback, never taken from the (attacker-craftable)
-  // link.
+  // The `registration_key` is the server's *public* per-connect key `X`; II
+  // mints a `P_reg -> X` delegation for it, so no secret key material rides the
+  // (attacker-craftable) link.
   const params = new URLSearchParams(url.hash.slice(1));
 
+  const registrationKey = parseRegistrationKey(params.get("registration_key"));
   const callback = parseCallback(params.get("callback"));
   const state = parseState(params.get("state"));
   const ttlSeconds = parseTtl(params.get("ttl"));
 
   if (
+    registrationKey === undefined ||
     callback === undefined ||
     state === undefined ||
     ttlSeconds === undefined
@@ -116,6 +146,6 @@ export const load: PageLoad = ({ url }): { params: McpParams } => {
     return { params: { kind: "invalid" } };
   }
   return {
-    params: { kind: "valid", callback, state, ttlSeconds },
+    params: { kind: "valid", registrationKey, callback, state, ttlSeconds },
   };
 };
