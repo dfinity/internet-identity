@@ -436,10 +436,19 @@ the delegation seed, and the public API are all unchanged (§6).
   method) as their default SSO; an unassigned user is denied at the IdP; a token for one gated
   app can't open another; **a rogue-domain login is certifiably a different `sso_domain`**.
 
-**PR 3 — Onboarding.** Per-IdP client setup, and guidance that a gated dapp must verify
-`sso:<domain>` with the existing certified-attribute lib (the rogue-domain defense, §7 — no new
-lib work). Covers Entra `stable_identifier_claim: "oid"` + assignment-required and the Okta
-400-denial (§8).
+**PR 3 — Docs + e2e (no new II code).** Concretely three artifacts:
+- **Admin setup guide** (`docs/`), per IdP: register a per-app OIDC client → redirect to id.ai
+  → assign the group; add `app_clients` / `gate_all_apps` / `stable_identifier_claim` to the
+  org's well-known. Spell out the gotchas: Entra needs `stable_identifier_claim: "oid"` **and**
+  "Assignment required" enabled (defaults OFF → silent fail-open); Okta's denial is a 400 HTML
+  page, not an OIDC error (§8).
+- **Dapp integration note + snippet**: the exact `sso:<domain>` check via the existing
+  certified-attribute lib, with the warning that a gated dapp that skips it is bypassable via a
+  rogue domain (§7).
+- **e2e test**: assigned user reaches the gated dapp; unassigned user denied at the IdP; a login
+  carrying the wrong `sso:<domain>` is rejected by the dapp check.
+
+Thin enough to **fold into PR 2** if preferred; kept separate only to keep PR 2 code-only.
 
 No canister beyond II core, no proxy, no panel, no migration, no new dapp lib.
 
