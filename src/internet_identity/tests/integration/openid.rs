@@ -344,6 +344,96 @@ fn can_get_sso_delegation_via_discovery() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Upgrading to the wasm that folds `sso_domain` into the index key kicks off
+/// the batched OpenID credential key migration; an SSO credential linked before
+/// the upgrade must keep resolving throughout the migration window (via the new
+/// key, with the legacy key as a dual-lookup fallback), and a JWT delegation
+/// must still be issued once the migration timer has completed.
+///
+/// NOTE: the credential here is written by the new wasm, so its index entry is
+/// already stored under the new `(iss, sub, aud, sso_domain)` key — this test
+/// exercises the migration timer running to completion on upgrade plus
+/// continued end-to-end resolution. The actual legacy→new re-keying (only
+/// producible from a wasm predating the key change, which does not exist for SSO
+/// credentials since SSO discovery is unreleased) is covered exhaustively by the
+/// `migrate_openid_credential_keys_batch` storage unit tests.
+#[test]
+fn sso_credential_resolves_across_key_migration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = setup_sso_canister(&env);
+    let responses = sso_http_responses();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
+    sync_time(&env, test_time);
+
+    // Link the SSO credential (stamped with `sso_domain = SSO_DOMAIN`).
+    drive_sso_until_ready(&env, &responses, || {
+        api::openid_credential_add_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            identity_number,
+            &jwt,
+            &salt,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO credential add failed");
+
+    let credentials = api::get_anchor_info(&env, canister_id, test_principal, identity_number)?
+        .openid_credentials
+        .expect("Could not fetch credentials!");
+    assert_eq!(credentials[0].sso_domain, Some(SSO_DOMAIN.to_string()));
+
+    // Upgrade to run the key migration, then let its interval timer complete.
+    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None)
+        .expect("Failed to upgrade canister");
+    for _ in 0..5 {
+        env.advance_time(Duration::from_secs(1));
+        env.tick();
+    }
+
+    // The SSO credential still resolves after the migration: a JWT delegation
+    // can be prepared and fetched. The caches are cold after upgrade, so warm
+    // them again via the `Pending`-retry loop.
+    let pub_session_key = ByteBuf::from("session public key");
+    let prepare_response = drive_sso_until_ready(&env, &responses, || {
+        api::openid_prepare_delegation_with_discovery(
+            &env,
+            canister_id,
+            test_principal,
+            &jwt,
+            &salt,
+            &pub_session_key,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap()
+    })
+    .expect("SSO prepare delegation failed after migration");
+
+    match api::openid_get_delegation_with_discovery(
+        &env,
+        canister_id,
+        test_principal,
+        &jwt,
+        &salt,
+        &pub_session_key,
+        &prepare_response.expiration,
+        Some(SSO_DOMAIN),
+    )? {
+        OpenIdResult::Ok(signed) => assert_eq!(
+            signed.delegation.pubkey, pub_session_key,
+            "delegation should be bound to the requested session key after migration"
+        ),
+        other => panic!("expected a signed delegation after migration, got {other:?}"),
+    }
+
+    Ok(())
+}
+
 /// Verifies that Microsoft Accounts can be added
 #[test]
 fn can_link_microsoft_account() -> Result<(), RejectResponse> {

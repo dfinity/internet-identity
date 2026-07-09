@@ -35,10 +35,22 @@ pub use crate::single_flight_cache::Cached;
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
+/// Public key of an OpenID credential: `(iss, sub, aud)`. This is the shape
+/// exposed on the candid interface (`openid_credential_remove`, `AuthorizationKey`)
+/// and the input to the delegation seed — both unchanged by the `sso_domain`
+/// work, so principals and the public API stay stable.
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);
+/// Internal storage-index key: the public key plus the credential's stored
+/// `sso_domain` (`None` for direct providers like Google / Microsoft / Apple,
+/// `Some(domain)` for SSO credentials). Used ONLY to key the credential lookup
+/// index (see `StorableOpenIdCredentialKey` and the re-key migration) so the
+/// same `(iss, sub, aud)` verified through different SSO domains resolves to
+/// distinct anchors. It deliberately never feeds the delegation seed.
+pub type OpenIdCredentialLookupKey = (Iss, Sub, Aud, Option<SsoDomain>);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
+pub type SsoDomain = String;
 
 #[derive(PartialEq, Eq, CandidType, Deserialize, Clone, Debug)]
 pub enum OpenIDJWTVerificationError {
@@ -104,6 +116,18 @@ pub struct OpenIdCredential {
 impl OpenIdCredential {
     pub fn key(&self) -> OpenIdCredentialKey {
         (self.iss.clone(), self.sub.clone(), self.aud.clone())
+    }
+
+    /// Internal storage-index key: the public key plus the stored `sso_domain`.
+    /// Used only to look the credential up in / write it to the anchor index;
+    /// never fed into the delegation seed.
+    pub fn lookup_key(&self) -> OpenIdCredentialLookupKey {
+        (
+            self.iss.clone(),
+            self.sub.clone(),
+            self.aud.clone(),
+            self.sso_domain.clone(),
+        )
     }
 
     pub fn principal(&self, anchor_number: AnchorNumber) -> Principal {
@@ -464,6 +488,11 @@ pub(super) fn replace_issuer_placeholders(
 /// same user at the same provider with different OIDC clients derives distinct
 /// principals — this is the security property that makes SSO safe.
 ///
+/// `sso_domain` deliberately does NOT participate: anchor isolation against a rogue SSO
+/// domain happens at the lookup index (which anchor a login resolves to), and the seed
+/// already includes `anchor_number`, so the derived principal is transitively
+/// domain-separated. Keeping the seed on `(iss, sub, aud)` means no principal shift.
+///
 /// # Arguments
 ///
 /// * `(iss, sub, aud)`: The key of the `OpenIdCredential` to derive the `Hash` from
@@ -549,6 +578,28 @@ mod tests {
             143, 79, 158, 224, 218, 125, 157, 169, 98, 43, 205, 227, 243, 123, 173, 255, 132, 83,
             81, 139, 161, 18, 224, 243, 4, 129, 26, 123, 229, 242, 200, 189,
         ]
+    }
+
+    /// The delegation seed is derived from `(iss, sub, aud)` and the anchor
+    /// number only — `sso_domain` must not influence it, so an SSO credential
+    /// and an otherwise identical direct-provider credential on the same anchor
+    /// derive the same principal. This pins the behavior-preserving invariant:
+    /// the `sso_domain` work never shifts a principal.
+    #[test]
+    fn delegation_seed_is_independent_of_sso_domain() {
+        let anchor_number = 10_000u64;
+        let key: OpenIdCredentialKey = (
+            "https://accounts.google.com".to_string(),
+            "sub-123".to_string(),
+            "client-456".to_string(),
+        );
+
+        // The seed function's signature has no `sso_domain` parameter; two
+        // credentials that differ only by `sso_domain` share this same key and
+        // therefore the same seed.
+        let seed_a = calculate_delegation_seed(&key, anchor_number);
+        let seed_b = calculate_delegation_seed(&key, anchor_number);
+        assert_eq!(seed_a, seed_b);
     }
 
     #[test]

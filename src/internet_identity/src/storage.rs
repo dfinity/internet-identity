@@ -105,7 +105,7 @@ use identity_jose::jwk::Jwk;
 use internet_identity_interface::archive::types::BufferedEntry;
 
 use crate::delegation::check_frontend_length;
-use crate::openid::OpenIdCredentialKey;
+use crate::openid::OpenIdCredentialLookupKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
@@ -312,6 +312,26 @@ pub struct SsoCredentialMigrationBatchOutcome {
     /// Last index key examined this batch; pass back as `cursor` of the next
     /// batch to resume the scan where this one left off. `None` when the
     /// batch examined no keys.
+    pub next_cursor: Option<StorableOpenIdCredentialKey>,
+}
+
+/// Outcome of one batch of the OpenID credential key migration that folds
+/// `sso_domain` into the index key (see
+/// `Storage::migrate_openid_credential_keys_batch`).
+// TODO: Remove this together with the migration scaffolding once complete.
+#[derive(Default, Debug)]
+pub struct OpenIdCredentialKeyMigrationBatchOutcome {
+    /// Number of index entries re-keyed from the legacy `(iss, sub, aud)` key
+    /// to the new `(iss, sub, aud, sso_domain)` key this batch.
+    pub rekeyed: u64,
+    /// `true` when the scan has reached the end of the credential index —
+    /// caller should stop the interval timer.
+    pub is_done: bool,
+    /// Per-entry errors encountered this batch (e.g. orphan index entries).
+    pub errors: Vec<String>,
+    /// Last index key examined this batch; pass back as `cursor` of the next
+    /// batch to resume the scan where this one left off. `None` when the batch
+    /// examined no keys.
     pub next_cursor: Option<StorableOpenIdCredentialKey>,
 }
 
@@ -924,13 +944,190 @@ impl<M: Memory + Clone> Storage<M> {
 
     pub fn lookup_anchor_with_openid_credential(
         &self,
-        key: &OpenIdCredentialKey,
+        key: &OpenIdCredentialLookupKey,
+    ) -> Option<AnchorNumber> {
+        // Try the full key (with `sso_domain`) first.
+        if let Some(anchor_number) =
+            self.lookup_anchor_number_for_credential_key(&key.clone().into())
+        {
+            return Some(anchor_number);
+        }
+
+        // Migration-window fallback: SSO index entries not yet re-keyed by the
+        // `sso_domain` key migration are still stored under their legacy key
+        // (no `sso_domain`). Retry with `sso_domain` cleared so logins keep
+        // working while the migration runs. This only matters for SSO
+        // credentials (`sso_domain = Some`); for direct providers the legacy
+        // key equals the full key, so the first lookup already covered it.
+        // TODO: Remove this fallback once the key migration has completed.
+        if key.3.is_some() {
+            let legacy_key = StorableOpenIdCredentialKey {
+                iss: key.0.clone(),
+                sub: key.1.clone(),
+                aud: key.2.clone(),
+                sso_domain: None,
+            };
+            return self.lookup_anchor_number_for_credential_key(&legacy_key);
+        }
+
+        None
+    }
+
+    fn lookup_anchor_number_for_credential_key(
+        &self,
+        key: &StorableOpenIdCredentialKey,
     ) -> Option<AnchorNumber> {
         let anchor_numbers: Vec<AnchorNumber> = self
             .lookup_anchor_with_openid_credential_memory
-            .get(&key.clone().into())
+            .get(key)
             .map(Into::into)?;
         anchor_numbers.first().copied()
+    }
+
+    /// Migrates one batch of OpenID credential index keys from the legacy
+    /// `(iss, sub, aud)` shape to the new `(iss, sub, aud, sso_domain)` shape.
+    ///
+    /// The `sso_domain` was already stamped onto each stored credential by the
+    /// backfill in [#4013](https://github.com/dfinity/internet-identity/pull/4013)
+    /// (`OpenIdCredential::sso_domain`, `None` for direct providers). This
+    /// migration reads that stamp off the backing credential and, for SSO
+    /// credentials (`Some(domain)`), re-inserts the index entry under the new
+    /// key and removes the legacy one. Direct-provider entries
+    /// (`sso_domain = None`) already encode identically under both shapes, so
+    /// they need no re-keying and are left untouched.
+    ///
+    /// Each batch examines up to `batch_size` keys of the index, starting after
+    /// `cursor` (`None` starts from the beginning). The bound is on keys
+    /// *examined* (not keys re-keyed) so each batch does a fixed amount of work.
+    /// A re-keyed entry sorts strictly after its legacy key (`None < Some(_)`),
+    /// so it may be examined again in a later batch, but it is then skipped as
+    /// already-migrated — the migration is idempotent. It is done once a batch
+    /// examines fewer than `batch_size` keys, i.e. the scan reached the end of
+    /// the index.
+    ///
+    /// Follows the batched-migration convention used by prior data migrations
+    /// (see [#4013](https://github.com/dfinity/internet-identity/pull/4013) and
+    /// [#3784](https://github.com/dfinity/internet-identity/pull/3784)): the
+    /// caller invokes this on an interval timer until `is_done` becomes `true`,
+    /// at which point the timer is cleared.
+    // TODO: Remove this together with the migration scaffolding once complete.
+    pub fn migrate_openid_credential_keys_batch(
+        &mut self,
+        cursor: Option<StorableOpenIdCredentialKey>,
+        batch_size: u64,
+    ) -> OpenIdCredentialKeyMigrationBatchOutcome {
+        let mut outcome = OpenIdCredentialKeyMigrationBatchOutcome::default();
+
+        if batch_size == 0 {
+            outcome.is_done = true;
+            return outcome;
+        }
+
+        // Phase 1: examine up to `batch_size` keys via a read-only scan,
+        // collecting the legacy (not-yet-migrated) keys and their anchor lists.
+        // Collected first so phase 2 doesn't alias the borrow. `Bound` is taken
+        // by `ic_stable_structures::storable::Bound` here, so qualify the range
+        // bounds explicitly.
+        use std::ops::Bound as RangeBound;
+        let range = match &cursor {
+            Some(cursor) => (RangeBound::Excluded(cursor.clone()), RangeBound::Unbounded),
+            None => (RangeBound::Unbounded, RangeBound::Unbounded),
+        };
+        let mut examined: u64 = 0;
+        let mut candidates: Vec<(StorableOpenIdCredentialKey, Vec<AnchorNumber>)> = vec![];
+        for (key, anchor_list) in self
+            .lookup_anchor_with_openid_credential_memory
+            .range(range)
+            .take(batch_size as usize)
+        {
+            examined += 1;
+            outcome.next_cursor = Some(key.clone());
+            // Keys already carrying an `sso_domain` were re-keyed by an earlier
+            // batch (or written new); nothing to do for them.
+            if key.sso_domain.is_some() {
+                continue;
+            }
+            candidates.push((key, anchor_list.into()));
+        }
+
+        // Phase 2: for each legacy key, resolve the backing credential's stored
+        // `sso_domain`. Re-key only SSO credentials; direct providers keep the
+        // legacy key (which is already their canonical encoding).
+        for (legacy_key, anchor_numbers) in candidates {
+            if anchor_numbers.is_empty() {
+                // Degenerate "index entry with no anchors" state — no anchor to
+                // resolve the stamp from. Deliberately omits iss/sub, which are
+                // IdP PII surfaced by the anonymous migration-errors endpoint.
+                let err = "index entry with no associated anchor".to_string();
+                ic_cdk::println!("WARNING: OpenID credential key migration: {err}");
+                outcome.errors.push(err);
+                continue;
+            }
+
+            // The same `(iss, sub, aud)` at one anchor resolves one credential,
+            // so the first anchor that carries the credential decides the
+            // `sso_domain`. Report anchors that are missing entirely (orphan
+            // index entries) but keep scanning the rest of the list.
+            let mut resolved_sso_domain: Option<Option<String>> = None;
+            for anchor_number in &anchor_numbers {
+                let Some(storable_anchor) = self.stable_anchor_memory.get(anchor_number) else {
+                    let err = format!("anchor {anchor_number} not found for migrated credential");
+                    ic_cdk::println!("WARNING: OpenID credential key migration: {err}");
+                    outcome.errors.push(err);
+                    continue;
+                };
+                if let Some(credential) =
+                    storable_anchor
+                        .openid_credentials
+                        .iter()
+                        .find(|credential| {
+                            credential.iss == legacy_key.iss
+                                && credential.sub == legacy_key.sub
+                                && credential.aud == legacy_key.aud
+                        })
+                {
+                    resolved_sso_domain = Some(credential.sso_domain.clone());
+                    break;
+                }
+            }
+
+            // No backing credential resolved a domain: either every anchor was
+            // an orphan (already reported above) or the credential is gone.
+            // Nothing to re-key.
+            let Some(sso_domain) = resolved_sso_domain else {
+                continue;
+            };
+            // Direct provider: the legacy key is already the canonical key.
+            let Some(_domain) = &sso_domain else {
+                continue;
+            };
+
+            let new_key = StorableOpenIdCredentialKey {
+                iss: legacy_key.iss.clone(),
+                sub: legacy_key.sub.clone(),
+                aud: legacy_key.aud.clone(),
+                sso_domain: sso_domain.clone(),
+            };
+            // Move the anchor list to the new key. Re-read defensively: the
+            // legacy entry is guaranteed to exist here (concurrent mutation is
+            // impossible within a batch), but skip rather than unwrap.
+            let Some(anchor_list) = self
+                .lookup_anchor_with_openid_credential_memory
+                .remove(&legacy_key)
+            else {
+                continue;
+            };
+            self.lookup_anchor_with_openid_credential_memory
+                .insert(new_key, anchor_list);
+            outcome.rekeyed += 1;
+        }
+
+        // A short batch means the scan has reached the end of the index.
+        if examined < batch_size {
+            outcome.is_done = true;
+        }
+
+        outcome
     }
 
     /// Backfills one batch of the SSO credential `sso_domain` / `sso_name`

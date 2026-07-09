@@ -188,6 +188,102 @@ fn init_sso_credential_migration_timer() {
     });
 }
 
+// ---- OpenID credential key migration (temporary, PR 1 of the SSO domain key
+// stack) ----
+//
+// The OpenID credential index key grew an `sso_domain` component so the same
+// `(iss, sub, aud)` verified through different SSO domains resolves to distinct
+// credentials. Existing index entries were written under the legacy
+// `(iss, sub, aud)` key and must be re-keyed. The `sso_domain` for each was
+// already stamped onto the stored credential by the #4013 backfill, so this
+// migration needs no upgrade arg — it reads the stamp off the credential. Doing
+// all entries synchronously in `post_upgrade` would blow the instruction limit
+// on II's production canister, so the work is batched via an interval timer,
+// same convention as the prior migrations (#4013, #3784, #3713).
+
+/// How long to wait between migration batches.
+const OPENID_KEY_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
+
+/// Maximum number of index keys to examine per batch (= per ingress message).
+/// Matches the 2 000-per-batch convention used for previous migrations.
+const OPENID_KEY_MIGRATION_BATCH_SIZE: u64 = 2_000;
+
+thread_local! {
+    // TODO: Remove these after the data migration is complete.
+    static OPENID_KEY_MIGRATION_CURSOR: RefCell<Option<StorableOpenIdCredentialKey>> = const { RefCell::new(None) };
+    static OPENID_KEY_MIGRATION_DONE: RefCell<bool> = const { RefCell::new(false) };
+    static OPENID_KEY_MIGRATION_REKEYED: RefCell<u64> = const { RefCell::new(0) };
+    static OPENID_KEY_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static OPENID_KEY_MIGRATION_TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+/// Temporary hidden endpoint: returns any per-entry errors encountered during
+/// the OpenID credential key migration.
+#[update(hidden = true)]
+fn list_openid_key_migration_errors() -> Vec<String> {
+    OPENID_KEY_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
+}
+
+/// Temporary hidden endpoint: returns `(rekeyed_entries, is_done)` so
+/// monitoring can track migration progress.
+#[query(hidden = true)]
+fn openid_key_migration_status() -> (u64, bool) {
+    (
+        OPENID_KEY_MIGRATION_REKEYED.with_borrow(|c| *c),
+        OPENID_KEY_MIGRATION_DONE.with_borrow(|d| *d),
+    )
+}
+
+/// Process one batch of the OpenID credential key migration. Bound to the
+/// interval timer set up in [`init_openid_key_migration_timer`]; clears the
+/// timer once the migration signals completion.
+fn run_openid_key_migration_batch() {
+    if OPENID_KEY_MIGRATION_DONE.with_borrow(|done| *done) {
+        return;
+    }
+
+    let cursor = OPENID_KEY_MIGRATION_CURSOR.with_borrow(|cursor| cursor.clone());
+    let outcome = state::storage_borrow_mut(|storage| {
+        storage.migrate_openid_credential_keys_batch(cursor, OPENID_KEY_MIGRATION_BATCH_SIZE)
+    });
+
+    OPENID_KEY_MIGRATION_REKEYED.with_borrow_mut(|count| {
+        *count = count.saturating_add(outcome.rekeyed);
+    });
+    if !outcome.errors.is_empty() {
+        OPENID_KEY_MIGRATION_ERRORS.with_borrow_mut(|errors| errors.extend(outcome.errors));
+    }
+    if let Some(next_cursor) = outcome.next_cursor {
+        OPENID_KEY_MIGRATION_CURSOR.replace(Some(next_cursor));
+    }
+
+    if outcome.is_done {
+        OPENID_KEY_MIGRATION_DONE.replace(true);
+        OPENID_KEY_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+            if let Some(timer_id) = id_slot.take() {
+                ic_cdk_timers::clear_timer(timer_id);
+            }
+        });
+        let rekeyed = OPENID_KEY_MIGRATION_REKEYED.with_borrow(|c| *c);
+        ic_cdk::println!("OpenID credential key migration COMPLETED ({rekeyed} entries re-keyed).");
+    }
+}
+
+/// Start the interval timer driving [`run_openid_key_migration_batch`]. Safe to
+/// call from both `init` (the first batch will immediately see an empty index
+/// and mark the migration done) and `post_upgrade`.
+fn init_openid_key_migration_timer() {
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        OPENID_KEY_MIGRATION_BATCH_BACKOFF_SECONDS,
+        run_openid_key_migration_batch,
+    );
+    OPENID_KEY_MIGRATION_TIMER_ID.with_borrow_mut(|id_slot| {
+        if let Some(old_id) = id_slot.replace(timer_id) {
+            ic_cdk_timers::clear_timer(old_id);
+        }
+    });
+}
+
 #[update]
 async fn init_salt() {
     state::init_salt().await;
@@ -904,6 +1000,13 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // signals done (immediately, when no `sso_credential_migration` arg was
     // supplied).
     init_sso_credential_migration_timer();
+
+    // Kick off the OpenID credential key batch migration that folds
+    // `sso_domain` into the index key. Examines at most
+    // `OPENID_KEY_MIGRATION_BATCH_SIZE` index keys per tick so each batch fits
+    // in one ingress message; timer self-clears once the scan reaches the end
+    // of the index (immediately, on a fresh canister with no credentials).
+    init_openid_key_migration_timer();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -1578,7 +1681,7 @@ mod openid_api {
 
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
             let anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+                storage.lookup_anchor_with_openid_credential(&openid_credential.lookup_key())
             })
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
@@ -1596,7 +1699,7 @@ mod openid_api {
 
             // Checking again because the association could've changed during the .await
             let still_anchor_number = state::storage_borrow(|storage| {
-                storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+                storage.lookup_anchor_with_openid_credential(&openid_credential.lookup_key())
             })
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
@@ -1638,7 +1741,7 @@ mod openid_api {
         };
 
         let delegation = match state::storage_borrow(|storage| {
-            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+            storage.lookup_anchor_with_openid_credential(&openid_credential.lookup_key())
         }) {
             Some(anchor_number) => {
                 openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)

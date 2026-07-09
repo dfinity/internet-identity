@@ -276,7 +276,7 @@ fn validate_identity_data<M: Memory + Clone>(
                 )
             })?;
 
-            check_openid_credential_is_unique(storage, &credential.key())
+            check_openid_credential_is_unique(storage, &credential.lookup_key())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             let name = openid_registration_data.name.clone();

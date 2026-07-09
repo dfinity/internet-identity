@@ -1,5 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
-use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
+use crate::openid::{OpenIdCredential, OpenIdCredentialKey, OpenIdCredentialLookupKey};
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use crate::storage::Storage;
 use crate::{state, stats::activity_stats};
@@ -200,10 +200,10 @@ pub fn identity_properties_replace(
 
 pub fn check_openid_credential_is_unique<M: Memory + Clone>(
     storage: &Storage<M>,
-    openid_credential_key: &OpenIdCredentialKey,
+    openid_credential_lookup_key: &OpenIdCredentialLookupKey,
 ) -> Result<(), AnchorError> {
     if storage
-        .lookup_anchor_with_openid_credential(openid_credential_key)
+        .lookup_anchor_with_openid_credential(openid_credential_lookup_key)
         .is_some()
     {
         return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
@@ -239,7 +239,9 @@ pub fn add_openid_credential(
     openid_credential: OpenIdCredential,
     now_ns: u64,
 ) -> Result<Operation, AnchorError> {
-    storage_borrow(|storage| check_openid_credential_is_unique(storage, &openid_credential.key()))?;
+    storage_borrow(|storage| {
+        check_openid_credential_is_unique(storage, &openid_credential.lookup_key())
+    })?;
 
     add_openid_credential_skip_checks(anchor, openid_credential, now_ns)
 }

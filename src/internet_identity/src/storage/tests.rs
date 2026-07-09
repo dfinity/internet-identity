@@ -186,13 +186,13 @@ fn should_write_and_update_openid_credential_lookup() {
     assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_0.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_0.lookup_key())
             .unwrap(),
         anchor.anchor_number()
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_1.lookup_key())
             .unwrap(),
         anchor.anchor_number()
     );
@@ -203,12 +203,12 @@ fn should_write_and_update_openid_credential_lookup() {
         .unwrap();
     storage.write(anchor.clone()).unwrap();
     assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
+        storage.lookup_anchor_with_openid_credential(&openid_credential_0.lookup_key()),
         None
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_1.lookup_key())
             .unwrap(),
         anchor.anchor_number()
     );
@@ -219,18 +219,18 @@ fn should_write_and_update_openid_credential_lookup() {
         .unwrap();
     storage.write(anchor.clone()).unwrap();
     assert_eq!(
-        storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
+        storage.lookup_anchor_with_openid_credential(&openid_credential_0.lookup_key()),
         None
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_1.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_1.lookup_key())
             .unwrap(),
         anchor.anchor_number()
     );
     assert_eq!(
         storage
-            .lookup_anchor_with_openid_credential(&openid_credential_2.key())
+            .lookup_anchor_with_openid_credential(&openid_credential_2.lookup_key())
             .unwrap(),
         anchor.anchor_number()
     );
@@ -2277,6 +2277,7 @@ mod migrate_sso_credentials_batch_tests {
             iss: SSO_ISS.to_string(),
             sub: "sub-x".to_string(),
             aud: SSO_AUD.to_string(),
+            sso_domain: None,
         };
         storage.lookup_anchor_with_openid_credential_memory.insert(
             key,
@@ -2305,6 +2306,298 @@ mod migrate_sso_credentials_batch_tests {
         let (stamped_again, errors, _) =
             run_to_completion(&mut storage, &[migration_entry()], 2_000);
         assert_eq!(stamped_again, 0);
+        assert!(errors.is_empty());
+    }
+}
+
+mod migrate_openid_credential_keys_batch_tests {
+    use super::*;
+    use crate::openid::OpenIdCredentialLookupKey;
+    use crate::storage::storable::anchor_number_list::StorableAnchorNumberList;
+    use crate::storage::storable::openid_credential_key::StorableOpenIdCredentialKey;
+    use internet_identity_interface::internet_identity::types::AnchorNumber;
+    use pretty_assertions::assert_eq;
+
+    const SSO_ISS: &str = "https://auth.acme.com";
+    const SSO_AUD: &str = "acme-client-id";
+    const SSO_DOMAIN: &str = "acme.com";
+
+    const GOOGLE_ISS: &str = "https://accounts.google.com";
+    const GOOGLE_AUD: &str = "google-client-id";
+
+    /// Seed an anchor holding one OpenID credential whose stored `sso_domain`
+    /// is `sso_domain`, while leaving its index entry in the legacy (no
+    /// `sso_domain`) shape — the exact pre-migration state after the #4013
+    /// backfill stamped the credential but before the key migration ran.
+    fn seed_legacy_indexed_credential<M: Memory + Clone>(
+        storage: &mut Storage<M>,
+        iss: &str,
+        sub: &str,
+        aud: &str,
+        sso_domain: Option<String>,
+    ) -> u64 {
+        // Write with `sso_domain = None` so the index key is the legacy shape.
+        let mut anchor = storage.allocate_anchor(0).unwrap();
+        anchor
+            .add_openid_credential(OpenIdCredential {
+                iss: iss.to_string(),
+                sub: sub.to_string(),
+                aud: aud.to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::new(),
+                sso_domain: None,
+                sso_name: None,
+            })
+            .unwrap();
+        let anchor_number = anchor.anchor_number();
+        storage.write(anchor).unwrap();
+
+        // Stamp the stored credential directly, bypassing `write` so the index
+        // key stays legacy — this is what #4013 left behind.
+        if sso_domain.is_some() {
+            let mut storable_anchor = storage.stable_anchor_memory.get(&anchor_number).unwrap();
+            storable_anchor.openid_credentials[0].sso_domain = sso_domain;
+            storage
+                .stable_anchor_memory
+                .insert(anchor_number, storable_anchor);
+        }
+        anchor_number
+    }
+
+    fn index_anchor<M: Memory + Clone>(
+        storage: &Storage<M>,
+        iss: &str,
+        sub: &str,
+        aud: &str,
+        sso_domain: Option<String>,
+    ) -> Option<AnchorNumber> {
+        let key = StorableOpenIdCredentialKey {
+            iss: iss.to_string(),
+            sub: sub.to_string(),
+            aud: aud.to_string(),
+            sso_domain,
+        };
+        let anchors: Option<Vec<AnchorNumber>> = storage
+            .lookup_anchor_with_openid_credential_memory
+            .get(&key)
+            .map(Into::into);
+        anchors.and_then(|a| a.first().copied())
+    }
+
+    /// Drive the migration to completion the way the timer in `main.rs` does:
+    /// thread `next_cursor` into the next batch until `is_done`.
+    fn run_to_completion<M: Memory + Clone>(
+        storage: &mut Storage<M>,
+        batch_size: u64,
+    ) -> (u64, Vec<String>, u64) {
+        let mut rekeyed = 0;
+        let mut errors = vec![];
+        let mut batches = 0;
+        let mut cursor = None;
+        loop {
+            let outcome = storage.migrate_openid_credential_keys_batch(cursor, batch_size);
+            rekeyed += outcome.rekeyed;
+            errors.extend(outcome.errors);
+            batches += 1;
+            if outcome.is_done {
+                return (rekeyed, errors, batches);
+            }
+            cursor = outcome.next_cursor;
+        }
+    }
+
+    #[test]
+    fn should_complete_on_empty_index() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let outcome = storage.migrate_openid_credential_keys_batch(None, 2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.rekeyed, 0);
+        assert!(outcome.errors.is_empty());
+        assert!(outcome.next_cursor.is_none());
+    }
+
+    #[test]
+    fn should_rekey_sso_credential_and_complete() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor_number = seed_legacy_indexed_credential(
+            &mut storage,
+            SSO_ISS,
+            "sub-1",
+            SSO_AUD,
+            Some(SSO_DOMAIN.to_string()),
+        );
+
+        // Precondition: entry is under the legacy key, not the new key.
+        assert_eq!(
+            index_anchor(&storage, SSO_ISS, "sub-1", SSO_AUD, None),
+            Some(anchor_number)
+        );
+        assert_eq!(
+            index_anchor(
+                &storage,
+                SSO_ISS,
+                "sub-1",
+                SSO_AUD,
+                Some(SSO_DOMAIN.to_string())
+            ),
+            None
+        );
+
+        let outcome = storage.migrate_openid_credential_keys_batch(None, 2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.rekeyed, 1);
+        assert!(outcome.errors.is_empty());
+
+        // Postcondition: entry moved to the new key; legacy key gone.
+        assert_eq!(
+            index_anchor(
+                &storage,
+                SSO_ISS,
+                "sub-1",
+                SSO_AUD,
+                Some(SSO_DOMAIN.to_string())
+            ),
+            Some(anchor_number)
+        );
+        assert_eq!(
+            index_anchor(&storage, SSO_ISS, "sub-1", SSO_AUD, None),
+            None
+        );
+    }
+
+    #[test]
+    fn should_leave_direct_provider_entries_untouched() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor_number =
+            seed_legacy_indexed_credential(&mut storage, GOOGLE_ISS, "sub-1", GOOGLE_AUD, None);
+
+        let outcome = storage.migrate_openid_credential_keys_batch(None, 2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.rekeyed, 0);
+        assert!(outcome.errors.is_empty());
+
+        // The direct-provider entry keeps its legacy (== canonical) key.
+        assert_eq!(
+            index_anchor(&storage, GOOGLE_ISS, "sub-1", GOOGLE_AUD, None),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
+    fn should_split_work_across_batches_with_cursor_resume() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor_numbers: Vec<u64> = (0..5)
+            .map(|i| {
+                seed_legacy_indexed_credential(
+                    &mut storage,
+                    SSO_ISS,
+                    &format!("sub-{i}"),
+                    SSO_AUD,
+                    Some(SSO_DOMAIN.to_string()),
+                )
+            })
+            .collect();
+
+        // Batch size 2 over 5 legacy keys. Re-keyed entries sort after their
+        // legacy key, so they may be re-examined and skipped — more than the
+        // minimal 3 batches, but the migration still terminates and re-keys
+        // every entry exactly once.
+        let (rekeyed, errors, batches) = run_to_completion(&mut storage, 2);
+        assert_eq!(rekeyed, 5);
+        assert!(errors.is_empty());
+        assert!(batches >= 3);
+
+        for (i, anchor_number) in anchor_numbers.iter().enumerate() {
+            assert_eq!(
+                index_anchor(
+                    &storage,
+                    SSO_ISS,
+                    &format!("sub-{i}"),
+                    SSO_AUD,
+                    Some(SSO_DOMAIN.to_string())
+                ),
+                Some(*anchor_number)
+            );
+            assert_eq!(
+                index_anchor(&storage, SSO_ISS, &format!("sub-{i}"), SSO_AUD, None),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn dual_lookup_resolves_legacy_sso_entry_before_and_after_migration() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        let anchor_number = seed_legacy_indexed_credential(
+            &mut storage,
+            SSO_ISS,
+            "sub-1",
+            SSO_AUD,
+            Some(SSO_DOMAIN.to_string()),
+        );
+        let full_key: OpenIdCredentialLookupKey = (
+            SSO_ISS.to_string(),
+            "sub-1".to_string(),
+            SSO_AUD.to_string(),
+            Some(SSO_DOMAIN.to_string()),
+        );
+
+        // Before migration the entry is stored under the legacy (no
+        // `sso_domain`) key; the full-key lookup must fall back to it so logins
+        // keep working during the migration window.
+        assert_eq!(
+            storage.lookup_anchor_with_openid_credential(&full_key),
+            Some(anchor_number)
+        );
+
+        // After migration it resolves via the new key directly.
+        let _ = run_to_completion(&mut storage, 2_000);
+        assert_eq!(
+            storage.lookup_anchor_with_openid_credential(&full_key),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
+    fn should_report_orphan_index_entry() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+
+        // Legacy index entry whose backing anchor doesn't exist — orphan.
+        let key = StorableOpenIdCredentialKey {
+            iss: SSO_ISS.to_string(),
+            sub: "sub-x".to_string(),
+            aud: SSO_AUD.to_string(),
+            sso_domain: None,
+        };
+        storage
+            .lookup_anchor_with_openid_credential_memory
+            .insert(key, StorableAnchorNumberList::from(vec![999u64]));
+
+        let outcome = storage.migrate_openid_credential_keys_batch(None, 2_000);
+        assert!(outcome.is_done);
+        assert_eq!(outcome.rekeyed, 0);
+        assert_eq!(outcome.errors.len(), 1);
+        assert!(outcome.errors[0].contains("anchor 999 not found"));
+    }
+
+    #[test]
+    fn should_be_idempotent_when_rerun_from_scratch() {
+        let mut storage = Storage::new((0, 100), VectorMemory::default());
+        seed_legacy_indexed_credential(
+            &mut storage,
+            SSO_ISS,
+            "sub-1",
+            SSO_AUD,
+            Some(SSO_DOMAIN.to_string()),
+        );
+
+        let (rekeyed, _, _) = run_to_completion(&mut storage, 2_000);
+        assert_eq!(rekeyed, 1);
+
+        // A second full scan finds only already-migrated (new-key) entries and
+        // re-keys nothing further.
+        let (rekeyed_again, errors, _) = run_to_completion(&mut storage, 2_000);
+        assert_eq!(rekeyed_again, 0);
         assert!(errors.is_empty());
     }
 }

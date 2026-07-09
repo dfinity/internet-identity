@@ -44,6 +44,7 @@ impl StorableOpenIdCredential {
             iss: self.iss.clone(),
             sub: self.sub.clone(),
             aud: self.aud.clone(),
+            sso_domain: self.sso_domain.clone(),
         }
     }
 }
