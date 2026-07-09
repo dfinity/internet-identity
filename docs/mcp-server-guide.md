@@ -1,11 +1,22 @@
 # MCP server guide: connecting to Internet Identity
 
 This documents the protocol an MCP server implements to act on an Internet
-Identity user's behalf. The user registers the server's **session key** with
-the II canister (a _grant_, up to 30 days, revocable in II Settings at any
-time); the server then signs `mcp_*` canister calls with that key — no
-delegation chains are delivered or handled. Per-app delegations (up to 1 hour)
-are minted on demand through `mcp_prepare_delegation` / `mcp_get_delegation`.
+Identity user's behalf. At connect, II mints a **single-use registration
+delegation** that your server redeems to bind its **session key** to the
+user's identity (a _grant_, up to 30 days, revocable in II Settings at any
+time); the server then signs `mcp_*` canister calls with that key. The
+registration delegation is the only delegation chain your server ever
+handles, and it is redeemed exactly once, at connect. Per-app delegations
+(up to 1 hour) are minted on demand through `mcp_prepare_delegation` /
+`mcp_get_delegation`.
+
+Your server generates **two keypairs per connection**:
+
+- the **registration key `X`** — per connect attempt; its public key rides
+  the connect link, and II mints the registration delegation for it. Its
+  private key is what makes the delegation redeemable by you alone.
+- the **session key `S`** — the long-lived key the grant is bound to; you
+  sign all subsequent `mcp_*` calls with it.
 
 ## Lifecycle at a glance
 
@@ -20,20 +31,21 @@ sequenceDiagram
 
     rect rgb(244, 244, 250)
     note over U,C: Phase 1 — connect handshake (once per session)
-    M->>U: redirect to /mcp#callback, state, ttl
+    M->>U: redirect to /mcp#registration_key, callback, state, ttl
     U->>F: open /mcp, authenticate and consent (pick TTL)
     F->>C: mcp_get_config(anchor)
     C-->>F: enabled + trusted URL (verify callback origin)
-    F->>M: POST callback {state}
-    M-->>F: 200 {public_key} — fresh keypair for this connection
-    F->>C: mcp_register(anchor, session_key, ttl) [user-authenticated]
-    C-->>F: {expiration} — grant bound: principal to anchor
-    F-)M: POST callback {state, expiration} (best effort)
-    alt key response carried finish_url
-        F->>M: browser navigates to finish_url — finish your flow (e.g. OAuth code redirect)
-    else
-        F-->>U: "You're signed in"
-    end
+    F->>M: GET /.well-known/ii-auth-callbacks
+    M-->>F: {"callbacks": [...]} — link's callback must exact-match
+    F->>C: prepare_mcp_registration_delegation(anchor, X, permissions, ttl)
+    C-->>F: {user_key, expiration} — consent recorded under P_reg
+    F->>C: get_mcp_registration_delegation(anchor, X, expiration)
+    C-->>F: SignedDelegation — the P_reg to X chain
+    F->>U: navigate tab to callback#delegation, state
+    U->>M: your connect page reads the fragment, ships it to your backend
+    M->>C: mcp_register_v2(session key S) — signed via the P_reg to X chain
+    C-->>M: {expiration, permissions} — grant bound: S's principal to anchor
+    note over U,M: your page owns the tab now — finish your flow (e.g. OAuth code redirect)
     end
 
     rect rgb(240, 248, 244)
@@ -55,98 +67,156 @@ sequenceDiagram
     end
     M->>C: mcp_* (signed by session key)
     C-->>M: Err Unauthorized(principal)
-    note over M: session over → prompt a fresh connect with a new key
+    note over M: session over → prompt a fresh connect with new keys
     end
 ```
 
-## 1. Connect link
+## 1. Declare your callbacks
+
+II delivers the registration delegation only to a callback **you declare**.
+Host an allow-list at a fixed well-known path on your origin:
+
+```
+GET https://<your-origin>/.well-known/ii-auth-callbacks
+
+200 Content-Type: application/json
+{"callbacks": ["https://<your-origin>/mcp/connect"]}
+```
+
+Requirements — II's fetch is strict and fails the connect (closed) on any
+violation:
+
+- **Same origin only.** Every entry must be an absolute URL on this origin
+  (a declared cross-origin entry is rejected, never honoured). Different
+  origins are separate trusted-server entries, each with its own file.
+- **Exact match, no normalization.** The connect link's `callback` must equal
+  a declared entry byte-for-byte — declare the exact string you put in links
+  (no trailing-slash or case slack, query strings allowed but must match).
+- **No fragments** in entries (II appends its own).
+- Served as `application/json`, at most 8 KiB, **without redirects** (II
+  refuses to follow any — an open redirect at this path must not let a third
+  party serve your list), and with **CORS** headers that let II read it
+  (`Access-Control-Allow-Origin: <II origin>` or `*`; the fetch carries no
+  credentials). It is fetched with `cache: no-store` at every connect, so
+  changes take effect immediately.
+- **List only clean endpoints** you fully control — no reflecting routes, no
+  user-content paths, nothing that redirects. The list is a security
+  boundary: anything on it can receive registration delegations.
+
+The name is deliberately not MCP-specific: it is a general auth-callback
+allow-list that other II flows can reuse.
+
+## 2. Connect link
 
 Send the user's browser to:
 
 ```
-https://<II_ORIGIN>/mcp#callback=<https URL on your origin>&state=<opaque>&ttl=<seconds>
+https://<II_ORIGIN>/mcp#registration_key=<base64url DER public key>&callback=<declared URL>&state=<opaque>&ttl=<seconds>
 ```
 
-- `callback` — an https URL on your origin. The user must have set your origin
-  as their trusted MCP server in II Settings (matching is by **origin**).
+- `registration_key` — the public key of a **fresh registration keypair `X`,
+  minted per connect attempt** (Ed25519 recommended, e.g. agent-js
+  `Ed25519KeyIdentity`), DER-encoded, base64url without padding. Only public
+  key material travels in the link; the corresponding private key stays on
+  your server and is what lets you — and only you — redeem the delegation.
+  Never reuse an `X` across connect attempts: II rejects a second
+  registration for a key whose previous one is still live, and the
+  delegation for it is single-use.
+- `callback` — one of the URLs you declared in §1, verbatim. The user must
+  have set your origin as their trusted MCP server in II Settings (matching
+  is by **origin**; the callback is then matched against your declared list).
 - `state` — unguessable, single-use, bound server-side to this pending
-  connection. Treat a mismatch as a hard reject.
+  connection. It comes back alongside the delegation; treat a mismatch as a
+  hard reject.
 - `ttl` — optional requested grant lifetime in seconds. Default 3600, clamped
   to [600, 2 592 000] (10 min – 30 days). The user can override it in the
-  consent UI, so treat it as a suggestion; the authoritative value arrives in
-  the completion notification.
+  consent UI, so treat it as a suggestion; the authoritative value is the
+  `expiration` returned by `mcp_register_v2`.
 
-No key material travels in the link: II never registers anything taken from
-the (attacker-craftable) fragment.
+## 3. Receive and redeem the registration delegation
 
-## 2. Callback endpoint
-
-Your callback answers JSON POSTs from the II frontend. Enable CORS: answer
-`OPTIONS` preflights and set `Access-Control-Allow-Origin: <II origin>` (or
-`*`; no credentials are used), `Access-Control-Allow-Headers: content-type`,
-`Access-Control-Allow-Methods: POST`.
-
-**a) Key request** — after user consent, II's frontend asks for your session
-public key:
+**a) Delivery.** After the user consents, II mints a canister-signed
+delegation `P_reg -> X` (where `P_reg` is a registration principal derived
+from the user's consent — you never construct it) and navigates the
+connecting tab to your declared callback with the chain in the **URL
+fragment**:
 
 ```
-POST <callback>            Content-Type: application/json
-{"state": "<state>"}
+https://<your-origin>/mcp/connect#delegation=<URL-encoded chain JSON>&state=<state>
 ```
 
-Respond:
+The fragment is never sent in the HTTP request, so the chain stays out of
+your access logs and any intermediary's. Your callback page reads it
+client-side and ships it to your backend over a same-origin request:
 
-```
-200 {"public_key": "<base64url, unpadded, DER-encoded public key>",
-     "finish_url": "<optional: absolute https URL on your origin>"}
-```
-
-Generate a **fresh keypair per user-connection** — Ed25519 recommended (e.g.
-agent-js `Ed25519KeyIdentity`). The registered principal is
-`self_authenticating(DER)`; one principal serves at most one identity, so a
-key reused across users makes the second registration fail. An unknown,
-already-used, or expired `state` must get a non-2xx response — the connect
-flow then errors out and **nothing is registered**.
-
-`finish_url` asks II to hand the connecting tab back to you once the session
-is registered (see (c) below). It must be an **absolute https URL on the same
-origin as the callback** — anything else fails the connect before anything is
-registered. Omit it (`null` and `""` also count as omitted) and the II tab
-simply shows its own success screen.
-
-**b) Completion notification** — best effort, after II registers the key
-(distinguish from (a) by the `expiration` field):
-
-```
-POST <callback>
-{"state": "<state>",
- "expiration": "<grant expiry, ns since epoch, decimal string>",
- "permissions": "queries" | "all"}
+```js
+const params = new URLSearchParams(location.hash.slice(1));
+const delegation = params.get("delegation"); // chain JSON
+const state = params.get("state");
+history.replaceState(null, "", location.pathname); // clear the fragment
+// POST { delegation, state } to your backend, same-origin
 ```
 
-Respond with any 2xx; mark the connection live and store `expiration` (a
-string because u64 nanoseconds overflow JSON numbers) and `permissions` (the
-session's access level — `"queries"` = read-only, `"all"` = full; see
-[Read-only sessions](#read-only-sessions)). You must tolerate never receiving
-this call (e.g. network failure after registration succeeded): fall back to
-attempting a signed call — success means you are registered — and to reading
-the access level off any minted delegation's `permissions` field.
+**b) The chain format** is agent-js `DelegationChain.toJSON()`: an object
+`{"delegations": [{"delegation": {"pubkey": "<hex>", "expiration": "<hex ns>"},
+"signature": "<hex>"}], "publicKey": "<hex>"}` with hex-encoded fields, where
+`publicKey` is `P_reg`'s DER key and the single delegation is to your `X`.
+With agent-js, reconstruction is two calls:
 
-**c) Finish redirect** — only if your key response carried `finish_url`:
-after registering the session and sending (b), II navigates the connecting
-tab to your `finish_url`. Use it to complete a flow of your own around the
-connect; without it the II tab finishes on its own and never redirects.
+```js
+import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 
-- **Ordering:** II awaits (b) before navigating, so you normally hear about
-  the registration first — but (b) is best effort, so the browser can arrive
-  without it. Treat arrival at `finish_url` as a UX signal, not as proof of
-  registration: verify via (b), or by making a signed `mcp_get_accounts` call
-  and checking for the `Ok` variant. (Check the candid result, not the
-  transport status: an unregistered key gets `Err Unauthorized(principal)`
-  delivered inside a _successful_ query response.)
-- Tie the request to the pending connection via the `finish_url` query — II
-  passes the URL through untouched, which is exactly how the one-time
-  `finish_secret` reaches `/oauth/finish` (see "Consent-Bound Completion").
+const chain = DelegationChain.fromJSON(JSON.parse(delegation));
+const identity = DelegationIdentity.fromDelegation(registrationKeyX, chain);
+```
+
+**c) Redemption.** Using that identity (so the canister sees `caller() ==
+P_reg`), call:
+
+```candid
+mcp_register_v2 : (session_key : blob)
+  -> (variant { Ok : McpRegistrationV2; Err : text });
+
+type McpRegistrationV2 = record {
+    expiration : nat64;        // grant expiry, ns since epoch
+    permissions : Permissions; // queries = read-only, all = full
+};
+```
+
+with the DER public key of your **session key `S`**. On `Ok`, the grant is
+live: `S`'s self-authenticating principal is bound to the consenting user's
+identity until `expiration`, with the access level the user chose (see
+[Read-only sessions](#read-only-sessions)). This response is synchronous and
+authoritative — there is no separate completion notification to wait for or
+tolerate missing.
+
+Semantics to build against:
+
+- **Redeem immediately.** The registration delegation lives ~90 seconds —
+  enough for the browser hops, not for a queue. Expired delegations get a
+  clean `Err`.
+- **Single-use, retry-safe.** The delegation binds one `S`. A retry of the
+  same call (same chain, same `S` — e.g. after a network timeout) is served
+  idempotently with the current grant; presenting a used delegation with a
+  *different* `S` is rejected. A failed connect is restarted with a fresh
+  `X`, fresh `state`, and a new link — never by re-driving the old one.
+- **Consent is fixed at consent time.** The anchor, the read-only choice, and
+  the grant TTL were recorded when the user consented; `mcp_register_v2`
+  takes none of them as arguments, so you cannot alter them — you only
+  supply the key to bind.
+- **Check `state` before redeeming.** Only redeem a delegation delivered
+  with a `state` you issued and haven't consumed; consume it atomically on
+  first use.
+- The chain is **inert to anyone without `X`'s private key**, authenticates
+  nothing but this one `mcp_register_v2` call, and grants no access by
+  itself. Discard it after redemption.
+
+**d) Finish on your own page.** After delivery, the tab is on *your* origin,
+on a page you serve — there is no redirect-back channel to ask II for.
+Verify the redemption result and continue your flow from there (show a
+"connected" state, or redirect onward — e.g. hand an OAuth code back to an
+MCP client). A 2xx from your own endpoint is not proof of registration; the
+canister's `Ok` is.
 
 ### Serving MCP clients over OAuth
 
@@ -157,70 +227,52 @@ metadata and RFC 8414 AS metadata, with RFC 7591 dynamic client registration.
 The RFC 8628 device grant is **not** part of that profile — no current client
 uses it, and it adds a device-code phishing surface with none of the PKCE
 binding the rest of the flow relies on, so prefer to omit it. The II connect
-slots into the code flow as your "identity provider" leg, with `finish_url`
-closing the loop:
+slots into the code flow as your "identity provider" leg, with your connect
+page closing the loop:
 
 1. `GET /oauth/authorize` — validate `client_id` + exact `redirect_uri` +
-   PKCE, create a pending auth `{code_challenge, oauth_state, resource}`, set
-   an initiator cookie (`sid`, `HttpOnly; Secure; SameSite=Lax`) referencing
-   it, and 302 the browser to the II connect link (§1) with a fresh,
-   single-use `connect_state` as the link's `state`.
-2. Your callback (§2a) answers the key request with a fresh keypair **and a
-   `finish_url` carrying a one-time `finish_secret` in its query** (see
-   "Consent-Bound Completion" below). Mint the keypair and `finish_secret`
-   and mark `connect_state` consumed in one atomic step, on the _first_ POST
-   for that `connect_state`; reject any later POST for it.
-3. `GET <finish_url>` — mint the authorization code only once the browser
-   proves it is both the initiator (the `sid` cookie) and the consenter (the
-   matching `finish_secret`), and the session is provably registered (see
-   (c)); then 302 to the client's `redirect_uri` with `code` + the client's
-   original `state`.
+   PKCE, create a pending auth `{code_challenge, oauth_state, resource}`,
+   mint a **fresh registration keypair `X`** and a fresh, single-use
+   `connect_state` for it, set an initiator cookie (`sid`, `HttpOnly;
+   Secure; SameSite=Lax`) referencing the pending auth, and 302 the browser
+   to the II connect link (§2).
+2. The consenting browser arrives at your declared callback (§3a) carrying
+   the delegation and `connect_state`; the page ships both to your backend
+   (the same-origin request carries the `sid` cookie).
+3. Bind before you redeem: accept the delivery only if the request carries
+   the `sid` cookie of the pending auth **and** the matching, unconsumed
+   `connect_state`. Then redeem (§3c) and, on `Ok`, mint the authorization
+   code and 302 to the client's `redirect_uri` with `code` + the client's
+   original `state`. If the initiator binding is missing, refuse and redeem
+   nothing.
 4. `POST /oauth/token` — exchange code + PKCE verifier for a bearer token.
    Bound its lifetime by the grant — never issue a token that outlives the
    grant. Refresh tokens are **optional**: they enable silent renewal but only
    pay off alongside server-side persistence (a restart wipes them too) and add
    no security over the grant, which is the hard, user-revocable ceiling either
    way. Without them the client re-runs the browser flow when the token
-   expires; the `error="invalid_token"` challenge (below) lets it prompt inline.
+   expires; the `error="invalid_token"` challenge lets it prompt inline.
 
-**Consent-Bound Completion: bind the code to whoever actually consented.** The
-`connect_state` in the II link travels back to the client in the redirect, and
-a cookie alone binds only `authorize`↔`finish` to one browser — neither binds
-the code to the browser that performed the II consent. Without that binding a
-split-browser takeover remains: an attacker registers a client (open DCR) with
-their own `redirect_uri` + PKCE, starts `/oauth/authorize`, lifts the resulting
-II connect link, and phishes it to a victim who already trusts your origin —
-II's consent screen names only **your server's origin**, never the OAuth
-client, so nothing warns the victim. The victim consents (registering _their_
-session under the attacker's pending auth); the attacker, still holding the
-`sid` cookie, completes `/oauth/finish` and redeems a token for the victim's
-identity.
+**Consent-Bound Completion is structural in this flow.** The classic
+split-browser takeover — an attacker registers a client (open DCR), starts
+`/oauth/authorize`, lifts the II connect link, and phishes it to a victim who
+already trusts your origin (II's consent screen names only **your server's
+origin**, never the OAuth client) — is broken at step 3: the delegation is
+delivered only to the consenting browser (the victim's), and that browser
+does not hold the attacker's `sid` cookie, so the delivery is refused,
+nothing is redeemed, and no code is minted. Conversely the attacker's
+browser holds `sid` but never receives the delegation. Only the legitimate
+same-browser flow holds both proofs — *initiator* (`sid`) and *consenter*
+(the delegation, single-use and redeemable only with your `X`) — so a code
+can never be minted for an identity other than the one operating the
+initiating client. No side-channel secret or "exactly one request, never
+retried" discipline is needed; the delegation itself is the consent-bound
+credential.
 
-Close it by requiring **two independent proofs** at `/oauth/finish` before
-minting a code: the `sid` cookie (proves _initiator_) **and** the
-`finish_secret` (proves _consenter_ — it is disclosed only in the key-request
-response, which runs in the consenting browser, and rides through to
-`/oauth/finish` inside `finish_url`). Because `connect_state` is single-use, the
-key request — and thus the `finish_secret` — reaches exactly one browser; only
-in the legitimate same-browser flow can one user-agent hold both proofs, so a
-code can never be minted for an identity other than the one operating the
-initiating client. This rests on II issuing **exactly one key request per
-connect and never auto-retrying it**: II drops the link's `state` after parsing
-and issues a single, non-retried `fetch`, so a failed connect must restart at
-`/oauth/authorize` with a new `connect_state` — never re-drive the same one. Do
-not add a client- or server-side retry of the key request.
-
-Two supporting requirements keep the proof intact. Treat the session as
-**registered only on proof of an on-chain grant** — a signed `mcp_get_accounts`
-returning `Ok` (see (c)), never a bare completion POST, which any
-`connect_state`-knower can forge. And keep `finish_secret` **leak-free**: carry
-it in the query string (not a path segment), set `Referrer-Policy: no-referrer`
-on `/oauth/finish`, and keep it out of logs, metrics, and error bodies.
-
-Consent-Bound Completion closes this for every client transport, including
-loopback. It does **not** by itself close the _same-browser_ variant (the
-attacker induces the victim's own browser to both initiate and consent) toward
-a **hosted** `redirect_uri`; that residual needs hosted-redirect allow-listing.
+This closes the takeover for every client transport, including loopback. It
+does **not** by itself close the _same-browser_ variant (the attacker induces
+the victim's own browser to both initiate and consent) toward a **hosted**
+`redirect_uri`; that residual needs hosted-redirect allow-listing.
 Loopback/native clients — whose redirect resolves on the consenter's own
 machine — are safe either way. (II cannot help with any of this: its trust
 model only ever identifies your origin, not the OAuth client.)
@@ -238,7 +290,7 @@ endpoint.
 
 At consent the user picks an access level, and **the connect screen defaults to
 read-only** — so unless the user deliberately opts out, you get a read-only
-session. II records the level on the grant and applies it to _every_ per-app
+session. II records the level at consent time and applies it to _every_ per-app
 delegation your session mints: a read-only session's delegations carry
 `permissions = "queries"`, so the IC rejects update calls made through them at
 ingress — enforcement is protocol-level, not up to the target app. This
@@ -247,17 +299,15 @@ uninstall/delete, and even `canister_status` and cycles reads are update
 calls), so that entire class of tools is inert under the default session. You
 don't choose this per call and can't widen it; it's fixed for the session.
 
-To know the level up front — rather than discovering it through an opaque
-ingress rejection — read the `permissions` field of the completion notification
-(§2b): `"queries"` = read-only, `"all"` = full. That POST is best-effort, so if
-it never arrives, fall back to inspecting the `permissions` field on the first
-`SignedDelegation` you mint (`queries` = read-only, absent = full). Either way,
-if your server needs update access and the session is read-only, tell the user
-to reconnect with read-only off instead of surfacing raw IC rejections. (You
-never pass the level yourself — `mcp_register` takes it as an `opt permissions`
-argument the II frontend fills from the consent screen.)
+You learn the level synchronously: it is the `permissions` field of
+`mcp_register_v2`'s `Ok` response (`queries` = read-only, `all` = full). The
+`permissions` field on any `SignedDelegation` you later mint carries the same
+value, as a cross-check. If your server needs update access and the session is
+read-only, tell the user to reconnect with read-only off instead of surfacing
+raw IC rejections. (You never pass the level yourself — it is recorded from
+the consent screen when the delegation is prepared, before you are involved.)
 
-## 3. Calling Internet Identity
+## 4. Calling Internet Identity
 
 Sign directly with the session key (a plain identity, no `DelegationChain`):
 
@@ -315,14 +365,14 @@ app's `ii-alternative-origins` (a web search or a direct fetch) and retry with
 the declared derivation origin as `target_origin`. Resolving it automatically is
 a planned enhancement, not current behavior.
 
-## 4. Session lifecycle
+## 5. Session lifecycle
 
 - **One active session per user identity.** A new connect (any agent, any
   device) replaces the previous grant immediately; the old key starts getting
   `Unauthorized`.
 - **Expiry:** at the grant's `expiration` every call returns
-  `Unauthorized(<your principal>)`. Reconnect via a fresh connect link with a
-  fresh keypair.
+  `Unauthorized(<your principal>)`. Reconnect via a fresh connect link — with
+  a fresh registration keypair `X` and a fresh session keypair `S`.
 - **Revocation:** the user can revoke at any time in II Settings (toggling MCP
   off or changing the trusted URL). Indistinguishable from expiry on your
   side. Treat any `Unauthorized` as "session over → offer reconnect"; do not
