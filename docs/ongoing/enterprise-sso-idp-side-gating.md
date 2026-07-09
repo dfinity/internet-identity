@@ -429,23 +429,40 @@ resolution in II core (§6).
 
 ---
 
-## 10. Build order
+## 10. Build order (stacked PRs)
 
-1. **Well-known + routing.** II core parses `app_clients` from the well-known it already
-   fetches and caches (`discover_sso`); `get_sso_discovery` resolves the client_id for the
-   target origin; the frontend runs the ceremony against it.
-2. **Gate + identity in II core.** The `aud == declared-client-for-origin` check and anchor
-   resolution keyed on `(iss, stable_id, primary_client, sso_domain)` (§6), including the
-   one-shot index migration that adds `sso_domain` to the key (§6.1). Validate: an assigned
-   user reaches the gated dapp with the same identity (and single access method) as their
-   default SSO; an unassigned user is denied at the IdP; a token for one gated app cannot open
-   another; **a login via a rogue discovery domain resolves to a different anchor** (the §3
-   bypass is closed).
-3. **Onboarding guide + Entra migration.** Per-IdP client setup, with the Entra
-   assignment-required, Okta 400-denial, and Entra `stable_identifier_claim: "oid"` requirements
-   called out (§8). Note: `oid` is not stored today, so Entra uses an auxiliary
-   `(iss, oid, sso_domain)` index populated lazily at primary login — no credential re-key
-   (§6.1).
+Each PR stacks on the previous. **Migrations land before enforcement.**
+
+> **Security invariant:** the gate (PR 3) must not ship before the key migration (PR 1).
+> Enabling enforcement while the key is still `(iss, sub, aud)` runs the gate without domain
+> isolation — the §3 rogue-domain bypass would be open.
+
+**PR 1 — `sso_domain` into the credential key (migration 1).** BE only; no user-visible change.
+- Extend `StorableOpenIdCredentialKey` to `(iss, sub, aud, Option<sso_domain>)`, update all
+  call sites, rebuild the lookup index from stored data (§6.1).
+- Behavior-preserving: same-domain logins resolve identically; only cross-domain collisions
+  separate. Isolating this delicate stable-structure migration lets it bake before it is
+  load-bearing.
+
+**PR 2 — BE plumbing: config parsing + `oid` capture + aux index (migration 2).** Still no
+enforcement; invisible.
+- Parse `app_clients` / `gate_all_apps` / `stable_identifier_claim` into the cached discovery
+  config (§5).
+- Decode `oid`; stand up the additive `(iss, oid, sso_domain)` aux index, populated at login
+  (§6.1). Shipping before the gate lets it pre-populate from normal Entra logins, so entries
+  exist by the time gating turns on.
+
+**PR 3 — Gate + routing (enforcement turns on).**
+- `get_sso_discovery` resolves the per-origin client; the frontend routes the ceremony to it.
+- BE gate: `aud == declared-client-for-origin`; anchor resolution on
+  `(iss, stable_id, primary_client, sso_domain)`; cold cache → `Pending` (§6).
+- Validate: an assigned user reaches the gated dapp with the same identity (and single access
+  method) as their default SSO; an unassigned user is denied at the IdP; a token for one gated
+  app cannot open another; **a login via a rogue discovery domain resolves to a different
+  anchor** (the §3 bypass is closed).
+
+**PR 4 — Onboarding.** Per-IdP client setup, with the Entra assignment-required, Okta
+400-denial, and Entra `stable_identifier_claim: "oid"` requirements called out (§8).
 
 No canister beyond II core, no proxy, no panel.
 
