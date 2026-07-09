@@ -267,10 +267,17 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
   (org authorization server), Google, and OneLogin; on **Entra `sub` is pairwise** (per
   client), so Entra orgs set `subject_claim: "oid"` (§5). Using raw `sub` on Entra would
   fragment the user — this is the one thing to get right per IdP.
-- **Migration.** For orgs whose stable subject equals `sub` (Okta/Google/OneLogin), existing
-  SSO credentials are already `(iss, sub, primary)` — no migration, seed formula unchanged.
-  An Entra org adopting per-app gating needs a one-shot re-key of its existing credentials
-  from `sub` to `oid` (a backfill like the existing `sso_credential_migration`).
+- **`oid` is not captured today (implementation note).** II currently decodes and stores only
+  `sub` (plus `tid`, folded into the issuer via the `{tid}` template and kept in metadata); it
+  never reads `oid`. Supporting `subject_claim: "oid"` therefore requires II to decode the
+  configured subject claim from the token and key the credential on it — a real code change,
+  not just config.
+- **Migration (Entra only).** Because `oid` was never stored, an Entra org's existing
+  `sub`-keyed credentials **cannot** be re-keyed by a pure canister-side backfill (the stored
+  data has no `oid` to key on). The re-key happens **lazily at the next login**: the fresh
+  token carries both `sub` and `oid`, so II matches the old `(iss, sub, aud)` credential and
+  upgrades it to the `oid`-keyed identity. Orgs whose stable subject is already `sub`
+  (Okta/Google/OneLogin) need no migration and the seed formula is unchanged.
 - **Per-app tokens are read-only for identity.** A per-app login gates and resolves the
   anchor but does **not** write profile metadata (email, name); that always comes from a
   primary-client login. The dapp-facing principal is `f(anchor, origin)` regardless
@@ -361,7 +368,8 @@ resolution in II core (§6).
    another.
 3. **Onboarding guide + Entra migration.** Per-IdP client setup, with the Entra
    assignment-required, Okta 400-denial, and Entra `subject_claim: "oid"` requirements called
-   out (§8), plus the one-shot `sub`->`oid` re-key for existing Entra credentials (§6).
+   out (§8). Note: `oid` is not stored today, so the `sub`->`oid` re-key for existing Entra
+   credentials is a lazy at-next-login upgrade, not a backfill (§6).
 
 No canister beyond II core, no proxy, no panel.
 
