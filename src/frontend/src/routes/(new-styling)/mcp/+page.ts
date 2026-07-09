@@ -20,13 +20,13 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
  * requests so the server can tie them to the connect it started, and the
  * requested session-grant TTL (`ttl`, in seconds). The MCP server the user
  * connects is identified by the callback's *origin* (each user trusts whichever
- * server they connect); only that origin is used from the callback — the connect
- * flow fetches the server's session key from a pinned endpoint derived from the
- * synced trusted-server config (origin + a fixed path, see `connectCallbackUrl`),
- * not from the callback's path, so a crafted link can't point II at an arbitrary
- * path on the trusted origin. No key material travels in the fragment, and no
- * account is chosen here (it's per-app, picked server-side at delegation time).
- * `invalid` means the fragment was missing or malformed.
+ * server they connect); the callback itself is only honoured after it
+ * exact-matches the allow-list the server declares at a fixed well-known path
+ * on that origin (see `matchDeclaredCallback`), so a crafted link can't point
+ * II at an arbitrary path on the trusted origin — the link only selects among
+ * the server-declared callbacks. No key material travels in the fragment, and
+ * no account is chosen here (it's per-app, picked server-side at delegation
+ * time). `invalid` means the fragment was missing or malformed.
  *
  * Whether the callback origin is one the connect flow accepts (https only — MCP
  * connections are to remote servers) is checked in the page component, which

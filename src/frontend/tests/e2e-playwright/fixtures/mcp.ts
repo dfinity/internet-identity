@@ -1,6 +1,7 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { test as base, type Page } from "@playwright/test";
 import { toBase64URL } from "../../../src/lib/utils/utils";
+import { AUTH_CALLBACKS_PATH } from "../../../src/lib/utils/authCallbacks";
 import { II_URL } from "../utils";
 
 /** What the MCP server stand-in does on its next callback request. */
@@ -29,10 +30,12 @@ export type McpCompletion = {
  * no real HTTP server: the callback is a public https origin, and the connect
  * flow talks to it with JSON `fetch`es. We intercept those with `page.route`
  * (which catches them before the network, so no server or DNS for `mcp.id.ai`
- * is needed) and answer exactly like a real MCP server would: the key request
- * (`{state}`) gets this connection's session public key, and the completion
- * notification (`{state, expiration}`) gets a 200. A request with a state the
- * server never issued gets a 403 — nothing is registered then.
+ * is needed) and answer exactly like a real MCP server would: the well-known
+ * auth-callback allow-list (`/.well-known/ii-auth-callbacks`) declares this
+ * connection's callback, the key request (`{state}`) gets this connection's
+ * session public key, and the completion notification (`{state, expiration}`)
+ * gets a 200. A request with a state the server never issued gets a 403 —
+ * nothing is registered then.
  *
  * `completion` resolves with the completion body once the flow reports the
  * session registered.
@@ -83,12 +86,12 @@ export type McpFixture = {
   }) => string;
 };
 
-// The connect flow's callback requests are cross-origin JSON `fetch`es, so the
-// stand-in must answer the CORS preflight and mark its responses readable —
-// exactly what a real MCP server has to do.
+// The connect flow's requests (the allow-list GET and the callback POSTs) are
+// cross-origin JSON `fetch`es, so the stand-in must answer the CORS preflight
+// and mark its responses readable — exactly what a real MCP server has to do.
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "POST",
+  "access-control-allow-methods": "GET, POST",
   "access-control-allow-headers": "content-type",
 };
 
@@ -136,6 +139,18 @@ export const test = base.extend<{ mcp: McpFixture }>({
           return;
         }
         if (request.method() === "GET") {
+          // The server-declared auth-callback allow-list: II fetches it and
+          // exact-matches the link's callback against it before contacting
+          // the callback. Served with CORS (a cross-origin JSON GET) and the
+          // application/json content type II requires.
+          if (new URL(request.url()).pathname === AUTH_CALLBACKS_PATH) {
+            await route.fulfill({
+              status: 200,
+              headers: { ...CORS_HEADERS, "content-type": "application/json" },
+              body: JSON.stringify({ callbacks: [callbackUrl] }),
+            });
+            return;
+          }
           // A navigation to the finish URL: the browser was handed back to
           // the server after the connect. Serve the landing page.
           if (request.url() === finishUrl) {

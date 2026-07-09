@@ -257,7 +257,7 @@ test("Allow access registers the server's session key", async ({
   ).toBeVisible();
 });
 
-test("A tampered callback path is ignored: II uses the pinned connect endpoint", async ({
+test("An undeclared callback path fails the connect: nothing contacts it, nothing registers", async ({
   page,
   mcp,
 }) => {
@@ -266,15 +266,15 @@ test("A tampered callback path is ignored: II uses the pinned connect endpoint",
   await mcp.installInterceptor(page);
   // An attacker-controlled path on the *trusted* origin that, if II ever fetched
   // it, would hand back a key of the attacker's choosing (the reported phishing
-  // vector: a planted/echoing path on the trusted origin). Registered after the
+  // vector: a planted/echoing path on the trusted origin). It is NOT in the
+  // allow-list the server declares at /.well-known/ii-auth-callbacks, so the
+  // connect must fail closed before contacting it. Registered after the
   // fixture's catch-all so it would win for this exact path if contacted.
   let attackerPathHit = false;
   await page.route(`${mcp.mcpOrigin}/attacker-echo`, async (route) => {
-    // A CORS-correct stub. The real connect fetch is a cross-origin POST with a
-    // JSON content-type, so the browser preflights: answer OPTIONS with the
-    // preflight headers (204). Only the actual request flips the flag, so a
-    // regression that fetched this path fails on the `attackerPathHit`
-    // assertion cleanly rather than stalling on a rejected preflight.
+    // A CORS-correct stub. If a regression ever fetched this path, the actual
+    // request (not the preflight) flips the flag, so the failure is a clean
+    // assertion rather than a stall on a rejected preflight.
     if (route.request().method() === "OPTIONS") {
       await route.fulfill({
         status: 204,
@@ -301,8 +301,8 @@ test("A tampered callback path is ignored: II uses the pinned connect endpoint",
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page);
 
-  // Same trusted origin (so the connect proceeds), but an attacker-chosen path
-  // in the connect link.
+  // Same trusted origin (so the connect proceeds past the trust check), but an
+  // attacker-chosen path in the connect link — one the server never declared.
   await page.goto(
     mcp.buildAuthorizeUrl({
       app: APP,
@@ -311,17 +311,19 @@ test("A tampered callback path is ignored: II uses the pinned connect endpoint",
   );
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  // The connect completes against the server's real key from the pinned
-  // endpoint and reaches the terminal screen. Assert the flag before awaiting
-  // the fixture-resolved completion: the heading resolves whether or not a
-  // regression occurred, so a regression fails fast on `attackerPathHit` here
-  // instead of hanging on a completion misdirected to the attacker path.
+  // The link's callback only selects among the server-declared entries: an
+  // undeclared one fails the connect. The failure surfaces and the user is
+  // back on the connect screen — never the success screen.
+  await expect(page.getByText(/does not declare this callback/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "You're signed in" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  // The attacker path was never contacted, and no session was registered.
   expect(attackerPathHit).toBe(false);
-  const completion = await mcp.completion;
-  expect(completion.state).toBe(mcp.state);
+  expect(mcp.completions).toHaveLength(0);
 });
 
 test("A finish_url from the server hands the tab back to it after connecting", async ({

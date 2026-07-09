@@ -57,37 +57,6 @@ export const originOf = (url: string): string | undefined => {
 export const isOriginTrusted = (config: McpConfig, origin: string): boolean =>
   config.enabled && config.url !== undefined && originOf(config.url) === origin;
 
-/**
- * The fixed path, on the trusted server's origin, where the `/mcp` connect flow
- * performs its handshake (fetches the server's session key, reports completion).
- * A server exposes its II connect endpoint here.
- */
-export const MCP_CONNECT_PATH = "/.well-known/ii-mcp-connect";
-
-/**
- * The pinned connect endpoint for `config`'s trusted server: its origin plus
- * {@link MCP_CONNECT_PATH}, or `undefined` when the feature is disabled or no
- * server is set.
- *
- * The `/mcp` connect flow uses *this* as the URL it fetches the session key from
- * and reports completion to — never the callback path carried in the (attacker-
- * craftable) connect link. Only the callback's origin is taken from the link,
- * and only to identify the server and gate the untrusted screen (see
- * {@link isOriginTrusted}); the path is pinned here so an attacker-crafted link
- * cannot point II at an arbitrary path on the trusted origin (a planted file, a
- * reflecting or redirecting route) and have its response registered as the
- * server's key. Pinning to an exact path is a deliberate, narrow exception to
- * the origin-only trust boundary above: delegations stay origin-scoped, but this
- * one HTTP fetch is pinned so a sibling path can't substitute its response.
- */
-export const connectCallbackUrl = (config: McpConfig): string | undefined => {
-  if (!config.enabled || config.url === undefined) {
-    return undefined;
-  }
-  const origin = originOf(config.url);
-  return origin === undefined ? undefined : `${origin}${MCP_CONNECT_PATH}`;
-};
-
 /** Read the identity's synced MCP config from the canister. */
 export const readMcpConfig = async (
   actor: ActorSubclass<_SERVICE>,

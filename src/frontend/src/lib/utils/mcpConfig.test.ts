@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  originOf,
-  isOriginTrusted,
-  connectCallbackUrl,
-  MCP_CONNECT_PATH,
-  type McpConfig,
-} from "./mcpConfig";
+import { originOf, isOriginTrusted, type McpConfig } from "./mcpConfig";
 
 describe("originOf", () => {
   it("returns the origin (scheme + host + port), dropping path/query/hash", () => {
@@ -94,46 +88,5 @@ describe("isOriginTrusted", () => {
     expect(isOriginTrusted(trust("not a url"), "https://mcp.id.ai")).toBe(
       false,
     );
-  });
-});
-
-describe("connectCallbackUrl", () => {
-  const config = (url: string | undefined, enabled = true): McpConfig => ({
-    enabled,
-    url,
-  });
-
-  it("pins the connect endpoint to the configured origin + fixed path", () => {
-    expect(connectCallbackUrl(config("https://mcp.id.ai/mcp"))).toBe(
-      `https://mcp.id.ai${MCP_CONNECT_PATH}`,
-    );
-  });
-
-  it("ignores the configured URL's path (derives from the origin only)", () => {
-    // The trusted URL is the MCP resource endpoint; the connect endpoint is a
-    // fixed path on the same origin, never a path taken from config or the link.
-    expect(connectCallbackUrl(config("https://mcp.id.ai/some/deep/path"))).toBe(
-      `https://mcp.id.ai${MCP_CONNECT_PATH}`,
-    );
-  });
-
-  it("keeps a non-default port", () => {
-    expect(connectCallbackUrl(config("https://mcp.id.ai:8443/mcp"))).toBe(
-      `https://mcp.id.ai:8443${MCP_CONNECT_PATH}`,
-    );
-  });
-
-  it("is undefined when the feature is disabled", () => {
-    expect(
-      connectCallbackUrl(config("https://mcp.id.ai/mcp", false)),
-    ).toBeUndefined();
-  });
-
-  it("is undefined when no server URL is configured", () => {
-    expect(connectCallbackUrl(config(undefined))).toBeUndefined();
-  });
-
-  it("is undefined when the configured URL is unparsable", () => {
-    expect(connectCallbackUrl(config("not a url"))).toBeUndefined();
   });
 });
