@@ -202,17 +202,17 @@ org's web root.
 
 `client_id`s are public by design (II uses public/SPA clients, no secret), so exposing them is
 harmless. The **origins** may be sensitive — they reveal the org's internal app portfolio. An
-org may hide them by replacing a cleartext origin key with a `salt:hash` key, keeping the same
+org may hide them by replacing a cleartext origin key with a `hash:salt` key, keeping the same
 `origin -> client_id` object:
 
 ```jsonc
 "app_clients": {
   "https://oc.app": "0oaCHAT",                    // cleartext key, or:
-  "9f3a7c2e...:b5d4045c...e21": "0oaPAYROLL"       // "<salt>:sha256(salt || origin)", hex
+  "b5d4045c...e21:9f3a7c2e...": "0oaPAYROLL"       // "sha256(salt || origin):<salt>", hex
 }
 ```
 
-II knows the target origin from the ceremony; for each `salt:hash` key it computes
+II knows the target origin from the ceremony; for each `hash:salt` key it computes
 `sha256(salt || origin)` and matches it against the key's hash. The per-key salt prevents
 bulk precomputation and cross-org correlation of the same origin. It does not hide an origin
 an attacker already guesses — they can confirm a guess against the published salt — but
@@ -256,7 +256,7 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
 
 // client_for resolves the per-app client for an origin, over app_clients keys (§5):
 //   cleartext key -> app_clients[origin]
-//   "salt:hash" key -> the key where sha256(salt || origin) == hash
+//   "hash:salt" key -> the key where sha256(salt || origin) == hash
 ```
 
 - **One access method.** Identity keys on `(iss, subject, primary_client_id)`, where
