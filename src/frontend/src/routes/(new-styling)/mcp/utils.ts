@@ -48,10 +48,12 @@ interface McpAuthorizeInput {
  *  1. Generate an ephemeral registration key `Y` for this connect; its private
  *     half never leaves this page.
  *  2. `prepare_mcp_registration_delegation` — authenticated as the user, mint a
- *     short-lived canister-signed delegation `P_reg -> Y`. Nothing is stored:
- *     `P_reg` is *derived* from the consent tuple (this anchor, the read-only
- *     choice, the grant TTL, the trusted server URL), so only that exact tuple
- *     ever redeems it — never an argument the server invents.
+ *     short-lived canister-signed delegation `P_reg -> Y`. `P_reg` is *derived*
+ *     from the consent tuple (this anchor, the read-only choice, the grant TTL,
+ *     the trusted server URL); the canister stores only the anchor (keyed by
+ *     `P_reg`) so it can recover it at redemption, while the read-only choice
+ *     and TTL are re-derived and compared rather than trusted from a
+ *     `register_v2` argument the server invents.
  *  3. `get_mcp_registration_delegation` — fetch the certified `P_reg -> Y`
  *     delegation (passing the same consent parameters, which determine the
  *     derivation), then extend the chain *locally* with a second hop `Y -> X`
@@ -95,8 +97,8 @@ export const mcpAuthorize = async ({
   // The ephemeral registration key `Y` for this connect. The canister-signed
   // hop targets this browser-held key — never the link-supplied `X` — so the
   // delegation that transits the IC is inert to any transport-level observer:
-  // only this page holds `priv(Y)`. Fresh per attempt, which also keeps
-  // `P_reg` per-connect-unique (and retries collision-free).
+  // only this page holds `priv(Y)`. Fresh per attempt so each connect signs its
+  // own second hop (`P_reg` itself is derived from the consent, not from `Y`).
   const registrationIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
@@ -106,9 +108,9 @@ export const mcpAuthorize = async ({
 
   // The session-grant lifetime the user chose (the backend clamps again). The
   // access level and TTL are folded into `P_reg`'s derivation, so `get` takes
-  // them too (the seed is re-derived from arguments; nothing is stored). A
-  // backend refusal (MCP disabled, unauthenticated, ...) throws here and
-  // fails the connect before anything is delivered.
+  // them too (the seed is re-derived from arguments; the canister stores only
+  // the anchor). A backend refusal (MCP disabled, unauthenticated, ...) throws
+  // here and fails the connect before anything is delivered.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
   const { user_key, expiration } = await actor
     .prepare_mcp_registration_delegation(

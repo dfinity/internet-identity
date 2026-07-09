@@ -271,9 +271,9 @@ page closing the loop:
 1. `GET /oauth/authorize` — validate `client_id` + exact `redirect_uri` +
    PKCE, create a pending auth `{code_challenge, oauth_state, resource}`,
    mint a **fresh registration keypair `X`** and a fresh, single-use
-   `connect_state` for it, set an initiator cookie (`sid`, `HttpOnly;
-Secure; SameSite=Lax`) referencing the pending auth, and 302 the browser
-   to the II connect link (§2).
+   `connect_state` for it, set an initiator cookie
+   (`sid`, `HttpOnly; Secure; SameSite=Lax`) referencing the pending auth,
+   and 302 the browser to the II connect link (§2).
 2. The consenting browser arrives at your declared callback (§3a) carrying
    the delegation and `connect_state`; the page ships both to your backend
    (the same-origin request carries the `sid` cookie).

@@ -10,8 +10,9 @@ const REGISTRATION_KEY = "cmVnaXN0cmF0aW9uLWtleQ";
 
 // A complete, valid fragment with an optional `ttl`. The callback is an
 // accepted https origin; the only key material is the server's *public*
-// registration key (II mints a `P_reg -> X` delegation for it — nothing secret
-// travels in the fragment).
+// registration key `X` (II mints a two-hop `P_reg -> Y -> X` chain rooted at
+// it — a canister-signed `P_reg -> Y` extended browser-side to `X` — nothing
+// secret travels in the fragment).
 const fragment = (ttl?: string): string => {
   const params = new URLSearchParams();
   params.set("registration_key", REGISTRATION_KEY);

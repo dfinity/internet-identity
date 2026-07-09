@@ -52,7 +52,10 @@ const insecureUndici = new UndiciAgent({
   connect: { rejectUnauthorized: false },
 });
 const insecureFetch: typeof fetch = (url, options = {}) =>
-  fetch(url, { dispatcher: insecureUndici, ...options } as RequestInit);
+  // Spread the caller's options first, then pin the dispatcher, so this
+  // fixture's self-signed-tolerant agent is authoritative and can't be
+  // silently overridden (defensive — the callers here never pass a dispatcher).
+  fetch(url, { ...options, dispatcher: insecureUndici } as RequestInit);
 
 const permissionsString = (permissions: Permissions): string =>
   "queries" in permissions ? "queries" : "all";
