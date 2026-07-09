@@ -42,6 +42,9 @@ const makeActor = () => {
       (
         _anchor: bigint,
         requestedKey: Uint8Array,
+        _permissions: [{ queries: null } | { all: null }],
+        _maxTtl: [bigint],
+        _expiration: bigint,
       ): Promise<
         | {
             Ok: {
@@ -110,8 +113,8 @@ describe("mcpAuthorize registration-delegation minting", () => {
     await authorize(actor, "read-only");
 
     // Minted for the identity and a browser-generated ephemeral key Y, with
-    // the user-chosen grant TTL and the read-only access level (recorded on
-    // the index entry by the backend, never folded into the signature).
+    // the user-chosen grant TTL and the read-only access level (folded into
+    // the derived registration principal, never into the signature).
     expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
       expect.any(Uint8Array),
@@ -130,7 +133,7 @@ describe("mcpAuthorize registration-delegation minting", () => {
     expect(browserKey.length).toBeGreaterThan(0);
     expect(toHex(browserKey)).not.toBe(toHex(REGISTRATION_KEY));
     const [, getKey] = actor.get_mcp_registration_delegation.mock.calls[0];
-    expect(toHex(getKey as Uint8Array)).toBe(toHex(browserKey));
+    expect(toHex(getKey)).toBe(toHex(browserKey));
   });
 
   it("generates a fresh Y per connect attempt", async () => {
@@ -153,13 +156,17 @@ describe("mcpAuthorize registration-delegation minting", () => {
     );
   });
 
-  it("fetches the certified delegation for the expiration prepare returned", async () => {
+  it("fetches the certified delegation with the same consent parameters", async () => {
     const actor = makeActor();
     await authorize(actor, "read-only");
 
+    // `get` re-derives the seed from its arguments (nothing is stored), so it
+    // takes the exact consent tuple prepare folded, plus prepare's expiration.
     expect(actor.get_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
       browserKeyOf(actor),
+      [{ queries: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
       actor.expiration,
     );
   });
@@ -177,6 +184,27 @@ describe("mcpAuthorize delivery URL", () => {
     expect(url.startsWith(`${CALLBACK}#`)).toBe(true);
     const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
     expect(fragment.get("state")).toBe(STATE);
+  });
+
+  it("carries the consent tuple the server must echo to mcp_register_v2", async () => {
+    // The derivation authenticates the echo (a tampered value fails to
+    // redeem), but the server needs the plain values to echo: the anchor, the
+    // access level as its wire string, and the grant TTL in nanoseconds.
+    const url = await authorize(makeActor(), "read-only");
+
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    expect(fragment.get("anchor")).toBe(IDENTITY_NUMBER.toString());
+    expect(fragment.get("permissions")).toBe("queries");
+    expect(fragment.get("ttl")).toBe(
+      (BigInt(TTL_SECONDS) * BigInt(1_000_000_000)).toString(),
+    );
+  });
+
+  it("marks a full-access connect as such in the consent tuple", async () => {
+    const url = await authorize(makeActor(), "full-access");
+
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    expect(fragment.get("permissions")).toBe("all");
   });
 
   it("carries a reconstructable two-hop P_reg -> Y -> X chain", async () => {

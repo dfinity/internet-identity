@@ -1,4 +1,8 @@
-import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
+import {
+  toPermissionsArg,
+  toPermissionsString,
+  type AccessLevel,
+} from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -14,7 +18,7 @@ interface McpAuthorizeInput {
   ttlSeconds: number;
   /** Whether the whole session is read-only: when read-only, every per-app
    *  delegation the server later mints is restricted to query calls. Chosen
-   *  once at connect and recorded on the registration delegation's index entry,
+   *  once at connect and folded into the registration principal's derivation,
    *  so the server cannot upgrade a read-only session to full access. */
   accessLevel: AccessLevel;
   /** The trusted server's declared connect callback: exact-matched by the
@@ -37,27 +41,31 @@ interface McpAuthorizeInput {
 }
 
 /**
- * Connects the MCP server by minting a single-use *registration delegation
+ * Connects the MCP server by minting a short-lived *registration delegation
  * chain* and handing it to the server, instead of fetching the server's key
  * and calling `mcp_register` on its behalf. The flow:
  *
  *  1. Generate an ephemeral registration key `Y` for this connect; its private
  *     half never leaves this page.
  *  2. `prepare_mcp_registration_delegation` — authenticated as the user, mint a
- *     short-lived canister-signed delegation `P_reg -> Y` and record the
- *     consent (this anchor, the read-only choice, the grant TTL) on an index
- *     entry keyed by `P_reg`. The anchor and access level live on that entry,
- *     never in an argument the server controls.
+ *     short-lived canister-signed delegation `P_reg -> Y`. Nothing is stored:
+ *     `P_reg` is *derived* from the consent tuple (this anchor, the read-only
+ *     choice, the grant TTL, the trusted server URL), so only that exact tuple
+ *     ever redeems it — never an argument the server invents.
  *  3. `get_mcp_registration_delegation` — fetch the certified `P_reg -> Y`
- *     delegation, then extend the chain *locally* with a second hop `Y -> X`
+ *     delegation (passing the same consent parameters, which determine the
+ *     derivation), then extend the chain *locally* with a second hop `Y -> X`
  *     signed by `priv(Y)`, where `X` is the server's per-connect registration
  *     key from the link.
- *  4. Deliver the full chain to the trusted server over a URL fragment (a
- *     top-level navigation to the callback it declared — see
- *     `matchDeclaredCallback`). The server, holding `X`'s private key, redeems
- *     it by calling `mcp_register_v2` with its long-lived session key `S`; the
- *     backend binds `S` to the recorded anchor with the recorded access level.
- *     II never binds a key it merely received, and the chain is single-use.
+ *  4. Deliver the full chain — with the consent tuple alongside — to the
+ *     trusted server over a URL fragment (a top-level navigation to the
+ *     callback it declared — see `matchDeclaredCallback`). The server, holding
+ *     `X`'s private key, redeems it by calling `mcp_register_v2` with its
+ *     long-lived session key `S`, echoing the tuple; the backend re-derives
+ *     `P_reg` from the echoed tuple and binds `S` only if it lands exactly on
+ *     `caller()`. II never binds a key it merely received, and any altered
+ *     echo (upgraded access, stretched TTL, different anchor) derives a
+ *     different principal and is rejected.
  *
  * The two-hop shape is load-bearing: what the canister signs transits the IC
  * (the `get` query response passes the answering replica and API boundary
@@ -95,8 +103,9 @@ export const mcpAuthorize = async ({
   );
 
   // The session-grant lifetime the user chose (the backend clamps again). The
-  // access level is recorded on the index entry, not folded into the signature.
-  // A backend refusal (MCP disabled, unauthenticated, ...) throws here and
+  // access level and TTL are folded into `P_reg`'s derivation, so `get` takes
+  // them too (the seed is re-derived from arguments; nothing is stored). A
+  // backend refusal (MCP disabled, unauthenticated, ...) throws here and
   // fails the connect before anything is delivered.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
   const { user_key, expiration } = await actor
@@ -109,7 +118,13 @@ export const mcpAuthorize = async ({
     .then(throwTextCanisterError);
 
   const signed = await actor
-    .get_mcp_registration_delegation(identityNumber, browserKey, expiration)
+    .get_mcp_registration_delegation(
+      identityNumber,
+      browserKey,
+      toPermissionsArg(accessLevel),
+      [grantTtlNanos],
+      expiration,
+    )
     .then(throwTextCanisterError);
 
   // Hop 1, canister-signed: `P_reg -> Y`. `user_key` is `P_reg`'s DER public
@@ -133,9 +148,15 @@ export const mcpAuthorize = async ({
 
   // Deliver over the fragment (never sent to the server in the HTTP request):
   // the trusted server's endpoint reads it client-side, reconstructs the chain,
-  // and redeems it. `state` rides along so the server can correlate.
+  // and redeems it. The consent tuple rides along — `anchor`, `permissions`
+  // ("queries"/"all") and `ttl` (grant lifetime in ns) are what the server
+  // must echo to `mcp_register_v2` (the derivation authenticates the echo; a
+  // tampered value simply fails to redeem). `state` lets the server correlate.
   const fragment = new URLSearchParams();
   fragment.set("delegation", JSON.stringify(chain.toJSON()));
   fragment.set("state", state);
+  fragment.set("anchor", identityNumber.toString());
+  fragment.set("permissions", toPermissionsString(accessLevel));
+  fragment.set("ttl", grantTtlNanos.toString());
   return `${callback}#${fragment.toString()}`;
 };

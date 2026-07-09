@@ -158,10 +158,11 @@
   });
 
   // Invoked by the reused account picker once it has authenticated the selected
-  // identity and resolved the chosen account. Connecting mints a single-use
-  // registration delegation for the server's per-connect key (recording the
-  // anchor and chosen access level on the backend) and hands the tab to the
-  // server's declared callback, which redeems it (`mcp_register_v2`).
+  // identity and resolved the chosen account. Connecting mints a short-lived
+  // registration delegation for the server's per-connect key (rooted at a
+  // principal derived from the anchor and the chosen access level, so neither
+  // can be altered) and hands the tab to the server's declared callback, which
+  // redeems it (`mcp_register_v2`).
   const handleAuthorize = (
     ttlSeconds: number,
     accessLevel: AccessLevel,

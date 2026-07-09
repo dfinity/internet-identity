@@ -24,7 +24,7 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
  * delivered delegation to the connect it started, and the requested
  * session-grant TTL (`ttl`, in seconds). The MCP server the user connects is
  * identified by the callback's *origin* (each user trusts whichever server they
- * connect); II mints a single-use registration delegation chain (rooted at a
+ * connect); II mints a short-lived registration delegation chain (rooted at a
  * canister-signed hop to a browser-held key, extended locally to `X`) and
  * delivers it to the callback only after it exact-matches the allow-list the
  * server declares at a fixed well-known path on that origin (see

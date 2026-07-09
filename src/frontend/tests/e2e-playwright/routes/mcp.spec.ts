@@ -241,11 +241,12 @@ test("Allow access mints a registration delegation the server redeems", async ({
   ).toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  // II minted a single-use P_reg -> Y -> X registration chain and handed it to the trusted
-  // server's declared callback (in the fragment). The server redeemed it via
-  // mcp_register_v2, binding its session key: the completion reports the state
-  // echo, the grant expiration (ns since epoch as a decimal string), and the
-  // access level. The private registration key never left the server.
+  // II minted a short-lived P_reg -> Y -> X registration chain and handed it
+  // (plus the consent tuple) to the trusted server's declared callback (in the
+  // fragment). The server redeemed it via mcp_register_v2, echoing the tuple
+  // and binding its session key: the completion reports the state echo, the
+  // grant expiration (ns since epoch as a decimal string), and the access
+  // level. The private registration key never left the server.
   const completion = await mcp.completion;
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
@@ -488,19 +489,21 @@ test("Unchecking read-only mode connects with full access", async ({
   await readOnly.uncheck();
 
   await page.getByRole("button", { name: "Allow access" }).click();
-  // Unchecking the toggle switches the session to full access, recorded on the
-  // registration delegation's index entry and reflected in the grant the server
+  // Unchecking the toggle switches the session to full access, folded into the
+  // registration principal's derivation and reflected in the grant the server
   // gets back from mcp_register_v2.
   const completion = await mcp.completion;
   expect(completion.permissions).toBe("all");
 });
 
-// The browser /mcp flow mints a single-use registration chain (P_reg -> Y -> X)
-// and hands it to the trusted server, which redeems it (`mcp_register_v2`) to
-// bind its long-lived session key `S` to the user's identity — no per-request
-// app, and no account chosen at connect. Per-app delegations are minted
-// server-side by the `mcp_prepare/get_delegation` canister methods, with the
-// app account chosen there. Grant semantics (expiry, revocation, replacement)
-// and the registration delegation's single-use/idempotency guarantees are
-// canister logic, covered by the integration tests (tests/integration/mcp.rs),
-// not here.
+// The browser /mcp flow mints a short-lived registration chain (P_reg -> Y -> X)
+// and hands it to the trusted server, which redeems it (`mcp_register_v2`,
+// echoing the delivered consent tuple) to bind its long-lived session key `S`
+// to the user's identity — no per-request app, and no account chosen at
+// connect. Per-app delegations are minted server-side by the
+// `mcp_prepare/get_delegation` canister methods, with the app account chosen
+// there. Grant semantics (expiry, revocation, replacement) and the
+// registration delegation's derive-and-compare guarantees (altered echoes
+// rejected, config changes invalidating in-flight delegations) are canister
+// logic, covered by the integration tests (tests/integration/mcp.rs), not
+// here.
