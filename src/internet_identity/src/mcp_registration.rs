@@ -3,15 +3,28 @@
 //! Instead of the frontend fetching the MCP server's session key and calling
 //! [`crate::mcp::register`] with it, the connect flow now:
 //!
-//! 1. mints a short-lived, single-use canister-signed delegation `P_reg -> X`
-//!    ([`prepare`] + [`get`]), where `X` is a registration key the MCP server
-//!    generated for the browser session and `P_reg` is a synthetic principal
-//!    derived from a per-connect seed folding in the anchor and `X`;
-//! 2. delivers that delegation to the MCP frontend over a URL fragment (see the
-//!    `/mcp` frontend), never a server-visible channel;
-//! 3. lets the MCP server redeem it: authenticated by the `P_reg -> X` chain
-//!    (so `caller()` *is* `P_reg`), it calls [`register_v2`] with the long-lived
-//!    session key `S` it generated.
+//! 1. mints a short-lived, single-use canister-signed delegation `P_reg -> Y`
+//!    ([`prepare`] + [`get`]), where `Y` is an ephemeral registration key the
+//!    *II frontend* generates for this connect (its private half never leaves
+//!    the browser) and `P_reg` is a synthetic principal derived from a
+//!    per-connect seed folding in the anchor and `Y`;
+//! 2. lets the frontend extend the chain locally with a second, browser-signed
+//!    hop `Y -> X` to the MCP server's registration key `X` (from the connect
+//!    link), and deliver the full chain to the server's declared callback over
+//!    a URL fragment — never a server- or node-visible channel;
+//! 3. lets the MCP server redeem it: authenticated by the `P_reg -> Y -> X`
+//!    chain (so `caller()` *is* `P_reg`), it calls [`register_v2`] with the
+//!    long-lived session key `S` it generated.
+//!
+//! The two-hop shape is load-bearing, not an implementation detail: everything
+//! this canister signs transits the IC in the clear (update arguments, and the
+//! [`get`] query response passes the answering replica and the API boundary
+//! nodes), so the canister-signed hop must never be redeemable on its own.
+//! Delegating to the browser-held `Y` keeps it inert to any transport-level
+//! observer; delegating directly to a key from the (attacker-craftable)
+//! connect link would let a leaky node hand an attacker a bearer credential
+//! for the consenting anchor. The only redeemable artifact — the full chain —
+//! is assembled inside the consenting browser and never transits the IC.
 //!
 //! What the user consented to — the anchor and the read-only choice — is
 //! recorded on an index entry ([`StorableMcpRegistration`]) at [`prepare`] time,
@@ -58,11 +71,11 @@ pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
 
 /// Seed for the registration principal `P_reg`. Folds a fixed-length hash of the
-/// registration key `X` into the per-anchor seed, so `P_reg` is unique per
-/// connect (each connect has a fresh `X`) without a separate nonce. A dedicated
-/// domain separator keeps this principal namespace disjoint from the session,
-/// account, and email-recovery seeds (pure seed hygiene — II is the only signer
-/// that could ever collide).
+/// browser-generated registration key `Y` into the per-anchor seed, so `P_reg`
+/// is unique per connect (the II frontend mints a fresh `Y` for every attempt)
+/// without a separate nonce. A dedicated domain separator keeps this principal
+/// namespace disjoint from the session, account, and email-recovery seeds (pure
+/// seed hygiene — II is the only signer that could ever collide).
 fn mcp_registration_seed(anchor_number: AnchorNumber, registration_key: &[u8]) -> Hash {
     const DOMAIN_SEPARATOR: &[u8] = b"mcp-registration";
 
@@ -97,7 +110,9 @@ fn permissions_of(read_only: bool) -> Permissions {
     }
 }
 
-/// `prepare_mcp_registration_delegation`: mint the `P_reg -> X` delegation and
+/// `prepare_mcp_registration_delegation`: mint the `P_reg -> Y` delegation
+/// (`Y` = the frontend's ephemeral, browser-held registration key — see the
+/// module doc for why the canister never delegates to a link-supplied key) and
 /// record the consent (anchor, read-only choice, grant lifetime) on an index
 /// entry. Authenticated as the user (full authorization) — only the consenting
 /// user can create a registration delegation for their anchor.
@@ -169,8 +184,9 @@ pub async fn prepare(
     })
 }
 
-/// `get_mcp_registration_delegation`: fetch the certified `P_reg -> X`
-/// delegation prepared above. Authenticated as the user, like [`prepare`].
+/// `get_mcp_registration_delegation`: fetch the certified `P_reg -> Y`
+/// delegation prepared above, for the frontend to extend browser-side with the
+/// `Y -> X` hop and deliver. Authenticated as the user, like [`prepare`].
 pub fn get(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
@@ -210,9 +226,9 @@ pub fn get(
 }
 
 /// `mcp_register_v2`: bind the MCP server's long-lived session key `S` to the
-/// consenting anchor. Authenticated by the `P_reg -> X` chain (so `caller()` is
-/// `P_reg`); the anchor and read-only choice come from the index entry keyed by
-/// `caller()`, never from an argument.
+/// consenting anchor. Authenticated by the `P_reg -> Y -> X` chain (so
+/// `caller()` is `P_reg`); the anchor and read-only choice come from the index
+/// entry keyed by `caller()`, never from an argument.
 ///
 /// Authorization is the index lookup on `caller()`: a caller with no entry gets
 /// a clean error (there is no fallback that would answer for an arbitrary,

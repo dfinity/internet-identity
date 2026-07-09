@@ -1443,7 +1443,7 @@ fn mcp_read_only_grant_stays_queries_only_across_upgrade() -> Result<(), RejectR
 }
 
 /// Phase-2 registration delegation, happy path. The user consents by minting a
-/// `P_reg -> X` registration delegation (`prepare` + `get`); the delegation is a
+/// `P_reg -> Y` registration delegation (`prepare` + `get`); the delegation is a
 /// valid II canister signature over `X`; the MCP server then redeems it —
 /// authenticated as `P_reg` (the chain root) — via `mcp_register_v2` to bind its
 /// long-lived session key `S`. The anchor and the read-only choice come from the
@@ -1457,9 +1457,10 @@ fn mcp_register_v2_binds_session_via_registration_delegation() -> Result<(), Rej
     let anchor = flows::register_anchor(&env, canister_id);
     trust_mcp_server(&env, canister_id, principal_1(), anchor);
 
-    // The MCP server's per-browser-session registration key X, delivered to the
-    // II frontend. The user consents (full auth) by minting the delegation.
-    let registration_key = ByteBuf::from("mcp registration key X");
+    // The ephemeral registration key Y the II frontend generates for this
+    // connect (browser-held; the chain is extended to the server's key
+    // browser-side). The user consents (full auth) by minting the delegation.
+    let registration_key = ByteBuf::from("browser registration key Y");
     let prepared = prepare_mcp_registration_delegation(
         &env,
         canister_id,
@@ -1472,7 +1473,7 @@ fn mcp_register_v2_binds_session_via_registration_delegation() -> Result<(), Rej
     .unwrap()
     .unwrap();
 
-    // The frontend fetches the signed P_reg -> X delegation; it is a valid II
+    // The frontend fetches the signed P_reg -> Y delegation; it is a valid II
     // canister signature over exactly that key.
     let signed = get_mcp_registration_delegation(
         &env,
@@ -1529,7 +1530,7 @@ fn mcp_register_v2_is_single_use_and_idempotent() -> Result<(), RejectResponse> 
     let anchor = flows::register_anchor(&env, canister_id);
     trust_mcp_server(&env, canister_id, principal_1(), anchor);
 
-    let registration_key = ByteBuf::from("mcp registration key X");
+    let registration_key = ByteBuf::from("browser registration key Y");
     let prepared = prepare_mcp_registration_delegation(
         &env,
         canister_id,

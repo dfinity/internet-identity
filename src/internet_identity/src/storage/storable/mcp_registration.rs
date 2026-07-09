@@ -9,10 +9,11 @@ use std::borrow::Cow;
 ///
 /// Written by the authenticated `prepare_mcp_registration_delegation` (so only
 /// the consenting user can create one), it records what a later
-/// `mcp_register_v2` — authenticated by the `P_reg -> X` delegation chain, so
-/// its `caller()` *is* `P_reg` — needs to bind the session key the MCP server
-/// generates: the anchor to bind it to (recovered here, never taken from a call
-/// argument), the read-only choice the user made at connect, and the session
+/// `mcp_register_v2` — authenticated by the registration delegation chain
+/// rooted at `P_reg`, so its `caller()` *is* `P_reg` — needs to bind the
+/// session key the MCP server generates: the anchor to bind it to (recovered
+/// here, never taken from a call argument), the read-only choice the user made
+/// at connect, and the session
 /// grant's requested lifetime. The entry is *retained* after the first
 /// successful `mcp_register_v2`, marked `used` and bound to the registered key,
 /// so the delegation is single-use: a boundary retry is idempotent only for the

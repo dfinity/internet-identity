@@ -773,10 +773,11 @@ fn get_session_delegation(
 /// Mint a single-use MCP *registration* delegation `P_reg -> registration_key`
 /// (see [`mcp_registration`]). Authenticated as the identity (full
 /// authorization): only the consenting user can create one. `registration_key`
-/// is the key the trusted MCP server generated for this browser session;
-/// `permissions` records the read-only choice and `max_ttl` the requested
-/// session-grant lifetime — both are applied later at `mcp_register_v2`, so the
-/// server cannot alter them.
+/// is an ephemeral key the II frontend generates for this connect (browser-held
+/// — never a key taken from the connect link; the frontend extends the chain to
+/// the MCP server's key browser-side); `permissions` records the read-only
+/// choice and `max_ttl` the requested session-grant lifetime — both are applied
+/// later at `mcp_register_v2`, so the server cannot alter them.
 #[update]
 async fn prepare_mcp_registration_delegation(
     anchor_number: AnchorNumber,
