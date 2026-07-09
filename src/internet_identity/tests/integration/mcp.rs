@@ -1684,7 +1684,10 @@ fn mcp_register_v2_rejects_after_config_change() -> Result<(), RejectResponse> {
         "a delegation minted under the old trusted URL must not redeem under the new one: {stale:?}"
     );
 
-    // Disabling MCP outright rejects at the config gate.
+    // Disabling MCP outright rejects too — with the same generic error as a
+    // derivation mismatch: `mcp_register_v2` is callable by anyone, so a
+    // distinct config error would let arbitrary callers probe which anchors
+    // have MCP enabled.
     mcp_set_config(
         &env,
         canister_id,
@@ -1708,8 +1711,72 @@ fn mcp_register_v2_rejects_after_config_change() -> Result<(), RejectResponse> {
     )
     .unwrap();
     assert!(
-        matches!(&disabled, Err(message) if message.contains("no trusted MCP server")),
-        "redemption with MCP disabled must be rejected: {disabled:?}"
+        matches!(&disabled, Err(message) if message.contains("not authorized")),
+        "redemption with MCP disabled must be rejected with the generic error: {disabled:?}"
+    );
+
+    Ok(())
+}
+
+/// The grant TTL is clamped to [10 min, 30 days] *before* the registration
+/// principal is derived, so the number bound into `P_reg` is the effective
+/// grant lifetime: a below-minimum request redeems (both sides resolve it the
+/// same way) and the minted grant runs exactly the clamp minimum — never
+/// longer than what the derivation authenticated.
+#[test]
+fn mcp_registration_ttl_is_clamped_before_derivation() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    // The user "consents" (via a direct canister call — the frontend clamps
+    // client-side) to a 1-second grant, below the 10-minute minimum.
+    let registration_key = ByteBuf::from("browser registration key Y");
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        registration_key,
+        Some(true),
+        Some(1),
+    )
+    .unwrap()
+    .unwrap();
+    let p_reg = Principal::self_authenticating(&prepared.user_key);
+
+    // Echoing the same below-minimum value redeems, and the grant is exactly
+    // the clamp minimum — the value the seed actually bound.
+    let server_key = ByteBuf::from("mcp server session key S");
+    let registration = mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg,
+        anchor,
+        server_key.clone(),
+        Some(true),
+        Some(1),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(registration.expiration, time(&env) + GRANT_MIN_TTL_NS);
+
+    // Because both sides resolve before deriving, the *clamped* value is the
+    // same consent tuple: echoing it redeems identically.
+    let clamped_echo = mcp_register_v2(
+        &env,
+        canister_id,
+        p_reg,
+        anchor,
+        server_key,
+        Some(true),
+        Some(GRANT_MIN_TTL_NS),
+    )
+    .unwrap();
+    assert!(
+        clamped_echo.is_ok(),
+        "the clamped TTL is the resolved consent value and must redeem: {clamped_echo:?}"
     );
 
     Ok(())

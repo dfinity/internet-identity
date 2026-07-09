@@ -72,12 +72,23 @@ use sha2::{Digest, Sha256};
 pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 
 /// Default session-grant lifetime when the caller omits `max_ttl`: 1 hour,
-/// matching the frontend's default connect TTL. `mcp::register` still clamps to
-/// [10 min, 30 days]. Named explicitly (rather than falling through to the clamp
-/// minimum) so an omitted argument has a documented, unsurprising meaning. Both
-/// [`prepare`] and [`register_v2`] resolve an omitted value to this constant
-/// *before* deriving the seed, so the two sides always fold the same number.
+/// matching the frontend's default connect TTL. Named explicitly (rather than
+/// falling through to the clamp minimum) so an omitted argument has a
+/// documented, unsurprising meaning.
 pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
+
+/// The effective session-grant lifetime for a requested `max_ttl`: the
+/// documented default when omitted, clamped to `mcp::register`'s [10 min,
+/// 30 days] bounds. Every entry point resolves the argument through this
+/// *before* deriving the seed, so the TTL folded into `P_reg` is the one the
+/// grant actually gets — if the seed folded the raw request instead, a
+/// below-minimum value would pass derive-and-compare yet mint a grant
+/// *longer* than the consent-bound number once `mcp::register` clamps it.
+fn resolve_grant_ttl(max_ttl: Option<u64>) -> u64 {
+    max_ttl
+        .unwrap_or(DEFAULT_MCP_GRANT_TTL_NS)
+        .clamp(mcp::MCP_GRANT_MIN_TTL_NS, mcp::MCP_GRANT_MAX_TTL_NS)
+}
 
 /// Seed for the registration principal `P_reg`: folds the anchor, the consent
 /// parameters (read-only choice, resolved grant lifetime), and the trusted
@@ -172,9 +183,9 @@ pub async fn prepare(
     let url = trusted_url(anchor_number)?;
     state::ensure_salt_set().await;
 
-    // Session-grant lifetime the user chose at connect; an omitted value means
-    // the documented default, not the clamp minimum. `mcp::register` clamps.
-    let grant_ttl_ns = max_ttl.unwrap_or(DEFAULT_MCP_GRANT_TTL_NS);
+    // The effective session-grant lifetime (defaulted and clamped), so the
+    // seed binds the number the grant will actually get.
+    let grant_ttl_ns = resolve_grant_ttl(max_ttl);
     let read_only = read_only_from(permissions);
 
     let expiration = time().saturating_add(MCP_REGISTRATION_DELEGATION_TTL_NS);
@@ -218,7 +229,7 @@ pub fn get(
     }
     let url = trusted_url(anchor_number)?;
 
-    let grant_ttl_ns = max_ttl.unwrap_or(DEFAULT_MCP_GRANT_TTL_NS);
+    let grant_ttl_ns = resolve_grant_ttl(max_ttl);
     let read_only = read_only_from(permissions);
     let seed = mcp_registration_seed(anchor_number, read_only, grant_ttl_ns, &url);
     state::assets_and_signatures(|certified_assets, sigs| {
@@ -257,24 +268,31 @@ pub fn register_v2(
     permissions: Option<Permissions>,
     max_ttl: Option<u64>,
 ) -> Result<McpRegistrationV2, String> {
+    // The one error this public method reports for anything short of an
+    // authorized redemption. In particular the missing/disabled-config case
+    // must not be distinguishable from a derivation mismatch: `register_v2`
+    // can be called by anyone, and a distinct error would be an oracle for
+    // enumerating which anchors have MCP enabled. (`prepare`/`get` keep the
+    // specific config error — they authenticate as the identity first.)
+    const NOT_AUTHORIZED: &str =
+        "MCP registration failed: not authorized by a registration delegation.";
+
     // Before the salt exists no delegation was ever minted, and deriving would
     // trap; report the caller as unauthorized instead.
     let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
     if !salt_initialised {
-        return Err(
-            "MCP registration failed: not authorized by a registration delegation.".to_string(),
-        );
+        return Err(NOT_AUTHORIZED.to_string());
     }
-    let url = trusted_url(anchor_number)?;
+    let Ok(url) = trusted_url(anchor_number) else {
+        return Err(NOT_AUTHORIZED.to_string());
+    };
 
-    let grant_ttl_ns = max_ttl.unwrap_or(DEFAULT_MCP_GRANT_TTL_NS);
+    let grant_ttl_ns = resolve_grant_ttl(max_ttl);
     let read_only = read_only_from(permissions);
     let seed = mcp_registration_seed(anchor_number, read_only, grant_ttl_ns, &url);
     let p_reg = Principal::self_authenticating(der_encode_canister_sig_key(seed.to_vec()));
     if caller() != p_reg {
-        return Err(
-            "MCP registration failed: not authorized by a registration delegation.".to_string(),
-        );
+        return Err(NOT_AUTHORIZED.to_string());
     }
 
     // The tuple is authenticated; bind S under it (config /
