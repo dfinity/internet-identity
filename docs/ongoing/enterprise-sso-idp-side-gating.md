@@ -267,7 +267,7 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
         // per-app aud never enters identity; sso_domain binds the anchor to THIS domain.
         // It is unforgeable (the discovery domain II actually used), so a login via a rogue
         // domain that copies iss + primary client_id still resolves to a DIFFERENT anchor.
-    lookup_or_create_anchor(identity_key)                     // the single OpenID credential
+    lookup_or_create_anchor(identity_key)   // sub: direct index; oid (Entra): via the aux index (§6.1)
 }
 
 // client_for resolves the per-app client for an origin, over app_clients keys (§5):
@@ -327,16 +327,34 @@ rebuilds the index in the post-upgrade hook:
   must be complete, so no SSO credential is keyed `None` and accidentally shares the direct
   provider namespace.
 
-**2. Entra `sub` → `oid` — lazy, per-org, only when adopting per-app gating.** The `stable_id`
-component is `sub` for Okta/Google/OneLogin (nothing to do) but `oid` for Entra (§6), and
-`oid` is not stored today, so this part **cannot** be a one-shot backfill. It upgrades lazily:
-on an Entra user's next login the token carries both `sub` and `oid`, so II matches the
-existing `(iss, sub, aud, sso_domain)` credential and re-keys its identifier component to
-`oid`. Until then the credential stays `sub`-keyed and works normally. This composes with
-migration 1 — an Entra credential goes `(iss, sub, aud, Some(dom))` → (next login) →
-`(iss, oid, aud, Some(dom))`.
+**2. Entra: an auxiliary `oid` index — additive, lazy, no key mutation.** On Entra `sub` is
+per-client, so a per-app login's `sub` won't match the primary credential; the stable
+correlator is `oid` (§6). We do **not** re-key the credential from `sub` to `oid` — mutating a
+security-critical, principal-deriving stable key in place is exactly what to avoid. Instead
+the primary credential stays exactly as stored, and we add an **auxiliary index**:
 
-Neither migration touches the delegation seed or the dapp-facing principal `f(anchor, origin)`.
+```
+(iss, oid, sso_domain)  ->  the primary credential's (iss, sub) key
+```
+
+- **Populated at primary-client login** — the only login carrying both the stable `oid` and
+  the primary `sub`. Existing Entra users get their entry on their next normal SSO login; the
+  stored credential is never touched, an entry is only *added*.
+- **Entra per-app logins resolve through it:** the per-app token gives `(iss, oid)`, the aux
+  index yields the primary `(iss, sub)`, and the existing credential index (with `sso_domain`
+  from migration 1) yields the anchor.
+- **A miss fails safe.** If the aux entry doesn't exist yet, resolution simply doesn't find an
+  anchor — the user completes a normal primary login first — rather than resolving to the
+  wrong identity.
+- The aux key includes `sso_domain`, so it inherits the same rogue-domain isolation as
+  migration 1.
+
+Non-Entra IdPs need no auxiliary index: `sub` is stable across clients, so migration 1's key
+already resolves per-app logins (canonicalizing `aud` to the primary).
+
+Neither migration mutates a credential, the delegation seed, or the dapp-facing principal
+`f(anchor, origin)` — migration 1 rebuilds an index from stored data, migration 2 only adds
+index entries.
 
 ---
 
@@ -425,8 +443,9 @@ resolution in II core (§6).
    bypass is closed).
 3. **Onboarding guide + Entra migration.** Per-IdP client setup, with the Entra
    assignment-required, Okta 400-denial, and Entra `stable_identifier_claim: "oid"` requirements
-   called out (§8). Note: `oid` is not stored today, so the `sub`->`oid` re-key for existing
-   Entra credentials is a lazy at-next-login upgrade, not a backfill (§6.1).
+   called out (§8). Note: `oid` is not stored today, so Entra uses an auxiliary
+   `(iss, oid, sso_domain)` index populated lazily at primary login — no credential re-key
+   (§6.1).
 
 No canister beyond II core, no proxy, no panel.
 
