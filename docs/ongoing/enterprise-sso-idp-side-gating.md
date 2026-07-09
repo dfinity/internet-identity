@@ -208,12 +208,12 @@ org may hide them by replacing a cleartext origin key with a `hash:salt` key, ke
 ```jsonc
 "app_clients": {
   "https://oc.app": "0oaCHAT",                    // cleartext key, or:
-  "b5d4045c...e21:9f3a7c2e...": "0oaPAYROLL"       // "sha256(salt || origin):<salt>", hex
+  "b5d4045c...e21:9f3a7c2e...": "0oaPAYROLL"       // "sha256(origin || salt):<salt>", hex
 }
 ```
 
 II knows the target origin from the ceremony; for each `hash:salt` key it computes
-`sha256(salt || origin)` and matches it against the key's hash. The per-key salt prevents
+`sha256(origin || salt)` and matches it against the key's hash. The per-key salt prevents
 bulk precomputation and cross-org correlation of the same origin. It does not hide an origin
 an attacker already guesses — they can confirm a guess against the published salt — but
 public-dapp origins are guessable anyway, so this protects the non-obvious internal ones,
@@ -256,7 +256,7 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
 
 // client_for resolves the per-app client for an origin, over app_clients keys (§5):
 //   cleartext key -> app_clients[origin]
-//   "hash:salt" key -> the key where sha256(salt || origin) == hash
+//   "hash:salt" key -> the key where sha256(origin || salt) == hash
 ```
 
 - **One access method.** Identity keys on `(iss, subject, primary_client_id)`, where
