@@ -682,10 +682,12 @@ pub struct McpRegistration {
 }
 
 /// Result of `prepare_mcp_registration_delegation`: the canister-signature
-/// public key the `P_reg -> X` registration delegation chain is rooted at, and
-/// the (short) expiration of that delegation. The frontend fetches the signed
-/// delegation with `get_mcp_registration_delegation` and delivers the chain to
-/// the trusted MCP server, which redeems it via `mcp_register_v2`.
+/// public key the registration delegation chain is rooted at (`P_reg`; the
+/// canister-signed hop delegates to the browser-held registration key `Y`),
+/// and the (short) expiration of that delegation. The frontend fetches the
+/// signed delegation with `get_mcp_registration_delegation`, extends the chain
+/// browser-side to the MCP server's key, and delivers it to the server, which
+/// redeems it via `mcp_register_v2`.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct PrepareMcpRegistrationDelegation {
     pub user_key: UserKey,

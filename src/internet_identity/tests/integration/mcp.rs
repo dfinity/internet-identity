@@ -1444,7 +1444,8 @@ fn mcp_read_only_grant_stays_queries_only_across_upgrade() -> Result<(), RejectR
 
 /// Phase-2 registration delegation, happy path. The user consents by minting a
 /// `P_reg -> Y` registration delegation (`prepare` + `get`); the delegation is a
-/// valid II canister signature over `X`; the MCP server then redeems it —
+/// valid II canister signature over the browser-held registration key `Y`; the
+/// MCP server then redeems it —
 /// authenticated as `P_reg` (the chain root) — via `mcp_register_v2` to bind its
 /// long-lived session key `S`. The anchor and the read-only choice come from the
 /// index recorded at prepare (never from a `register_v2` argument), so the echo
@@ -1569,7 +1570,7 @@ fn mcp_register_v2_is_single_use_and_idempotent() -> Result<(), RejectResponse> 
     Ok(())
 }
 
-/// An empty registration key is rejected at `prepare`: hashing an empty `X`
+/// An empty registration key is rejected at `prepare`: hashing an empty `Y`
 /// would derive a fixed, predictable `P_reg` per anchor, defeating the
 /// per-connect uniqueness of the registration principal (mirrors
 /// `mcp_register`'s empty-session-key check).
@@ -1585,7 +1586,7 @@ fn mcp_prepare_registration_delegation_rejects_empty_key() -> Result<(), RejectR
         canister_id,
         principal_1(),
         anchor,
-        ByteBuf::new(), // empty X
+        ByteBuf::new(), // empty Y
         Some(true),
         Some(GRANT_TTL_NS),
     )
