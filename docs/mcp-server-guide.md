@@ -192,9 +192,9 @@ tolerate missing.
 
 Semantics to build against:
 
-- **Redeem immediately.** The registration delegation lives ~90 seconds —
-  enough for the browser hops, not for a queue. Expired delegations get a
-  clean `Err`.
+- **Redeem immediately.** The registration delegation lives 5 minutes —
+  sized to cover the browser hops plus the IC's permitted clock drift, not
+  a queue. Expired delegations get a clean `Err`.
 - **Single-use, retry-safe.** The delegation binds one `S`. A retry of the
   same call (same chain, same `S` — e.g. after a network timeout) is served
   idempotently with the current grant; presenting a used delegation with a
