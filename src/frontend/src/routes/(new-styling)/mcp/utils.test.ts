@@ -186,21 +186,34 @@ describe("mcpAuthorize delivery URL", () => {
     expect(fragment.get("state")).toBe(STATE);
   });
 
-  it("carries the consent tuple the server must echo to mcp_register_v2", async () => {
+  it("carries the echoed consent (permissions, ttl) the server passes to mcp_register_v2", async () => {
     // The derivation authenticates the echo (a tampered value fails to
-    // redeem), but the server needs the plain values to echo: the anchor, the
-    // access level as its wire string, and the grant TTL in nanoseconds.
+    // redeem), but the server needs the plain values to echo: the access level
+    // as its wire string and the grant TTL in nanoseconds.
     const url = await authorize(makeActor(), "read-only");
 
     const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
-    expect(fragment.get("anchor")).toBe(IDENTITY_NUMBER.toString());
     expect(fragment.get("permissions")).toBe("queries");
     expect(fragment.get("ttl")).toBe(
       (BigInt(TTL_SECONDS) * BigInt(1_000_000_000)).toString(),
     );
   });
 
-  it("marks a full-access connect as such in the consent tuple", async () => {
+  it("never delivers the anchor number to the server", async () => {
+    // The canister recovers the anchor server-side from the registration
+    // entry, so it must not ride the fragment (the server never learns it).
+    const url = await authorize(makeActor(), "read-only");
+
+    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+    expect(fragment.get("anchor")).toBeNull();
+    // No delivered value *is* the anchor (the delegation blob is hex and may
+    // contain the digits incidentally, so check param values, not substrings).
+    for (const value of fragment.values()) {
+      expect(value).not.toBe(IDENTITY_NUMBER.toString());
+    }
+  });
+
+  it("marks a full-access connect as such in the echoed consent", async () => {
     const url = await authorize(makeActor(), "full-access");
 
     const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));

@@ -89,12 +89,13 @@ export type McpCompletion = {
  * against that list, mints a short-lived registration chain — a canister-signed
  * `P_reg -> Y` hop to a browser-held ephemeral key, extended browser-side with
  * a `Y -> X` hop — and hands it to the declared callback over a top-level
- * navigation (the chain plus the consent tuple in the URL fragment). There's
- * no real HTTP server: `page.route` intercepts the navigation and serves a
- * page that reads the fragment and POSTs it to a fixture endpoint; that
- * handler — holding `X`'s private key — reconstructs the chain and redeems it
- * by calling `mcp_register_v2` as the server would, echoing the delivered
- * consent tuple (anchor, permissions, ttl) alongside `pub(S)`, then resolves
+ * navigation (the chain plus the echoed consent — permissions, ttl — in the
+ * URL fragment; the anchor is not delivered). There's no real HTTP server:
+ * `page.route` intercepts the navigation and serves a page that reads the
+ * fragment and POSTs it to a fixture endpoint; that handler — holding `X`'s
+ * private key — reconstructs the chain and redeems it by calling
+ * `mcp_register_v2` as the server would, echoing the delivered permissions and
+ * ttl alongside `pub(S)` (the canister recovers the anchor), then resolves
  * `completion`.
  */
 export type McpFixture = {
@@ -153,11 +154,12 @@ const CORS_HEADERS = {
 };
 
 /** The page served at the declared connect callback. Reads the delivered
- *  delegation + state + consent tuple (anchor, permissions, ttl — what the
- *  server must echo to `mcp_register_v2`) from the fragment (never sent to the
- *  server in the HTTP request) and ships them to the redeem endpoint; on
- *  success it either lands on its "connected" state or, if the server asked
- *  for it, navigates onward to its own finish URL. */
+ *  delegation + state + echoed consent (permissions, ttl — what the server
+ *  passes to `mcp_register_v2`; the anchor is NOT delivered, the canister
+ *  recovers it) from the fragment (never sent to the server in the HTTP
+ *  request) and ships them to the redeem endpoint; on success it either lands
+ *  on its "connected" state or, if the server asked for it, navigates onward to
+ *  its own finish URL. */
 const connectPageHtml = (redeemPath: string): string => `<!doctype html>
 <meta charset="utf-8" />
 <title>MCP connect</title>
@@ -168,14 +170,13 @@ const connectPageHtml = (redeemPath: string): string => `<!doctype html>
     const params = new URLSearchParams(location.hash.slice(1));
     const delegation = params.get("delegation");
     const state = params.get("state");
-    const anchor = params.get("anchor");
     const permissions = params.get("permissions");
     const ttl = params.get("ttl");
     // Clear the fragment once parsed (keeping the query string — the declared
     // callback may carry one) so the delegation doesn't linger in the address
     // bar / history — what the server guide tells real servers to do.
     history.replaceState(null, "", location.pathname + location.search);
-    if (!delegation || !state || !anchor || !permissions || !ttl) {
+    if (!delegation || !state || !permissions || !ttl) {
       el.textContent = "Missing delegation";
       return;
     }
@@ -183,7 +184,7 @@ const connectPageHtml = (redeemPath: string): string => `<!doctype html>
       const res = await fetch(${JSON.stringify(redeemPath)}, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ delegation, state, anchor, permissions, ttl }),
+        body: JSON.stringify({ delegation, state, permissions, ttl }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) {
@@ -240,13 +241,13 @@ export const test = base.extend<{ mcp: McpFixture }>({
 
     // Redeem the delivered `P_reg -> Y -> X` chain exactly as the server would:
     // reconstruct the chain, sign as X (which the server holds), and bind S via
-    // `mcp_register_v2`, echoing the delivered consent tuple. `caller()` is
-    // `P_reg`, and the backend re-derives the principal from the echoed tuple
-    // (plus the anchor's current trusted-server config) and matches it against
-    // `caller()` — an altered echo simply fails to redeem.
+    // `mcp_register_v2`, echoing the delivered consent (permissions, ttl).
+    // `caller()` is `P_reg`; the backend recovers the anchor from the
+    // registration entry (never delivered here) and re-derives the principal
+    // from (recovered anchor, echoed values, current config), matching it
+    // against `caller()` — an altered echo simply fails to redeem.
     const redeem = async (delivered: {
       delegation: string;
-      anchor: string;
       permissions: string;
       ttl: string;
     }): Promise<McpCompletion> => {
@@ -267,7 +268,6 @@ export const test = base.extend<{ mcp: McpFixture }>({
         canisterId: II_CANISTER_ID,
       });
       const result = await actor.mcp_register_v2(
-        BigInt(delivered.anchor),
         sessionKey,
         permissionsArg(delivered.permissions),
         [BigInt(delivered.ttl)],
@@ -302,7 +302,6 @@ export const test = base.extend<{ mcp: McpFixture }>({
           let body: {
             delegation?: unknown;
             state?: unknown;
-            anchor?: unknown;
             permissions?: unknown;
             ttl?: unknown;
           } = {};
@@ -314,7 +313,6 @@ export const test = base.extend<{ mcp: McpFixture }>({
           if (
             typeof body.delegation !== "string" ||
             body.state !== state ||
-            typeof body.anchor !== "string" ||
             typeof body.permissions !== "string" ||
             typeof body.ttl !== "string"
           ) {
@@ -324,7 +322,6 @@ export const test = base.extend<{ mcp: McpFixture }>({
           try {
             const received = await redeem({
               delegation: body.delegation,
-              anchor: body.anchor,
               permissions: body.permissions,
               ttl: body.ttl,
             });

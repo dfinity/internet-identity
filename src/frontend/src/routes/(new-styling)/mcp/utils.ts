@@ -57,15 +57,17 @@ interface McpAuthorizeInput {
  *     derivation), then extend the chain *locally* with a second hop `Y -> X`
  *     signed by `priv(Y)`, where `X` is the server's per-connect registration
  *     key from the link.
- *  4. Deliver the full chain — with the consent tuple alongside — to the
- *     trusted server over a URL fragment (a top-level navigation to the
- *     callback it declared — see `matchDeclaredCallback`). The server, holding
- *     `X`'s private key, redeems it by calling `mcp_register_v2` with its
- *     long-lived session key `S`, echoing the tuple; the backend re-derives
- *     `P_reg` from the echoed tuple and binds `S` only if it lands exactly on
- *     `caller()`. II never binds a key it merely received, and any altered
- *     echo (upgraded access, stretched TTL, different anchor) derives a
- *     different principal and is rejected.
+ *  4. Deliver the full chain — with the echoed consent (`permissions`, `ttl`)
+ *     alongside — to the trusted server over a URL fragment (a top-level
+ *     navigation to the callback it declared — see `matchDeclaredCallback`).
+ *     The server, holding `X`'s private key, redeems it by calling
+ *     `mcp_register_v2` with its long-lived session key `S`, echoing those two
+ *     values; the backend recovers the anchor from the registration entry
+ *     (so the anchor is never delivered to or seen by the server), re-derives
+ *     `P_reg` from (recovered anchor, echoed values, current config) and binds
+ *     `S` only if it lands exactly on `caller()`. II never binds a key it
+ *     merely received, and an altered echo (upgraded access, stretched TTL)
+ *     derives a different principal and is rejected.
  *
  * The two-hop shape is load-bearing: what the canister signs transits the IC
  * (the `get` query response passes the answering replica and API boundary
@@ -148,14 +150,16 @@ export const mcpAuthorize = async ({
 
   // Deliver over the fragment (never sent to the server in the HTTP request):
   // the trusted server's endpoint reads it client-side, reconstructs the chain,
-  // and redeems it. The consent tuple rides along — `anchor`, `permissions`
-  // ("queries"/"all") and `ttl` (grant lifetime in ns) are what the server
-  // must echo to `mcp_register_v2` (the derivation authenticates the echo; a
-  // tampered value simply fails to redeem). `state` lets the server correlate.
+  // and redeems it. The echoed consent rides along — `permissions`
+  // ("queries"/"all") and `ttl` (grant lifetime in ns) are what the server must
+  // pass back to `mcp_register_v2` (the derivation authenticates the echo; a
+  // tampered value simply fails to redeem). The anchor is deliberately *not*
+  // delivered: the canister recovers it server-side from the registration
+  // entry, so the server never learns the user's II anchor number. `state`
+  // lets the server correlate.
   const fragment = new URLSearchParams();
   fragment.set("delegation", JSON.stringify(chain.toJSON()));
   fragment.set("state", state);
-  fragment.set("anchor", identityNumber.toString());
   fragment.set("permissions", toPermissionsString(accessLevel));
   fragment.set("ttl", grantTtlNanos.toString());
   return `${callback}#${fragment.toString()}`;
