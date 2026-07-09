@@ -217,7 +217,8 @@
           callback,
           state: request.state,
           // The server's public per-connect key `X` from the link (validated
-          // base64url in `load`); II mints a `P_reg -> X` delegation for it.
+          // base64url in `load`); the browser-signed final hop of the
+          // registration chain targets it.
           registrationKey: fromBase64URL(request.registrationKey),
         });
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);

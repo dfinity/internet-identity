@@ -13,8 +13,10 @@ handles, and it is redeemed exactly once, at connect. Per-app delegations
 Your server generates **two keypairs per connection**:
 
 - the **registration key `X`** — per connect attempt; its public key rides
-  the connect link, and II mints the registration delegation for it. Its
-  private key is what makes the delegation redeemable by you alone.
+  the connect link, and the registration chain's final, browser-signed hop
+  targets it. Its private key is what makes the chain redeemable by you
+  alone. (The chain's canister-signed hop targets an ephemeral key the II
+  frontend holds — see §3b — but you never handle that key.)
 - the **session key `S`** — the long-lived key the grant is bound to; you
   sign all subsequent `mcp_*` calls with it.
 
@@ -37,13 +39,15 @@ sequenceDiagram
     C-->>F: enabled + trusted URL (verify callback origin)
     F->>M: GET /.well-known/ii-auth-callbacks
     M-->>F: {"callbacks": [...]} — link's callback must exact-match
-    F->>C: prepare_mcp_registration_delegation(anchor, X, permissions, ttl)
+    note over F: generate ephemeral key Y (browser-held)
+    F->>C: prepare_mcp_registration_delegation(anchor, Y, permissions, ttl)
     C-->>F: {user_key, expiration} — consent recorded under P_reg
-    F->>C: get_mcp_registration_delegation(anchor, X, expiration)
-    C-->>F: SignedDelegation — the P_reg to X chain
+    F->>C: get_mcp_registration_delegation(anchor, Y, expiration)
+    C-->>F: SignedDelegation — the P_reg to Y hop (inert without Y)
+    note over F: sign the second hop Y to X locally — full chain never transits the IC
     F->>U: navigate tab to callback#delegation, state
     U->>M: your connect page reads the fragment, ships it to your backend
-    M->>C: mcp_register_v2(session key S) — signed via the P_reg to X chain
+    M->>C: mcp_register_v2(session key S) — signed via the P_reg to Y to X chain
     C-->>M: {expiration, permissions} — grant bound: S's principal to anchor
     note over U,M: your page owns the tab now — finish your flow (e.g. OAuth code redirect)
     end
@@ -118,10 +122,10 @@ https://<II_ORIGIN>/mcp#registration_key=<base64url DER public key>&callback=<de
   minted per connect attempt** (Ed25519 recommended, e.g. agent-js
   `Ed25519KeyIdentity`), DER-encoded, base64url without padding. Only public
   key material travels in the link; the corresponding private key stays on
-  your server and is what lets you — and only you — redeem the delegation.
-  Never reuse an `X` across connect attempts: II rejects a second
-  registration for a key whose previous one is still live, and the
-  delegation for it is single-use.
+  your server and is what lets you — and only you — redeem the delegation
+  chain. Mint a fresh `X` per attempt and bind it to that attempt's `state`:
+  the chain you receive is single-use, so a stale `X` has nothing left to
+  redeem.
 - `callback` — one of the URLs you declared in §1, verbatim. The user must
   have set your origin as their trusted MCP server in II Settings (matching
   is by **origin**; the callback is then matched against your declared list).
@@ -136,9 +140,11 @@ https://<II_ORIGIN>/mcp#registration_key=<base64url DER public key>&callback=<de
 ## 3. Receive and redeem the registration delegation
 
 **a) Delivery.** After the user consents, II mints a canister-signed
-delegation `P_reg -> X` (where `P_reg` is a registration principal derived
-from the user's consent — you never construct it) and navigates the
-connecting tab to your declared callback with the chain in the **URL
+delegation `P_reg -> Y` (where `P_reg` is a registration principal derived
+from the user's consent and `Y` is an ephemeral key the II frontend holds —
+you never construct or see either), extends it browser-side with a second,
+browser-signed hop `Y -> X` to your registration key, and navigates the
+connecting tab to your declared callback with the full chain in the **URL
 fragment**:
 
 ```
@@ -159,10 +165,14 @@ history.replaceState(null, "", location.pathname + location.search);
 ```
 
 **b) The chain format** is agent-js `DelegationChain.toJSON()`: an object
-`{"delegations": [{"delegation": {"pubkey": "<hex>", "expiration": "<hex ns>"},
-"signature": "<hex>"}], "publicKey": "<hex>"}` with hex-encoded fields, where
-`publicKey` is `P_reg`'s DER key and the single delegation is to your `X`.
-With agent-js, reconstruction is two calls:
+`{"delegations": [ ... ], "publicKey": "<hex>"}` with hex-encoded fields,
+where `publicKey` is `P_reg`'s DER key and `delegations` carries **two
+hops** — the canister-signed `P_reg -> Y` and the browser-signed `Y -> X` to
+your registration key. The split is deliberate: what the II canister signs
+transits the IC (replicas, boundary nodes) and must be inert on its own, so
+it targets the browser-held `Y`; the redeemable chain is assembled only in
+the consenting browser and reaches you only via the fragment. You never
+handle `Y` — with agent-js, reconstruction is the same two calls:
 
 ```js
 import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";

@@ -24,7 +24,8 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
  * delivered delegation to the connect it started, and the requested
  * session-grant TTL (`ttl`, in seconds). The MCP server the user connects is
  * identified by the callback's *origin* (each user trusts whichever server they
- * connect); II mints a single-use registration delegation `P_reg -> X` and
+ * connect); II mints a single-use registration delegation chain (rooted at a
+ * canister-signed hop to a browser-held key, extended locally to `X`) and
  * delivers it to the callback only after it exact-matches the allow-list the
  * server declares at a fixed well-known path on that origin (see
  * `matchDeclaredCallback`), so a crafted link can't point II at an arbitrary
@@ -42,9 +43,10 @@ export type McpParams =
   | {
       kind: "valid";
       /** The MCP server's registration public key `X` (DER, base64url) for this
-       *  connect. II mints a single-use `P_reg -> X` delegation for it, so the
-       *  server can bind its long-lived session key by redeeming that chain
-       *  (`mcp_register_v2`) — nothing secret rides this public key. */
+       *  connect. The registration chain's browser-signed final hop targets
+       *  it, so the server can bind its long-lived session key by redeeming
+       *  that chain (`mcp_register_v2`) — nothing secret rides this public
+       *  key. */
       registrationKey: string;
       callback: string;
       /** Opaque value the server issued for this connect; delivered back
@@ -120,9 +122,9 @@ export const load: PageLoad = ({ url }): { params: McpParams } => {
   // II's request logs; the address-bar copy is cleared in `+page.svelte` via
   // `replaceState`). Reading `url.hash` relies on this universal `load`
   // re-running client-side; with `adapter-static` it's empty during prerender.
-  // The `registration_key` is the server's *public* per-connect key `X`; II
-  // mints a `P_reg -> X` delegation for it, so no secret key material rides the
-  // (attacker-craftable) link.
+  // The `registration_key` is the server's *public* per-connect key `X`; the
+  // browser-signed hop of the registration chain targets it, so no secret key
+  // material rides the (attacker-craftable) link.
   const params = new URLSearchParams(url.hash.slice(1));
 
   const request = McpRequestSchema.safeParse({

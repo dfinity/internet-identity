@@ -75,9 +75,10 @@ export type McpCompletion = {
  * long-lived session key `S` it wants bound to the anchor. It declares its
  * connect callback in the auth-callback allow-list it hosts at
  * `/.well-known/ii-auth-callbacks`; II exact-matches the link's callback
- * against that list, mints a single-use `P_reg -> X` delegation, and hands it
- * to the declared callback over a top-level navigation (the delegation in the
- * URL fragment). There's no real HTTP server: `page.route` intercepts the
+ * against that list, mints a single-use registration chain — a canister-signed
+ * `P_reg -> Y` hop to a browser-held ephemeral key, extended browser-side with
+ * a `Y -> X` hop — and hands it to the declared callback over a top-level
+ * navigation (the chain in the URL fragment). There's no real HTTP server: `page.route` intercepts the
  * navigation and serves a page that reads the fragment and POSTs it to a
  * fixture endpoint; that handler — holding `X`'s private key — reconstructs the
  * chain and redeems it by calling `mcp_register_v2(pub(S))` as the server
@@ -220,7 +221,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
       nextOutcome = outcome;
     };
 
-    // Redeem the delivered `P_reg -> X` chain exactly as the server would:
+    // Redeem the delivered `P_reg -> Y -> X` chain exactly as the server would:
     // reconstruct the chain, sign as X (which the server holds), and bind S via
     // `mcp_register_v2`. `caller()` is `P_reg`, so the backend recovers the
     // anchor and access level from the index entry `prepare` recorded.

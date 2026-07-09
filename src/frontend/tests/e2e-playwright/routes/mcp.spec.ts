@@ -241,7 +241,7 @@ test("Allow access mints a registration delegation the server redeems", async ({
   ).toBeChecked();
   await page.getByRole("button", { name: "Allow access" }).click();
 
-  // II minted a single-use P_reg -> X delegation and handed it to the trusted
+  // II minted a single-use P_reg -> Y -> X registration chain and handed it to the trusted
   // server's declared callback (in the fragment). The server redeemed it via
   // mcp_register_v2, binding its session key: the completion reports the state
   // echo, the grant expiration (ns since epoch as a decimal string), and the
@@ -495,7 +495,7 @@ test("Unchecking read-only mode connects with full access", async ({
   expect(completion.permissions).toBe("all");
 });
 
-// The browser /mcp flow mints a single-use registration delegation (P_reg -> X)
+// The browser /mcp flow mints a single-use registration chain (P_reg -> Y -> X)
 // and hands it to the trusted server, which redeems it (`mcp_register_v2`) to
 // bind its long-lived session key `S` to the user's identity — no per-request
 // app, and no account chosen at connect. Per-app delegations are minted

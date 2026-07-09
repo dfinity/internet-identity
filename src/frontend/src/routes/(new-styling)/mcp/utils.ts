@@ -1,6 +1,7 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
-import { DelegationChain } from "@icp-sdk/core/identity";
+import type { PublicKey } from "@icp-sdk/core/agent";
+import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import {
   throwTextCanisterError,
   transformSignedDelegation,
@@ -28,38 +29,48 @@ interface McpAuthorizeInput {
    *  the registration delegation so the server can tie it to the connect it
    *  started. */
   state: string;
-  /** The MCP server's registration public key `X` (DER) for this connect. II
-   *  mints a single-use `P_reg -> X` delegation for it; nothing secret. */
+  /** The MCP server's registration public key `X` (DER) for this connect, from
+   *  the link. The *browser-signed* final hop of the registration chain targets
+   *  it (see `mcpAuthorize` — the canister never delegates to it directly);
+   *  nothing secret. */
   registrationKey: Uint8Array;
 }
 
 /**
- * Connects the MCP server by minting a single-use *registration delegation* and
- * handing it to the server, instead of fetching the server's key and calling
- * `mcp_register` on its behalf. The flow:
+ * Connects the MCP server by minting a single-use *registration delegation
+ * chain* and handing it to the server, instead of fetching the server's key
+ * and calling `mcp_register` on its behalf. The flow:
  *
- *  1. `prepare_mcp_registration_delegation` — authenticated as the user, mint a
- *     short-lived canister-signed delegation `P_reg -> X` (where `X` is the
- *     server's per-connect registration key from the link) and record the
+ *  1. Generate an ephemeral registration key `Y` for this connect; its private
+ *     half never leaves this page.
+ *  2. `prepare_mcp_registration_delegation` — authenticated as the user, mint a
+ *     short-lived canister-signed delegation `P_reg -> Y` and record the
  *     consent (this anchor, the read-only choice, the grant TTL) on an index
  *     entry keyed by `P_reg`. The anchor and access level live on that entry,
  *     never in an argument the server controls.
- *  2. `get_mcp_registration_delegation` — fetch the certified `P_reg -> X`
- *     delegation and assemble the chain.
- *  3. Deliver the chain to the trusted server over a URL fragment (a top-level
- *     navigation to the callback it declared — see `matchDeclaredCallback`).
- *     The server, holding `X`'s private key, redeems the chain by calling
- *     `mcp_register_v2` with its long-lived session key `S`; the backend binds
- *     `S` to the recorded anchor with the recorded access level. II never binds
- *     a key it merely received, and the registration delegation is single-use.
+ *  3. `get_mcp_registration_delegation` — fetch the certified `P_reg -> Y`
+ *     delegation, then extend the chain *locally* with a second hop `Y -> X`
+ *     signed by `priv(Y)`, where `X` is the server's per-connect registration
+ *     key from the link.
+ *  4. Deliver the full chain to the trusted server over a URL fragment (a
+ *     top-level navigation to the callback it declared — see
+ *     `matchDeclaredCallback`). The server, holding `X`'s private key, redeems
+ *     it by calling `mcp_register_v2` with its long-lived session key `S`; the
+ *     backend binds `S` to the recorded anchor with the recorded access level.
+ *     II never binds a key it merely received, and the chain is single-use.
  *
- * Nothing is delivered anywhere but a callback the trusted origin declares
- * (the origin is verified against the synced config, and the callback against
- * the server's allow-list, by the caller), and the fragment carries only the
- * server's own public key material — no secret. Resolves with the delivery URL
- * the caller should navigate the tab to; the server's callback finishes the
- * flow on its side (e.g. redeeming the chain and handing an OAuth code back to
- * an MCP client).
+ * The two-hop shape is load-bearing: what the canister signs transits the IC
+ * (the `get` query response passes the answering replica and API boundary
+ * nodes), so it must be inert on its own — it delegates to the browser-held
+ * `Y`, never to the link-supplied `X` an attacker could have planted. The only
+ * redeemable artifact, the full `P_reg -> Y -> X` chain, is assembled inside
+ * this page and leaves it exclusively via the fragment navigation to the
+ * declared callback. Nothing is delivered anywhere but a callback the trusted
+ * origin declares (the origin is verified against the synced config, and the
+ * callback against the server's allow-list, by the caller). Resolves with the
+ * delivery URL the caller should navigate the tab to; the server's callback
+ * finishes the flow on its side (e.g. redeeming the chain and handing an OAuth
+ * code back to an MCP client).
  */
 export const mcpAuthorize = async ({
   authenticated,
@@ -71,34 +82,53 @@ export const mcpAuthorize = async ({
 }: McpAuthorizeInput): Promise<string> => {
   const { identityNumber, actor } = authenticated;
 
+  // The ephemeral registration key `Y` for this connect. The canister-signed
+  // hop targets this browser-held key — never the link-supplied `X` — so the
+  // delegation that transits the IC is inert to any transport-level observer:
+  // only this page holds `priv(Y)`. Fresh per attempt, which also keeps
+  // `P_reg` per-connect-unique (and retries collision-free).
+  const registrationIdentity = await ECDSAKeyIdentity.generate({
+    extractable: false,
+  });
+  const browserKey = new Uint8Array(
+    registrationIdentity.getPublicKey().toDer(),
+  );
+
   // The session-grant lifetime the user chose (the backend clamps again). The
   // access level is recorded on the index entry, not folded into the signature.
-  // A backend refusal (MCP disabled, unauthenticated, a duplicate in-flight
-  // key, ...) throws here and fails the connect before anything is delivered.
+  // A backend refusal (MCP disabled, unauthenticated, ...) throws here and
+  // fails the connect before anything is delivered.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
   const { user_key, expiration } = await actor
     .prepare_mcp_registration_delegation(
       identityNumber,
-      registrationKey,
+      browserKey,
       toPermissionsArg(accessLevel),
       [grantTtlNanos],
     )
     .then(throwTextCanisterError);
 
   const signed = await actor
-    .get_mcp_registration_delegation(
-      identityNumber,
-      registrationKey,
-      expiration,
-    )
+    .get_mcp_registration_delegation(identityNumber, browserKey, expiration)
     .then(throwTextCanisterError);
 
-  // Assemble the `P_reg -> X` chain the server will redeem. `user_key` is
-  // `P_reg`'s DER public key, so the server's `mcp_register_v2` call is seen by
-  // the backend as `caller() == P_reg`.
-  const chain = DelegationChain.fromDelegations(
+  // Hop 1, canister-signed: `P_reg -> Y`. `user_key` is `P_reg`'s DER public
+  // key, so the server's eventual `mcp_register_v2` call is seen by the
+  // backend as `caller() == P_reg`.
+  const canisterHop = DelegationChain.fromDelegations(
     [transformSignedDelegation(signed)],
     new Uint8Array(user_key),
+  );
+
+  // Hop 2, signed here with `priv(Y)`: extend the chain to the server's `X`
+  // from the link, with the same expiration as the canister hop. Only now does
+  // a redeemable chain exist — inside this page — and it leaves only via the
+  // fragment navigation below.
+  const chain = await DelegationChain.create(
+    registrationIdentity,
+    { toDer: () => registrationKey } as unknown as PublicKey,
+    new Date(Number(expiration / BigInt(1_000_000))),
+    { previous: canisterHop },
   );
 
   // Deliver over the fragment (never sent to the server in the HTTP request):

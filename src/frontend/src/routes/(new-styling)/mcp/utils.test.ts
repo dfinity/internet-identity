@@ -15,8 +15,8 @@ const CALLBACK = `${MCP_ORIGIN}/mcp/connect`;
 const STATE = "opaque-state";
 const TTL_SECONDS = 3600;
 
-/** The MCP server's per-connect registration public key `X` (DER). II mints a
- *  `P_reg -> X` delegation for it — nothing secret rides this. */
+/** The MCP server's per-connect registration public key `X` (DER), from the
+ *  link. The browser-signed final hop targets it — the canister never sees it. */
 const REGISTRATION_KEY = new Uint8Array(44).fill(9);
 /** `P_reg`'s DER public key, returned by the mocked prepare call — the chain's
  *  public key, and what makes the server's redemption `caller() == P_reg`. */
@@ -26,9 +26,11 @@ const expirationNanos = (): bigint =>
   BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000);
 
 /** Fake actor recording the exact candid arguments the flow sends. `prepare`
- *  returns `P_reg`'s key + an expiration; `get` returns a well-formed (but
- *  arbitrary) signed `P_reg -> X` delegation — the chain is only assembled and
- *  serialized on the frontend, never verified, so the bytes needn't be real. */
+ *  returns `P_reg`'s key + an expiration; `get` echoes back a well-formed
+ *  signed delegation for whatever key was requested (the browser-generated
+ *  `Y`, unknown to the test up front) — the chain is only assembled and
+ *  serialized on the frontend, never verified, so the signature needn't be
+ *  real. */
 const makeActor = () => {
   const expiration = expirationNanos();
   return {
@@ -36,19 +38,43 @@ const makeActor = () => {
     prepare_mcp_registration_delegation: vi
       .fn()
       .mockResolvedValue({ Ok: { user_key: USER_KEY, expiration } }),
-    get_mcp_registration_delegation: vi.fn().mockResolvedValue({
-      Ok: {
-        delegation: {
-          pubkey: Array.from(REGISTRATION_KEY),
-          expiration,
-          targets: [],
-          permissions: [],
-        },
-        signature: Array.from(new Uint8Array(64).fill(1)),
-      },
-    }),
+    get_mcp_registration_delegation: vi.fn(
+      (
+        _anchor: bigint,
+        requestedKey: Uint8Array,
+      ): Promise<
+        | {
+            Ok: {
+              delegation: {
+                pubkey: number[];
+                expiration: bigint;
+                targets: never[];
+                permissions: never[];
+              };
+              signature: number[];
+            };
+          }
+        | { Err: string }
+      > =>
+        Promise.resolve({
+          Ok: {
+            delegation: {
+              pubkey: Array.from(requestedKey),
+              expiration,
+              targets: [],
+              permissions: [],
+            },
+            signature: Array.from(new Uint8Array(64).fill(1)),
+          },
+        }),
+    ),
   };
 };
+
+/** The browser-generated registration key `Y` the flow sent to `prepare` —
+ *  readable only after the flow ran. */
+const browserKeyOf = (actor: ReturnType<typeof makeActor>): Uint8Array =>
+  actor.prepare_mcp_registration_delegation.mock.calls[0][1] as Uint8Array;
 
 const authorize = (
   actor: ReturnType<typeof makeActor>,
@@ -83,15 +109,36 @@ describe("mcpAuthorize registration-delegation minting", () => {
     const actor = makeActor();
     await authorize(actor, "read-only");
 
-    // Minted for the identity and the server's registration key, with the
-    // user-chosen grant TTL and the read-only access level (recorded on the
-    // index entry by the backend, never folded into the signature).
+    // Minted for the identity and a browser-generated ephemeral key Y, with
+    // the user-chosen grant TTL and the read-only access level (recorded on
+    // the index entry by the backend, never folded into the signature).
     expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
-      REGISTRATION_KEY,
+      expect.any(Uint8Array),
       [{ queries: null }],
       [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
     );
+  });
+
+  it("never sends the link's key X to the canister", async () => {
+    // The canister-signed hop must be inert to a transport-level observer:
+    // it targets the browser-held Y, never the (attacker-craftable) link's X.
+    const actor = makeActor();
+    await authorize(actor, "read-only");
+
+    const browserKey = browserKeyOf(actor);
+    expect(browserKey.length).toBeGreaterThan(0);
+    expect(toHex(browserKey)).not.toBe(toHex(REGISTRATION_KEY));
+    const [, getKey] = actor.get_mcp_registration_delegation.mock.calls[0];
+    expect(toHex(getKey as Uint8Array)).toBe(toHex(browserKey));
+  });
+
+  it("generates a fresh Y per connect attempt", async () => {
+    const first = makeActor();
+    await authorize(first, "read-only");
+    const second = makeActor();
+    await authorize(second, "read-only");
+    expect(toHex(browserKeyOf(first))).not.toBe(toHex(browserKeyOf(second)));
   });
 
   it("passes full access explicitly (never relies on the backend default)", async () => {
@@ -100,7 +147,7 @@ describe("mcpAuthorize registration-delegation minting", () => {
 
     expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
-      REGISTRATION_KEY,
+      expect.any(Uint8Array),
       [{ all: null }],
       [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
     );
@@ -112,7 +159,7 @@ describe("mcpAuthorize registration-delegation minting", () => {
 
     expect(actor.get_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
-      REGISTRATION_KEY,
+      browserKeyOf(actor),
       actor.expiration,
     );
   });
@@ -132,8 +179,9 @@ describe("mcpAuthorize delivery URL", () => {
     expect(fragment.get("state")).toBe(STATE);
   });
 
-  it("carries a reconstructable P_reg -> X delegation chain", async () => {
-    const url = await authorize(makeActor(), "read-only");
+  it("carries a reconstructable two-hop P_reg -> Y -> X chain", async () => {
+    const actor = makeActor();
+    const url = await authorize(actor, "read-only");
 
     const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
     const delegation = fragment.get("delegation");
@@ -143,11 +191,20 @@ describe("mcpAuthorize delivery URL", () => {
     const chain = DelegationChain.fromJSON(JSON.parse(delegation));
     // Its public key is P_reg's DER key, so the redemption is caller() == P_reg.
     expect(toHex(new Uint8Array(chain.publicKey))).toBe(toHex(USER_KEY));
-    expect(chain.delegations).toHaveLength(1);
-    // The delegated-to key is the server's registration key X.
-    expect(toHex(new Uint8Array(chain.delegations[0].delegation.pubkey))).toBe(
+    expect(chain.delegations).toHaveLength(2);
+    const [canisterHop, browserHop] = chain.delegations;
+    // Hop 1 (canister-signed) targets the browser-held Y...
+    expect(toHex(new Uint8Array(canisterHop.delegation.pubkey))).toBe(
+      toHex(browserKeyOf(actor)),
+    );
+    // ...hop 2 (browser-signed) targets the server's X, expiring no later
+    // than the canister hop.
+    expect(toHex(new Uint8Array(browserHop.delegation.pubkey))).toBe(
       toHex(REGISTRATION_KEY),
     );
+    expect(
+      browserHop.delegation.expiration <= canisterHop.delegation.expiration,
+    ).toBe(true);
   });
 });
 
