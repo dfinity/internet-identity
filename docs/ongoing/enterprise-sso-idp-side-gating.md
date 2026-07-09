@@ -202,24 +202,22 @@ org's web root.
 
 `client_id`s are public by design (II uses public/SPA clients, no secret), so exposing them is
 harmless. The **origins** may be sensitive — they reveal the org's internal app portfolio. An
-org may instead publish each entry hashed with a **per-origin salt**:
+org may hide them by replacing a cleartext origin key with a `salt:hash` key, keeping the same
+`origin -> client_id` object:
 
 ```jsonc
-"app_clients": [
-  {
-    "origin_sha256": "b5d4045c...e21",   // sha256(salt || origin), hex
-    "salt": "9f3a7c2e...",               // random, distinct per entry, hex
-    "client_id": "0oaPAYROLL"
-  }
-]
+"app_clients": {
+  "https://oc.app": "0oaCHAT",                    // cleartext key, or:
+  "9f3a7c2e...:b5d4045c...e21": "0oaPAYROLL"       // "<salt>:sha256(salt || origin)", hex
+}
 ```
 
-II knows the target origin from the ceremony, so it resolves an entry by computing
-`sha256(entry.salt || origin)` and matching it against `origin_sha256`. The per-origin salt
-prevents bulk precomputation and cross-org correlation of the same origin. It does not hide
-an origin an attacker already guesses — they can confirm a guess against the published salt —
-but public-dapp origins are guessable anyway, so this protects the non-obvious internal ones,
-which is sufficient.
+II knows the target origin from the ceremony; for each `salt:hash` key it computes
+`sha256(salt || origin)` and matches it against the key's hash. The per-key salt prevents
+bulk precomputation and cross-org correlation of the same origin. It does not hide an origin
+an attacker already guesses — they can confirm a guess against the published salt — but
+public-dapp origins are guessable anyway, so this protects the non-obvious internal ones,
+which is sufficient. Cleartext and hashed keys may coexist in one object.
 
 ---
 
@@ -256,9 +254,9 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
     lookup_or_create_anchor(identity_key)                     // the single OpenID credential
 }
 
-// client_for resolves the per-app client for an origin, handling both forms (§5):
-//   cleartext  -> app_clients[origin]
-//   hashed     -> the entry whose sha256(entry.salt || origin) == entry.origin_sha256
+// client_for resolves the per-app client for an origin, over app_clients keys (§5):
+//   cleartext key -> app_clients[origin]
+//   "salt:hash" key -> the key where sha256(salt || origin) == hash
 ```
 
 - **One access method.** Identity keys on `(iss, subject, primary_client_id)`, where
