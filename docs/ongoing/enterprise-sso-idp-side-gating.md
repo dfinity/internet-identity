@@ -82,12 +82,13 @@ gated app.
   attribute forwarding.
 - **Changing the dapp-facing principal derivation** — it stays `f(anchor, origin)` (§6).
 
-**In-scope behavior change (deliberate).** SSO attributes (`sso:<domain>:…` and the gated
-`implicit:origin`) become certifiable **only from an SSO session** (`sso_prepare_delegation`),
-not from a passkey/`openid_prepare_delegation` session on an anchor that merely has an SSO
-access method (§6.3). This tightens the existing `sso:<domain>` flow (today cert reads the
-stored credential in any session), so it affects current SSO-attribute consumers, not just the
-new gate — a conscious part of this design, not a side effect.
+**In-scope behavior change (deliberate).** `sso:<domain>:…` attributes become certifiable
+**only from an SSO session** (`sso_prepare_delegation`), not from a
+passkey/`openid_prepare_delegation` session on an anchor that merely has an SSO access method
+(§6.3). This tightens the existing `sso:<domain>` flow (today cert reads the stored credential
+in any session), so it affects current SSO-attribute consumers, not just the new gate — a
+conscious part of this design. (`implicit:origin` is unchanged — it stays certified for every
+flow as the general origin binding; the gate rides on `sso:<domain>`, §6.4.)
 
 ---
 
@@ -153,10 +154,10 @@ sequenceDiagram
         FE->>II: get_account_delegation(anchor, payroll.com)
         II-->>FE: delegation for f(account, payroll.com)
         FE->>II: prepare_icrc3_attributes(anchor, payroll.com)
-        Note over II: caller == seed_sso(org.com, payroll)? then certify implicit:origin + sso:org.com
+        Note over II: caller == seed_sso(org.com, payroll)? then certify sso:org.com (implicit:origin as usual)
         II-->>FE: certified attributes
         FE->>Dapp: delegation + certified attributes
-        Note over Dapp: verify sso:org.com AND implicit:origin, then grant
+        Note over Dapp: require certified sso:org.com, then grant
     end
 ```
 
@@ -171,7 +172,7 @@ per-origin client with `get_sso_discovery(domain, origin)`. Three responsibiliti
   The origin-scoped calls then require that principal — so if the gate refused to mint, there
   is no session to authenticate with (§6). Identity still resolves to the primary client.
 - **Dapp — verify.** The dapp checks the certified `sso:<domain>` (which org) and relies on the
-  certified `implicit:origin` (gated access). Both are only produced from an SSO session (§6.3),
+  certified `sso:<domain>` (gated access), which is only produced from an SSO session (§6.3),
   so a passkey login on the same anchor shares no SSO attributes.
 
 ---
@@ -305,27 +306,31 @@ require caller == seed(iss, sub, sso_domain, origin, anchor)   // one hash — O
 
 - **Config-free at cert.** No `app_clients`, no client-matching, no hashed-key math — the gate
   already happened at mint time (§6.2), so a matching principal *exists only if* it passed.
-- **SSO attributes require an SSO sign-in.** `sso:<domain>` (and the gated `implicit:origin`)
-  are certified only for this principal. A **passkey** login — or `openid_prepare_delegation` —
+- **SSO attributes require an SSO sign-in.** `sso:<domain>` (and any `sso:<domain>:…`) are
+  certified only for this principal. A **passkey** login — or `openid_prepare_delegation` —
   produces a different principal, so an anchor that merely *has* an SSO access method shares
   **no** SSO attributes unless the user actually signed in through SSO this session. (This
-  tightens today's behavior, where cert reads the stored credential in any session — see the
-  scope note in §2.)
+  tightens today's behavior; see §2.) `implicit:origin` is *not* gated — it stays certified for
+  every flow (direct providers, passkey) as the general origin binding; the gate rides on
+  `sso:<domain>` (§6.4).
 - **Own freshness.** The SSO delegation carries its own (tighter) expiry, so SSO attributes
   reflect a *recent* SSO ceremony, independent of the general/passkey session lifetime.
 
-### 6.4 Composition with `sso:<domain>` — assignment vs. domain
+### 6.4 The gate is the origin-bound `sso:<domain>`
 
-Two independent layers, both certified only from the SSO session:
-- **`implicit:origin` (per-app assignment within a domain):** exists only because the gate
-  (§6.2) minted the SSO delegation for this origin's per-app client.
-- **`sso:<domain>` (which domain):** the discovery domain II actually resolved from —
-  unforgeable.
+The dapp's boundary is a single certified attribute: **`sso:<domain>`**, and its *presence in a
+message for origin X* proves both things at once, because it is only certified for the
+SSO-session principal (§6.3), and that session:
+- **exists only if the per-app gate passed** — `sso_prepare_delegation` mints it only when
+  `aud == app_clients[X]` (assignment *within* the domain, §6.2), and
+- **carries the domain II actually resolved from** — `sso:evil.com` for a rogue login, never
+  `sso:acme.com` (which *domain*, unforgeable).
 
-An insider via a rogue `evil.com` (pointing at the org's real IdP) is certifiably
-`sso:evil.com`, so the dapp rejects — regardless of what `evil.com`'s `app_clients` claims.
-Within the org's real domain, the gated origin's per-app client is only issued to assigned
-users by the IdP. Together: **assigned user, from the expected org.**
+So a gated dapp that requires `sso:acme.com` gets "assigned user, from the expected org" from
+that one check. An insider via a rogue `evil.com` (pointing at the org's real IdP) is certifiably
+`sso:evil.com` → rejected, regardless of `evil.com`'s `app_clients`; a non-assigned user can't
+mint the SSO session for X at all. `implicit:origin` is orthogonal — the usual anti-replay
+origin binding, certified for every flow, not the gate.
 
 > **Bounded reconfiguration window.** The seed binds the origin, not the client. So an SSO
 > delegation minted while an app was *ungated* still matches after the app is flipped to gated,
@@ -370,15 +375,16 @@ Cross-domain isolation does **not** depend on this lookup — it comes from the 
    mints the SSO delegation only if `jwt.aud == app_clients[origin]` (§6.2), and its seed binds
    `(sso_domain, origin)`. The origin-scoped calls recompute that principal (§6.3), so a caller
    can't fake or omit anything — a wrong/absent SSO session simply doesn't match. There is no
-   ungated path to the certified `implicit:origin`.
-2. **SSO attributes only exist for an SSO sign-in.** `sso:<domain>` and the gated
-   `implicit:origin` are certified only for the SSO-session principal, so a passkey login (or
+   ungated path to the certified `sso:<domain>` for this origin.
+2. **SSO attributes only exist for an SSO sign-in.** `sso:<domain>` (and `sso:<domain>:…`) are
+   certified only for the SSO-session principal, so a passkey login (or
    `openid_prepare_delegation`) on an anchor that merely *has* an SSO access method shares none
    of them. The SSO delegation's own (tighter) expiry keeps them fresh.
-3. **The certified `sso:<domain>` is unforgeable** — it is the discovery domain II actually
-   resolved from, so a rogue-domain login is `sso:evil.com` and the dapp rejects, regardless of
-   what that domain's `app_clients` claims (§6.4). `implicit:origin` gates *assignment within a
-   domain*; `sso:<domain>` gates *which domain* — both are required.
+3. **The origin-bound `sso:<domain>` is the whole gate.** Its presence for origin X proves both
+   *which domain* (it is the discovery domain II resolved from — a rogue login is `sso:evil.com`,
+   never `sso:acme.com`) and *assignment within it* (the SSO session was minted only if
+   `aud == app_clients[X]`, §6.2). So a gated dapp requiring `sso:acme.com` gets both from one
+   check; `implicit:origin` is orthogonal anti-replay, not the gate (§6.4).
 4. **IdP assignment gates the per-app token.** Within the real domain, the IdP only issues a
    token for the origin's per-app client to assigned users, so `sso_prepare_delegation` can only
    mint an origin-bound session for them.
@@ -441,7 +447,7 @@ well-known.
 > **Security invariant:** the gate is **mint-or-refuse at `sso_prepare_delegation`** (§6.2) — a
 > refused gate mints no SSO delegation, so the origin-scoped calls have no principal to
 > authenticate with. Certification is a config-free check that the caller *is* that SSO-session
-> principal (§6.3). SSO attributes (`sso:<domain>`, gated `implicit:origin`) are therefore only
+> principal (§6.3). SSO attributes (`sso:<domain>`, `sso:<domain>:…`) are therefore only
 > ever produced from an SSO sign-in, and the dapp additionally verifies `sso:<domain>` for the
 > domain (existing lib — no new work).
 
