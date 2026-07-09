@@ -1567,3 +1567,32 @@ fn mcp_register_v2_is_single_use_and_idempotent() -> Result<(), RejectResponse> 
 
     Ok(())
 }
+
+/// An empty registration key is rejected at `prepare`: hashing an empty `X`
+/// would derive a fixed, predictable `P_reg` per anchor, defeating the
+/// per-connect uniqueness of the registration principal (mirrors
+/// `mcp_register`'s empty-session-key check).
+#[test]
+fn mcp_prepare_registration_delegation_rejects_empty_key() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    let result = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::new(), // empty X
+        Some(true),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap();
+    assert!(
+        matches!(&result, Err(message) if message.contains("empty registration key")),
+        "an empty registration key must be rejected: {result:?}"
+    );
+
+    Ok(())
+}

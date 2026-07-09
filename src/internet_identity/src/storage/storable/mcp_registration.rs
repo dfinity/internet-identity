@@ -13,9 +13,11 @@ use std::borrow::Cow;
 /// its `caller()` *is* `P_reg` — needs to bind the session key the MCP server
 /// generates: the anchor to bind it to (recovered here, never taken from a call
 /// argument), the read-only choice the user made at connect, and the session
-/// grant's requested lifetime. The entry is deleted on the first successful
-/// `mcp_register_v2`, so the registration delegation is single-use; a boundary
-/// retry with the same key is served idempotently from the resulting grant.
+/// grant's requested lifetime. The entry is *retained* after the first
+/// successful `mcp_register_v2`, marked `used` and bound to the registered key,
+/// so the delegation is single-use: a boundary retry is idempotent only for the
+/// same caller (`P_reg`) and the same key, and any other reuse is rejected. The
+/// entry is removed once a lookup finds it expired.
 #[derive(Encode, Decode, Clone, Debug, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableMcpRegistration {

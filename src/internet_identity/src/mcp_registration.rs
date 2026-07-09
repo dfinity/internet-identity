@@ -41,11 +41,15 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 
-/// Lifetime of a registration delegation. Long enough to cover the browser hops
-/// (II frontend `get` query, top-level navigation to the pinned callback, the
-/// MCP server redeeming the chain) and short enough to bound how long a leaked
-/// or abandoned entry is useful.
-pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 90 * 1_000_000_000;
+/// Lifetime of a registration delegation: 5 minutes. Long enough to cover the
+/// browser hops (II frontend `get` query, top-level navigation to the server's
+/// declared callback, the MCP server redeeming the chain) and short enough to
+/// bound how long a leaked or abandoned entry is useful. Deliberately not
+/// shorter: delegation expiry is checked at ingress against the receiving
+/// node's clock, and IC gateways/libraries permit ~5 minutes of clock drift —
+/// a tighter window could be partly (or wholly) consumed by skew between this
+/// subnet's time and the validator's.
+pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 
 /// Default session-grant lifetime when the caller omits `max_ttl`: 1 hour,
 /// matching the frontend's default connect TTL. `mcp::register` still clamps to
@@ -105,6 +109,11 @@ pub async fn prepare(
 ) -> Result<PrepareMcpRegistrationDelegation, String> {
     check_authorization(anchor_number)
         .map_err(|err| format!("{} could not be authenticated.", err.principal))?;
+    // An empty key would hash to a fixed, predictable `P_reg` per anchor,
+    // defeating per-connect uniqueness (mirrors `mcp::register`'s check).
+    if registration_key.is_empty() {
+        return Err("MCP registration failed: empty registration key.".to_string());
+    }
     state::ensure_salt_set().await;
 
     // Session-grant lifetime the user chose at connect; an omitted value means

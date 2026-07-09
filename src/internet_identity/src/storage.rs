@@ -258,9 +258,11 @@ const MCP_GRANT_MEMORY_ID: MemoryId = MemoryId::new(MCP_GRANT_MEMORY_INDEX);
 
 /// Pending MCP registration delegations ([`StorableMcpRegistration`]), keyed by
 /// the registration principal `P_reg` (the `caller()` of `mcp_register_v2`).
-/// Entries are minted by `prepare_mcp_registration_delegation` and deleted on
-/// the first successful `mcp_register_v2` (single-use); a short expiry bounds
-/// how long an abandoned entry lingers.
+/// Entries are minted by `prepare_mcp_registration_delegation`; the first
+/// successful `mcp_register_v2` retains the entry, marked `used` and bound to
+/// the registered key, so a boundary retry is idempotent only for the same
+/// caller and key (single-use). Entries are removed when a lookup finds them
+/// expired; the short expiry bounds how long any entry lingers.
 const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMORY_INDEX);
 
 /// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
@@ -1136,7 +1138,8 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Insert (or replace) the pending MCP registration entry keyed by
     /// `principal`. Written by `prepare_mcp_registration_delegation` under user
-    /// authorization; consumed (and removed) by `mcp_register_v2`.
+    /// authorization; updated in place by `mcp_register_v2` on the first
+    /// successful redemption (marked `used`, bound to the registered key).
     pub fn insert_mcp_registration(
         &mut self,
         principal: Principal,
@@ -1145,8 +1148,9 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_registration_memory.insert(principal, registration);
     }
 
-    /// Remove the pending MCP registration entry keyed by `principal`. Called on
-    /// the first successful `mcp_register_v2` (making the delegation single-use).
+    /// Remove the pending MCP registration entry keyed by `principal`. Called
+    /// when a lookup finds the entry expired (successful redemption *retains*
+    /// the entry, marked `used`, for caller/key-bound idempotent retries).
     pub fn remove_mcp_registration(&mut self, principal: Principal) {
         self.mcp_registration_memory.remove(&principal);
     }
