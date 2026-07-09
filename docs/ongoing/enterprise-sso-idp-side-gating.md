@@ -204,6 +204,13 @@ org's web root.
   open fallback. The parsed map lives in II's **in-heap** SSO discovery cache (not stable
   memory), shared across up to `SSO_CACHE_MAX_ENTRIES` (5000) domains, so 100/org also bounds
   aggregate heap; `DISCOVERY_MAX_RESPONSE_BYTES` is sized to fit.
+- **Propagation latency.** A change to the well-known (`app_clients`, `gate_all_apps`, …)
+  takes effect only after II's cached copy refreshes. The backend discovery cache is fresh for
+  `FRESH_FOR_SECONDS` (**1 h**) and then served up to `STALE_FOR_SECONDS` (**+1 h**)
+  stale-if-error (`openid/sso.rs`), so an edit propagates within **~1 h**. There is no
+  frontend cache — the frontend only reads the canister (`get_sso_discovery`) and drives the
+  fetch (`discover_sso`). Both windows are single constants: shorten them for faster policy
+  propagation, lengthen them to cut outcall volume.
 
 ### 5.1 Optional: hashed origins
 
