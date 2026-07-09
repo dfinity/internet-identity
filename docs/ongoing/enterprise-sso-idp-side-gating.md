@@ -82,6 +82,13 @@ gated app.
   attribute forwarding.
 - **Changing the dapp-facing principal derivation** — it stays `f(anchor, origin)` (§6).
 
+**In-scope behavior change (deliberate).** SSO attributes (`sso:<domain>:…` and the gated
+`implicit:origin`) become certifiable **only from an SSO session** (`sso_prepare_delegation`),
+not from a passkey/`openid_prepare_delegation` session on an anchor that merely has an SSO
+access method (§6.3). This tightens the existing `sso:<domain>` flow (today cert reads the
+stored credential in any session), so it affects current SSO-attribute consumers, not just the
+new gate — a conscious part of this design, not a side effect.
+
 ---
 
 ## 3. Threat model
@@ -139,12 +146,14 @@ sequenceDiagram
         FE-->>U: no access
     else assigned
         IdP-->>FE: id_token (aud = client_P)
-        FE->>II: openid_prepare_delegation(jwt)
-        Note over II: session seeded (primary, client_P); anchor resolves to primary
-        FE->>II: get_account_delegation(anchor, payroll.com, per_app_client=client_P)
+        FE->>II: sso_prepare_delegation(jwt, org.com, payroll.com)
+        Note over II: GATE: aud == app_clients[payroll]? if not, refuse (no delegation)
+        Note over II: anchor resolves to primary; seed = (iss, sub, org.com, payroll, anchor)
+        II-->>FE: SSO delegation (bound to org.com + payroll)
+        FE->>II: get_account_delegation(anchor, payroll.com)
         II-->>FE: delegation for f(account, payroll.com)
-        FE->>II: prepare_icrc3_attributes(anchor, payroll.com, per_app_client=client_P)
-        Note over II: client_P == app_clients[payroll]? then certify implicit:origin + sso:org.com
+        FE->>II: prepare_icrc3_attributes(anchor, payroll.com)
+        Note over II: caller == seed_sso(org.com, payroll)? then certify implicit:origin + sso:org.com
         II-->>FE: certified attributes
         FE->>Dapp: delegation + certified attributes
         Note over Dapp: verify sso:org.com AND implicit:origin, then grant
@@ -156,12 +165,14 @@ per-origin client with `get_sso_discovery(domain, origin)`. Three responsibiliti
 
 - **IdP — assignment.** App-assignment decides who can obtain a token for `client_P`. II holds
   no policy.
-- **II — gate the certified `implicit:origin`.** The `openid_prepare_delegation` session is
-  seeded with the per-app client; the origin-scoped calls prove it (§6.3), and II certifies
-  `implicit:origin` for the gated origin only when the proven client matches
-  `app_clients[origin]`. Identity resolves to the primary client (`aud` never enters identity).
+- **II — the gate is mint-or-refuse.** A dedicated `sso_prepare_delegation` (separate from the
+  untouched `openid_prepare_delegation`) mints an SSO session **only if** the JWT's `aud`
+  matches the origin's declared client; the delegation's seed encodes `(sso_domain, origin)`.
+  The origin-scoped calls then require that principal — so if the gate refused to mint, there
+  is no session to authenticate with (§6). Identity still resolves to the primary client.
 - **Dapp — verify.** The dapp checks the certified `sso:<domain>` (which org) and relies on the
-  certified `implicit:origin` (gated access). That's the boundary it enforces on.
+  certified `implicit:origin` (gated access). Both are only produced from an SSO session (§6.3),
+  so a passkey login on the same anchor shares no SSO attributes.
 
 ---
 
@@ -240,84 +251,95 @@ which is sufficient. Cleartext and hashed keys may coexist in one object.
 
 ## 6. II core changes
 
-No `.did` change to `openid_prepare_delegation`, no stable-memory migration, no change to
-`StorableOpenIdCredentialKey`. The delegation seed gains an **optional second input** (the
-per-app client) used only for gated logins — a normal login's seed, and thus its principal, is
-byte-identical to today. Enforcement is the certified **`implicit:origin`** attribute, gated
-via that session principal. `openid_prepare_delegation` is *not* the gate (it's II-internal
-auth), and neither is the dapp's `f(account, origin)` delegation.
+A dedicated `sso_prepare_delegation` / `sso_get_delegation` pair carries the SSO sign-in.
+`openid_prepare_delegation` is **left unchanged** (direct providers, existing flows). No
+stable-memory migration and no change to `StorableOpenIdCredentialKey`. The enforcement is
+simply **whether the SSO delegation was minted**: its seed encodes `(sso_domain, origin)`, and
+the origin-scoped calls require that principal, so a refused gate leaves nothing to
+authenticate with.
 
-### 6.1 Identity: per-app logins resolve to the primary identity
+### 6.1 Identity: the SSO session resolves to the primary identity
 
 A gated dapp's login runs against a per-app client, so the token's `aud` is that per-app
-client_id. For *identity*, II resolves the anchor as if the login had used the **primary**
-client — it looks up `(iss, stable_id, primary_client_id)`, substituting the primary client for
-the token's `aud`. So all of an org's per-app clients collapse to one primary-client identity,
-and a per-app login creates no credential and no access method. Existing single-client
-credentials are already primary-keyed, so this is a lookup-time substitution — **no stored key
-change, no migration.** (When `stable_identifier_claim != "sub"`, an auxiliary lookup bridges
-the per-client `sub`; see §6.6.)
+client_id. For *identity*, `sso_prepare_delegation` resolves the anchor as if the login had
+used the **primary** client — it looks up `(iss, stable_id, primary_client_id)`, substituting
+the primary client for the token's `aud`. So all of an org's per-app clients collapse to one
+primary-client identity, and an SSO login creates no extra credential and no access method.
+Existing single-client credentials are already primary-keyed, so this is a lookup-time
+substitution — **no stored key change, no migration.** (When `stable_identifier_claim != "sub"`,
+an auxiliary lookup bridges the per-client `sub`; see §6.5.)
 
 `wellknown(sso_domain)` is II core's in-heap cached copy (populated by `discover_sso`); a cold
 miss returns `Pending` (re-drive discovery), never "no `app_clients`" (which would fail open).
 
-### 6.2 The session principal carries the per-app client
+### 6.2 `sso_prepare_delegation` — the gate is mint-or-refuse
 
-`openid_prepare_delegation` reads the JWT's `aud`. If it's a **per-app** client (not the org's
-primary), the session delegation is seeded from **both** clients:
-
-```
-gated login:   S = seed(iss, sub, primary_client, per_app_client, anchor)
-normal login:  S = seed(iss, sub, primary_client, anchor)   // per-app input absent = today's seed
-```
-
-The per-app input affects only the *session* principal, never identity (the anchor is resolved
-to primary, §6.1). II gets the per-app client from the JWT's own `aud` — no new argument to
-`openid_prepare_delegation`, and a normal login's principal is unchanged.
-
-### 6.3 Verifying the per-app proof — a general `check_authorization` primitive
-
-The origin-scoped calls — `prepare`/`get_account_delegation` and `prepare_icrc3_attributes` —
-gain an **optional `per_app_client` argument**. `check_authorization` recomputes the expected
-principal and requires the caller to match:
+`sso_prepare_delegation(jwt, discovery_domain, origin)`:
 
 ```
-expected = seed(iss, sub, primary_client, per_app_client?, anchor)   // one hash — O(1)
-require caller == expected
+verify_id_token(jwt)                                  // iss/aud/nonce/exp/JWKS
+expected = app_clients[origin]        if origin listed          // gated
+         | primary_client             if unlisted and !gate_all_apps
+         | DENY                        if unlisted and gate_all_apps
+require jwt.aud == expected            else DENY (mint nothing)  // THE GATE
+anchor = resolve_to_primary(iss, stable_id)           // §6.1
+mint delegation seeded  seed(iss, sub, sso_domain, origin, anchor)
 ```
 
-No stored set, no scan. The caller **can't lie**: passing a `per_app_client` they didn't
-authenticate with yields a different `expected` → mismatch → rejected. With the argument absent
-it expects the plain primary session, so nothing changes for normal logins.
+- The **one** `app_clients` / hashed-key (§5.1) / `gate_all_apps` lookup happens here, where
+  discovery already has the well-known cached.
+- The seed binds the session to `(sso_domain, origin)`. If the gate fails, **no delegation is
+  minted** — there is no principal to make the follow-up calls with.
+- This is the SSO path for **every** dapp sign-in, gated or not (gating only decides whether
+  `expected` is a per-app client or the primary). `openid_prepare_delegation` is untouched.
 
-### 6.4 The gate: certify `implicit:origin` only for the origin's per-app client
+### 6.3 Certification requires the SSO-session principal
 
-In `prepare_icrc3_attributes`, for a **gated** origin (the login's `sso_domain` well-known
-lists it in `app_clients`, honoring `gate_all_apps`), certify `implicit:origin` **only if** the
-proven `per_app_client == app_clients[origin]`. A relying dapp requires the certified
-`implicit:origin`; without the right per-app client it is never produced → access denied. This
-is the whole enforcement, bound to the session principal (§6.3), not to an omittable hint.
+The origin-scoped calls — `get_account_delegation` and `prepare_icrc3_attributes` — already
+carry the `origin`. `check_authorization` recomputes the SSO-session principal and requires the
+caller to match:
 
-### 6.5 Composition with `sso:<domain>` — assignment vs. domain
+```
+require caller == seed(iss, sub, sso_domain, origin, anchor)   // one hash — O(1), no config
+```
 
-Two independent layers:
-- **`implicit:origin` gate (II-side):** you used the origin's per-app client → per-app
-  **assignment within a domain**.
-- **certified `sso:<domain>` (dapp-side check):** which **domain** you came from — the
-  discovery domain II actually resolved from, so it's unforgeable.
+- **Config-free at cert.** No `app_clients`, no client-matching, no hashed-key math — the gate
+  already happened at mint time (§6.2), so a matching principal *exists only if* it passed.
+- **SSO attributes require an SSO sign-in.** `sso:<domain>` (and the gated `implicit:origin`)
+  are certified only for this principal. A **passkey** login — or `openid_prepare_delegation` —
+  produces a different principal, so an anchor that merely *has* an SSO access method shares
+  **no** SSO attributes unless the user actually signed in through SSO this session. (This
+  tightens today's behavior, where cert reads the stored credential in any session — see the
+  scope note in §2.)
+- **Own freshness.** The SSO delegation carries its own (tighter) expiry, so SSO attributes
+  reflect a *recent* SSO ceremony, independent of the general/passkey session lifetime.
+
+### 6.4 Composition with `sso:<domain>` — assignment vs. domain
+
+Two independent layers, both certified only from the SSO session:
+- **`implicit:origin` (per-app assignment within a domain):** exists only because the gate
+  (§6.2) minted the SSO delegation for this origin's per-app client.
+- **`sso:<domain>` (which domain):** the discovery domain II actually resolved from —
+  unforgeable.
 
 An insider via a rogue `evil.com` (pointing at the org's real IdP) is certifiably
 `sso:evil.com`, so the dapp rejects — regardless of what `evil.com`'s `app_clients` claims.
 Within the org's real domain, the gated origin's per-app client is only issued to assigned
 users by the IdP. Together: **assigned user, from the expected org.**
 
-### 6.6 Cross-client identity when the stable identifier isn't `sub`
+> **Bounded reconfiguration window.** The seed binds the origin, not the client. So an SSO
+> delegation minted while an app was *ungated* still matches after the app is flipped to gated,
+> until it expires (~session) and the discovery cache refreshes (~1 h, §5). This is the same
+> propagation class we already accept for `app_clients` edits; eliminable only by also seeding
+> the client (at the cost of a config read back at cert). We accept the window.
+
+### 6.5 Cross-client identity when the stable identifier isn't `sub`
 
 The credential index is keyed on `sub`. This is **config-driven, not IdP-brand-driven** — II
 reads `stable_identifier_claim`, it never detects "Entra":
 
 - When `stable_identifier_claim == "sub"` (Okta org server, Google, OneLogin), the
-  primary-client substitution (§6) resolves per-app logins directly — nothing extra.
+  primary-client substitution (§6.1) resolves the SSO login directly — nothing extra.
 - When it **isn't** `sub`, a per-app login's `sub` differs from the primary credential's and
   can't be matched by substituting the client alone. II doesn't index the alternate claim
   today, so it decodes the configured `stable_identifier_claim` and keeps a small **auxiliary
@@ -344,26 +366,27 @@ Cross-domain isolation does **not** depend on this lookup — it comes from the 
 
 ## 7. Why this is safe
 
-1. **The per-app proof is cryptographic, not a hint.** The gated-login session principal is
-   `seed(iss, sub, primary, per_app_client, anchor)`, and `check_authorization` recomputes it
-   (§6.3). A caller can only present a `per_app_client` they actually authenticated with;
-   omitting or faking it changes `expected` → mismatch → rejected. There is no ungated path to
-   the same certified `implicit:origin`.
-2. **`implicit:origin` is the gate, and a dapp can't be reached without it.** II certifies it
-   for a gated origin only when the proven client equals `app_clients[origin]` (§6.4). A
-   primary-client or wrong-client session never produces it, so a dapp that requires the
-   certified origin attribute denies access.
+1. **The gate is mint-or-refuse, and the proof is the session principal.** `sso_prepare_delegation`
+   mints the SSO delegation only if `jwt.aud == app_clients[origin]` (§6.2), and its seed binds
+   `(sso_domain, origin)`. The origin-scoped calls recompute that principal (§6.3), so a caller
+   can't fake or omit anything — a wrong/absent SSO session simply doesn't match. There is no
+   ungated path to the certified `implicit:origin`.
+2. **SSO attributes only exist for an SSO sign-in.** `sso:<domain>` and the gated
+   `implicit:origin` are certified only for the SSO-session principal, so a passkey login (or
+   `openid_prepare_delegation`) on an anchor that merely *has* an SSO access method shares none
+   of them. The SSO delegation's own (tighter) expiry keeps them fresh.
 3. **The certified `sso:<domain>` is unforgeable** — it is the discovery domain II actually
    resolved from, so a rogue-domain login is `sso:evil.com` and the dapp rejects, regardless of
-   what that domain's `app_clients` claims (§6.5). `implicit:origin` gates *assignment within a
+   what that domain's `app_clients` claims (§6.4). `implicit:origin` gates *assignment within a
    domain*; `sso:<domain>` gates *which domain* — both are required.
 4. **IdP assignment gates the per-app token.** Within the real domain, the IdP only issues a
-   token for the origin's per-app client to assigned users; freshness of the whole chain is the
-   session delegation's own expiry.
-5. **Identity is unchanged and minimal.** The anchor is primary-keyed (per-app `aud` never
-   enters identity), `StorableOpenIdCredentialKey` and stored data are untouched, and a normal
-   login's principal is byte-identical to today. Direct providers (no `sso_domain`, no
-   `app_clients`) are entirely unaffected.
+   token for the origin's per-app client to assigned users, so `sso_prepare_delegation` can only
+   mint an origin-bound session for them.
+5. **Identity is unchanged and minimal.** The anchor is primary-keyed (the per-app `aud` never
+   enters identity), `StorableOpenIdCredentialKey` and stored data are untouched, and
+   `openid_prepare_delegation` / direct providers are entirely unaffected.
+6. **Bounded reconfiguration window** (§6.4): flipping an app ungated→gated leaves already-minted
+   SSO delegations valid until they expire; accepted, same class as `app_clients` propagation.
 
 ---
 
@@ -412,37 +435,40 @@ resolution in II core (§6).
 ## 10. Implementation
 
 One PR — a single cohesive feature. **No stable-memory migration, no `StorableOpenIdCredentialKey`
-change, no `.did` change to `openid_prepare_delegation`.** The seed gains an optional per-app
-input (normal logins byte-identical). Inert until an org adds `app_clients` to its well-known.
+change, `openid_prepare_delegation` untouched.** Inert until an org adds `app_clients` to its
+well-known.
 
-> **Security invariant:** enforcement is the **certified `implicit:origin`**, gated on the
-> session-proven per-app client (§6.4), **plus** the dapp verifying the certified
-> **`sso:<domain>`** (§6.5). The `aud` check at *login* is not the boundary. Both must hold:
-> II won't certify `implicit:origin` for a gated origin without the matching per-app-client
-> session, and a gated dapp must check `sso:<domain>` (existing lib — no new work).
+> **Security invariant:** the gate is **mint-or-refuse at `sso_prepare_delegation`** (§6.2) — a
+> refused gate mints no SSO delegation, so the origin-scoped calls have no principal to
+> authenticate with. Certification is a config-free check that the caller *is* that SSO-session
+> principal (§6.3). SSO attributes (`sso:<domain>`, gated `implicit:origin`) are therefore only
+> ever produced from an SSO sign-in, and the dapp additionally verifies `sso:<domain>` for the
+> domain (existing lib — no new work).
 
 Contents:
 - **Config (§5):** parse `app_clients` / `gate_all_apps` / `stable_identifier_claim`;
-  `get_sso_discovery(domain, opt origin)` returns the per-origin `resolved_client_id`.
-- **Session principal (§6.2):** `openid_prepare_delegation` seeds the delegation with the
-  optional per-app client (taken from the JWT's `aud`) alongside the primary; identity/anchor
-  still resolves to primary (`aud` → primary, §6.1), with the aux lookup when
-  `stable_identifier_claim != "sub"` (§6.6). No stored-key change, no migration.
-- **Auth primitive (§6.3):** `check_authorization` takes an optional `per_app_client` and
-  requires `caller == seed(iss, sub, primary, per_app_client?, anchor)`. The origin-scoped
-  calls — `prepare`/`get_account_delegation`, `prepare_icrc3_attributes` — gain that arg.
-- **The gate (§6.4):** `prepare_icrc3_attributes` certifies `implicit:origin` for a gated
-  origin only if the proven `per_app_client == app_clients[origin]` (honoring `gate_all_apps`);
-  cold cache → `Pending`.
-- **Frontend:** route the gated-dapp ceremony to `resolved_client_id`, and pass the per-app
-  client on the origin-scoped calls.
-- **Tests:** gated == ungated → same dapp principal (linchpin); a primary/wrong-client session
-  does **not** get `implicit:origin` certified for a gated origin; `gate_all_apps` default-deny;
-  hashed keys; Entra `oid` identity + first-gated-login-needs-normal-first; direct providers
-  unaffected.
+  `get_sso_discovery(domain, opt origin)` returns the per-origin `resolved_client_id` for FE
+  routing.
+- **`sso_prepare_delegation` / `sso_get_delegation` (new, §6.2):** verify the JWT, enforce the
+  gate (`aud == app_clients[origin]` / primary / DENY), resolve the anchor to primary (§6.1,
+  aux lookup when `stable_identifier_claim != "sub"`, §6.5), and mint a delegation seeded
+  `(iss, sub, sso_domain, origin, anchor)`. `openid_prepare_delegation` is left as-is.
+- **Certification (§6.3):** `check_authorization` on the origin-scoped calls —
+  `get_account_delegation`, `prepare_icrc3_attributes` — requires
+  `caller == seed(iss, sub, sso_domain, origin, anchor)`. No `app_clients`/config at cert. SSO
+  attributes gated on this principal (so passkey sessions get none); SSO delegation carries its
+  own tighter expiry.
+- **Frontend:** route the dapp SSO ceremony to `resolved_client_id`; sign in via
+  `sso_prepare_delegation`; handle the first-gated-login-before-normal case for non-`sub` IdPs
+  (§6.1/§6.5) with a "sign in normally first" prompt.
+- **Tests:** gated == ungated → same dapp principal (linchpin); a passkey / non-SSO session
+  gets **no** SSO attributes; a refused gate mints no SSO delegation → cert unreachable;
+  `gate_all_apps` default-deny; hashed keys; Entra `oid` identity + first-gated-login flow;
+  `openid_prepare_delegation` / direct providers unchanged.
 
-`.did` deltas are additive only: `get_sso_discovery` origin arg + `resolved_client_id`, and an
-optional `per_app_client` on the origin-scoped calls. No change to the delegation methods.
+`.did` deltas are additive only: **add** `sso_prepare_delegation` / `sso_get_delegation`, and
+`get_sso_discovery` gains the `opt origin` arg + `resolved_client_id`. No change to
+`openid_prepare_delegation` / `openid_get_delegation`.
 
 No canister beyond II core, no proxy, no panel, no migration, no new dapp lib. Admin/dapp docs
 tracked separately.
