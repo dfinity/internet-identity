@@ -41,7 +41,7 @@ sequenceDiagram
     M-->>F: {"callbacks": [...]} — link's callback must exact-match
     note over F: generate ephemeral key Y (browser-held)
     F->>C: prepare_mcp_registration_delegation(anchor, Y, permissions, ttl)
-    C-->>F: {user_key, expiration} — P_reg derived; only the anchor is stored
+    C-->>F: {user_key, expiration} — P_reg derived, only the anchor stored
     F->>C: get_mcp_registration_delegation(anchor, Y, permissions, ttl, expiration)
     C-->>F: SignedDelegation — the P_reg to Y hop (inert without Y)
     note over F: sign the second hop Y to X locally — full chain never transits the IC
