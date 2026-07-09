@@ -18,7 +18,8 @@ layer** that gates entirely on the **IdP side**. The two are composable and sele
 | **IdP** | The org's corporate identity system (Okta, Microsoft Entra ID, OneLogin). |
 | **id_token** | The signed OIDC JWT the IdP issues for a login; II verifies it against the IdP's JWKS. |
 | **`aud`** | Audience claim — the OAuth `client_id` the token was minted for. |
-| **`iss` / `sub`** | The issuer and the IdP's stable, opaque identifier for the human. |
+| **`iss` / `sub`** | The issuer and the IdP's identifier for the human within a token. |
+| **Stable subject** | A subject identifier that is the **same across all of an org's OIDC clients**. `sub` qualifies on Okta (org authorization server), Google, and OneLogin, but **not on Entra**, whose `sub` is pairwise (per-client); Entra's cross-client-stable id is `oid`. Declared per org as `subject_claim` in the well-known (§5). |
 | **App-assignment** | The IdP's native "which users/groups may use this application" control, evaluated at the app's authorization endpoint. |
 | **Primary client** | The org's default OIDC client — the one meant for II itself. All identity/credential data is keyed on it. |
 | **Per-app client** | A dedicated OIDC client the org registers in its IdP for a single gated dapp. Used **only** for the gate, never for identity. |
@@ -178,7 +179,11 @@ and caches this file (via `discover_sso`); the frontend never reads the org's we
   "app_clients": {
     "https://payroll.com": "0oaPAYROLL",
     "https://admin.internal.app": "0oaADMIN"
-  }
+  },
+
+  // new: the cross-client-stable subject claim (default "sub"; Entra uses "oid").
+  // Optional; absent means "sub".
+  "subject_claim": "sub"
 }
 ```
 
@@ -217,16 +222,24 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
     // --- identity: always the primary client, never the per-app one ---
     require(claims.aud in wellknown(sso_domain).declared_clients());   // token from a client the org vouches for
     let primary = wellknown(sso_domain).client_id;                    // the client meant for II itself
-    let identity_key = (claims.iss, claims.sub, primary);             // per-app aud never enters identity
+    let subject = claims[wellknown(sso_domain).subject_claim];        // "sub" by default; "oid" on Entra
+    let identity_key = (claims.iss, subject, primary);                // per-app aud never enters identity
     lookup_or_create_anchor(identity_key)                            // the single OpenID credential
 }
 ```
 
-- **One access method.** Identity keys on `(iss, sub, primary_client_id)` — the same key an
-  ordinary org SSO login already produces. There is exactly one OpenID credential per user
-  per org; per-app clients never appear in credential state.
-- **Existing data untouched.** Current SSO credentials are already `(iss, sub, primary)`, so
-  there is no migration and the delegation seed formula is unchanged.
+- **One access method.** Identity keys on `(iss, subject, primary_client_id)`, where
+  `subject` is the declared stable claim. There is exactly one OpenID credential per user per
+  org; per-app clients never appear in credential state.
+- **The subject must be cross-client stable.** Correlating a per-app login to the primary
+  identity only works if the subject is the same across the org's clients. `sub` is on Okta
+  (org authorization server), Google, and OneLogin; on **Entra `sub` is pairwise** (per
+  client), so Entra orgs set `subject_claim: "oid"` (§5). Using raw `sub` on Entra would
+  fragment the user — this is the one thing to get right per IdP.
+- **Migration.** For orgs whose stable subject equals `sub` (Okta/Google/OneLogin), existing
+  SSO credentials are already `(iss, sub, primary)` — no migration, seed formula unchanged.
+  An Entra org adopting per-app gating needs a one-shot re-key of its existing credentials
+  from `sub` to `oid` (a backfill like the existing `sso_credential_migration`).
 - **Per-app tokens are read-only for identity.** A per-app login gates and resolves the
   anchor but does **not** write profile metadata (email, name); that always comes from a
   primary-client login. The dapp-facing principal is `f(anchor, origin)` regardless
@@ -246,7 +259,8 @@ guard rails:
 1. **Only across declared clients.** A per-app token resolves to identity only if its `aud`
    is in the `sso_domain`'s declared client set (primary + `app_clients`). The org, via its
    DNS-rooted well-known, has vouched that those clients are all its own — so within that set
-   one `(iss, sub)` is one human, and canonicalizing to the primary key is sound.
+   one `(iss, subject)` is one human (using the declared cross-client-stable subject, §6), and
+   canonicalizing to the primary key is sound.
 2. **Scoped to SSO.** This applies only under a verified `sso_domain`. Direct providers
    (Google-direct, Apple, Microsoft — no `sso_domain`, no `app_clients`) keep full
    `(iss, sub, aud)` isolation, so a stray OAuth client at a shared issuer can never resolve
@@ -271,7 +285,7 @@ the group, and add `origin -> client_id` to the well-known.
 | IdP | Per-app assignment | Note |
 | --- | --- | --- |
 | Okta | Native; free. Unassigned user blocked at `/authorize`. | Denial is an HTML 400 page, not an OIDC error redirect — II infers denial from the failed ceremony. |
-| Entra ID | Native, via "Assignment required" + user/group assignment. | **Defaults to OFF** — a forgotten toggle silently fail-opens to the whole tenant. Groups need P1/P2. |
+| Entra ID | Native, via "Assignment required" + user/group assignment. | **Defaults to OFF** — a forgotten toggle silently fail-opens to the whole tenant. Groups need P1/P2. **`sub` is pairwise (per client), so set `subject_claim: "oid"`** (§5, §6). |
 | OneLogin | Native, via Roles, enforced at sign-in. | — |
 | Google Workspace | **Not supported** — the user-access toggle is SAML-only and OAuth clients live in the GCP console; per-OIDC-client group assignment cannot be expressed. |
 
@@ -310,11 +324,13 @@ resolution in II core (§6).
    fetches and caches (`discover_sso`); `get_sso_discovery` resolves the client_id for the
    target origin; the frontend runs the ceremony against it.
 2. **Gate + identity in II core.** The `aud == declared-client-for-origin` check and
-   primary-keyed anchor resolution (§6). Validate: an assigned user reaches the gated dapp
-   with the same identity (and single access method) as their default SSO; an unassigned user
-   is denied at the IdP; a token for one gated app cannot open another.
-3. **Onboarding guide.** Per-IdP client setup, with the Entra assignment-required and Okta
-   400-denial edges called out (§8).
+   primary-keyed anchor resolution on the declared `subject_claim` (§6). Validate: an assigned
+   user reaches the gated dapp with the same identity (and single access method) as their
+   default SSO; an unassigned user is denied at the IdP; a token for one gated app cannot open
+   another.
+3. **Onboarding guide + Entra migration.** Per-IdP client setup, with the Entra
+   assignment-required, Okta 400-denial, and Entra `subject_claim: "oid"` requirements called
+   out (§8), plus the one-shot `sub`->`oid` re-key for existing Entra credentials (§6).
 
 No canister beyond II core, no proxy, no panel.
 
