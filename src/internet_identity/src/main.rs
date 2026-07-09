@@ -813,19 +813,21 @@ fn get_mcp_registration_delegation(
 
 /// Called by the trusted MCP server, authenticated by the registration
 /// delegation chain (so `caller()` is the registration principal): bind the
-/// server's long-lived `session_key` to `anchor_number`. The presented
-/// parameters are authorized by derive-and-compare — the seed re-derived from
-/// them (and the anchor's current trusted-server config) must land exactly on
-/// `caller()` — so a tuple the user never consented to is rejected. Returns
-/// the grant expiration and the access level.
+/// server's long-lived `session_key` to the consenting anchor. The anchor is
+/// recovered server-side from the index entry keyed by `caller()` — never taken
+/// as an argument, so it is not disclosed to the server. `permissions` and
+/// `max_ttl` are echoed by the server and authorized by derive-and-compare: the
+/// seed re-derived from (recovered anchor, echoed values, the anchor's current
+/// trusted-server config) must land exactly on `caller()`, so an echo the user
+/// never consented to is rejected. Returns the grant expiration and the access
+/// level.
 #[update]
 fn mcp_register_v2(
-    anchor_number: AnchorNumber,
     session_key: SessionKey,
     permissions: Option<Permissions>,
     max_ttl: Option<u64>,
 ) -> Result<McpRegistrationV2, String> {
-    mcp_registration::register_v2(anchor_number, session_key, permissions, max_ttl)
+    mcp_registration::register_v2(session_key, permissions, max_ttl)
 }
 
 #[query]

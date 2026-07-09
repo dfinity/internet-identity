@@ -559,7 +559,6 @@ pub fn mcp_register_v2(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    anchor_number: AnchorNumber,
     session_key: SessionKey,
     read_only: Option<bool>,
     max_ttl: Option<u64>,
@@ -570,12 +569,7 @@ pub fn mcp_register_v2(
         RawEffectivePrincipal::None,
         sender,
         "mcp_register_v2",
-        (
-            anchor_number,
-            session_key,
-            permissions_arg(read_only),
-            max_ttl,
-        ),
+        (session_key, permissions_arg(read_only), max_ttl),
     )
     .map(|(x,)| x)
 }

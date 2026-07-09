@@ -2150,7 +2150,7 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   'mcp_register_v2' : ActorMethod<
-    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
+    [SessionKey, [] | [Permissions], [] | [bigint]],
     { 'Ok' : McpRegistrationV2 } |
       { 'Err' : string }
   >,

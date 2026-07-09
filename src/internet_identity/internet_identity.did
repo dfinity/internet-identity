@@ -1956,16 +1956,18 @@ service : (opt InternetIdentityInit) -> {
     ) -> (variant { Ok : SignedDelegation; Err : text }) query;
 
     // Called by the trusted MCP server, authenticated by the registration
-    // delegation chain: bind the server's long-lived session_key to the anchor,
-    // with the consented read-only choice and grant lifetime. The arguments must
-    // echo what the user consented to: the canister re-derives the registration
-    // principal from (anchor_number, permissions, max_ttl, current trusted-server
-    // URL) and rejects unless it equals caller() — so a mismatched echo, a
-    // disabled config or a changed trusted server all fail. Usable until the
-    // registration delegation expires (~5 min); re-registration within that
-    // window replaces the anchor's single MCP session.
+    // delegation chain: bind the server's long-lived session_key to the
+    // consenting anchor. The anchor is NOT an argument — it is recovered
+    // server-side from the entry keyed by caller() (the registration
+    // principal), so it is never disclosed to the server. permissions and
+    // max_ttl are echoed by the server (it remembers what the user chose) and
+    // authorized by derive-and-compare: the canister re-derives the
+    // registration principal from (recovered anchor, permissions, max_ttl,
+    // current trusted-server URL) and rejects unless it equals caller() — so a
+    // mismatched echo, a disabled config or a changed trusted server all fail.
+    // Usable until the registration delegation expires (~5 min); re-registration
+    // within that window replaces the anchor's single MCP session.
     mcp_register_v2 : (
-        anchor_number : UserNumber,
         session_key : SessionKey,
         permissions : opt Permissions,
         max_ttl : opt nat64
