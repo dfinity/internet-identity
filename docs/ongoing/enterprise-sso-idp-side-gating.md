@@ -162,39 +162,64 @@ Two responsibilities split cleanly:
 
 ---
 
-## 5. Well-known map
+## 5. Well-known additions
 
-The org's existing `/.well-known/ii-openid-configuration` gains an `origin -> client_id` map.
-Additive; existing single-client SSO deployments keep working. As today, **II core** fetches
-and caches this file (via `discover_sso`); the frontend never reads the org's web root.
+The org's existing `/.well-known/ii-openid-configuration` gains an `origin -> client_id` map
+plus two flags. Additive; existing single-client SSO deployments keep working. As today,
+**II core** fetches and caches this file (via `discover_sso`); the frontend never reads the
+org's web root.
 
 ```jsonc
 {
-  // existing SSO discovery (default client for ungated apps)
+  // existing SSO discovery (the primary client, meant for II itself)
   "client_id": "0oaDEFAULT",
   "openid_configuration": "https://org.okta.com/.well-known/openid-configuration",
   "name": "Org",
 
-  // new: per-app clients for gated dapps
+  // per-app clients for gated dapps: origin -> client_id
   "app_clients": {
     "https://payroll.com": "0oaPAYROLL",
     "https://admin.internal.app": "0oaADMIN"
   },
 
-  // new: the cross-client-stable subject claim (default "sub"; Entra uses "oid").
-  // Optional; absent means "sub".
+  // when true, an origin NOT in app_clients is denied (default-deny).
+  // when false/absent, an unlisted origin uses the primary client (open to any org user).
+  "gate_all_apps": false,
+
+  // cross-client-stable subject claim (default "sub"; Entra uses "oid"). Optional.
   "subject_claim": "sub"
 }
 ```
 
-- An origin in `app_clients` is **gated**: II uses that client_id and requires the returned
-  `aud` to match it.
-- Any other origin uses the default `client_id`, exactly as today.
-- The **declared client set** for the domain = the default plus every value in `app_clients`.
-  It is the allowlist used by the identity-resolution safety check (§6).
-- The map is public. `client_id`s are public-by-design (II uses public/SPA clients, no
-  secret). If a gated origin is itself sensitive, its key may be hashed (`sha256(origin) ->
-  client_id`); II hashes the target origin before lookup.
+- **Listed origin** -> gated: II uses that client_id and requires the returned `aud` to match.
+- **Unlisted origin** -> depends on `gate_all_apps`: `false`/absent serves it via the primary
+  client (open to any authenticated org user, exactly as today); `true` denies it.
+  `gate_all_apps: true` lets an org lock II SSO down to an explicit set of dapps.
+- **Declared client set** = the primary `client_id` plus every `app_clients` value; the
+  allowlist used by the identity-resolution safety check (§6, §7).
+
+### 5.1 Optional: hashed origins
+
+`client_id`s are public by design (II uses public/SPA clients, no secret), so exposing them is
+harmless. The **origins** may be sensitive — they reveal the org's internal app portfolio. An
+org may instead publish each entry hashed with a **per-origin salt**:
+
+```jsonc
+"app_clients": [
+  {
+    "origin_sha256": "b5d4045c...e21",   // sha256(salt || origin), hex
+    "salt": "9f3a7c2e...",               // random, distinct per entry, hex
+    "client_id": "0oaPAYROLL"
+  }
+]
+```
+
+II knows the target origin from the ceremony, so it resolves an entry by computing
+`sha256(entry.salt || origin)` and matching it against `origin_sha256`. The per-origin salt
+prevents bulk precomputation and cross-org correlation of the same origin. It does not hide
+an origin an attacker already guesses — they can confirm a guess against the published salt —
+but public-dapp origins are guessable anyway, so this protects the non-obvious internal ones,
+which is sufficient.
 
 ---
 
@@ -214,19 +239,26 @@ client. A per-app login therefore creates no credential and no access method.
 ```
 fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
     let claims = verify_id_token(jwt);              // iss, sub, aud, nonce, exp, JWKS — unchanged
+    let wk = wellknown(sso_domain);                 // II core's cached copy
 
     // --- gate: the token must be for THIS origin's client ---
-    let expected = wellknown(sso_domain).client_for(origin);   // default, or app_clients[origin]
-    if claims.aud != expected { return Deny; }                 // wrong app / no-fallback
+    let expected = match wk.client_for(origin) {    // app_clients lookup (cleartext or hashed, §5.1)
+        Some(c) => c,                               // listed origin -> its per-app client
+        None if wk.gate_all_apps => return Deny,    // unlisted + default-deny -> no access
+        None => wk.client_id,                       // unlisted -> primary client (open)
+    };
+    if claims.aud != expected { return Deny; }      // wrong app / no-fallback
 
     // --- identity: always the primary client, never the per-app one ---
-    require(claims.aud in wellknown(sso_domain).declared_clients());   // token from a client the org vouches for
-    let primary = wellknown(sso_domain).client_id;                    // the client meant for II itself
-    let subject = claims[wellknown(sso_domain).subject_claim];        // "sub" by default; "oid" on Entra
-    let identity_key = (claims.iss, subject, primary);                // per-app aud never enters identity
-    lookup_or_create_anchor(identity_key)                            // the single OpenID credential
+    require(claims.aud in wk.declared_clients());   // token from a client the org vouches for
+    let subject = claims[wk.subject_claim];         // "sub" by default; "oid" on Entra
+    let identity_key = (claims.iss, subject, wk.client_id);   // per-app aud never enters identity
+    lookup_or_create_anchor(identity_key)                     // the single OpenID credential
 }
-```
+
+// client_for resolves the per-app client for an origin, handling both forms (§5):
+//   cleartext  -> app_clients[origin]
+//   hashed     -> the entry whose sha256(entry.salt || origin) == entry.origin_sha256
 
 - **One access method.** Identity keys on `(iss, subject, primary_client_id)`, where
   `subject` is the declared stable claim. There is exactly one OpenID credential per user per
