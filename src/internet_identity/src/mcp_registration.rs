@@ -73,9 +73,26 @@ pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
 /// Seed for the registration principal `P_reg`. Folds a fixed-length hash of the
 /// browser-generated registration key `Y` into the per-anchor seed, so `P_reg`
 /// is unique per connect (the II frontend mints a fresh `Y` for every attempt)
-/// without a separate nonce. A dedicated domain separator keeps this principal
-/// namespace disjoint from the session, account, and email-recovery seeds (pure
-/// seed hygiene — II is the only signer that could ever collide).
+/// without a separate nonce.
+///
+/// Why the key rather than a nonce: [`get`] is a query, so it must re-derive
+/// this seed *statelessly from its own call arguments* to look the signature up
+/// in the certified map — a canister-minted nonce would have to round-trip
+/// through the client and come back as a call argument anyway. Folding (a hash
+/// of) the delegated-to key is how every delegation seed in this canister
+/// already works (e.g. `calculate_seed` folds the caller-supplied frontend
+/// hostname).
+///
+/// Why caller-supplied bytes are safe here: the key is hashed to fixed length
+/// before folding, every field is length-prefixed (no concatenation
+/// ambiguity), and a dedicated domain separator keeps this principal namespace
+/// disjoint from the session, account, and email-recovery seeds. The bytes are
+/// never *trusted* — choosing them only chooses which `P_reg`, out of 2^256,
+/// the fully-authenticated caller lands on within their own anchor's
+/// namespace; `P_reg` confers nothing except through the delegation and index
+/// entry created under that same authentication, and reaching another seed's
+/// principal would require a second preimage. The one degenerate input (an
+/// empty key ⇒ a fixed `P_reg` per anchor) is rejected in [`prepare`].
 fn mcp_registration_seed(anchor_number: AnchorNumber, registration_key: &[u8]) -> Hash {
     const DOMAIN_SEPARATOR: &[u8] = b"mcp-registration";
 
