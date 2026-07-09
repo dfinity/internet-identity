@@ -13,6 +13,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { parseMcpServerUrl } from "$lib/utils/mcpServer";
   import { readMcpConfig, isOriginTrusted } from "$lib/utils/mcpConfig";
+  import { matchDeclaredCallback } from "$lib/utils/authCallbacks";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import McpHero from "./components/McpHero.svelte";
@@ -36,7 +37,9 @@
   // The MCP server the user is connecting is identified by the origin of the
   // request's callback: each user trusts whichever (remote) server they connect.
   // The connect flow fetches the server's session key from that callback and
-  // reports completion to it — MCP is remote-only, so only https callbacks are
+  // reports completion to it — once the callback has been matched against the
+  // allow-list the server declares on its origin (see `matchDeclaredCallback`
+  // in `handleAuthorize`). MCP is remote-only, so only https callbacks are
   // accepted (a plain-http or loopback callback is rejected). A disallowed (or
   // unparsable) callback yields `undefined` → the invalid screen.
   const mcpServer = $derived(
@@ -194,11 +197,24 @@
           phase = { kind: "untrusted" };
           return;
         }
+        // Contact the trusted server only at a callback it *declares*: the
+        // server hosts an allow-list at a fixed well-known path on its origin
+        // (/.well-known/ii-auth-callbacks), and the link's callback must
+        // exact-match a declared entry. The (attacker-craftable) link only
+        // ever selects among the server-declared set — a crafted link can't
+        // point II at an arbitrary path on the trusted origin (a planted
+        // file, a reflecting or redirecting route). An undeclared callback,
+        // or an unreachable/invalid allow-list, throws: the connect fails
+        // closed into the catch below, before anything is registered.
+        const callback = await matchDeclaredCallback(
+          server.origin,
+          request.callback,
+        );
         const finishUrl = await mcpAuthorize({
           authenticated,
           ttlSeconds,
           accessLevel,
-          callback: request.callback,
+          callback,
           state: request.state,
         });
         mcpAuthorizeFunnel.trigger(McpAuthorizeEvents.Success);
