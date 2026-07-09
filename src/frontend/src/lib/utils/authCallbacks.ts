@@ -35,10 +35,55 @@
  *  entries, each with its own file. */
 export const AUTH_CALLBACKS_PATH = "/.well-known/ii-auth-callbacks";
 
-/** Upper bound on the allow-list document size, in UTF-16 code units
- *  (~bytes for the ASCII documents these are). Generous for a list of URLs;
- *  anything larger is a misbehaving server, not a bigger list. */
+/** Upper bound on the allow-list document size, in bytes. Generous for a
+ *  list of URLs; anything larger is a misbehaving server, not a bigger list. */
 export const AUTH_CALLBACKS_MAX_SIZE = 8 * 1024;
+
+/** Reads `response`'s body as text with {@link AUTH_CALLBACKS_MAX_SIZE} as a
+ *  hard cap: rejected up front when the server declares an oversize
+ *  `Content-Length`, and enforced chunk-by-chunk while streaming otherwise —
+ *  the read stops (and the connection is cancelled) at the cap, rather than
+ *  buffering an arbitrarily large body first and measuring it afterwards. */
+const readCapped = async (response: Response): Promise<string> => {
+  const tooLarge = (): Error =>
+    new Error("The MCP server's callback allow-list is too large.");
+
+  const declaredLength = response.headers.get("content-length");
+  if (
+    declaredLength !== null &&
+    Number(declaredLength) > AUTH_CALLBACKS_MAX_SIZE
+  ) {
+    throw tooLarge();
+  }
+
+  if (response.body === null) {
+    // No streamable body (older environments): read, then enforce the cap.
+    const text = await response.text();
+    if (text.length > AUTH_CALLBACKS_MAX_SIZE) {
+      throw tooLarge();
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    received += value.byteLength;
+    if (received > AUTH_CALLBACKS_MAX_SIZE) {
+      // Stop pulling from the network instead of buffering the rest.
+      await reader.cancel().catch(() => undefined);
+      throw tooLarge();
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+};
 
 /**
  * Fetches `origin`'s declared auth-callback allow-list and exact-matches
@@ -74,10 +119,7 @@ export const matchDeclaredCallback = async (
   if (!contentType.toLowerCase().startsWith("application/json")) {
     throw new Error("The MCP server's callback allow-list is not JSON.");
   }
-  const text = await response.text();
-  if (text.length > AUTH_CALLBACKS_MAX_SIZE) {
-    throw new Error("The MCP server's callback allow-list is too large.");
-  }
+  const text = await readCapped(response);
   let body: unknown;
   try {
     body = JSON.parse(text);

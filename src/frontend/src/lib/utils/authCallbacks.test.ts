@@ -14,10 +14,12 @@ const stubFetch = ({
   status = 200,
   contentType = "application/json",
   body = JSON.stringify({ callbacks: [CALLBACK] }),
+  headers = {},
 }: {
   status?: number;
   contentType?: string;
   body?: string;
+  headers?: Record<string, string>;
 } = {}): void => {
   vi.stubGlobal(
     "fetch",
@@ -25,7 +27,7 @@ const stubFetch = ({
       Promise.resolve(
         new Response(body, {
           status,
-          headers: { "content-type": contentType },
+          headers: { "content-type": contentType, ...headers },
         }),
       ),
     ),
@@ -126,6 +128,18 @@ describe("matchDeclaredCallback", () => {
       pad: "x".repeat(AUTH_CALLBACKS_MAX_SIZE),
     });
     stubFetch({ body: padded });
+    await expect(matchDeclaredCallback(ORIGIN, CALLBACK)).rejects.toThrow(
+      /too large/,
+    );
+  });
+
+  it("rejects an oversize declared Content-Length before reading the body", async () => {
+    // The cap must not require buffering the body to be enforced: a declared
+    // oversize length is rejected up front (and a body without one is capped
+    // while streaming — the previous test's path).
+    stubFetch({
+      headers: { "content-length": String(AUTH_CALLBACKS_MAX_SIZE + 1) },
+    });
     await expect(matchDeclaredCallback(ORIGIN, CALLBACK)).rejects.toThrow(
       /too large/,
     );
