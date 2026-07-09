@@ -259,6 +259,7 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
 // client_for resolves the per-app client for an origin, handling both forms (§5):
 //   cleartext  -> app_clients[origin]
 //   hashed     -> the entry whose sha256(entry.salt || origin) == entry.origin_sha256
+```
 
 - **One access method.** Identity keys on `(iss, subject, primary_client_id)`, where
   `subject` is the declared stable claim. There is exactly one OpenID credential per user per
