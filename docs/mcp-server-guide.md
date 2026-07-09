@@ -153,7 +153,8 @@ client-side and ships it to your backend over a same-origin request:
 const params = new URLSearchParams(location.hash.slice(1));
 const delegation = params.get("delegation"); // chain JSON
 const state = params.get("state");
-history.replaceState(null, "", location.pathname); // clear the fragment
+// Clear the fragment, keeping any query string your declared callback carries.
+history.replaceState(null, "", location.pathname + location.search);
 // POST { delegation, state } to your backend, same-origin
 ```
 

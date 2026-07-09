@@ -45,7 +45,7 @@
   <div class="flex flex-col items-center gap-1">
     <p class="text-text-tertiary text-base">
       {#if redirecting}
-        {$t`Redirecting back to the agent…`}
+        {$t`Taking you to the server to finish connecting…`}
       {:else}
         {$t`You can return to your agent.`}
       {/if}

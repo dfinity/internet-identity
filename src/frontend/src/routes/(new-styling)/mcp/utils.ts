@@ -1,7 +1,10 @@
 import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import { DelegationChain } from "@icp-sdk/core/identity";
-import { transformSignedDelegation } from "$lib/utils/utils";
+import {
+  throwTextCanisterError,
+  transformSignedDelegation,
+} from "$lib/utils/utils";
 
 interface McpAuthorizeInput {
   authenticated: Authenticated;
@@ -70,34 +73,31 @@ export const mcpAuthorize = async ({
 
   // The session-grant lifetime the user chose (the backend clamps again). The
   // access level is recorded on the index entry, not folded into the signature.
+  // A backend refusal (MCP disabled, unauthenticated, a duplicate in-flight
+  // key, ...) throws here and fails the connect before anything is delivered.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
-  const prepared = await actor.prepare_mcp_registration_delegation(
-    identityNumber,
-    registrationKey,
-    toPermissionsArg(accessLevel),
-    [grantTtlNanos],
-  );
-  if ("Err" in prepared) {
-    // A backend refusal (MCP disabled, unauthenticated, a duplicate in-flight
-    // key, ...) fails the connect before anything is delivered.
-    throw new Error(prepared.Err);
-  }
-  const { user_key, expiration } = prepared.Ok;
+  const { user_key, expiration } = await actor
+    .prepare_mcp_registration_delegation(
+      identityNumber,
+      registrationKey,
+      toPermissionsArg(accessLevel),
+      [grantTtlNanos],
+    )
+    .then(throwTextCanisterError);
 
-  const signed = await actor.get_mcp_registration_delegation(
-    identityNumber,
-    registrationKey,
-    expiration,
-  );
-  if ("Err" in signed) {
-    throw new Error(signed.Err);
-  }
+  const signed = await actor
+    .get_mcp_registration_delegation(
+      identityNumber,
+      registrationKey,
+      expiration,
+    )
+    .then(throwTextCanisterError);
 
   // Assemble the `P_reg -> X` chain the server will redeem. `user_key` is
   // `P_reg`'s DER public key, so the server's `mcp_register_v2` call is seen by
   // the backend as `caller() == P_reg`.
   const chain = DelegationChain.fromDelegations(
-    [transformSignedDelegation(signed.Ok)],
+    [transformSignedDelegation(signed)],
     new Uint8Array(user_key),
   );
 

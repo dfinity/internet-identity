@@ -153,6 +153,10 @@ const connectPageHtml = (redeemPath: string): string => `<!doctype html>
     const params = new URLSearchParams(location.hash.slice(1));
     const delegation = params.get("delegation");
     const state = params.get("state");
+    // Clear the fragment once parsed (keeping the query string — the declared
+    // callback may carry one) so the delegation doesn't linger in the address
+    // bar / history — what the server guide tells real servers to do.
+    history.replaceState(null, "", location.pathname + location.search);
     if (!delegation || !state) {
       el.textContent = "Missing delegation";
       return;
