@@ -76,8 +76,10 @@ gated app.
 
 - **Google Workspace** — cannot express per-OIDC-client group assignment (§8).
 - **Any id.ai-side policy or directory** — that is the companion layer.
-- **Forwarding groups/roles to dapps** — this layer only decides *reachability*; attributes
-  are a separate concern.
+- **Forwarding groups/roles to dapps** — out of scope (that's the id.ai-side layer). Note
+  this layer *does* rely on the dapp verifying the **certified `sso_domain`** (provenance) for
+  the rogue-domain defense (§6, §7) — but that's the existing `sso:<domain>` label, not new
+  attribute forwarding.
 - **Changing the dapp-facing principal derivation** — it stays `f(anchor, origin)` (§6).
 
 ---
@@ -105,8 +107,8 @@ gated app.
 | --- | --- |
 | Token minted for app W replayed to reach app P | II re-checks `aud == the origin's declared client_id`; a W token is rejected for origin P (§6). |
 | Reaching a gated app via the org's default client | No fallback: a gated origin is servable only by its declared client (same `aud` check). |
-| **Insider re-routes a gated app through a rogue discovery domain** — an org member (assigned to the primary client, not to the gated app) publishes their own `evil.com` whose well-known points at the org's *real* IdP and declares a client they can pass, then signs in through it to reach the gated app as their real identity | `sso_domain` is part of the credential key (§6): a login via `evil.com` resolves to a **distinct** anchor, so it can never act as the `acme.com` identity. **Verified against the codebase** — today the key is `(iss, sub, aud)` only with `sso_domain` a non-key field, so without this fix the two logins collide; §6.1 is the migration that closes it. |
-| A stray client at the same issuer hijacking an anchor | `sso_domain` in the key, plus `aud`-collapse applying only to SSO credentials (`sso_domain = Some`); direct providers (`None`) keep full `(iss, sub, aud)` isolation (§7). |
+| **Insider re-routes a gated app through a rogue discovery domain** — an org member (assigned to the primary client, not to the gated app) publishes their own `evil.com` whose well-known points at the org's *real* IdP and declares a client they can pass, then signs in through it to reach the gated app as their real identity | The **certified `sso_domain`** is unforgeable (it is the discovery domain II actually resolved), so the login is certifiably `sso:evil.com`. A gated dapp trusts a specific org domain and rejects it (§6, §7). The anchor may collide (same human) but access is decided on the certified domain, not the principal — so no anchor re-key is needed. |
+| A stray client at the same issuer hijacking an anchor | A per-app token resolves to identity only if its `aud` is a client the org's well-known declares; direct providers (no `sso_domain`, no `app_clients`) keep full `(iss, sub, aud)` isolation (§7). |
 
 **Out of scope / operational (cannot be enforced by II)**
 
@@ -237,13 +239,19 @@ which is sufficient. Cleartext and hashed keys may coexist in one object.
 
 ## 6. II core changes
 
-Only the OpenID delegation path changes. No new canister, no new externally-callable method
-shape beyond threading the target origin (already available in the authorize flow).
+The OpenID delegation path gains two things; nothing else. **No public API change, no
+stable-memory migration, no change to `StorableOpenIdCredentialKey`, and the delegation seed is
+untouched** — the security property lives in the *certified `sso_domain`*, checked at
+enforcement, not in the anchor key.
 
-The principle: **the per-app client is used only for the gate; identity is always keyed on
-the primary client.** The token's `aud` is checked against the origin's declared client and
-then discarded for identity — the anchor is resolved as if the login had used the primary
-client. A per-app login therefore creates no credential and no access method.
+**1. Per-app logins resolve to the primary identity.** A gated dapp's login runs against a
+per-app client, so the token's `aud` is that per-app client_id. II uses `aud` only for the
+gate; for *identity* it resolves the anchor as if the login had used the **primary** client —
+it looks up `(iss, stable_id, primary_client_id)`, substituting the primary client for the
+token's `aud`. So all of an org's per-app clients collapse to the one primary-client identity,
+and a per-app login creates no credential and no access method. Existing single-client
+credentials are already keyed on the primary client, so this is a **lookup-time substitution —
+no stored key change, no migration.**
 
 `wellknown(sso_domain)` below is II core's **in-heap** cached copy of the org's well-known
 (populated by `discover_sso`), not a fresh fetch. The cache is transient — empty after an
@@ -256,10 +264,10 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
     let claims = verify_id_token(jwt);              // iss, sub, aud, nonce, exp, JWKS — unchanged
     let wk = match wellknown(sso_domain) {          // II core's IN-HEAP discovery cache
         Cached(c) => c,
-        Cold      => return Pending,                // cold/post-upgrade/evicted: re-drive discover_sso.
+        Cold      => return Pending,                // cold/post-upgrade/evicted: re-drive discover_sso
     };                                              // NEVER read a cold cache as "no app_clients" (would fail open)
 
-    // --- gate: the token must be for THIS origin's client ---
+    // gate: the token must be for THIS origin's declared client
     let expected = match wk.client_for(origin) {    // app_clients lookup (cleartext or hashed, §5.1)
         Some(c) => c,                               // listed origin -> its per-app client
         None if wk.gate_all_apps => return Deny,    // unlisted + default-deny -> no access
@@ -267,14 +275,12 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
     };
     if claims.aud != expected { return Deny; }      // wrong app / no-fallback
 
-    // --- identity: primary client + the verified sso_domain, never the per-app client ---
+    // identity: resolve on the PRIMARY client. aud is gate-only; sso_domain is NOT in the key.
     require(claims.aud in wk.declared_clients());   // token from a client the org vouches for
-    let stable_id = claims[wk.stable_identifier_claim];       // "sub" by default; "oid" on Entra
-    let identity_key = (claims.iss, stable_id, wk.client_id, Some(sso_domain));
-        // per-app aud never enters identity; sso_domain binds the anchor to THIS domain.
-        // It is unforgeable (the discovery domain II actually used), so a login via a rogue
-        // domain that copies iss + primary client_id still resolves to a DIFFERENT anchor.
-    lookup_or_create_anchor(identity_key)   // sub: direct index; oid (Entra): via the aux index (§6.1)
+    let stable_id = claims[wk.stable_identifier_claim];   // "sub" by default; "oid" on Entra
+    lookup_or_create_anchor((claims.iss, stable_id, wk.client_id))
+        // per-app aud -> primary, so per-app clients share one identity.
+        // sub: existing index; oid (Entra): via the aux index (§6.1).
 }
 
 // client_for resolves the per-app client for an origin, over app_clients keys (§5):
@@ -282,115 +288,76 @@ fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
 //   "hash:salt" key -> the key where sha256(origin || salt) == hash
 ```
 
-- **One access method.** Identity keys on `(iss, stable_id, primary_client_id, sso_domain)`
-  (`stable_id` = the declared stable claim). There is exactly one OpenID credential per user
-  per SSO domain; per-app clients never appear in credential state.
-- **`sso_domain` is in the key, and it must be.** It binds the anchor to the domain whose
-  well-known II actually used, which the caller cannot forge. Without it the key is
-  `(iss, sub, aud)` and a login via an attacker-controlled discovery domain that points at the
-  org's real IdP collides onto the org's anchor — a verified per-app-gate bypass (§3, §6.1).
-- **The identifier must be cross-client stable.** Correlating a per-app login to the primary
+**Anti-rogue-domain: the certified `sso_domain`, not the anchor.** The security property — a
+login via an attacker's discovery domain must not act as the org's identity — is enforced on
+the **certified `sso_domain`**, which II stamps from the discovery domain it actually resolved
+the config from. That value is verified and **unforgeable**: a caller cannot claim `acme.com`
+while using `evil.com`'s well-known, because `sso_domain` *is* the domain II fetched from. A
+gated dapp trusts a specific org domain and checks the certified `sso_domain` (II already
+labels SSO credentials `sso:<domain>` and surfaces it via the verification lib); an `evil.com`
+login is certifiably `sso:evil.com` and is rejected. The anchor may *collide* across domains
+(same `(iss, stable_id, primary)`) — but that is harmless: it is the same human, and access is
+decided on the certified domain, not the raw principal. So `sso_domain` stays **out** of the
+anchor key and the seed, and there is no re-key migration.
+
+- **One access method.** Identity keys on `(iss, stable_id, primary_client_id)` — the same key
+  an ordinary org SSO login already produces. Exactly one OpenID credential per user; per-app
+  clients never appear in credential state.
+- **The identifier must be cross-client stable.** Canonicalizing per-app logins to the primary
   identity only works if the identifier is the same across the org's clients. `sub` is on Okta
   (org authorization server), Google, and OneLogin; on **Entra `sub` is pairwise** (per
-  client), so Entra orgs set `stable_identifier_claim: "oid"` (§5). Using raw `sub` on Entra would
-  fragment the user — this is the one thing to get right per IdP.
-- **`oid` is not captured today (implementation note).** II currently decodes and stores only
-  `sub` (plus `tid`, folded into the issuer via the `{tid}` template and kept in metadata); it
-  never reads `oid`. Supporting `stable_identifier_claim: "oid"` therefore requires II to decode the
-  configured subject claim from the token and key the credential on it — a real code change,
-  not just config.
-- **Per-app tokens are read-only for identity.** A per-app login gates and resolves the
-  anchor but does **not** write profile metadata (email, name); that always comes from a
-  primary-client login. The dapp-facing principal is `f(anchor, origin)` regardless
+  client), so Entra orgs set `stable_identifier_claim: "oid"` (§5, §6.1).
+- **Per-app tokens are read-only for identity.** A per-app login gates and resolves the anchor
+  but does **not** write profile metadata (email, name); that always comes from a primary-client
+  login. The dapp-facing principal is `f(anchor, origin)` regardless
   (`delegation.rs::calculate_anchor_seed`), so every gated app sees the same identity.
 
-The first login for a user establishes the single credential under `(iss, stable_id,
-primary_client, sso_domain)` (whether that first login is the org's default SSO or a gated app
-— either way it is keyed on the primary client and the `sso_domain`, and the per-app `aud` is
-only used to gate).
+### 6.1 Entra: cross-client identity (auxiliary `oid` index)
 
-### 6.1 Migration
-
-Two migrations, both bounded.
-
-**1. Add `sso_domain` to the credential key — one-shot, at upgrade.** Today the anchor lookup
-index is `StableBTreeMap<StorableOpenIdCredentialKey, StorableAnchorNumberList>`
-(`storage.rs`), and `StorableOpenIdCredentialKey` wraps only `(iss, sub, aud)`
-(`storable/openid_credential_key.rs`). `sso_domain` is stored *on the credential*
-(`OpenIdCredentialData.sso_domain: Option<String>`) but is **not** in the index key, so two
-logins with the same `(iss, sub, aud)` under different domains resolve to one anchor (the
-verified bypass, §3). The fix extends the key to `(iss, sub, aud, Option<sso_domain>)` and
-rebuilds the index in the post-upgrade hook:
-
-- The rebuild is **deterministic and reads only already-stored data** — every credential
-  carries its own `sso_domain` (`Some(domain)` for SSO, `None` for direct providers). Iterate
-  the credentials, recompute each key with its `sso_domain`, repopulate the map.
-- **No behavior change for legitimate use.** A user always authenticates through the same
-  domain, so their new key `(…, Some(acme.com))` resolves to the same anchor as before. Only
-  cross-domain collisions — the attack — are now separated into distinct anchors.
-- **Direct providers are untouched:** their key gains a constant `None`, and they have no
-  discovery domain to collide over.
-- **Prerequisite:** the `sso_domain` backfill on SSO credentials (`sso_credential_migration`)
-  must be complete, so no SSO credential is keyed `None` and accidentally shares the direct
-  provider namespace.
-
-**2. Entra: an auxiliary `oid` index — additive, lazy, no key mutation.** On Entra `sub` is
-per-client, so a per-app login's `sub` won't match the primary credential; the stable
-correlator is `oid` (§6). We do **not** re-key the credential from `sub` to `oid` — mutating a
-security-critical, principal-deriving stable key in place is exactly what to avoid. Instead
-the primary credential stays exactly as stored, and we add an **auxiliary index**:
+On Entra `sub` is per-client, so a per-app login's `sub` differs from the primary credential's
+and can't be canonicalized by substituting the client alone; the stable correlator is `oid`.
+II doesn't store `oid` today (it decodes only `sub`, plus `tid` folded into the issuer), so
+supporting `stable_identifier_claim: "oid"` needs II to decode the configured claim and keep a
+small **auxiliary index** — *additive, not a migration; no credential, seed, or key is
+mutated*:
 
 ```
-(iss, oid, sso_domain)  ->  the primary credential's (iss, sub) key
+(iss, oid)  ->  the primary credential's (iss, sub)
 ```
 
 - **Populated at primary-client login** — the only login carrying both the stable `oid` and
-  the primary `sub`. Existing Entra users get their entry on their next normal SSO login; the
-  stored credential is never touched, an entry is only *added*.
+  the primary `sub`. Existing Entra users get their entry on their next normal SSO login;
+  nothing stored is changed, an entry is only *added*.
 - **Entra per-app logins resolve through it:** the per-app token gives `(iss, oid)`, the aux
-  index yields the primary `(iss, sub)`, and the existing credential index (with `sso_domain`
-  from migration 1) yields the anchor.
-- **A miss fails safe.** If the aux entry doesn't exist yet, resolution simply doesn't find an
-  anchor — the user completes a normal primary login first — rather than resolving to the
-  wrong identity.
-- The aux key includes `sso_domain`, so it inherits the same rogue-domain isolation as
-  migration 1.
+  index yields the primary `(iss, sub)`, and the existing credential index resolves the anchor.
+- **A miss fails safe** — no anchor found, so the user completes a normal primary login first,
+  rather than resolving to the wrong identity.
 
-Non-Entra IdPs need no auxiliary index: `sub` is stable across clients, so migration 1's key
-already resolves per-app logins (canonicalizing `aud` to the primary).
-
-Neither migration mutates a credential, the delegation seed, or the dapp-facing principal
-`f(anchor, origin)` — migration 1 rebuilds an index from stored data, migration 2 only adds
-index entries.
+Non-Entra IdPs need no auxiliary index: `sub` is stable across clients, so the primary-client
+substitution already resolves per-app logins. Cross-domain isolation does **not** depend on
+this index — it comes from the certified `sso_domain` (§6, §7).
 
 ---
 
-## 7. Why resolving identity from a per-app token is safe
+## 7. Why this is safe
 
-Accepting a per-app-client token as proof of the primary-keyed identity is safe under these
-guard rails:
-
-1. **Bound to the domain, in the key.** Identity is keyed on `sso_domain` (§6, §6.1), so a
-   per-app token only ever resolves within the anchor namespace of the domain it was
-   discovered through. A rogue domain that copies the org's `iss` and primary client_id still
-   lands on a *different* anchor — the domain component differs and it is unforgeable.
-2. **Only across declared clients.** Within one `sso_domain`, a per-app token resolves to
-   identity only if its `aud` is in that domain's declared client set (primary + `app_clients`).
-   The org, via its DNS-rooted well-known, has vouched those clients are its own — so within
-   that set one `(iss, stable_id, sso_domain)` is one human, and canonicalizing the per-app
-   `aud` to the primary is sound.
-3. **Scoped to SSO.** Domain-keying applies only to SSO credentials (`sso_domain = Some`).
-   Direct providers (Google-direct, Apple, Microsoft — `None`, no `app_clients`) keep full
-   `(iss, sub, aud)` isolation, so a stray OAuth client at a shared issuer can never resolve
-   to someone's anchor.
-4. **The gate is separate from identity.** Reaching origin P still requires `aud == client_P`.
-   A `client_W` token resolves to the same (domain- and primary-keyed) identity but is denied
-   at origin P. Identity-resolution and authorization do not leak into each other.
-
-The property the seed's `aud` component protects — "a token for one client can't stand in for
-another" — is preserved *as the gate* (rule 4), and it never has to be relaxed in identity,
-because identity is keyed on the primary client scoped to the `sso_domain` — the per-app `aud`
-is discarded after gating (rules 1–3).
+1. **The certified `sso_domain` is unforgeable.** It is the discovery domain II actually
+   resolved the config from — not anything the caller supplies or the token carries. A login
+   via `evil.com` is certifiably `sso:evil.com`; it cannot present as `sso:acme.com`.
+2. **Enforcement is on the certified domain, not the principal.** A gated dapp trusts a
+   specific org domain and checks the certified `sso_domain`. So even though a rogue-domain
+   login may resolve to the *same anchor* as the real user (same human — same
+   `(iss, stable_id, primary)`), it carries the wrong certified domain and is rejected. The
+   anchor collision is irrelevant to the access decision, which is why `sso_domain` need not be
+   in the key.
+3. **Assignment is enforced by the IdP.** Within the org's real domain, reaching a gated origin
+   requires a token for that origin's per-app client (`aud` check, no fallback), which the IdP
+   only issues to assigned users. An unassigned insider can't get that token via the org's real
+   well-known — and via a rogue domain they fail the certified-domain check (rule 2).
+4. **Declared clients only.** A per-app token resolves to identity only if its `aud` is a
+   client the org's well-known declares; direct providers (no `sso_domain`, no `app_clients`)
+   keep full `(iss, sub, aud)` isolation, so a stray OAuth client at a shared issuer can't
+   resolve onto someone's anchor.
 
 ---
 
@@ -438,40 +405,37 @@ resolution in II core (§6).
 
 ## 10. Build order (stacked PRs)
 
-Each PR stacks on the previous. **Migrations land before enforcement.**
+Each PR stacks on the previous. There is **no stable-memory migration** — identity keying,
+the delegation seed, and the public API are all unchanged (§6).
 
-> **Security invariant:** the gate (PR 3) must not ship before the key migration (PR 1).
-> Enabling enforcement while the key is still `(iss, sub, aud)` runs the gate without domain
-> isolation — the §3 rogue-domain bypass would be open.
+> **Security invariant:** the `aud` gate alone does **not** stop a rogue discovery domain (the
+> attacker controls their own well-known). A gated dapp's isolation comes from verifying the
+> **certified `sso_domain`** (§7). So the enforcement PR must ship *with* the means for a dapp
+> to require a specific `sso_domain` — not the `aud` gate on its own.
 
-**PR 1 — `sso_domain` into the credential key (migration 1).** BE only; no user-visible change.
-- Extend `StorableOpenIdCredentialKey` to `(iss, sub, aud, Option<sso_domain>)`, update all
-  call sites, rebuild the lookup index from stored data (§6.1).
-- Behavior-preserving: same-domain logins resolve identically; only cross-domain collisions
-  separate. Isolating this delicate stable-structure migration lets it bake before it is
-  load-bearing.
-
-**PR 2 — BE plumbing: config parsing + `oid` capture + aux index (migration 2).** Still no
-enforcement; invisible.
+**PR 1 — BE plumbing: config parsing + `oid` capture + aux index.** No enforcement; invisible.
 - Parse `app_clients` / `gate_all_apps` / `stable_identifier_claim` into the cached discovery
   config (§5).
-- Decode `oid`; stand up the additive `(iss, oid, sso_domain)` aux index, populated at login
-  (§6.1). Shipping before the gate lets it pre-populate from normal Entra logins, so entries
-  exist by the time gating turns on.
+- Decode `oid`; keep the additive `(iss, oid) -> (iss, sub)` aux index for Entra, populated at
+  login (§6.1). Shipping first lets it pre-populate from normal Entra logins, so entries exist
+  before gating turns on. Additive only — no migration.
 
-**PR 3 — Gate + routing (enforcement turns on).**
+**PR 2 — Gate + routing + identity (enforcement turns on).**
 - `get_sso_discovery` resolves the per-origin client; the frontend routes the ceremony to it.
-- BE gate: `aud == declared-client-for-origin`; anchor resolution on
-  `(iss, stable_id, primary_client, sso_domain)`; cold cache → `Pending` (§6).
+- BE gate: `aud == declared-client-for-origin`, no fallback; identity resolved on the primary
+  client (`aud` -> primary); cold cache -> `Pending` (§6). No stored-key change, no seed change.
+- Surface the certified `sso_domain` per login for relying parties (via the existing
+  `sso:<domain>` attribute path).
 - Validate: an assigned user reaches the gated dapp with the same identity (and single access
   method) as their default SSO; an unassigned user is denied at the IdP; a token for one gated
-  app cannot open another; **a login via a rogue discovery domain resolves to a different
-  anchor** (the §3 bypass is closed).
+  app can't open another; **a rogue-domain login is certifiably a different `sso_domain`**.
 
-**PR 4 — Onboarding.** Per-IdP client setup, with the Entra assignment-required, Okta
-400-denial, and Entra `stable_identifier_claim: "oid"` requirements called out (§8).
+**PR 3 — Dapp-side verification + onboarding.** A helper in the II verification lib for a dapp
+to require a specific certified `sso_domain` (the rogue-domain defense, §7), plus per-IdP
+onboarding: client setup, Entra `stable_identifier_claim: "oid"` + assignment-required, Okta
+400-denial (§8).
 
-No canister beyond II core, no proxy, no panel.
+No canister beyond II core, no proxy, no panel, no migration.
 
 ---
 
