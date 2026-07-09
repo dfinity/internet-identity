@@ -39,15 +39,23 @@ sequenceDiagram
     autonumber
     participant U as User
     participant FE as II Frontend
-    participant IdP as org's IdP
     participant II as II Core
+    participant IdP as org's IdP
     U->>FE: sign in with SSO (org.com)
-    FE->>IdP: OIDC ceremony (discovered via well-known)
+    FE->>II: discover_sso(org.com)
+    Note over II: II core fetches + caches the org's well-known and OIDC config
+    FE->>II: get_sso_discovery(org.com)
+    II-->>FE: client_id, endpoints
+    FE->>IdP: OIDC ceremony (authorize)
     IdP-->>FE: id_token
     FE->>II: openid_prepare_delegation(jwt)
     II->>II: verify iss / aud / nonce / exp / JWKS
     II-->>FE: delegation for (anchor, dapp-origin)
 ```
+
+The frontend never reads the org's web root: II core fetches and caches the well-known
+(`discover_sso`, an HTTP outcall) and the frontend reads the resolved config with a query
+(`get_sso_discovery`).
 
 ### 1.1 The gap
 

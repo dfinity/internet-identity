@@ -123,11 +123,15 @@ sequenceDiagram
     autonumber
     participant U as User
     participant FE as II Frontend
+    participant II as II Core
     participant Web as org.com web root
     participant IdP as org's IdP
-    participant II as II Core
     U->>FE: sign in to gated dapp (payroll.com)
-    FE->>Web: read well-known, map origin -> client_P
+    FE->>II: discover_sso(org.com)
+    II->>Web: GET /.well-known/ii-openid-configuration
+    Web-->>II: config incl. app_clients (cached by II)
+    FE->>II: get_sso_discovery(org.com, payroll.com)
+    II-->>FE: client_P + endpoints
     FE->>IdP: authorize(client_P, nonce)
     Note over IdP: IdP evaluates app-assignment for client_P
     alt user assigned to client_P
@@ -142,6 +146,11 @@ sequenceDiagram
     end
 ```
 
+The frontend never reads the org's web root. As today, II core fetches and caches the
+well-known (the existing `discover_sso` update outcall); the frontend reads the resolved
+config — here extended so `get_sso_discovery` returns the client for the target origin from
+`app_clients` — via a query.
+
 Two responsibilities split cleanly:
 
 - **Gate = the IdP.** App-assignment decides who gets a token for `client_P`. II does not
@@ -155,7 +164,8 @@ Two responsibilities split cleanly:
 ## 5. Well-known map
 
 The org's existing `/.well-known/ii-openid-configuration` gains an `origin -> client_id` map.
-Additive; existing single-client SSO deployments keep working.
+Additive; existing single-client SSO deployments keep working. As today, **II core** fetches
+and caches this file (via `discover_sso`); the frontend never reads the org's web root.
 
 ```jsonc
 {
@@ -192,6 +202,9 @@ The principle: **the per-app client is used only for the gate; identity is alway
 the primary client.** The token's `aud` is checked against the origin's declared client and
 then discarded for identity — the anchor is resolved as if the login had used the primary
 client. A per-app login therefore creates no credential and no access method.
+
+`wellknown(sso_domain)` below is II core's cached copy of the org's well-known (populated by
+`discover_sso`), not a fresh fetch.
 
 ```
 fn resolve_and_gate(jwt, origin, sso_domain) -> Result<Anchor> {
@@ -293,8 +306,9 @@ resolution in II core (§6).
 
 ## 10. Build order
 
-1. **Well-known + routing.** Parse `app_clients`; the frontend selects the client_id for the
-   target origin and runs the ceremony against it.
+1. **Well-known + routing.** II core parses `app_clients` from the well-known it already
+   fetches and caches (`discover_sso`); `get_sso_discovery` resolves the client_id for the
+   target origin; the frontend runs the ceremony against it.
 2. **Gate + identity in II core.** The `aud == declared-client-for-origin` check and
    primary-keyed anchor resolution (§6). Validate: an assigned user reaches the gated dapp
    with the same identity (and single access method) as their default SSO; an unassigned user
