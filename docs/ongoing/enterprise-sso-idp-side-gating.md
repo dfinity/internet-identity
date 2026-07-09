@@ -421,9 +421,10 @@ the delegation seed, and the public API are all unchanged (§6).
 **PR 1 — BE plumbing: config parsing + `oid` capture + aux index.** No enforcement; invisible.
 - Parse `app_clients` / `gate_all_apps` / `stable_identifier_claim` into the cached discovery
   config (§5).
-- Decode `oid`; keep the additive `(iss, oid) -> (iss, sub)` aux index for Entra, populated at
-  login (§6.1). Shipping first lets it pre-populate from normal Entra logins, so entries exist
-  before gating turns on. Additive only — no migration.
+- When `stable_identifier_claim != "sub"` (currently Entra `oid`), decode that claim and keep
+  the additive `(iss, <stable id>) -> (iss, sub)` aux lookup, populated at login (§6.1).
+  Shipping first lets it pre-populate from normal logins, so entries exist before gating turns
+  on. Additive only — no migration.
 
 **PR 2 — Gate + routing + identity (enforcement turns on).**
 - `get_sso_discovery` resolves the per-origin client; the frontend routes the ceremony to it.
