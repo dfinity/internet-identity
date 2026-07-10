@@ -47,7 +47,7 @@ sequenceDiagram
     note over F: sign the second hop Y to X locally — full chain never transits the IC
     F->>U: navigate tab to callback#delegation, state
     U->>M: your connect page reads the fragment, ships it to your backend
-    M->>C: mcp_register_v2(S) — signed via the chain; consent recovered server-side
+    M->>C: mcp_register_v2(S) — signed via the chain, consent recovered server-side
     C-->>M: {expiration, permissions} — grant bound: S's principal to anchor
     note over U,M: your page owns the tab now — finish your flow (e.g. OAuth code redirect)
     end
