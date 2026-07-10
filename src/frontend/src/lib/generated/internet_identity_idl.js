@@ -605,11 +605,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdRegFinishResult = IDL.Record({ 'identity_number' : IDL.Nat64 });
   const IdRegFinishError = IDL.Variant({
+    'SsoNormalLoginRequired' : IDL.Null,
     'NoRegistrationFlow' : IDL.Null,
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'InvalidAuthnMethod' : IDL.Text,
     'StorageError' : IDL.Text,
-    'SsoNormalLoginRequired' : IDL.Null,
   });
   const IdRegStartError = IDL.Variant({
     'InvalidCaller' : IDL.Null,
@@ -642,6 +642,10 @@ export const idlFactory = ({ IDL }) => {
     'expiration' : Timestamp,
   });
   const McpRegistration = IDL.Record({ 'expiration' : Timestamp });
+  const McpRegistrationV2 = IDL.Record({
+    'permissions' : Permissions,
+    'expiration' : Timestamp,
+  });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -666,8 +670,8 @@ export const idlFactory = ({ IDL }) => {
   const OpenIDRegFinishArg = IDL.Record({
     'jwt' : JWT,
     'name' : IDL.Text,
-    'salt' : Salt,
     'origin' : IDL.Opt(IDL.Text),
+    'salt' : Salt,
     'discovery_domain' : IDL.Opt(IDL.Text),
   });
   const OpenIdPrepareDelegationResponse = IDL.Record({
@@ -729,6 +733,10 @@ export const idlFactory = ({ IDL }) => {
   const PrepareIdAliasError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+  });
+  const PrepareMcpRegistrationDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
   });
   const PrepareSessionDelegation = IDL.Record({
     'user_key' : UserKey,
@@ -1052,6 +1060,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
         ['query'],
       ),
+    'get_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, PublicKey, Timestamp],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
+        ['query'],
+      ),
     'get_principal' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Principal],
@@ -1181,6 +1194,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
       ),
+    'mcp_register_v2' : IDL.Func(
+        [SessionKey],
+        [IDL.Variant({ 'Ok' : McpRegistrationV2, 'Err' : IDL.Text })],
+        [],
+      ),
     'mcp_set_config' : IDL.Func(
         [UserNumber, McpConfig],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
@@ -1280,6 +1298,16 @@ export const idlFactory = ({ IDL }) => {
     'prepare_id_alias' : IDL.Func(
         [PrepareIdAliasRequest],
         [IDL.Variant({ 'Ok' : PreparedIdAlias, 'Err' : PrepareIdAliasError })],
+        [],
+      ),
+    'prepare_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(Permissions), IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareMcpRegistrationDelegation,
+            'Err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'prepare_session_delegation' : IDL.Func(

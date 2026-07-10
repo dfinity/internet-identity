@@ -826,6 +826,19 @@ export interface IdRegFinishArg {
 }
 export type IdRegFinishError = {
     /**
+     * A first gated SSO login (IdP-side per-app gating) for a non-`sub` org
+     * (e.g. Entra `oid`): the per-app token's pairwise sub can't be bridged to
+     * the org's primary identity until the user has signed in through the
+     * primary client once. Registration creates nothing; the frontend prompts a
+     * normal primary-client sign-in, then retries. NOTE: this is a deliberate
+     * non-additive variant addition (authorized) — inert for existing clients,
+     * which never send `OpenIDRegFinishArg.origin` and so never trigger the
+     * SSO-gated registration path that can return it.
+     */
+    'SsoNormalLoginRequired' : null
+  } |
+  {
+    /**
      * No registration flow ongoing for the caller.
      */
     'NoRegistrationFlow' : null
@@ -847,15 +860,6 @@ export type IdRegFinishError = {
      * Error while persisting the new identity.
      */
     'StorageError' : string
-  } |
-  {
-    /**
-     * A first gated SSO login for a non-`sub` org (e.g. Entra `oid`): the
-     * per-app token's pairwise sub can't be bridged to the primary identity
-     * until a normal primary-client sign-in has happened. Registration creates
-     * nothing; the frontend prompts a normal sign-in, then retries.
-     */
-    'SsoNormalLoginRequired' : null
   };
 export interface IdRegFinishResult { 'identity_number' : bigint }
 export interface IdRegNextStepResult {
@@ -1144,6 +1148,13 @@ export type ListAvailableAttributesError = {
  */
 export interface ListAvailableAttributesRequest {
   /**
+   * The dapp origin, supplied when the caller authenticates through an SSO
+   * session (IdP-side per-app gating): it lets the canister recompute the
+   * SSO-session principal and authorize this read for it. Omitted by
+   * device / OpenID sessions, which authorize via the usual auth check.
+   */
+  'origin' : [] | [string],
+  /**
    * Optional list of attribute keys to filter by.
    * Each key is either a fully-scoped key (e.g.,
    * `"openid:https://accounts.google.com:email"` or
@@ -1156,13 +1167,6 @@ export interface ListAvailableAttributesRequest {
    * Identity for which available attributes should be listed.
    */
   'identity_number' : IdentityNumber,
-  /**
-   * The dapp origin, supplied when the caller authenticates through an SSO
-   * session (IdP-side per-app gating): lets the canister recompute the
-   * SSO-session principal and authorize this read for it. Omitted by
-   * device / OpenID sessions.
-   */
-  'origin' : [] | [string],
 }
 export type ListAvailableAttributesResponse = Array<
   [string, Uint8Array | number[]]
@@ -1196,6 +1200,16 @@ export interface McpPrepareDelegation {
  */
 export interface McpRegistration { 'expiration' : Timestamp }
 /**
+ * Result of mcp_register_v2: the expiration (ns since epoch) of the MCP session
+ * grant, plus the access level the user chose at connect (queries = read-only,
+ * all = full). The server reads permissions to learn the read-only state up
+ * front (the v2 flow has no completion POST carrying it).
+ */
+export interface McpRegistrationV2 {
+  'permissions' : Permissions,
+  'expiration' : Timestamp,
+}
+/**
  * Map with some variants for the value type.
  * Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
  */
@@ -1222,19 +1236,20 @@ export type MetadataMapV2 = Array<
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
+  /**
+   * The target dapp origin, set only for a first gated SSO login (IdP-side
+   * per-app gating). When present (with discovery_domain), registration runs
+   * the same gate as sso_prepare_delegation and stores a primary-client-keyed
+   * credential (stable-sub substitution) so a gated first login registers
+   * directly. Absent for direct providers and normal (un-gated) SSO logins.
+   */
+  'origin' : [] | [string],
   'salt' : Salt,
   /**
    * SSO discovery domain the JWT was obtained through, or null for a direct
    * provider (Google / Microsoft / Apple). Selects the JWK source.
    */
   'discovery_domain' : [] | [string],
-  /**
-   * The target dapp origin, set only for a first gated SSO login (IdP-side
-   * per-app gating). When present (with discovery_domain), registration runs
-   * the gate and stores a primary-client-keyed credential so a gated first
-   * login registers directly. Absent otherwise.
-   */
-  'origin' : [] | [string],
 }
 export interface OpenIdConfig {
   'auth_uri' : string,
@@ -1422,6 +1437,17 @@ export interface PrepareIdAliasRequest {
    * Identity for which the IdAlias should be generated.
    */
   'identity_number' : IdentityNumber,
+}
+/**
+ * Result of prepare_mcp_registration_delegation: the canister-signature public
+ * key the registration delegation is rooted at (P_reg), and the (short)
+ * expiration of that delegation. The frontend fetches the signed delegation via
+ * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * server, which redeems it with mcp_register_v2.
+ */
+export interface PrepareMcpRegistrationDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
@@ -2035,6 +2061,17 @@ export interface _SERVICE {
     { 'Ok' : IdAliasCredentials } |
       { 'Err' : GetIdAliasError }
   >,
+  /**
+   * Fetch the signed registration delegation prepared above, to deliver to the
+   * trusted MCP server. Authenticated as the identity, like the prepare call.
+   * user_key is the value the prepare call returned; the seed is recovered
+   * from it, so no consent parameters need re-passing.
+   */
+  'get_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, PublicKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : string }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -2207,6 +2244,23 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * Called by the trusted MCP server, authenticated by the registration
+   * delegation chain: bind the server's long-lived session_key to the
+   * consenting anchor. The entire consent — anchor, read-only choice, grant
+   * lifetime — is recovered from the entry keyed by caller() (the registration
+   * principal), so the server passes only session_key: it cannot name a
+   * different anchor, upgrade the access level or stretch the grant, and never
+   * learns the anchor number. A trusted-server switch or disable since consent
+   * invalidates the delegation. Usable until the registration delegation
+   * expires (~5 min); re-registration within that window replaces the anchor's
+   * single MCP session.
+   */
+  'mcp_register_v2' : ActorMethod<
+    [SessionKey],
+    { 'Ok' : McpRegistrationV2 } |
+      { 'Err' : string }
+  >,
+  /**
    * Persist the identity's trusted-MCP-server config so it syncs across the
    * identity's devices. Authenticated as the identity, so only the user — never
    * a page that initiates a connect request — can change what it trusts.
@@ -2305,6 +2359,23 @@ export interface _SERVICE {
     [PrepareIdAliasRequest],
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
+  >,
+  /**
+   * Mint a short-lived MCP registration delegation (P_reg -> registration_key).
+   * Authenticated as the identity (only the consenting user can create one).
+   * registration_key is an ephemeral key the II frontend generates for this
+   * connect (browser-held — the canister never delegates to a key taken from
+   * the connect link; the frontend extends the chain to the server's key
+   * browser-side). P_reg is derived from a fresh random nonce, and the whole
+   * consent — the anchor, permissions (read-only choice), max_ttl (session-
+   * grant lifetime), and the identity's current trusted-server URL — is
+   * recorded on an index entry keyed by P_reg, so mcp_register_v2 recovers it
+   * server-side and the server cannot alter any of it.
+   */
+  'prepare_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
+    { 'Ok' : PrepareMcpRegistrationDelegation } |
+      { 'Err' : string }
   >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],
