@@ -1524,6 +1524,78 @@ fn mcp_register_v2_binds_session_via_registration_delegation() -> Result<(), Rej
     Ok(())
 }
 
+/// `get_mcp_registration_delegation` is scoped to the authenticated anchor: an
+/// identity authorized for one anchor cannot fetch a *different* anchor's
+/// certified `P_reg -> Y` hop, even presenting that anchor's `(user_key, Y,
+/// expiration)`. The entry keyed by `P_reg` must belong to the anchor named in
+/// the call. (The hop is inert without the browser-held `priv(Y)`, so this is
+/// least-privilege hardening — but there is no reason to serve it across
+/// anchors.)
+#[test]
+fn mcp_get_registration_delegation_is_scoped_to_the_authenticating_anchor(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+
+    // Two anchors, each controlled by its own device principal, both trusting
+    // the MCP server.
+    let anchor_1 = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor_1);
+    let anchor_2 = flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    trust_mcp_server(&env, canister_id, principal_2(), anchor_2);
+
+    // Anchor 2 mints its own registration delegation.
+    let registration_key = ByteBuf::from("browser registration key Y");
+    let prepared = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor_2,
+        registration_key.clone(),
+        Some(true),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .unwrap();
+
+    // Positive control: anchor 2 fetches its own delegation.
+    let own = get_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor_2,
+        registration_key.clone(),
+        prepared.user_key.clone(),
+        prepared.expiration,
+    )
+    .unwrap();
+    assert!(
+        own.is_ok(),
+        "an anchor must fetch its own delegation: {own:?}"
+    );
+
+    // Anchor 1 (authenticated for its own anchor) presents anchor 2's key
+    // material. Without the scoping check this returned anchor 2's certified
+    // hop; now the entry's anchor doesn't match the call's, so it is reported
+    // absent — indistinguishable from a delegation that never existed.
+    let cross = get_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor_1,
+        registration_key.clone(),
+        prepared.user_key.clone(),
+        prepared.expiration,
+    )
+    .unwrap();
+    assert!(
+        matches!(&cross, Err(message) if message.contains("no such delegation")),
+        "one anchor must not fetch another's registration delegation: {cross:?}"
+    );
+
+    Ok(())
+}
+
 /// The read-only choice and grant lifetime are recovered from the stored entry,
 /// not passed by the server, so the server has no argument to alter — a
 /// read-only consent yields a queries-only grant with no way for the redeemer
