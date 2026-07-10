@@ -41,13 +41,13 @@ sequenceDiagram
     M-->>F: {"callbacks": [...]} — link's callback must exact-match
     note over F: generate ephemeral key Y (browser-held)
     F->>C: prepare_mcp_registration_delegation(anchor, Y, permissions, ttl)
-    C-->>F: {user_key, expiration} — P_reg derived, only the anchor stored
-    F->>C: get_mcp_registration_delegation(anchor, Y, permissions, ttl, expiration)
+    C-->>F: {user_key, expiration} — P_reg from a random nonce, consent stored
+    F->>C: get_mcp_registration_delegation(anchor, Y, user_key, expiration)
     C-->>F: SignedDelegation — the P_reg to Y hop (inert without Y)
     note over F: sign the second hop Y to X locally — full chain never transits the IC
-    F->>U: navigate tab to callback#delegation, state, permissions, ttl
+    F->>U: navigate tab to callback#delegation, state
     U->>M: your connect page reads the fragment, ships it to your backend
-    M->>C: mcp_register_v2(S, permissions, ttl) — signed via the chain, echoing the consent
+    M->>C: mcp_register_v2(S) — signed via the chain; consent recovered server-side
     C-->>M: {expiration, permissions} — grant bound: S's principal to anchor
     note over U,M: your page owns the tab now — finish your flow (e.g. OAuth code redirect)
     end
@@ -140,42 +140,35 @@ https://<II_ORIGIN>/mcp#registration_key=<base64url DER public key>&callback=<de
 ## 3. Receive and redeem the registration delegation
 
 **a) Delivery.** After the user consents, II mints a canister-signed
-delegation `P_reg -> Y` (where `P_reg` is a registration principal **derived
-from the user's consent** — the anchor, the access level, the grant TTL, and
-the trusted server URL; nothing is stored — and `Y` is an ephemeral key the
-II frontend holds; you never construct or see either), extends it
-browser-side with a second, browser-signed hop `Y -> X` to your registration
-key, and navigates the connecting tab to your declared callback with the
-full chain **plus the consent tuple** in the **URL fragment**:
+delegation `P_reg -> Y` (where `P_reg` is a registration principal seeded
+from a **fresh random nonce** — not from the consent — and `Y` is an
+ephemeral key the II frontend holds; you never construct or see either),
+extends it browser-side with a second, browser-signed hop `Y -> X` to your
+registration key, and navigates the connecting tab to your declared callback
+with the full chain in the **URL fragment**:
 
 ```
-https://<your-origin>/mcp/connect#delegation=<URL-encoded chain JSON>&state=<state>&permissions=<queries|all>&ttl=<ns>
+https://<your-origin>/mcp/connect#delegation=<URL-encoded chain JSON>&state=<state>
 ```
 
-- `permissions` — the access level the user chose: `queries` (read-only)
-  or `all`.
-- `ttl` — the consented grant lifetime, in **nanoseconds**, as a decimal
-  string (it overflows 32-bit ints; parse as a 64-bit/bigint).
-
-These are the values you **echo verbatim to `mcp_register_v2`** (§3c). You
-can't gain anything by editing them: they are folded into `P_reg`'s
-derivation, so an altered echo derives a different principal and the
-redemption is rejected. Note the fragment does **not** carry the user's
-anchor (identity) number: II recovers it server-side from the registration
-delegation, so a connected server never learns it. The fragment is never
-sent in the HTTP request, so the chain stays out of your access logs and any
-intermediary's. Your callback page reads it client-side and ships it to your
-backend over a same-origin request:
+The whole consent — the anchor, the access level, the grant lifetime, and
+the trusted server URL — is **recorded canister-side** on the registration
+entry keyed by `P_reg` at consent time. You carry none of it: the fragment
+holds only the chain and your `state`, and redemption (§3c) passes only your
+session key. So the server can't name a different anchor, upgrade the access
+level, or stretch the lifetime — it never handles any of those values — and
+it **never learns the user's anchor (identity) number**. The fragment is
+never sent in the HTTP request, so the chain stays out of your access logs
+and any intermediary's. Your callback page reads it client-side and ships it
+to your backend over a same-origin request:
 
 ```js
 const params = new URLSearchParams(location.hash.slice(1));
 const delegation = params.get("delegation"); // chain JSON
 const state = params.get("state");
-const permissions = params.get("permissions");
-const ttl = params.get("ttl");
 // Clear the fragment, keeping any query string your declared callback carries.
 history.replaceState(null, "", location.pathname + location.search);
-// POST { delegation, state, permissions, ttl } to your backend, same-origin
+// POST { delegation, state } to your backend, same-origin
 ```
 
 **b) The chain format** is agent-js `DelegationChain.toJSON()`: an object
@@ -200,9 +193,7 @@ P_reg`), call:
 
 ```candid
 mcp_register_v2 : (
-    session_key : blob,           // DER public key of your session key S
-    permissions : opt Permissions, // echo the fragment's `permissions`
-    max_ttl : opt nat64           // echo the fragment's `ttl` (ns)
+    session_key : blob            // DER public key of your session key S
   ) -> (variant { Ok : McpRegistrationV2; Err : text });
 
 type McpRegistrationV2 = record {
@@ -211,30 +202,32 @@ type McpRegistrationV2 = record {
 };
 ```
 
-echoing the fragment's `permissions` and `ttl` alongside the DER public key
-of your **session key `S`**. You do **not** pass the anchor — the canister
-recovers it from the registration delegation (keyed by `caller() == P_reg`),
-so you never handle the user's identity number. On `Ok`, the grant is live:
-`S`'s self-authenticating principal is bound to the consenting user's
-identity until `expiration`, with the access level the user chose (see
-[Read-only sessions](#read-only-sessions)). This response is synchronous and
-authoritative — there is no separate completion notification to wait for or
-tolerate missing.
+You pass **only** the DER public key of your **session key `S`** — no
+anchor, no access level, no lifetime. The canister looks up the registration
+entry keyed by `caller() == P_reg` and recovers the entire consent from it
+(the anchor to bind, the access level, and the grant lifetime), so you never
+handle any of those values and never learn the user's identity number. On
+`Ok`, the grant is live: `S`'s self-authenticating principal is bound to the
+consenting user's identity until `expiration`, with the access level the user
+chose (see [Read-only sessions](#read-only-sessions)). The response echoes
+back the effective `permissions` and `expiration` so you know exactly what
+was granted. This response is synchronous and authoritative — there is no
+separate completion notification to wait for or tolerate missing.
 
 Semantics to build against:
 
 - **Redeem immediately.** The registration delegation lives 5 minutes —
   sized to cover the browser hops plus the IC's permitted clock drift, not
   a queue. Expired delegations get a clean `Err`.
-- **Echo the consent exactly.** The canister stores only the anchor at
-  consent; the access level and lifetime are re-derived, not stored. It
-  recovers the anchor from your `caller()` (`P_reg`), then re-derives `P_reg`
-  from `(recovered anchor, permissions, max_ttl, current trusted-server URL)`
-  and redeems only if it lands exactly on `caller()`. You cannot upgrade the
-  access level or stretch the TTL — an altered value derives a different
-  principal and gets a clean `Err`. The same mechanism means a consent-time
-  config change (the user switching or disabling the trusted server)
-  invalidates an in-flight delegation.
+- **The consent is fixed at consent time.** The canister records the whole
+  consent (anchor, access level, grant lifetime, trusted-server URL) on the
+  registration entry when the user consents, and recovers it at redemption
+  from the entry keyed by your `caller()` (`P_reg`). You pass none of it, so
+  there is nothing to alter — you cannot upgrade the access level or stretch
+  the TTL. Redemption also requires the recorded trusted-server URL to still
+  equal the anchor's current one, so a config change between consent and
+  redemption (the user switching or disabling the trusted server) invalidates
+  an in-flight delegation with a clean `Err`.
 - **Retry-safe, replace-not-add.** Within its 5-minute lifetime the
   delegation redeems repeatedly: a retry of the same call (same chain, same
   `S` — e.g. after a network timeout) just re-binds `S`, and the user's
@@ -347,15 +340,14 @@ uninstall/delete, and even `canister_status` and cycles reads are update
 calls), so that entire class of tools is inert under the default session. You
 don't choose this per call and can't widen it; it's fixed for the session.
 
-You learn the level at delivery (the fragment's `permissions`) and have it
-confirmed synchronously: it is the `permissions` field of `mcp_register_v2`'s
-`Ok` response (`queries` = read-only, `all` = full). The `permissions` field
-on any `SignedDelegation` you later mint carries the same value, as a
-cross-check. If your server needs update access and the session is read-only,
-tell the user to reconnect with read-only off instead of surfacing raw IC
-rejections. (You echo the level, but you can't choose it — it is folded into
-the registration principal's derivation from the consent screen, so an
-altered echo fails to redeem.)
+You learn the level synchronously at redemption: it is the `permissions`
+field of `mcp_register_v2`'s `Ok` response (`queries` = read-only, `all` =
+full). The `permissions` field on any `SignedDelegation` you later mint
+carries the same value, as a cross-check. If your server needs update access
+and the session is read-only, tell the user to reconnect with read-only off
+instead of surfacing raw IC rejections. (You never pass the level — it is
+recorded canister-side at consent and recovered at redemption, so there is
+nothing for the server to choose or alter.)
 
 ## 4. Calling Internet Identity
 

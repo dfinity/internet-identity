@@ -42,8 +42,7 @@ const makeActor = () => {
       (
         _anchor: bigint,
         requestedKey: Uint8Array,
-        _permissions: [{ queries: null } | { all: null }],
-        _maxTtl: [bigint],
+        _userKey: Uint8Array,
         _expiration: bigint,
       ): Promise<
         | {
@@ -113,8 +112,8 @@ describe("mcpAuthorize registration-delegation minting", () => {
     await authorize(actor, "read-only");
 
     // Minted for the identity and a browser-generated ephemeral key Y, with
-    // the user-chosen grant TTL and the read-only access level (folded into
-    // the derived registration principal, never into the signature).
+    // the user-chosen grant TTL and the read-only access level (recorded on
+    // the registration entry, never into the signature).
     expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
       expect.any(Uint8Array),
@@ -156,17 +155,17 @@ describe("mcpAuthorize registration-delegation minting", () => {
     );
   });
 
-  it("fetches the certified delegation with the same consent parameters", async () => {
+  it("fetches the certified delegation by handing back the user_key prepare returned", async () => {
     const actor = makeActor();
     await authorize(actor, "read-only");
 
-    // `get` re-derives the seed from its arguments (nothing is stored), so it
-    // takes the exact consent tuple prepare folded, plus prepare's expiration.
+    // `get` recovers the seed from `user_key` (no consent params), so it is
+    // called with the browser key Y, the user_key prepare returned, and the
+    // expiration.
     expect(actor.get_mcp_registration_delegation).toHaveBeenCalledWith(
       IDENTITY_NUMBER,
       browserKeyOf(actor),
-      [{ queries: null }],
-      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
+      USER_KEY,
       actor.expiration,
     );
   });
@@ -186,38 +185,35 @@ describe("mcpAuthorize delivery URL", () => {
     expect(fragment.get("state")).toBe(STATE);
   });
 
-  it("carries the echoed consent (permissions, ttl) the server passes to mcp_register_v2", async () => {
-    // The derivation authenticates the echo (a tampered value fails to
-    // redeem), but the server needs the plain values to echo: the access level
-    // as its wire string and the grant TTL in nanoseconds.
-    const url = await authorize(makeActor(), "read-only");
-
-    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
-    expect(fragment.get("permissions")).toBe("queries");
-    expect(fragment.get("ttl")).toBe(
-      (BigInt(TTL_SECONDS) * BigInt(1_000_000_000)).toString(),
-    );
-  });
-
-  it("never delivers the anchor number to the server", async () => {
-    // The canister recovers the anchor server-side from the registration
-    // entry, so it must not ride the fragment (the server never learns it).
-    const url = await authorize(makeActor(), "read-only");
-
-    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
-    expect(fragment.get("anchor")).toBeNull();
-    // No delivered value *is* the anchor (the delegation blob is hex and may
-    // contain the digits incidentally, so check param values, not substrings).
-    for (const value of fragment.values()) {
-      expect(value).not.toBe(IDENTITY_NUMBER.toString());
+  it("delivers only the delegation and state — no consent params", async () => {
+    // The server passes nothing but its session key to mcp_register_v2; the
+    // canister recovers the whole consent from the entry. So the fragment
+    // carries only the chain and the state echo — no anchor, permissions, or
+    // ttl (checked for both access levels, since neither should surface).
+    for (const level of ["read-only", "full-access"] as const) {
+      const url = await authorize(makeActor(), level);
+      const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
+      expect([...fragment.keys()].sort()).toEqual(["delegation", "state"]);
+      // Belt-and-suspenders: the anchor number appears as no param value (the
+      // delegation blob is hex and may contain the digits incidentally, so
+      // check values, not substrings).
+      for (const value of fragment.values()) {
+        expect(value).not.toBe(IDENTITY_NUMBER.toString());
+      }
     }
   });
 
-  it("marks a full-access connect as such in the echoed consent", async () => {
-    const url = await authorize(makeActor(), "full-access");
+  it("marks a full-access connect as such to prepare (never in the fragment)", async () => {
+    const actor = makeActor();
+    await authorize(actor, "full-access");
 
-    const fragment = new URLSearchParams(url.slice(url.indexOf("#") + 1));
-    expect(fragment.get("permissions")).toBe("all");
+    // The access level reaches the canister via prepare, not the fragment.
+    expect(actor.prepare_mcp_registration_delegation).toHaveBeenCalledWith(
+      IDENTITY_NUMBER,
+      expect.any(Uint8Array),
+      [{ all: null }],
+      [BigInt(TTL_SECONDS) * BigInt(1_000_000_000)],
+    );
   });
 
   it("carries a reconstructable two-hop P_reg -> Y -> X chain", async () => {

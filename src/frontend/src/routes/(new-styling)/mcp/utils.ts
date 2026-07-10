@@ -1,8 +1,4 @@
-import {
-  toPermissionsArg,
-  toPermissionsString,
-  type AccessLevel,
-} from "$lib/utils/accessLevel";
+import { toPermissionsArg, type AccessLevel } from "$lib/utils/accessLevel";
 import type { Authenticated } from "$lib/stores/authentication.store";
 import type { PublicKey } from "@icp-sdk/core/agent";
 import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
@@ -18,8 +14,8 @@ interface McpAuthorizeInput {
   ttlSeconds: number;
   /** Whether the whole session is read-only: when read-only, every per-app
    *  delegation the server later mints is restricted to query calls. Chosen
-   *  once at connect and folded into the registration principal's derivation,
-   *  so the server cannot upgrade a read-only session to full access. */
+   *  once at connect and recorded on the registration entry by `prepare`, so
+   *  the server cannot upgrade a read-only session to full access. */
   accessLevel: AccessLevel;
   /** The trusted server's declared connect callback: exact-matched by the
    *  caller against the allow-list the server hosts at a fixed well-known
@@ -48,28 +44,24 @@ interface McpAuthorizeInput {
  *  1. Generate an ephemeral registration key `Y` for this connect; its private
  *     half never leaves this page.
  *  2. `prepare_mcp_registration_delegation` — authenticated as the user, mint a
- *     short-lived canister-signed delegation `P_reg -> Y`. `P_reg` is *derived*
- *     from the consent tuple (this anchor, the read-only choice, the grant TTL,
- *     the trusted server URL); the canister stores only the anchor (keyed by
- *     `P_reg`) so it can recover it at redemption, while the read-only choice
- *     and TTL are re-derived and compared rather than trusted from a
- *     `register_v2` argument the server invents.
+ *     short-lived canister-signed delegation `P_reg -> Y`. `P_reg` is derived
+ *     from a fresh random nonce, and the whole consent (this anchor, the
+ *     read-only choice, the grant TTL, the trusted server URL) is recorded on
+ *     the index entry keyed by `P_reg`, so the server recovers it at redemption
+ *     rather than being trusted to supply it.
  *  3. `get_mcp_registration_delegation` — fetch the certified `P_reg -> Y`
- *     delegation (passing the same consent parameters, which determine the
- *     derivation), then extend the chain *locally* with a second hop `Y -> X`
- *     signed by `priv(Y)`, where `X` is the server's per-connect registration
- *     key from the link.
- *  4. Deliver the full chain — with the echoed consent (`permissions`, `ttl`)
- *     alongside — to the trusted server over a URL fragment (a top-level
- *     navigation to the callback it declared — see `matchDeclaredCallback`).
- *     The server, holding `X`'s private key, redeems it by calling
- *     `mcp_register_v2` with its long-lived session key `S`, echoing those two
- *     values; the backend recovers the anchor from the registration entry
- *     (so the anchor is never delivered to or seen by the server), re-derives
- *     `P_reg` from (recovered anchor, echoed values, current config) and binds
- *     `S` only if it lands exactly on `caller()`. II never binds a key it
- *     merely received, and an altered echo (upgraded access, stretched TTL)
- *     derives a different principal and is rejected.
+ *     delegation (handing back the `user_key` prepare returned, which the
+ *     canister uses to recover the seed), then extend the chain *locally* with
+ *     a second hop `Y -> X` signed by `priv(Y)`, where `X` is the server's
+ *     per-connect registration key from the link.
+ *  4. Deliver the full chain to the trusted server over a URL fragment (a
+ *     top-level navigation to the callback it declared — see
+ *     `matchDeclaredCallback`). The server, holding `X`'s private key, redeems
+ *     it by calling `mcp_register_v2` with only its long-lived session key `S`;
+ *     the backend recovers the entire consent (anchor, read-only choice, grant
+ *     lifetime) from the registration entry keyed by `caller()`. II never binds
+ *     a key it merely received, the server passes no consented value (so it
+ *     can't alter any), and it never learns the anchor number.
  *
  * The two-hop shape is load-bearing: what the canister signs transits the IC
  * (the `get` query response passes the answering replica and API boundary
@@ -106,11 +98,11 @@ export const mcpAuthorize = async ({
     registrationIdentity.getPublicKey().toDer(),
   );
 
-  // The session-grant lifetime the user chose (the backend clamps again). The
-  // access level and TTL are folded into `P_reg`'s derivation, so `get` takes
-  // them too (the seed is re-derived from arguments; the canister stores only
-  // the anchor). A backend refusal (MCP disabled, unauthenticated, ...) throws
-  // here and fails the connect before anything is delivered.
+  // The session-grant lifetime and the read-only choice go to `prepare`, which
+  // records the whole consent on the index entry keyed by `P_reg` (the server
+  // recovers it at redemption). A backend refusal (MCP disabled,
+  // unauthenticated, ...) throws here and fails the connect before anything is
+  // delivered.
   const grantTtlNanos = BigInt(ttlSeconds) * BigInt(1e9);
   const { user_key, expiration } = await actor
     .prepare_mcp_registration_delegation(
@@ -121,12 +113,13 @@ export const mcpAuthorize = async ({
     )
     .then(throwTextCanisterError);
 
+  // `get` recovers the seed from `user_key` (the value `prepare` returned), so
+  // it needs neither the consent params nor a deterministic re-derivation.
   const signed = await actor
     .get_mcp_registration_delegation(
       identityNumber,
       browserKey,
-      toPermissionsArg(accessLevel),
-      [grantTtlNanos],
+      user_key,
       expiration,
     )
     .then(throwTextCanisterError);
@@ -152,17 +145,13 @@ export const mcpAuthorize = async ({
 
   // Deliver over the fragment (never sent to the server in the HTTP request):
   // the trusted server's endpoint reads it client-side, reconstructs the chain,
-  // and redeems it. The echoed consent rides along — `permissions`
-  // ("queries"/"all") and `ttl` (grant lifetime in ns) are what the server must
-  // pass back to `mcp_register_v2` (the derivation authenticates the echo; a
-  // tampered value simply fails to redeem). The anchor is deliberately *not*
-  // delivered: the canister recovers it server-side from the registration
-  // entry, so the server never learns the user's II anchor number. `state`
-  // lets the server correlate.
+  // and redeems it with `mcp_register_v2(session_key)` — nothing else. The
+  // whole consent (anchor, read-only choice, grant lifetime) is recovered
+  // server-side from the registration entry, so the server passes only its own
+  // key and never learns any of it; only `state` rides along, so the server can
+  // correlate the delivery with the connect it started.
   const fragment = new URLSearchParams();
   fragment.set("delegation", JSON.stringify(chain.toJSON()));
   fragment.set("state", state);
-  fragment.set("permissions", toPermissionsString(accessLevel));
-  fragment.set("ttl", grantTtlNanos.toString());
   return `${callback}#${fragment.toString()}`;
 };
