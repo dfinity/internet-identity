@@ -1,13 +1,16 @@
 # IdP-side per-app gating for enterprise SSO
 
-**Status:** Draft — RFC for review. Nothing here is implemented.
-**Last updated:** 2026-07-09
+**Status:** Implemented in `dfinity/internet-identity` PR #4096 (single PR). This doc is the spec.
+**Last updated:** 2026-07-10
 **Companion:** `enterprise-sso-per-app-access-control.md` specifies the *id.ai-side* gate
 (directory + access canister). This document specifies an **independent, complementary
 layer** that gates entirely on the **IdP side**. The two are composable and selected per app
 (§9); neither depends on the other.
 
-**Implementation status.** None. All sections are proposed.
+**Implementation status.** Implemented in PR #4096. The one deviation from the "zero
+stable-memory changes" goal is the non-`sub` aux bridge (§6.5), which is a **new additive**
+stable structure (a fresh memory region) — additive, not a migration; existing structures and
+`StorableOpenIdCredentialKey` are unchanged.
 
 ---
 
@@ -273,6 +276,17 @@ an auxiliary lookup bridges the per-client `sub`; see §6.5.)
 `wellknown(sso_domain)` is II core's in-heap cached copy (populated by `discover_sso`); a cold
 miss returns `Pending` (re-drive discovery), never "no `app_clients`" (which would fail open).
 
+**Registration analogue.** A user's *first* login can be a gated one (a new employee whose first
+II touch is a gated dapp). Registration (`OpenIDRegFinishArg` gains `origin`) runs the **same
+gate** as `sso_prepare_delegation` and, on pass, stores a **primary-client-keyed** credential via
+the same stable-sub substitution — so a first gated login for a `sub` org registers directly, in
+one IdP trip, never creating a per-app credential. For a non-`sub` org the per-app token's
+pairwise `sub` can't be bridged yet, so registration **fails safe** (creates nothing, returns
+`IdRegFinishError::SsoNormalLoginRequired`); the frontend then guides a normal primary-client
+sign-in first (§6.5), after which the gated login registers. `IdRegFinishError::SsoNormalLoginRequired`
+is the one deliberate non-additive `.did` change — inert for existing clients, which never send
+`origin` and so never reach the path that returns it.
+
 ### 6.2 `sso_prepare_delegation` — the gate is mint-or-refuse
 
 `sso_prepare_delegation(jwt, discovery_domain, origin)`:
@@ -296,13 +310,23 @@ mint delegation seeded  seed(iss, sub, sso_domain, origin, anchor)
 
 ### 6.3 Certification requires the SSO-session principal
 
-The origin-scoped calls — `get_account_delegation` and `prepare_icrc3_attributes` — already
-carry the `origin`. `check_authorization` recomputes the SSO-session principal and requires the
-caller to match:
+The origin-scoped calls all carry the `origin`. Each accepts the SSO session by recomputing the
+SSO-session principal and requiring the caller to match:
 
 ```
 require caller == seed(iss, sub, sso_domain, origin, anchor)   // one hash — O(1), no config
 ```
+
+This is an **OR-branch** added alongside the existing authorization check — the non-SSO path
+(device / OpenID / email) is unchanged and only falls through to the SSO check when it fails. The
+methods that accept the SSO session are exactly the seven origin-scoped ones the gated dapp flow
+needs: `prepare_account_delegation` / `get_account_delegation` (mint the dapp delegation),
+`get_default_account` / `get_accounts` (the account picker reads this origin's accounts before
+minting), and `prepare_icrc3_attributes` / `get_icrc3_attributes` / `list_available_attributes`
+(certified attributes + the consent listing). **`identity_info` deliberately does NOT accept the
+SSO session** — it is anchor-level, not origin-scoped; the consent flow's only use of it was to
+feed the `verified_email` wizard, which SSO never offers, so the consent path simply skips
+`identity_info` for an SSO session rather than authorizing it.
 
 - **Config-free at cert.** No `app_clients`, no client-matching, no hashed-key math — the gate
   already happened at mint time (§6.2), so a matching principal *exists only if* it passed.
@@ -348,19 +372,37 @@ reads `stable_identifier_claim`, it never detects "Entra":
 - When it **isn't** `sub`, a per-app login's `sub` differs from the primary credential's and
   can't be matched by substituting the client alone. II doesn't index the alternate claim
   today, so it decodes the configured `stable_identifier_claim` and keeps a small **auxiliary
-  lookup** from it to the primary credential — *additive, not a migration; no credential, seed,
-  or key is mutated*:
+  bridge** from it to the primary credential's `sub`. This is a **new, additive stable
+  structure** (its own memory region) — no existing credential, seed, key, or stable layout is
+  mutated, so it is additive, *not* a migration:
 
 ```
-(iss, <stable_identifier_claim>)  ->  the primary credential's (iss, sub)
+(iss, primary_client_id, <stable_identifier_claim>)  ->  the primary credential's sub
 // currently only Entra needs this: its sub is pairwise, so the stable id is oid
 ```
 
-- **Populated at primary-client login** — the only login carrying both the alternate stable id
-  and the primary `sub`. Existing users of such an org get their entry on their next normal SSO
-  login; nothing stored is changed, an entry is only *added*.
-- **Per-app logins resolve through it:** the per-app token gives `(iss, <stable id>)`, the aux
-  lookup yields the primary `(iss, sub)`, and the existing credential index resolves the anchor.
+- **Why all three key components.** The bridged `sub` is **pairwise per client** on a non-`sub`
+  IdP, so the key must name the client it belongs to. Keying on `(iss, stable_id)` alone would
+  (a) collide when one tenant is exposed through two discovery domains with different primary
+  clients — same `(iss, oid)`, two different primary `sub`s, last-writer-wins → wrong resolution
+  — and (b) rest the entire cross-org boundary on `iss` being tenant-unique. Adding
+  `primary_client_id` scopes the bridge per primary client and removes that single point of
+  failure. Within a tenant, `iss` is tenant-scoped (Entra's `iss` carries the tenant id) and
+  `oid` is per-user unique and IdP-signed, so no cross-user or cross-tenant collision arises;
+  the `primary_client_id` component is the defense-in-depth that keeps this true even under a
+  shared or misconfigured issuer.
+- **Persistent across upgrades.** Because it lives in stable memory, the bridge survives canister
+  upgrades: a non-`sub` user does the normal-login-first step **once, ever**, not on every
+  deploy. (An in-heap cache would be wiped each upgrade, forcing the CTA repeatedly — the reason
+  this is stable, not heap.)
+- **Populated only on a primary-client login** — the only login carrying both the alternate
+  stable id and the primary `sub`, and only from an **IdP-signed primary-client token** (the JWT
+  is verified before the entry is written). The write happens exclusively on the update /
+  registration paths; identity **resolution** (`resolve_primary_identity`) is side-effect-free,
+  so the query delegation path only ever *reads* the bridge.
+- **Per-app logins resolve through it:** the per-app token gives `(iss, primary_client_id, <stable
+  id>)`, the aux lookup yields the primary `sub`, and the existing credential index resolves the
+  anchor.
 - **A miss fails safe** — no anchor found, so the user completes a normal primary login first,
   rather than resolving to the wrong identity.
 
@@ -402,6 +444,14 @@ Cross-domain isolation does **not** depend on this lookup — it comes from the 
 (multiple clients may share the same id.ai redirect — the `aud` distinguishes them), assign
 the group, and add `origin -> client_id` to the well-known.
 
+> **The `app_clients` key must be the exact browser origin** (scheme + host + optional port, no
+> path, no trailing slash — e.g. `https://payroll.com`). Matching is byte-exact against the
+> origin the browser reports, and that exact string is also bound into the SSO-session seed. A
+> mismatch (wrong case, stray slash, `www.` vs apex) **fails safe** — the origin routes to the
+> primary client (gate off) or is denied (`gate_all_apps`), and a session minted for a
+> non-canonical origin is useless at the real one — but the dapp then won't be gated as intended,
+> so it's a config error to catch, not a security hole.
+
 | IdP | Per-app assignment | Note |
 | --- | --- | --- |
 | Okta | Native; free. Unassigned user blocked at `/authorize`. | Denial is an HTML 400 page, not an OIDC error redirect — II infers denial from the failed ceremony. |
@@ -440,9 +490,10 @@ resolution in II core (§6).
 
 ## 10. Implementation
 
-One PR — a single cohesive feature. **No stable-memory migration, no `StorableOpenIdCredentialKey`
-change, `openid_prepare_delegation` untouched.** Inert until an org adds `app_clients` to its
-well-known.
+One PR — a single cohesive feature. **No stable-memory *migration*, no `StorableOpenIdCredentialKey`
+change, `openid_prepare_delegation` untouched.** The only new persistent state is the non-`sub`
+aux bridge (§6.5), an **additive** stable map in a fresh memory region — existing structures and
+layout are byte-unchanged. Inert until an org adds `app_clients` to its well-known.
 
 > **Security invariant:** the gate is **mint-or-refuse at `sso_prepare_delegation`** (§6.2) — a
 > refused gate mints no SSO delegation, so the origin-scoped calls have no principal to
@@ -459,25 +510,37 @@ Contents:
   gate (`aud == app_clients[origin]` / primary / DENY), resolve the anchor to primary (§6.1,
   aux lookup when `stable_identifier_claim != "sub"`, §6.5), and mint a delegation seeded
   `(iss, sub, sso_domain, origin, anchor)`. `openid_prepare_delegation` is left as-is.
-- **Certification (§6.3):** `check_authorization` on the origin-scoped calls —
-  `get_account_delegation`, `prepare_icrc3_attributes` — requires
-  `caller == seed(iss, sub, sso_domain, origin, anchor)`. No `app_clients`/config at cert. SSO
-  attributes gated on this principal (so passkey sessions get none); SSO delegation carries its
-  own tighter expiry.
+- **SSO-aware registration (§6.1):** `OpenIDRegFinishArg.origin` — a first gated login runs the
+  same gate and stores a primary-keyed credential (`sub` orgs register directly; non-`sub` fails
+  safe with `SsoNormalLoginRequired`).
+- **Certification / origin-scoped reads (§6.3):** the SSO-session principal
+  (`caller == seed(iss, sub, sso_domain, origin, anchor)`) is accepted, as an OR-branch beside
+  the existing auth check, on the seven origin-scoped methods:
+  `prepare_account_delegation` / `get_account_delegation`, `get_default_account` / `get_accounts`,
+  and `prepare_icrc3_attributes` / `get_icrc3_attributes` / `list_available_attributes`. No
+  `app_clients`/config at cert. `identity_info` is **not** included (the consent path skips it for
+  SSO). SSO attributes gated on this principal (so passkey sessions get none); the SSO delegation
+  carries its own tighter expiry.
 - **Frontend:** route the dapp SSO ceremony to `resolved_client_id`; sign in via
-  `sso_prepare_delegation`; handle the first-gated-login-before-normal case for non-`sub` IdPs
-  (§6.1/§6.5) with a "sign in normally first" prompt.
-- **Tests:** gated == ungated → same dapp principal (linchpin); a passkey / non-SSO session
-  gets **no** SSO attributes; a refused gate mints no SSO delegation → cert unreachable;
-  `gate_all_apps` default-deny; hashed keys; Entra `oid` identity + first-gated-login flow;
-  `openid_prepare_delegation` / direct providers unchanged.
+  `sso_prepare_delegation`; for the non-`sub` first-gated-login case (§6.1/§6.5), guide the user
+  with **button-driven CTAs** (a fresh user gesture per ceremony — "sign in with your
+  organization", then "continue to <app>") rather than a passive prompt, since browsers block
+  chained popups opened after an `await`.
+- **Tests:** gated == ungated → same dapp principal (linchpin, proven at integration *and* e2e);
+  a passkey / non-SSO session gets **no** SSO attributes; a refused gate mints no SSO delegation →
+  cert unreachable; `gate_all_apps` default-deny; hashed keys; Entra `oid` identity + first-gated
+  registration fail-safe; **aux bridge survives upgrade** + **is scoped per primary client**
+  (§6.5); `openid_prepare_delegation` / direct providers unchanged.
 
-`.did` deltas are additive only: **add** `sso_prepare_delegation` / `sso_get_delegation`, and
-`get_sso_discovery` gains the `opt origin` arg + `resolved_client_id`. No change to
-`openid_prepare_delegation` / `openid_get_delegation`.
+`.did` deltas are additive **except one authorized non-additive variant**: **add**
+`sso_prepare_delegation` / `sso_get_delegation`; `get_sso_discovery` gains the `opt origin` arg +
+`resolved_client_id`; `OpenIDRegFinishArg` and `ListAvailableAttributesRequest` each gain an
+`opt` field; and `IdRegFinishError` gains the `SsoNormalLoginRequired` variant (the one
+non-additive change — inert for existing clients, §6.1). No change to `openid_prepare_delegation`
+/ `openid_get_delegation`.
 
-No canister beyond II core, no proxy, no panel, no migration, no new dapp lib. Admin/dapp docs
-tracked separately.
+No canister beyond II core, no proxy, no panel, no data migration, no new dapp lib (one additive
+stable structure, §6.5). Admin/dapp docs tracked separately.
 
 ---
 
