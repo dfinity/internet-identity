@@ -29,17 +29,12 @@ export class SsoNormalLoginRequiredError extends Error {
  * (`aud == the origin's declared client`) and binds the delegation to
  * `(sso_domain, origin)`. `openid_prepare_delegation` is untouched.
  *
- * `NoSuchAnchor` handling depends on whether the origin is `gated`:
- * - **gated** (per-app client): the user isn't bridged to a primary identity
- *   yet (non-`sub` org, §6.5) — throw {@link SsoNormalLoginRequiredError} so
- *   the UI prompts a normal sign-in first. A gated per-app client can't be used
- *   to register.
- * - **ungated** (primary client): a brand-new user — surface the raw
- *   `NoSuchAnchor` canister error so the caller routes to registration, exactly
- *   like the openid path.
- *
- * @throws {SsoNormalLoginRequiredError} for a gated login with no bridged
- *   identity yet.
+ * A `NoSuchAnchor` result (no identity for this token yet) surfaces as the raw
+ * canister error so the caller routes to registration — for BOTH gated and
+ * un-gated origins. Registration is where the gated/`sub` vs non-`sub`
+ * distinction is made (`openid_identity_registration_finish` with the origin):
+ * a `sub` org registers directly from the gated token; a non-`sub` org returns
+ * `SsoNormalLoginRequired`, which the caller maps to a normal-login-first prompt.
  */
 export const authenticateWithSso = async ({
   canisterId,
@@ -47,14 +42,12 @@ export const authenticateWithSso = async ({
   jwt,
   discoveryDomain,
   origin,
-  gated,
 }: {
   canisterId: Principal;
   session: Session;
   jwt: string;
   discoveryDomain: string;
   origin: string;
-  gated: boolean;
 }): Promise<{
   identity: DelegationIdentity;
   identityNumber: bigint;
@@ -76,9 +69,6 @@ export const authenticateWithSso = async ({
     if ("Pending" in prepared) {
       await pollDelay();
       continue;
-    }
-    if (gated && "Err" in prepared && "NoSuchAnchor" in prepared.Err) {
-      throw new SsoNormalLoginRequiredError();
     }
     const {
       anchor_number: identityNumber,

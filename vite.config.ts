@@ -66,7 +66,11 @@ export default defineConfig(({ command, mode }): UserConfig => {
           forwardDomains: ["icp0.io", "ic0.app"],
           forwardRules: [
             {
-              hosts: ["nice-name.com"],
+              // `nice-name.com` is the default test-app origin; `denied-app.com`
+              // is a second test-app origin the IdP-side per-app gating e2e test
+              // uses as an UNLISTED dapp (denied under `gate_all_apps`) while
+              // `nice-name.com` stays the gated-but-allowed one.
+              hosts: ["nice-name.com", "denied-app.com"],
               canisterName: "test_app",
             },
             {
@@ -124,6 +128,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
                 "https://identity.internetcomputer.org",
                 "https://identity.ic0.app",
                 "https://nice-name.com",
+                "https://denied-app.com",
                 "https://nice-issuer-custom-orig.com",
                 "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
                 // Test app

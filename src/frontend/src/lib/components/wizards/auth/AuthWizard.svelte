@@ -290,6 +290,46 @@
     }
   };
 
+  // Apply the outcome of an SSO `continueWithSso` call: complete a sign-in,
+  // finish registration, or hand off to the registration view.
+  const applySsoAuthResult = async (
+    authResult: Awaited<ReturnType<typeof authFlow.continueWithSso>>,
+    ssoResult: SsoDiscoveryResult,
+    preSnapshot: Record<string, LastUsedIdentity>,
+  ): Promise<void> => {
+    if (authResult === undefined) {
+      if (authFlow.view === "openIdNotConnected") {
+        pendingSsoRegistration = true;
+      }
+      return;
+    }
+    if (authResult.type === "signIn") {
+      if (
+        maybeRequestMethodSwitch(
+          authResult.identityNumber,
+          "sso",
+          preSnapshot[authResult.identityNumber.toString()],
+          authResult.pendingLastUsedEntry,
+          {
+            providerDomain: ssoResult.domain,
+            providerName: ssoResult.name ?? ssoResult.domain,
+          },
+        )
+      ) {
+        return;
+      }
+      commitLastUsedEntry(authResult.pendingLastUsedEntry);
+      await onSignIn(authResult.identityNumber);
+      return;
+    }
+    if (authResult.name !== undefined) {
+      await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
+    } else {
+      pendingSsoRegistration = true;
+      authFlow.setupNewIdentity();
+    }
+  };
+
   const handleContinueWithSso = async (
     ssoResult: SsoDiscoveryResult,
   ): Promise<void | "cancelled"> => {
@@ -301,45 +341,60 @@
         mode,
         ssoOrigin,
       );
-      if (authResult === undefined) {
-        if (authFlow.view === "openIdNotConnected") {
-          pendingSsoRegistration = true;
-        }
-        return;
-      }
-      if (authResult.type === "signIn") {
-        if (
-          maybeRequestMethodSwitch(
-            authResult.identityNumber,
-            "sso",
-            preSnapshot[authResult.identityNumber.toString()],
-            authResult.pendingLastUsedEntry,
-            {
-              providerDomain: ssoResult.domain,
-              providerName: ssoResult.name ?? ssoResult.domain,
-            },
-          )
-        ) {
-          return;
-        }
-        commitLastUsedEntry(authResult.pendingLastUsedEntry);
-        await onSignIn(authResult.identityNumber);
-        return;
-      }
-      if (authResult.name !== undefined) {
-        await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
-      } else {
-        pendingSsoRegistration = true;
-        authFlow.setupNewIdentity();
-      }
+      await applySsoAuthResult(authResult, ssoResult, preSnapshot);
     } catch (error) {
       if (isOpenIdCancelError(error)) {
         return "cancelled";
       }
-      // A gated dapp login for a not-yet-bridged non-`sub` identity: let
-      // SignInWithSso surface the "sign in normally first" copy inline.
+      // A first gated login for a non-`sub` org (e.g. Entra): the per-app token
+      // can't be bridged to the primary identity yet. Surface it so
+      // SignInWithSso shows a button-driven CTA ("Sign in with your
+      // organization" then "Continue"), each ceremony on a fresh user gesture —
+      // a `sub` org registered directly above and never reaches here.
       if (error instanceof SsoNormalLoginRequiredError) {
         throw error;
+      }
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
+  // The Entra (non-`sub`) first-gated-login CTA step: run a NORMAL primary-client
+  // SSO sign-in to establish the identity + the stable-id bridge (§6.5), so the
+  // subsequent gated retry resolves. Invoked from a fresh user click in
+  // SignInWithSso (popup-safe — never chained after the gated attempt's await).
+  // Establishes the identity only; it does NOT complete the dapp authorization —
+  // the caller then retries the gated login (a second click) to mint the
+  // origin-bound SSO session the dapp needs.
+  const handleSignInNormally = async (
+    ssoResult: SsoDiscoveryResult,
+  ): Promise<void | "cancelled"> => {
+    try {
+      isAuthenticating = true;
+      // Force the org's primary client and drop the dapp origin: a normal
+      // (un-gated) SSO sign-in. Registration records the non-`sub` aux bridge.
+      const primaryResult: SsoDiscoveryResult = {
+        ...ssoResult,
+        resolvedClientId: ssoResult.clientId,
+      };
+      const normalResult = await authFlow.continueWithSso(
+        primaryResult,
+        "both",
+      );
+      if (normalResult?.type === "signUp") {
+        await authFlow.completeSsoRegistration(
+          normalResult.name ??
+            normalResult.email?.split("@")[0] ??
+            ssoResult.name ??
+            ssoResult.domain,
+        );
+      }
+      // signIn / already-linked: the identity already exists. Either way it's
+      // now established; the caller retries the gated login to reach the app.
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
       }
       onError(error);
     } finally {
@@ -435,6 +490,7 @@
   {:else if authFlow.view === "signInWithSso"}
     <SignInWithSso
       continueWithSso={handleContinueWithSso}
+      signInNormally={handleSignInNormally}
       goBack={authFlow.chooseMethod}
       origin={ssoOrigin}
     />

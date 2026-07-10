@@ -258,6 +258,14 @@ pub struct OpenIDRegFinishArg {
     /// direct provider (Google / Microsoft / Apple). Selects which JWK source
     /// verifies the JWT.
     pub discovery_domain: Option<String>,
+    /// The target dapp origin, set only for a first *gated* SSO login (IdP-side
+    /// per-app gating, §6.1 registration analogue). When present (alongside
+    /// `discovery_domain`), registration runs the same gate as
+    /// `sso_prepare_delegation` and stores a PRIMARY-client-keyed credential via
+    /// the stable-sub substitution — so a gated first login registers directly
+    /// without a per-app credential. Absent for direct providers and normal
+    /// (un-gated) SSO logins, which keep the existing registration behavior.
+    pub origin: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -267,10 +275,20 @@ pub struct IdRegFinishResult {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IdRegFinishError {
-    UnexpectedCall { next_step: RegistrationFlowNextStep },
+    UnexpectedCall {
+        next_step: RegistrationFlowNextStep,
+    },
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
     StorageError(String),
+    /// A first *gated* SSO login (IdP-side per-app gating) for an org whose
+    /// stable identifier isn't `sub` (e.g. Entra `oid`): the per-app token's
+    /// pairwise sub can't be bridged to the org's primary identity until the
+    /// user has signed in through the org's primary client at least once
+    /// (§6.5). Registration creates nothing; the frontend prompts a normal
+    /// primary-client sign-in, then retries the gated login. `sub` orgs never
+    /// hit this — they register directly from the gated token.
+    SsoNormalLoginRequired,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

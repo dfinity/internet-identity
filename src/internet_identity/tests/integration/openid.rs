@@ -1362,6 +1362,7 @@ mod sso_gating {
     use super::*;
     use crate::attributes::{build_fake_google_jwt_and_jwks, FakeJwtInput};
     use canister_tests::api::internet_identity::api_v2::{
+        check_captcha, identity_registration_start, openid_identity_registration_finish,
         prepare_account_delegation, AccountDelegationParams,
     };
     use internet_identity_interface::internet_identity::types::attributes::{
@@ -1369,7 +1370,8 @@ mod sso_gating {
     };
     use internet_identity_interface::internet_identity::types::{
         AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-        AuthnMethodSecuritySettings, PublicKeyAuthn, SsoDiscoveryState,
+        AuthnMethodSecuritySettings, IdRegFinishError, OpenIDRegFinishArg, PublicKeyAuthn,
+        RegistrationFlowNextStep, SsoDiscoveryState,
     };
 
     const GATE_DOMAIN: &str = "gate.example.org";
@@ -1505,6 +1507,13 @@ mod sso_gating {
             .unwrap()
         })
         .expect("primary SSO credential add failed");
+        // Initialize the canister salt so the synchronous SSO-session seed
+        // computation in `prepare_icrc3_attributes` (`matching_sso_session`,
+        // §6.3) has a salt to hash against. In production a passkey session has
+        // always run a delegation-prepare (which calls `ensure_salt_set`) before
+        // reaching the attribute path; here nothing has, so a passkey-first
+        // `prepare_icrc3_attributes` would otherwise trap with "Salt is not set".
+        api::init_salt(env, canister_id).unwrap();
         identity_number
     }
 
@@ -1858,6 +1867,185 @@ mod sso_gating {
         assert_eq!(
             resolved(None).resolved_client_id,
             Some(PRIMARY_CLIENT.to_string())
+        );
+        Ok(())
+    }
+
+    /// Warm the gate's discovery + JWKS caches (driving the mocked outcalls)
+    /// WITHOUT creating an anchor, so a following `openid_identity_registration_finish`
+    /// — whose test wrapper collapses `Pending` into a panic — settles in one
+    /// shot. A gated `sso_prepare_delegation` verifies the token (which reads
+    /// both caches, warming them) before the anchor lookup fails, which is
+    /// exactly the warming the registration path needs. `warm_jwt`/`warm_origin`
+    /// must pass the gate so the JWKS fetch is actually reached (a
+    /// `gate_all_apps`-denied origin returns before `read_jwks`).
+    fn warm_gate_caches(
+        env: &PocketIc,
+        canister_id: Principal,
+        responses: &[(String, String)],
+        warm_jwt: &str,
+        warm_origin: &str,
+    ) {
+        let session_key = ByteBuf::from("cache-warming session key");
+        let _ = drive_sso_until_ready(env, responses, || {
+            api::sso_prepare_delegation(
+                env,
+                canister_id,
+                test_principal(),
+                warm_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                warm_origin,
+            )
+            .unwrap()
+        });
+    }
+
+    /// Run the SSO-aware registration finish for `(jwt, GATE_DOMAIN, origin)`
+    /// (the §6.2 registration gate). Caches must already be warm (see
+    /// [`warm_gate_caches`]); the flow's captcha step is answered here.
+    fn register_via_sso_gate(
+        env: &PocketIc,
+        canister_id: Principal,
+        jwt: &str,
+        origin: &str,
+    ) -> Result<u64, IdRegFinishError> {
+        let start = identity_registration_start(env, canister_id, test_principal())
+            .expect("API call failed")
+            .expect("registration start failed");
+        if let RegistrationFlowNextStep::CheckCaptcha { .. } = start.next_step {
+            check_captcha(env, canister_id, test_principal(), "a".to_string())
+                .expect("API call failed")
+                .expect("check_captcha failed");
+        }
+        openid_identity_registration_finish(
+            env,
+            canister_id,
+            test_principal(),
+            &OpenIDRegFinishArg {
+                jwt: jwt.to_owned(),
+                salt: test_salt(),
+                name: "Gate User".into(),
+                discovery_domain: Some(GATE_DOMAIN.to_string()),
+                origin: Some(origin.to_string()),
+            },
+        )
+        .expect("API call failed")
+        .map(|result| result.identity_number)
+    }
+
+    /// A `sub`-based org's FIRST gated login registers DIRECTLY in one IdP trip
+    /// (§6.1): the per-app (gated) token registration-finish stores the
+    /// PRIMARY-keyed credential (no per-app credential, no double trip). Proof:
+    /// after registering via the gate, BOTH a gated per-app login and an ungated
+    /// primary login resolve to the same, just-registered anchor.
+    #[test]
+    fn sub_org_first_gated_login_registers_directly() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        // `sub` org: the gated per-app token shares the primary credential's sub.
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let (primary_jwt, _) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+
+        sync_time(&env, TEST_TIME_MS);
+        warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
+
+        let identity_number = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN)
+            .expect("sub-org first gated login must register directly");
+
+        let session_key = ByteBuf::from("dapp session key");
+
+        // The gated login now resolves to the just-registered anchor.
+        let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(gated.anchor_number, identity_number);
+
+        // The ungated primary login resolves to the SAME anchor — proof the
+        // stored credential is the primary-keyed one, not a per-app credential.
+        let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(
+            ungated.anchor_number, identity_number,
+            "gate-registered credential must be primary-keyed (ungated login resolves to it)"
+        );
+        Ok(())
+    }
+
+    /// A non-`sub` (Entra-style `oid`) org's FIRST gated login canNOT register
+    /// directly: the per-app token's pairwise sub has no aux bridge yet, so no
+    /// primary sub can be derived. Registration FAILS SAFE with the typed
+    /// `SsoNormalLoginRequired` (the FE routes the user through a normal
+    /// primary-client sign-in first, §6.5) — it creates nothing.
+    #[test]
+    fn non_sub_org_first_gated_registration_fails_safe() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+
+        sync_time(&env, TEST_TIME_MS);
+        warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
+
+        let result = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
+        assert!(
+            matches!(result, Err(IdRegFinishError::SsoNormalLoginRequired)),
+            "non-sub first gated registration must fail safe, got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// The registration gate denies a token the delegation gate would deny: with
+    /// `gate_all_apps` on, a registration attempt from an UNLISTED origin is
+    /// refused (§6.2). Fails with a handled verification error, creating nothing.
+    #[test]
+    fn gate_all_apps_denies_registration_from_unlisted_origin() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let (primary_jwt, _) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        // `gate_all_apps` on: only the listed GATED_ORIGIN is allowed.
+        let responses = responses(well_known(&app_clients, true, "sub"), jwks);
+
+        // Warm via the ALLOWED (gated) origin so discovery AND JWKS are cached
+        // before we probe the denied origin (whose gate check returns before the
+        // JWKS fetch, so it must not need to warm anything).
+        sync_time(&env, TEST_TIME_MS);
+        warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
+
+        let result = register_via_sso_gate(&env, canister_id, &primary_jwt, UNGATED_ORIGIN);
+        assert!(
+            matches!(result, Err(IdRegFinishError::InvalidAuthnMethod(_))),
+            "gate_all_apps must deny registration from an unlisted origin, got {result:?}"
         );
         Ok(())
     }

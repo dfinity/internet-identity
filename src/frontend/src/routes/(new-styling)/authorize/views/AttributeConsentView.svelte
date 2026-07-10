@@ -233,10 +233,14 @@
     preferredAddress?: string,
   ): Promise<void> => {
     try {
+      const { effectiveOrigin } = await context;
       const available = await $authenticatedStore.actor
         .list_available_attributes({
           identity_number: $authenticatedStore.identityNumber,
           attributes: [],
+          // Pass the origin so an SSO session is authorized for this read
+          // (§6.3); ignored for device / OpenID sessions.
+          origin: [effectiveOrigin],
         })
         .then(throwCanisterError);
       const groups = mergeGroups(

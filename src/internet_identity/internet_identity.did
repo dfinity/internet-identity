@@ -909,6 +909,12 @@ type OpenIDRegFinishArg = record {
     // SSO discovery domain the JWT was obtained through, or null for a direct
     // provider (Google / Microsoft / Apple). Selects the JWK source.
     discovery_domain : opt text;
+    // The target dapp origin, set only for a first gated SSO login (IdP-side
+    // per-app gating). When present (with discovery_domain), registration runs
+    // the same gate as sso_prepare_delegation and stores a primary-client-keyed
+    // credential (stable-sub substitution) so a gated first login registers
+    // directly. Absent for direct providers and normal (un-gated) SSO logins.
+    origin : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -1262,6 +1268,15 @@ type IdRegFinishError = variant {
     InvalidAuthnMethod : text;
     // Error while persisting the new identity.
     StorageError : text;
+    // A first gated SSO login (IdP-side per-app gating) for a non-`sub` org
+    // (e.g. Entra `oid`): the per-app token's pairwise sub can't be bridged to
+    // the org's primary identity until the user has signed in through the
+    // primary client once. Registration creates nothing; the frontend prompts a
+    // normal primary-client sign-in, then retries. NOTE: this is a deliberate
+    // non-additive variant addition (authorized) — inert for existing clients,
+    // which never send `OpenIDRegFinishArg.origin` and so never trigger the
+    // SSO-gated registration path that can return it.
+    SsoNormalLoginRequired;
 };
 
 type AccountInfo = record {
@@ -1508,6 +1523,12 @@ type ListAvailableAttributesRequest = record {
     // `"email"`) which matches all scopes.
     // If not provided, all available attributes are returned.
     attributes : opt vec text;
+
+    // The dapp origin, supplied when the caller authenticates through an SSO
+    // session (IdP-side per-app gating): it lets the canister recompute the
+    // SSO-session principal and authorize this read for it. Omitted by
+    // device / OpenID sessions, which authorize via the usual auth check.
+    origin : opt text;
 };
 
 type ListAvailableAttributesResponse = vec record { text; blob };

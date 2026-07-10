@@ -16,6 +16,21 @@ export const SSO_OPENID_PORT = 11107;
 export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 
 /**
+ * A SECOND discovery domain for the same test provider (`127.0.0.1` instead of
+ * `localhost`, same port), allowlisted alongside {@link SSO_DISCOVERY_DOMAIN}.
+ * The IdP-side per-app gating tests use this domain exclusively so their
+ * per-test gating config lands in a discovery-cache entry the un-gated SSO tests
+ * never touch — II caches discovery per domain for ~1h with no force-refresh, so
+ * sharing one domain would let an earlier un-gated lookup pin a stale
+ * (un-gated) config for the gating tests (and vice-versa). Distinct host string
+ * ⇒ distinct cache key ⇒ the two suites can't clobber each other's cached
+ * config, in any shard order. Requires `127.0.0.1:11107` in the canister's
+ * `sso_discoverable_domains` (see `scripts/dev-e2e-setup` and
+ * `.github/workflows/canister-tests.yml`).
+ */
+export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
+
+/**
  * The per-app OIDC client the test provider registers for IdP-side per-app
  * gating (mirrors `PER_APP_CLIENT_ID` in `src/test_openid_provider/index.js`).
  * A gated dapp origin maps to this client in the well-known's `app_clients`.

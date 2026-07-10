@@ -4,6 +4,7 @@ import { test } from "../../fixtures";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
 import {
   SSO_DISCOVERY_DOMAIN,
+  SSO_GATING_DISCOVERY_DOMAIN,
   SSO_OPENID_PORT,
   SSO_PER_APP_CLIENT_ID,
 } from "../../fixtures/sso";
@@ -350,80 +351,123 @@ test.describe("Authorize with 1-click SSO", () => {
 // origin into `get_sso_discovery` (→ `resolved_client_id`) and signs in via
 // `sso_prepare_delegation` (the SSO gate path).
 //
-// These use the MANUAL SSO wizard entry (`openSsoPopup`) rather than the
-// 1-click `?sso=` auto-init flow, so `configureSsoGating` runs in the test body
-// *before* discovery is triggered (the user types the domain).
+// Both cases discover through SSO_GATING_DISCOVERY_DOMAIN (`127.0.0.1:11107`),
+// NOT the un-gated tests' `localhost:11107`: II caches discovery per domain for
+// ~1h with no force-refresh, so a shared domain would let an earlier un-gated
+// lookup pin a stale config here (and vice-versa). A distinct host string is a
+// distinct cache key, isolating the two suites in any shard order.
 //
-// CAVEAT (authored-but-unrun here): they need a running e2e stack (dev server +
-// canisters + the test provider), and the II backend caches SSO discovery per
-// domain for ~1h — so the `localhost:11107` discovery cache must be COLD when
-// gating is configured (run these before other SSO tests warm it, or serve the
-// gated cases from a dedicated allowlisted discovery domain). The RP origin
-// gated here is the fixture's default `testAppURL` (`https://nice-name.com`),
-// which the frontend remaps to the effective origin used for the delegation.
+// To keep that single gating cache entry coherent no matter which test warms it
+// first, BOTH cases use ONE gating config: the gated origin is listed (served by
+// the per-app client) and `gate_all_apps` denies everything else. So the gated
+// test uses the listed origin and the denied test uses an unlisted one — nothing
+// mutates the config between them.
 // ===========================================================================
 test.describe("Authorize with IdP-side per-app gating", () => {
   const name = "John Doe";
-  const RP_ORIGIN = "https://nice-name.com";
+  // Listed in `app_clients` → served by the per-app client. The frontend remaps
+  // `testAppURL` to the effective origin used for the delegation/gate; for
+  // `nice-name.com` that is the origin itself.
+  const GATED_ORIGIN = "https://nice-name.com";
+  // Absent from `app_clients` → denied by `gate_all_apps`.
+  const DENIED_ORIGIN = "https://denied-app.com";
 
-  test.use({
-    openIdConfig: {
-      defaultPort: SSO_OPENID_PORT,
-      createUsers: [{ claims: { name } }],
-    },
-    authorizeConfig: {
-      protocol: "icrc25",
-      testAppURL: RP_ORIGIN,
-      useIcrc3Attributes: true,
-      // No `sso` here: use the manual wizard entry so gating is configured
-      // before discovery runs.
-    },
-  });
+  // One config for both tests (see the block comment): the gated origin is
+  // allowed via its per-app client, every other origin is denied.
+  const gatingConfig = {
+    appClients: { [GATED_ORIGIN]: SSO_PER_APP_CLIENT_ID },
+    gateAllApps: true,
+  };
 
-  test("gated origin: assigned user signs in through the per-app client", async ({
-    authorizePage,
-    openSsoPopup,
-    signInWithOpenId,
-    openIdUsers,
-    authorizedPrincipal,
-    configureSsoGating,
-  }) => {
-    // Gate the RP origin behind the dedicated per-app client. An assigned user
-    // (the test provider issues the token unconditionally, standing in for a
-    // passed IdP app-assignment) completes the ceremony against that client and
-    // reaches the same dapp principal as an ungated login. Continue enabling in
-    // `openSsoPopup` proves discovery resolved the per-app client for the
-    // origin; completing the popup proves `sso_prepare_delegation` accepted the
-    // per-app `aud`.
-    await configureSsoGating({
-      appClients: { [RP_ORIGIN]: SSO_PER_APP_CLIENT_ID },
+  test.describe("gated origin (assigned user)", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { name } }],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        testAppURL: GATED_ORIGIN,
+        useIcrc3Attributes: true,
+      },
     });
-    const popup = await openSsoPopup(
-      authorizePage.page,
-      SSO_DISCOVERY_DOMAIN,
-      "signin",
-    );
-    await signInWithOpenId(popup, openIdUsers[0].id);
-    expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+
+    test("first gated login auto-runs the normal sign-in, then reaches the app", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+      authorizedPrincipal,
+      configureSsoGating,
+    }) => {
+      // A brand-new user hitting a gated app first can't register through the
+      // per-app client (§6.5), so the wizard transparently runs a normal
+      // primary-client sign-in and then retries the gated login — up to three
+      // IdP ceremonies (the gated attempt, the automatic normal sign-in, the
+      // gated retry). Auto-drive every popup with the same assigned user rather
+      // than capturing a single one; reaching a non-anonymous principal proves
+      // the whole chain (per-app `aud` accepted, identity established, gated
+      // session minted) completed without a manual "sign in normally" step.
+      await configureSsoGating(gatingConfig);
+      authorizePage.page.context().on("page", (popup) => {
+        void signInWithOpenId(popup, openIdUsers[0].id).catch(() => {
+          // A popup can close before it's driven (e.g. the initial gated attempt
+          // that resolves to "needs a normal login"); ignore and let the flow
+          // open the next one.
+        });
+      });
+      await authorizePage.page
+        .getByRole("button", { name: "Sign in with SSO" })
+        .click();
+      await authorizePage.page
+        .getByRole("textbox", { name: "Company domain" })
+        .fill(SSO_GATING_DISCOVERY_DOMAIN);
+      const continueButton = authorizePage.page.getByRole("button", {
+        name: "Continue",
+        exact: true,
+      });
+      await expect(continueButton).toBeEnabled({ timeout: 30_000 });
+      await continueButton.click();
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    });
   });
 
-  test("denied origin: gate_all_apps blocks an unlisted dapp", async ({
-    authorizePage,
-    configureSsoGating,
-  }) => {
-    // Default-deny: with `gate_all_apps` on and the RP origin absent from
-    // `app_clients`, discovery resolves the domain but denies the origin, so
-    // the SSO Continue button never enables and an inline "not granted" error
-    // is shown — no delegation is issued.
-    await configureSsoGating({ gateAllApps: true, appClients: {} });
-    await authorizePage.page
-      .getByRole("button", { name: "Sign in with SSO" })
-      .click();
-    await authorizePage.page
-      .getByRole("textbox", { name: "Company domain" })
-      .fill(SSO_DISCOVERY_DOMAIN);
-    await expect(
-      authorizePage.page.getByText(/hasn't granted this app access|not granted/i),
-    ).toBeVisible({ timeout: 30_000 });
+  test.describe("denied origin (gate_all_apps)", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { name } }],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        testAppURL: DENIED_ORIGIN,
+        useIcrc3Attributes: true,
+      },
+    });
+
+    test("gate_all_apps blocks an unlisted dapp", async ({
+      authorizePage,
+      configureSsoGating,
+    }) => {
+      // With `gate_all_apps` on and this origin absent from `app_clients`,
+      // discovery resolves the domain but denies the origin, so the Continue
+      // button never enables and an inline "not granted" error is shown — no
+      // delegation is issued.
+      await configureSsoGating(gatingConfig);
+      await authorizePage.page
+        .getByRole("button", { name: "Sign in with SSO" })
+        .click();
+      await authorizePage.page
+        .getByRole("textbox", { name: "Company domain" })
+        .fill(SSO_GATING_DISCOVERY_DOMAIN);
+      await expect(
+        authorizePage.page.getByText(
+          /hasn't granted this app access|not granted/i,
+        ),
+      ).toBeVisible({ timeout: 30_000 });
+      // This flow never authorizes, so the auth tab won't close on its own;
+      // close it so the `authorizePage` fixture's teardown (which awaits
+      // `close`) doesn't time out. Mirrors the conflicting-`?openid`/`?sso` test.
+      await authorizePage.page.close();
+    });
   });
 });

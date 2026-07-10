@@ -7,6 +7,7 @@ import {
   authenticateWithPasskey,
   authenticateWithSession,
   authenticateWithSso,
+  SsoNormalLoginRequiredError,
 } from "$lib/utils/authentication";
 import { frontendCanisterConfig, canisterId } from "$lib/globals";
 import {
@@ -88,6 +89,15 @@ export class AuthFlow {
   #ssoJwt = $state<string>();
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
+  // The dapp SSO context (origin + whether it's gated) for the in-flight
+  // sign-in, when this is a dapp SSO flow. Set in `#openIdJwtSignIn` and read by
+  // `#openIdRegistrationCommit` so a *new* SSO user's post-registration session
+  // is minted through the SSO gate path (`sso_prepare_delegation`) — the
+  // SSO-session principal §6.3 certification requires for `sso:<domain>`
+  // attributes — instead of the openid path (which yields a different principal
+  // that gets no SSO attributes). `undefined` for direct providers and
+  // management (non-dapp) SSO.
+  #sso = $state<{ origin: string; gated: boolean }>();
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
   #pendingMethodSwitch = $state<{
@@ -209,6 +219,7 @@ export class AuthFlow {
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
+    this.#sso = undefined;
     this.#view = "chooseMethod";
     return identityNumber;
   };
@@ -221,6 +232,7 @@ export class AuthFlow {
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
+    this.#sso = undefined;
     this.#view = "chooseMethod";
   };
 
@@ -268,8 +280,13 @@ export class AuthFlow {
       }
     | undefined
   > => {
-    const { resolvedClientId, clientId, discovery, domain, name: ssoName } =
-      ssoResult;
+    const {
+      resolvedClientId,
+      clientId,
+      discovery,
+      domain,
+      name: ssoName,
+    } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
     // Route the ceremony to the client the origin resolves to under IdP-side
     // per-app gating: the per-app client for a gated dapp origin, else the
@@ -541,6 +558,10 @@ export class AuthFlow {
         email?: string;
       }
   > => {
+    // Remember the dapp SSO context so registration of a *new* SSO user
+    // (`#openIdRegistrationCommit`) mints its session through the SSO path, not
+    // the openid path (§6.3). `undefined` for direct providers / management SSO.
+    this.#sso = sso;
     let jwt: string | undefined = existingJwt;
     if (jwt === undefined) {
       // Two try-catch blocks to avoid double-triggering the analytics.
@@ -574,7 +595,6 @@ export class AuthFlow {
               jwt,
               discoveryDomain,
               origin: sso.origin,
-              gated: sso.gated,
             })
           : await authenticateWithJWT({
               canisterId,
@@ -587,6 +607,13 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { openid: { iss, sub } },
+        // Mark this as an SSO session (authenticated via the gate path) so the
+        // attribute flow keys SSO-specific handling on the session, not the
+        // 1-click-vs-manual flow type (§6.3).
+        sso:
+          this.#sso !== undefined && discoveryDomain !== undefined
+            ? { origin: this.#sso.origin, domain: discoveryDomain }
+            : undefined,
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
@@ -839,23 +866,54 @@ export class AuthFlow {
     try {
       // An SSO discovery / JWKS cache that's cold (or has since been evicted)
       // reports `Pending`; retry until it warms instead of failing the signup.
-      await retryWhilePending(() =>
-        get(sessionStore).actor.openid_identity_registration_finish({
-          jwt,
-          salt: get(sessionStore).salt,
-          name,
-          discovery_domain:
-            discoveryDomain !== undefined ? [discoveryDomain] : [],
-        }),
-      ).then(throwCanisterError);
+      // For a first *gated* SSO login, pass the dapp `origin`: registration runs
+      // the same gate as `sso_prepare_delegation` and stores a PRIMARY-keyed
+      // credential (§6.1 registration analogue), so a `sub` org registers
+      // directly in one IdP trip. A non-`sub` org can't bridge the pairwise sub
+      // from a gated token, so the canister returns `SsoNormalLoginRequired` —
+      // mapped below to prompt a normal primary-client sign-in first.
+      try {
+        await retryWhilePending(() =>
+          get(sessionStore).actor.openid_identity_registration_finish({
+            jwt,
+            salt: get(sessionStore).salt,
+            name,
+            discovery_domain:
+              discoveryDomain !== undefined ? [discoveryDomain] : [],
+            origin: this.#sso !== undefined ? [this.#sso.origin] : [],
+          }),
+        ).then(throwCanisterError);
+      } catch (error) {
+        if (
+          isCanisterError<IdRegFinishError>(error) &&
+          error.type === "SsoNormalLoginRequired"
+        ) {
+          throw new SsoNormalLoginRequiredError();
+        }
+        throw error;
+      }
       const decodedJwt = decodeJWT(jwt);
       const { iss, sub, loginHint } = decodedJwt;
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-        discoveryDomain,
-      });
+      // Registration created the primary-keyed credential; now mint the session
+      // through the SSO gate path so the principal is the SSO-session principal
+      // bound to this origin (§6.3) — the only one for which `sso:<domain>`
+      // attributes certify. `gated` reflects the origin: a gated dapp's first
+      // login registered directly above and now resolves here.
+      const { identity, identityNumber } =
+        this.#sso !== undefined && discoveryDomain !== undefined
+          ? await authenticateWithSso({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+              origin: this.#sso.origin,
+            })
+          : await authenticateWithJWT({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+            });
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );
@@ -863,6 +921,10 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { openid: { iss, sub } },
+        sso:
+          this.#sso !== undefined && discoveryDomain !== undefined
+            ? { origin: this.#sso.origin, domain: discoveryDomain }
+            : undefined,
       });
       this.#captcha = undefined;
       return { iss, sub, loginHint, identityNumber, decodedJwt };

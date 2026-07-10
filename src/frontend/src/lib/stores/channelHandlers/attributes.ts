@@ -301,6 +301,12 @@ const resolveConsentPipeline = async (params: {
   try {
     const { accountNumberPromise } = await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
+    // Whether this session is the origin-scoped SSO-session principal (the gate
+    // path), not a device/OpenID one — keyed on the session, so BOTH the
+    // `?sso=` 1-click and the manual "Sign in with SSO" paths are covered
+    // (§6.3). It authorizes the origin-scoped attribute reads but not the
+    // anchor-level `identity_info`.
+    const isSso = authenticated.sso !== undefined;
 
     const validationResult = await validateDerivationOrigin({
       requestOrigin: channel.origin,
@@ -324,19 +330,31 @@ const resolveConsentPipeline = async (params: {
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
+              // Pass the origin so an SSO session (the origin-scoped
+              // SSO-session principal) is authorized for this read (§6.3);
+              // ignored for device / OpenID sessions.
+              origin: [origin],
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
+    // `identity_info` only feeds recovery / verified-email addresses, which are
+    // used solely by the `verified_email` attribute type. SSO never supports
+    // `verified_email`, and its origin-scoped session isn't a valid caller for
+    // the anchor-level `identity_info` — so skip the call entirely for the SSO
+    // flow (rather than granting the SSO session access to `identity_info`).
+    const identityInfoPromise = isSso
+      ? Promise.resolve(undefined)
+      : authenticated.actor
+          .identity_info(authenticated.identityNumber)
+          .then(throwCanisterError);
     const [available, identityInfo] = await Promise.all([
       availablePromise,
-      authenticated.actor
-        .identity_info(authenticated.identityNumber)
-        .then(throwCanisterError),
+      identityInfoPromise,
     ]);
-    const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
+    const recoveryAddresses = (identityInfo?.email_recovery[0] ?? []).map(
       (c: { address: string }) => c.address,
     );
-    const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
+    const verifiedAddresses = (identityInfo?.verified_emails[0] ?? []).map(
       (e: { address: string }) => e.address,
     );
 
@@ -490,6 +508,8 @@ export const handleIcrc3OneClickOpenIdAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
+          // OpenID session authorizes via the usual check; origin is unused.
+          origin: [origin],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));
@@ -520,10 +540,11 @@ export const handleIcrc3OneClickOpenIdAttributes =
   };
 
 /**
- * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the
- * user signed in via the `?sso=<domain>` 1-click entry and every requested
- * key is in that domain's auto-approve allowlist, certify and send without
- * showing the consent UI.
+ * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the user
+ * signed in through the SSO gate (the `?sso=<domain>` 1-click entry OR the
+ * manual "Sign in with SSO" wizard) and every requested key is in that domain's
+ * auto-approve allowlist, certify and send without showing the consent UI.
+ * Keyed on the SSO-session marker (not the flow type) so it covers both paths.
  */
 export const handleIcrc3OneClickSsoAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -545,18 +566,18 @@ export const handleIcrc3OneClickSsoAttributes =
       return;
     }
 
-    const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-    if (flow.type !== "1-click-sso") {
-      return;
-    }
-    const ssoDomain = flow.domain;
-    if (!requestedKeys.every((key) => isOneClickSsoKey(key, ssoDomain))) {
-      return;
-    }
-
     try {
-      const { accountNumberPromise } = await waitForStore(authorizedStore);
       const authenticated = await waitForStore(authenticationStore);
+      const sso = authenticated.sso;
+      // Only an SSO session (gate path) auto-approves SSO attributes; a
+      // passkey / direct-OpenID session into the same dapp does not.
+      if (sso === undefined) {
+        return;
+      }
+      if (!requestedKeys.every((key) => isOneClickSsoKey(key, sso.domain))) {
+        return;
+      }
+      const { accountNumberPromise } = await waitForStore(authorizedStore);
 
       const validationResult = await validateDerivationOrigin({
         requestOrigin: channel.origin,
@@ -580,6 +601,9 @@ export const handleIcrc3OneClickSsoAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
+          // SSO session: pass the origin so the canister authorizes this read
+          // for the origin-scoped SSO-session principal (§6.3).
+          origin: [origin],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));
@@ -640,20 +664,22 @@ export const handleIcrc3ConsentAttributes =
 
     await serializeConsentRequest(async () => {
       try {
-        // Wait for the flow — set eagerly by the authorize page — so we can
-        // bail out as soon as we know one of the 1-click handlers will
-        // take this request.
+        // Wait for the flow (openid auto-approve is keyed on it) and the
+        // authenticated session (SSO auto-approve is keyed on the SSO-session
+        // marker, so it covers BOTH the 1-click and the manual "Sign in with
+        // SSO" paths, unlike the flow which is only set for 1-click). Bail out
+        // as soon as we know one of the 1-click handlers will take this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
+        const authenticated = await waitForStore(authenticationStore);
+        const sso = authenticated.sso;
         const oneClickHandlerWillHandle =
           requestedKeys.length > 0 &&
           ((flow.type === "1-click-openid" &&
             requestedKeys.every((key) =>
               isOneClickOpenIdKey(key, flow.issuer),
             )) ||
-            (flow.type === "1-click-sso" &&
-              requestedKeys.every((key) =>
-                isOneClickSsoKey(key, flow.domain),
-              )));
+            (sso !== undefined &&
+              requestedKeys.every((key) => isOneClickSsoKey(key, sso.domain))));
         if (oneClickHandlerWillHandle) {
           return;
         }

@@ -609,6 +609,7 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedCall' : IDL.Record({ 'next_step' : RegistrationFlowNextStep }),
     'InvalidAuthnMethod' : IDL.Text,
     'StorageError' : IDL.Text,
+    'SsoNormalLoginRequired' : IDL.Null,
   });
   const IdRegStartError = IDL.Variant({
     'InvalidCaller' : IDL.Null,
@@ -616,6 +617,7 @@ export const idlFactory = ({ IDL }) => {
     'RateLimitExceeded' : IDL.Null,
   });
   const ListAvailableAttributesRequest = IDL.Record({
+    'origin' : IDL.Opt(IDL.Text),
     'attributes' : IDL.Opt(IDL.Vec(IDL.Text)),
     'identity_number' : IdentityNumber,
   });
@@ -665,6 +667,7 @@ export const idlFactory = ({ IDL }) => {
     'jwt' : JWT,
     'name' : IDL.Text,
     'salt' : Salt,
+    'origin' : IDL.Opt(IDL.Text),
     'discovery_domain' : IDL.Opt(IDL.Text),
   });
   const OpenIdPrepareDelegationResponse = IDL.Record({

@@ -2383,10 +2383,28 @@ mod attribute_sharing {
             message,
         } = request.try_into()?;
 
-        let (anchor, _) =
-            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
-                GetIcrc3AttributeError::AuthorizationError(principal)
-            })?;
+        // Accept the SSO-session principal (IdP-side per-app gating, §6.3), the
+        // read-side pair of `prepare_icrc3_attributes`: the same session that
+        // certified the message must be able to read the signature back. Its
+        // seed binds this exact origin, so it can only read for its own origin.
+        let anchor = state::anchor(identity_number);
+        let is_sso_session = openid::matching_sso_session(
+            anchor.openid_credentials().iter(),
+            identity_number,
+            &origin,
+            caller(),
+        )
+        .is_some();
+        let anchor = match check_authorization(identity_number) {
+            Ok((anchor, _)) => anchor,
+            Err(AuthorizationError { principal }) => {
+                if is_sso_session {
+                    anchor
+                } else {
+                    return Err(GetIcrc3AttributeError::AuthorizationError(principal));
+                }
+            }
+        };
 
         let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
             .map_err(GetIcrc3AttributeError::GetAccountError)?;
@@ -2403,12 +2421,35 @@ mod attribute_sharing {
         let ValidatedListAvailableAttributesRequest {
             identity_number,
             attributes,
+            origin,
         } = request.try_into()?;
 
-        let (anchor, _) =
-            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
-                ListAvailableAttributesError::AuthorizationError(principal)
-            })?;
+        // Accept the SSO-session principal (IdP-side per-app gating, §6.3) when
+        // the caller supplies its origin: recompute the config-free SSO-session
+        // principal `seed(iss, sub, sso_domain, origin, anchor)` and match. The
+        // FE attribute flow lists available attributes with the same SSO session
+        // it uses to certify `sso:<domain>` attributes. Device / OpenID sessions
+        // omit `origin` and authorize via `check_authorization` as before.
+        let anchor = state::anchor(identity_number);
+        let is_sso_session = origin.as_deref().is_some_and(|origin| {
+            openid::matching_sso_session(
+                anchor.openid_credentials().iter(),
+                identity_number,
+                origin,
+                caller(),
+            )
+            .is_some()
+        });
+        let anchor = match check_authorization(identity_number) {
+            Ok((anchor, _)) => anchor,
+            Err(AuthorizationError { principal }) => {
+                if is_sso_session {
+                    anchor
+                } else {
+                    return Err(ListAvailableAttributesError::AuthorizationError(principal));
+                }
+            }
+        };
 
         Ok(anchor.list_available_attributes(attributes))
     }

@@ -847,6 +847,15 @@ export type IdRegFinishError = {
      * Error while persisting the new identity.
      */
     'StorageError' : string
+  } |
+  {
+    /**
+     * A first gated SSO login for a non-`sub` org (e.g. Entra `oid`): the
+     * per-app token's pairwise sub can't be bridged to the primary identity
+     * until a normal primary-client sign-in has happened. Registration creates
+     * nothing; the frontend prompts a normal sign-in, then retries.
+     */
+    'SsoNormalLoginRequired' : null
   };
 export interface IdRegFinishResult { 'identity_number' : bigint }
 export interface IdRegNextStepResult {
@@ -1147,6 +1156,13 @@ export interface ListAvailableAttributesRequest {
    * Identity for which available attributes should be listed.
    */
   'identity_number' : IdentityNumber,
+  /**
+   * The dapp origin, supplied when the caller authenticates through an SSO
+   * session (IdP-side per-app gating): lets the canister recompute the
+   * SSO-session principal and authorize this read for it. Omitted by
+   * device / OpenID sessions.
+   */
+  'origin' : [] | [string],
 }
 export type ListAvailableAttributesResponse = Array<
   [string, Uint8Array | number[]]
@@ -1212,6 +1228,13 @@ export interface OpenIDRegFinishArg {
    * provider (Google / Microsoft / Apple). Selects the JWK source.
    */
   'discovery_domain' : [] | [string],
+  /**
+   * The target dapp origin, set only for a first gated SSO login (IdP-side
+   * per-app gating). When present (with discovery_domain), registration runs
+   * the gate and stores a primary-client-keyed credential so a gated first
+   * login registers directly. Absent otherwise.
+   */
+  'origin' : [] | [string],
 }
 export interface OpenIdConfig {
   'auth_uri' : string,

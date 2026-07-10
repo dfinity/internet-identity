@@ -710,6 +710,74 @@ pub fn resolve_primary_identity(
     Ok(SsoPrimaryIdentity { credential })
 }
 
+/// Record the non-`sub` aux bridge after a normal (un-gated) primary-client SSO
+/// login (§6.5): `(iss, stable_id) -> primary sub`. This is the login that
+/// carries BOTH the alternate stable id (e.g. Entra `oid`) and the primary
+/// `sub`, so a later gated per-app login (whose pairwise sub differs) can be
+/// bridged to the primary identity. No-op for `sub` orgs and for direct
+/// providers (no `sso_domain`). Additive, in-heap; never mutates a credential.
+///
+/// Called from the primary-token registration / credential-add paths (which use
+/// `verify_jwt`, not the gated `resolve_primary_identity` that already inserts
+/// on the delegation path), so a new non-`sub` user who signs in normally gets
+/// their bridge and a subsequent gated login resolves.
+pub fn note_primary_sso_login(jwt: &str, credential: &OpenIdCredential) {
+    let Some(domain) = credential.sso_domain.as_deref() else {
+        return;
+    };
+    let Cached::Ready(cfg) = sso::peek_discovery(domain) else {
+        return;
+    };
+    if cfg.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM {
+        return;
+    }
+    if let Some(stable_id) = extract_string_claim(jwt, &cfg.stable_identifier_claim) {
+        aux_stable_id_insert(&credential.iss, &stable_id, &credential.sub);
+    }
+}
+
+/// Verify an SSO JWT for *registration* — the registration analogue of the
+/// `sso_prepare_delegation` gate (§6.1/§6.2). Enforces the SAME gate for
+/// `(discovery_domain, origin)` (via [`verify_sso_jwt`]) and returns the
+/// PRIMARY-keyed credential to store (via [`resolve_primary_identity`]'s
+/// substitution), so a first *gated* login registers directly under the org's
+/// primary client — never a per-app credential. Reuses the delegation gate
+/// helpers verbatim; the credential shape is identical to a normal primary SSO
+/// credential (no new key, no migration).
+///
+/// **Fails safe.** A non-`sub` org's per-app token carries a pairwise sub with
+/// no aux bridge yet, so no primary sub can be derived — this returns an error
+/// and the caller creates NOTHING (the frontend routes the user to a normal
+/// primary-client sign-in first, then retries). Also denies a wrong-`aud` /
+/// `gate_all_apps`-blocked token exactly as the delegation gate does.
+pub fn verify_sso_for_registration(
+    jwt: &str,
+    salt: &[u8; 32],
+    discovery_domain: &str,
+    origin: &str,
+) -> Result<Cached<OpenIdCredential>, IdRegFinishError> {
+    let verification = match verify_sso_jwt(jwt, salt, discovery_domain, origin) {
+        Ok(Cached::Pending) => return Ok(Cached::Pending),
+        Ok(Cached::Ready(verification)) => verification,
+        // Gate mismatch / wrong `aud` / `gate_all_apps` deny / expired / bad
+        // signature: a clear handled verification error (never a silent
+        // fallthrough that looks like success).
+        Err(err) => return Err(err.into()),
+    };
+    match resolve_primary_identity(&verification) {
+        Ok(identity) => Ok(Cached::Ready(identity.credential)),
+        // Non-`sub` org, first gated login: the per-app token's pairwise sub has
+        // no aux bridge yet, so no primary sub can be derived. Create nothing and
+        // signal the FE to run a normal primary-client sign-in first (§6.5).
+        Err(OpenIdDelegationError::NoSuchAnchor) => Err(IdRegFinishError::SsoNormalLoginRequired),
+        // Any other resolution failure (e.g. a non-`sub` token missing the
+        // configured stable claim) is a malformed request, not a bridgeable one.
+        Err(_) => Err(IdRegFinishError::InvalidAuthnMethod(
+            "SSO identity could not be resolved".to_string(),
+        )),
+    }
+}
+
 /// Seed for an SSO-session delegation, binding `(iss, sub, sso_domain, origin,
 /// anchor)` (§6.2). A dedicated domain separator and length-prefixed fields
 /// keep it disjoint from every [`calculate_delegation_seed`] output, so an SSO
