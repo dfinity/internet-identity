@@ -258,13 +258,14 @@ const MCP_GRANT_MEMORY_ID: MemoryId = MemoryId::new(MCP_GRANT_MEMORY_INDEX);
 
 /// Pending MCP registration delegations ([`StorableMcpRegistration`]), keyed by
 /// the registration principal `P_reg` (the `caller()` of `mcp_register_v2`).
-/// Entries are minted by `prepare_mcp_registration_delegation` and store only
-/// the anchor to bind — so `mcp_register_v2` recovers the anchor server-side
-/// instead of taking it as an argument (the MCP server never learns it). The
-/// rest of the consent (read-only, grant TTL) is folded into `P_reg`'s seed and
-/// validated by re-derivation, not stored. The delegation is multi-use within
-/// its short expiry (a retry re-binds); entries are removed when a lookup finds
-/// them expired.
+/// Entries are minted by `prepare_mcp_registration_delegation` and store the
+/// whole consent — the anchor to bind, the read-only choice, the resolved grant
+/// TTL, and the trusted server URL — so `mcp_register_v2` recovers all of it
+/// server-side instead of taking any as an argument (the MCP server passes only
+/// its session key and never learns the anchor). `P_reg` is seeded from a fresh
+/// random nonce, so the consent can't be re-derived and is kept here in full.
+/// The delegation is multi-use within its short expiry (a retry re-binds);
+/// entries are removed when a lookup finds them expired.
 const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMORY_INDEX);
 
 /// Per-anchor trusted-MCP-server configuration (master toggle + trusted server
@@ -1140,8 +1141,9 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Insert (or replace) the pending MCP registration entry keyed by
     /// `principal`. Written by `prepare_mcp_registration_delegation` under user
-    /// authorization; it records only the anchor to bind (plus the delegation's
-    /// expiry), so `mcp_register_v2` recovers the anchor without a call argument.
+    /// authorization; it records the whole consent (anchor, read-only choice,
+    /// grant TTL, trusted URL, and the delegation's expiry), so
+    /// `mcp_register_v2` recovers all of it without a call argument.
     pub fn insert_mcp_registration(
         &mut self,
         principal: Principal,

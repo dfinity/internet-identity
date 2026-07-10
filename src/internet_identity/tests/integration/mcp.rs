@@ -1446,11 +1446,11 @@ fn mcp_read_only_grant_stays_queries_only_across_upgrade() -> Result<(), RejectR
 /// `P_reg -> Y` registration delegation (`prepare` + `get`); the delegation is a
 /// valid II canister signature over the browser-held registration key `Y`; the
 /// MCP server then redeems it — authenticated as `P_reg` (the chain root) — via
-/// `mcp_register_v2` to bind its long-lived session key `S`. The anchor is
-/// recovered server-side from the minimal index entry keyed by `P_reg` (never a
-/// call argument, so it is never disclosed to the server); the read-only choice
-/// and grant lifetime are echoed and validated by re-deriving `P_reg`. The
-/// resulting grant authorizes the server-facing `mcp_*` methods.
+/// `mcp_register_v2` to bind its long-lived session key `S`. The whole consent
+/// (anchor, read-only choice, grant lifetime) is recovered server-side from the
+/// index entry keyed by `P_reg` — `mcp_register_v2` takes only the session key,
+/// so none of it is a call argument and the anchor is never disclosed to the
+/// server. The resulting grant authorizes the server-facing `mcp_*` methods.
 #[test]
 fn mcp_register_v2_binds_session_via_registration_delegation() -> Result<(), RejectResponse> {
     let env = env();
