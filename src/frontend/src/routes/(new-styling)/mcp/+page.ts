@@ -1,6 +1,5 @@
 import type { PageLoad } from "./$types";
 import { z } from "zod";
-import { fromBase64URL } from "$lib/utils/utils";
 
 /** Default grant lifetime in seconds when the request omits `ttl`. */
 const DEFAULT_TTL_SECONDS = 60 * 60;
@@ -65,55 +64,31 @@ export type McpParams =
  * `z.string()` treats absence as invalid.
  */
 const McpRequestSchema = z.object({
-  // The server's registration public key `X` (DER, base64url). Kept verbatim
-  // as the base64url string (decoded to bytes at connect time); this just
-  // validates it is present and actually base64url-decodable, so a malformed
-  // key invalidates the request up front rather than throwing mid-connect.
-  registration_key: z.string().refine((raw) => {
-    try {
-      return fromBase64URL(raw).length > 0;
-    } catch {
-      return false;
-    }
-  }),
-  // Structural callback check: must be an absolute http(s) URL. The stricter
-  // "is this an origin the connect flow accepts" check (https only) happens in
-  // the component, alongside the consent UI — keeping this `load` minimal
-  // since it also runs at prerender.
-  callback: z.string().refine((raw) => {
-    try {
-      const url = new URL(raw);
-      return url.protocol === "https:" || url.protocol === "http:";
-    } catch {
-      return false;
-    }
-  }),
+  // The server's registration public key `X` (DER, base64url), surfaced
+  // verbatim (decoded to bytes at connect time). Zod's `base64url` check
+  // rejects a key with out-of-alphabet characters up front — so a malformed
+  // key invalidates the request rather than throwing mid-connect — and
+  // `.min(1)` rejects a present-but-empty one.
+  registration_key: z.base64url().min(1),
+  // Structural callback check: an absolute http(s) URL. The stricter "is this
+  // an origin the connect flow accepts" gate (https only) runs in the
+  // component, alongside the consent UI — keeping this `load` minimal since it
+  // also runs at prerender.
+  callback: z.url({ protocol: /^https?$/ }),
   state: z.string().min(1),
-  // `ttl` is a lifetime in seconds. Any positive value is accepted and clamped
-  // to the allowed range — at least 10 minutes, at most 30 days — so the exact
-  // requested duration is honoured within those bounds. An omitted `ttl` uses
-  // the default, and a malformed one (non-numeric or <= 0) invalidates the
-  // request.
-  ttl: z
-    .string()
-    .nullable()
-    .transform((raw, ctx) => {
-      if (raw === null) {
-        return DEFAULT_TTL_SECONDS;
-      }
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        ctx.addIssue({
-          code: "custom",
-          message: "ttl must be a positive number of seconds",
-        });
-        return z.NEVER;
-      }
-      return Math.min(
-        Math.max(Math.floor(parsed), MIN_TTL_SECONDS),
-        MAX_TTL_SECONDS,
-      );
-    }),
+  // `ttl` is a lifetime in seconds: coerced from the string, required to be a
+  // positive integer, then clamped to the allowed range (at least 10 minutes,
+  // at most 30 days) so the exact requested duration is honoured within those
+  // bounds. An omitted `ttl` uses the default; a malformed one (non-numeric or
+  // <= 0) invalidates the request.
+  ttl: z.coerce
+    .number()
+    .int()
+    .positive()
+    .transform((seconds) =>
+      Math.min(Math.max(seconds, MIN_TTL_SECONDS), MAX_TTL_SECONDS),
+    )
+    .default(DEFAULT_TTL_SECONDS),
 });
 
 export const load: PageLoad = ({ url }): { params: McpParams } => {
@@ -131,7 +106,9 @@ export const load: PageLoad = ({ url }): { params: McpParams } => {
     registration_key: params.get("registration_key"),
     callback: params.get("callback"),
     state: params.get("state"),
-    ttl: params.get("ttl"),
+    // Absent (`null` from `URLSearchParams.get`) becomes `undefined` so the
+    // schema's `.default()` applies; a present value is coerced and validated.
+    ttl: params.get("ttl") ?? undefined,
   });
   if (!request.success) {
     return { params: { kind: "invalid" } };
