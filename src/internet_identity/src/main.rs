@@ -775,11 +775,12 @@ fn get_session_delegation(
 /// only the consenting user can create one. `registration_key` is an ephemeral
 /// key the II frontend generates for this connect (browser-held — never a key
 /// taken from the connect link; the frontend extends the chain to the MCP
-/// server's key browser-side). The consent — the anchor, `permissions`
-/// (read-only choice), `max_ttl` (requested session-grant lifetime), and the
-/// trusted server URL from the synced config — is folded into the seed that
-/// derives `P_reg`, so `mcp_register_v2` can authenticate it by derivation
-/// rather than storage, and the server cannot alter any of it.
+/// server's key browser-side). `P_reg` is derived from a fresh random nonce,
+/// and the whole consent — the anchor, `permissions` (read-only choice),
+/// `max_ttl` (session-grant lifetime), and the trusted server URL from the
+/// synced config — is recorded on an index entry keyed by `P_reg`, so
+/// `mcp_register_v2` recovers it server-side and the server cannot alter any
+/// of it.
 #[update]
 async fn prepare_mcp_registration_delegation(
     anchor_number: AnchorNumber,
@@ -791,43 +792,31 @@ async fn prepare_mcp_registration_delegation(
 }
 
 /// Fetch the signed registration delegation prepared above, to deliver to the
-/// trusted MCP server. Takes the same consent parameters as the prepare call
-/// because the seed is re-derived from arguments (nothing is stored).
+/// trusted MCP server. `user_key` is the value the prepare call returned; the
+/// seed is recovered from it, so no consent parameters need re-passing.
 /// Authenticated as the identity, like the prepare call.
 #[query]
 fn get_mcp_registration_delegation(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
-    permissions: Option<Permissions>,
-    max_ttl: Option<u64>,
+    user_key: UserKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, String> {
-    mcp_registration::get(
-        anchor_number,
-        registration_key,
-        permissions,
-        max_ttl,
-        expiration,
-    )
+    mcp_registration::get(anchor_number, registration_key, user_key, expiration)
 }
 
 /// Called by the trusted MCP server, authenticated by the registration
 /// delegation chain (so `caller()` is the registration principal): bind the
-/// server's long-lived `session_key` to the consenting anchor. The anchor is
-/// recovered server-side from the index entry keyed by `caller()` — never taken
-/// as an argument, so it is not disclosed to the server. `permissions` and
-/// `max_ttl` are echoed by the server and authorized by derive-and-compare: the
-/// seed re-derived from (recovered anchor, echoed values, the anchor's current
-/// trusted-server config) must land exactly on `caller()`, so an echo the user
-/// never consented to is rejected. Returns the grant expiration and the access
-/// level.
+/// server's long-lived `session_key` to the consenting anchor. The entire
+/// consent — anchor, read-only choice, grant lifetime — is recovered from the
+/// index entry keyed by `caller()`, so the server passes only `session_key`:
+/// it cannot name a different anchor, upgrade the access level, or stretch the
+/// grant, and never learns the anchor number. A trusted-server switch or
+/// disable since consent invalidates the delegation. Returns the grant
+/// expiration and the access level.
 #[update]
-fn mcp_register_v2(
-    session_key: SessionKey,
-    permissions: Option<Permissions>,
-    max_ttl: Option<u64>,
-) -> Result<McpRegistrationV2, String> {
-    mcp_registration::register_v2(session_key, permissions, max_ttl)
+fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
+    mcp_registration::register_v2(session_key)
 }
 
 #[query]
@@ -1107,8 +1096,10 @@ fn update_root_hash() {
     })
 }
 
-/// Calls raw rand to retrieve a random salt (32 bytes).
-async fn random_salt() -> Salt {
+/// Calls raw rand to retrieve 32 fresh random bytes. Named for its original
+/// use (the canister salt), but also reused by `mcp_registration::prepare` as a
+/// per-connect nonce — each call is an independent `raw_rand` draw.
+pub(crate) async fn random_salt() -> Salt {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {
         Ok((res,)) => res,
         Err((_, err)) => trap(&format!("failed to get salt: {err}")),

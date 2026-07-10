@@ -6,36 +6,36 @@
 //! 1. mints a short-lived canister-signed delegation `P_reg -> Y` via
 //!    [`prepare`] and [`get`], where `Y` is an ephemeral registration key the
 //!    *II frontend* generates for this connect (its private half never leaves
-//!    the browser) and `P_reg` is a synthetic principal derived from a seed
-//!    folding the anchor, the consent parameters (read-only choice, grant
-//!    lifetime), and the trusted server URL from the anchor's synced config;
+//!    the browser) and `P_reg` is a synthetic principal derived from a *random
+//!    per-connect nonce* (`raw_rand`), under a dedicated domain separator;
 //! 2. lets the frontend extend the chain locally with a second, browser-signed
 //!    hop `Y -> X` to the MCP server's registration key `X` (from the connect
-//!    link), and deliver the full chain — plus the echoed consent parameters —
-//!    to the server's declared callback over a URL fragment;
+//!    link), and deliver the full chain to the server's declared callback over
+//!    a URL fragment;
 //! 3. lets the MCP server redeem it: authenticated by the `P_reg -> Y -> X`
-//!    chain (so `caller()` *is* `P_reg`), it calls [`register_v2`] echoing the
-//!    read-only choice and grant lifetime, with the long-lived session key `S`
-//!    it generated.
+//!    chain (so `caller()` *is* `P_reg`), it calls [`register_v2`] with the
+//!    long-lived session key `S` it generated — and nothing else.
 //!
-//! **What is stored is deliberately minimal: only the anchor.** At [`prepare`]
-//! time (authenticated as the user) a tiny index entry
-//! ([`StorableMcpRegistration`]) records `P_reg -> anchor`. [`register_v2`]
-//! looks that up by `caller()` (== `P_reg`) to recover the anchor
-//! **server-side** — so the anchor number, the one identifier II otherwise
-//! never hands a relying party, is never a `register_v2` argument and never
-//! reaches the MCP server (which has no use for it: every later `mcp_*` call
-//! recovers the anchor from the session-key grant).
+//! **The consent lives in storage, not in the seed.** At [`prepare`] time
+//! (authenticated as the user) the canister records an index entry
+//! ([`StorableMcpRegistration`]) keyed by `P_reg`, holding the whole consent:
+//! the anchor, the read-only choice, the resolved grant lifetime, and the
+//! trusted server URL from the anchor's synced config. Because `P_reg` is
+//! derived from a random nonce (not from the consent), [`prepare`] and [`get`]
+//! don't have to agree on a deterministic derivation — [`prepare`] returns the
+//! `user_key` (`= der(seed)`), and [`get`] recovers the seed straight back out
+//! of it to fetch the certified signature. [`register_v2`] then recovers the
+//! entire consent by looking up `caller()` (`== P_reg`): it takes **no** anchor,
+//! read-only, or TTL argument, so the MCP server sends nothing but its own key
+//! and cannot alter any consented value. The anchor number in particular — the
+//! one identifier II otherwise never hands a relying party — is never disclosed
+//! to the server (every later `mcp_*` call recovers the anchor from the
+//! session-key grant, so the server has no use for it).
 //!
-//! The rest of the consent — the read-only choice and the grant lifetime — is
-//! *not* stored. It is folded into `P_reg`'s seed, so the server remembers and
-//! echoes those two, and [`register_v2`] validates them by re-deriving `P_reg`
-//! from (recovered anchor, echoed params, current trusted-server URL) and
-//! comparing to `caller()`: an altered echo derives a different principal and
-//! is rejected, so the server can neither upgrade a read-only session nor
-//! stretch the grant. Folding the trusted server URL means a config change
-//! (new trusted server, or MCP disabled) between consent and redemption also
-//! invalidates the delegation — derivation no longer matches.
+//! A config change between consent and redemption is caught at [`register_v2`]:
+//! the entry's stored trusted URL must still equal the anchor's *current*
+//! trusted URL, so switching or disabling the trusted server invalidates an
+//! in-flight delegation.
 //!
 //! The two-hop chain shape is load-bearing, not an implementation detail:
 //! everything this canister signs transits the IC in the clear (update
@@ -59,14 +59,15 @@ use crate::storage::storable::mcp_registration::StorableMcpRegistration;
 use crate::{mcp, state, update_root_hash};
 use candid::Principal;
 use ic_canister_sig_creation::{
-    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
+    delegation_signature_msg, signature_map::CanisterSigInputs, CanisterSigPublicKey,
+    DELEGATION_SIG_DOMAIN,
 };
 use ic_cdk::api::time;
 use ic_cdk::caller;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, McpRegistrationV2, Permissions, PrepareMcpRegistrationDelegation,
-    SessionKey, SignedDelegation, Timestamp,
+    SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -89,54 +90,29 @@ pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
 
 /// The effective session-grant lifetime for a requested `max_ttl`: the
 /// documented default when omitted, clamped to `mcp::register`'s [10 min,
-/// 30 days] bounds. Every entry point resolves the argument through this
-/// *before* deriving the seed, so the TTL folded into `P_reg` is the one the
-/// grant actually gets — if the seed folded the raw request instead, a
-/// below-minimum value would pass derive-and-compare yet mint a grant
-/// *longer* than the consent-bound number once `mcp::register` clamps it.
+/// 30 days] bounds. [`prepare`] resolves the argument through this and *stores*
+/// the result, so the grant `register_v2` mints runs exactly the recorded
+/// lifetime.
 fn resolve_grant_ttl(max_ttl: Option<u64>) -> u64 {
     max_ttl
         .unwrap_or(DEFAULT_MCP_GRANT_TTL_NS)
         .clamp(mcp::MCP_GRANT_MIN_TTL_NS, mcp::MCP_GRANT_MAX_TTL_NS)
 }
 
-/// Seed for the registration principal `P_reg`: folds the anchor, the consent
-/// parameters (read-only choice, resolved grant lifetime), and the trusted
-/// server URL from the anchor's synced config. No per-connect nonce and no
-/// key material — the delegated-to key `Y` lives in the signed *message*, not
-/// the seed — so [`register_v2`] can re-derive the principal purely from its
-/// call arguments plus current state and compare it to `caller()`
-/// (derive-and-compare; nothing is stored). Every field is length-prefixed and
-/// the URL is hashed to fixed length, and a dedicated domain separator keeps
-/// this principal namespace disjoint from the session, account, and
-/// email-recovery seeds.
-fn mcp_registration_seed(
-    anchor_number: AnchorNumber,
-    read_only: bool,
-    grant_ttl_ns: u64,
-    trusted_url: &str,
-) -> Hash {
+/// Seed for the registration principal `P_reg`: a fixed domain separator plus a
+/// random per-connect `nonce` (`raw_rand`), both length-prefixed. The nonce is
+/// the only entropy — `P_reg` carries no consent or key material, so the
+/// consent must be stored (see the module doc) and the delegated-to key `Y`
+/// lives in the signed *message*. The domain separator keeps this principal
+/// namespace disjoint from the session, account, and email-recovery seeds.
+fn mcp_registration_seed(nonce: &[u8]) -> Hash {
     const DOMAIN_SEPARATOR: &[u8] = b"mcp-registration";
 
-    let salt = state::salt();
-    let anchor_bytes = anchor_number.to_le_bytes();
-    let read_only_byte = [read_only as u8];
-    let ttl_bytes = grant_ttl_ns.to_le_bytes();
-    let url_hash = Sha256::digest(trusted_url.as_bytes());
-
     let mut blob: Vec<u8> = Vec::new();
-    blob.push(salt.len() as u8);
-    blob.extend_from_slice(&salt);
     blob.push(DOMAIN_SEPARATOR.len() as u8);
     blob.extend_from_slice(DOMAIN_SEPARATOR);
-    blob.push(anchor_bytes.len() as u8);
-    blob.extend_from_slice(&anchor_bytes);
-    blob.push(read_only_byte.len() as u8);
-    blob.extend_from_slice(&read_only_byte);
-    blob.push(ttl_bytes.len() as u8);
-    blob.extend_from_slice(&ttl_bytes);
-    blob.push(url_hash.len() as u8);
-    blob.extend_from_slice(&url_hash);
+    blob.push(nonce.len() as u8);
+    blob.extend_from_slice(nonce);
 
     let mut hasher = Sha256::new();
     hasher.update(&blob);
@@ -155,10 +131,10 @@ fn permissions_of(read_only: bool) -> Permissions {
     }
 }
 
-/// The anchor's trusted server URL, required by every entry point here: the
-/// seed folds it, so no registration delegation can exist (or be redeemed)
-/// without a live trusted-server config — and any config change invalidates
-/// in-flight delegations by changing the derivation.
+/// The anchor's trusted server URL. Required at [`prepare`] (there is no
+/// registration delegation without a trusted server to connect) and recorded on
+/// the index entry; [`register_v2`] compares the stored URL against this again,
+/// so a config change or disable between consent and redemption is caught.
 fn trusted_url(anchor_number: AnchorNumber) -> Result<String, String> {
     let config = mcp::get_mcp_config(anchor_number);
     match (config.enabled, config.url) {
@@ -173,10 +149,10 @@ fn trusted_url(anchor_number: AnchorNumber) -> Result<String, String> {
 /// `prepare_mcp_registration_delegation`: mint the `P_reg -> Y` delegation
 /// (`Y` = the frontend's ephemeral, browser-held registration key — see the
 /// module doc for why the canister never delegates to a link-supplied key).
-/// The full consent (anchor, read-only choice, grant lifetime, trusted server)
-/// is folded into the seed; only the *anchor* is additionally stored (keyed by
-/// `P_reg`), so [`register_v2`] can recover it server-side rather than take it
-/// from the server. Authenticated as the user (full authorization) — only the
+/// `P_reg` is derived from a fresh random nonce, and the whole consent (anchor,
+/// read-only choice, resolved grant lifetime, trusted server URL) is recorded
+/// on the index entry keyed by `P_reg`, so [`register_v2`] recovers it
+/// server-side. Authenticated as the user (full authorization) — only the
 /// consenting user can create a registration delegation for their anchor.
 pub async fn prepare(
     anchor_number: AnchorNumber,
@@ -192,28 +168,28 @@ pub async fn prepare(
         return Err("MCP registration failed: empty registration key.".to_string());
     }
     let url = trusted_url(anchor_number)?;
-    state::ensure_salt_set().await;
 
-    // The effective session-grant lifetime (defaulted and clamped), so the
-    // seed binds the number the grant will actually get.
+    // Effective (defaulted + clamped) grant lifetime, stored so the grant runs
+    // exactly this long; and a fresh random nonce (raw_rand) that makes P_reg
+    // per-connect-unique and unpredictable.
     let grant_ttl_ns = resolve_grant_ttl(max_ttl);
     let read_only = read_only_from(permissions);
+    let nonce = crate::random_salt().await;
 
     let expiration = time().saturating_add(MCP_REGISTRATION_DELEGATION_TTL_NS);
-    let seed = mcp_registration_seed(anchor_number, read_only, grant_ttl_ns, &url);
+    let seed = mcp_registration_seed(&nonce);
 
     state::signature_map_mut(|sigs| {
         // No queries-only restriction on the registration delegation itself: it
-        // authenticates one update (mcp_register_v2). The user's read-only
-        // choice is folded into the seed above, not into this signature.
+        // authenticates one update (mcp_register_v2). The read-only choice is
+        // recorded on the index entry below, not on this signature.
         add_delegation_signature(sigs, registration_key, &seed, expiration, None);
     });
     update_root_hash();
 
-    // Record only the anchor, keyed by P_reg, so register_v2 recovers it
-    // server-side (never from an argument the server controls, so the anchor
-    // number is never disclosed to the MCP server). read-only / grant TTL stay
-    // in the seed, validated at redemption by re-derivation.
+    // Record the whole consent, keyed by P_reg, so register_v2 recovers it
+    // server-side — the server passes only its session key, and the anchor
+    // number is never disclosed to it.
     let user_key = der_encode_canister_sig_key(seed.to_vec());
     let p_reg = Principal::self_authenticating(&user_key);
     state::storage_borrow_mut(|storage| {
@@ -221,6 +197,9 @@ pub async fn prepare(
             p_reg,
             StorableMcpRegistration {
                 anchor_number,
+                read_only,
+                grant_ttl_ns,
+                trusted_url: url,
                 expires_at_ns: expiration,
             },
         );
@@ -234,31 +213,24 @@ pub async fn prepare(
 
 /// `get_mcp_registration_delegation`: fetch the certified `P_reg -> Y`
 /// delegation prepared above, for the frontend to extend browser-side with the
-/// `Y -> X` hop and deliver. Takes the same consent parameters as [`prepare`]
-/// because the seed must be re-derived from call arguments (this is a query —
-/// it can look nothing up that isn't derivable). Authenticated as the user.
+/// `Y -> X` hop and deliver. `user_key` is the value [`prepare`] returned; the
+/// seed is recovered straight out of it (the delegation's own public key), so
+/// this query needs no deterministic re-derivation. Authenticated as the user.
 pub fn get(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
-    permissions: Option<Permissions>,
-    max_ttl: Option<u64>,
+    user_key: UserKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, String> {
     check_authorization(anchor_number)
         .map_err(|err| format!("{} could not be authenticated.", err.principal))?;
 
-    // No delegation could exist before the salt was initialised (`prepare`
-    // awaits `ensure_salt_set`); skip the seed derivation, which would trap on
-    // `state::salt()`, and report the delegation as absent instead.
-    let salt_initialised = state::storage_borrow(|storage| storage.salt().is_some());
-    if !salt_initialised {
+    // Recover the seed from `user_key` (the DER canister-signature public key
+    // `prepare` returned). A malformed key, or a seed with no signature in the
+    // certified map, reports the delegation as absent.
+    let Ok(seed) = CanisterSigPublicKey::try_from(user_key.as_ref()).map(|pk| pk.seed) else {
         return Err("MCP registration failed: no such delegation.".to_string());
-    }
-    let url = trusted_url(anchor_number)?;
-
-    let grant_ttl_ns = resolve_grant_ttl(max_ttl);
-    let read_only = read_only_from(permissions);
-    let seed = mcp_registration_seed(anchor_number, read_only, grant_ttl_ns, &url);
+    };
     state::assets_and_signatures(|certified_assets, sigs| {
         let inputs = CanisterSigInputs {
             domain: DELEGATION_SIG_DOMAIN,
@@ -282,34 +254,28 @@ pub fn get(
 
 /// `mcp_register_v2`: bind the MCP server's long-lived session key `S` to the
 /// consenting anchor. Authenticated by the `P_reg -> Y -> X` chain (so
-/// `caller()` is `P_reg`). The anchor is recovered **server-side** from the
-/// index entry keyed by `caller()` — never taken as an argument, so it is
-/// never disclosed to the server. The read-only choice and grant lifetime *are*
-/// arguments (the server echoes what it remembered), authorized by
-/// derive-and-compare: the seed is re-derived from (recovered anchor, echoed
-/// params, the anchor's *current* trusted-server URL) and must land exactly on
-/// `caller()`. An echo the user never consented to — an upgraded access level,
-/// a longer lifetime, or a config that has since changed — derives a different
-/// principal and is rejected. Multi-use within the delegation's short lifetime:
-/// the entry is retained (a retry re-binds), and removed once found expired.
-pub fn register_v2(
-    session_key: SessionKey,
-    permissions: Option<Permissions>,
-    max_ttl: Option<u64>,
-) -> Result<McpRegistrationV2, String> {
+/// `caller()` is `P_reg`). The entire consent — anchor, read-only choice, grant
+/// lifetime — is recovered from the index entry keyed by `caller()`, so the
+/// server passes **only** `session_key`: it cannot name a different anchor,
+/// upgrade the access level, or stretch the grant, and the anchor number is
+/// never disclosed to it. A config change since consent (the entry's stored
+/// trusted URL no longer matches the anchor's current one, or MCP was disabled)
+/// invalidates the delegation. Multi-use within the delegation's short
+/// lifetime: the entry is retained (a retry re-binds), and removed once found
+/// expired.
+pub fn register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
     // The one error this public method reports for anything short of an
-    // authorized redemption. In particular a missing entry, an expired entry,
-    // and a disabled/changed config are all indistinguishable from a derivation
-    // mismatch: `register_v2` can be called by anyone, and a distinct error
-    // would be an oracle for probing anchors or their MCP config. (`prepare` /
-    // `get` keep specific errors — they authenticate as the identity first.)
+    // authorized redemption. A missing entry, an expired entry, and a
+    // disabled/changed config are all indistinguishable: `register_v2` can be
+    // called by anyone, and a distinct error would be an oracle for probing
+    // anchors or their MCP config. (`prepare` / `get` keep specific errors —
+    // they authenticate as the identity first.)
     const NOT_AUTHORIZED: &str =
         "MCP registration failed: not authorized by a registration delegation.";
 
-    // Recover the consented anchor from the index entry keyed by caller()
-    // (== P_reg). No entry ⇒ this caller never received a registration
-    // delegation. An expired entry authorizes nothing and is pruned. (Also
-    // covers the pre-salt case: no entry could exist before the salt was set.)
+    // Recover the consent from the index entry keyed by caller() (== P_reg).
+    // No entry ⇒ this caller never received a registration delegation. An
+    // expired entry authorizes nothing and is pruned.
     let p_reg = caller();
     let Some(entry) = state::storage_borrow(|storage| storage.lookup_mcp_registration(p_reg))
     else {
@@ -319,31 +285,26 @@ pub fn register_v2(
         state::storage_borrow_mut(|storage| storage.remove_mcp_registration(p_reg));
         return Err(NOT_AUTHORIZED.to_string());
     }
-    let anchor_number = entry.anchor_number;
 
-    // The anchor's current trusted-server URL is folded into the seed, so a
-    // config change (or disable) since consent breaks the re-derivation below.
-    let Ok(url) = trusted_url(anchor_number) else {
-        return Err(NOT_AUTHORIZED.to_string());
-    };
-
-    // Validate the echoed read-only / grant-lifetime by re-deriving P_reg from
-    // (recovered anchor, echoed params, current URL) and comparing to caller().
-    // The anchor is trusted (recovered, not echoed); only the two echoed values
-    // and the current config can make this diverge from caller().
-    let grant_ttl_ns = resolve_grant_ttl(max_ttl);
-    let read_only = read_only_from(permissions);
-    let seed = mcp_registration_seed(anchor_number, read_only, grant_ttl_ns, &url);
-    if p_reg != Principal::self_authenticating(der_encode_canister_sig_key(seed.to_vec())) {
-        return Err(NOT_AUTHORIZED.to_string());
+    // The trusted server the user consented to must still be the anchor's
+    // current one — otherwise a switch or disable since consent has invalidated
+    // this delegation.
+    match trusted_url(entry.anchor_number) {
+        Ok(current_url) if current_url == entry.trusted_url => {}
+        _ => return Err(NOT_AUTHORIZED.to_string()),
     }
 
     // Consent is authenticated; bind S under it (config /
     // one-session-per-anchor invariants and the TTL clamp live in
     // `mcp::register`). The entry is retained (multi-use); a retry re-binds.
-    let registration = mcp::register(anchor_number, session_key, grant_ttl_ns, read_only)?;
+    let registration = mcp::register(
+        entry.anchor_number,
+        session_key,
+        entry.grant_ttl_ns,
+        entry.read_only,
+    )?;
     Ok(McpRegistrationV2 {
         expiration: registration.expiration,
-        permissions: permissions_of(read_only),
+        permissions: permissions_of(entry.read_only),
     })
 }

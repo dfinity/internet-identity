@@ -2150,7 +2150,7 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   'mcp_register_v2' : ActorMethod<
-    [SessionKey, [] | [Permissions], [] | [bigint]],
+    [SessionKey],
     { 'Ok' : McpRegistrationV2 } |
       { 'Err' : string }
   >,
@@ -2160,7 +2160,7 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   'get_mcp_registration_delegation' : ActorMethod<
-    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint], Timestamp],
+    [UserNumber, SessionKey, PublicKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,

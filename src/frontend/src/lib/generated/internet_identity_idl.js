@@ -1185,7 +1185,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'mcp_register_v2' : IDL.Func(
-        [SessionKey, IDL.Opt(Permissions), IDL.Opt(IDL.Nat64)],
+        [SessionKey],
         [IDL.Variant({ 'Ok' : McpRegistrationV2, 'Err' : IDL.Text })],
         [],
       ),
@@ -1200,13 +1200,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'get_mcp_registration_delegation' : IDL.Func(
-        [
-          UserNumber,
-          SessionKey,
-          IDL.Opt(Permissions),
-          IDL.Opt(IDL.Nat64),
-          Timestamp,
-        ],
+        [UserNumber, SessionKey, PublicKey, Timestamp],
         [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
         ['query'],
       ),
