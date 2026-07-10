@@ -559,27 +559,50 @@ pub struct SsoVerification {
     pub stable_id: Option<String>,
 }
 
-// In-heap auxiliary lookup `(iss, stable_id) -> primary sub` for orgs whose
-// stable identifier isn't `sub` (Entra `oid`, §6.5). Additive, non-persistent
-// (rebuilt on the users' next primary login after an upgrade); a miss fails
-// safe (no anchor found → the user signs in normally first). Never a
-// migration and never mutates a stored credential/key.
-thread_local! {
-    static SSO_STABLE_ID_INDEX: std::cell::RefCell<HashMap<(String, String), String>> =
-        std::cell::RefCell::new(HashMap::new());
+// Auxiliary lookup `(iss, primary_client_id, stable_id) -> primary sub` for orgs
+// whose stable identifier isn't `sub` (Entra `oid`, §6.5). Persisted in its own
+// stable memory region (`SSO_STABLE_ID_INDEX_MEMORY_ID`) so it survives upgrades
+// — the "sign in normally first" step then happens once per user, ever, instead
+// of every ~weekly upgrade. A miss fails safe (no anchor found → the user signs
+// in normally first). Additive; never a migration and never mutates a stored
+// credential/key.
+//
+// The `primary_client_id` key component scopes each entry to its primary client:
+// on Entra the bridged `primary_sub` is pairwise-per-client, so one tenant
+// exposed through two II discovery domains (different primary clients) would
+// otherwise clobber the other under a `(iss, stable_id)`-only key.
+
+/// The `(iss, primary_client_id, stable_id) -> primary_sub` bridge entry a
+/// non-`sub` PRIMARY login produces. [`resolve_primary_identity`] surfaces it
+/// (staying pure); the UPDATE caller persists it via [`record_primary_sso_bridge`]
+/// — the `sso_get_delegation` query never does (a write from a query is invalid
+/// against a stable map, not merely discarded).
+pub struct AuxRecord {
+    pub iss: String,
+    pub primary_client_id: String,
+    pub stable_id: String,
+    pub primary_sub: String,
 }
 
-fn aux_stable_id_insert(iss: &str, stable_id: &str, primary_sub: &str) {
-    SSO_STABLE_ID_INDEX.with_borrow_mut(|m| {
-        m.insert(
-            (iss.to_string(), stable_id.to_string()),
-            primary_sub.to_string(),
-        );
+fn aux_stable_id_insert(iss: &str, primary_client_id: &str, stable_id: &str, primary_sub: &str) {
+    state::storage_borrow_mut(|storage| {
+        storage.insert_sso_stable_id(iss, primary_client_id, stable_id, primary_sub);
     });
 }
 
-fn aux_stable_id_lookup(iss: &str, stable_id: &str) -> Option<String> {
-    SSO_STABLE_ID_INDEX.with_borrow(|m| m.get(&(iss.to_string(), stable_id.to_string())).cloned())
+fn aux_stable_id_lookup(iss: &str, primary_client_id: &str, stable_id: &str) -> Option<String> {
+    state::storage_borrow(|storage| storage.lookup_sso_stable_id(iss, primary_client_id, stable_id))
+}
+
+/// Persist a surfaced [`AuxRecord`]. Call ONLY from update contexts
+/// (`sso_prepare_delegation`, the registration path); never from a query.
+pub fn record_primary_sso_bridge(record: &AuxRecord) {
+    aux_stable_id_insert(
+        &record.iss,
+        &record.primary_client_id,
+        &record.stable_id,
+        &record.primary_sub,
+    );
 }
 
 /// Extract a single string claim from a JWT's raw claims (used for the
@@ -665,10 +688,20 @@ pub struct SsoPrimaryIdentity {
     /// credential's sub (the stable id for `sub` orgs; bridged via the aux
     /// lookup otherwise).
     pub credential: OpenIdCredential,
+    /// For a non-`sub` PRIMARY login: the `(iss, primary_client_id, stable_id)
+    /// -> primary_sub` bridge entry to persist (§6.5). `None` for `sub` orgs and
+    /// for gated logins. The UPDATE caller records it via
+    /// [`record_primary_sso_bridge`]; the query path ignores it.
+    pub aux_record: Option<AuxRecord>,
 }
 
-/// Resolve a verified SSO login to the primary identity (§6.1, §6.5). Does not
-/// touch storage; the caller looks the anchor up by `credential.key()`.
+/// Resolve a verified SSO login to the primary identity (§6.1, §6.5). PURE with
+/// respect to writes: it may READ the aux bridge (the gated-login lookup) but
+/// never writes it — a non-`sub` primary login's bridge entry is SURFACED as
+/// `aux_record` for the update caller to persist. This keeps `sso_get_delegation`
+/// (a `#[query]`) valid against the stable map, where a write would be invalid.
+/// Does not touch anchor storage; the caller looks the anchor up by
+/// `credential.key()`.
 ///
 /// `Err(NoSuchAnchor)` for a non-`sub` gated login whose stable id has no aux
 /// entry yet — the user must sign in normally (primary) first (§6.5).
@@ -676,9 +709,9 @@ pub fn resolve_primary_identity(
     verification: &SsoVerification,
 ) -> Result<SsoPrimaryIdentity, OpenIdDelegationError> {
     let is_sub = verification.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM;
-    let primary_sub = if is_sub {
+    let (primary_sub, aux_record) = if is_sub {
         // `sub` is stable: the token's sub is the primary credential's sub.
-        verification.credential.sub.clone()
+        (verification.credential.sub.clone(), None)
     } else {
         let stable_id = verification.stable_id.clone().ok_or(
             // A non-`sub` org whose token omits the configured stable claim
@@ -686,19 +719,28 @@ pub fn resolve_primary_identity(
             OpenIdDelegationError::JwtVerificationFailed,
         )?;
         if verification.gated {
-            // Per-app login: bridge (iss, stable_id) -> primary sub via the aux
-            // index. A miss fails safe (§6.5).
-            aux_stable_id_lookup(&verification.credential.iss, &stable_id)
-                .ok_or(OpenIdDelegationError::NoSuchAnchor)?
+            // Per-app login: bridge (iss, primary_client_id, stable_id) ->
+            // primary sub via the aux index (read-only). A miss fails safe (§6.5).
+            let primary_sub = aux_stable_id_lookup(
+                &verification.credential.iss,
+                &verification.primary_client_id,
+                &stable_id,
+            )
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            (primary_sub, None)
         } else {
             // Primary login: the token's sub *is* the primary sub, and it also
-            // carries the alternate stable id — so it populates the aux index.
-            aux_stable_id_insert(
-                &verification.credential.iss,
-                &stable_id,
-                &verification.credential.sub,
-            );
-            verification.credential.sub.clone()
+            // carries the alternate stable id — surface the bridge entry for the
+            // update caller to persist (kept out of this pure resolver).
+            (
+                verification.credential.sub.clone(),
+                Some(AuxRecord {
+                    iss: verification.credential.iss.clone(),
+                    primary_client_id: verification.primary_client_id.clone(),
+                    stable_id,
+                    primary_sub: verification.credential.sub.clone(),
+                }),
+            )
         }
     };
 
@@ -707,7 +749,10 @@ pub fn resolve_primary_identity(
         sub: primary_sub,
         ..verification.credential.clone()
     };
-    Ok(SsoPrimaryIdentity { credential })
+    Ok(SsoPrimaryIdentity {
+        credential,
+        aux_record,
+    })
 }
 
 /// Record the non-`sub` aux bridge after a normal (un-gated) primary-client SSO
@@ -718,9 +763,9 @@ pub fn resolve_primary_identity(
 /// providers (no `sso_domain`). Additive, in-heap; never mutates a credential.
 ///
 /// Called from the primary-token registration / credential-add paths (which use
-/// `verify_jwt`, not the gated `resolve_primary_identity` that already inserts
-/// on the delegation path), so a new non-`sub` user who signs in normally gets
-/// their bridge and a subsequent gated login resolves.
+/// `verify_jwt`, not the gated delegation path), so a new non-`sub` user who
+/// signs in normally gets their bridge and a subsequent gated login resolves.
+/// Always an update context, so it persists directly.
 pub fn note_primary_sso_login(jwt: &str, credential: &OpenIdCredential) {
     let Some(domain) = credential.sso_domain.as_deref() else {
         return;
@@ -732,7 +777,14 @@ pub fn note_primary_sso_login(jwt: &str, credential: &OpenIdCredential) {
         return;
     }
     if let Some(stable_id) = extract_string_claim(jwt, &cfg.stable_identifier_claim) {
-        aux_stable_id_insert(&credential.iss, &stable_id, &credential.sub);
+        // The stored credential is primary-keyed here, so its `aud` IS the org's
+        // primary client — the same value the gated lookup keys on.
+        aux_stable_id_insert(
+            &credential.iss,
+            &credential.aud,
+            &stable_id,
+            &credential.sub,
+        );
     }
 }
 
@@ -765,7 +817,15 @@ pub fn verify_sso_for_registration(
         Err(err) => return Err(err.into()),
     };
     match resolve_primary_identity(&verification) {
-        Ok(identity) => Ok(Cached::Ready(identity.credential)),
+        Ok(identity) => {
+            // Always an update context (registration finish): persist the bridge
+            // entry a non-`sub` primary-client registration surfaces, so a later
+            // gated per-app login for this user resolves.
+            if let Some(record) = &identity.aux_record {
+                record_primary_sso_bridge(record);
+            }
+            Ok(Cached::Ready(identity.credential))
+        }
         // Non-`sub` org, first gated login: the per-app token's pairwise sub has
         // no aux bridge yet, so no primary sub can be derived. Create nothing and
         // signal the FE to run a normal primary-client sign-in first (§6.5).
@@ -1179,36 +1239,61 @@ mod tests {
         sub: &str,
         stable_id: Option<&str>,
     ) -> SsoVerification {
+        sso_verification_with_client(gated, claim, sub, stable_id, "primary")
+    }
+
+    fn sso_verification_with_client(
+        gated: bool,
+        claim: &str,
+        sub: &str,
+        stable_id: Option<&str>,
+        primary_client_id: &str,
+    ) -> SsoVerification {
         SsoVerification {
             credential: OpenIdCredential {
                 iss: "https://idp".to_string(),
                 sub: sub.to_string(),
-                aud: if gated { "per-app" } else { "primary" }.to_string(),
+                aud: if gated {
+                    "per-app".to_string()
+                } else {
+                    primary_client_id.to_string()
+                },
                 last_usage_timestamp: None,
                 metadata: HashMap::new(),
                 sso_domain: Some(SSO_DOMAIN.to_string()),
                 sso_name: None,
             },
-            primary_client_id: "primary".to_string(),
+            primary_client_id: primary_client_id.to_string(),
             gated,
             stable_identifier_claim: claim.to_string(),
             stable_id: stable_id.map(str::to_string),
         }
     }
 
+    // Fresh, empty stable storage (incl. the SSO stable-id bridge region) so the
+    // aux lookup/insert have a map to work against in unit tests.
+    fn init_test_storage() {
+        crate::state::storage_replace(crate::storage::Storage::new(
+            (0, 10_000),
+            ic_stable_structures::VectorMemory::default(),
+        ));
+    }
+
     #[test]
     fn resolve_primary_identity_sub_uses_token_sub() {
+        // `sub` orgs never touch the aux bridge (no storage access).
         let v = sso_verification(true, "sub", "sub-123", None);
         let identity = resolve_primary_identity(&v).expect("sub resolves directly");
         assert_eq!(identity.credential.sub, "sub-123");
         assert_eq!(identity.credential.aud, "primary");
+        assert!(identity.aux_record.is_none());
     }
 
     #[test]
     fn resolve_primary_identity_non_sub_gated_needs_normal_login_first() {
-        SSO_STABLE_ID_INDEX.with_borrow_mut(|m| m.clear());
+        init_test_storage();
         // First gated login for an Entra-style (oid) org, before any primary
-        // login populated the aux index: no anchor can be resolved (§6.5).
+        // login recorded the bridge: no anchor can be resolved (§6.5).
         let gated = sso_verification(true, "oid", "per-app-sub", Some("oid-1"));
         assert!(matches!(
             resolve_primary_identity(&gated),
@@ -1216,14 +1301,71 @@ mod tests {
         ));
 
         // A normal (primary) login carries both the primary sub and the stable
-        // id, populating the aux index.
+        // id. `resolve_primary_identity` is PURE: it surfaces the bridge entry
+        // but does NOT write it.
         let primary = sso_verification(false, "oid", "primary-sub", Some("oid-1"));
         let identity = resolve_primary_identity(&primary).expect("primary login resolves");
         assert_eq!(identity.credential.sub, "primary-sub");
+        let record = identity
+            .aux_record
+            .expect("primary login surfaces a bridge entry");
+        assert_eq!(record.iss, "https://idp");
+        assert_eq!(record.primary_client_id, "primary");
+        assert_eq!(record.stable_id, "oid-1");
+        assert_eq!(record.primary_sub, "primary-sub");
+        // The gated login still can't resolve until the caller persists it.
+        assert!(matches!(
+            resolve_primary_identity(&gated),
+            Err(OpenIdDelegationError::NoSuchAnchor)
+        ));
 
-        // Now the gated login bridges (iss, oid) -> primary sub.
+        // The update caller records the surfaced bridge entry.
+        record_primary_sso_bridge(&record);
+
+        // Now the gated login bridges (iss, primary_client_id, oid) -> primary sub.
         let identity =
-            resolve_primary_identity(&gated).expect("gated resolves after aux populated");
+            resolve_primary_identity(&gated).expect("gated resolves after bridge recorded");
         assert_eq!(identity.credential.sub, "primary-sub");
+        assert!(identity.aux_record.is_none());
+    }
+
+    #[test]
+    fn aux_bridge_is_scoped_per_primary_client() {
+        init_test_storage();
+        // Same tenant (iss) and stable id, exposed through two II discovery
+        // domains with DIFFERENT primary clients. On Entra each has its own
+        // pairwise primary sub; the `primary_client_id` key component keeps them
+        // from clobbering each other.
+        let primary_a =
+            sso_verification_with_client(false, "oid", "primary-sub-a", Some("oid-9"), "client-a");
+        let primary_b =
+            sso_verification_with_client(false, "oid", "primary-sub-b", Some("oid-9"), "client-b");
+        record_primary_sso_bridge(
+            &resolve_primary_identity(&primary_a)
+                .unwrap()
+                .aux_record
+                .unwrap(),
+        );
+        record_primary_sso_bridge(
+            &resolve_primary_identity(&primary_b)
+                .unwrap()
+                .aux_record
+                .unwrap(),
+        );
+
+        let gated_a =
+            sso_verification_with_client(true, "oid", "pairwise-a", Some("oid-9"), "client-a");
+        let gated_b =
+            sso_verification_with_client(true, "oid", "pairwise-b", Some("oid-9"), "client-b");
+        assert_eq!(
+            resolve_primary_identity(&gated_a).unwrap().credential.sub,
+            "primary-sub-a",
+            "client-a gated login must resolve to client-a's primary sub"
+        );
+        assert_eq!(
+            resolve_primary_identity(&gated_b).unwrap().credential.sub,
+            "primary-sub-b",
+            "client-b gated login must resolve to client-b's primary sub (no clobber)"
+        );
     }
 }

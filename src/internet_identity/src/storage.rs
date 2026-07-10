@@ -135,6 +135,7 @@ use storable::mcp_grant::StorableMcpGrant;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
 use storable::openid_jwks::StorableJwks;
+use storable::sso_stable_id_key::StorableSsoStableIdKey;
 use storable::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
@@ -199,6 +200,7 @@ const MCP_CONFIG_MEMORY_INDEX: u8 = 26u8;
 // const DEPRECATED_LOOKUP_MCP_PRINCIPAL_READ_ONLY_MEMORY_INDEX: u8 = 27u8;
 // const DEPRECATED_MCP_ACCESS_MEMORY_INDEX: u8 = 28u8;
 const MCP_GRANT_MEMORY_INDEX: u8 = 29u8;
+const SSO_STABLE_ID_INDEX_MEMORY_INDEX: u8 = 30u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -261,6 +263,17 @@ const MCP_GRANT_MEMORY_ID: MemoryId = MemoryId::new(MCP_GRANT_MEMORY_INDEX);
 /// of the identity's devices. Kept in its own map so it never touches anchor
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
+
+/// Auxiliary SSO stable-id bridge (IdP-side per-app gating, §6.5):
+/// `(iss, primary_client_id, stable_id) -> primary_sub` for orgs whose stable
+/// identifier isn't `sub` (e.g. Entra `oid`). A normal (primary-client) SSO
+/// login writes the entry; a later gated per-app login (whose pairwise `sub`
+/// differs) reads it to resolve the primary identity. Persisting it on-chain
+/// (rather than the former in-heap map, wiped every upgrade) makes the
+/// "sign in normally first" step happen once per user, ever. A miss fails safe
+/// (no anchor → the user signs in normally first). Never a migration and never
+/// mutates a stored credential/key.
+const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -416,6 +429,11 @@ pub struct Storage<M: Memory> {
     mcp_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Per-anchor trusted-MCP-server config. See [`MCP_CONFIG_MEMORY_ID`].
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
+
+    sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    /// Auxiliary SSO stable-id bridge `(iss, primary_client_id, stable_id) ->
+    /// primary_sub`. See [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
+    sso_stable_id_index_memory: StableBTreeMap<StorableSsoStableIdKey, String, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -504,6 +522,7 @@ impl<M: Memory + Clone> Storage<M> {
         let mcp_grant_memory = memory_manager.get(MCP_GRANT_MEMORY_ID);
         let openid_jwks_cache_memory = memory_manager.get(OPENID_JWKS_CACHE_MEMORY_ID);
         let mcp_config_memory = memory_manager.get(MCP_CONFIG_MEMORY_ID);
+        let sso_stable_id_index_memory = memory_manager.get(SSO_STABLE_ID_INDEX_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -616,6 +635,10 @@ impl<M: Memory + Clone> Storage<M> {
             openid_jwks_cache_memory: StableBTreeMap::init(openid_jwks_cache_memory),
             mcp_config_memory_wrapper: MemoryWrapper::new(mcp_config_memory.clone()),
             mcp_config_memory: StableBTreeMap::init(mcp_config_memory),
+            sso_stable_id_index_memory_wrapper: MemoryWrapper::new(
+                sso_stable_id_index_memory.clone(),
+            ),
+            sso_stable_id_index_memory: StableBTreeMap::init(sso_stable_id_index_memory),
         }
     }
 
@@ -1122,6 +1145,44 @@ impl<M: Memory + Clone> Storage<M> {
     /// previous value), so it syncs across the identity's devices.
     pub fn write_mcp_config(&mut self, anchor_number: AnchorNumber, config: StorableMcpConfig) {
         self.mcp_config_memory.insert(anchor_number, config);
+    }
+
+    /// Read the SSO stable-id bridge entry (§6.5): the primary-client `sub` a
+    /// non-`sub` org's `(iss, primary_client_id, stable_id)` maps to, or `None`
+    /// if no normal login has recorded it yet (the user must sign in normally
+    /// first).
+    pub fn lookup_sso_stable_id(
+        &self,
+        iss: &str,
+        primary_client_id: &str,
+        stable_id: &str,
+    ) -> Option<String> {
+        self.sso_stable_id_index_memory
+            .get(&StorableSsoStableIdKey {
+                iss: iss.to_string(),
+                primary_client_id: primary_client_id.to_string(),
+                stable_id: stable_id.to_string(),
+            })
+    }
+
+    /// Record (or refresh) the SSO stable-id bridge entry (§6.5). Written only
+    /// from update contexts (a normal primary-client SSO login / registration);
+    /// the `sso_get_delegation` query only ever reads.
+    pub fn insert_sso_stable_id(
+        &mut self,
+        iss: &str,
+        primary_client_id: &str,
+        stable_id: &str,
+        primary_sub: &str,
+    ) {
+        self.sso_stable_id_index_memory.insert(
+            StorableSsoStableIdKey {
+                iss: iss.to_string(),
+                primary_client_id: primary_client_id.to_string(),
+                stable_id: stable_id.to_string(),
+            },
+            primary_sub.to_string(),
+        );
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to
@@ -2333,6 +2394,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "mcp_config_memory".to_string(),
                 self.mcp_config_memory_wrapper.size(),
+            ),
+            (
+                "sso_stable_id_index_memory".to_string(),
+                self.sso_stable_id_index_memory_wrapper.size(),
             ),
         ])
     }

@@ -1829,6 +1829,71 @@ mod sso_gating {
         Ok(())
     }
 
+    /// The aux bridge is PERSISTED (its own stable memory region), so it survives
+    /// a canister upgrade: a non-`sub` (Entra `oid`) user who signed in normally
+    /// once keeps resolving gated logins after an upgrade — WITHOUT being sent
+    /// through the "sign in normally first" step again (§6.5). The former in-heap
+    /// map was wiped on every upgrade, forcing that step ~weekly.
+    #[test]
+    fn aux_bridge_survives_upgrade() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+        let identity_number =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
+
+        // A normal (primary) login records the
+        // (iss, primary_client, oid) -> primary_sub bridge in stable memory.
+        let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(normal.anchor_number, identity_number);
+
+        // Upgrade the canister. The former in-heap bridge would be wiped here; the
+        // stable bridge survives. (The replica clock stays where it is — already
+        // at/just past `TEST_TIME_MS`, well within the fake JWTs' validity.)
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+        // The gated per-app login (pairwise sub) resolves via the PERSISTED bridge
+        // — no fresh primary login needed. (The discovery/JWKS caches are cold
+        // after the upgrade, so `drive_sso_until_ready` re-warms them; the bridge
+        // itself is not re-populated.)
+        let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(
+            resolved.anchor_number, identity_number,
+            "gated login must resolve via the persisted bridge after an upgrade"
+        );
+        Ok(())
+    }
+
     /// `get_sso_discovery` reports the per-origin `resolved_client_id`: the
     /// per-app client for a listed origin, the primary for an unlisted one.
     #[test]

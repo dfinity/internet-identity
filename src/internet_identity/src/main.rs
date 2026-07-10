@@ -1769,6 +1769,14 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err),
         };
 
+        // Update context: persist the aux bridge entry a non-`sub` primary-client
+        // login surfaces (§6.5), so a later gated per-app login for this user
+        // resolves. `resolve_primary_identity` stays pure so the paired
+        // `sso_get_delegation` query can reuse it without writing.
+        if let Some(record) = &identity.aux_record {
+            openid::record_primary_sso_bridge(record);
+        }
+
         let prepared: Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> = async {
             let key = identity.credential.key();
             let anchor_number =
@@ -1832,6 +1840,12 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
+        // Read-only: this is a `#[query]`. `resolve_primary_identity` is pure —
+        // a non-`sub` primary login surfaces an `aux_record` here, but the query
+        // deliberately ignores it (the paired `sso_prepare_delegation` update
+        // already persisted it); a non-`sub` gated login does a read-only lookup.
+        // Writing the aux bridge from a query would be invalid against the stable
+        // map.
         let identity = match openid::resolve_primary_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),
