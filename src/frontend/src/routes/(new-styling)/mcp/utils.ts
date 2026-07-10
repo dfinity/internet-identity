@@ -92,12 +92,10 @@ export const mcpAuthorize = async ({
   // only this page holds `priv(Y)`. Fresh per attempt so each connect signs its
   // own second hop (`P_reg` is seeded canister-side from a fresh random nonce —
   // not from `Y` and not from the consent).
-  const registrationIdentity = await ECDSAKeyIdentity.generate({
+  const browserIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
-  const browserKey = new Uint8Array(
-    registrationIdentity.getPublicKey().toDer(),
-  );
+  const browserKey = new Uint8Array(browserIdentity.getPublicKey().toDer());
 
   // The session-grant lifetime and the read-only choice go to `prepare`, which
   // records the whole consent on the index entry keyed by `P_reg` (the server
@@ -138,7 +136,7 @@ export const mcpAuthorize = async ({
   // a redeemable chain exist — inside this page — and it leaves only via the
   // fragment navigation below.
   const chain = await DelegationChain.create(
-    registrationIdentity,
+    browserIdentity,
     { toDer: () => registrationKey } as unknown as PublicKey,
     new Date(Number(expiration / BigInt(1_000_000))),
     { previous: canisterHop },
