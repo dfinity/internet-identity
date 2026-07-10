@@ -285,6 +285,21 @@ export const throwCanisterError = <
   return response.Ok as Promise<S>;
 };
 
+/** Sibling of {@link throwCanisterError} for methods whose candid error is a
+ *  plain `text` (e.g. the `mcp_*` family) rather than a variant record —
+ *  {@link CanisterError} wraps variants, so it doesn't fit those. Unwraps `Ok`
+ *  and throws the `Err` string as an `Error`. Transport/replica failures
+ *  reject the call itself, so a catch can still distinguish them from
+ *  canister-reported errors. */
+export const throwTextCanisterError = <T>(
+  response: { Ok: T } | { Err: string },
+): T => {
+  if ("Err" in response) {
+    throw new Error(response.Err);
+  }
+  return response.Ok;
+};
+
 // Helper that normalizes ArrayBuffer-like inputs.
 // Given a Uint8Array or an ArrayBuffer, always return an ArrayBuffer corresponding
 // exactly to the view's bytes (respects byteOffset/byteLength for typed arrays).

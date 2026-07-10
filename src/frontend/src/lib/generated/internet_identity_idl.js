@@ -803,6 +803,14 @@ export const idlFactory = ({ IDL }) => {
     'queries' : IDL.Null,
     'all' : IDL.Null,
   });
+  const PrepareMcpRegistrationDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+  });
+  const McpRegistrationV2 = IDL.Record({
+    'expiration' : Timestamp,
+    'permissions' : Permissions,
+  });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
     'add' : IDL.Func([UserNumber, DeviceData], [], []),
@@ -1175,6 +1183,26 @@ export const idlFactory = ({ IDL }) => {
         [UserNumber, SessionKey, IDL.Nat64, IDL.Opt(Permissions)],
         [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
+      ),
+    'mcp_register_v2' : IDL.Func(
+        [SessionKey],
+        [IDL.Variant({ 'Ok' : McpRegistrationV2, 'Err' : IDL.Text })],
+        [],
+      ),
+    'prepare_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(Permissions), IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareMcpRegistrationDelegation,
+            'Err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'get_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, PublicKey, Timestamp],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
+        ['query'],
       ),
     'mcp_set_config' : IDL.Func(
         [UserNumber, McpConfig],

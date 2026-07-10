@@ -655,10 +655,7 @@ pub fn email_recovery_credential_prepare_add(
     identity_number: IdentityNumber,
     dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
-    Result<
-        types::email_challenge::EmailChallenge,
-        types::email_challenge::EmailChallengeError,
-    >,
+    Result<types::email_challenge::EmailChallenge, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     call_candid_as(
@@ -694,10 +691,7 @@ pub fn email_recovery_prepare_delegation(
     dns_input: types::email_challenge::EmailChallengeDnsInput,
     session_key: types::SessionKey,
 ) -> Result<
-    Result<
-        types::email_challenge::EmailChallenge,
-        types::email_challenge::EmailChallengeError,
-    >,
+    Result<types::email_challenge::EmailChallenge, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     call_candid(
@@ -779,10 +773,7 @@ pub fn verified_email_prepare_add(
     identity_number: IdentityNumber,
     dns_input: types::email_challenge::EmailChallengeDnsInput,
 ) -> Result<
-    Result<
-        types::email_challenge::EmailChallenge,
-        types::email_challenge::EmailChallengeError,
-    >,
+    Result<types::email_challenge::EmailChallenge, types::email_challenge::EmailChallengeError>,
     RejectResponse,
 > {
     call_candid_as(

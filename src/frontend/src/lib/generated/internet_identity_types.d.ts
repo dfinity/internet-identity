@@ -1169,6 +1169,14 @@ export interface McpPrepareDelegation {
  * once it passes; the server reconnects through a new consent flow.
  */
 export interface McpRegistration { 'expiration' : Timestamp }
+export interface PrepareMcpRegistrationDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+}
+export interface McpRegistrationV2 {
+  'expiration' : Timestamp,
+  'permissions' : Permissions,
+}
 /**
  * Map with some variants for the value type.
  * Note, due to the Candid mapping this must be a tuple type thus we cannot name the fields `key` and `value`.
@@ -2139,6 +2147,21 @@ export interface _SERVICE {
   'mcp_register' : ActorMethod<
     [UserNumber, SessionKey, bigint, [] | [Permissions]],
     { 'Ok' : McpRegistration } |
+      { 'Err' : string }
+  >,
+  'mcp_register_v2' : ActorMethod<
+    [SessionKey],
+    { 'Ok' : McpRegistrationV2 } |
+      { 'Err' : string }
+  >,
+  'prepare_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
+    { 'Ok' : PrepareMcpRegistrationDelegation } |
+      { 'Err' : string }
+  >,
+  'get_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, PublicKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
   /**
