@@ -19,13 +19,6 @@ export const toPermissionsArg = (accessLevel: AccessLevel): [Permissions] => [
   accessLevel === "read-only" ? { queries: null } : { all: null },
 ];
 
-/** The wire string for this access level (`"queries"` / `"all"`), matching
- *  the protocol's `permissions` values. Used where the access level travels
- *  outside candid — e.g. the `/mcp` delivery fragment, whose value the MCP
- *  server echoes back as the `permissions` argument of `mcp_register_v2`. */
-export const toPermissionsString = (accessLevel: AccessLevel): string =>
-  accessLevel === "read-only" ? "queries" : "all";
-
 /** Whether an access-level toggle's checkbox is ticked: the box offers
  *  `prompt` as the opt-in, so it is ticked exactly when the current level
  *  *is* the prompted one. */

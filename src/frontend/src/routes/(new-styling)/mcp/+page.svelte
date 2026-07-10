@@ -160,9 +160,10 @@
   // Invoked by the reused account picker once it has authenticated the selected
   // identity and resolved the chosen account. Connecting mints a short-lived
   // registration delegation for the server's per-connect key (rooted at a
-  // principal derived from the anchor and the chosen access level, so neither
-  // can be altered) and hands the tab to the server's declared callback, which
-  // redeems it (`mcp_register_v2`).
+  // principal `P_reg` seeded from a fresh random nonce; the whole consent —
+  // anchor, access level, grant lifetime — is recorded canister-side, so the
+  // server can't alter it) and hands the tab to the server's declared callback,
+  // which redeems it (`mcp_register_v2`).
   const handleAuthorize = (
     ttlSeconds: number,
     accessLevel: AccessLevel,

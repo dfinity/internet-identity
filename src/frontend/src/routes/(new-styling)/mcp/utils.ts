@@ -90,7 +90,8 @@ export const mcpAuthorize = async ({
   // hop targets this browser-held key — never the link-supplied `X` — so the
   // delegation that transits the IC is inert to any transport-level observer:
   // only this page holds `priv(Y)`. Fresh per attempt so each connect signs its
-  // own second hop (`P_reg` itself is derived from the consent, not from `Y`).
+  // own second hop (`P_reg` is seeded canister-side from a fresh random nonce —
+  // not from `Y` and not from the consent).
   const registrationIdentity = await ECDSAKeyIdentity.generate({
     extractable: false,
   });
