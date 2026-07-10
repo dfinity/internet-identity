@@ -491,15 +491,31 @@ fn get_accounts(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
-    match check_session_authorization(anchor_number) {
-        Ok(_) => Ok(
-            account_management::get_accounts_for_origin(anchor_number, &origin)
-                .iter()
-                .map(|acc| acc.to_info())
-                .collect(),
-        ),
-        Err(err) => Err(GetAccountsError::Unauthorized(err.principal)),
+    // Accept the SSO-session principal (IdP-side per-app gating, §6.3) — the
+    // origin-scoped read companion of `prepare_account_delegation` /
+    // `get_account_delegation`, which already accept it. The authorize flow's
+    // account picker lists this origin's accounts with the same SSO session it
+    // uses to mint the delegation. Its seed binds this exact origin, so it can
+    // only ever read its own origin's accounts.
+    let authorized = check_session_authorization(anchor_number).is_ok() || {
+        let anchor = state::anchor(anchor_number);
+        openid::matching_sso_session(
+            anchor.openid_credentials().iter(),
+            anchor_number,
+            &origin,
+            caller(),
+        )
+        .is_some()
+    };
+    if !authorized {
+        return Err(GetAccountsError::Unauthorized(caller()));
     }
+    Ok(
+        account_management::get_accounts_for_origin(anchor_number, &origin)
+            .iter()
+            .map(|acc| acc.to_info())
+            .collect(),
+    )
 }
 
 #[update]
@@ -542,8 +558,24 @@ fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    check_session_authorization(anchor_number)
-        .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
+    // Accept the SSO-session principal (IdP-side per-app gating, §6.3) — the
+    // origin-scoped read companion of `prepare_account_delegation` /
+    // `get_account_delegation`, which already accept it. The authorize flow reads
+    // this origin's default account (to mint the delegation for it) with the same
+    // SSO session; its seed binds this exact origin.
+    let authorized = check_session_authorization(anchor_number).is_ok() || {
+        let anchor = state::anchor(anchor_number);
+        openid::matching_sso_session(
+            anchor.openid_credentials().iter(),
+            anchor_number,
+            &origin,
+            caller(),
+        )
+        .is_some()
+    };
+    if !authorized {
+        return Err(GetDefaultAccountError::Unauthorized(caller()));
+    }
 
     let default_account_info =
         account_management::get_default_account_for_origin(anchor_number, origin)?;

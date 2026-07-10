@@ -392,27 +392,29 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       },
     });
 
-    test("first gated login auto-runs the normal sign-in, then reaches the app", async ({
+    test.afterEach(({ authorizedPrincipal }) => {
+      // Reaching a non-anonymous principal proves the whole gated chain
+      // (per-app `aud` accepted, identity registered, gated session minted,
+      // delegation issued to the dapp) completed.
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    });
+
+    test("first gated login registers directly, then reaches the app", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
-      authorizedPrincipal,
       configureSsoGating,
     }) => {
-      // A brand-new user hitting a gated app first can't register through the
-      // per-app client (§6.5), so the wizard transparently runs a normal
-      // primary-client sign-in and then retries the gated login — up to three
-      // IdP ceremonies (the gated attempt, the automatic normal sign-in, the
-      // gated retry). Auto-drive every popup with the same assigned user rather
-      // than capturing a single one; reaching a non-anonymous principal proves
-      // the whole chain (per-app `aud` accepted, identity established, gated
-      // session minted) completed without a manual "sign in normally" step.
+      // A brand-new user hitting a gated app whose org keys identities on the
+      // stable `sub` registers DIRECTLY through the per-app client in a single
+      // IdP trip (§6.1) — no "sign in normally first" detour. Auto-drive the one
+      // IdP popup the ceremony opens with the assigned user, then finalise on the
+      // standard post-registration "Continue to <app>" account screen.
       await configureSsoGating(gatingConfig);
       authorizePage.page.context().on("page", (popup) => {
         void signInWithOpenId(popup, openIdUsers[0].id).catch(() => {
-          // A popup can close before it's driven (e.g. the initial gated attempt
-          // that resolves to "needs a normal login"); ignore and let the flow
-          // open the next one.
+          // A popup can close before it's driven; ignore and let the flow
+          // proceed.
         });
       });
       await authorizePage.page
@@ -421,13 +423,21 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await authorizePage.page
         .getByRole("textbox", { name: "Company domain" })
         .fill(SSO_GATING_DISCOVERY_DOMAIN);
-      const continueButton = authorizePage.page.getByRole("button", {
+      const domainContinue = authorizePage.page.getByRole("button", {
         name: "Continue",
         exact: true,
       });
-      await expect(continueButton).toBeEnabled({ timeout: 30_000 });
-      await continueButton.click();
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      await expect(domainContinue).toBeEnabled({ timeout: 30_000 });
+      await domainContinue.click();
+      // Direct registration lands on the account screen; continue to the dapp.
+      await expect(
+        authorizePage.page.getByRole("heading", {
+          name: "Continue to Test Dapp",
+        }),
+      ).toBeVisible({ timeout: 30_000 });
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
     });
   });
 

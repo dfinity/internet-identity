@@ -351,7 +351,12 @@ export class AuthFlow {
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
     this.#ssoName = ssoName;
-    if (mode === "signin") {
+    // A dapp SSO sign-in (`sso !== undefined`) registers a new user directly
+    // through the gate: return `signUp` so the caller commits the registration
+    // in one trip (a `sub` org registers straight away; a non-`sub` org's first
+    // gated login surfaces `SsoNormalLoginRequired` and drives the CTA). Only a
+    // non-dapp openid sign-in falls back to the "not connected" prompt.
+    if (mode === "signin" && sso === undefined) {
       this.#view = "openIdNotConnected";
       return undefined;
     }
