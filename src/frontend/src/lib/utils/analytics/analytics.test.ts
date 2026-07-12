@@ -54,12 +54,18 @@ describe("analytics init ordering", () => {
 
     initAnalytics(ENABLED_CONFIG);
 
-    // The queued hits are flushed, in order, to the freshly-built tracker.
+    // The queued hits are flushed to the freshly-built tracker: exactly one of
+    // each, no extras, and in the order they were emitted (event, then
+    // pageView).
     expect(plausibleFactory).toHaveBeenCalledTimes(1);
+    expect(trackEvent).toHaveBeenCalledTimes(1);
     expect(trackEvent).toHaveBeenCalledWith("start-mcp-authorize", {
       props: undefined,
     });
     expect(trackPageview).toHaveBeenCalledTimes(1);
+    expect(trackEvent.mock.invocationCallOrder[0]).toBeLessThan(
+      trackPageview.mock.invocationCallOrder[0],
+    );
   });
 
   it("sends events directly once initialized", () => {
@@ -81,8 +87,12 @@ describe("analytics init ordering", () => {
     expect(plausibleFactory).not.toHaveBeenCalled();
     expect(trackEvent).not.toHaveBeenCalled();
 
-    // Subsequent events are also dropped, not queued.
+    // Subsequent events are dropped, not queued. Prove they were not merely
+    // withheld pending a later init: bringing analytics up (enabled) afterwards
+    // builds a tracker but must flush nothing, so `trackEvent` stays uncalled.
     analytics.event("mcp-authorize--confirmed");
+    initAnalytics(ENABLED_CONFIG);
+    expect(plausibleFactory).toHaveBeenCalledTimes(1);
     expect(trackEvent).not.toHaveBeenCalled();
   });
 });
