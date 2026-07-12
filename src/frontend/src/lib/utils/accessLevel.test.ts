@@ -1,8 +1,9 @@
 import {
-  isToggleChecked,
+  readAccessLevelPreference,
   toPermissionsArg,
-  toggledAccessLevel,
+  writeAccessLevelPreference,
   type AccessLevel,
+  type AccessLevelFlow,
 } from "./accessLevel";
 
 describe("toPermissionsArg", () => {
@@ -15,41 +16,37 @@ describe("toPermissionsArg", () => {
   });
 });
 
-// The toggle mapping is a double inversion (which level the box offers vs.
-// which is selected), so pin all combinations: a silently flipped default
-// here would grant the wrong privilege by default.
-describe("access-level toggle mapping", () => {
-  const levels: AccessLevel[] = ["read-only", "full-access"];
+describe("access-level preference persistence", () => {
+  const flows: AccessLevelFlow[] = ["continue", "cli", "mcp"];
 
-  it("is ticked exactly when the current level is the prompted one", () => {
-    for (const prompt of levels) {
-      for (const accessLevel of levels) {
-        expect(isToggleChecked(accessLevel, prompt)).toBe(
-          accessLevel === prompt,
-        );
-      }
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("returns undefined when nothing has been stored (first-time sign in)", () => {
+    for (const flow of flows) {
+      expect(readAccessLevelPreference(flow)).toBeUndefined();
     }
   });
 
-  it("selects the prompted level when ticked", () => {
-    expect(toggledAccessLevel(true, "read-only")).toBe("read-only");
-    expect(toggledAccessLevel(true, "full-access")).toBe("full-access");
-  });
-
-  it("falls back to the other level when unticked", () => {
-    expect(toggledAccessLevel(false, "read-only")).toBe("full-access");
-    expect(toggledAccessLevel(false, "full-access")).toBe("read-only");
-  });
-
-  it("round-trips: untick then tick restores the prompted level", () => {
-    for (const prompt of levels) {
-      expect(toggledAccessLevel(true, prompt)).toBe(prompt);
-      expect(
-        toggledAccessLevel(
-          isToggleChecked(toggledAccessLevel(false, prompt), prompt),
-          prompt,
-        ),
-      ).not.toBe(prompt);
+  it("round-trips a stored preference", () => {
+    for (const level of ["read-only", "full-access"] as AccessLevel[]) {
+      writeAccessLevelPreference("continue", level);
+      expect(readAccessLevelPreference("continue")).toBe(level);
     }
+  });
+
+  it("keeps preferences separate across flows", () => {
+    writeAccessLevelPreference("continue", "full-access");
+    writeAccessLevelPreference("cli", "read-only");
+    // mcp is left untouched.
+    expect(readAccessLevelPreference("continue")).toBe("full-access");
+    expect(readAccessLevelPreference("cli")).toBe("read-only");
+    expect(readAccessLevelPreference("mcp")).toBeUndefined();
+  });
+
+  it("ignores an unrecognized stored value", () => {
+    localStorage.setItem("ii:access-level:continue", "garbage");
+    expect(readAccessLevelPreference("continue")).toBeUndefined();
   });
 });
