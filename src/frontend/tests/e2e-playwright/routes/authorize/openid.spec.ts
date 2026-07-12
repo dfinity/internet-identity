@@ -100,8 +100,10 @@ test.describe("Authorize with 1-click OpenID", () => {
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
       // Wait for the round-trip to finish (the identity is persisted before
-      // the popup redirects back and the app surfaces the principal).
-      await expect(page.locator("#principal")).toBeVisible();
+      // the popup redirects back and the app surfaces the principal). The
+      // popup-close + redirect can take a few seconds, so give it the same
+      // 15s budget the rest of the authorize suite uses.
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
 
       // Open the II origin the way a user would when they "go to id.ai" —
       // same browser context, so it shares the localStorage the popup wrote.
@@ -111,14 +113,94 @@ test.describe("Authorize with 1-click OpenID", () => {
         const lastUsedRaw = await iiPage.evaluate(() =>
           localStorage.getItem("ii-last-used-identities"),
         );
-        expect(lastUsedRaw).not.toBeNull();
         const lastUsed = JSON.parse(lastUsedRaw!) as {
           data: Record<string, { authMethod: Record<string, unknown> }>;
         };
+        // A brand-new identity was recorded (the buggy code left this empty).
         const entries = Object.values(lastUsed.data);
         expect(entries).toHaveLength(1);
         expect(entries[0]?.authMethod).toHaveProperty("openid");
         expect(entries[0]?.authMethod).not.toHaveProperty("sso");
+      } finally {
+        await iiPage.close();
+      }
+    });
+  });
+
+  // The sign-up regression tests above only exercise the sign-UP branch of
+  // resumeOpenId (fresh OpenID users). This covers the sign-IN branch — a
+  // returning user who signs in via 1-click on a device with no local
+  // "last used" entry — which commits the identity through a separate code
+  // path (`pendingLastUsedEntry`) that a regression could break independently.
+  test.describe("returning user with no local entry", () => {
+    const name = "John Doe";
+
+    test.use({
+      identityConfig: { createIdentities: [{ name }] },
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [{ claims: { name } }],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+      },
+    });
+
+    // Link the OpenID credential to an existing II identity, then wipe the
+    // II-origin localStorage so the subsequent 1-click flow reproduces a
+    // returning user on a fresh device: the anchor exists (so the flow signs
+    // in rather than signing up) but nothing is recorded locally yet.
+    test.beforeEach(
+      async ({
+        page,
+        identities,
+        signInWithIdentity,
+        signInWithOpenId,
+        openIdUsers,
+      }) => {
+        await page.goto(II_URL + "/manage/access");
+        await signInWithIdentity(page, identities[0].identityNumber);
+        await page.getByRole("button", { name: "Add new" }).click();
+        const popupPromise = page.context().waitForEvent("page");
+        await page
+          .getByRole("button", { name: openIdUsers[0].issuer.name })
+          .click();
+        const popup = await popupPromise;
+        const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+        await signInWithOpenId(popup, openIdUsers[0].id);
+        await closePromise;
+        await page.evaluate(() => localStorage.clear());
+      },
+    );
+
+    test.afterEach(({ authorizedPrincipal }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    });
+
+    test("records the signed-in identity in last-used storage", async ({
+      page,
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+
+      const iiPage = await page.context().newPage();
+      try {
+        await iiPage.goto(II_URL);
+        const lastUsedRaw = await iiPage.evaluate(() =>
+          localStorage.getItem("ii-last-used-identities"),
+        );
+        const lastUsed = JSON.parse(lastUsedRaw!) as {
+          data: Record<string, { authMethod: Record<string, unknown> }>;
+        };
+        // The sign-in branch recorded the identity even though localStorage
+        // started empty (the buggy code left it empty).
+        const entries = Object.values(lastUsed.data);
+        expect(entries).toHaveLength(1);
+        expect(entries[0]?.authMethod).toHaveProperty("openid");
       } finally {
         await iiPage.close();
       }

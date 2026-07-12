@@ -103,7 +103,9 @@ test.describe("Authorize with 1-click SSO", () => {
       openIdUsers,
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-      await expect(page.locator("#principal")).toBeVisible();
+      // The popup-close + redirect can take a few seconds; use the same 15s
+      // budget the rest of the authorize suite uses.
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
 
       const iiPage = await page.context().newPage();
       try {
@@ -111,10 +113,10 @@ test.describe("Authorize with 1-click SSO", () => {
         const lastUsedRaw = await iiPage.evaluate(() =>
           localStorage.getItem("ii-last-used-identities"),
         );
-        expect(lastUsedRaw).not.toBeNull();
         const lastUsed = JSON.parse(lastUsedRaw!) as {
           data: Record<string, { authMethod: Record<string, unknown> }>;
         };
+        // A brand-new identity was recorded (the buggy code left this empty).
         const entries = Object.values(lastUsed.data);
         expect(entries).toHaveLength(1);
         expect(entries[0]?.authMethod).toHaveProperty("sso");
