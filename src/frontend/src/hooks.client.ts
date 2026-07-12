@@ -3,7 +3,13 @@ import featureFlags from "$lib/state/featureFlags";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { mintSession } from "$lib/stores/session-delegation.store";
 import { sessionStore } from "$lib/stores/session.store";
-import { initGlobals, canisterId, agentOptions } from "$lib/globals";
+import {
+  initGlobals,
+  canisterId,
+  agentOptions,
+  frontendCanisterConfig,
+} from "$lib/globals";
+import { initAnalytics } from "$lib/utils/analytics/analytics";
 import { localeStore } from "$lib/stores/locale.store";
 import { getLocaleDirection } from "$lib/constants/locale.constants";
 
@@ -45,6 +51,14 @@ const overrideFeatureFlags = () => {
 
 export const init: ClientInit = async () => {
   await initGlobals();
+  // Initialize analytics here, in the client `init` hook, so the tracker exists
+  // before any component mounts. Svelte runs a child component's `onMount`
+  // before its parent's, so initializing in the root layout's `onMount` (as it
+  // was previously) happened *after* page `onMount`s had already fired their
+  // first events (e.g. the `/mcp` funnel's `start-mcp-authorize`), which were
+  // then dropped for lack of a tracker. `initGlobals` has populated the config
+  // by this point.
+  initAnalytics(frontendCanisterConfig.analytics_config[0]?.[0]);
   // Initialize them after globals so canister config can be used for defaults
   Object.values(featureFlags).forEach((flag) => flag.initialize());
   overrideFeatureFlags();
