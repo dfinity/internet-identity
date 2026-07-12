@@ -147,9 +147,9 @@ test.describe("Authorize with 1-click OpenID", () => {
       },
     });
 
-    // Link the OpenID credential to an existing II identity, then wipe the
-    // II-origin localStorage so the subsequent 1-click flow reproduces a
-    // returning user on a fresh device: the anchor exists (so the flow signs
+    // Link the OpenID credential to an existing II identity, then reset local
+    // browser state so the subsequent 1-click flow reproduces a returning user
+    // on a fresh device: the anchor exists on the canister (so the flow signs
     // in rather than signing up) but nothing is recorded locally yet.
     test.beforeEach(
       async ({
@@ -170,7 +170,15 @@ test.describe("Authorize with 1-click OpenID", () => {
         const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
         await signInWithOpenId(popup, openIdUsers[0].id);
         await closePromise;
+        // Empty the last-used list so the assertion can only be satisfied by
+        // the sign-in commit, and drop the IdP cookie so the linking session
+        // isn't reused — otherwise the IdP auto-approves and skips its consent
+        // screen, and `signInWithOpenId` can't find the "Authorize" heading
+        // (same reason index.spec.ts clears cookies before an existing-user
+        // OpenID sign-in). The (iss, sub) → anchor link lives on the canister,
+        // so clearing browser state still leaves the flow a sign-IN.
         await page.evaluate(() => localStorage.clear());
+        await page.context().clearCookies();
       },
     );
 
