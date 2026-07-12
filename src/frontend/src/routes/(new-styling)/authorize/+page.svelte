@@ -201,7 +201,10 @@
       // start sign-in again.
       return;
     }
-    const authFlow = new AuthFlow({ trackLastUsed: false });
+    // Track the last-used identity: a 1-click sign-up (or a sign-in on a
+    // device with no local entry yet) must land in localStorage so the
+    // identity shows up when the user later visits II directly.
+    const authFlow = new AuthFlow();
     const { iss, aud, ...metadata } = decodeJWT(jwt);
     // The marker is set by `initiateSso` for the `?sso=<domain>` path.
     // If present, treat the returning JWT as a 1-click SSO flow so the
@@ -259,9 +262,20 @@
     );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
+      // `completeOpenIdRegistration` records the newly-minted identity in
+      // last-used storage itself (as `openid` or `sso`, per discovery domain).
       await authFlow.completeOpenIdRegistration(
         name ?? email?.split("@")[0] ?? $t`${config.name} user`,
       );
+    } else if (authFlowResult?.type === "signIn") {
+      // Sign-in returns the entry for the caller to commit (it defers the
+      // write so the interactive wizard can gate it behind disambiguation);
+      // here there is no disambiguation, so commit it right away.
+      if (authFlowResult.pendingLastUsedEntry !== undefined) {
+        lastUsedIdentitiesStore.addLastUsedIdentity(
+          authFlowResult.pendingLastUsedEntry,
+        );
+      }
     }
     // 1-click OpenID flow: no access-level toggle, always full access.
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");

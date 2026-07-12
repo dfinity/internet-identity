@@ -86,6 +86,43 @@ test.describe("Authorize with 1-click OpenID", () => {
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
+
+    // Regression guard: the 1-click flow used to sign up without recording
+    // the new identity, so visiting II afterwards showed an empty identity
+    // list. The identity must land in `ii-last-used-identities` on the II
+    // origin, tagged `openid` so a later "last used" sign-in re-authenticates
+    // through the configured-provider branch.
+    test("records the new identity in last-used storage", async ({
+      page,
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      // Wait for the round-trip to finish (the identity is persisted before
+      // the popup redirects back and the app surfaces the principal).
+      await expect(page.locator("#principal")).toBeVisible();
+
+      // Open the II origin the way a user would when they "go to id.ai" —
+      // same browser context, so it shares the localStorage the popup wrote.
+      const iiPage = await page.context().newPage();
+      try {
+        await iiPage.goto(II_URL);
+        const lastUsedRaw = await iiPage.evaluate(() =>
+          localStorage.getItem("ii-last-used-identities"),
+        );
+        expect(lastUsedRaw).not.toBeNull();
+        const lastUsed = JSON.parse(lastUsedRaw!) as {
+          data: Record<string, { authMethod: Record<string, unknown> }>;
+        };
+        const entries = Object.values(lastUsed.data);
+        expect(entries).toHaveLength(1);
+        expect(entries[0]?.authMethod).toHaveProperty("openid");
+        expect(entries[0]?.authMethod).not.toHaveProperty("sso");
+      } finally {
+        await iiPage.close();
+      }
+    });
   });
 
   test.describe("with name and email attributes", () => {
