@@ -12,8 +12,8 @@
   },
   "type": "module",
   "devDependencies": {
-    "oidc-provider": "^9.4.2",
-    "express": "^5.1.0"
+    "oidc-provider": "^9.9.1",
+    "express": "^5.2.1"
   },
   "private": true
 }
