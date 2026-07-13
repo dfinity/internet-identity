@@ -215,22 +215,49 @@ pub async fn prepare(
 /// delegation prepared above, for the frontend to extend browser-side with the
 /// `Y -> X` hop and deliver. `user_key` is the value [`prepare`] returned; the
 /// seed is recovered straight out of it (the delegation's own public key), so
-/// this query needs no deterministic re-derivation. Authenticated as the user.
+/// this query needs no deterministic re-derivation. Authenticated as the user,
+/// and scoped to that user's own registration: the entry keyed by `P_reg`
+/// (`= self_authenticating(user_key)`) must belong to `anchor_number`, so an
+/// authenticated identity can only fetch *its own* delegation, never another
+/// anchor's given that anchor's `(user_key, Y, expiration)`.
 pub fn get(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
     user_key: UserKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, String> {
+    // Both a bad/foreign `user_key` and a genuinely absent signature report the
+    // same thing: the method never distinguishes "no delegation" from "someone
+    // else's delegation".
+    const NO_SUCH_DELEGATION: &str = "MCP registration failed: no such delegation.";
+
     check_authorization(anchor_number)
         .map_err(|err| format!("{} could not be authenticated.", err.principal))?;
 
     // Recover the seed from `user_key` (the DER canister-signature public key
-    // `prepare` returned). A malformed key, or a seed with no signature in the
-    // certified map, reports the delegation as absent.
+    // `prepare` returned). A malformed key reports the delegation as absent.
     let Ok(seed) = CanisterSigPublicKey::try_from(user_key.as_ref()).map(|pk| pk.seed) else {
-        return Err("MCP registration failed: no such delegation.".to_string());
+        return Err(NO_SUCH_DELEGATION.to_string());
     };
+
+    // Scope the fetch to the authenticated anchor. `check_authorization` proves
+    // the caller controls `anchor_number`, but not that this `user_key`'s entry
+    // is *theirs*: without this check any authenticated identity could fetch
+    // another anchor's certified `P_reg -> Y` hop by presenting its
+    // `(user_key, Y, expiration)`. The hop is inert without the browser-held
+    // `priv(Y)` and transits the IC in the clear regardless, so this is
+    // least-privilege hardening rather than a plugged leak — but there is no
+    // legitimate reason to serve one anchor another's delegation.
+    let p_reg = Principal::self_authenticating(&user_key);
+    let owned_by_anchor = state::storage_borrow(|storage| {
+        storage
+            .lookup_mcp_registration(p_reg)
+            .is_some_and(|entry| entry.anchor_number == anchor_number)
+    });
+    if !owned_by_anchor {
+        return Err(NO_SUCH_DELEGATION.to_string());
+    }
+
     state::assets_and_signatures(|certified_assets, sigs| {
         let inputs = CanisterSigInputs {
             domain: DELEGATION_SIG_DOMAIN,
@@ -247,7 +274,7 @@ pub fn get(
                 },
                 signature: ByteBuf::from(signature),
             }),
-            Err(_) => Err("MCP registration failed: no such delegation.".to_string()),
+            Err(_) => Err(NO_SUCH_DELEGATION.to_string()),
         }
     })
 }
