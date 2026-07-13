@@ -159,12 +159,12 @@
     </p>
 
     <!-- Session: how long the connection lasts before the user must reconnect. -->
-    <div class="border-border-tertiary mt-4 mb-6 border-t pt-4">
-      <span class="text-text-secondary text-sm font-medium">
+    <div class="border-border-tertiary mt-4 mb-6 flex flex-col border-t pt-4">
+      <span class="text-text-primary mb-0.5 text-base font-medium">
         {$t`Session`}
       </span>
-      <div class="mt-2 flex flex-row items-center justify-between gap-3">
-        <span class="text-text-tertiary text-sm">
+      <div class="flex flex-row items-center justify-between gap-2">
+        <span class="text-text-tertiary text-base">
           {$t`Time until you have to reconnect:`}
         </span>
         <Select
@@ -196,7 +196,7 @@
     <!-- Fine print: the connection can be revoked from Settings at any time.
          Opens in a new tab so the connect request in this one isn't lost. -->
     <div
-      class="border-border-tertiary text-text-tertiary mb-6 flex items-start gap-2 border-t pt-4 text-sm"
+      class="border-border-tertiary text-text-tertiary mb-6 flex items-start gap-2 border-t pt-5 text-sm"
     >
       <InfoIcon class="mt-0.5 size-4 shrink-0" />
       <span>
@@ -213,7 +213,7 @@
     </div>
 
     <button
-      class="btn btn-primary w-full gap-2"
+      class="btn btn-primary btn-xl w-full"
       onclick={handleAllowAccess}
       disabled={isAuthorizing ||
         selectedIdentityNumber === undefined ||

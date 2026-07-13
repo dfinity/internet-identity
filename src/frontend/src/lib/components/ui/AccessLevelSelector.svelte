@@ -27,15 +27,15 @@
 </script>
 
 <fieldset class={["flex flex-col", className]} {disabled}>
-  <legend class="text-text-secondary mb-3 text-sm font-medium">
+  <legend class="text-text-primary mb-4.5 text-base font-medium">
     {$t`Permissions`}
   </legend>
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-col gap-4.5">
     <Radiobox
       bind:group={accessLevel}
       value="read-only"
       name="access-level"
-      size="sm"
+      size="md"
       label={$t`Questions only`}
       hint={$t`Looks things up, changing nothing.`}
       {disabled}
@@ -44,7 +44,7 @@
       bind:group={accessLevel}
       value="full-access"
       name="access-level"
-      size="sm"
+      size="md"
       label={$t`Actions & questions`}
       hint={$t`Also makes changes on your behalf.`}
       {disabled}
