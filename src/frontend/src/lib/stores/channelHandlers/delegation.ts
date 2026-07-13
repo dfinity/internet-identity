@@ -96,7 +96,7 @@ export const handleDelegationRequest =
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
-        // When the user enabled "Read-only mode" during authorization, the
+        // When the user chose "Queries only" during authorization, the
         // delegation is restricted to query calls via its `permissions`
         // field, which the IC enforces (update calls are rejected).
         //
