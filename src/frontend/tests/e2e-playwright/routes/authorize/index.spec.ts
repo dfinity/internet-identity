@@ -40,7 +40,7 @@ test("Authorize by signing in with an existing passkey", async ({
     // hidden and authorizations are full access (a queries-only delegation
     // would fail closed in every current agent — see the READ_ONLY_MODE flag).
     await expect(
-      authPage.getByRole("radio", { name: "Actions & queries" }),
+      authPage.getByRole("radio", { name: "Actions & questions" }),
     ).toHaveCount(0);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })

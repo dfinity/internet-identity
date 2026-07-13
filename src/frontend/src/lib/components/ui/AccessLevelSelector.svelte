@@ -36,8 +36,8 @@
       value="read-only"
       name="access-level"
       size="sm"
-      label={$t`Queries only`}
-      hint={$t`Read your data without making changes on your behalf.`}
+      label={$t`Questions only`}
+      hint={$t`Looks things up, changing nothing.`}
       {disabled}
     />
     <Radiobox
@@ -45,8 +45,8 @@
       value="full-access"
       name="access-level"
       size="sm"
-      label={$t`Actions & queries`}
-      hint={$t`Read your data and make changes on your behalf.`}
+      label={$t`Actions & questions`}
+      hint={$t`Also makes changes on your behalf.`}
       {disabled}
     />
   </div>
