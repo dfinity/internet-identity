@@ -540,11 +540,14 @@ export const handleIcrc3OneClickOpenIdAttributes =
   };
 
 /**
- * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the user
- * signed in through the SSO gate (the `?sso=<domain>` 1-click entry OR the
- * manual "Sign in with SSO" wizard) and every requested key is in that domain's
- * auto-approve allowlist, certify and send without showing the consent UI.
- * Keyed on the SSO-session marker (not the flow type) so it covers both paths.
+ * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the app
+ * requested SSO sign-in via the `?sso=<domain>` 1-click entry and every
+ * requested key is in that domain's auto-approve allowlist, certify and send
+ * without showing the consent UI. Keyed on the `1-click-sso` FLOW (not the
+ * SSO-session marker) so it fires ONLY for that 1-click entry — the manual
+ * "Sign in with SSO" wizard is also an SSO session but must show explicit
+ * consent (it still gets SSO-session attribute authorization via the consent
+ * pipeline; it just isn't silently approved).
  */
 export const handleIcrc3OneClickSsoAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -567,16 +570,17 @@ export const handleIcrc3OneClickSsoAttributes =
     }
 
     try {
+      const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
+      // Auto-approve only the `?sso=<domain>` 1-click entry — NOT the manual
+      // "Sign in with SSO" wizard (which shows explicit consent) and NOT a
+      // passkey / direct-OpenID session into the same dapp.
+      if (flow.type !== "1-click-sso") {
+        return;
+      }
+      if (!requestedKeys.every((key) => isOneClickSsoKey(key, flow.domain))) {
+        return;
+      }
       const authenticated = await waitForStore(authenticationStore);
-      const sso = authenticated.sso;
-      // Only an SSO session (gate path) auto-approves SSO attributes; a
-      // passkey / direct-OpenID session into the same dapp does not.
-      if (sso === undefined) {
-        return;
-      }
-      if (!requestedKeys.every((key) => isOneClickSsoKey(key, sso.domain))) {
-        return;
-      }
       const { accountNumberPromise } = await waitForStore(authorizedStore);
 
       const validationResult = await validateDerivationOrigin({
@@ -664,22 +668,22 @@ export const handleIcrc3ConsentAttributes =
 
     await serializeConsentRequest(async () => {
       try {
-        // Wait for the flow (openid auto-approve is keyed on it) and the
-        // authenticated session (SSO auto-approve is keyed on the SSO-session
-        // marker, so it covers BOTH the 1-click and the manual "Sign in with
-        // SSO" paths, unlike the flow which is only set for 1-click). Bail out
-        // as soon as we know one of the 1-click handlers will take this request.
+        // Both 1-click auto-approve handlers are keyed on the FLOW (only set for
+        // the `?sso=` / `?openid=` 1-click entries); the manual "Sign in with
+        // SSO" wizard is an SSO session too but must reach explicit consent
+        // here. Bail out as soon as we know one of the 1-click handlers will
+        // take this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-        const authenticated = await waitForStore(authenticationStore);
-        const sso = authenticated.sso;
         const oneClickHandlerWillHandle =
           requestedKeys.length > 0 &&
           ((flow.type === "1-click-openid" &&
             requestedKeys.every((key) =>
               isOneClickOpenIdKey(key, flow.issuer),
             )) ||
-            (sso !== undefined &&
-              requestedKeys.every((key) => isOneClickSsoKey(key, sso.domain))));
+            (flow.type === "1-click-sso" &&
+              requestedKeys.every((key) =>
+                isOneClickSsoKey(key, flow.domain),
+              )));
         if (oneClickHandlerWillHandle) {
           return;
         }
