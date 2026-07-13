@@ -204,7 +204,7 @@
           Revoke access anytime in your <a
             href="/manage/settings"
             target="_blank"
-            rel="noopener"
+            rel="noopener noreferrer"
             class="text-text-primary font-medium underline-offset-2 hover:underline"
             >settings</a
           >.
