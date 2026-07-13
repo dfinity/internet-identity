@@ -1,4 +1,5 @@
 import type { PageLoad } from "./$types";
+import { z } from "zod";
 
 /** Default grant lifetime in seconds when the request omits `ttl`. */
 const DEFAULT_TTL_SECONDS = 60 * 60;
@@ -15,18 +16,23 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * The `/mcp` request, parsed from the URL fragment the MCP server redirects the
- * browser to. `valid` carries the validated request — the callback on the MCP
- * server the connect flow talks to, the single-use `state` included in those
- * requests so the server can tie them to the connect it started, and the
- * requested session-grant TTL (`ttl`, in seconds). The MCP server the user
- * connects is identified by the callback's *origin* (each user trusts whichever
- * server they connect); the callback itself is only honoured after it
- * exact-matches the allow-list the server declares at a fixed well-known path
- * on that origin (see `matchDeclaredCallback`), so a crafted link can't point
- * II at an arbitrary path on the trusted origin — the link only selects among
- * the server-declared callbacks. No key material travels in the fragment, and
- * no account is chosen here (it's per-app, picked server-side at delegation
- * time). `invalid` means the fragment was missing or malformed.
+ * browser to. `valid` carries the validated request — the MCP server's
+ * registration public key (`registration_key`, the per-connect key `X` the
+ * server generated for this browser session), the callback identifying the
+ * server, the single-use `state` the server echoes back so it can tie the
+ * delivered delegation to the connect it started, and the requested
+ * session-grant TTL (`ttl`, in seconds). The MCP server the user connects is
+ * identified by the callback's *origin* (each user trusts whichever server they
+ * connect); II mints a short-lived registration delegation chain (rooted at a
+ * canister-signed hop to a browser-held key, extended locally to `X`) and
+ * delivers it to the callback only after it exact-matches the allow-list the
+ * server declares at a fixed well-known path on that origin (see
+ * `matchDeclaredCallback`), so a crafted link can't point II at an arbitrary
+ * path on the trusted origin — the link only selects among the server-declared
+ * callbacks. The only key material in the fragment is the server's own public
+ * `registration_key` (never a secret), and no account is chosen here (it's
+ * per-app, picked server-side at delegation time). `invalid` means the fragment
+ * was missing or malformed.
  *
  * Whether the callback origin is one the connect flow accepts (https only — MCP
  * connections are to remote servers) is checked in the page component, which
@@ -35,10 +41,16 @@ const MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 export type McpParams =
   | {
       kind: "valid";
+      /** The MCP server's registration public key `X` (DER, base64url) for this
+       *  connect. The registration chain's browser-signed final hop targets
+       *  it, so the server can bind its long-lived session key by redeeming
+       *  that chain (`mcp_register_v2`) — nothing secret rides this public
+       *  key. */
+      registrationKey: string;
       callback: string;
-      /** Opaque value the server issued for this connect; included in the
-       *  key-request and completion calls so the server can tie them to the
-       *  request it started (CSRF protection). */
+      /** Opaque value the server issued for this connect; delivered back
+       *  alongside the registration delegation so the server can tie it to the
+       *  connect it started (CSRF protection). */
       state: string;
       /** Requested session-grant lifetime in seconds (clamped to
        *  [10 min, 30 days]). */
@@ -47,51 +59,37 @@ export type McpParams =
   | { kind: "invalid" };
 
 /**
- * Structural callback check: must be an absolute http(s) URL. The stricter
- * "is this an origin the connect flow accepts" check (https only) happens in
- * the component, alongside the consent UI — keeping this `load` minimal since
- * it also runs at prerender.
+ * The whole fragment, validated and normalized in one schema. Absent params
+ * arrive as `null` (from `URLSearchParams.get`), so any field typed plain
+ * `z.string()` treats absence as invalid.
  */
-const parseCallback = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return undefined;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    return undefined;
-  }
-  return raw;
-};
-
-const parseState = (raw: string | null): string | undefined => {
-  if (raw === null || raw === "") {
-    return undefined;
-  }
-  return raw;
-};
-
-// `ttl` is a lifetime in seconds. Any positive value is accepted and clamped to
-// the allowed range — at least 10 minutes, at most 30 days — so the exact
-// requested duration is honoured within those bounds. An omitted `ttl` uses the
-// default, and a malformed one (non-numeric or <= 0) invalidates the request.
-const parseTtl = (raw: string | null): number | undefined => {
-  if (raw === null) {
-    return DEFAULT_TTL_SECONDS;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return undefined;
-  }
-  return Math.min(
-    Math.max(Math.floor(parsed), MIN_TTL_SECONDS),
-    MAX_TTL_SECONDS,
-  );
-};
+const McpRequestSchema = z.object({
+  // The server's registration public key `X` (DER, base64url), surfaced
+  // verbatim (decoded to bytes at connect time). Zod's `base64url` check
+  // rejects a key with out-of-alphabet characters up front — so a malformed
+  // key invalidates the request rather than throwing mid-connect — and
+  // `.min(1)` rejects a present-but-empty one.
+  registration_key: z.base64url().min(1),
+  // Structural callback check: an absolute http(s) URL. The stricter "is this
+  // an origin the connect flow accepts" gate (https only) runs in the
+  // component, alongside the consent UI — keeping this `load` minimal since it
+  // also runs at prerender.
+  callback: z.url({ protocol: /^https?$/ }),
+  state: z.string().min(1),
+  // `ttl` is a lifetime in seconds: coerced from the string, required to be a
+  // positive integer, then clamped to the allowed range (at least 10 minutes,
+  // at most 30 days) so the exact requested duration is honoured within those
+  // bounds. An omitted `ttl` uses the default; a malformed one (non-numeric or
+  // <= 0) invalidates the request.
+  ttl: z.coerce
+    .number()
+    .int()
+    .positive()
+    .transform((seconds) =>
+      Math.min(Math.max(seconds, MIN_TTL_SECONDS), MAX_TTL_SECONDS),
+    )
+    .default(DEFAULT_TTL_SECONDS),
+});
 
 export const load: PageLoad = ({ url }): { params: McpParams } => {
   // The MCP server redirects the browser here with the request in the URL
@@ -99,23 +97,30 @@ export const load: PageLoad = ({ url }): { params: McpParams } => {
   // II's request logs; the address-bar copy is cleared in `+page.svelte` via
   // `replaceState`). Reading `url.hash` relies on this universal `load`
   // re-running client-side; with `adapter-static` it's empty during prerender.
-  // A legacy `public_key` param is ignored: the session key is fetched from
-  // the trusted server's callback, never taken from the (attacker-craftable)
-  // link.
+  // The `registration_key` is the server's *public* per-connect key `X`; the
+  // browser-signed hop of the registration chain targets it, so no secret key
+  // material rides the (attacker-craftable) link.
   const params = new URLSearchParams(url.hash.slice(1));
 
-  const callback = parseCallback(params.get("callback"));
-  const state = parseState(params.get("state"));
-  const ttlSeconds = parseTtl(params.get("ttl"));
-
-  if (
-    callback === undefined ||
-    state === undefined ||
-    ttlSeconds === undefined
-  ) {
+  const request = McpRequestSchema.safeParse({
+    registration_key: params.get("registration_key"),
+    callback: params.get("callback"),
+    state: params.get("state"),
+    // Absent (`null` from `URLSearchParams.get`) becomes `undefined` so the
+    // schema's `.default()` applies; a present value is coerced and validated.
+    ttl: params.get("ttl") ?? undefined,
+  });
+  if (!request.success) {
     return { params: { kind: "invalid" } };
   }
+  const { registration_key, callback, state, ttl } = request.data;
   return {
-    params: { kind: "valid", callback, state, ttlSeconds },
+    params: {
+      kind: "valid",
+      registrationKey: registration_key,
+      callback,
+      state,
+      ttlSeconds: ttl,
+    },
   };
 };
