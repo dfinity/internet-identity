@@ -113,6 +113,7 @@ test.describe("Authorize with 1-click OpenID", () => {
         const lastUsedRaw = await iiPage.evaluate(() =>
           localStorage.getItem("ii-last-used-identities"),
         );
+        expect(lastUsedRaw).not.toBeNull();
         const lastUsed = JSON.parse(lastUsedRaw!) as {
           data: Record<string, { authMethod: Record<string, unknown> }>;
         };
@@ -130,8 +131,9 @@ test.describe("Authorize with 1-click OpenID", () => {
   // The sign-up regression tests above only exercise the sign-UP branch of
   // resumeOpenId (fresh OpenID users). This covers the sign-IN branch — a
   // returning user who signs in via 1-click on a device with no local
-  // "last used" entry — which commits the identity through a separate code
-  // path (`pendingLastUsedEntry`) that a regression could break independently.
+  // "last used" entry — which AuthFlow records through a separate code path
+  // (the JWT-supplied sign-in commit in `continueWithOpenId`) that a
+  // regression could break independently.
   test.describe("returning user with no local entry", () => {
     const name = "John Doe";
 
@@ -201,6 +203,7 @@ test.describe("Authorize with 1-click OpenID", () => {
         const lastUsedRaw = await iiPage.evaluate(() =>
           localStorage.getItem("ii-last-used-identities"),
         );
+        expect(lastUsedRaw).not.toBeNull();
         const lastUsed = JSON.parse(lastUsedRaw!) as {
           data: Record<string, { authMethod: Record<string, unknown> }>;
         };

@@ -113,6 +113,7 @@ test.describe("Authorize with 1-click SSO", () => {
         const lastUsedRaw = await iiPage.evaluate(() =>
           localStorage.getItem("ii-last-used-identities"),
         );
+        expect(lastUsedRaw).not.toBeNull();
         const lastUsed = JSON.parse(lastUsedRaw!) as {
           data: Record<string, { authMethod: Record<string, unknown> }>;
         };
