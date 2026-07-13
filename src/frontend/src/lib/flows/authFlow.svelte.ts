@@ -475,12 +475,22 @@ export class AuthFlow {
         this.#view = "openIdAlreadyLinked";
         return undefined;
       }
+      // A caller-supplied JWT means this is the non-interactive 1-click
+      // resume flow: there is no method-switch disambiguation to gate the
+      // write, so AuthFlow persists the last-used entry itself rather than
+      // handing it back. The interactive AuthWizard fetches the JWT itself
+      // (`existingJwt === undefined`) and commits the returned entry once any
+      // disambiguation clears — see `AuthWizard.commitLastUsedEntry`.
+      if (existingJwt !== undefined && lastUsedEntry !== undefined) {
+        lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
+      }
       const { name: jwtName, email } = decodeJWT(result.jwt);
       return {
         identityNumber: result.identityNumber,
         name: result.info.name[0] ?? jwtName,
         email,
-        pendingLastUsedEntry: lastUsedEntry,
+        pendingLastUsedEntry:
+          existingJwt === undefined ? lastUsedEntry : undefined,
         type: "signIn",
       };
     }

@@ -262,20 +262,13 @@
     );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
-      // `completeOpenIdRegistration` records the newly-minted identity in
-      // last-used storage itself (as `openid` or `sso`, per discovery domain).
+      // AuthFlow owns last-used persistence (via `trackLastUsed`): sign-up is
+      // recorded by `completeOpenIdRegistration` here, and the sign-in case is
+      // already recorded inside `continueWithOpenId` (the JWT was supplied, so
+      // there's no interactive disambiguation to defer the write for).
       await authFlow.completeOpenIdRegistration(
         name ?? email?.split("@")[0] ?? $t`${config.name} user`,
       );
-    } else if (authFlowResult?.type === "signIn") {
-      // Sign-in returns the entry for the caller to commit (it defers the
-      // write so the interactive wizard can gate it behind disambiguation);
-      // here there is no disambiguation, so commit it right away.
-      if (authFlowResult.pendingLastUsedEntry !== undefined) {
-        lastUsedIdentitiesStore.addLastUsedIdentity(
-          authFlowResult.pendingLastUsedEntry,
-        );
-      }
     }
     // 1-click OpenID flow: no access-level toggle, always full access.
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");

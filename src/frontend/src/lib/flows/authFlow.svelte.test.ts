@@ -502,7 +502,7 @@ describe("AuthFlow — last-used tracking (openid vs sso)", () => {
     });
   });
 
-  it("sign-in returns an openid entry when no discovery domain is present", async () => {
+  it("sign-in commits an openid entry (and returns none) when the caller supplies the JWT and no discovery domain", async () => {
     authenticateWithJWTMock.mockResolvedValue({
       identity: {},
       identityNumber: BigInt(10),
@@ -513,17 +513,24 @@ describe("AuthFlow — last-used tracking (openid vs sso)", () => {
 
     expect(result?.type).toBe("signIn");
     if (result?.type !== "signIn") throw new Error("expected signIn");
-    expect(result.pendingLastUsedEntry?.authMethod).toHaveProperty("openid");
-    expect(result.pendingLastUsedEntry?.authMethod).not.toHaveProperty("sso");
-    const openid = (
-      result.pendingLastUsedEntry?.authMethod as {
-        openid: { iss: string; sub: string };
-      }
-    ).openid;
-    expect(openid).toMatchObject({ iss: testConfig.issuer, sub: "user-1" });
+    // The 1-click resume flow supplies the JWT, so AuthFlow persists the entry
+    // itself and hands nothing back for the caller to commit.
+    expect(result.pendingLastUsedEntry).toBeUndefined();
+    expect(
+      lastUsedIdentitiesStoreValue.addLastUsedIdentity,
+    ).toHaveBeenCalledTimes(1);
+    const entry =
+      lastUsedIdentitiesStoreValue.addLastUsedIdentity.mock.calls[0][0];
+    expect(entry.identityNumber).toBe(BigInt(10));
+    expect(entry.authMethod).toHaveProperty("openid");
+    expect(entry.authMethod).not.toHaveProperty("sso");
+    expect(entry.authMethod.openid).toMatchObject({
+      iss: testConfig.issuer,
+      sub: "user-1",
+    });
   });
 
-  it("sign-in returns an sso entry (keyed by domain) when a discovery domain is present", async () => {
+  it("sign-in commits an sso entry (keyed by domain) when the caller supplies the JWT and a discovery domain", async () => {
     authenticateWithJWTMock.mockResolvedValue({
       identity: {},
       identityNumber: BigInt(11),
@@ -539,19 +546,38 @@ describe("AuthFlow — last-used tracking (openid vs sso)", () => {
 
     expect(result?.type).toBe("signIn");
     if (result?.type !== "signIn") throw new Error("expected signIn");
-    expect(result.pendingLastUsedEntry?.authMethod).toHaveProperty("sso");
-    expect(result.pendingLastUsedEntry?.authMethod).not.toHaveProperty(
-      "openid",
-    );
-    const sso = (
-      result.pendingLastUsedEntry?.authMethod as {
-        sso: { domain: string; email?: string };
-      }
-    ).sso;
-    expect(sso).toMatchObject({
+    expect(result.pendingLastUsedEntry).toBeUndefined();
+    expect(
+      lastUsedIdentitiesStoreValue.addLastUsedIdentity,
+    ).toHaveBeenCalledTimes(1);
+    const entry =
+      lastUsedIdentitiesStoreValue.addLastUsedIdentity.mock.calls[0][0];
+    expect(entry.authMethod).toHaveProperty("sso");
+    expect(entry.authMethod).not.toHaveProperty("openid");
+    expect(entry.authMethod.sso).toMatchObject({
       domain: SSO_DOMAIN,
       email: "alice@example.com",
     });
+  });
+
+  it("sign-in returns the entry uncommitted when the caller fetches the JWT itself (interactive wizard path)", async () => {
+    requestJWTMock.mockResolvedValue("wizard-jwt");
+    authenticateWithJWTMock.mockResolvedValue({
+      identity: {},
+      identityNumber: BigInt(12),
+    });
+
+    const flow = new AuthFlow();
+    const result = await flow.continueWithOpenId(testConfig);
+
+    expect(result?.type).toBe("signIn");
+    if (result?.type !== "signIn") throw new Error("expected signIn");
+    // No caller-supplied JWT → interactive flow: AuthFlow defers the write so
+    // the wizard can gate it behind method-switch disambiguation.
+    expect(result.pendingLastUsedEntry?.authMethod).toHaveProperty("openid");
+    expect(
+      lastUsedIdentitiesStoreValue.addLastUsedIdentity,
+    ).not.toHaveBeenCalled();
   });
 
   it("sign-up commits an openid entry when no discovery domain is present", async () => {
