@@ -4,11 +4,8 @@
   import Select from "$lib/components/ui/Select.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
-  import {
-    readAccessLevelPreference,
-    writeAccessLevelPreference,
-    type AccessLevel,
-  } from "$lib/utils/accessLevel";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { accessLevelStore } from "$lib/stores/access-level.store";
   import { ChevronDownIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -59,7 +56,7 @@
   let accessLevel: AccessLevel | undefined = $derived(
     selectedIdentityNumber === undefined
       ? undefined
-      : readAccessLevelPreference("mcp", selectedIdentityNumber),
+      : accessLevelStore.getPreference("mcp", selectedIdentityNumber),
   );
   let isAuthorizing = $state(false);
 
@@ -121,7 +118,7 @@
       return;
     }
     // Remember this anchor's choice so it pre-fills its next MCP connect.
-    writeAccessLevelPreference(
+    accessLevelStore.setPreference(
       "mcp",
       selected.identityNumber,
       chosenAccessLevel,

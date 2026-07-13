@@ -2,11 +2,8 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
-  import {
-    readAccessLevelPreference,
-    writeAccessLevelPreference,
-    type AccessLevel,
-  } from "$lib/utils/accessLevel";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { accessLevelStore } from "$lib/stores/access-level.store";
   import { READ_ONLY_MODE } from "$lib/state/featureFlags";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import CliHeader from "../components/CliHeader.svelte";
@@ -39,7 +36,7 @@
   let accessLevel: AccessLevel | undefined = $derived(
     selectedIdentityNumber === undefined
       ? undefined
-      : readAccessLevelPreference("cli", selectedIdentityNumber),
+      : accessLevelStore.getPreference("cli", selectedIdentityNumber),
   );
   // With the flag on, the selector gates "Continue" until a choice is made, so
   // `accessLevel` is always defined here; the fallback only satisfies the type.
@@ -59,7 +56,11 @@
         accessLevel !== undefined &&
         selectedIdentityNumber !== undefined
       ) {
-        writeAccessLevelPreference("cli", selectedIdentityNumber, accessLevel);
+        accessLevelStore.setPreference(
+          "cli",
+          selectedIdentityNumber,
+          accessLevel,
+        );
       }
       await onAuthorize(effectiveAccessLevel);
     } finally {

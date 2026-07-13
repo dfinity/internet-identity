@@ -33,11 +33,8 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
   import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
-  import {
-    readAccessLevelPreference,
-    writeAccessLevelPreference,
-    type AccessLevel,
-  } from "$lib/utils/accessLevel";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { accessLevelStore } from "$lib/stores/access-level.store";
   import { READ_ONLY_MODE } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
@@ -114,7 +111,7 @@
   // (a queries-only delegation would fail closed in every current agent — see
   // the READ_ONLY_MODE flag).
   let accessLevel: AccessLevel | undefined = $state(
-    readAccessLevelPreference(
+    accessLevelStore.getPreference(
       "continue",
       $lastUsedIdentitiesStore.selected!.identityNumber,
     ),
@@ -134,7 +131,7 @@
   // (nothing was chosen).
   const rememberAccessLevel = (): void => {
     if ($READ_ONLY_MODE && accessLevel !== undefined) {
-      writeAccessLevelPreference(
+      accessLevelStore.setPreference(
         "continue",
         selectedIdentityNumber,
         accessLevel,
@@ -190,7 +187,10 @@
     authLastUsedFlow.init([selectedIdentityNumber]);
     const hydrated = readToggle(selectedIdentityNumber);
     isMultipleAccountsEnabled = hydrated;
-    accessLevel = readAccessLevelPreference("continue", selectedIdentityNumber);
+    accessLevel = accessLevelStore.getPreference(
+      "continue",
+      selectedIdentityNumber,
+    );
     defaultAccountNumber = null;
     if (hydrated) {
       void handleEnableMultipleAccounts();
