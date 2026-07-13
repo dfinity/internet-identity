@@ -431,24 +431,36 @@ export class AuthFlow {
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
         .trackLastUsed
-        ? (() => {
-            const authnMethod = result.info.openid_credentials[0]?.find(
-              (method) => method.iss === result.iss,
-            );
-            return {
-              identityNumber: result.identityNumber,
-              name: result.info.name[0],
-              authMethod: {
-                openid: {
-                  iss: result.iss,
-                  sub: result.sub,
-                  loginHint: result.loginHint,
-                  metadata: authnMethod?.metadata,
-                },
-              },
-              createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
-            };
-          })()
+        ? {
+            identityNumber: result.identityNumber,
+            name: result.info.name[0],
+            // A discovery domain means the JWT was minted through on-demand
+            // SSO discovery rather than a static `openid_configs` provider,
+            // so track the credential as `sso` (keyed by domain). An `openid`
+            // entry would send a later "last used" sign-in down the
+            // static-config branch of `authLastUsedFlow`, which can't resolve
+            // an SSO issuer nor pass the discovery domain to the canister.
+            authMethod:
+              discoveryDomain !== undefined
+                ? {
+                    sso: {
+                      domain: discoveryDomain,
+                      email: decodeJWT(result.jwt).email,
+                      loginHint: result.loginHint,
+                    },
+                  }
+                : {
+                    openid: {
+                      iss: result.iss,
+                      sub: result.sub,
+                      loginHint: result.loginHint,
+                      metadata: result.info.openid_credentials[0]?.find(
+                        (method) => method.iss === result.iss,
+                      )?.metadata,
+                    },
+                  },
+            createdAtMillis: result.info.created_at.map(nanosToMillis)[0],
+          }
         : undefined;
       if (mode === "signup") {
         // See `continueWithSso`: the openIdAlreadyLinked path commits
@@ -463,12 +475,22 @@ export class AuthFlow {
         this.#view = "openIdAlreadyLinked";
         return undefined;
       }
+      // A caller-supplied JWT means this is the non-interactive 1-click
+      // resume flow: there is no method-switch disambiguation to gate the
+      // write, so AuthFlow persists the last-used entry itself rather than
+      // handing it back. The interactive AuthWizard fetches the JWT itself
+      // (`existingJwt === undefined`) and commits the returned entry once any
+      // disambiguation clears — see `AuthWizard.commitLastUsedEntry`.
+      if (existingJwt !== undefined && lastUsedEntry !== undefined) {
+        lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedEntry);
+      }
       const { name: jwtName, email } = decodeJWT(result.jwt);
       return {
         identityNumber: result.identityNumber,
         name: result.info.name[0] ?? jwtName,
         email,
-        pendingLastUsedEntry: lastUsedEntry,
+        pendingLastUsedEntry:
+          existingJwt === undefined ? lastUsedEntry : undefined,
         type: "signIn",
       };
     }
@@ -722,32 +744,53 @@ export class AuthFlow {
       discoveryDomain,
     );
     if (this.#options.trackLastUsed) {
-      const { name: jwtName, email, ...restJWTClaims } = result.decodedJwt;
-      const metadata: MetadataMapV2 = [];
-      if (jwtName !== undefined) {
-        metadata.push(["name", { String: jwtName }]);
-      }
-      if (email !== undefined) {
-        metadata.push(["email", { String: email }]);
-      }
-      extractIssuerTemplateClaims(configIssuer).forEach((key) => {
-        if (restJWTClaims[key] !== undefined) {
-          metadata.push([key, { String: restJWTClaims[key] }]);
-        }
-      });
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber: result.identityNumber,
-        name,
-        authMethod: {
-          openid: {
-            iss: result.iss,
-            sub: result.sub,
-            loginHint: result.loginHint,
-            metadata,
+      if (discoveryDomain !== undefined) {
+        // A discovery domain means this JWT was redeemed through on-demand
+        // SSO discovery, not a static `openid_configs` provider (this is the
+        // 1-click SSO sign-up path, which reuses `continueWithOpenId`). Track
+        // it as `sso` — keyed by domain — so re-auth re-runs discovery;
+        // recording it as `openid` would break sign-in, whose SSO branch
+        // needs the domain. Mirrors `#registerWithSso`.
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber: result.identityNumber,
+          name,
+          authMethod: {
+            sso: {
+              domain: discoveryDomain,
+              email: result.decodedJwt.email,
+              loginHint: result.loginHint,
+            },
           },
-        },
-        createdAtMillis: Date.now(),
-      });
+          createdAtMillis: Date.now(),
+        });
+      } else {
+        const { name: jwtName, email, ...restJWTClaims } = result.decodedJwt;
+        const metadata: MetadataMapV2 = [];
+        if (jwtName !== undefined) {
+          metadata.push(["name", { String: jwtName }]);
+        }
+        if (email !== undefined) {
+          metadata.push(["email", { String: email }]);
+        }
+        extractIssuerTemplateClaims(configIssuer).forEach((key) => {
+          if (restJWTClaims[key] !== undefined) {
+            metadata.push([key, { String: restJWTClaims[key] }]);
+          }
+        });
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber: result.identityNumber,
+          name,
+          authMethod: {
+            openid: {
+              iss: result.iss,
+              sub: result.sub,
+              loginHint: result.loginHint,
+              metadata,
+            },
+          },
+          createdAtMillis: Date.now(),
+        });
+      }
     }
     return result.identityNumber;
   };
