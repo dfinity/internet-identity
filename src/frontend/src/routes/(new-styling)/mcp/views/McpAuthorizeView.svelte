@@ -31,17 +31,6 @@
 
   const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
 
-  // The MCP connect flow always offers the access-level choice (ungated by
-  // READ_ONLY_MODE): the choice is recorded with the grant and applies to the
-  // per-app delegations the server later obtains, while its standing delegation
-  // stays full access. Starts on the user's last MCP choice, or unselected on a
-  // first-time connect so they pick explicitly (the "Allow access" button is
-  // disabled until then). The chosen level maps to the per-app delegations'
-  // `permissions`: "read-only" = queries-only, "full-access" = update-capable.
-  let accessLevel: AccessLevel | undefined = $state(
-    readAccessLevelPreference("mcp"),
-  );
-
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
   // an app). The identity switcher (shown by the layout) is how the user picks
@@ -56,6 +45,22 @@
       authLastUsedFlow.init([selectedIdentityNumber]);
     }
   });
+
+  // The MCP connect flow always offers the access-level choice (ungated by
+  // READ_ONLY_MODE): the choice is recorded with the grant and applies to the
+  // per-app delegations the server later obtains, while its standing delegation
+  // stays full access. The chosen level maps to the per-app delegations'
+  // `permissions`: "read-only" = queries-only, "full-access" = update-capable.
+  // Derived per-anchor (the browser may be shared) from the selected anchor's
+  // stored MCP choice: unselected on a first-time connect so the user picks
+  // explicitly (the "Allow access" button stays disabled until then), and
+  // re-hydrated when they switch identity. The user's own radio pick overrides
+  // this until the identity changes again.
+  let accessLevel: AccessLevel | undefined = $derived(
+    selectedIdentityNumber === undefined
+      ? undefined
+      : readAccessLevelPreference("mcp", selectedIdentityNumber),
+  );
   let isAuthorizing = $state(false);
 
   const MINUTE = 60;
@@ -115,8 +120,12 @@
     if (selected === undefined || chosenAccessLevel === undefined) {
       return;
     }
-    // Remember this choice so it pre-fills the next MCP connect.
-    writeAccessLevelPreference("mcp", chosenAccessLevel);
+    // Remember this anchor's choice so it pre-fills its next MCP connect.
+    writeAccessLevelPreference(
+      "mcp",
+      selected.identityNumber,
+      chosenAccessLevel,
+    );
     isAuthorizing = true;
     try {
       // Authenticate unless the live session is already the selected identity.

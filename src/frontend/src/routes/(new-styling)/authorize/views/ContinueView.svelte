@@ -106,13 +106,18 @@
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
   // The access-level selector (shown only when READ_ONLY_MODE is on) starts on
-  // the user's last choice for this flow, or unselected on a first-time sign in
-  // so they pick explicitly. While the flag is off (the current default), the
-  // selector is hidden and `effectiveAccessLevel` forces full access, so this
-  // state is never surfaced (a queries-only delegation would fail closed in
-  // every current agent — see the READ_ONLY_MODE flag).
+  // this anchor's last choice for this flow, or unselected on a first-time sign
+  // in so they pick explicitly. Per-anchor (the browser may be shared); the
+  // effect below re-hydrates it when the selected identity changes. While the
+  // flag is off (the current default), the selector is hidden and
+  // `effectiveAccessLevel` forces full access, so this state is never surfaced
+  // (a queries-only delegation would fail closed in every current agent — see
+  // the READ_ONLY_MODE flag).
   let accessLevel: AccessLevel | undefined = $state(
-    readAccessLevelPreference("continue"),
+    readAccessLevelPreference(
+      "continue",
+      $lastUsedIdentitiesStore.selected!.identityNumber,
+    ),
   );
   // With the flag on, the selector gates Continue until a choice is made, so
   // `accessLevel` is always defined here; the fallback only satisfies the type.
@@ -124,11 +129,16 @@
   const mustChooseAccess = $derived(
     $READ_ONLY_MODE && accessLevel === undefined,
   );
-  // Persist the chosen level when the selector was actually shown and used, so
-  // it pre-fills next time. No-op while the flag is off (nothing was chosen).
+  // Persist the chosen level for this anchor when the selector was actually
+  // shown and used, so it pre-fills next time. No-op while the flag is off
+  // (nothing was chosen).
   const rememberAccessLevel = (): void => {
     if ($READ_ONLY_MODE && accessLevel !== undefined) {
-      writeAccessLevelPreference("continue", accessLevel);
+      writeAccessLevelPreference(
+        "continue",
+        selectedIdentityNumber,
+        accessLevel,
+      );
     }
   };
   let isMultipleAccountsEnabled = $state(
@@ -171,15 +181,16 @@
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
   // Re-initialize the flow and re-hydrate per-identity state when the
-  // identity changes. Read the persisted value into a local so the
+  // identity changes. Read the persisted values into locals so the
   // effect's only reactive dependency is `selectedIdentityNumber` -- if
-  // we read `isMultipleAccountsEnabled` directly, the user's own toggle
-  // click would re-trigger this effect and overwrite the new value back
-  // from stale localStorage.
+  // we read `isMultipleAccountsEnabled` (or `accessLevel`) directly, the
+  // user's own toggle/selector click would re-trigger this effect and
+  // overwrite the new value back from stale localStorage.
   $effect(() => {
     authLastUsedFlow.init([selectedIdentityNumber]);
     const hydrated = readToggle(selectedIdentityNumber);
     isMultipleAccountsEnabled = hydrated;
+    accessLevel = readAccessLevelPreference("continue", selectedIdentityNumber);
     defaultAccountNumber = null;
     if (hydrated) {
       void handleEnableMultipleAccounts();

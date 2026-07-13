@@ -26,37 +26,45 @@ export const toPermissionsArg = (accessLevel: AccessLevel): [Permissions] => [
  *  CLI shouldn't have that leak into how they connect an app. */
 export type AccessLevelFlow = "continue" | "cli" | "mcp";
 
-// Browser-local, per-flow persistence for the access-level choice. Global
-// (not per-anchor): the read-only/full-access decision is a mental-mode
-// preference for a kind of connection, not something a user re-decides per
-// identity. First-time (no stored value) leaves the selector unselected so the
-// user makes an explicit choice; thereafter the last choice pre-fills.
+// Browser-local persistence for the access-level choice, keyed by BOTH the flow
+// and the anchor. Per-flow because the flows differ in kind (see above);
+// per-anchor because the browser is shared — on a public/kiosk device several
+// people sign in with different anchors, and one person's choice must not
+// become another's pre-filled default. (Mirrors the per-anchor auxiliary state
+// pattern used for the multi-accounts toggle and `cli-access.store`.)
+// First-time (no stored value) leaves the selector unselected so the user makes
+// an explicit choice; thereafter that anchor's last choice pre-fills.
 const ACCESS_LEVEL_STORAGE_PREFIX = "ii:access-level:";
+
+const storageKey = (flow: AccessLevelFlow, identityNumber: bigint): string =>
+  `${ACCESS_LEVEL_STORAGE_PREFIX}${flow}:${identityNumber.toString()}`;
 
 const isAccessLevel = (value: string | null): value is AccessLevel =>
   value === "read-only" || value === "full-access";
 
-/** The remembered access level for a flow, or `undefined` when the user hasn't
- *  chosen one yet (first-time sign in) — in which case the selector shows
- *  nothing pre-selected. */
+/** The remembered access level for a flow and anchor, or `undefined` when that
+ *  anchor hasn't chosen one yet (first-time sign in) — in which case the
+ *  selector shows nothing pre-selected. */
 export const readAccessLevelPreference = (
   flow: AccessLevelFlow,
+  identityNumber: bigint,
 ): AccessLevel | undefined => {
   if (typeof localStorage === "undefined") {
     return undefined;
   }
-  const value = localStorage.getItem(`${ACCESS_LEVEL_STORAGE_PREFIX}${flow}`);
+  const value = localStorage.getItem(storageKey(flow, identityNumber));
   return isAccessLevel(value) ? value : undefined;
 };
 
-/** Persist the access level the user connected with, so it pre-fills the next
- *  time they use this flow. */
+/** Persist the access level the anchor connected with, so it pre-fills the next
+ *  time that anchor uses this flow. */
 export const writeAccessLevelPreference = (
   flow: AccessLevelFlow,
+  identityNumber: bigint,
   accessLevel: AccessLevel,
 ): void => {
   if (typeof localStorage === "undefined") {
     return;
   }
-  localStorage.setItem(`${ACCESS_LEVEL_STORAGE_PREFIX}${flow}`, accessLevel);
+  localStorage.setItem(storageKey(flow, identityNumber), accessLevel);
 };

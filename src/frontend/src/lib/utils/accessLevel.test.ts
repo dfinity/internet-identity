@@ -18,6 +18,8 @@ describe("toPermissionsArg", () => {
 
 describe("access-level preference persistence", () => {
   const flows: AccessLevelFlow[] = ["continue", "cli", "mcp"];
+  const ANCHOR = BigInt(10_000);
+  const OTHER_ANCHOR = BigInt(20_000);
 
   beforeEach(() => {
     localStorage.clear();
@@ -25,28 +27,38 @@ describe("access-level preference persistence", () => {
 
   it("returns undefined when nothing has been stored (first-time sign in)", () => {
     for (const flow of flows) {
-      expect(readAccessLevelPreference(flow)).toBeUndefined();
+      expect(readAccessLevelPreference(flow, ANCHOR)).toBeUndefined();
     }
   });
 
   it("round-trips a stored preference", () => {
     for (const level of ["read-only", "full-access"] as AccessLevel[]) {
-      writeAccessLevelPreference("continue", level);
-      expect(readAccessLevelPreference("continue")).toBe(level);
+      writeAccessLevelPreference("continue", ANCHOR, level);
+      expect(readAccessLevelPreference("continue", ANCHOR)).toBe(level);
     }
   });
 
   it("keeps preferences separate across flows", () => {
-    writeAccessLevelPreference("continue", "full-access");
-    writeAccessLevelPreference("cli", "read-only");
+    writeAccessLevelPreference("continue", ANCHOR, "full-access");
+    writeAccessLevelPreference("cli", ANCHOR, "read-only");
     // mcp is left untouched.
-    expect(readAccessLevelPreference("continue")).toBe("full-access");
-    expect(readAccessLevelPreference("cli")).toBe("read-only");
-    expect(readAccessLevelPreference("mcp")).toBeUndefined();
+    expect(readAccessLevelPreference("continue", ANCHOR)).toBe("full-access");
+    expect(readAccessLevelPreference("cli", ANCHOR)).toBe("read-only");
+    expect(readAccessLevelPreference("mcp", ANCHOR)).toBeUndefined();
+  });
+
+  it("keeps preferences separate across anchors (shared-device safety)", () => {
+    // One anchor's choice must not become another anchor's default on a
+    // shared/public browser.
+    writeAccessLevelPreference("mcp", ANCHOR, "read-only");
+    expect(readAccessLevelPreference("mcp", OTHER_ANCHOR)).toBeUndefined();
+    writeAccessLevelPreference("mcp", OTHER_ANCHOR, "full-access");
+    expect(readAccessLevelPreference("mcp", ANCHOR)).toBe("read-only");
+    expect(readAccessLevelPreference("mcp", OTHER_ANCHOR)).toBe("full-access");
   });
 
   it("ignores an unrecognized stored value", () => {
-    localStorage.setItem("ii:access-level:continue", "garbage");
-    expect(readAccessLevelPreference("continue")).toBeUndefined();
+    localStorage.setItem(`ii:access-level:continue:${ANCHOR}`, "garbage");
+    expect(readAccessLevelPreference("continue", ANCHOR)).toBeUndefined();
   });
 });

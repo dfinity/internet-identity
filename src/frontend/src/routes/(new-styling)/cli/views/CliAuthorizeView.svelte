@@ -8,6 +8,7 @@
     type AccessLevel,
   } from "$lib/utils/accessLevel";
   import { READ_ONLY_MODE } from "$lib/state/featureFlags";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import CliHeader from "../components/CliHeader.svelte";
   import TerminalBlock from "../components/TerminalBlock.svelte";
   import { Trans } from "$lib/components/locale";
@@ -24,13 +25,21 @@
 
   let busy = $state(false);
   // The access-level selector (shown only when READ_ONLY_MODE is on) starts on
-  // the user's last CLI choice, or unselected on a first-time sign in so they
+  // this anchor's last CLI choice, or unselected on a first-time sign in so they
   // pick explicitly. While the flag is off (the current default), the selector
   // is hidden and `effectiveAccessLevel` forces full access, so this state is
   // never surfaced (a queries-only delegation would fail closed in every
   // current agent — see the READ_ONLY_MODE flag).
-  let accessLevel: AccessLevel | undefined = $state(
-    readAccessLevelPreference("cli"),
+  const selectedIdentityNumber = $derived(
+    $lastUsedIdentitiesStore.selected?.identityNumber,
+  );
+  // Derived per-anchor (the browser may be shared) from the selected anchor's
+  // stored CLI choice, re-hydrating when the user switches identity. The user's
+  // own radio pick overrides this until the identity changes again.
+  let accessLevel: AccessLevel | undefined = $derived(
+    selectedIdentityNumber === undefined
+      ? undefined
+      : readAccessLevelPreference("cli", selectedIdentityNumber),
   );
   // With the flag on, the selector gates "Continue" until a choice is made, so
   // `accessLevel` is always defined here; the fallback only satisfies the type.
@@ -45,8 +54,12 @@
   const handleClick = async () => {
     busy = true;
     try {
-      if ($READ_ONLY_MODE && accessLevel !== undefined) {
-        writeAccessLevelPreference("cli", accessLevel);
+      if (
+        $READ_ONLY_MODE &&
+        accessLevel !== undefined &&
+        selectedIdentityNumber !== undefined
+      ) {
+        writeAccessLevelPreference("cli", selectedIdentityNumber, accessLevel);
       }
       await onAuthorize(effectiveAccessLevel);
     } finally {
