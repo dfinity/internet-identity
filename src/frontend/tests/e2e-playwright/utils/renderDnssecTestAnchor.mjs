@@ -19,7 +19,7 @@
  * pasting into `local_test_arg.did`.
  */
 
-import { ed25519 } from "@noble/curves/ed25519";
+import { ed25519 } from "@noble/curves/ed25519.js";
 
 // MUST match `ROOT_SEED` in dnssecTestSigner.ts.
 const ROOT_SEED = new Uint8Array(32).fill(1);
