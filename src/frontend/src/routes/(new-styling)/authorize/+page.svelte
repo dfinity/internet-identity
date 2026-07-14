@@ -250,21 +250,12 @@
     // Show the redirect animation now so the wait below doesn't flash the wizard.
     openIdResumeProcessing = true;
     // Redeem through the origin-bound gate path so the session certifies
-    // `sso:<domain>` attributes. Re-discover with the origin to learn whether
-    // it's gated (a per-app `resolved_client_id` differs from `client_id`).
-    let sso: { origin: string; gated: boolean } | undefined;
+    // `sso:<domain>` attributes.
+    let sso: { origin: string } | undefined;
     if (ssoDomain !== null) {
       const dappOrigin = await waitForEffectiveOrigin();
       if (dappOrigin !== undefined) {
-        const resolved = await discoverSsoConfig(
-          ssoDomain,
-          undefined,
-          dappOrigin,
-        );
-        sso = {
-          origin: dappOrigin,
-          gated: resolved.resolvedClientId !== resolved.clientId,
-        };
+        sso = { origin: dappOrigin };
       }
     }
     let config: OpenIdConfig | undefined;

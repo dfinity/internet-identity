@@ -90,7 +90,7 @@ export class AuthFlow {
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
   // Dapp SSO context for the in-flight sign-in; undefined for direct providers and management SSO.
-  #sso = $state<{ origin: string; gated: boolean }>();
+  #sso = $state<{ origin: string }>();
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
   #pendingMethodSwitch = $state<{
@@ -271,22 +271,9 @@ export class AuthFlow {
       }
     | undefined
   > => {
-    const {
-      resolvedClientId,
-      clientId,
-      discovery,
-      domain,
-      name: ssoName,
-    } = ssoResult;
+    const { resolvedClientId, discovery, domain, name: ssoName } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
-    const sso =
-      dappOrigin !== undefined
-        ? {
-            origin: dappOrigin,
-            // A per-app (gated) client differs from the org's primary client.
-            gated: resolvedClientId !== clientId,
-          }
-        : undefined;
+    const sso = dappOrigin !== undefined ? { origin: dappOrigin } : undefined;
     const result = await this.#openIdJwtSignIn(
       {
         clientId: resolvedClientId,
@@ -338,8 +325,7 @@ export class AuthFlow {
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
     this.#ssoName = ssoName;
-    // A gated dapp SSO sign-in falls through to registration; every other sign-in-mode path shows the "not connected" prompt.
-    if (mode === "signin" && sso?.gated !== true) {
+    if (mode === "signin") {
       this.#view = "openIdNotConnected";
       return undefined;
     }
@@ -427,7 +413,7 @@ export class AuthFlow {
     mode: AuthMode = this.#mode,
     discoveryDomain?: string,
     // Dapp SSO context; routes the 1-click resume through the SSO gate path.
-    sso?: { origin: string; gated: boolean },
+    sso?: { origin: string },
   ): Promise<
     | {
         identityNumber: bigint;
@@ -546,7 +532,7 @@ export class AuthFlow {
     existingJwt?: string,
     discoveryDomain?: string,
     // Dapp SSO context; when set, redeems the JWT via the SSO gate path (`discoveryDomain` is always present alongside).
-    sso?: { origin: string; gated: boolean },
+    sso?: { origin: string },
   ): Promise<
     | {
         type: "signIn";

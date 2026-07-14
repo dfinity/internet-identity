@@ -400,33 +400,59 @@ test.describe("Authorize with IdP-side per-app gating", () => {
   };
 
   test.describe("gated origin (assigned user)", () => {
+    const email = "john.doe@example.com";
+
     test.use({
       openIdConfig: {
         defaultPort: SSO_OPENID_PORT,
-        createUsers: [{ claims: { name } }],
+        createUsers: [{ claims: { name, email } }],
       },
       authorizeConfig: {
         protocol: "icrc25",
         testAppURL: GATED_ORIGIN,
         useIcrc3Attributes: true,
+        attributes: [
+          `sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`,
+        ],
       },
     });
 
-    test.afterEach(({ authorizedPrincipal }) => {
+    // Round-trip: the certified bundle must replay through the test_app canister.
+    test.afterEach(
+      ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+        if (authorizedIcrc3Attributes === undefined) return;
+        const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+        expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+      },
+    );
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       // Non-anonymous principal proves the gated chain completed.
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      // Certified/returned: the gated sign-up attached the SSO bundle.
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) return;
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(textEntries).toMatchObject({
+        [`sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`]: name,
+        [`sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`]: email,
+      });
     });
 
-    test("first gated login registers directly, then reaches the app", async ({
+    test("first gated login goes through the sign-up prompt, then reaches the app", async ({
+      attributeConsentView,
       authorizePage,
       signInWithOpenId,
       openIdUsers,
       configureSsoGating,
     }) => {
-      // A brand-new user on a `sub`-keyed org registers directly through the
-      // per-app client; auto-drive the IdP popup, then finalise on the account
-      // screen.
+      // A brand-new gated SSO user flows through the standard "not connected →
+      // sign up" prompt (no direct-register shortcut); auto-drive the IdP popup.
       await configureSsoGating(gatingConfig);
+      const consent = attributeConsentView(authorizePage.page);
       authorizePage.page.context().on("page", (popup) => {
         void signInWithOpenId(popup, openIdUsers[0].id).catch(() => {
           // A popup can close before it's driven; ignore.
@@ -444,15 +470,23 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       });
       await expect(domainContinue).toBeEnabled({ timeout: 30_000 });
       await domainContinue.click();
-      // Direct registration lands on the account screen; continue to the dapp.
-      await expect(
-        authorizePage.page.getByRole("heading", {
-          name: "Continue to Test Dapp",
-        }),
-      ).toBeVisible({ timeout: 30_000 });
+      // Fresh SSO user → IdentityNotConnectedDialog; confirm sign-up.
+      await authorizePage.page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sign up" })
+        .click();
       await authorizePage.page
         .getByRole("button", { name: "Continue", exact: true })
         .click();
+      // Listed: the consent screen surfaces the SSO-scoped rows.
+      await consent.waitForVisible();
+      await expect(
+        consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
+      ).toBeVisible();
+      await expect(
+        consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
+      ).toBeVisible();
+      await consent.continue();
     });
   });
 
