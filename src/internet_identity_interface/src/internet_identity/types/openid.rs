@@ -1,6 +1,9 @@
-use crate::internet_identity::types::{AnchorNumber, MetadataEntryV2, Timestamp, UserKey};
+use crate::internet_identity::types::{
+    AnchorNumber, MetadataEntryV2, SignedDelegation, Timestamp, UserKey,
+};
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
+use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 /// Types for OpenID credentials, used for OpenID sign in
@@ -46,6 +49,32 @@ pub struct OpenIdPrepareDelegationResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
     pub anchor_number: AnchorNumber,
+}
+
+/// Response of `sso_prepare_delegation` (IdP-side per-app gating). Carries the
+/// credential-seed openid delegation (`user_key` / `expiration` /
+/// `anchor_number`, identical to [`OpenIdPrepareDelegationResponse`]) PLUS the
+/// certified SSO attribute bundle `message` the frontend attaches to subsequent
+/// calls via the SDK `AttributesIdentity`.
+#[derive(CandidType, Debug, Deserialize)]
+pub struct SsoPrepareDelegationResponse {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+    pub anchor_number: AnchorNumber,
+    /// The SSO attribute bundle message bytes (encodes `sso_domain`, `origin`,
+    /// `expiry`). Paired with the signature from `sso_get_delegation`.
+    pub sso_attr_bundle: ByteBuf,
+}
+
+/// Response of `sso_get_delegation` (IdP-side per-app gating). Carries the
+/// credential-seed `SignedDelegation` PLUS the canister signature over the SSO
+/// attribute bundle message returned by `sso_prepare_delegation`.
+#[derive(CandidType, Debug, Deserialize)]
+pub struct SsoGetDelegationResponse {
+    pub signed_delegation: SignedDelegation,
+    /// Canister signature over the bundle `message` from
+    /// `SsoPrepareDelegationResponse.sso_attr_bundle`.
+    pub sso_attr_bundle_signature: ByteBuf,
 }
 
 #[derive(CandidType, Debug, Deserialize, Serialize)]

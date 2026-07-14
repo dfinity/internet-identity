@@ -29,9 +29,12 @@ pub(crate) use configured::{clear_for_test, setup_for_test};
 mod jwks;
 mod provider;
 mod sso;
+mod sso_bundle;
 mod verify;
 
 pub use crate::single_flight_cache::Cached;
+pub use sso_bundle::SsoAttrBundle;
+use sso_bundle::{decode_sso_attr_bundle, encode_sso_attr_bundle};
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -531,10 +534,18 @@ fn salt() -> [u8; 32] {
 // SSO sign-in. `openid_prepare_delegation` / `openid_get_delegation` are left
 // byte-identical (direct providers + the pre-feature flow). The gate is
 // mint-or-refuse: `verify_sso_jwt` enforces `jwt.aud == the origin's declared
-// client`, and the minted delegation's seed binds `(iss, sub, sso_domain,
-// origin, anchor)`. The origin-scoped calls recompute that principal
-// (`matching_sso_session`), so a refused gate leaves nothing to authenticate
-// with. Identity always resolves to the primary client.
+// client`, so a refused gate mints nothing. Identity always resolves to the
+// primary client.
+//
+// The minted session is the PLAIN openid-credential delegation (seed =
+// `calculate_delegation_seed((iss, sub, aud), anchor)`, which
+// `check_authorization` already recognizes). The per-app gating context — the
+// SSO discovery domain and the certified dapp origin — travels separately in a
+// small II-signed attribute bundle the frontend attaches to each call via the
+// SDK `AttributesIdentity` (`sender_info`). The bundle is signed as a canister
+// signature under the SAME credential seed, so it is intrinsically bound to
+// that credential's principal and cannot be replayed onto another identity;
+// `read_certified_sso_bundle` is the generic consumer.
 // ===========================================================================
 
 /// Tighter session lifetime for the SSO sign-in path so certified SSO
@@ -838,130 +849,108 @@ pub fn verify_sso_for_registration(
     }
 }
 
-/// Seed for an SSO-session delegation, binding `(iss, sub, sso_domain, origin,
-/// anchor)` (§6.2). A dedicated domain separator and length-prefixed fields
-/// keep it disjoint from every [`calculate_delegation_seed`] output, so an SSO
-/// session principal can never collide with an OpenID-credential principal.
-fn calculate_sso_delegation_seed(
-    iss: &str,
-    sub: &str,
-    sso_domain: &str,
-    origin: &str,
-    anchor_number: AnchorNumber,
-) -> Hash {
-    fn write_field(blob: &mut Vec<u8>, data: &[u8]) {
-        blob.extend_from_slice(&(data.len() as u64).to_be_bytes());
-        blob.extend_from_slice(data);
+// --- SSO attribute bundle: thin `msg_caller_info` wrappers + consumer -------
+
+/// Copy this call's `sender_info` data payload (the attribute bundle bytes the
+/// caller attached). Empty when no `sender_info` was attached.
+fn msg_caller_info_data() -> Vec<u8> {
+    let n = ic0::msg_caller_info_data_size();
+    let mut b = vec![0u8; n];
+    ic0::msg_caller_info_data_copy(&mut b, 0);
+    b
+}
+
+/// The canister that signed this call's `sender_info`, if any. `None` when no
+/// `sender_info` was attached.
+fn msg_caller_info_signer() -> Option<Principal> {
+    let n = ic0::msg_caller_info_signer_size();
+    if n == 0 {
+        return None;
     }
-    let mut blob: Vec<u8> = Vec::new();
-    blob.extend_from_slice(b"ii-sso-per-app-delegation");
-    write_field(&mut blob, &salt());
-    write_field(&mut blob, iss.as_bytes());
-    write_field(&mut blob, sub.as_bytes());
-    write_field(&mut blob, sso_domain.as_bytes());
-    write_field(&mut blob, origin.as_bytes());
-    write_field(&mut blob, &anchor_number.to_be_bytes());
-
-    let mut hasher = Sha256::new();
-    hasher.update(blob);
-    hasher.finalize().into()
+    let mut b = vec![0u8; n];
+    ic0::msg_caller_info_signer_copy(&mut b, 0);
+    Some(Principal::try_from(b.as_slice()).expect("valid principal"))
 }
 
-/// The self-authenticating principal of an SSO-session delegation.
-pub fn sso_session_principal(
-    iss: &str,
-    sub: &str,
-    sso_domain: &str,
-    origin: &str,
-    anchor_number: AnchorNumber,
-) -> Principal {
-    let seed = calculate_sso_delegation_seed(iss, sub, sso_domain, origin, anchor_number);
-    let public_key: PublicKey = der_encode_canister_sig_key(seed.to_vec()).into();
-    Principal::self_authenticating(public_key)
+/// The certified SSO attribute bundle attached to this call, if the caller
+/// attached one signed by THIS canister and not expired. `None` for a plain
+/// (bundle-less) session.
+///
+/// A `Some` result proves only that II signed the bundle under the caller's own
+/// credential seed (the replica verified `sender_info.sig` as a canister
+/// signature under the seed parsed from the caller's inner canister-sig pubkey,
+/// so a bundle signed for credential A cannot be presented by principal B) and
+/// that it has not expired. The caller MUST still check `bundle.origin ==` the
+/// serving origin before trusting `bundle.sso_domain` — the bundle is bound to
+/// the identity, not to the origin being served.
+pub fn read_certified_sso_bundle() -> Option<SsoAttrBundle> {
+    if msg_caller_info_signer()? != ic_cdk::id() {
+        return None;
+    }
+    let bundle = decode_sso_attr_bundle(&msg_caller_info_data()).ok()?;
+    if time() > bundle.expiry_ns {
+        return None;
+    }
+    Some(bundle)
 }
 
-/// Mint an SSO-session delegation seeded `(iss, sub, sso_domain, origin,
-/// anchor)` with the tighter SSO expiry.
-pub async fn prepare_sso_delegation(
+// --- SSO attribute bundle: producer -----------------------------------------
+
+/// Prepare the certified SSO attribute bundle for `(iss, sub, aud, anchor)` at
+/// `(sso_domain, origin)`: encode the `(sso_domain, origin, expiry)` message and
+/// add its canister signature under the credential seed (the SAME seed the
+/// session principal derives from), with the ic-sender-info domain. Returns the
+/// bundle message bytes and its expiry; [`get_sso_attr_bundle_signature`]
+/// witnesses the signature. Mirrors `Anchor::prepare_icrc3_attributes`.
+pub fn prepare_sso_attr_bundle(
     iss: &str,
     sub: &str,
+    aud: &str,
+    anchor_number: AnchorNumber,
     sso_domain: &str,
     origin: &str,
-    anchor_number: AnchorNumber,
-    session_key: SessionKey,
-) -> (UserKey, Timestamp) {
-    state::ensure_salt_set().await;
+) -> (Vec<u8>, Timestamp) {
     let expiration = time().saturating_add(SSO_SESSION_DURATION_NS);
-    let seed = calculate_sso_delegation_seed(iss, sub, sso_domain, origin, anchor_number);
+    let message = encode_sso_attr_bundle(sso_domain, origin, expiration);
+    let seed = calculate_delegation_seed(
+        &(iss.to_string(), sub.to_string(), aud.to_string()),
+        anchor_number,
+    );
     state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration, None);
+        sigs.add_signature(&CanisterSigInputs {
+            domain: crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+            seed: &seed,
+            message: &message,
+        });
     });
     update_root_hash();
-    (
-        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        expiration,
-    )
+    (message, expiration)
 }
 
-/// Fetch a previously minted SSO-session delegation (query side).
-pub fn get_sso_delegation(
+/// Witness the canister signature over an SSO attribute bundle `message`
+/// prepared by [`prepare_sso_attr_bundle`] for `(iss, sub, aud, anchor)`, using
+/// the same credential seed + ic-sender-info domain. Mirrors
+/// `Anchor::get_icrc3_attributes`.
+pub fn get_sso_attr_bundle_signature(
     iss: &str,
     sub: &str,
-    sso_domain: &str,
-    origin: &str,
+    aud: &str,
     anchor_number: AnchorNumber,
-    session_key: SessionKey,
-    expiration: Timestamp,
-) -> Result<SignedDelegation, OpenIdDelegationError> {
-    let seed = calculate_sso_delegation_seed(iss, sub, sso_domain, origin, anchor_number);
+    message: &[u8],
+) -> Result<Vec<u8>, OpenIdDelegationError> {
+    let seed = calculate_delegation_seed(
+        &(iss.to_string(), sub.to_string(), aud.to_string()),
+        anchor_number,
+    );
     state::assets_and_signatures(|certified_assets, sigs| {
         let inputs = CanisterSigInputs {
-            domain: DELEGATION_SIG_DOMAIN,
+            domain: crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
             seed: &seed,
-            message: &delegation_signature_msg(&session_key, expiration, None),
+            message,
         };
-        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
-            Ok(signature) => Ok(SignedDelegation {
-                delegation: Delegation {
-                    pubkey: session_key,
-                    expiration,
-                    targets: None,
-                    permissions: None,
-                },
-                signature: ByteBuf::from(signature),
-            }),
-            Err(_) => Err(OpenIdDelegationError::NoSuchDelegation),
-        }
+        sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
     })
-}
-
-/// Config-free cert-time check (§6.3): if `caller` is the SSO-session principal
-/// for one of `credentials` at `origin`, return that credential's `sso_domain`.
-/// Only SSO credentials (`sso_domain.is_some()`) participate, and the match is
-/// exact — a passkey / `openid_prepare_delegation` session yields a different
-/// principal, so it matches nothing and gets no SSO attributes.
-pub fn matching_sso_session<'a>(
-    credentials: impl Iterator<Item = &'a OpenIdCredential>,
-    anchor_number: AnchorNumber,
-    origin: &str,
-    caller: Principal,
-) -> Option<String> {
-    for credential in credentials {
-        let Some(sso_domain) = credential.sso_domain.as_ref() else {
-            continue;
-        };
-        let principal = sso_session_principal(
-            &credential.iss,
-            &credential.sub,
-            sso_domain,
-            origin,
-            anchor_number,
-        );
-        if principal == caller {
-            return Some(sso_domain.clone());
-        }
-    }
-    None
+    .map_err(|_| OpenIdDelegationError::NoSuchDelegation)
 }
 
 #[cfg(test)]
@@ -1188,49 +1177,6 @@ mod tests {
         assert!(
             verify_sso_jwt(VALID_JWT, &test_salt(), SSO_DOMAIN, "https://unlisted.app").is_err()
         );
-    }
-
-    #[test]
-    fn sso_session_seed_binds_all_inputs() {
-        // The SSO-session seed binds (iss, sub, sso_domain, origin, anchor):
-        // changing any input changes the seed, so a session minted for one
-        // (domain, origin) can never authenticate another. (`sso_session_principal`
-        // / `matching_sso_session` wrap this seed; they call `ic_cdk::id()` and
-        // are exercised end-to-end in the integration tests.)
-        let base = calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, GATED_ORIGIN, 42);
-        // Same inputs -> same seed.
-        assert_eq!(
-            base,
-            calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, GATED_ORIGIN, 42)
-        );
-        // Each field is load-bearing.
-        assert_ne!(
-            base,
-            calculate_sso_delegation_seed("iss2", "sub", SSO_DOMAIN, GATED_ORIGIN, 42)
-        );
-        assert_ne!(
-            base,
-            calculate_sso_delegation_seed("iss", "sub2", SSO_DOMAIN, GATED_ORIGIN, 42)
-        );
-        assert_ne!(
-            base,
-            calculate_sso_delegation_seed("iss", "sub", "other.org", GATED_ORIGIN, 42)
-        );
-        assert_ne!(
-            base,
-            calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, "https://other.app", 42)
-        );
-        assert_ne!(
-            base,
-            calculate_sso_delegation_seed("iss", "sub", SSO_DOMAIN, GATED_ORIGIN, 43)
-        );
-        // Distinct from the OpenID/direct-credential seed for the same identity —
-        // the domain separator keeps SSO-session principals disjoint.
-        let openid_seed = calculate_delegation_seed(
-            &("iss".to_string(), "sub".to_string(), "aud".to_string()),
-            42,
-        );
-        assert_ne!(base, openid_seed);
     }
 
     fn sso_verification(

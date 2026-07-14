@@ -5,7 +5,7 @@ use internet_identity_interface::archive::types::BufferedEntry;
 use internet_identity_interface::internet_identity::types::{
     self, CredentialId, DeviceKeyWithAnchor, IdentityNumber, OpenIdCredentialKey,
 };
-use pocket_ic::common::rest::RawEffectivePrincipal;
+use pocket_ic::common::rest::{RawEffectivePrincipal, RawSenderInfo};
 use pocket_ic::{
     call_candid, call_candid_as, query_candid, query_candid_as, PocketIc, RejectResponse,
 };
@@ -410,7 +410,7 @@ pub fn sso_prepare_delegation(
     discovery_domain: &str,
     origin: &str,
 ) -> Result<
-    types::OpenIdResult<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
+    types::OpenIdResult<types::SsoPrepareDelegationResponse, types::OpenIdDelegationError>,
     RejectResponse,
 > {
     call_candid_as(
@@ -435,8 +435,9 @@ pub fn sso_get_delegation(
     expiration: &types::Timestamp,
     discovery_domain: &str,
     origin: &str,
+    sso_attr_bundle: &[u8],
 ) -> Result<
-    types::OpenIdResult<types::SignedDelegation, types::OpenIdDelegationError>,
+    types::OpenIdResult<types::SsoGetDelegationResponse, types::OpenIdDelegationError>,
     RejectResponse,
 > {
     query_candid_as(
@@ -444,7 +445,15 @@ pub fn sso_get_delegation(
         canister_id,
         sender,
         "sso_get_delegation",
-        (jwt, salt, session_key, expiration, discovery_domain, origin),
+        (
+            jwt,
+            salt,
+            session_key,
+            expiration,
+            discovery_domain,
+            origin,
+            serde_bytes::ByteBuf::from(sso_attr_bundle.to_vec()),
+        ),
     )
     .map(|(x,)| x)
 }
@@ -687,6 +696,47 @@ pub fn get_icrc3_attributes(
     RejectResponse,
 > {
     query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
+}
+
+/// Like [`prepare_icrc3_attributes`], but attaches a `sender_info` (the SSO
+/// attribute bundle `info` + `signer`) to the call, the way the SDK
+/// `AttributesIdentity` does in production. Used to exercise the IdP-side
+/// per-app gating consumer (`read_certified_sso_bundle`).
+///
+/// Note: PocketIC impersonates senders and does NOT verify the `sender_info`
+/// canister signature (the `RawSenderInfo` wire form has no signature field), so
+/// the crypto binding of the bundle to the caller's seed is enforced by the real
+/// replica, not here. These tests exercise the canister-observable checks:
+/// `signer == this canister`, expiry, and `bundle.origin == serving origin`.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_icrc3_attributes_with_bundle(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::PrepareIcrc3AttributeRequest,
+    bundle_info: &[u8],
+    signer: Principal,
+) -> Result<
+    Result<
+        types::attributes::PrepareIcrc3AttributeResponse,
+        types::attributes::PrepareIcrc3AttributeError,
+    >,
+    RejectResponse,
+> {
+    let payload = candid::encode_one(request).expect("encode PrepareIcrc3AttributeRequest");
+    let sender_info = RawSenderInfo {
+        info: bundle_info.to_vec(),
+        signer: signer.as_slice().to_vec(),
+    };
+    let bytes = env.update_call_with_sender_info(
+        canister_id,
+        sender,
+        "prepare_icrc3_attributes",
+        payload,
+        sender_info,
+    )?;
+    let (result,) = candid::decode_args(&bytes).expect("decode prepare_icrc3_attributes response");
+    Ok(result)
 }
 
 pub type ListAvailableAttributesResult =

@@ -23,6 +23,7 @@
     authenticatedStore,
     authenticationStore,
   } from "$lib/stores/authentication.store";
+  import { DelegationIdentity } from "@icp-sdk/core/identity";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { purgeSession } from "$lib/stores/session-delegation.store";
   import { sessionStore } from "$lib/stores/session.store";
@@ -237,6 +238,12 @@
       return;
     }
     let earliest = Infinity;
+    // The management flow always authenticates with a `DelegationIdentity`
+    // (passkey / direct OpenID / recovery); the SSO gate's `AttributesIdentity`
+    // only appears in the dapp authorize flow, never here.
+    if (!(authenticated.identity instanceof DelegationIdentity)) {
+      return;
+    }
     for (const { delegation } of authenticated.identity.getDelegation()
       .delegations) {
       const expiryMs = Number(delegation.expiration / BigInt(1_000_000));

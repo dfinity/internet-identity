@@ -565,6 +565,25 @@ type OpenIdPrepareDelegationResponse = record {
     anchor_number : UserNumber;
 };
 
+// Response of `sso_prepare_delegation` (IdP-side per-app gating). Carries the
+// credential-seed openid delegation (identical to
+// `OpenIdPrepareDelegationResponse`) plus the certified SSO attribute bundle
+// message the frontend attaches to subsequent calls via `AttributesIdentity`.
+type SsoPrepareDelegationResponse = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    anchor_number : UserNumber;
+    sso_attr_bundle : blob;
+};
+
+// Response of `sso_get_delegation` (IdP-side per-app gating). Carries the
+// credential-seed `SignedDelegation` plus the canister signature over the SSO
+// attribute bundle message returned by `sso_prepare_delegation`.
+type SsoGetDelegationResponse = record {
+    signed_delegation : SignedDelegation;
+    sso_attr_bundle_signature : blob;
+};
+
 // Email-recovery types
 // ====================
 // See `docs/ongoing/email-recovery.md` for the full design. Covers
@@ -1723,8 +1742,8 @@ service : (opt InternetIdentityInit) -> {
     // `Pending` (re-call to keep the fetch moving), exactly like the openid
     // pair. The trailing args are the SSO discovery domain and the target dapp
     // origin.
-    sso_prepare_delegation : (JWT, Salt, SessionKey, text, FrontendHostname) -> (variant { Ok : OpenIdPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
-    sso_get_delegation : (JWT, Salt, SessionKey, Timestamp, text, FrontendHostname) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
+    sso_prepare_delegation : (JWT, Salt, SessionKey, text, FrontendHostname) -> (variant { Ok : SsoPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
+    sso_get_delegation : (JWT, Salt, SessionKey, Timestamp, text, FrontendHostname, blob) -> (variant { Ok : SsoGetDelegationResponse; Pending; Err : OpenIdDelegationError }) query;
 
     // ===================================================================
     // Email-challenge protocol (shared inbound-DKIM primitive)

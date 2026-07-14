@@ -785,6 +785,16 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Record({}),
     'Err' : SmtpRequestError,
   });
+  const SsoGetDelegationResponse = IDL.Record({
+    'signed_delegation' : SignedDelegation,
+    'sso_attr_bundle_signature' : IDL.Vec(IDL.Nat8),
+  });
+  const SsoPrepareDelegationResponse = IDL.Record({
+    'user_key' : UserKey,
+    'sso_attr_bundle' : IDL.Vec(IDL.Nat8),
+    'expiration' : Timestamp,
+    'anchor_number' : UserNumber,
+  });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
     'archive_canister' : IDL.Opt(IDL.Principal),
@@ -1339,10 +1349,18 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'sso_get_delegation' : IDL.Func(
-        [JWT, Salt, SessionKey, Timestamp, IDL.Text, FrontendHostname],
+        [
+          JWT,
+          Salt,
+          SessionKey,
+          Timestamp,
+          IDL.Text,
+          FrontendHostname,
+          IDL.Vec(IDL.Nat8),
+        ],
         [
           IDL.Variant({
-            'Ok' : SignedDelegation,
+            'Ok' : SsoGetDelegationResponse,
             'Err' : OpenIdDelegationError,
             'Pending' : IDL.Null,
           }),
@@ -1353,7 +1371,7 @@ export const idlFactory = ({ IDL }) => {
         [JWT, Salt, SessionKey, IDL.Text, FrontendHostname],
         [
           IDL.Variant({
-            'Ok' : OpenIdPrepareDelegationResponse,
+            'Ok' : SsoPrepareDelegationResponse,
             'Err' : OpenIdDelegationError,
             'Pending' : IDL.Null,
           }),

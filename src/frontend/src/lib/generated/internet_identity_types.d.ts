@@ -1687,6 +1687,27 @@ export interface SsoDiscovery {
 export type SsoDiscoveryState = { 'NotAllowed' : null } |
   { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
+/**
+ * Response of `sso_get_delegation` (IdP-side per-app gating). Carries the
+ * credential-seed `SignedDelegation` plus the canister signature over the SSO
+ * attribute bundle message returned by `sso_prepare_delegation`.
+ */
+export interface SsoGetDelegationResponse {
+  'signed_delegation' : SignedDelegation,
+  'sso_attr_bundle_signature' : Uint8Array | number[],
+}
+/**
+ * Response of `sso_prepare_delegation` (IdP-side per-app gating). Carries the
+ * credential-seed openid delegation (identical to
+ * `OpenIdPrepareDelegationResponse`) plus the certified SSO attribute bundle
+ * message the frontend attaches to subsequent calls via `AttributesIdentity`.
+ */
+export interface SsoPrepareDelegationResponse {
+  'user_key' : UserKey,
+  'sso_attr_bundle' : Uint8Array | number[],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -2422,8 +2443,16 @@ export interface _SERVICE {
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'sso_get_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey, Timestamp, string, FrontendHostname],
-    { 'Ok' : SignedDelegation } |
+    [
+      JWT,
+      Salt,
+      SessionKey,
+      Timestamp,
+      string,
+      FrontendHostname,
+      Uint8Array | number[],
+    ],
+    { 'Ok' : SsoGetDelegationResponse } |
       { 'Err' : OpenIdDelegationError } |
       { 'Pending' : null }
   >,
@@ -2439,7 +2468,7 @@ export interface _SERVICE {
    */
   'sso_prepare_delegation' : ActorMethod<
     [JWT, Salt, SessionKey, string, FrontendHostname],
-    { 'Ok' : OpenIdPrepareDelegationResponse } |
+    { 'Ok' : SsoPrepareDelegationResponse } |
       { 'Err' : OpenIdDelegationError } |
       { 'Pending' : null }
   >,

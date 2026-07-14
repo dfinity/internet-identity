@@ -1592,7 +1592,7 @@ dependencies = [
  "hex",
  "ic-certification 3.0.3",
  "ic-representation-independent-hash",
- "ic0 1.0.1",
+ "ic0 1.1.0",
  "lazy_static",
  "serde",
  "serde_bytes",
@@ -1915,9 +1915,9 @@ checksum = "8de254dd67bbd58073e23dc1c8553ba12fa1dc610a19de94ad2bbcd0460c067f"
 
 [[package]]
 name = "ic0"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1499d08fd5be8f790d477e1865d63bab6a8d748300e141270c4296e6d5fdd6bc"
+checksum = "c77c8932bff1f09502d0d8c079d5a206a06afe523e35e816162cf4d30b5bf80d"
 
 [[package]]
 name = "ic_bls12_381"
@@ -2241,6 +2241,7 @@ dependencies = [
  "ic-response-verification",
  "ic-stable-structures",
  "ic-verifiable-credentials",
+ "ic0 1.1.0",
  "identity_jose",
  "include_dir",
  "internet_identity_interface",

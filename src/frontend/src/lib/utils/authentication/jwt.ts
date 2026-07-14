@@ -1,5 +1,5 @@
 import { Principal } from "@icp-sdk/core/principal";
-import { Actor } from "@icp-sdk/core/agent";
+import { Actor, type Identity } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
@@ -7,7 +7,11 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 import { MAX_POLL_ATTEMPTS, pollDelay } from "$lib/utils/openidPoll";
-import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
+import {
+  AttributesIdentity,
+  DelegationChain,
+  DelegationIdentity,
+} from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 
 /**
@@ -49,7 +53,7 @@ export const authenticateWithSso = async ({
   discoveryDomain: string;
   origin: string;
 }): Promise<{
-  identity: DelegationIdentity;
+  identity: Identity;
   identityNumber: bigint;
 }> => {
   const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
@@ -74,6 +78,7 @@ export const authenticateWithSso = async ({
       anchor_number: identityNumber,
       expiration,
       user_key,
+      sso_attr_bundle: ssoAttrBundle,
     } = await throwCanisterError(prepared);
 
     const delegation = await actor.sso_get_delegation(
@@ -83,21 +88,36 @@ export const authenticateWithSso = async ({
       expiration,
       discoveryDomain,
       origin,
+      ssoAttrBundle,
     );
     if ("Pending" in delegation) {
       await pollDelay();
       continue;
     }
-    const signedDelegation = await throwCanisterError(delegation);
+    const { signed_delegation: signedDelegation, sso_attr_bundle_signature } =
+      await throwCanisterError(delegation);
     const transformedDelegation = transformSignedDelegation(signedDelegation);
     const delegationChain = DelegationChain.fromDelegations(
       [transformedDelegation],
       new Uint8Array(user_key),
     );
-    const identity = DelegationIdentity.fromDelegation(
+    const delegationIdentity = DelegationIdentity.fromDelegation(
       session.identity,
       delegationChain,
     );
+    // Attach the certified SSO attribute bundle as `sender_info` on every
+    // subsequent call, so the attribute sites can certify `sso:<domain>`
+    // attributes (IdP-side per-app gating, §6.3). The bundle is bound to this
+    // credential seed, so the replica verifies it as a canister signature under
+    // the caller's own principal.
+    const identity = new AttributesIdentity({
+      inner: delegationIdentity,
+      attributes: {
+        data: new Uint8Array(ssoAttrBundle),
+        signature: new Uint8Array(sso_attr_bundle_signature),
+      },
+      signer: { canisterId },
+    });
     return { identity, identityNumber };
   }
 

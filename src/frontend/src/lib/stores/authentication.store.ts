@@ -1,10 +1,10 @@
 import { type Readable, derived, writable } from "svelte/store";
-import { DelegationIdentity } from "@icp-sdk/core/identity";
 import {
   Actor,
   ActorSubclass,
   HttpAgent,
   HttpAgentOptions,
+  type Identity,
 } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -15,7 +15,11 @@ export interface Authenticated {
   identityNumber: bigint;
   nonce: string;
   salt: Uint8Array;
-  identity: DelegationIdentity;
+  // Usually a `DelegationIdentity`; an SSO gate session is an
+  // `AttributesIdentity` wrapping the delegation so the certified SSO attribute
+  // bundle rides along as `sender_info` on every call (IdP-side per-app gating,
+  // §6.3). Both implement `Identity`.
+  identity: Identity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;
   authMethod:

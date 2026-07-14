@@ -122,6 +122,12 @@ export function sendAuthToOpenedTab(
     clearTimeout(timer);
 
     try {
+      // The manage handoff only ever carries a management session, which is a
+      // `DelegationIdentity`. The SSO gate's `AttributesIdentity` lives in the
+      // dapp authorize flow and is never handed off to a manage tab.
+      if (!(auth.identity instanceof DelegationIdentity)) {
+        return;
+      }
       const receiverDer = fromBase64(
         parsed.data.publicKeyDer,
       ) as DerEncodedPublicKey;

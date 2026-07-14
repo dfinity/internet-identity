@@ -1689,7 +1689,9 @@ mod sso_gating {
             "passkey session must not obtain sso:<domain> attributes, got {passkey:?}"
         );
 
-        // SSO session -> the attribute is certified.
+        // SSO session -> the attribute is certified. The session is now the
+        // plain credential principal; the SSO context rides in the certified
+        // bundle attached as `sender_info` (signer = this canister).
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
         let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
@@ -1706,15 +1708,34 @@ mod sso_gating {
             .unwrap()
         }));
         let sso_session_principal = Principal::self_authenticating(gated.user_key.as_ref());
-        let sso = api::prepare_icrc3_attributes(
+        let sso = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            sso_session_principal,
+            request(GATED_ORIGIN),
+            gated.sso_attr_bundle.as_ref(),
+            canister_id,
+        )?;
+        assert!(
+            sso.is_ok(),
+            "SSO session must certify sso:<domain> attributes, got {sso:?}"
+        );
+
+        // Same authorized session, but NO bundle attached (a plain openid
+        // session): no `sso:<domain>` attribute is certified (test category 4,
+        // bundle-absent).
+        let no_bundle = api::prepare_icrc3_attributes(
             &env,
             canister_id,
             sso_session_principal,
             request(GATED_ORIGIN),
         )?;
         assert!(
-            sso.is_ok(),
-            "SSO session must certify sso:<domain> attributes, got {sso:?}"
+            matches!(
+                no_bundle,
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { .. })
+            ),
+            "a bundle-less openid session must not obtain sso:<domain> attributes, got {no_bundle:?}"
         );
         Ok(())
     }
@@ -2111,6 +2132,298 @@ mod sso_gating {
         assert!(
             matches!(result, Err(IdRegFinishError::InvalidAuthnMethod(_))),
             "gate_all_apps must deny registration from an unlisted origin, got {result:?}"
+        );
+        Ok(())
+    }
+
+    // ── certified SSO attribute bundle consumer (`read_certified_sso_bundle`) ──
+    //
+    // These drive `prepare_icrc3_attributes` with a `sender_info` bundle, the way
+    // the SDK `AttributesIdentity` does in production. PocketIC impersonates
+    // senders and does NOT verify the `sender_info` canister signature (the
+    // `RawSenderInfo` wire form carries no signature), so the crypto binding of
+    // the bundle to the caller's credential seed — the cross-identity-replay
+    // guarantee — is enforced by the real replica / SDK (the VERIFIED SAFETY
+    // PROPERTY), not reproducible here. What the CANISTER itself controls, and
+    // what these tests assert, is the fail-closed consumer logic:
+    //   - `signer` must be THIS canister (else `read_certified_sso_bundle` = None),
+    //   - the bundle must not be expired,
+    //   - `bundle.origin` must equal the serving origin,
+    //   - a caller with no bundle (or an unauthorized caller) gets no SSO cert.
+
+    /// Prepare a primary anchor + a gated SSO bundle for `GATED_ORIGIN`. Returns
+    /// `(identity_number, bundle_message)`.
+    fn gated_bundle(
+        env: &PocketIc,
+        canister_id: Principal,
+        responses: &[(String, String)],
+        primary_jwt: &str,
+    ) -> (u64, Vec<u8>) {
+        let identity_number =
+            register_with_primary_credential(env, canister_id, responses, primary_jwt);
+        let session_key = ByteBuf::from("dapp session key");
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let gated = expect_ready(drive_sso_until_ready(env, responses, || {
+            api::sso_prepare_delegation(
+                env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(gated.anchor_number, identity_number);
+        (identity_number, gated.sso_attr_bundle.into_vec())
+    }
+
+    fn sso_attr_request(identity_number: u64, origin: &str) -> PrepareIcrc3AttributeRequest {
+        PrepareIcrc3AttributeRequest {
+            identity_number,
+            origin: origin.to_string(),
+            unmapped_origin: None,
+            account_number: None,
+            attributes: vec![AttributeSpec {
+                key: format!("sso:{GATE_DOMAIN}:email"),
+                value: None,
+                omit_scope: false,
+            }],
+            nonce: vec![9u8; 32],
+        }
+    }
+
+    /// Test category 1 — cross-identity replay / forged signer. A valid bundle
+    /// presented by an UNAUTHORIZED principal is rejected (`AuthorizationError`),
+    /// and a bundle whose `signer` is NOT this canister yields no `sso:<domain>`
+    /// cert even for the authorized session (the `signer == id()` gate). The
+    /// crypto binding that also stops an *authorized* other identity from
+    /// replaying A's bundle is a replica guarantee (see the block comment).
+    #[test]
+    fn cross_identity_or_forged_signer_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+
+        let session_principal = test_principal();
+
+        // Unauthorized caller (not on the anchor) presenting a valid bundle:
+        // `check_authorization` refuses before any SSO attribute is considered.
+        let stranger = Principal::anonymous();
+        let unauthorized = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            stranger,
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?;
+        assert!(
+            matches!(
+                unauthorized,
+                Err(PrepareIcrc3AttributeError::AuthorizationError(_))
+            ),
+            "an unauthorized caller must be rejected regardless of the bundle, got {unauthorized:?}"
+        );
+
+        // Authorized session, but the bundle claims a signer other than this
+        // canister: `read_certified_sso_bundle` fails the `signer == id()` gate,
+        // so no `sso:<domain>` attribute is certified.
+        let forged_signer = Principal::management_canister();
+        let forged = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            session_principal,
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            forged_signer,
+        )?;
+        assert!(
+            matches!(
+                forged,
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { .. })
+            ),
+            "a bundle not signed by this canister must yield no sso:<domain> cert, got {forged:?}"
+        );
+        Ok(())
+    }
+
+    /// Test category 2 — expiry. A bundle whose `expiry` has passed yields no
+    /// `sso:<domain>` cert (the producer stamps `expiry = now + 30min`; we
+    /// advance the replica clock past it and re-present the same bundle).
+    #[test]
+    fn expired_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+
+        // Fresh bundle certifies now.
+        let fresh = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?;
+        assert!(fresh.is_ok(), "fresh bundle must certify, got {fresh:?}");
+
+        // Advance the clock past the bundle's 30-minute expiry.
+        sync_time(&env, TEST_TIME_MS + 31 * 60 * 1_000);
+
+        let expired = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?;
+        assert!(
+            matches!(
+                expired,
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { .. })
+            ),
+            "an expired bundle must yield no sso:<domain> cert, got {expired:?}"
+        );
+        Ok(())
+    }
+
+    /// Test category 3 — icp0.io → ic0.app remap. The bundle-origin match and the
+    /// account seed both key on the CANONICAL (mapped) origin: an attribute
+    /// prepared with `unmapped_origin` set to the icp0.io form still certifies
+    /// (the bundle matches the mapped origin), and the same session's account
+    /// principal `f(account, mapped-origin)` is identical to a passkey session's
+    /// for that mapped origin — i.e. the account seed uses the canonical origin
+    /// identically on both paths.
+    #[test]
+    fn sso_attributes_survive_icp0_to_ic0_remap() -> Result<(), RejectResponse> {
+        // A dapp served on `*.icp0.io`: the frontend remaps it to the canonical
+        // `*.ic0.app` origin and passes THAT as `origin` to both the SSO
+        // ceremony and the attribute/account calls, carrying the icp0.io form as
+        // `unmapped_origin` only for the certified `implicit:origin`.
+        const REMAP_MAPPED: &str = "https://payroll.ic0.app";
+        const REMAP_UNMAPPED: &str = "https://payroll.icp0.io";
+
+        let env = env();
+        let canister_id = install(&env);
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        // Gate the mapped origin (the canonical form the ceremony binds to).
+        let app_clients = format!(r#"{{"{REMAP_MAPPED}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        let identity_number =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("remap session key");
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
+        let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                REMAP_MAPPED,
+            )
+            .unwrap()
+        }));
+        assert_eq!(gated.anchor_number, identity_number);
+        let bundle = gated.sso_attr_bundle.into_vec();
+
+        // Certify with the unmapped (icp0.io) origin set: it must still verify,
+        // because the bundle-origin comparison and the account seed both key on
+        // the mapped (ic0.app) origin, not the unmapped one.
+        let mut request = sso_attr_request(identity_number, REMAP_MAPPED);
+        request.unmapped_origin = Some(REMAP_UNMAPPED.to_string());
+        let remapped = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            request,
+            &bundle,
+            canister_id,
+        )?;
+        assert!(
+            remapped.is_ok(),
+            "an attribute with unmapped_origin set must still certify against the mapped origin, got {remapped:?}"
+        );
+
+        // The account principal the certified attribute is bound to — keyed on
+        // the mapped origin — matches a passkey session's for the same origin.
+        let sso_session_principal = Principal::self_authenticating(gated.user_key.as_ref());
+        let via_sso = prepare_account_delegation(
+            &AccountDelegationParams::new(
+                &env,
+                canister_id,
+                sso_session_principal,
+                identity_number,
+                REMAP_MAPPED.to_string(),
+                None,
+                session_key.clone(),
+            ),
+            None,
+        )?
+        .expect("SSO session mints the mapped-origin account delegation");
+        let via_passkey = prepare_account_delegation(
+            &AccountDelegationParams::new(
+                &env,
+                canister_id,
+                test_principal(),
+                identity_number,
+                REMAP_MAPPED.to_string(),
+                None,
+                session_key.clone(),
+            ),
+            None,
+        )?
+        .expect("passkey session mints the mapped-origin account delegation");
+        assert_eq!(
+            via_sso.user_key, via_passkey.user_key,
+            "account seed keys on the canonical (mapped) origin on both paths"
+        );
+        Ok(())
+    }
+
+    /// Test category 5 — cross-origin. A bundle certified for `GATED_ORIGIN`
+    /// presented on a DIFFERENT serving origin yields no `sso:<domain>` cert
+    /// (`bundle.origin != serving origin`).
+    #[test]
+    fn cross_origin_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+        // `gate_all_apps` off so the primary/ungated origin is also servable, and
+        // so the anchor legitimately owns the SSO domain credential.
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+
+        // Same authorized session and valid bundle (origin = GATED_ORIGIN), but
+        // the call serves a DIFFERENT origin: the origin filter drops the bundle.
+        let cross = api::prepare_icrc3_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            sso_attr_request(identity_number, UNGATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?;
+        assert!(
+            matches!(
+                cross,
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { .. })
+            ),
+            "a bundle for another origin must yield no sso:<domain> cert, got {cross:?}"
         );
         Ok(())
     }
