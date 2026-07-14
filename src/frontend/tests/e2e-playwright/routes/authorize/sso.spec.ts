@@ -520,3 +520,100 @@ test.describe("Authorize with IdP-side per-app gating", () => {
     });
   });
 });
+
+// ===========================================================================
+// Manual "Sign in with SSO" parity (regression guard for the wizard path)
+//
+// The 1-click `?sso=` entry resolves the dapp origin (`waitForEffectiveOrigin`)
+// and signs in via `authenticateWithSso`, attaching the certified attribute
+// bundle. The MANUAL wizard entry ("Sign in with SSO" → type the company
+// domain) must do the same: it takes `ssoOrigin` (the effective origin,
+// forwarded through `AuthWizardView`) so `continueWithSso` builds an `sso`
+// context and `authenticateWithSso` attaches the bundle. If that origin were
+// dropped, the wizard would fall back to the plain OpenID path with NO bundle,
+// so `read_certified_sso_bundle` would return `None` and the session would
+// list/certify NO `sso:<domain>` attributes. This asserts the manual path both
+// LISTS the SSO rows (consent) and CERTIFIES/RETURNS them (round-tripped to the
+// dapp), mirroring the 1-click attribute test.
+// ===========================================================================
+test.describe("Authorize with manual Sign in with SSO", () => {
+  const name = "John Doe";
+  const email = "john.doe@example.com";
+
+  // Round-trip verification — the certified bundle the dapp receives must
+  // replay byte-for-byte through the test_app canister (see `consent.spec.ts`).
+  test.afterEach(
+    ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+      if (authorizedIcrc3Attributes === undefined) return;
+      const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+    },
+  );
+
+  test.use({
+    openIdConfig: {
+      defaultPort: SSO_OPENID_PORT,
+      createUsers: [{ claims: { name, email } }],
+    },
+    // No `sso:` field → the regular authorize entry (the wizard), NOT the
+    // `?sso=` 1-click path. The dapp still requests the SSO-scoped attributes.
+    authorizeConfig: {
+      protocol: "icrc25",
+      useIcrc3Attributes: true,
+      attributes: [
+        `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+        `sso:${SSO_DISCOVERY_DOMAIN}:email`,
+      ],
+    },
+  });
+
+  test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+    expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    // Certified/returned: the manual session attached the bundle, so the dapp
+    // received the SSO attributes.
+    expect(authorizedIcrc3Attributes).toBeDefined();
+    if (authorizedIcrc3Attributes === undefined) return;
+    const textEntries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+    expect(textEntries).toMatchObject({
+      [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
+      [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
+    });
+  });
+
+  test("lists and certifies SSO attributes via the manual wizard entry", async ({
+    attributeConsentView,
+    authorizePage,
+    openSsoPopup,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    const consent = attributeConsentView(authorizePage.page);
+    // Manual entry: click "Sign in with SSO" and type the company domain.
+    const ssoPage = await openSsoPopup(
+      authorizePage.page,
+      SSO_DISCOVERY_DOMAIN,
+      "signin",
+    );
+    const closePromise = ssoPage.waitForEvent("close", { timeout: 15_000 });
+    await signInWithOpenId(ssoPage, openIdUsers[0].id);
+    await closePromise;
+    // Fresh SSO user → IdentityNotConnectedDialog; confirm sign-up.
+    await authorizePage.page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign up" })
+      .click();
+    await authorizePage.page
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+    // LISTED: the consent screen surfaces the SSO-scoped rows (only possible
+    // when `list_available_attributes` saw the certified bundle).
+    await consent.waitForVisible();
+    await expect(
+      consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
+    ).toBeVisible();
+    await expect(
+      consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
+    ).toBeVisible();
+    await consent.continue();
+  });
+});
