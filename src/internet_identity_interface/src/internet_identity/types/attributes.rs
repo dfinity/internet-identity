@@ -853,10 +853,11 @@ pub struct ListAvailableAttributesRequest {
     pub identity_number: AnchorNumber,
     pub attributes: Option<Vec<String>>,
     /// The dapp origin, when the caller authenticates through an SSO session
-    /// (IdP-side per-app gating, §6.3): it lets the canister recompute the
-    /// SSO-session principal `seed(iss, sub, sso_domain, origin, anchor)` and
-    /// authorize this read for it. Additive; omitted by device / OpenID
-    /// sessions, which authorize via the usual authentication check.
+    /// (IdP-side per-app gating, §6.3): it is matched against the certified SSO
+    /// attribute bundle attached to the call so the listing includes
+    /// `sso:<domain>` rows only for a bundle whose origin matches (what this
+    /// session can actually certify). Additive; omitted by device / OpenID
+    /// sessions, which carry no bundle and see no `sso:` rows.
     pub origin: Option<FrontendHostname>,
 }
 

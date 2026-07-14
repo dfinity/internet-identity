@@ -1366,7 +1366,8 @@ mod sso_gating {
         prepare_account_delegation, AccountDelegationParams,
     };
     use internet_identity_interface::internet_identity::types::attributes::{
-        AttributeSpec, PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
+        AttributeSpec, ListAvailableAttributesRequest, PrepareIcrc3AttributeError,
+        PrepareIcrc3AttributeRequest,
     };
     use internet_identity_interface::internet_identity::types::{
         AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
@@ -2424,6 +2425,71 @@ mod sso_gating {
                 Err(PrepareIcrc3AttributeError::AttributeMismatch { .. })
             ),
             "a bundle for another origin must yield no sso:<domain> cert, got {cross:?}"
+        );
+        Ok(())
+    }
+
+    /// `list_available_attributes` offers `sso:<domain>` rows only to a session
+    /// holding a matching certified bundle (Issue-2 UX: never offer a key that
+    /// `prepare_icrc3_attributes` would then refuse). A bundle-less session sees
+    /// no `sso:` rows; an SSO session with a matching bundle sees them.
+    #[test]
+    fn list_available_attributes_gates_sso_rows_on_bundle() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "sub"), jwks);
+        let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
+
+        let request = |origin: &str| ListAvailableAttributesRequest {
+            identity_number,
+            attributes: None,
+            origin: Some(origin.to_string()),
+        };
+        let sso_email_key = format!("sso:{GATE_DOMAIN}:email");
+
+        // Bundle-less (plain openid) session: no `sso:<domain>` rows offered.
+        let no_bundle = api::list_available_attributes(
+            &env,
+            canister_id,
+            test_principal(),
+            request(GATED_ORIGIN),
+        )?
+        .expect("list succeeds");
+        assert!(
+            !no_bundle.iter().any(|(k, _)| *k == sso_email_key),
+            "a bundle-less session must not be offered sso:<domain> rows, got {no_bundle:?}"
+        );
+
+        // SSO session with a matching certified bundle: `sso:<domain>` rows show.
+        let with_bundle = api::list_available_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            request(GATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?
+        .expect("list succeeds");
+        assert!(
+            with_bundle.iter().any(|(k, _)| *k == sso_email_key),
+            "an SSO session with a matching bundle must be offered sso:<domain> rows, got {with_bundle:?}"
+        );
+
+        // Cross-origin bundle: the origin filter drops it, so no `sso:` rows.
+        let cross = api::list_available_attributes_with_bundle(
+            &env,
+            canister_id,
+            test_principal(),
+            request(UNGATED_ORIGIN),
+            &bundle,
+            canister_id,
+        )?
+        .expect("list succeeds");
+        assert!(
+            !cross.iter().any(|(k, _)| *k == sso_email_key),
+            "a cross-origin bundle must not surface sso:<domain> rows, got {cross:?}"
         );
         Ok(())
     }

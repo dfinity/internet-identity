@@ -2475,19 +2475,27 @@ mod attribute_sharing {
         let ValidatedListAvailableAttributesRequest {
             identity_number,
             attributes,
-            origin: _origin,
+            origin,
         } = request.try_into()?;
 
         // The plain openid-credential principal an SSO session now uses is
-        // recognized by `check_authorization` (IdP-side per-app gating, §6.3),
-        // so no bundle gating is needed to list available attributes; the
-        // `sso:<domain>` scope filtering is applied per-key at certify time.
+        // recognized by `check_authorization` (IdP-side per-app gating, §6.3).
+        // The `sso:<domain>` rows are gated by the certified bundle — the same
+        // signal `prepare_icrc3_attributes` uses — so the listing offers only
+        // what this session can actually certify. A missing origin (device /
+        // direct-OpenID callers omit it) never matches a bundle, so no `sso:`
+        // rows surface.
+        let sso_session_domain = origin.as_ref().and_then(|origin| {
+            openid::read_certified_sso_bundle()
+                .filter(|bundle| &bundle.origin == origin)
+                .map(|bundle| bundle.sso_domain)
+        });
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 ListAvailableAttributesError::AuthorizationError(principal)
             })?;
 
-        Ok(anchor.list_available_attributes(attributes))
+        Ok(anchor.list_available_attributes(attributes, sso_session_domain))
     }
 }
 

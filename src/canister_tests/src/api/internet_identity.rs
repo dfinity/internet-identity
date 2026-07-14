@@ -758,6 +758,34 @@ pub fn list_available_attributes(
     .map(|(x,)| x)
 }
 
+/// Like [`list_available_attributes`], but attaches a `sender_info` (SSO
+/// attribute bundle `info` + `signer`) to the query, as the SDK
+/// `AttributesIdentity` does. See [`prepare_icrc3_attributes_with_bundle`] for
+/// the PocketIC signature-verification caveat.
+pub fn list_available_attributes_with_bundle(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::ListAvailableAttributesRequest,
+    bundle_info: &[u8],
+    signer: Principal,
+) -> Result<ListAvailableAttributesResult, RejectResponse> {
+    let payload = candid::encode_one(request).expect("encode ListAvailableAttributesRequest");
+    let sender_info = RawSenderInfo {
+        info: bundle_info.to_vec(),
+        signer: signer.as_slice().to_vec(),
+    };
+    let bytes = env.query_call_with_sender_info(
+        canister_id,
+        sender,
+        "list_available_attributes",
+        payload,
+        sender_info,
+    )?;
+    let (result,) = candid::decode_args(&bytes).expect("decode list_available_attributes response");
+    Ok(result)
+}
+
 // --- Email recovery ---
 
 pub fn email_recovery_credential_prepare_add(
