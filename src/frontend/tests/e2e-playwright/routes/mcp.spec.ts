@@ -38,7 +38,7 @@ const expirationMillis = (expiration: string): number =>
  *  Defaults to full access where the chosen level doesn't affect the assertion. */
 const allowAccess = async (
   page: Page,
-  level: "Queries only" | "Actions & queries" = "Actions & queries",
+  level: "Questions only" | "Actions & questions" = "Actions & questions",
 ): Promise<void> => {
   await page.getByRole("radio", { name: level }).check();
   await page.getByRole("button", { name: "Allow access" }).click();
@@ -247,11 +247,11 @@ test("Allow access mints a registration delegation the server redeems", async ({
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   // The MCP connect flow always shows the access-level choice, with nothing
   // pre-selected on a first-time connect: "Allow access" is disabled until the
-  // user picks a level. Choosing "Queries only" makes the connect read-only.
+  // user picks a level. Choosing "Questions only" makes the connect read-only.
   await expect(
     page.getByRole("button", { name: "Allow access" }),
   ).toBeDisabled();
-  await allowAccess(page, "Queries only");
+  await allowAccess(page, "Questions only");
 
   // II minted a short-lived P_reg -> Y -> X registration chain and handed it
   // to the trusted server's declared callback (in the fragment; no consent
@@ -264,8 +264,8 @@ test("Allow access mints a registration delegation the server redeems", async ({
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
   expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
-  // With "Queries only" chosen, the grant is queries-only. The full-access
-  // path (choosing "Actions & queries") has its own test below.
+  // With "Questions only" chosen, the grant is queries-only. The full-access
+  // path (choosing "Actions & questions") has its own test below.
   expect(completion.permissions).toBe("queries");
   // The tab landed on the server's connect page, which shows its connected
   // state once the redemption succeeds.
@@ -371,7 +371,7 @@ test("Identity switcher shows while signing in and hides once connecting", async
 
   // Pick an access level to enable "Allow access" (unselected on a first-time
   // connect), then connect.
-  await page.getByRole("radio", { name: "Actions & queries" }).check();
+  await page.getByRole("radio", { name: "Actions & questions" }).check();
   await allow.click();
   // Once connecting, the switcher is gone — and it stays gone as the tab is
   // handed to the server's declared callback (a different origin entirely).
@@ -499,8 +499,8 @@ test("Choosing actions & queries connects with full access", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await allowAccess(page, "Actions & queries");
-  // Choosing "Actions & queries" makes the session full access, recorded on the
+  await allowAccess(page, "Actions & questions");
+  // Choosing "Actions & questions" makes the session full access, recorded on the
   // registration entry at prepare and reflected in the grant the server gets
   // back from mcp_register_v2.
   const completion = await mcp.completion;
@@ -519,19 +519,21 @@ test("Remembers the access-level choice for the next connect", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page);
 
-  // First connect: nothing pre-selected, so the user picks "Queries only".
+  // First connect: nothing pre-selected, so the user picks "Questions only".
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await expect(
     page.getByRole("button", { name: "Allow access" }),
   ).toBeDisabled();
-  await allowAccess(page, "Queries only");
+  await allowAccess(page, "Questions only");
   await expect(page.getByRole("heading", { name: "Connected" })).toBeVisible();
 
   // Second connect from the same browser: the choice was persisted, so
-  // "Queries only" is pre-selected and "Allow access" is enabled with no
+  // "Questions only" is pre-selected and "Allow access" is enabled with no
   // further interaction.
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await expect(page.getByRole("radio", { name: "Queries only" })).toBeChecked();
+  await expect(
+    page.getByRole("radio", { name: "Questions only" }),
+  ).toBeChecked();
   await expect(
     page.getByRole("button", { name: "Allow access" }),
   ).toBeEnabled();

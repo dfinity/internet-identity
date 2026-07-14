@@ -49,7 +49,7 @@
     displayOrigin: string;
     /** Called when the user confirms with the default account or selects a
      *  specific account. `accessLevel` reflects the access-level choice
-     *  ("Queries only" vs "Actions & queries"): "read-only" restricts the
+     *  ("Questions only" vs "Actions & questions"): "read-only" restricts the
      *  session delegation to query calls, so the app can read on the user's
      *  behalf but cannot change state (the Internet Computer rejects update
      *  calls authenticated through it). */
