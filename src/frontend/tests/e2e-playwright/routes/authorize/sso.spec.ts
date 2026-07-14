@@ -381,38 +381,19 @@ test.describe("Authorize with 1-click SSO", () => {
   });
 });
 
-// ===========================================================================
-// IdP-side per-app SSO gating (docs/ongoing/enterprise-sso-idp-side-gating.md)
-//
-// The test provider serves `app_clients` / `gate_all_apps` in its well-known
-// (configured via `configureSsoGating`), so a dapp origin becomes gated (served
-// by a dedicated per-app client) or denied. The frontend threads the dapp
-// origin into `get_sso_discovery` (→ `resolved_client_id`) and signs in via
-// `sso_prepare_delegation` (the SSO gate path).
-//
-// Both cases discover through SSO_GATING_DISCOVERY_DOMAIN (`127.0.0.1:11107`),
-// NOT the un-gated tests' `localhost:11107`: II caches discovery per domain for
-// ~1h with no force-refresh, so a shared domain would let an earlier un-gated
-// lookup pin a stale config here (and vice-versa). A distinct host string is a
-// distinct cache key, isolating the two suites in any shard order.
-//
-// To keep that single gating cache entry coherent no matter which test warms it
-// first, BOTH cases use ONE gating config: the gated origin is listed (served by
-// the per-app client) and `gate_all_apps` denies everything else. So the gated
-// test uses the listed origin and the denied test uses an unlisted one — nothing
-// mutates the config between them.
-// ===========================================================================
+// IdP-side per-app SSO gating: the test provider serves `app_clients` /
+// `gate_all_apps` in its well-known, so a dapp origin becomes gated (served by a
+// per-app client) or denied. Both cases discover through
+// SSO_GATING_DISCOVERY_DOMAIN and share one gating config, so nothing mutates it
+// between them.
 test.describe("Authorize with IdP-side per-app gating", () => {
   const name = "John Doe";
-  // Listed in `app_clients` → served by the per-app client. The frontend remaps
-  // `testAppURL` to the effective origin used for the delegation/gate; for
-  // `nice-name.com` that is the origin itself.
+  // Listed in `app_clients` → served by the per-app client.
   const GATED_ORIGIN = "https://nice-name.com";
   // Absent from `app_clients` → denied by `gate_all_apps`.
   const DENIED_ORIGIN = "https://denied-app.com";
 
-  // One config for both tests (see the block comment): the gated origin is
-  // allowed via its per-app client, every other origin is denied.
+  // Gated origin allowed via its per-app client; every other origin denied.
   const gatingConfig = {
     appClients: { [GATED_ORIGIN]: SSO_PER_APP_CLIENT_ID },
     gateAllApps: true,
@@ -432,9 +413,7 @@ test.describe("Authorize with IdP-side per-app gating", () => {
     });
 
     test.afterEach(({ authorizedPrincipal }) => {
-      // Reaching a non-anonymous principal proves the whole gated chain
-      // (per-app `aud` accepted, identity registered, gated session minted,
-      // delegation issued to the dapp) completed.
+      // Non-anonymous principal proves the gated chain completed.
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
     });
 
@@ -444,16 +423,13 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       openIdUsers,
       configureSsoGating,
     }) => {
-      // A brand-new user hitting a gated app whose org keys identities on the
-      // stable `sub` registers DIRECTLY through the per-app client in a single
-      // IdP trip (§6.1) — no "sign in normally first" detour. Auto-drive the one
-      // IdP popup the ceremony opens with the assigned user, then finalise on the
-      // standard post-registration "Continue to <app>" account screen.
+      // A brand-new user on a `sub`-keyed org registers directly through the
+      // per-app client; auto-drive the IdP popup, then finalise on the account
+      // screen.
       await configureSsoGating(gatingConfig);
       authorizePage.page.context().on("page", (popup) => {
         void signInWithOpenId(popup, openIdUsers[0].id).catch(() => {
-          // A popup can close before it's driven; ignore and let the flow
-          // proceed.
+          // A popup can close before it's driven; ignore.
         });
       });
       await authorizePage.page
@@ -497,10 +473,8 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       authorizePage,
       configureSsoGating,
     }) => {
-      // With `gate_all_apps` on and this origin absent from `app_clients`,
-      // discovery resolves the domain but denies the origin, so the Continue
-      // button never enables and an inline "not granted" error is shown — no
-      // delegation is issued.
+      // Origin denied under `gate_all_apps`: discovery resolves the domain but
+      // Continue never enables and an inline "not granted" error is shown.
       await configureSsoGating(gatingConfig);
       await authorizePage.page
         .getByRole("button", { name: "Sign in with SSO" })
@@ -513,35 +487,21 @@ test.describe("Authorize with IdP-side per-app gating", () => {
           /hasn't granted this app access|not granted/i,
         ),
       ).toBeVisible({ timeout: 30_000 });
-      // This flow never authorizes, so the auth tab won't close on its own;
-      // close it so the `authorizePage` fixture's teardown (which awaits
-      // `close`) doesn't time out. Mirrors the conflicting-`?openid`/`?sso` test.
+      // This flow never authorizes, so close the tab manually or the
+      // `authorizePage` fixture teardown (awaits `close`) times out.
       await authorizePage.page.close();
     });
   });
 });
 
-// ===========================================================================
-// Manual "Sign in with SSO" parity (regression guard for the wizard path)
-//
-// The 1-click `?sso=` entry resolves the dapp origin (`waitForEffectiveOrigin`)
-// and signs in via `authenticateWithSso`, attaching the certified attribute
-// bundle. The MANUAL wizard entry ("Sign in with SSO" → type the company
-// domain) must do the same: it takes `ssoOrigin` (the effective origin,
-// forwarded through `AuthWizardView`) so `continueWithSso` builds an `sso`
-// context and `authenticateWithSso` attaches the bundle. If that origin were
-// dropped, the wizard would fall back to the plain OpenID path with NO bundle,
-// so `read_certified_sso_bundle` would return `None` and the session would
-// list/certify NO `sso:<domain>` attributes. This asserts the manual path both
-// LISTS the SSO rows (consent) and CERTIFIES/RETURNS them (round-tripped to the
-// dapp), mirroring the 1-click attribute test.
-// ===========================================================================
+// The manual wizard entry ("Sign in with SSO" → type the domain) must attach the
+// certified SSO bundle like the 1-click path; otherwise the session lists and
+// certifies no `sso:<domain>` attributes.
 test.describe("Authorize with manual Sign in with SSO", () => {
   const name = "John Doe";
   const email = "john.doe@example.com";
 
-  // Round-trip verification — the certified bundle the dapp receives must
-  // replay byte-for-byte through the test_app canister (see `consent.spec.ts`).
+  // Round-trip: the certified bundle must replay through the test_app canister.
   test.afterEach(
     ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
       if (authorizedIcrc3Attributes === undefined) return;
@@ -555,8 +515,7 @@ test.describe("Authorize with manual Sign in with SSO", () => {
       defaultPort: SSO_OPENID_PORT,
       createUsers: [{ claims: { name, email } }],
     },
-    // No `sso:` field → the regular authorize entry (the wizard), NOT the
-    // `?sso=` 1-click path. The dapp still requests the SSO-scoped attributes.
+    // No `sso:` field → the wizard entry, not the `?sso=` 1-click path.
     authorizeConfig: {
       protocol: "icrc25",
       useIcrc3Attributes: true,
@@ -569,8 +528,7 @@ test.describe("Authorize with manual Sign in with SSO", () => {
 
   test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
     expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-    // Certified/returned: the manual session attached the bundle, so the dapp
-    // received the SSO attributes.
+    // Certified/returned: the manual session attached the bundle.
     expect(authorizedIcrc3Attributes).toBeDefined();
     if (authorizedIcrc3Attributes === undefined) return;
     const textEntries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
@@ -605,8 +563,7 @@ test.describe("Authorize with manual Sign in with SSO", () => {
     await authorizePage.page
       .getByRole("button", { name: "Continue", exact: true })
       .click();
-    // LISTED: the consent screen surfaces the SSO-scoped rows (only possible
-    // when `list_available_attributes` saw the certified bundle).
+    // Listed: the consent screen surfaces the SSO-scoped rows.
     await consent.waitForVisible();
     await expect(
       consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
@@ -618,26 +575,16 @@ test.describe("Authorize with manual Sign in with SSO", () => {
   });
 });
 
-// ===========================================================================
-// "Continue as a last-used SSO identity" parity (the real coverage hole)
-//
-// After an SSO sign-in stores a last-used SSO entry, a later authorize load
-// with no active session shows the ContinueView "Continue" button. That
-// re-auth path (`authLastUsedFlow.authenticate`) must ALSO redeem through the
-// gate path (`authenticateWithSso`) so the certified attribute bundle is
-// attached — otherwise it falls back to the plain OpenID path with no bundle,
-// and the session lists/certifies NO `sso:<domain>` attributes (the exact bug
-// the user hit). This drives two authorize ceremonies in one context: a
-// 1-click SSO sign-in to seed the last-used entry, then a regular authorize
-// where we click "Continue" and assert the SSO attributes are BOTH listed
-// (consent rows) AND certified/returned (round-tripped to the dapp).
-// ===========================================================================
+// The last-used SSO re-auth (`authLastUsedFlow.authenticate` behind the
+// ContinueView "Continue" button) must redeem through the gate path so the
+// certified attribute bundle is attached; otherwise the session lists and
+// certifies no `sso:<domain>` attributes.
 test.describe("Continue as a last-used SSO identity", () => {
   const name = "John Doe";
   const email = "john.doe@example.com";
 
-  // Round-trip verification: the certified bundle the dapp receives on the
-  // SECOND (Continue) authorize must replay through the test_app canister.
+  // Round-trip: the certified bundle from the Continue authorize must replay
+  // through the test_app canister.
   test.afterEach(
     ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
       if (authorizedIcrc3Attributes === undefined) return;
@@ -651,9 +598,8 @@ test.describe("Continue as a last-used SSO identity", () => {
       defaultPort: SSO_OPENID_PORT,
       createUsers: [{ claims: { name, email } }],
     },
-    // The FIRST authorize is `?sso=` 1-click, which seeds the last-used SSO
-    // entry. The SECOND authorize (driven in the body) drops `?sso=` so the
-    // ContinueView path runs.
+    // First authorize (`?sso=` 1-click) seeds the last-used SSO entry; the second
+    // drops `?sso=` to run the ContinueView path.
     authorizeConfig: {
       protocol: "icrc25",
       sso: SSO_DISCOVERY_DOMAIN,
@@ -688,10 +634,9 @@ test.describe("Continue as a last-used SSO identity", () => {
     await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
 
-    // SECOND authorize: re-navigate the test_app (resets #principal) and drive a
-    // REGULAR authorize (no `?sso=`), re-selecting ICRC-3 + the same requested
-    // attributes. The last-used SSO identity persists in localStorage across the
-    // reload, so the II popup shows the ContinueView "Continue" path.
+    // SECOND authorize: re-navigate test_app and drive a regular authorize (no
+    // `?sso=`). The last-used SSO identity persists across the reload, so the II
+    // popup shows the ContinueView "Continue" path.
     await page.goto("https://nice-name.com");
     await page
       .getByRole("textbox", { name: "Identity Provider" })
@@ -715,16 +660,14 @@ test.describe("Continue as a last-used SSO identity", () => {
     await page.getByRole("button", { name: "Sign In" }).click();
     const secondAuth = await secondAuthPromise;
 
-    // "Continue" as the last-used SSO identity → re-auth runs the SSO ceremony
-    // (`requestWithPopup`). The IdP session established by the first sign-in is
-    // reused (`mediation: "optional"`), so the ceremony popup auto-completes
-    // without a sign-in form; control returns to the consent screen.
+    // Continue re-runs the SSO ceremony; the first sign-in's IdP session is
+    // reused (`mediation: "optional"`), so the popup auto-completes without a
+    // sign-in form.
     await secondAuth
       .getByRole("button", { name: "Continue", exact: true })
       .click();
 
-    // LISTED: the consent screen surfaces the SSO-scoped rows (only possible
-    // when the re-auth attached the certified bundle). Accept to certify.
+    // Listed: the consent screen surfaces the SSO-scoped rows. Accept to certify.
     const consent = attributeConsentView(secondAuth);
     await consent.waitForVisible();
     await expect(

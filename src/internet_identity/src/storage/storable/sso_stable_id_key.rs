@@ -3,21 +3,9 @@ use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-/// Key for the auxiliary SSO stable-id bridge (§6.5):
-/// `(iss, primary_client_id, stable_id) -> primary_sub`.
-///
-/// The bridge maps a non-`sub` org's cross-client-stable identifier (e.g. Entra
-/// `oid`) to the org's primary-client `sub`, so a later gated per-app login
-/// (whose pairwise `sub` differs) resolves to the primary identity. The
-/// `primary_client_id` component scopes each entry to its primary client: one
-/// tenant exposed through two II discovery domains (different primary clients)
-/// has a distinct pairwise `primary_sub` per client, so keying on `(iss,
-/// stable_id)` alone would let one clobber the other (last-writer-wins). Adding
-/// `primary_client_id` removes that collision and stops resting isolation on
-/// `iss` being tenant-unique.
-///
-/// Serialized as a CBOR map `{0: iss, 1: primary_client_id, 2: stable_id}` via
-/// the `#[cbor(map)]` derive, mirroring [`super::openid_credential_key`].
+/// Key for the SSO stable-id bridge: `(iss, primary_client_id, stable_id) -> primary_sub`.
+/// `primary_client_id` scopes each entry to its primary client so distinct
+/// clients on the same `iss` don't collide.
 #[derive(Encode, Decode, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableSsoStableIdKey {

@@ -51,29 +51,21 @@ pub struct OpenIdPrepareDelegationResponse {
     pub anchor_number: AnchorNumber,
 }
 
-/// Response of `sso_prepare_delegation` (IdP-side per-app gating). Carries the
-/// credential-seed openid delegation (`user_key` / `expiration` /
-/// `anchor_number`, identical to [`OpenIdPrepareDelegationResponse`]) PLUS the
-/// certified SSO attribute bundle `message` the frontend attaches to subsequent
-/// calls via the SDK `AttributesIdentity`.
+/// Response of `sso_prepare_delegation`.
 #[derive(CandidType, Debug, Deserialize)]
 pub struct SsoPrepareDelegationResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
     pub anchor_number: AnchorNumber,
-    /// The SSO attribute bundle message bytes (encodes `sso_domain`, `origin`,
-    /// `expiry`). Paired with the signature from `sso_get_delegation`.
+    /// SSO attribute bundle message bytes (encodes `sso_domain`, `origin`, `expiry`).
     pub sso_attr_bundle: ByteBuf,
 }
 
-/// Response of `sso_get_delegation` (IdP-side per-app gating). Carries the
-/// credential-seed `SignedDelegation` PLUS the canister signature over the SSO
-/// attribute bundle message returned by `sso_prepare_delegation`.
+/// Response of `sso_get_delegation`.
 #[derive(CandidType, Debug, Deserialize)]
 pub struct SsoGetDelegationResponse {
     pub signed_delegation: SignedDelegation,
-    /// Canister signature over the bundle `message` from
-    /// `SsoPrepareDelegationResponse.sso_attr_bundle`.
+    /// Canister signature over the `sso_attr_bundle` message.
     pub sso_attr_bundle_signature: ByteBuf,
 }
 

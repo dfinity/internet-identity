@@ -21,7 +21,6 @@ const DISCOVERY: SsoDiscovery = {
   authorization_endpoint: "https://dfinity.okta.com/oauth2/v1/authorize",
   scopes: ["openid", "profile", "email"],
   name: ["DFINITY"],
-  // No origin supplied -> mirrors the primary client_id.
   resolved_client_id: ["dfinity-sso-client-id"],
 };
 
@@ -116,7 +115,6 @@ describe("ssoDiscovery", () => {
           scopes_supported: ["openid", "profile", "email"],
         },
       });
-      // No origin was supplied, so the query was called with an empty origin.
       expect(anonymousActor.get_sso_discovery).toHaveBeenCalledWith(
         "dfinity.org",
         [],
@@ -129,7 +127,6 @@ describe("ssoDiscovery", () => {
       vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
         Resolved: {
           ...DISCOVERY,
-          // Gated origin -> a dedicated per-app client.
           resolved_client_id: ["per-app-client-id"],
         },
       });
@@ -141,7 +138,6 @@ describe("ssoDiscovery", () => {
       );
 
       expect(result.resolvedClientId).toBe("per-app-client-id");
-      // The primary client is still reported separately.
       expect(result.clientId).toBe("dfinity-sso-client-id");
       expect(anonymousActor.get_sso_discovery).toHaveBeenCalledWith(
         "dfinity.org",
@@ -153,7 +149,6 @@ describe("ssoDiscovery", () => {
       vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
         Resolved: {
           ...DISCOVERY,
-          // Origin denied under gate_all_apps -> no resolved client.
           resolved_client_id: [],
         },
       });

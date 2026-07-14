@@ -220,11 +220,8 @@ pub fn verify_openid_for_registration(
     } = openid_registration_data;
 
     openid::prefetch_sso(discovery_domain.as_deref());
-    // A first *gated* SSO login carries both a discovery domain and the dapp
-    // origin: verify through the SSO gate (§6.2) and store the PRIMARY-keyed
-    // credential (primary-client substitution, §6.1), so the gated token never
-    // becomes a per-app credential. Every other registration (direct providers,
-    // normal un-gated SSO) keeps the untouched `verify_jwt` path.
+    // Both discovery domain and origin present means a gated SSO login: verify
+    // through the SSO gate and store the primary-keyed credential.
     let openid_credential = match (discovery_domain.as_deref(), origin.as_deref()) {
         (Some(discovery_domain), Some(origin)) => {
             match openid::verify_sso_for_registration(jwt, salt, discovery_domain, origin)? {
@@ -234,9 +231,7 @@ pub fn verify_openid_for_registration(
         }
         _ => match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
             openid::Cached::Ready(credential) => {
-                // A normal (un-gated) primary-client SSO registration for a
-                // non-`sub` org records the aux bridge so a later gated login can
-                // resolve this identity (§6.5). No-op for `sub` / direct providers.
+                // Record the aux bridge so a later gated login resolves this identity.
                 openid::note_primary_sso_login(jwt, &credential);
                 credential
             }

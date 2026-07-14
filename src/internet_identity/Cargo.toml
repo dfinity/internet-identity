@@ -49,11 +49,8 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 
 # All IC deps
 candid.workspace = true
-# `ic0 1.1` exposes the `msg_caller_info_*` system API (the certified SSO
-# attribute bundle consumer in `openid.rs`). It has no `links` key, so it
-# coexists with the `ic0 0.23` pulled in transitively by `ic-cdk` and does not
-# force an `ic-cdk` bump (0.20 would collide with the pinned vc-sdk via
-# `ic-cdk-executor`'s `links`).
+# Separate `ic0 1.1` for the `msg_caller_info_*` system API; it has no `links`
+# key, so it coexists with the `ic0 0.23` pulled in transitively by `ic-cdk`.
 ic0 = "1.1"
 ic-cdk = { workspace = true, features = ["transform-closure"] }
 ic-cdk-macros.workspace = true

@@ -493,10 +493,6 @@ fn get_accounts(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
-    // Account methods are permissionless (IdP-side per-app gating, §6.3): the
-    // SSO session is now the plain openid-credential principal, which
-    // `check_session_authorization` accepts (via `check_authorization`), so no
-    // bundle gating is needed here.
     if check_session_authorization(anchor_number).is_err() {
         return Err(GetAccountsError::Unauthorized(caller()));
     }
@@ -548,9 +544,6 @@ fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    // Account methods are permissionless (IdP-side per-app gating, §6.3): the
-    // SSO session is the plain openid-credential principal, accepted by
-    // `check_session_authorization` (via `check_authorization`).
     if check_session_authorization(anchor_number).is_err() {
         return Err(GetDefaultAccountError::Unauthorized(caller()));
     }
@@ -598,9 +591,6 @@ async fn prepare_account_delegation(
     max_ttl: Option<u64>,
     permissions: Option<Permissions>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    // Account methods are permissionless (IdP-side per-app gating, §6.3): the
-    // SSO session is the plain openid-credential principal, which
-    // `check_authz_and_record_activity` (via `check_authorization`) recognizes.
     let ii_domain = check_authz_and_record_activity(anchor_number)?;
     account_management::prepare_account_delegation(
         anchor_number,
@@ -629,10 +619,6 @@ fn get_account_delegation(
     expiration: Timestamp,
     permissions: Option<Permissions>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    // Account methods are permissionless (IdP-side per-app gating, §6.3): the
-    // SSO session is the plain openid-credential principal, which
-    // `check_authorization` recognizes, yielding the same `f(account, origin)`
-    // principal any other session would.
     if check_authorization(anchor_number).is_err() {
         return Err(AccountDelegationError::Unauthorized(caller()));
     }
@@ -1728,10 +1714,7 @@ mod openid_api {
     /// Read the state of `domain`'s SSO discovery: `Resolved` with the config,
     /// `Pending` while the fetch is in flight, or `NotAllowed`.
     ///
-    /// When `origin` is supplied, the resolved config's `resolved_client_id`
-    /// reports the client that origin must run its ceremony against (IdP-side
-    /// per-app gating): the per-app client if listed, the primary client if
-    /// not, or `None` when denied under `gate_all_apps`.
+    /// When `origin` is supplied, the resolved `resolved_client_id` is the client that origin must use.
     #[query]
     fn get_sso_discovery(
         domain: String,
@@ -1743,17 +1726,8 @@ mod openid_api {
         )
     }
 
-    /// SSO sign-in — the IdP-side per-app gating path (§6.2). Verifies the JWT,
-    /// enforces the gate (`aud == the origin's declared client`), resolves the
-    /// anchor to the primary identity, and mints the PLAIN credential-seed
-    /// openid delegation (recognized by `check_authorization`). A refused gate
-    /// mints nothing. `openid_prepare_delegation` is left unchanged for direct
-    /// providers.
-    ///
-    /// Alongside the delegation it prepares a certified SSO attribute bundle
-    /// (signed under the same credential seed) carrying `(sso_domain, origin,
-    /// expiry)`; the frontend attaches it to subsequent calls via the SDK
-    /// `AttributesIdentity` so the attribute sites can certify `sso:<domain>`.
+    /// SSO sign-in: verify the JWT, enforce the per-app gate, resolve the primary
+    /// identity, and mint the openid delegation plus a certified SSO attribute bundle.
     #[update]
     async fn sso_prepare_delegation(
         jwt: String,
@@ -1776,10 +1750,7 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err),
         };
 
-        // Update context: persist the aux bridge entry a non-`sub` primary-client
-        // login surfaces (§6.5), so a later gated per-app login for this user
-        // resolves. `resolve_primary_identity` stays pure so the paired
-        // `sso_get_delegation` query can reuse it without writing.
+        // Persist the aux bridge entry (updates only; the paired query can't write).
         if let Some(record) = &identity.aux_record {
             openid::record_primary_sso_bridge(record);
         }
@@ -1790,26 +1761,18 @@ mod openid_api {
                 state::storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(&key))
                     .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
-            // Refresh the primary credential's metadata (name / email) from the
-            // token, exactly as the primary key it's stored under — never adds a
-            // per-app credential or access method (§6.1).
+            // Refresh the primary credential's metadata from the token; never adds a per-app credential.
             let mut anchor = state::anchor(anchor_number);
             update_openid_credential(&mut anchor, identity.credential.clone())
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
             state::storage_borrow_mut(|storage| storage.write(anchor))
                 .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
-            // Mint the plain credential-seed openid delegation (the same one
-            // `openid_prepare_delegation` mints); `check_authorization`
-            // recognizes its principal, so the account/session methods accept
-            // the session without any special casing.
             let (user_key, expiration) = identity
                 .credential
                 .prepare_jwt_delegation(session_key, anchor_number)
                 .await;
 
-            // Prepare the certified SSO attribute bundle carrying the per-app
-            // gating context; the FE attaches it via `AttributesIdentity`.
             let (sso_attr_bundle, _bundle_expiration) = openid::prepare_sso_attr_bundle(
                 &identity.credential.iss,
                 &identity.credential.sub,
@@ -1842,9 +1805,7 @@ mod openid_api {
         }
     }
 
-    /// Fetch the delegation + SSO attribute bundle signature prepared by
-    /// `sso_prepare_delegation`. `sso_attr_bundle` is the bundle message the
-    /// paired prepare returned; the query witnesses its signature.
+    /// Fetch the delegation and SSO attribute bundle signature prepared by `sso_prepare_delegation`.
     #[query]
     fn sso_get_delegation(
         jwt: String,
@@ -1861,12 +1822,7 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
-        // Read-only: this is a `#[query]`. `resolve_primary_identity` is pure —
-        // a non-`sub` primary login surfaces an `aux_record` here, but the query
-        // deliberately ignores it (the paired `sso_prepare_delegation` update
-        // already persisted it); a non-`sub` gated login does a read-only lookup.
-        // Writing the aux bridge from a query would be invalid against the stable
-        // map.
+        // Query context: ignore any `aux_record` — a query can't write the bridge.
         let identity = match openid::resolve_primary_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),
@@ -2405,12 +2361,7 @@ mod attribute_sharing {
             nonce,
         } = request.try_into()?;
 
-        // Authorize the caller, and determine whether this is an SSO session
-        // (IdP-side per-app gating, §6.3). `sso:<domain>` attributes are
-        // certified only when the caller attached a certified SSO attribute
-        // bundle THIS canister signed (bound to the caller's credential seed)
-        // whose `origin` matches the serving origin — a passkey / direct-OpenID
-        // session attaches no bundle and gets no SSO attributes.
+        // SSO session iff a certified bundle for this origin is attached; gates `sso:<domain>` attributes.
         let sso_session_domain = openid::read_certified_sso_bundle()
             .filter(|bundle| bundle.origin == origin)
             .map(|bundle| bundle.sso_domain);
@@ -2451,10 +2402,6 @@ mod attribute_sharing {
             message,
         } = request.try_into()?;
 
-        // The read-side pair of `prepare_icrc3_attributes` (IdP-side per-app
-        // gating, §6.3): the plain openid-credential principal is recognized by
-        // `check_authorization`; the SSO context (if any) rides in the certified
-        // bundle, but the signature witness here doesn't need it.
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 GetIcrc3AttributeError::AuthorizationError(principal)
@@ -2478,13 +2425,7 @@ mod attribute_sharing {
             origin,
         } = request.try_into()?;
 
-        // The plain openid-credential principal an SSO session now uses is
-        // recognized by `check_authorization` (IdP-side per-app gating, §6.3).
-        // The `sso:<domain>` rows are gated by the certified bundle — the same
-        // signal `prepare_icrc3_attributes` uses — so the listing offers only
-        // what this session can actually certify. A missing origin (device /
-        // direct-OpenID callers omit it) never matches a bundle, so no `sso:`
-        // rows surface.
+        // Gate `sso:<domain>` rows by the certified bundle for this origin, matching what `prepare_icrc3_attributes` certifies.
         let sso_session_domain = origin.as_ref().and_then(|origin| {
             openid::read_certified_sso_bundle()
                 .filter(|bundle| &bundle.origin == origin)

@@ -155,10 +155,6 @@ export const handleError = (error: unknown) => {
       case "NoAuthnMethodToConfirm":
       case "SsoNormalLoginRequired":
         // Shouldn't have happened; reaching here means they weren't avoided.
-        // (`SsoNormalLoginRequired` is a first gated SSO login for a non-`sub`
-        // org: the SSO wizard catches it, maps it to
-        // `SsoNormalLoginRequiredError`, and drives the sign-in-normally-first
-        // CTA, so it shouldn't reach this generic handler.)
         toaster.error({
           title: "Unexpected error",
           description: error.type,

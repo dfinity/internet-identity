@@ -89,14 +89,7 @@ export class AuthFlow {
   #ssoJwt = $state<string>();
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
-  // The dapp SSO context (origin + whether it's gated) for the in-flight
-  // sign-in, when this is a dapp SSO flow. Set in `#openIdJwtSignIn` and read by
-  // `#openIdRegistrationCommit` so a *new* SSO user's post-registration session
-  // is minted through the SSO gate path (`sso_prepare_delegation`) — the
-  // SSO-session principal §6.3 certification requires for `sso:<domain>`
-  // attributes — instead of the openid path (which yields a different principal
-  // that gets no SSO attributes). `undefined` for direct providers and
-  // management (non-dapp) SSO.
+  // Dapp SSO context for the in-flight sign-in; undefined for direct providers and management SSO.
   #sso = $state<{ origin: string; gated: boolean }>();
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
@@ -263,9 +256,7 @@ export class AuthFlow {
   continueWithSso = async (
     ssoResult: SsoDiscoveryResult,
     mode: AuthMode = this.#mode,
-    // The target dapp origin, when signing in to a dapp (the authorize flow).
-    // Present -> sign in via the SSO path (`sso_prepare_delegation`) bound to
-    // this origin. Absent (management / non-dapp flows) -> the openid path.
+    // Target dapp origin; present routes sign-in via the SSO gate path, absent uses the openid path.
     dappOrigin?: string,
   ): Promise<
     | {
@@ -288,10 +279,6 @@ export class AuthFlow {
       name: ssoName,
     } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
-    // Route the ceremony to the client the origin resolves to under IdP-side
-    // per-app gating: the per-app client for a gated dapp origin, else the
-    // primary. `resolvedClientId` equals the primary `clientId` when the
-    // discovery was performed without a target origin.
     const sso =
       dappOrigin !== undefined
         ? {
@@ -351,14 +338,7 @@ export class AuthFlow {
     this.#ssoJwt = result.jwt;
     this.#ssoDomain = domain;
     this.#ssoName = ssoName;
-    // A first GATED dapp SSO login (IdP-side per-app gating) registers a new
-    // user directly through the gate: return `signUp` so the caller commits the
-    // registration in one trip (a `sub` org registers straight away; a non-`sub`
-    // org's first gated login surfaces `SsoNormalLoginRequired` and drives the
-    // CTA). Every OTHER sign-in-mode path — a non-dapp openid sign-in AND an
-    // un-gated dapp SSO sign-in — keeps the unchanged "not connected" prompt for
-    // a fresh user (they click "Sign up" to register), so only the gated flow is
-    // affected.
+    // A gated dapp SSO sign-in falls through to registration; every other sign-in-mode path shows the "not connected" prompt.
     if (mode === "signin" && sso?.gated !== true) {
       this.#view = "openIdNotConnected";
       return undefined;
@@ -446,9 +426,7 @@ export class AuthFlow {
     existingJwt?: string,
     mode: AuthMode = this.#mode,
     discoveryDomain?: string,
-    // Set for the 1-click SSO resume (a dapp sign-in): redeem the returning
-    // JWT through the SSO gate path bound to this dapp origin instead of the
-    // openid path. Unused by direct providers.
+    // Dapp SSO context; routes the 1-click resume through the SSO gate path.
     sso?: { origin: string; gated: boolean },
   ): Promise<
     | {
@@ -567,9 +545,7 @@ export class AuthFlow {
     requestConfig: RequestConfig,
     existingJwt?: string,
     discoveryDomain?: string,
-    // When set (a dapp SSO sign-in), redeem the JWT through the SSO gate path
-    // (`sso_prepare_delegation`) bound to this origin instead of the openid
-    // path. `discoveryDomain` is always present alongside it.
+    // Dapp SSO context; when set, redeems the JWT via the SSO gate path (`discoveryDomain` is always present alongside).
     sso?: { origin: string; gated: boolean },
   ): Promise<
     | {
@@ -588,9 +564,6 @@ export class AuthFlow {
         email?: string;
       }
   > => {
-    // Remember the dapp SSO context so registration of a *new* SSO user
-    // (`#openIdRegistrationCommit`) mints its session through the SSO path, not
-    // the openid path (§6.3). `undefined` for direct providers / management SSO.
     this.#sso = sso;
     let jwt: string | undefined = existingJwt;
     if (jwt === undefined) {
@@ -614,9 +587,6 @@ export class AuthFlow {
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
-      // A dapp SSO sign-in redeems through the gate path bound to the dapp
-      // origin; every other flow (direct providers, management SSO) keeps the
-      // untouched openid path.
       const { identity, identityNumber } =
         sso !== undefined && discoveryDomain !== undefined
           ? await authenticateWithSso({
@@ -910,12 +880,6 @@ export class AuthFlow {
     try {
       // An SSO discovery / JWKS cache that's cold (or has since been evicted)
       // reports `Pending`; retry until it warms instead of failing the signup.
-      // For a first *gated* SSO login, pass the dapp `origin`: registration runs
-      // the same gate as `sso_prepare_delegation` and stores a PRIMARY-keyed
-      // credential (§6.1 registration analogue), so a `sub` org registers
-      // directly in one IdP trip. A non-`sub` org can't bridge the pairwise sub
-      // from a gated token, so the canister returns `SsoNormalLoginRequired` —
-      // mapped below to prompt a normal primary-client sign-in first.
       try {
         await retryWhilePending(() =>
           get(sessionStore).actor.openid_identity_registration_finish({
@@ -938,11 +902,6 @@ export class AuthFlow {
       }
       const decodedJwt = decodeJWT(jwt);
       const { iss, sub, loginHint } = decodedJwt;
-      // Registration created the primary-keyed credential; now mint the session
-      // through the SSO gate path so the principal is the SSO-session principal
-      // bound to this origin (§6.3) — the only one for which `sso:<domain>`
-      // attributes certify. `gated` reflects the origin: a gated dapp's first
-      // login registered directly above and now resolves here.
       const { identity, identityNumber } =
         this.#sso !== undefined && discoveryDomain !== undefined
           ? await authenticateWithSso({

@@ -1444,9 +1444,7 @@ pub(crate) struct FakeJwtInput<'a> {
     pub email_verified: bool,
     pub iat_secs: u64,
     pub exp_secs: u64,
-    /// Extra top-level claims merged into the JWT payload (e.g. Entra's `oid`
-    /// for the non-`sub` stable-identifier tests). Applied after the standard
-    /// claims, so they can add fields the base builder doesn't set.
+    /// Extra top-level claims merged into the JWT payload after the standard ones.
     pub extra_claims: &'a [(&'a str, &'a str)],
 }
 

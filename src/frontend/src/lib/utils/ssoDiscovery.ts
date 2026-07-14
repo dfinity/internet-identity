@@ -17,15 +17,9 @@ export interface SsoDiscoveryResult {
    * provenance rather than by the underlying IdP's issuer.
    */
   domain: string;
-  /** The org's primary OIDC client (the one meant for II itself). */
+  /** The org's primary OIDC client. */
   clientId: string;
-  /**
-   * The client the ceremony must run against for the target dapp origin under
-   * IdP-side per-app gating: the per-app client if the origin is gated, the
-   * primary client otherwise. Equals {@link clientId} when no origin was passed
-   * to {@link discoverSsoConfig}. An origin denied by `gate_all_apps` surfaces
-   * as a {@link DomainNotConfiguredError} rather than a result.
-   */
+  /** The client to run the ceremony against for the target origin; equals {@link clientId} when no origin was passed. */
   resolvedClientId: string;
   /**
    * Human-readable name for the SSO, if the domain publishes one. Used by the
@@ -117,16 +111,8 @@ export const validateDomain = (domain: string): string => {
   return trimmed;
 };
 
-/**
- * Shape a resolved `SsoDiscovery` into an {@link SsoDiscoveryResult}.
- *
- * @throws {DomainNotConfiguredError} with reason `origin-denied` when a target
- *   origin was supplied but the canister reports no `resolved_client_id` — the
- *   origin is denied under `gate_all_apps`.
- */
 const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => {
-  // `resolved_client_id` is `[]` only when an origin was supplied and denied
-  // (`gate_all_apps`). Without an origin it always mirrors `client_id`.
+  // `resolved_client_id` is empty only when an origin was supplied and denied by `gate_all_apps`.
   const resolvedClientId = discovery.resolved_client_id[0];
   if (resolvedClientId === undefined) {
     throw new DomainNotConfiguredError("origin-denied");
@@ -155,12 +141,6 @@ const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
  * `get_sso_discovery` (query) for the state; on `Pending` it drives the fetch
  * with `discover_sso` (update) and polls again. An optional `signal` cancels
  * the poll (the input debounce drops a stale lookup when the user keeps typing).
- *
- * When `origin` is supplied, the resolved result's `resolvedClientId` is the
- * client the ceremony must run against for that dapp origin under IdP-side
- * per-app gating (the per-app client if the origin is gated, the primary client
- * otherwise). An origin denied by `gate_all_apps` throws a
- * {@link DomainNotConfiguredError} with reason `origin-denied`.
  *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
  * @throws {DomainNotConfiguredError} when the domain isn't allowed

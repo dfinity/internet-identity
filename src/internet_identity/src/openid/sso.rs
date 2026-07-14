@@ -21,15 +21,8 @@ use identity_jose::jwk::Jwk;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 
-/// The claim carrying the cross-client-stable identifier defaults to `sub`
-/// (Okta org server, Google, OneLogin). Orgs whose `sub` is pairwise (Entra)
-/// declare a different claim (`oid`) via `stable_identifier_claim` in the
-/// well-known (§5, §6.5 of the IdP-side gating design).
 pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
 
-/// Hard cap on the number of `app_clients` entries an org may declare (§5).
-/// A well-known exceeding this is rejected (not truncated) so a gated origin
-/// can never silently drop into the `gate_all_apps: false` open fallback.
 pub(super) const MAX_APP_CLIENTS: usize = 100;
 
 #[cfg(not(test))]
@@ -70,11 +63,9 @@ const RETRY_MULTIPLIER: u64 = 2;
 const ABANDON_FILL_AFTER_SECONDS: u64 = 120;
 
 /// Response-size cap for the two discovery hops (`ii-openid-configuration` and
-/// the OIDC discovery document). The `ii-openid-configuration` doc may now
-/// carry up to `MAX_APP_CLIENTS` (100) `origin -> client_id` entries (§5), each
-/// with a potentially hashed key (`sha256hex:salthex`, ~140 bytes) — so the cap
-/// is sized to fit 100 such entries plus the base fields with generous
-/// headroom. The OIDC discovery document is unaffected (still small).
+/// the OIDC discovery document). Sized to fit up to `MAX_APP_CLIENTS`
+/// `origin -> client_id` entries (each key up to ~140 bytes when hashed) with
+/// headroom.
 #[cfg(not(test))]
 const DISCOVERY_MAX_RESPONSE_BYTES: u64 = 64 * 1024;
 /// Cap on the number of `scopes_supported` stored per discovery entry. `scopes`
@@ -97,32 +88,28 @@ const DEFAULT_SCOPES: [&str; 3] = ["openid", "profile", "email"];
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct DiscoveredConfig {
     pub issuer: String,
-    /// The org's **primary** OIDC client — the one meant for II itself. All
-    /// identity/credential data is keyed on it (§6.1).
+    /// The org's primary OIDC client; identity is keyed on it.
     pub client_id: String,
     pub jwks_uri: String,
     pub authorization_endpoint: String,
     pub scopes: Vec<String>,
     pub name: Option<String>,
-    /// Per-app clients for gated dapps, parsed from `app_clients` (§5, §5.1).
-    /// Keys may be cleartext origins or `sha256(origin||salt):salt` hashes.
     pub app_clients: Vec<AppClient>,
-    /// When true, an origin not in `app_clients` is denied (default-deny, §5).
+    /// When true, an origin not in `app_clients` is denied.
     pub gate_all_apps: bool,
-    /// Claim holding the cross-client-stable identifier (default `sub`, §6.5).
+    /// Claim holding the cross-client-stable identifier (default `sub`).
     pub stable_identifier_claim: String,
 }
 
-/// One `origin -> client_id` entry from `app_clients`. The origin key is either
-/// cleartext or hidden as a per-key salted hash (§5.1).
+/// One `origin -> client_id` entry from `app_clients`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct AppClient {
     pub key: AppClientKey,
     pub client_id: String,
 }
 
-/// An `app_clients` key: either a cleartext origin, or a salted hash of one
-/// (`sha256(origin || salt)` hex, paired with the hex `salt`).
+/// An `app_clients` key: a cleartext origin or a salted hash
+/// (`sha256(origin || salt)` hex + hex `salt`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum AppClientKey {
     Cleartext(String),
@@ -130,9 +117,8 @@ pub(super) enum AppClientKey {
 }
 
 impl AppClientKey {
-    /// Parse a raw `app_clients` key. A key is treated as hashed iff it has the
-    /// exact `<hex>:<hex>` shape; every other key (notably a real origin like
-    /// `https://payroll.com`, which contains `/` and `.`) is cleartext.
+    /// Parse a raw `app_clients` key: hashed iff it has the exact `<hex>:<hex>`
+    /// shape, else cleartext.
     fn parse(raw: &str) -> Self {
         if let Some((hash, salt)) = raw.split_once(':') {
             let is_hex = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit());
@@ -146,8 +132,7 @@ impl AppClientKey {
         AppClientKey::Cleartext(raw.to_string())
     }
 
-    /// Does this key designate `origin`? Cleartext keys match by equality;
-    /// hashed keys recompute `sha256(origin || salt)` and compare hex.
+    /// Does this key designate `origin`?
     fn matches(&self, origin: &str) -> bool {
         match self {
             AppClientKey::Cleartext(o) => o == origin,
@@ -162,20 +147,20 @@ impl AppClientKey {
     }
 }
 
-/// How an origin resolves against a domain's declared clients (§4, §6.2).
+/// How an origin resolves against a domain's declared clients.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ClientResolution {
-    /// Origin listed in `app_clients` — gated, served by this per-app client.
+    /// Origin listed in `app_clients`, served by this per-app client.
     PerApp(String),
     /// Origin unlisted and `gate_all_apps` off — served by the primary client.
     Primary(String),
-    /// Origin unlisted and `gate_all_apps` on — denied (default-deny).
+    /// Origin unlisted and `gate_all_apps` on — denied.
     NotAllowed,
 }
 
-/// Parse the raw `app_clients` map into `AppClient`s, rejecting (never
-/// truncating) a map over the `MAX_APP_CLIENTS` cap — truncation could silently
-/// drop a gated origin into the `gate_all_apps: false` open fallback (§5).
+/// Parse the raw `app_clients` map, rejecting (never truncating) a map over
+/// `MAX_APP_CLIENTS` — truncation could silently drop a gated origin into the
+/// open fallback.
 pub(super) fn parse_app_clients(
     entries: &std::collections::HashMap<String, String>,
 ) -> Result<Vec<AppClient>, String> {
@@ -195,8 +180,7 @@ pub(super) fn parse_app_clients(
 }
 
 impl DiscoveredConfig {
-    /// Resolve `origin` to the client that serves it (§6.2). The single
-    /// `app_clients` / hashed-key / `gate_all_apps` lookup for a login.
+    /// Resolve `origin` to the client that serves it.
     pub(super) fn resolve_client_for_origin(&self, origin: &str) -> ClientResolution {
         for app in &self.app_clients {
             if app.key.matches(origin) {
@@ -437,14 +421,13 @@ struct IIOpenIdConfiguration {
     openid_configuration: String,
     #[serde(default)]
     name: Option<String>,
-    /// Per-app clients: `origin -> client_id` (§5). Additive; existing
-    /// single-client deployments omit it.
+    /// Per-app clients: `origin -> client_id`.
     #[serde(default)]
     app_clients: std::collections::HashMap<String, String>,
-    /// Default-deny an origin not in `app_clients` (§5).
+    /// Default-deny an origin not in `app_clients`.
     #[serde(default)]
     gate_all_apps: bool,
-    /// Cross-client-stable identifier claim (default `sub`, §6.5).
+    /// Cross-client-stable identifier claim (default `sub`).
     #[serde(default)]
     stable_identifier_claim: Option<String>,
 }
@@ -707,8 +690,7 @@ fn validate_same_host(reference_url: &str, other_url: &str) -> Result<(), String
 }
 
 /// Test-only: reset the SSO caches and warm `domain`'s discovery + JWKS from an
-/// injected `DiscoveredConfig`, so the parent module (`openid`) can exercise
-/// `verify_sso_jwt` / the gate against a ready cache.
+/// injected `DiscoveredConfig`.
 #[cfg(test)]
 pub(super) fn test_setup_discovery(domain: &str, cfg: DiscoveredConfig, jwks: Vec<Jwk>) {
     use crate::single_flight_cache::{run_detached, set_test_now};
@@ -725,8 +707,7 @@ pub(super) fn test_setup_discovery(domain: &str, cfg: DiscoveredConfig, jwks: Ve
         m.clear();
         m.insert(cfg.jwks_uri.clone(), jwks);
     });
-    // First pass warms discovery; the second, now that discovery is `Ready`,
-    // lets `prefetch` spawn and warm the JWKS fill for its `jwks_uri`.
+    // First pass warms discovery; the second warms JWKS now that discovery is Ready.
     prefetch(domain);
     run_detached();
     prefetch(domain);
@@ -921,12 +902,10 @@ mod tests {
             ],
             ..sample_config()
         };
-        // Listed origin -> its per-app client.
         assert_eq!(
             cfg.resolve_client_for_origin("https://payroll.com"),
             ClientResolution::PerApp("0oaPAYROLL".to_string())
         );
-        // Unlisted origin, gate off -> primary client (open to any org user).
         assert_eq!(
             cfg.resolve_client_for_origin("https://public.app"),
             ClientResolution::Primary("client-123".to_string())
@@ -935,7 +914,6 @@ mod tests {
 
     #[test]
     fn app_client_hashed_key_resolution() {
-        // "sha256(origin || salt)" hex, matched at login (§5.1).
         let origin = "https://oc.app";
         let salt = "9f3a7c2e";
         let mut hasher = Sha256::new();
@@ -956,7 +934,6 @@ mod tests {
             cfg.resolve_client_for_origin(origin),
             ClientResolution::PerApp("0oaCHAT".to_string())
         );
-        // A different origin does not match the hash.
         assert_eq!(
             cfg.resolve_client_for_origin("https://evil.app"),
             ClientResolution::Primary("client-123".to_string())
@@ -973,12 +950,10 @@ mod tests {
             gate_all_apps: true,
             ..sample_config()
         };
-        // Listed origin still resolves to its client.
         assert_eq!(
             cfg.resolve_client_for_origin("https://payroll.com"),
             ClientResolution::PerApp("0oaPAYROLL".to_string())
         );
-        // Unlisted origin is denied under gate_all_apps.
         assert_eq!(
             cfg.resolve_client_for_origin("https://public.app"),
             ClientResolution::NotAllowed
@@ -1004,13 +979,10 @@ mod tests {
 
     #[test]
     fn app_client_key_parse_distinguishes_cleartext_from_hashed() {
-        // A real origin (contains `/` and `.`) is cleartext even though it has a
-        // colon in `https:`.
         assert_eq!(
             AppClientKey::parse("https://payroll.com"),
             AppClientKey::Cleartext("https://payroll.com".to_string())
         );
-        // A `<hex>:<hex>` key is hashed.
         assert_eq!(
             AppClientKey::parse("b5d4045c:9f3a7c2e"),
             AppClientKey::Hashed {

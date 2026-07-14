@@ -388,8 +388,7 @@ pub fn get_sso_discovery(
 }
 
 /// Like [`get_sso_discovery`] but supplies the target dapp origin so the
-/// resolved config reports the per-origin `resolved_client_id` (IdP-side per-app
-/// gating).
+/// resolved config reports the per-origin `resolved_client_id`.
 pub fn get_sso_discovery_for_origin(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -698,16 +697,11 @@ pub fn get_icrc3_attributes(
     query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
 }
 
-/// Like [`prepare_icrc3_attributes`], but attaches a `sender_info` (the SSO
-/// attribute bundle `info` + `signer`) to the call, the way the SDK
-/// `AttributesIdentity` does in production. Used to exercise the IdP-side
-/// per-app gating consumer (`read_certified_sso_bundle`).
+/// Like [`prepare_icrc3_attributes`], but attaches a `sender_info` (SSO
+/// attribute bundle `info` + `signer`) to the call.
 ///
-/// Note: PocketIC impersonates senders and does NOT verify the `sender_info`
-/// canister signature (the `RawSenderInfo` wire form has no signature field), so
-/// the crypto binding of the bundle to the caller's seed is enforced by the real
-/// replica, not here. These tests exercise the canister-observable checks:
-/// `signer == this canister`, expiry, and `bundle.origin == serving origin`.
+/// PocketIC does not verify the `sender_info` canister signature, so only the
+/// canister-observable checks (signer, expiry, origin) are exercised here.
 #[allow(clippy::too_many_arguments)]
 pub fn prepare_icrc3_attributes_with_bundle(
     env: &PocketIc,
@@ -759,9 +753,8 @@ pub fn list_available_attributes(
 }
 
 /// Like [`list_available_attributes`], but attaches a `sender_info` (SSO
-/// attribute bundle `info` + `signer`) to the query, as the SDK
-/// `AttributesIdentity` does. See [`prepare_icrc3_attributes_with_bundle`] for
-/// the PocketIC signature-verification caveat.
+/// attribute bundle `info` + `signer`) to the query. See
+/// [`prepare_icrc3_attributes_with_bundle`] for the PocketIC signature caveat.
 pub fn list_available_attributes_with_bundle(
     env: &PocketIc,
     canister_id: CanisterId,

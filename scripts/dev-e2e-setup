@@ -19,9 +19,8 @@ REPO_ROOT="$PWD"
 LAUNCHER_TAG="v12.0.0-2026-04-16-04-20"
 OPENID_PORTS=(11105 11106 11107)
 DIRECT_OPENID_PORTS=(11105 11106)
-# localhost:11107 backs the un-gated SSO tests; 127.0.0.1:11107 is the same
-# provider under a distinct host so the IdP-side per-app gating tests get their
-# own discovery-cache entry (see fixtures/sso.ts SSO_GATING_DISCOVERY_DOMAIN).
+# 127.0.0.1:11107 is the same provider under a distinct host so the gating tests
+# get their own discovery-cache entry (see fixtures/sso.ts SSO_GATING_DISCOVERY_DOMAIN).
 SSO_DOMAINS=("localhost:11107" "127.0.0.1:11107")
 
 STATE_DIR=".icp/cache/dev-e2e"

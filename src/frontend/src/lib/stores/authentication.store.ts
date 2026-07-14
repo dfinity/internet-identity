@@ -15,10 +15,7 @@ export interface Authenticated {
   identityNumber: bigint;
   nonce: string;
   salt: Uint8Array;
-  // Usually a `DelegationIdentity`; an SSO gate session is an
-  // `AttributesIdentity` wrapping the delegation so the certified SSO attribute
-  // bundle rides along as `sender_info` on every call (IdP-side per-app gating,
-  // §6.3). Both implement `Identity`.
+  // An SSO gate session is an `AttributesIdentity` wrapping the delegation; otherwise a `DelegationIdentity`.
   identity: Identity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;

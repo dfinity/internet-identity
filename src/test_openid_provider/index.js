@@ -57,16 +57,12 @@ const ssoName = process.env.OIDC_SSO_NAME ?? `Test SSO ${port}`;
 
 const accountClaims = new Map();
 
-// IdP-side per-app SSO gating (docs/ongoing/enterprise-sso-idp-side-gating.md):
-// the `client_id` a dedicated gated dapp runs its ceremony against. Registered
-// alongside the primary `internet_identity` client so a gated login can obtain
-// a token whose `aud` is this per-app client.
+// The `client_id` a gated dapp runs its ceremony against, registered alongside
+// the primary client so a gated login gets a token whose `aud` is this client.
 const PER_APP_CLIENT_ID = "ii-per-app-gated-client";
 
-// Mutable per-app gating config surfaced in the ii-openid-configuration
-// well-known. Tests set it via `POST /sso-config` (see fixtures/sso.ts):
-//   { "app_clients": { "<origin>": "<client_id>" }, "gate_all_apps": <bool>,
-//     "stable_identifier_claim": "<claim>" }
+// Mutable per-app gating config surfaced in the well-known; tests set it via
+// `POST /sso-config`.
 let ssoGating = {
   app_clients: {},
   gate_all_apps: false,
@@ -157,9 +153,8 @@ app.post("/account/:id/claims", express.json(), async (req, res) => {
   res.status(201).send();
 });
 
-// Configure IdP-side per-app gating (app_clients / gate_all_apps /
-// stable_identifier_claim) surfaced in the ii-openid-configuration well-known.
-// Tests POST the fields they want to set; omitted fields keep their defaults.
+// Set per-app gating fields surfaced in the well-known; omitted fields keep
+// their defaults.
 app.post("/sso-config", express.json(), (req, res) => {
   ssoGating = {
     app_clients: req.body.app_clients ?? {},

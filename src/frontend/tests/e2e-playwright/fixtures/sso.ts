@@ -16,28 +16,21 @@ export const SSO_OPENID_PORT = 11107;
 export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 
 /**
- * A SECOND discovery domain for the same test provider (`127.0.0.1` instead of
- * `localhost`, same port), allowlisted alongside {@link SSO_DISCOVERY_DOMAIN}.
- * The IdP-side per-app gating tests use this domain exclusively so their
- * per-test gating config lands in a discovery-cache entry the un-gated SSO tests
- * never touch — II caches discovery per domain for ~1h with no force-refresh, so
- * sharing one domain would let an earlier un-gated lookup pin a stale
- * (un-gated) config for the gating tests (and vice-versa). Distinct host string
- * ⇒ distinct cache key ⇒ the two suites can't clobber each other's cached
- * config, in any shard order. Requires `127.0.0.1:11107` in the canister's
- * `sso_discoverable_domains` (see `scripts/dev-e2e-setup` and
- * `.github/workflows/canister-tests.yml`).
+ * A second discovery domain for the same test provider (`127.0.0.1`, same port)
+ * used only by the gating tests, so their config lands in a discovery-cache
+ * entry the un-gated tests never touch (II caches discovery per domain ~1h with
+ * no force-refresh). Requires `127.0.0.1:11107` in the canister's
+ * `sso_discoverable_domains`.
  */
 export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
 
 /**
- * The per-app OIDC client the test provider registers for IdP-side per-app
- * gating (mirrors `PER_APP_CLIENT_ID` in `src/test_openid_provider/index.js`).
- * A gated dapp origin maps to this client in the well-known's `app_clients`.
+ * The per-app OIDC client id the test provider registers for gating; a gated
+ * origin maps to it in the well-known's `app_clients`.
  */
 export const SSO_PER_APP_CLIENT_ID = "ii-per-app-gated-client";
 
-/** Configuration for the test provider's IdP-side per-app gating. */
+/** Configuration for the test provider's per-app gating. */
 export interface SsoGatingConfig {
   /** `origin -> client_id` map served in the well-known's `app_clients`. */
   appClients?: Record<string, string>;
@@ -73,13 +66,9 @@ export const test = base.extend<{
     mode?: SsoEntryMode,
   ) => Promise<Page>;
   /**
-   * Configure the test provider's IdP-side per-app gating. Sets the
-   * `app_clients` / `gate_all_apps` / `stable_identifier_claim` fields the
-   * `ii-openid-configuration` well-known serves, so a test can turn a dapp
-   * origin into a gated one (or default-deny). The change propagates once II's
-   * discovery cache refreshes; e2e canisters use short cache windows.
-   *
-   * Auto-resets to un-gated defaults after each test so the change never leaks.
+   * Configure the test provider's per-app gating (`app_clients` /
+   * `gate_all_apps` / `stable_identifier_claim` in the well-known).
+   * Auto-resets to un-gated defaults after each test.
    */
   configureSsoGating: (config: SsoGatingConfig) => Promise<void>;
 }>({

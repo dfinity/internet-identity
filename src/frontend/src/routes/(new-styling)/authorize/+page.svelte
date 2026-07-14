@@ -138,13 +138,9 @@
   };
 
   /**
-   * Resolve once the dapp's effective origin is known. The `?sso=` (and
-   * `?openid=`) flows establish the channel in *pending* mode (see the authorize
-   * `+layout`), so the effective origin — which the dapp only sends with its
-   * authorize request — is typically not yet set when `initiateSso`/`resumeOpenId`
-   * run. Both the SSO gate path and the delegation delivery need it, and the
-   * request always arrives (the dapp is waiting for the delegation), so wait for
-   * it, with a timeout fallback so a non-conforming dapp can't hang the flow.
+   * Resolve once the dapp's effective origin is known. Pending `?sso=`/`?openid=`
+   * flows don't have it until the dapp's authorize request arrives; times out so
+   * a non-conforming dapp can't hang the flow.
    */
   const waitForEffectiveOrigin = (
     timeoutMs = 15_000,
@@ -180,15 +176,13 @@
    * `+page.ts`).
    */
   const initiateSso = async (domain: string) => {
-    // The `?sso=` channel is pending here, so the effective origin usually isn't
-    // known yet (the gate binding is resolved on resume instead, once the dapp's
-    // authorize request has arrived). Discover without an origin so the ceremony
-    // runs against the org's primary client.
+    // Effective origin isn't known yet; discover without an origin so the
+    // ceremony runs against the org's primary client.
     const result = await discoverSsoConfig(domain);
     // Stash the SSO discovery domain so `resumeOpenId` knows the returning JWT
     // belongs to a 1-click SSO flow rather than a 1-click OpenID one. The flow
     // type drives which auto-approve allowlist the attribute consent handler
-    // bypasses; `resumeOpenId` re-derives the dapp origin + gating there.
+    // bypasses.
     sessionStorage.setItem("ii-sso-1-click-domain", domain);
     const syntheticConfig: OpenIdConfig = {
       auth_uri: result.discovery.authorization_endpoint,
@@ -199,8 +193,7 @@
       email_verification: [],
       issuer: result.discovery.issuer,
       auth_scope: selectAuthScopes(result.discovery.scopes_supported),
-      // Route the ceremony to the client the origin resolves to under IdP-side
-      // per-app gating (the per-app client for a gated dapp, else the primary).
+      // The per-app client for a gated dapp, else the primary.
       client_id: result.resolvedClientId,
       seed_jwks: [],
     };
@@ -254,16 +247,11 @@
     // marker can't leak into a subsequent direct-OpenID round-trip.
     const ssoDomain = sessionStorage.getItem("ii-sso-1-click-domain");
     sessionStorage.removeItem("ii-sso-1-click-domain");
-    // Show the redirect animation while we resolve the origin and redeem — the
-    // wait below (for the dapp's authorize request) shouldn't flash the wizard.
+    // Show the redirect animation now so the wait below doesn't flash the wizard.
     openIdResumeProcessing = true;
-    // Redeem the SSO sign-in through the origin-bound gate path
-    // (`sso_prepare_delegation`) so the session is the SSO-session principal that
-    // certifies `sso:<domain>` attributes (§6.3). The gate binds to the dapp's
-    // effective origin, which the pending `?sso=` channel only exposes once the
-    // dapp's authorize request has arrived — so resolve it here rather than at
-    // `initiateSso`. Re-discover with that origin to learn whether it's gated
-    // (a per-app `resolved_client_id` differs from the primary `client_id`).
+    // Redeem through the origin-bound gate path so the session certifies
+    // `sso:<domain>` attributes. Re-discover with the origin to learn whether
+    // it's gated (a per-app `resolved_client_id` differs from `client_id`).
     let sso: { origin: string; gated: boolean } | undefined;
     if (ssoDomain !== null) {
       const dappOrigin = await waitForEffectiveOrigin();

@@ -278,15 +278,7 @@ const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMO
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 
-/// Auxiliary SSO stable-id bridge (IdP-side per-app gating, §6.5):
-/// `(iss, primary_client_id, stable_id) -> primary_sub` for orgs whose stable
-/// identifier isn't `sub` (e.g. Entra `oid`). A normal (primary-client) SSO
-/// login writes the entry; a later gated per-app login (whose pairwise `sub`
-/// differs) reads it to resolve the primary identity. Persisting it on-chain
-/// (rather than the former in-heap map, wiped every upgrade) makes the
-/// "sign in normally first" step happen once per user, ever. A miss fails safe
-/// (no anchor → the user signs in normally first). Never a migration and never
-/// mutates a stored credential/key.
+/// SSO stable-id bridge: `(iss, primary_client_id, stable_id) -> primary_sub`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
@@ -450,8 +442,7 @@ pub struct Storage<M: Memory> {
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
 
     sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// Auxiliary SSO stable-id bridge `(iss, primary_client_id, stable_id) ->
-    /// primary_sub`. See [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
+    /// SSO stable-id bridge. See [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
     sso_stable_id_index_memory: StableBTreeMap<StorableSsoStableIdKey, String, ManagedMemory<M>>,
 }
 
@@ -1196,10 +1187,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_config_memory.insert(anchor_number, config);
     }
 
-    /// Read the SSO stable-id bridge entry (§6.5): the primary-client `sub` a
-    /// non-`sub` org's `(iss, primary_client_id, stable_id)` maps to, or `None`
-    /// if no normal login has recorded it yet (the user must sign in normally
-    /// first).
+    /// Read the SSO stable-id bridge entry, or `None` if no login has recorded it yet.
     pub fn lookup_sso_stable_id(
         &self,
         iss: &str,
@@ -1214,9 +1202,7 @@ impl<M: Memory + Clone> Storage<M> {
             })
     }
 
-    /// Record (or refresh) the SSO stable-id bridge entry (§6.5). Written only
-    /// from update contexts (a normal primary-client SSO login / registration);
-    /// the `sso_get_delegation` query only ever reads.
+    /// Record (or refresh) the SSO stable-id bridge entry. Update contexts only — queries can't write.
     pub fn insert_sso_stable_id(
         &mut self,
         iss: &str,

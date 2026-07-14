@@ -1349,15 +1349,7 @@ fn number_of_openid_credentials(
     Ok(openid_credentials.len())
 }
 
-// ===========================================================================
-// IdP-side per-app SSO gating
-// (docs/ongoing/enterprise-sso-idp-side-gating.md)
-//
-// These drive the new `sso_prepare_delegation` / `sso_get_delegation` gate path
-// end to end against a mocked well-known that declares `app_clients` /
-// `gate_all_apps` / `stable_identifier_claim`. Tokens are signed with the
-// shared fake-JWT builder so their `aud` can be set to a per-app client.
-// ===========================================================================
+// End-to-end tests for the `sso_prepare_delegation` / `sso_get_delegation` gate path.
 mod sso_gating {
     use super::*;
     use crate::attributes::{build_fake_google_jwt_and_jwks, FakeJwtInput};
@@ -1382,8 +1374,8 @@ mod sso_gating {
     const GATED_ORIGIN: &str = "https://payroll.example";
     const UNGATED_ORIGIN: &str = "https://public.example";
     const PRIMARY_SUB: &str = "sso-primary-sub-0001";
-    /// Entra-style pairwise (per-client) sub for the gated login: differs from
-    /// the primary credential's sub, bridged via the `oid` aux lookup (§6.5).
+    /// Pairwise (per-client) sub for the gated login; differs from the primary
+    /// sub, bridged via the `oid` aux lookup.
     const PER_APP_SUB: &str = "entra-pairwise-sub-0002";
     const STABLE_OID: &str = "entra-oid-stable-0003";
     const TEST_TIME_MS: u64 = 1_800_000_000_000;
@@ -1392,9 +1384,8 @@ mod sso_gating {
         [42u8; 32]
     }
 
-    // Deterministic caller: the fake JWT binds its nonce to SHA256(salt ||
-    // principal), so we reuse a fixed pubkey/principal (from the attributes
-    // integration tests) as both the anchor's passkey and the JWT caller.
+    // The fake JWT binds its nonce to SHA256(salt || principal), so a fixed
+    // pubkey/principal is reused as both the anchor's passkey and the JWT caller.
     fn test_pubkey() -> Vec<u8> {
         vec![
             48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38,
@@ -1427,7 +1418,7 @@ mod sso_gating {
     }
 
     /// Build a JWT (and matching JWKS) for the gate issuer with the given `aud` /
-    /// `sub` and optional extra claims (e.g. `oid`).
+    /// `sub` and optional extra claims.
     fn token(aud: &str, sub: &str, extra_claims: &[(&str, &str)]) -> (String, String) {
         let iat = (TEST_TIME_MS / 1_000) - 300;
         build_fake_google_jwt_and_jwks(FakeJwtInput {
@@ -1483,9 +1474,8 @@ mod sso_gating {
         )
     }
 
-    /// Register an anchor with the test passkey and link its **primary** SSO
-    /// credential (the identity all per-app clients collapse to). Warms the
-    /// discovery cache with `responses`.
+    /// Register an anchor with the test passkey and link its primary SSO
+    /// credential, warming the discovery cache with `responses`.
     fn register_with_primary_credential(
         env: &PocketIc,
         canister_id: Principal,
@@ -1508,12 +1498,9 @@ mod sso_gating {
             .unwrap()
         })
         .expect("primary SSO credential add failed");
-        // Initialize the canister salt so the synchronous SSO-session seed
-        // computation in `prepare_icrc3_attributes` (`matching_sso_session`,
-        // §6.3) has a salt to hash against. In production a passkey session has
-        // always run a delegation-prepare (which calls `ensure_salt_set`) before
-        // reaching the attribute path; here nothing has, so a passkey-first
-        // `prepare_icrc3_attributes` would otherwise trap with "Salt is not set".
+        // Initialize the salt so `prepare_icrc3_attributes`'s SSO-session seed
+        // computation has a salt to hash against; otherwise it traps with
+        // "Salt is not set".
         api::init_salt(env, canister_id).unwrap();
         identity_number
     }
@@ -1522,10 +1509,8 @@ mod sso_gating {
         result.expect("expected a settled Ok SSO delegation")
     }
 
-    /// Linchpin: whether an origin is gated (per-app client) or ungated (primary
-    /// client), the login resolves to the **same anchor**, so the dapp principal
-    /// `f(account, origin)` is identical. Also checks the gated SSO session can
-    /// mint that origin's account delegation, matching a passkey session's.
+    /// Gated and ungated logins resolve to the same anchor and mint the same
+    /// dapp principal; the gated SSO session mints the account delegation too.
     #[test]
     fn gated_and_ungated_resolve_to_same_dapp_principal() -> Result<(), RejectResponse> {
         let env = env();
@@ -1540,8 +1525,7 @@ mod sso_gating {
 
         let session_key = ByteBuf::from("dapp session key");
 
-        // Gated login: the per-app token (aud = per-app client) at the gated
-        // origin passes the gate and resolves to the primary anchor.
+        // Gated login: per-app token at the gated origin passes the gate.
         let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
         let gated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
@@ -1558,8 +1542,7 @@ mod sso_gating {
         }));
         assert_eq!(gated.anchor_number, identity_number);
 
-        // Ungated login: the primary token at an unlisted origin resolves to the
-        // same anchor via the primary client.
+        // Ungated login: primary token at an unlisted origin resolves via the primary client.
         let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1575,9 +1558,7 @@ mod sso_gating {
         }));
         assert_eq!(ungated.anchor_number, identity_number);
 
-        // The dapp principal for the gated origin, minted by the gated SSO
-        // session, equals the one a normal (passkey) session mints — proving
-        // `f(account, origin)` is independent of the gate.
+        // The gated SSO session mints the same dapp principal as a passkey session.
         let sso_session_principal = Principal::self_authenticating(gated.user_key.as_ref());
         let sso_params = AccountDelegationParams::new(
             &env,
@@ -1611,9 +1592,7 @@ mod sso_gating {
         Ok(())
     }
 
-    /// A token minted for the primary (or any other) client is refused at a
-    /// gated origin: the gate is mint-or-refuse, so no SSO delegation exists and
-    /// the origin-scoped calls have no principal to authenticate with.
+    /// A token minted for a different client is refused at a gated origin.
     #[test]
     fn refused_gate_mints_no_delegation() -> Result<(), RejectResponse> {
         let env = env();
@@ -1626,8 +1605,7 @@ mod sso_gating {
 
         let session_key = ByteBuf::from("dapp session key");
 
-        // Present the PRIMARY token at the gated origin (which requires the
-        // per-app client). The gate refuses — verification fails.
+        // Present the primary token at the gated origin: the gate refuses.
         let result = drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1648,8 +1626,8 @@ mod sso_gating {
         Ok(())
     }
 
-    /// A passkey (non-SSO) session gets no `sso:<domain>` attributes, while the
-    /// SSO session that signed in through that domain does.
+    /// A passkey session gets no `sso:<domain>` attributes; the SSO session that
+    /// signed in through that domain does.
     #[test]
     fn passkey_session_gets_no_sso_attributes() -> Result<(), RejectResponse> {
         let env = env();
@@ -1690,8 +1668,7 @@ mod sso_gating {
             "passkey session must not obtain sso:<domain> attributes, got {passkey:?}"
         );
 
-        // SSO session -> the attribute is certified. The session is now the
-        // plain credential principal; the SSO context rides in the certified
+        // SSO session -> certified. The SSO context rides in the certified
         // bundle attached as `sender_info` (signer = this canister).
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PRIMARY_SUB, &[]);
@@ -1722,9 +1699,8 @@ mod sso_gating {
             "SSO session must certify sso:<domain> attributes, got {sso:?}"
         );
 
-        // Same authorized session, but NO bundle attached (a plain openid
-        // session): no `sso:<domain>` attribute is certified (test category 4,
-        // bundle-absent).
+        // Same authorized session but no bundle attached: no `sso:<domain>`
+        // attribute is certified.
         let no_bundle = api::prepare_icrc3_attributes(
             &env,
             canister_id,
@@ -1748,7 +1724,7 @@ mod sso_gating {
         let canister_id = install(&env);
 
         let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
-        // Gate everything: only the explicitly listed origin is servable.
+        // Gate everything: only the listed origin is servable.
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, true, "sub"), jwks);
         register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
@@ -1774,10 +1750,9 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Entra-style org (`stable_identifier_claim = "oid"`, pairwise `sub`): a
-    /// first gated login before any normal login can't resolve (§6.5) and must
-    /// prompt a normal sign-in first; after the normal login populates the aux
-    /// index, the gated login resolves to the same anchor.
+    /// Entra-style org (`oid` stable claim, pairwise `sub`): the first gated
+    /// login needs a normal login first, then resolves to the same anchor once
+    /// the aux index is populated.
     #[test]
     fn entra_oid_first_gated_needs_normal_then_resolves() -> Result<(), RejectResponse> {
         let env = env();
@@ -1793,8 +1768,8 @@ mod sso_gating {
         // Pairwise per-app token: its sub differs from the primary credential's.
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // First gated login, before any normal (primary) login populated the
-        // aux index: no anchor resolves -> "sign in normally first".
+        // First gated login, before any normal login populated the aux index:
+        // no anchor resolves.
         let first = drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1813,8 +1788,7 @@ mod sso_gating {
             "first gated login (non-sub) must need a normal login first, got {first:?}"
         );
 
-        // A normal (primary) login carries both the primary sub and the oid,
-        // populating the aux index.
+        // A normal login carries both sub and oid, populating the aux index.
         let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1851,11 +1825,8 @@ mod sso_gating {
         Ok(())
     }
 
-    /// The aux bridge is PERSISTED (its own stable memory region), so it survives
-    /// a canister upgrade: a non-`sub` (Entra `oid`) user who signed in normally
-    /// once keeps resolving gated logins after an upgrade — WITHOUT being sent
-    /// through the "sign in normally first" step again (§6.5). The former in-heap
-    /// map was wiped on every upgrade, forcing that step ~weekly.
+    /// The persisted aux bridge survives a canister upgrade: an `oid` user who
+    /// signed in normally once keeps resolving gated logins after an upgrade.
     #[test]
     fn aux_bridge_survives_upgrade() -> Result<(), RejectResponse> {
         let env = env();
@@ -1870,8 +1841,8 @@ mod sso_gating {
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // A normal (primary) login records the
-        // (iss, primary_client, oid) -> primary_sub bridge in stable memory.
+        // A normal login records the (iss, primary_client, oid) -> primary_sub
+        // bridge in stable memory.
         let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1887,15 +1858,11 @@ mod sso_gating {
         }));
         assert_eq!(normal.anchor_number, identity_number);
 
-        // Upgrade the canister. The former in-heap bridge would be wiped here; the
-        // stable bridge survives. (The replica clock stays where it is — already
-        // at/just past `TEST_TIME_MS`, well within the fake JWTs' validity.)
+        // Upgrade the canister; the stable bridge survives.
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-        // The gated per-app login (pairwise sub) resolves via the PERSISTED bridge
-        // — no fresh primary login needed. (The discovery/JWKS caches are cold
-        // after the upgrade, so `drive_sso_until_ready` re-warms them; the bridge
-        // itself is not re-populated.)
+        // The gated login resolves via the persisted bridge, no fresh primary
+        // login needed.
         let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1950,7 +1917,7 @@ mod sso_gating {
             resolved(Some(UNGATED_ORIGIN)).resolved_client_id,
             Some(PRIMARY_CLIENT.to_string())
         );
-        // No origin -> mirrors the primary client.
+        // No origin -> primary client.
         assert_eq!(
             resolved(None).resolved_client_id,
             Some(PRIMARY_CLIENT.to_string())
@@ -1958,14 +1925,10 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Warm the gate's discovery + JWKS caches (driving the mocked outcalls)
-    /// WITHOUT creating an anchor, so a following `openid_identity_registration_finish`
-    /// — whose test wrapper collapses `Pending` into a panic — settles in one
-    /// shot. A gated `sso_prepare_delegation` verifies the token (which reads
-    /// both caches, warming them) before the anchor lookup fails, which is
-    /// exactly the warming the registration path needs. `warm_jwt`/`warm_origin`
-    /// must pass the gate so the JWKS fetch is actually reached (a
-    /// `gate_all_apps`-denied origin returns before `read_jwks`).
+    /// Warm the gate's discovery + JWKS caches without creating an anchor, so a
+    /// following `openid_identity_registration_finish` settles in one shot.
+    /// `warm_jwt`/`warm_origin` must pass the gate, else the JWKS fetch is never
+    /// reached (a `gate_all_apps`-denied origin returns before `read_jwks`).
     fn warm_gate_caches(
         env: &PocketIc,
         canister_id: Principal,
@@ -1989,9 +1952,8 @@ mod sso_gating {
         });
     }
 
-    /// Run the SSO-aware registration finish for `(jwt, GATE_DOMAIN, origin)`
-    /// (the §6.2 registration gate). Caches must already be warm (see
-    /// [`warm_gate_caches`]); the flow's captcha step is answered here.
+    /// Run the SSO-aware registration finish for `(jwt, GATE_DOMAIN, origin)`.
+    /// Caches must already be warm (see [`warm_gate_caches`]).
     fn register_via_sso_gate(
         env: &PocketIc,
         canister_id: Principal,
@@ -2022,11 +1984,9 @@ mod sso_gating {
         .map(|result| result.identity_number)
     }
 
-    /// A `sub`-based org's FIRST gated login registers DIRECTLY in one IdP trip
-    /// (§6.1): the per-app (gated) token registration-finish stores the
-    /// PRIMARY-keyed credential (no per-app credential, no double trip). Proof:
-    /// after registering via the gate, BOTH a gated per-app login and an ungated
-    /// primary login resolve to the same, just-registered anchor.
+    /// A `sub`-based org's first gated login registers directly, storing the
+    /// primary-keyed credential; both a gated and an ungated login then resolve
+    /// to that anchor.
     #[test]
     fn sub_org_first_gated_login_registers_directly() -> Result<(), RejectResponse> {
         let env = env();
@@ -2062,8 +2022,7 @@ mod sso_gating {
         }));
         assert_eq!(gated.anchor_number, identity_number);
 
-        // The ungated primary login resolves to the SAME anchor — proof the
-        // stored credential is the primary-keyed one, not a per-app credential.
+        // The ungated login resolves to the same anchor: the stored credential is primary-keyed.
         let ungated = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -2084,11 +2043,9 @@ mod sso_gating {
         Ok(())
     }
 
-    /// A non-`sub` (Entra-style `oid`) org's FIRST gated login canNOT register
-    /// directly: the per-app token's pairwise sub has no aux bridge yet, so no
-    /// primary sub can be derived. Registration FAILS SAFE with the typed
-    /// `SsoNormalLoginRequired` (the FE routes the user through a normal
-    /// primary-client sign-in first, §6.5) — it creates nothing.
+    /// A non-`sub` (`oid`) org's first gated login cannot register directly (no
+    /// aux bridge yet); registration fails safe with `SsoNormalLoginRequired`
+    /// and creates nothing.
     #[test]
     fn non_sub_org_first_gated_registration_fails_safe() -> Result<(), RejectResponse> {
         let env = env();
@@ -2109,9 +2066,8 @@ mod sso_gating {
         Ok(())
     }
 
-    /// The registration gate denies a token the delegation gate would deny: with
-    /// `gate_all_apps` on, a registration attempt from an UNLISTED origin is
-    /// refused (§6.2). Fails with a handled verification error, creating nothing.
+    /// With `gate_all_apps` on, a registration attempt from an unlisted origin
+    /// is refused and creates nothing.
     #[test]
     fn gate_all_apps_denies_registration_from_unlisted_origin() -> Result<(), RejectResponse> {
         let env = env();
@@ -2123,9 +2079,8 @@ mod sso_gating {
         // `gate_all_apps` on: only the listed GATED_ORIGIN is allowed.
         let responses = responses(well_known(&app_clients, true, "sub"), jwks);
 
-        // Warm via the ALLOWED (gated) origin so discovery AND JWKS are cached
-        // before we probe the denied origin (whose gate check returns before the
-        // JWKS fetch, so it must not need to warm anything).
+        // Warm via the allowed origin so discovery and JWKS are cached before
+        // probing the denied origin (whose gate check returns before the JWKS fetch).
         sync_time(&env, TEST_TIME_MS);
         warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
 
@@ -2137,20 +2092,11 @@ mod sso_gating {
         Ok(())
     }
 
-    // ── certified SSO attribute bundle consumer (`read_certified_sso_bundle`) ──
-    //
-    // These drive `prepare_icrc3_attributes` with a `sender_info` bundle, the way
-    // the SDK `AttributesIdentity` does in production. PocketIC impersonates
-    // senders and does NOT verify the `sender_info` canister signature (the
-    // `RawSenderInfo` wire form carries no signature), so the crypto binding of
-    // the bundle to the caller's credential seed — the cross-identity-replay
-    // guarantee — is enforced by the real replica / SDK (the VERIFIED SAFETY
-    // PROPERTY), not reproducible here. What the CANISTER itself controls, and
-    // what these tests assert, is the fail-closed consumer logic:
-    //   - `signer` must be THIS canister (else `read_certified_sso_bundle` = None),
-    //   - the bundle must not be expired,
-    //   - `bundle.origin` must equal the serving origin,
-    //   - a caller with no bundle (or an unauthorized caller) gets no SSO cert.
+    // Certified SSO attribute bundle consumer (`read_certified_sso_bundle`) tests.
+    // PocketIC does not verify the `sender_info` canister signature, so the crypto
+    // binding of the bundle to the caller's seed is enforced by the real replica,
+    // not here; these tests assert the canister-observable checks (signer, expiry,
+    // bundle.origin == serving origin, bundle-absent/unauthorized).
 
     /// Prepare a primary anchor + a gated SSO bundle for `GATED_ORIGIN`. Returns
     /// `(identity_number, bundle_message)`.
@@ -2196,12 +2142,9 @@ mod sso_gating {
         }
     }
 
-    /// Test category 1 — cross-identity replay / forged signer. A valid bundle
-    /// presented by an UNAUTHORIZED principal is rejected (`AuthorizationError`),
-    /// and a bundle whose `signer` is NOT this canister yields no `sso:<domain>`
-    /// cert even for the authorized session (the `signer == id()` gate). The
-    /// crypto binding that also stops an *authorized* other identity from
-    /// replaying A's bundle is a replica guarantee (see the block comment).
+    /// A valid bundle presented by an unauthorized principal is rejected; a
+    /// bundle whose `signer` is not this canister yields no `sso:<domain>` cert
+    /// even for the authorized session.
     #[test]
     fn cross_identity_or_forged_signer_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
         let env = env();
@@ -2213,8 +2156,7 @@ mod sso_gating {
 
         let session_principal = test_principal();
 
-        // Unauthorized caller (not on the anchor) presenting a valid bundle:
-        // `check_authorization` refuses before any SSO attribute is considered.
+        // Unauthorized caller presenting a valid bundle: `check_authorization` refuses.
         let stranger = Principal::anonymous();
         let unauthorized = api::prepare_icrc3_attributes_with_bundle(
             &env,
@@ -2232,9 +2174,8 @@ mod sso_gating {
             "an unauthorized caller must be rejected regardless of the bundle, got {unauthorized:?}"
         );
 
-        // Authorized session, but the bundle claims a signer other than this
-        // canister: `read_certified_sso_bundle` fails the `signer == id()` gate,
-        // so no `sso:<domain>` attribute is certified.
+        // Authorized session, but the bundle's signer is not this canister:
+        // fails the `signer == id()` gate, no cert.
         let forged_signer = Principal::management_canister();
         let forged = api::prepare_icrc3_attributes_with_bundle(
             &env,
@@ -2254,9 +2195,7 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Test category 2 — expiry. A bundle whose `expiry` has passed yields no
-    /// `sso:<domain>` cert (the producer stamps `expiry = now + 30min`; we
-    /// advance the replica clock past it and re-present the same bundle).
+    /// A bundle whose `expiry` has passed yields no `sso:<domain>` cert.
     #[test]
     fn expired_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
         let env = env();
@@ -2298,26 +2237,20 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Test category 3 — icp0.io → ic0.app remap. The bundle-origin match and the
-    /// account seed both key on the CANONICAL (mapped) origin: an attribute
-    /// prepared with `unmapped_origin` set to the icp0.io form still certifies
-    /// (the bundle matches the mapped origin), and the same session's account
-    /// principal `f(account, mapped-origin)` is identical to a passkey session's
-    /// for that mapped origin — i.e. the account seed uses the canonical origin
-    /// identically on both paths.
+    /// icp0.io → ic0.app remap: the bundle-origin match and account seed both key
+    /// on the canonical (mapped) origin, so an attribute with `unmapped_origin`
+    /// set still certifies and the account principal matches a passkey session's.
     #[test]
     fn sso_attributes_survive_icp0_to_ic0_remap() -> Result<(), RejectResponse> {
-        // A dapp served on `*.icp0.io`: the frontend remaps it to the canonical
-        // `*.ic0.app` origin and passes THAT as `origin` to both the SSO
-        // ceremony and the attribute/account calls, carrying the icp0.io form as
-        // `unmapped_origin` only for the certified `implicit:origin`.
+        // The frontend remaps `*.icp0.io` to the canonical `*.ic0.app` and passes
+        // that as `origin`, carrying the icp0.io form as `unmapped_origin`.
         const REMAP_MAPPED: &str = "https://payroll.ic0.app";
         const REMAP_UNMAPPED: &str = "https://payroll.icp0.io";
 
         let env = env();
         let canister_id = install(&env);
         let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
-        // Gate the mapped origin (the canonical form the ceremony binds to).
+        // Gate the mapped (canonical) origin the ceremony binds to.
         let app_clients = format!(r#"{{"{REMAP_MAPPED}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
         let identity_number =
@@ -2341,9 +2274,8 @@ mod sso_gating {
         assert_eq!(gated.anchor_number, identity_number);
         let bundle = gated.sso_attr_bundle.into_vec();
 
-        // Certify with the unmapped (icp0.io) origin set: it must still verify,
-        // because the bundle-origin comparison and the account seed both key on
-        // the mapped (ic0.app) origin, not the unmapped one.
+        // Certify with `unmapped_origin` set: still verifies, since the comparison
+        // and account seed key on the mapped (ic0.app) origin.
         let mut request = sso_attr_request(identity_number, REMAP_MAPPED);
         request.unmapped_origin = Some(REMAP_UNMAPPED.to_string());
         let remapped = api::prepare_icrc3_attributes_with_bundle(
@@ -2359,8 +2291,7 @@ mod sso_gating {
             "an attribute with unmapped_origin set must still certify against the mapped origin, got {remapped:?}"
         );
 
-        // The account principal the certified attribute is bound to — keyed on
-        // the mapped origin — matches a passkey session's for the same origin.
+        // The account principal matches a passkey session's for the same mapped origin.
         let sso_session_principal = Principal::self_authenticating(gated.user_key.as_ref());
         let via_sso = prepare_account_delegation(
             &AccountDelegationParams::new(
@@ -2395,22 +2326,21 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Test category 5 — cross-origin. A bundle certified for `GATED_ORIGIN`
-    /// presented on a DIFFERENT serving origin yields no `sso:<domain>` cert
-    /// (`bundle.origin != serving origin`).
+    /// A bundle certified for `GATED_ORIGIN` presented on a different serving
+    /// origin yields no `sso:<domain>` cert.
     #[test]
     fn cross_origin_bundle_gets_no_sso_cert() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
-        // `gate_all_apps` off so the primary/ungated origin is also servable, and
-        // so the anchor legitimately owns the SSO domain credential.
+        // `gate_all_apps` off so the ungated origin is also servable and the
+        // anchor owns the SSO domain credential.
         let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
         let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
 
-        // Same authorized session and valid bundle (origin = GATED_ORIGIN), but
-        // the call serves a DIFFERENT origin: the origin filter drops the bundle.
+        // Valid bundle for GATED_ORIGIN, but the call serves a different origin:
+        // the origin filter drops it.
         let cross = api::prepare_icrc3_attributes_with_bundle(
             &env,
             canister_id,
@@ -2430,9 +2360,7 @@ mod sso_gating {
     }
 
     /// `list_available_attributes` offers `sso:<domain>` rows only to a session
-    /// holding a matching certified bundle (Issue-2 UX: never offer a key that
-    /// `prepare_icrc3_attributes` would then refuse). A bundle-less session sees
-    /// no `sso:` rows; an SSO session with a matching bundle sees them.
+    /// holding a matching certified bundle.
     #[test]
     fn list_available_attributes_gates_sso_rows_on_bundle() -> Result<(), RejectResponse> {
         let env = env();

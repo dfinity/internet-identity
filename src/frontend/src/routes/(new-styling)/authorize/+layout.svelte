@@ -152,10 +152,8 @@
       isAuthenticating = true;
       if ($authenticationStore?.identityNumber !== identityNumber) {
         sessionStore.reset();
-        // Pass the dapp's effective origin so switching to an SSO identity here
-        // redeems through the gate path and attaches the certified attribute
-        // bundle (same reason as the ContinueView "Continue" path). Undefined
-        // before the dapp request arrives → plain OpenID path.
+        // Pass the effective origin so an SSO identity redeems through the gate
+        // path. Undefined before the dapp request arrives → plain OpenID path.
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.identities[`${identityNumber}`],
           $authorizationStore?.effectiveOrigin,

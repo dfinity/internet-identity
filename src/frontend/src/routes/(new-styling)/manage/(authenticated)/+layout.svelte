@@ -238,9 +238,8 @@
       return;
     }
     let earliest = Infinity;
-    // The management flow always authenticates with a `DelegationIdentity`
-    // (passkey / direct OpenID / recovery); the SSO gate's `AttributesIdentity`
-    // only appears in the dapp authorize flow, never here.
+    // The management flow always uses a `DelegationIdentity`; the SSO gate's
+    // `AttributesIdentity` only appears in the dapp authorize flow.
     if (!(authenticated.identity instanceof DelegationIdentity)) {
       return;
     }

@@ -238,8 +238,8 @@
         .list_available_attributes({
           identity_number: $authenticatedStore.identityNumber,
           attributes: [],
-          // Pass the origin so an SSO session is authorized for this read
-          // (§6.3); ignored for device / OpenID sessions.
+          // Pass the origin so an SSO session is authorized for this read;
+          // ignored for device / OpenID sessions.
           origin: [effectiveOrigin],
         })
         .then(throwCanisterError);

@@ -1,72 +1,42 @@
-//! Encoding for the certified SSO attribute bundle (IdP-side per-app gating).
-//!
-//! The bundle is the `info` payload II attaches to a session as `sender_info`
-//! (via the SDK `AttributesIdentity`). It is signed by II as a canister
-//! signature under the **openid-credential seed** — the same seed the caller's
-//! delegation principal is derived from ([`crate::openid::calculate_delegation_seed`])
-//! — so it is intrinsically bound to that principal and cannot be replayed onto
-//! another identity. Because the credential seed is stable across delegation
-//! refreshes (it binds `(iss, sub, aud, anchor)`, not `origin`), the same bundle
-//! is reusable with any fresh openid delegation for that credential until its
-//! own `expiry` passes.
-//!
-//! Since II is the only producer and the only consumer, the wire format is a
-//! minimal length-prefixed byte string mirroring the seed encoding in
-//! [`crate::openid`] — no self-describing candid / ICRC-3 `Value` shape is
-//! needed:
+//! Encoding for the certified SSO attribute bundle — a length-prefixed byte
+//! string:
 //!
 //! ```text
 //! b"ii-sso-attr-v1"                    domain separator + version
-//! u64-BE len || sso_domain bytes       the SSO discovery domain signed in through
-//! u64-BE len || origin bytes           the certified dapp origin
-//! u64-BE len || expiry_ns (u64 BE)     bundle expiry, nanoseconds since epoch
+//! u64-BE len || sso_domain bytes       SSO discovery domain
+//! u64-BE len || origin bytes           certified dapp origin
+//! u64-BE len || expiry_ns (u64 BE)     bundle expiry, ns since epoch
 //! ```
 
-/// Domain separator + version for the SSO attribute bundle. Bumping the version
-/// suffix makes a future field change unambiguous.
+/// Domain separator + version for the SSO attribute bundle.
 const SSO_ATTR_BUNDLE_DOMAIN: &[u8] = b"ii-sso-attr-v1";
 
-/// A decoded SSO attribute bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsoAttrBundle {
-    /// The SSO discovery domain this session signed in through — the source for
-    /// `sso:<domain>` attribute certification (§6.3).
+    /// The SSO discovery domain this session signed in through.
     pub sso_domain: String,
     /// The dapp origin II certified this session for.
     pub origin: String,
-    /// Nanoseconds since the Unix epoch after which the bundle is no longer
-    /// valid.
+    /// Nanoseconds since the Unix epoch after which the bundle is invalid.
     pub expiry_ns: u64,
 }
 
-/// Why decoding a bundle failed. Every case is terminal — the caller must
-/// reject the bundle (fail closed).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SsoBundleDecodeError {
-    /// The domain-separator prefix was missing or did not match.
     BadDomain,
-    /// A length prefix claimed more bytes than remain in the buffer.
     Truncated,
-    /// Bytes remained after the last declared field.
     TrailingBytes,
-    /// The `expiry_ns` field was not exactly 8 bytes.
     BadExpiryWidth,
-    /// The `origin` field was not valid UTF-8.
     InvalidOriginUtf8,
-    /// The `sso_domain` field was not valid UTF-8.
     InvalidSsoDomainUtf8,
 }
 
-/// Append a length-prefixed field: `u64-BE length || data`. Mirrors the
-/// `write_field` helper used by the delegation seed encoders in
-/// [`crate::openid`].
+/// Append a length-prefixed field: `u64-BE length || data`.
 fn write_field(blob: &mut Vec<u8>, data: &[u8]) {
     blob.extend_from_slice(&(data.len() as u64).to_be_bytes());
     blob.extend_from_slice(data);
 }
 
-/// Encode `(sso_domain, origin, expiry_ns)` into the canonical bundle byte
-/// string.
 pub fn encode_sso_attr_bundle(sso_domain: &str, origin: &str, expiry_ns: u64) -> Vec<u8> {
     let mut blob: Vec<u8> = Vec::new();
     blob.extend_from_slice(SSO_ATTR_BUNDLE_DOMAIN);
@@ -76,8 +46,7 @@ pub fn encode_sso_attr_bundle(sso_domain: &str, origin: &str, expiry_ns: u64) ->
     blob
 }
 
-/// A cursor over the bundle bytes that reads length-prefixed fields. Every read
-/// is bounds-checked so a malformed buffer fails closed rather than panicking.
+/// A cursor reading length-prefixed fields; every read is bounds-checked.
 struct FieldReader<'a> {
     bytes: &'a [u8],
     pos: usize,
@@ -88,7 +57,6 @@ impl<'a> FieldReader<'a> {
         Self { bytes, pos: 0 }
     }
 
-    /// Read the next `u64-BE length || data` field, returning `data`.
     fn read_field(&mut self) -> Result<&'a [u8], SsoBundleDecodeError> {
         let len_end = self
             .pos
@@ -98,8 +66,12 @@ impl<'a> FieldReader<'a> {
             .bytes
             .get(self.pos..len_end)
             .ok_or(SsoBundleDecodeError::Truncated)?;
-        let len = u64::from_be_bytes(len_bytes.try_into().expect("slice is 8 bytes")) as usize;
-        let data_end = len_end.checked_add(len).ok_or(SsoBundleDecodeError::Truncated)?;
+        let len_u64 = u64::from_be_bytes(len_bytes.try_into().expect("slice is 8 bytes"));
+        // A length that doesn't fit in usize can't address the buffer (usize is 32-bit on wasm32).
+        let len = usize::try_from(len_u64).map_err(|_| SsoBundleDecodeError::Truncated)?;
+        let data_end = len_end
+            .checked_add(len)
+            .ok_or(SsoBundleDecodeError::Truncated)?;
         let data = self
             .bytes
             .get(len_end..data_end)
@@ -108,15 +80,12 @@ impl<'a> FieldReader<'a> {
         Ok(data)
     }
 
-    /// True once every byte has been consumed.
     fn is_exhausted(&self) -> bool {
         self.pos == self.bytes.len()
     }
 }
 
-/// Decode a bundle byte string produced by [`encode_sso_attr_bundle`]. Strictly
-/// the inverse: an unknown domain, a short/oversized field, a wrong-width
-/// expiry, non-UTF-8 origin, or any trailing byte all reject.
+/// Decode a bundle byte string produced by [`encode_sso_attr_bundle`].
 pub fn decode_sso_attr_bundle(bytes: &[u8]) -> Result<SsoAttrBundle, SsoBundleDecodeError> {
     let rest = bytes
         .strip_prefix(SSO_ATTR_BUNDLE_DOMAIN)
@@ -133,8 +102,8 @@ pub fn decode_sso_attr_bundle(bytes: &[u8]) -> Result<SsoAttrBundle, SsoBundleDe
 
     let sso_domain = String::from_utf8(sso_domain_bytes.to_vec())
         .map_err(|_| SsoBundleDecodeError::InvalidSsoDomainUtf8)?;
-    let origin =
-        String::from_utf8(origin_bytes.to_vec()).map_err(|_| SsoBundleDecodeError::InvalidOriginUtf8)?;
+    let origin = String::from_utf8(origin_bytes.to_vec())
+        .map_err(|_| SsoBundleDecodeError::InvalidOriginUtf8)?;
     let expiry_arr: [u8; 8] = expiry_bytes
         .try_into()
         .map_err(|_| SsoBundleDecodeError::BadExpiryWidth)?;
@@ -158,8 +127,7 @@ mod tests {
             origin: "https://nice-name.com".to_string(),
             expiry_ns: 1_700_000_000_000_000_000,
         };
-        let encoded =
-            encode_sso_attr_bundle(&bundle.sso_domain, &bundle.origin, bundle.expiry_ns);
+        let encoded = encode_sso_attr_bundle(&bundle.sso_domain, &bundle.origin, bundle.expiry_ns);
         assert_eq!(decode_sso_attr_bundle(&encoded), Ok(bundle));
     }
 
@@ -180,8 +148,6 @@ mod tests {
 
     #[test]
     fn distinct_fields_do_not_alias() {
-        // A length-prefixed encoding must not let a domain/origin split shift:
-        // swapping the two values yields a different byte string.
         let a = encode_sso_attr_bundle("ab", "c", 0);
         let b = encode_sso_attr_bundle("a", "bc", 0);
         assert_ne!(a, b);
@@ -195,7 +161,6 @@ mod tests {
             decode_sso_attr_bundle(&encoded),
             Err(SsoBundleDecodeError::BadDomain)
         );
-        // A different-version domain must not decode either.
         let mut wrong_version = b"ii-sso-attr-v2".to_vec();
         wrong_version.extend_from_slice(
             &encode_sso_attr_bundle("idp", "https://a.com", 1)[SSO_ATTR_BUNDLE_DOMAIN.len()..],
@@ -219,7 +184,6 @@ mod tests {
     #[test]
     fn rejects_truncated_field() {
         let encoded = encode_sso_attr_bundle("idp", "https://a.com", 1);
-        // Drop the final byte of the expiry field.
         let truncated = &encoded[..encoded.len() - 1];
         assert_eq!(
             decode_sso_attr_bundle(truncated),
@@ -229,7 +193,6 @@ mod tests {
 
     #[test]
     fn rejects_truncated_length_prefix() {
-        // Only the domain plus a partial (3-byte) length prefix.
         let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
         buf.extend_from_slice(&[0, 0, 0]);
         assert_eq!(
@@ -240,8 +203,6 @@ mod tests {
 
     #[test]
     fn rejects_oversized_length_prefix() {
-        // A length prefix claiming a huge field with no backing bytes must not
-        // panic or over-read.
         let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
         buf.extend_from_slice(&u64::MAX.to_be_bytes());
         buf.extend_from_slice(b"short");
@@ -252,8 +213,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_length_prefix_above_u32_max() {
+        let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
+        buf.extend_from_slice(&((u32::MAX as u64) + 1).to_be_bytes());
+        buf.extend_from_slice(b"short");
+        assert_eq!(
+            decode_sso_attr_bundle(&buf),
+            Err(SsoBundleDecodeError::Truncated)
+        );
+    }
+
+    #[test]
     fn rejects_bad_expiry_width() {
-        // Hand-build a bundle whose expiry field is 4 bytes instead of 8.
         let mut buf = SSO_ATTR_BUNDLE_DOMAIN.to_vec();
         write_field(&mut buf, b"idp");
         write_field(&mut buf, b"https://a.com");

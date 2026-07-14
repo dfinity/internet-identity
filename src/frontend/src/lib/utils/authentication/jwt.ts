@@ -14,12 +14,7 @@ import {
 } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 
-/**
- * Thrown by {@link authenticateWithSso} when the gated SSO login can't resolve
- * an existing identity because the org's stable identifier isn't `sub` and no
- * prior *normal* (primary-client) SSO login has bridged this user yet (§6.5).
- * The caller should prompt the user to sign in normally first.
- */
+/** Thrown by {@link authenticateWithSso} when a gated SSO login needs a normal sign-in first. */
 export class SsoNormalLoginRequiredError extends Error {
   constructor() {
     super("Sign in normally first before using this gated app");
@@ -27,19 +22,7 @@ export class SsoNormalLoginRequiredError extends Error {
   }
 }
 
-/**
- * SSO sign-in for a dapp origin — the IdP-side per-app gating path. Runs the
- * `sso_prepare_delegation` / `sso_get_delegation` pair, which enforces the gate
- * (`aud == the origin's declared client`) and binds the delegation to
- * `(sso_domain, origin)`. `openid_prepare_delegation` is untouched.
- *
- * A `NoSuchAnchor` result (no identity for this token yet) surfaces as the raw
- * canister error so the caller routes to registration — for BOTH gated and
- * un-gated origins. Registration is where the gated/`sub` vs non-`sub`
- * distinction is made (`openid_identity_registration_finish` with the origin):
- * a `sub` org registers directly from the gated token; a non-`sub` org returns
- * `SsoNormalLoginRequired`, which the caller maps to a normal-login-first prompt.
- */
+/** SSO sign-in bound to a dapp origin; attaches the certified SSO attribute bundle to the returned identity. */
 export const authenticateWithSso = async ({
   canisterId,
   session,
@@ -105,11 +88,7 @@ export const authenticateWithSso = async ({
       session.identity,
       delegationChain,
     );
-    // Attach the certified SSO attribute bundle as `sender_info` on every
-    // subsequent call, so the attribute sites can certify `sso:<domain>`
-    // attributes (IdP-side per-app gating, §6.3). The bundle is bound to this
-    // credential seed, so the replica verifies it as a canister signature under
-    // the caller's own principal.
+    // The bundle rides as `sender_info` on every call so attribute sites can certify `sso:<domain>` attributes.
     const identity = new AttributesIdentity({
       inner: delegationIdentity,
       attributes: {

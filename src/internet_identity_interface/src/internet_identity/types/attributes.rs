@@ -852,12 +852,8 @@ pub enum GetIcrc3AttributeError {
 pub struct ListAvailableAttributesRequest {
     pub identity_number: AnchorNumber,
     pub attributes: Option<Vec<String>>,
-    /// The dapp origin, when the caller authenticates through an SSO session
-    /// (IdP-side per-app gating, §6.3): it is matched against the certified SSO
-    /// attribute bundle attached to the call so the listing includes
-    /// `sso:<domain>` rows only for a bundle whose origin matches (what this
-    /// session can actually certify). Additive; omitted by device / OpenID
-    /// sessions, which carry no bundle and see no `sso:` rows.
+    /// Dapp origin for an SSO session; matched against the call's SSO bundle so
+    /// `sso:<domain>` rows appear only for a bundle whose origin matches.
     pub origin: Option<FrontendHostname>,
 }
 

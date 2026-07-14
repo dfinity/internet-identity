@@ -374,11 +374,8 @@ impl Anchor {
         unmapped_origin: Option<String>,
         issued_at_timestamp_ns: u64,
         account: Account,
-        // The SSO domain this session signed in through, if the caller is the
-        // SSO-session principal for this origin (IdP-side per-app gating, §6.3).
-        // `sso:<domain>` attributes are certified only when this matches the
-        // requested domain — a passkey / `openid_prepare_delegation` session
-        // passes `None` and gets no SSO attributes.
+        // SSO domain this session signed in through, or `None` for non-SSO
+        // sessions; `sso:<domain>` attributes certify only when it matches.
         sso_session_domain: Option<String>,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
@@ -421,10 +418,7 @@ impl Anchor {
                     insert_certified_attribute(&mut certified_pairs, &mut problems, spec, stored);
                 }
                 Some(AttributeScope::Sso { domain }) => {
-                    // SSO attributes require an SSO sign-in for this exact domain
-                    // (§6.3): only the SSO-session principal may certify them, so
-                    // an anchor that merely *has* an SSO access method shares none
-                    // from a passkey / `openid_prepare_delegation` session.
+                    // Certify SSO attributes only for a session that signed in through this exact domain.
                     if sso_session_domain.as_deref() != Some(domain.as_str()) {
                         problems.push(format!(
                             "sso:{domain} attributes require an SSO sign-in through that domain"
@@ -575,14 +569,7 @@ impl Anchor {
     /// so an anchor with multiple verified emails produces multiple
     /// rows that share the same key but carry different values.
     ///
-    /// `sso_session_domain` gates the `sso:<domain>` rows to what this
-    /// session can actually certify (IdP-side per-app gating, §6.3): a
-    /// credential's `sso:<domain>` attributes are listed only when the
-    /// caller attached a certified bundle for that exact domain (matching
-    /// origin, unexpired). `None` — a passkey / direct-OpenID session, or a
-    /// cross-origin / expired bundle — lists no `sso:` rows, so the listing
-    /// never offers a key `prepare_icrc3_attributes` would then refuse.
-    /// `OpenId` / direct scopes are unaffected.
+    /// `sso_session_domain` gates `sso:<domain>` rows to the domain this session can certify.
     pub fn list_available_attributes(
         &self,
         requested: Option<Vec<AttributeKey>>,
@@ -603,9 +590,7 @@ impl Anchor {
                 continue;
             };
 
-            // `sso:<domain>` rows are listed only for a session holding a
-            // certified bundle for that exact domain; otherwise they can't be
-            // certified, so don't offer them (IdP-side per-app gating, §6.3).
+            // List `sso:<domain>` rows only for a session that can certify that exact domain.
             if let AttributeScope::Sso { domain } = &scope {
                 if sso_session_domain.as_deref() != Some(domain) {
                     continue;
@@ -2410,8 +2395,6 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            // A session holding a certified bundle for this SSO domain sees its
-            // `sso:<domain>` rows.
             let listed =
                 anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()));
             let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
@@ -2432,12 +2415,8 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            // No bundle (passkey / direct-OpenID session): no `sso:<domain>` row
-            // is offered, so the listing never advertises a key that
-            // `prepare_icrc3_attributes` would then refuse.
             pretty_assert_eq!(anchor.list_available_attributes(None, None), vec![]);
 
-            // A bundle for a DIFFERENT domain likewise lists nothing here.
             pretty_assert_eq!(
                 anchor.list_available_attributes(None, Some("other.example".to_string())),
                 vec![]
@@ -2482,9 +2461,7 @@ mod tests {
                 None,
                 1_000_000_000,
                 account,
-                // Simulate an SSO session for this domain so the request
-                // reaches the `verified_email`-not-available branch (rather
-                // than being refused for lacking an SSO session).
+                // SSO session for this domain, so the request reaches the verified_email branch.
                 Some(SSO_DOMAIN.to_string()),
             );
             match res {

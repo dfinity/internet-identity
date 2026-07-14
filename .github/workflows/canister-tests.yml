@@ -497,13 +497,10 @@ jobs:
       # (registered earlier), producing an `openid:`-keyed credential
       # the SSO attribute scope can't reach.
       direct_openid_providers: "11105 11106"
-      # SSO discovery domains we ship to the canister at install time —
-      # the dedicated SSO test port. `localhost:11107` backs the un-gated SSO
-      # tests; `127.0.0.1:11107` is the same provider under a distinct host so
-      # the IdP-side per-app gating tests get their own discovery-cache entry
-      # (II caches discovery per domain for ~1h with no force-refresh, so a
-      # shared domain would let the two suites clobber each other's cached
-      # gating config). See fixtures/sso.ts SSO_GATING_DISCOVERY_DOMAIN.
+      # SSO discovery domains shipped to the canister at install time.
+      # `127.0.0.1:11107` is the same provider under a distinct host so the gating
+      # tests get their own discovery-cache entry (II caches discovery per domain
+      # ~1h with no force-refresh). See fixtures/sso.ts SSO_GATING_DISCOVERY_DOMAIN.
       sso_discoverable_domains: "localhost:11107 127.0.0.1:11107"
     steps:
       - uses: actions/checkout@v4

@@ -20,12 +20,8 @@
       result: SsoDiscoveryResult,
     ) => Promise<void | "cancelled">;
     /**
-     * Run a NORMAL primary-client SSO sign-in (not the gated ceremony). Used
-     * only for the Entra (non-`sub`) first-gated-login CTA: a first gated login
-     * throws {@link SsoNormalLoginRequiredError}, so we show a button that — on
-     * a fresh user click (popup-safe) — establishes the identity + stable-id
-     * bridge here, after which a second click retries the gated login. Absent in
-     * flows that never gate (e.g. add-access-method).
+     * Runs a normal (un-gated) SSO sign-in for the first-gated-login CTA. Absent
+     * in flows that never gate (e.g. add-access-method).
      */
     signInNormally?: (
       result: SsoDiscoveryResult,
@@ -42,10 +38,8 @@
      */
     openIdCredentials?: OpenIdCredential[];
     /**
-     * The target dapp origin, set only in the authorize (dapp sign-in) flow.
-     * Passed to SSO discovery so `get_sso_discovery` returns this origin's
-     * `resolved_client_id` (IdP-side per-app gating) — the ceremony then runs
-     * against the per-app client for a gated origin.
+     * The target dapp origin, set only in the authorize (dapp sign-in) flow;
+     * threaded into SSO discovery to resolve the per-app client for the origin.
      */
     origin?: string;
   }
@@ -59,16 +53,11 @@
   }: Props = $props();
 
   /**
-   * Entra (non-`sub`) first-gated-login CTA state (§6.5). A gated login for such
-   * an org can't register directly, so we guide the user through two clicks,
-   * each triggering its own IdP ceremony from a fresh gesture (never a
-   * `window.open` after an `await`, which the browser blocks):
-   * - `needs-normal-login`: show "Sign in with <org>" → runs the normal
-   *   primary-client sign-in (establishes identity + stable-id bridge).
-   * - `ready-to-continue`: show "Continue" → retries the gated login, which now
-   *   resolves and reaches the app.
-   * `undefined` for the normal single-ceremony path (`sub` orgs, returning
-   * users), which never surfaces the CTA.
+   * Two-step CTA for a first gated login that can't register directly:
+   * "needs-normal-login" (normal sign-in) then "ready-to-continue" (retry the
+   * gated login). Each step is its own click so the IdP popup fires from a fresh
+   * gesture (a `window.open` after an `await` is blocked). `undefined` on the
+   * normal single-ceremony path.
    */
   let ctaStep = $state<"needs-normal-login" | "ready-to-continue">();
 
@@ -92,8 +81,6 @@
    */
   let preparedResult = $state<SsoDiscoveryResult>();
 
-  // Friendly org label for the CTA copy: the SSO name if the domain published
-  // one, else the domain the user entered.
   const ctaOrgLabel = $derived(
     preparedResult?.name ?? preparedResult?.domain ?? domain,
   );
@@ -140,19 +127,12 @@
     domainInput: string,
   ): string | undefined => {
     if (e instanceof SsoNormalLoginRequiredError) {
-      // Reached only as a fallback: the wizard already ran a normal
-      // primary-client sign-in automatically, but the identity still can't be
-      // bridged to this gated app. This happens for an org whose stable
-      // identifier isn't `sub` (e.g. Entra `oid`) until a normal sign-in at a
-      // non-gated app has populated the bridge (§6.5) — an authorize-time sign-in
-      // can't populate it here. Tell the user plainly rather than repeating an
-      // instruction they just followed.
+      // Fallback: the identity still can't be bridged to this gated app.
       return $t`${domainInput} can't grant access to this app for your account yet. Sign in to another app with ${domainInput} SSO first, then try again.`;
     }
     if (e instanceof DomainNotConfiguredError) {
       if (e.reason === "origin-denied") {
-        // The org's admin has gated this dapp off (not in `app_clients` under
-        // `gate_all_apps`), so no client can serve this origin.
+        // The org gated this dapp off, so no client can serve this origin.
         return $t`Your organization hasn't granted this app access via ${domainInput}.`;
       }
       if (e.reason === "timeout") {
@@ -294,9 +274,7 @@
       // `preparedResult` by the debounced input handler.
       await continueWithSso(preparedResult);
     } catch (e) {
-      // A first gated login for a non-`sub` org can't register directly — guide
-      // the user through a normal primary-client sign-in first, via a
-      // click-driven CTA (each ceremony on its own gesture; see `ctaStep`).
+      // First gated login can't register directly — start the normal-login CTA.
       if (
         e instanceof SsoNormalLoginRequiredError &&
         signInNormally !== undefined
@@ -310,8 +288,8 @@
     }
   };
 
-  // CTA step 1: run the normal primary-client sign-in (fresh user gesture, so
-  // the popup isn't blocked). On success, advance to the "Continue" step.
+  // CTA step 1: normal sign-in on a fresh gesture (popup not blocked); advance
+  // to the "Continue" step on success.
   const handleSignInNormally = async () => {
     if (preparedResult === undefined || signInNormally === undefined) {
       return;
@@ -331,8 +309,7 @@
     }
   };
 
-  // CTA step 2: retry the gated login (fresh user gesture). Now that the
-  // identity + bridge exist, it resolves and continues into the app.
+  // CTA step 2: retry the gated login on a fresh gesture.
   const handleContinueToApp = async () => {
     if (preparedResult === undefined) {
       return;
@@ -370,9 +347,8 @@
     </div>
   </div>
   {#if ctaStep !== undefined}
-    <!-- Entra (non-`sub`) first-gated-login CTA. Each step is its own button so
-         the IdP ceremony fires from a fresh user gesture (a chained
-         `window.open` after the previous ceremony's `await` would be blocked). -->
+    <!-- Each step is its own button so the IdP popup fires from a fresh user
+         gesture (a `window.open` chained after an `await` is blocked). -->
     <div class="flex flex-col items-stretch gap-6">
       <p class="text-text-tertiary text-base font-medium">
         {#if ctaStep === "needs-normal-login"}

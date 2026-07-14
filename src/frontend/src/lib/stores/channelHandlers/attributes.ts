@@ -324,16 +324,11 @@ const resolveConsentPipeline = async (params: {
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
-              // Pass the origin so the canister can match this call's certified
-              // SSO attribute bundle and include `sso:<domain>` rows for an SSO
-              // session (§6.3); ignored for device / OpenID sessions.
+              // Origin lets the canister include `sso:<domain>` rows for an SSO session; ignored otherwise.
               origin: [origin],
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
-    // `identity_info` feeds recovery / verified-email addresses (used by the
-    // `verified_email` attribute type). Every session — including the SSO gate
-    // session, now a plain openid-credential principal — is a valid caller.
     const identityInfoPromise = authenticated.actor
       .identity_info(authenticated.identityNumber)
       .then(throwCanisterError);
@@ -533,11 +528,7 @@ export const handleIcrc3OneClickOpenIdAttributes =
  * SSO equivalent of {@link handleIcrc3OneClickOpenIdAttributes}. When the app
  * requested SSO sign-in via the `?sso=<domain>` 1-click entry and every
  * requested key is in that domain's auto-approve allowlist, certify and send
- * without showing the consent UI. Keyed on the `1-click-sso` FLOW (not the
- * SSO-session marker) so it fires ONLY for that 1-click entry — the manual
- * "Sign in with SSO" wizard is also an SSO session but must show explicit
- * consent (it still gets SSO-session attribute authorization via the consent
- * pipeline; it just isn't silently approved).
+ * without showing the consent UI.
  */
 export const handleIcrc3OneClickSsoAttributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -561,9 +552,7 @@ export const handleIcrc3OneClickSsoAttributes =
 
     try {
       const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
-      // Auto-approve only the `?sso=<domain>` 1-click entry — NOT the manual
-      // "Sign in with SSO" wizard (which shows explicit consent) and NOT a
-      // passkey / direct-OpenID session into the same dapp.
+      // Auto-approve only the `?sso=<domain>` 1-click entry, not the manual wizard or a passkey/OpenID session.
       if (flow.type !== "1-click-sso") {
         return;
       }
@@ -595,8 +584,7 @@ export const handleIcrc3OneClickSsoAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
-          // SSO session: pass the origin so the canister authorizes this read
-          // for the origin-scoped SSO-session principal (§6.3).
+          // SSO session: origin authorizes the read for the origin-scoped SSO-session principal.
           origin: [origin],
         })
         .then(throwCanisterError);
@@ -658,11 +646,7 @@ export const handleIcrc3ConsentAttributes =
 
     await serializeConsentRequest(async () => {
       try {
-        // Both 1-click auto-approve handlers are keyed on the FLOW (only set for
-        // the `?sso=` / `?openid=` 1-click entries); the manual "Sign in with
-        // SSO" wizard is an SSO session too but must reach explicit consent
-        // here. Bail out as soon as we know one of the 1-click handlers will
-        // take this request.
+        // Bail out as soon as we know one of the 1-click handlers will take this request.
         const flow = await waitForStore(authorizationStore, (ctx) => ctx?.flow);
         const oneClickHandlerWillHandle =
           requestedKeys.length > 0 &&

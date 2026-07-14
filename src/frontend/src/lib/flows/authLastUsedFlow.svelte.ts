@@ -41,15 +41,7 @@ export class AuthLastUsedFlow {
     });
   }
 
-  /**
-   * Re-authenticate a stored last-used identity. `dappOrigin` is the dapp's
-   * effective origin when this runs inside the dapp authorize flow: for an SSO
-   * identity it routes sign-in through the gate path (`authenticateWithSso`) so
-   * the certified attribute bundle is attached — without it the SSO session
-   * would carry no bundle and list/certify no `sso:<domain>` attributes.
-   * Omitted for management / non-dapp re-auth, where the plain OpenID path is
-   * used.
-   */
+  /** Re-authenticate a stored last-used identity; `dappOrigin` routes an SSO identity through the gate path. */
   authenticate = async (
     lastUsedIdentity: LastUsedIdentity,
     dappOrigin?: string,
@@ -133,10 +125,6 @@ export class AuthLastUsedFlow {
         // discovery before `window.open` would let Safari block the popup.
         const { domain, loginHint } = lastUsedIdentity.authMethod.sso;
         const jwt = await requestWithPopup(
-          // Pass the dapp origin so the ceremony runs against the client the
-          // origin resolves to under IdP-side per-app gating (`resolvedClientId`:
-          // the per-app client if gated, else the primary). Equals `clientId`
-          // when no origin is passed (management re-auth).
           discoverSsoConfig(domain, undefined, dappOrigin).then(
             (ssoResult) => ({
               clientId: ssoResult.resolvedClientId,
@@ -154,9 +142,6 @@ export class AuthLastUsedFlow {
         );
         const { iss, sub } = decodeJWT(jwt);
         this.systemOverlay = false;
-        // Dapp authorize flow (origin present): redeem through the gate path so
-        // the certified SSO attribute bundle is attached to the session.
-        // Management / non-dapp re-auth (no origin): plain OpenID path.
         const { identity, identityNumber } =
           dappOrigin !== undefined
             ? await authenticateWithSso({
@@ -177,9 +162,7 @@ export class AuthLastUsedFlow {
           identityNumber,
           authMethod: { openid: { iss, sub } },
         });
-        // Re-record the ORIGINAL last-used entry so it stays SSO-tagged (the
-        // session's `authMethod` has no `sso` variant; the last-used store keeps
-        // the `sso` entry, so a later re-auth takes this branch again).
+        // Re-record the original entry so it stays SSO-tagged; the session's `authMethod` has no `sso` variant.
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({ provider: "SSO" });
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);

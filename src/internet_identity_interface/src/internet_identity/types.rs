@@ -504,7 +504,7 @@ pub struct DiscoverableOidcConfig {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct SsoDiscovery {
     pub discovery_domain: String,
-    /// The org's **primary** OIDC client (the one meant for II itself).
+    /// The org's primary OIDC client.
     pub client_id: String,
     pub issuer: String,
     pub authorization_endpoint: String,
@@ -512,14 +512,8 @@ pub struct SsoDiscovery {
     /// Human-readable SSO label, if the domain published one in its
     /// `ii-openid-configuration`.
     pub name: Option<String>,
-    /// The client the frontend should run the ceremony against for the target
-    /// origin passed to `get_sso_discovery` (IdP-side per-app gating, §5/§6):
-    /// - `Some(per-app client)` when the origin is listed in `app_clients`;
-    /// - `Some(primary client)` when unlisted and `gate_all_apps` is off;
-    /// - `None` when unlisted and `gate_all_apps` is on (origin denied).
-    ///
-    /// When `get_sso_discovery` is called without an origin, this mirrors the
-    /// primary `client_id` so single-client callers keep working unchanged.
+    /// Client the frontend runs the ceremony against for the requested origin;
+    /// `None` when the origin is denied.
     pub resolved_client_id: Option<String>,
 }
 

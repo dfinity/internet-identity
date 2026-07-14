@@ -47,10 +47,7 @@
     // verbatim to PickAuthenticationMethod.
     switchModeTitle?: string;
     switchModeAction?: string;
-    // The target dapp origin, set only in the authorize (dapp sign-in) flow.
-    // Threaded into SSO discovery so `get_sso_discovery` returns the origin's
-    // `resolved_client_id` (IdP-side per-app gating), and into the SSO sign-in
-    // so it runs through `sso_prepare_delegation` bound to this origin.
+    // The target dapp origin; set only in the authorize (dapp sign-in) flow.
     ssoOrigin?: string;
     children?: Snippet<[boolean?]>;
   }
@@ -290,8 +287,6 @@
     }
   };
 
-  // Apply the outcome of an SSO `continueWithSso` call: complete a sign-in,
-  // finish registration, or hand off to the registration view.
   const applySsoAuthResult = async (
     authResult: Awaited<ReturnType<typeof authFlow.continueWithSso>>,
     ssoResult: SsoDiscoveryResult,
@@ -346,11 +341,7 @@
       if (isOpenIdCancelError(error)) {
         return "cancelled";
       }
-      // A first gated login for a non-`sub` org (e.g. Entra): the per-app token
-      // can't be bridged to the primary identity yet. Surface it so
-      // SignInWithSso shows a button-driven CTA ("Sign in with your
-      // organization" then "Continue"), each ceremony on a fresh user gesture —
-      // a `sub` org registered directly above and never reaches here.
+      // Re-throw so SignInWithSso can drive the normal-login CTA.
       if (error instanceof SsoNormalLoginRequiredError) {
         throw error;
       }
@@ -360,20 +351,14 @@
     }
   };
 
-  // The Entra (non-`sub`) first-gated-login CTA step: run a NORMAL primary-client
-  // SSO sign-in to establish the identity + the stable-id bridge (§6.5), so the
-  // subsequent gated retry resolves. Invoked from a fresh user click in
-  // SignInWithSso (popup-safe — never chained after the gated attempt's await).
-  // Establishes the identity only; it does NOT complete the dapp authorization —
-  // the caller then retries the gated login (a second click) to mint the
-  // origin-bound SSO session the dapp needs.
+  // Runs a normal (un-gated) SSO sign-in to establish the identity only; it does
+  // not complete the dapp authorization — the caller retries the gated login.
   const handleSignInNormally = async (
     ssoResult: SsoDiscoveryResult,
   ): Promise<void | "cancelled"> => {
     try {
       isAuthenticating = true;
-      // Force the org's primary client and drop the dapp origin: a normal
-      // (un-gated) SSO sign-in. Registration records the non-`sub` aux bridge.
+      // Force the org's primary client: a normal (un-gated) SSO sign-in.
       const primaryResult: SsoDiscoveryResult = {
         ...ssoResult,
         resolvedClientId: ssoResult.clientId,
@@ -390,8 +375,6 @@
             ssoResult.domain,
         );
       }
-      // signIn / already-linked: the identity already exists. Either way it's
-      // now established; the caller retries the gated login to reach the app.
     } catch (error) {
       if (isOpenIdCancelError(error)) {
         return "cancelled";
