@@ -32,6 +32,18 @@ const signUp = async (page: Page): Promise<void> => {
 const expirationMillis = (expiration: string): number =>
   Number(BigInt(expiration) / BigInt(1_000_000));
 
+/** Connect on the MCP screen. The access-level choice starts unselected on a
+ *  first-time connect (a fresh context has no stored preference), and "Allow
+ *  access" stays disabled until a level is picked — so choose one, then connect.
+ *  Defaults to full access where the chosen level doesn't affect the assertion. */
+const allowAccess = async (
+  page: Page,
+  level: "Queries only" | "Actions & queries" = "Actions & queries",
+): Promise<void> => {
+  await page.getByRole("radio", { name: level }).check();
+  await page.getByRole("button", { name: "Allow access" }).click();
+};
+
 test("Invalid params show the error screen", async ({ page }) => {
   await page.goto(II_URL + "/mcp");
   await expect(
@@ -66,7 +78,7 @@ test("Signing up to an untrusted server prompts to add it in settings", async ({
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
   await expect(
     page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
   ).toBeVisible();
@@ -88,7 +100,7 @@ test("Manage trusted server hands the session to a new Settings tab", async ({
   await addVirtualAuthenticator(page);
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await signUp(page);
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
   const manageButton = page.getByRole("button", {
     name: "Manage trusted server",
   });
@@ -233,13 +245,13 @@ test("Allow access mints a registration delegation the server redeems", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  // The MCP connect flow always shows the access-level toggle and defaults to
-  // read-only (opt-out): the "Read-only mode" box is shown checked. Left
-  // checked, the connect is read-only.
+  // The MCP connect flow always shows the access-level choice, with nothing
+  // pre-selected on a first-time connect: "Allow access" is disabled until the
+  // user picks a level. Choosing "Queries only" makes the connect read-only.
   await expect(
-    page.getByRole("checkbox", { name: "Read-only mode" }),
-  ).toBeChecked();
-  await page.getByRole("button", { name: "Allow access" }).click();
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeDisabled();
+  await allowAccess(page, "Queries only");
 
   // II minted a short-lived P_reg -> Y -> X registration chain and handed it
   // to the trusted server's declared callback (in the fragment; no consent
@@ -252,8 +264,8 @@ test("Allow access mints a registration delegation the server redeems", async ({
   expect(completion.state).toBe(mcp.state);
   expect(completion.expiration).toMatch(/^\d+$/);
   expect(expirationMillis(completion.expiration)).toBeGreaterThan(Date.now());
-  // Left at the read-only default, the grant is queries-only. The full-access
-  // path (after unchecking the toggle) has its own test below.
+  // With "Queries only" chosen, the grant is queries-only. The full-access
+  // path (choosing "Actions & queries") has its own test below.
   expect(completion.permissions).toBe("queries");
   // The tab landed on the server's connect page, which shows its connected
   // state once the redemption succeeds.
@@ -295,7 +307,7 @@ test("An undeclared callback path fails the connect: nothing is delivered to it"
       callbackUrl: `${mcp.mcpOrigin}/attacker-echo`,
     }),
   );
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
 
   // The link's callback only selects among the server-declared entries: an
   // undeclared one fails the connect before the delegation is even minted.
@@ -327,7 +339,7 @@ test("A finish redirect hands the tab onward after connecting", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
 
   // The session registers like any connect...
   const completion = await mcp.completion;
@@ -357,6 +369,9 @@ test("Identity switcher shows while signing in and hides once connecting", async
   await expect(allow).toBeVisible();
   await expect(switcher).toBeVisible();
 
+  // Pick an access level to enable "Allow access" (unselected on a first-time
+  // connect), then connect.
+  await page.getByRole("radio", { name: "Actions & queries" }).check();
   await allow.click();
   // Once connecting, the switcher is gone — and it stays gone as the tab is
   // handed to the server's declared callback (a different origin entirely).
@@ -377,7 +392,7 @@ test("Requested TTL within bounds is honoured", async ({ page, mcp }) => {
 
   const before = Date.now();
   await page.goto(mcp.buildAuthorizeUrl({ app: APP, ttlSeconds }));
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
 
   const expMillis = expirationMillis((await mcp.completion).expiration);
   const requestedMillis = ttlSeconds * 1000;
@@ -403,7 +418,7 @@ test("A failed redemption surfaces on the server's page and registers nothing", 
   // page, and no session grant is created.
   mcp.setNextOutcome("error");
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
 
   // The server's connect page reports the failure...
   await expect(
@@ -435,7 +450,7 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   // Trust is re-verified against the synced config at connect time, so with no
   // trusted server the connect lands on the untrusted screen.
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
   await expect(
     page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
   ).toBeVisible();
@@ -463,19 +478,18 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
   await expect(toggle).toBeEnabled();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  await page.getByRole("button", { name: "Allow access" }).click();
+  await allowAccess(page);
   await expect(
     page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
   ).toBeVisible();
 });
 
-test("Unchecking read-only mode connects with full access", async ({
+test("Choosing actions & queries connects with full access", async ({
   page,
   mcp,
 }) => {
-  // The read-only default (queries-only) connect is covered by "Allow access
-  // mints a registration delegation the server redeems"; this exercises the
-  // opt-out path.
+  // The queries-only connect is covered by "Allow access mints a registration
+  // delegation the server redeems"; this exercises the full-access choice.
   test.slow();
   await addVirtualAuthenticator(page);
   await mcp.installInterceptor(page);
@@ -485,16 +499,42 @@ test("Unchecking read-only mode connects with full access", async ({
   await mcp.trustServer(page);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
-  const readOnly = page.getByRole("checkbox", { name: "Read-only mode" });
-  await expect(readOnly).toBeChecked();
-  await readOnly.uncheck();
-
-  await page.getByRole("button", { name: "Allow access" }).click();
-  // Unchecking the toggle switches the session to full access, recorded on the
+  await allowAccess(page, "Actions & queries");
+  // Choosing "Actions & queries" makes the session full access, recorded on the
   // registration entry at prepare and reflected in the grant the server gets
   // back from mcp_register_v2.
   const completion = await mcp.completion;
   expect(completion.permissions).toBe("all");
+});
+
+test("Remembers the access-level choice for the next connect", async ({
+  page,
+  mcp,
+}) => {
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await mcp.installInterceptor(page);
+  await page.goto(II_URL);
+  await signUp(page);
+  await page.waitForURL(II_URL + "/manage");
+  await mcp.trustServer(page);
+
+  // First connect: nothing pre-selected, so the user picks "Queries only".
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeDisabled();
+  await allowAccess(page, "Queries only");
+  await expect(page.getByRole("heading", { name: "Connected" })).toBeVisible();
+
+  // Second connect from the same browser: the choice was persisted, so
+  // "Queries only" is pre-selected and "Allow access" is enabled with no
+  // further interaction.
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await expect(page.getByRole("radio", { name: "Queries only" })).toBeChecked();
+  await expect(
+    page.getByRole("button", { name: "Allow access" }),
+  ).toBeEnabled();
 });
 
 // The browser /mcp flow mints a short-lived registration chain (P_reg -> Y -> X)

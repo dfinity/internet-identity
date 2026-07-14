@@ -3,8 +3,9 @@
   import McpHero from "../components/McpHero.svelte";
   import Select from "$lib/components/ui/Select.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
+  import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { accessLevelStore } from "$lib/stores/access-level.store";
   import { ChevronDownIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -27,11 +28,6 @@
 
   const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
 
-  // MCP connections default to read-only (opt-out): the server can read across
-  // the user's apps, but its per-app delegations are query-only unless the user
-  // unchecks "Read-only mode" to grant full access.
-  let accessLevel: AccessLevel = $state("read-only");
-
   // Connecting authorizes this agent for the user's identity — no account is
   // chosen here (accounts are app-specific; the MCP server is the connector, not
   // an app). The identity switcher (shown by the layout) is how the user picks
@@ -46,6 +42,22 @@
       authLastUsedFlow.init([selectedIdentityNumber]);
     }
   });
+
+  // The MCP connect flow always offers the access-level choice (ungated by
+  // READ_ONLY_MODE): the choice is recorded with the grant and applies to the
+  // per-app delegations the server later obtains, while its standing delegation
+  // stays full access. The chosen level maps to the per-app delegations'
+  // `permissions`: "read-only" = queries-only, "full-access" = update-capable.
+  // Derived per-anchor (the browser may be shared) from the selected anchor's
+  // stored MCP choice: unselected on a first-time connect so the user picks
+  // explicitly (the "Allow access" button stays disabled until then), and
+  // re-hydrated when they switch identity. The user's own radio pick overrides
+  // this until the identity changes again.
+  let accessLevel: AccessLevel | undefined = $derived(
+    selectedIdentityNumber === undefined
+      ? undefined
+      : accessLevelStore.getPreference("mcp", selectedIdentityNumber),
+  );
   let isAuthorizing = $state(false);
 
   const MINUTE = 60;
@@ -99,9 +111,18 @@
 
   const handleAllowAccess = async (): Promise<void> => {
     const selected = $lastUsedIdentitiesStore.selected;
-    if (selected === undefined) {
+    // Capture the chosen level in a const so its non-undefined type survives the
+    // `await` below (a reactive `let` would widen back to `AccessLevel | undefined`).
+    const chosenAccessLevel = accessLevel;
+    if (selected === undefined || chosenAccessLevel === undefined) {
       return;
     }
+    // Remember this anchor's choice so it pre-fills its next MCP connect.
+    accessLevelStore.setPreference(
+      "mcp",
+      selected.identityNumber,
+      chosenAccessLevel,
+    );
     isAuthorizing = true;
     try {
       // Authenticate unless the live session is already the selected identity.
@@ -111,7 +132,7 @@
         sessionStore.reset();
         await authLastUsedFlow.authenticate(selected);
       }
-      onAuthorize(selectedTtlSeconds, accessLevel);
+      onAuthorize(selectedTtlSeconds, chosenAccessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -158,16 +179,17 @@
         </button>
       </Select>
     </div>
-    <AccessLevelToggle
+    <AccessLevelSelector
       bind:accessLevel
-      prompt="read-only"
       disabled={isAuthorizing}
       class="mb-6"
     />
     <button
       class="btn btn-primary w-full gap-2"
       onclick={handleAllowAccess}
-      disabled={isAuthorizing || selectedIdentityNumber === undefined}
+      disabled={isAuthorizing ||
+        selectedIdentityNumber === undefined ||
+        accessLevel === undefined}
     >
       {#if isAuthorizing}
         <ProgressRing class="size-5" />

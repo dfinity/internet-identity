@@ -94,6 +94,45 @@ test.describe("Authorize with 1-click SSO", () => {
     }) => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
+
+    // Regression guard: the 1-click flow used to sign up without recording
+    // the new identity. It must land in `ii-last-used-identities` on the II
+    // origin, and — because the resume flow redeems the SSO JWT through
+    // `continueWithOpenId` — it must be tagged `sso` (keyed by domain), not
+    // `openid`. An `openid` entry would break a later "last used" sign-in,
+    // whose SSO branch needs the discovery domain to re-run discovery.
+    test("records the new identity as an sso entry in last-used storage", async ({
+      page,
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+      // The popup-close + redirect can take a few seconds; use the same 15s
+      // budget the rest of the authorize suite uses.
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+
+      const iiPage = await page.context().newPage();
+      try {
+        await iiPage.goto(II_URL);
+        const lastUsedRaw = await iiPage.evaluate(() =>
+          localStorage.getItem("ii-last-used-identities"),
+        );
+        expect(lastUsedRaw).not.toBeNull();
+        const lastUsed = JSON.parse(lastUsedRaw!) as {
+          data: Record<string, { authMethod: Record<string, unknown> }>;
+        };
+        // A brand-new identity was recorded (the buggy code left this empty).
+        const entries = Object.values(lastUsed.data);
+        expect(entries).toHaveLength(1);
+        expect(entries[0]?.authMethod).toHaveProperty("sso");
+        expect(entries[0]?.authMethod).not.toHaveProperty("openid");
+        const sso = (entries[0]!.authMethod as { sso: { domain: string } }).sso;
+        expect(sso.domain).toBe(SSO_DISCOVERY_DOMAIN);
+      } finally {
+        await iiPage.close();
+      }
+    });
   });
 
   test.describe("with name and email attributes", () => {

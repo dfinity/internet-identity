@@ -43,6 +43,7 @@
     "@eslint/js": "^10.0.1",
     "@lingui/cli": "^5.9.2",
     "@lingui/vite-plugin": "^5.9.2",
+    "@noble/curves": "^2.2.0",
     "@playwright/test": "^1.56.1",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.54.0",
@@ -82,7 +83,7 @@
   },
   "dependencies": {
     "@dfinity/internet-identity-vc-api": "*",
-    "@icp-sdk/core": "^5.0.0",
+    "@icp-sdk/core": "^6.0.0",
     "@lingui/core": "^5.9.2",
     "@lucide/svelte": "^0.577.0",
     "@noble/hashes": "^2.0.1",

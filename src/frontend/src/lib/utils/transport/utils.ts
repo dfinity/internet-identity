@@ -168,6 +168,10 @@ export const DelegationResultSchema = z.codec(
         delegation: z.object({
           pubkey: z.base64(),
           expiration: z.string(),
+          // Optional `permissions` (e.g. "queries" for a read-only
+          // delegation). A plain semantic string, not base64 — omitted for
+          // unrestricted delegations.
+          permissions: z.optional(z.string()),
         }),
         signature: z.base64(),
       }),
@@ -178,10 +182,12 @@ export const DelegationResultSchema = z.codec(
     decode: ({ publicKey, signerDelegation }) =>
       DelegationChain.fromDelegations(
         signerDelegation.map(
-          ({ delegation: { pubkey, expiration }, signature }) => ({
+          ({ delegation: { pubkey, expiration, permissions }, signature }) => ({
             delegation: new Delegation(
               Base64ToBytesCodec.decode(pubkey),
               StringToBigIntCodec.decode(expiration),
+              undefined,
+              permissions,
             ),
             signature: Base64ToBytesCodec.decode(signature) as Signature,
           }),
@@ -198,6 +204,7 @@ export const DelegationResultSchema = z.codec(
             new Uint8Array(delegation.delegation.pubkey),
           ),
           expiration: delegation.delegation.expiration.toString(),
+          permissions: delegation.delegation.permissions,
         },
         signature: Base64ToBytesCodec.encode(
           new Uint8Array(delegation.signature),
@@ -282,6 +289,7 @@ export const AuthResponseCodec = z.codec(
               pubkey: z.base64(),
               expiration: z.string(),
               targets: z.optional(z.array(z.string())),
+              permissions: z.optional(z.string()),
             }),
             z.instanceof(Delegation),
           ]),
@@ -337,6 +345,7 @@ export const AuthResponseCodec = z.codec(
                         delegation.targets?.map((target) =>
                           Principal.fromText(target),
                         ),
+                        delegation.permissions,
                       ),
                 signature:
                   typeof signature === "string"
@@ -361,6 +370,7 @@ export const AuthResponseCodec = z.codec(
                   pubkey: z.util.uint8ArrayToBase64(delegation.pubkey),
                   expiration: delegation.expiration.toString(),
                   targets: delegation.targets?.map((target) => target.toText()),
+                  permissions: delegation.permissions,
                 },
                 signature: z.util.uint8ArrayToBase64(signature),
               }),
