@@ -1510,8 +1510,8 @@ mod openid_api {
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
-        OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult,
-        SsoGetDelegationResponse, SsoPrepareDelegationResponse, SessionKey, Timestamp,
+        OpenIdDelegationError, OpenIdPrepareDelegationResponse, OpenIdResult, SessionKey,
+        SsoGetDelegationResponse, SsoPrepareDelegationResponse, Timestamp,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -1833,14 +1833,14 @@ mod openid_api {
         else {
             return OpenIdResult::Err(OpenIdDelegationError::NoSuchAnchor);
         };
-        let signed_delegation = match identity.credential.get_jwt_delegation(
-            session_key,
-            expiration,
-            anchor_number,
-        ) {
-            Ok(signed) => signed,
-            Err(err) => return OpenIdResult::Err(err),
-        };
+        let signed_delegation =
+            match identity
+                .credential
+                .get_jwt_delegation(session_key, expiration, anchor_number)
+            {
+                Ok(signed) => signed,
+                Err(err) => return OpenIdResult::Err(err),
+            };
         let sso_attr_bundle_signature = match openid::get_sso_attr_bundle_signature(
             &identity.credential.iss,
             &identity.credential.sub,
@@ -2365,11 +2365,10 @@ mod attribute_sharing {
         let sso_session_domain = openid::read_certified_sso_bundle()
             .filter(|bundle| bundle.origin == origin)
             .map(|bundle| bundle.sso_domain);
-        let (anchor, _) = check_authorization(identity_number).map_err(
-            |AuthorizationError { principal }| {
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 PrepareIcrc3AttributeError::AuthorizationError(principal)
-            },
-        )?;
+            })?;
 
         let account =
             get_account_for_origin(anchor.anchor_number(), origin.clone(), account_number)

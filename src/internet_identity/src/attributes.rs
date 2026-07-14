@@ -2187,12 +2187,15 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: GOOGLE_ISSUER.to_string(),
-                }),
-                attribute_name: AttributeName::Email,
-            }]), None);
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: GOOGLE_ISSUER.to_string(),
+                    }),
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 1);
             pretty_assert_eq!(result[0].0, format!("openid:{}:email", GOOGLE_ISSUER));
@@ -2205,10 +2208,13 @@ mod tests {
             let anchor = google_anchor();
 
             // "email" without scope should match all scopes
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: None,
-                attribute_name: AttributeName::Email,
-            }]), None);
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 1);
             pretty_assert_eq!(result[0].0, format!("openid:{}:email", GOOGLE_ISSUER));
@@ -2220,12 +2226,15 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: GOOGLE_ISSUER.to_string(),
-                }),
-                attribute_name: AttributeName::VerifiedEmail,
-            }]), None);
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: GOOGLE_ISSUER.to_string(),
+                    }),
+                    attribute_name: AttributeName::VerifiedEmail,
+                }]),
+                None,
+            );
 
             // verified_email is not available because email_verified is not "true" in metadata
             pretty_assert_eq!(result.len(), 0);
@@ -2255,12 +2264,15 @@ mod tests {
             setup_google_provider();
             let anchor = google_anchor();
 
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: "https://unknown-issuer.com".to_string(),
-                }),
-                attribute_name: AttributeName::Email,
-            }]), None);
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: "https://unknown-issuer.com".to_string(),
+                    }),
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 0);
         }
@@ -2395,8 +2407,7 @@ mod tests {
                     sso_credential_with(email_and_name_metadata()),
                 ]);
 
-            let listed =
-                anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()));
+            let listed = anchor.list_available_attributes(None, Some(SSO_DOMAIN.to_string()));
             let keys: BTreeSet<String> = listed.iter().map(|(k, _)| k.clone()).collect();
 
             pretty_assert_eq!(
@@ -2635,10 +2646,13 @@ mod tests {
         #[test]
         fn filters_by_unscoped_key() {
             let anchor = anchor_with_verified(&["alice@example.com"]);
-            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
-                scope: None,
-                attribute_name: AttributeName::Email,
-            }]), None);
+            let result = anchor.list_available_attributes(
+                Some(vec![AttributeKey {
+                    scope: None,
+                    attribute_name: AttributeName::Email,
+                }]),
+                None,
+            );
 
             pretty_assert_eq!(result.len(), 1);
             pretty_assert_eq!(result[0].0, "email");
