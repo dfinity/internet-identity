@@ -301,12 +301,6 @@ const resolveConsentPipeline = async (params: {
   try {
     const { accountNumberPromise } = await waitForStore(authorizedStore);
     const authenticated = await waitForStore(authenticationStore);
-    // Whether this session is the origin-scoped SSO-session principal (the gate
-    // path), not a device/OpenID one — keyed on the session, so BOTH the
-    // `?sso=` 1-click and the manual "Sign in with SSO" paths are covered
-    // (§6.3). It authorizes the origin-scoped attribute reads but not the
-    // anchor-level `identity_info`.
-    const isSso = authenticated.sso !== undefined;
 
     const validationResult = await validateDerivationOrigin({
       requestOrigin: channel.origin,
@@ -330,23 +324,19 @@ const resolveConsentPipeline = async (params: {
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
-              // Pass the origin so an SSO session (the origin-scoped
-              // SSO-session principal) is authorized for this read (§6.3);
-              // ignored for device / OpenID sessions.
+              // Pass the origin so the canister can match this call's certified
+              // SSO attribute bundle and include `sso:<domain>` rows for an SSO
+              // session (§6.3); ignored for device / OpenID sessions.
               origin: [origin],
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
-    // `identity_info` only feeds recovery / verified-email addresses, which are
-    // used solely by the `verified_email` attribute type. SSO never supports
-    // `verified_email`, and its origin-scoped session isn't a valid caller for
-    // the anchor-level `identity_info` — so skip the call entirely for the SSO
-    // flow (rather than granting the SSO session access to `identity_info`).
-    const identityInfoPromise = isSso
-      ? Promise.resolve(undefined)
-      : authenticated.actor
-          .identity_info(authenticated.identityNumber)
-          .then(throwCanisterError);
+    // `identity_info` feeds recovery / verified-email addresses (used by the
+    // `verified_email` attribute type). Every session — including the SSO gate
+    // session, now a plain openid-credential principal — is a valid caller.
+    const identityInfoPromise = authenticated.actor
+      .identity_info(authenticated.identityNumber)
+      .then(throwCanisterError);
     const [available, identityInfo] = await Promise.all([
       availablePromise,
       identityInfoPromise,

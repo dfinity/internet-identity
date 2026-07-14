@@ -27,17 +27,6 @@ export interface Authenticated {
     | { openid: { iss: string; sub: string } }
     | { recoveryPhrase: { principal: Principal } }
     | { emailRecovery: { principal: Principal } };
-  /**
-   * Present when this session was authenticated through the SSO gate path
-   * (`sso_prepare_delegation`) — i.e. the session principal is the origin-scoped
-   * SSO-session principal, not a device/OpenID one (IdP-side per-app gating,
-   * §6.3). Carries the dapp `origin` the session is bound to. Consumers key
-   * SSO-specific handling on this (not on the 1-click vs manual flow type), so
-   * both the `?sso=` 1-click and the manual "Sign in with SSO" paths are
-   * covered, and passkey/direct-OpenID sessions are not. `domain` is the SSO
-   * discovery domain (the `sso:<domain>:…` attribute scope).
-   */
-  sso?: { origin: string; domain: string };
 }
 
 // `agent`/`actor` are created once in `init()` and shared by the store;

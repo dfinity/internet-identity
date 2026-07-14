@@ -637,13 +637,6 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { openid: { iss, sub } },
-        // Mark this as an SSO session (authenticated via the gate path) so the
-        // attribute flow keys SSO-specific handling on the session, not the
-        // 1-click-vs-manual flow type (§6.3).
-        sso:
-          this.#sso !== undefined && discoveryDomain !== undefined
-            ? { origin: this.#sso.origin, domain: discoveryDomain }
-            : undefined,
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
@@ -972,10 +965,6 @@ export class AuthFlow {
         identity,
         identityNumber,
         authMethod: { openid: { iss, sub } },
-        sso:
-          this.#sso !== undefined && discoveryDomain !== undefined
-            ? { origin: this.#sso.origin, domain: discoveryDomain }
-            : undefined,
       });
       this.#captcha = undefined;
       return { iss, sub, loginHint, identityNumber, decodedJwt };
