@@ -659,5 +659,11 @@
     "name": "CITADEL",
     "website": "https://ttxba-fqaaa-aaaaa-qgi4q-cai.icp0.io",
     "logo": "citadel_logo.svg"
+  },
+  {
+    "name": "MULTI/DEX",
+    "oneLiner": "A complete crypto exchange — order book, AMM, margin, yield, custody, analytics and even its AI — running as a single autonomous service on the Internet Computer.",
+    "website": "https://multidex.ai/",
+    "logo": "multidex_logo.svg"
   }
 ]
