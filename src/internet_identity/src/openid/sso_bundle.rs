@@ -8,6 +8,14 @@
 //! u64-BE len || expiry_ns (u64 BE)     bundle expiry, ns since epoch
 //! ```
 
+use super::{calculate_delegation_seed, SSO_SESSION_DURATION_NS};
+use crate::{state, update_root_hash};
+use candid::Principal;
+use ic_canister_sig_creation::signature_map::CanisterSigInputs;
+use ic_cdk::api::time;
+use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
+
 /// Domain separator + version for the SSO attribute bundle.
 const SSO_ATTR_BUNDLE_DOMAIN: &[u8] = b"ii-sso-attr-v1";
 
@@ -114,6 +122,98 @@ pub fn decode_sso_attr_bundle(bytes: &[u8]) -> Result<SsoAttrBundle, SsoBundleDe
         origin,
         expiry_ns,
     })
+}
+
+fn msg_caller_info_data() -> Vec<u8> {
+    let n = ic0::msg_caller_info_data_size();
+    let mut b = vec![0u8; n];
+    ic0::msg_caller_info_data_copy(&mut b, 0);
+    b
+}
+
+fn msg_caller_info_signer() -> Option<Principal> {
+    let n = ic0::msg_caller_info_signer_size();
+    if n == 0 {
+        return None;
+    }
+    let mut b = vec![0u8; n];
+    ic0::msg_caller_info_signer_copy(&mut b, 0);
+    Some(Principal::try_from(b.as_slice()).expect("valid principal"))
+}
+
+const MAX_SSO_BUNDLE_BYTES: usize = 4096;
+
+/// The certified SSO attribute bundle attached to this call, if signed by this
+/// canister and not expired.
+///
+/// A `Some` result only proves II signed the bundle under the caller's credential
+/// seed; the caller MUST still check `bundle.origin` matches the serving origin —
+/// the bundle is bound to the identity, not the origin.
+pub fn read_certified_sso_bundle() -> Option<SsoAttrBundle> {
+    if msg_caller_info_signer()? != ic_cdk::id() {
+        return None;
+    }
+    // A real bundle is a few hundred bytes; reject anything larger before allocating.
+    if ic0::msg_caller_info_data_size() > MAX_SSO_BUNDLE_BYTES {
+        return None;
+    }
+    let bundle = decode_sso_attr_bundle(&msg_caller_info_data()).ok()?;
+    if time() > bundle.expiry_ns {
+        return None;
+    }
+    Some(bundle)
+}
+
+/// Prepare the certified SSO attribute bundle: encode `(sso_domain, origin,
+/// expiry)` and sign it under the credential seed. Returns the message bytes and
+/// its expiry; [`get_sso_attr_bundle_signature`] witnesses the signature.
+pub fn prepare_sso_attr_bundle(
+    iss: &str,
+    sub: &str,
+    aud: &str,
+    anchor_number: AnchorNumber,
+    sso_domain: &str,
+    origin: &str,
+) -> (Vec<u8>, Timestamp) {
+    let expiration = time().saturating_add(SSO_SESSION_DURATION_NS);
+    let message = encode_sso_attr_bundle(sso_domain, origin, expiration);
+    let seed = calculate_delegation_seed(
+        &(iss.to_string(), sub.to_string(), aud.to_string()),
+        anchor_number,
+    );
+    state::signature_map_mut(|sigs| {
+        sigs.add_signature(&CanisterSigInputs {
+            domain: crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+            seed: &seed,
+            message: &message,
+        });
+    });
+    update_root_hash();
+    (message, expiration)
+}
+
+/// Witness the canister signature over an SSO attribute bundle `message`
+/// prepared by [`prepare_sso_attr_bundle`].
+pub fn get_sso_attr_bundle_signature(
+    iss: &str,
+    sub: &str,
+    aud: &str,
+    anchor_number: AnchorNumber,
+    message: &[u8],
+) -> Result<Vec<u8>, OpenIdDelegationError> {
+    let seed = calculate_delegation_seed(
+        &(iss.to_string(), sub.to_string(), aud.to_string()),
+        anchor_number,
+    );
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let inputs = CanisterSigInputs {
+            domain: crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+            seed: &seed,
+            message,
+        };
+        sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
+    })
+    .map_err(|_| OpenIdDelegationError::NoSuchDelegation)
 }
 
 #[cfg(test)]
