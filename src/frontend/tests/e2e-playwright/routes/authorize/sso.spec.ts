@@ -617,3 +617,123 @@ test.describe("Authorize with manual Sign in with SSO", () => {
     await consent.continue();
   });
 });
+
+// ===========================================================================
+// "Continue as a last-used SSO identity" parity (the real coverage hole)
+//
+// After an SSO sign-in stores a last-used SSO entry, a later authorize load
+// with no active session shows the ContinueView "Continue" button. That
+// re-auth path (`authLastUsedFlow.authenticate`) must ALSO redeem through the
+// gate path (`authenticateWithSso`) so the certified attribute bundle is
+// attached — otherwise it falls back to the plain OpenID path with no bundle,
+// and the session lists/certifies NO `sso:<domain>` attributes (the exact bug
+// the user hit). This drives two authorize ceremonies in one context: a
+// 1-click SSO sign-in to seed the last-used entry, then a regular authorize
+// where we click "Continue" and assert the SSO attributes are BOTH listed
+// (consent rows) AND certified/returned (round-tripped to the dapp).
+// ===========================================================================
+test.describe("Continue as a last-used SSO identity", () => {
+  const name = "John Doe";
+  const email = "john.doe@example.com";
+
+  // Round-trip verification: the certified bundle the dapp receives on the
+  // SECOND (Continue) authorize must replay through the test_app canister.
+  test.afterEach(
+    ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+      if (authorizedIcrc3Attributes === undefined) return;
+      const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+    },
+  );
+
+  test.use({
+    openIdConfig: {
+      defaultPort: SSO_OPENID_PORT,
+      createUsers: [{ claims: { name, email } }],
+    },
+    // The FIRST authorize is `?sso=` 1-click, which seeds the last-used SSO
+    // entry. The SECOND authorize (driven in the body) drops `?sso=` so the
+    // ContinueView path runs.
+    authorizeConfig: {
+      protocol: "icrc25",
+      sso: SSO_DISCOVERY_DOMAIN,
+      useIcrc3Attributes: true,
+      attributes: [
+        `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+        `sso:${SSO_DISCOVERY_DOMAIN}:email`,
+      ],
+    },
+  });
+
+  test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+    expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+    // Certified/returned on the Continue re-auth: the bundle was attached.
+    expect(authorizedIcrc3Attributes).toBeDefined();
+    if (authorizedIcrc3Attributes === undefined) return;
+    const textEntries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+    expect(textEntries).toMatchObject({
+      [`sso:${SSO_DISCOVERY_DOMAIN}:name`]: name,
+      [`sso:${SSO_DISCOVERY_DOMAIN}:email`]: email,
+    });
+  });
+
+  test("Continue re-auth attaches the bundle → lists + certifies SSO attributes", async ({
+    page,
+    attributeConsentView,
+    authorizePage,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    // FIRST authorize: 1-click SSO seeds the last-used SSO identity.
+    await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+
+    // SECOND authorize: re-navigate the test_app (resets #principal) and drive a
+    // REGULAR authorize (no `?sso=`), re-selecting ICRC-3 + the same requested
+    // attributes. The last-used SSO identity persists in localStorage across the
+    // reload, so the II popup shows the ContinueView "Continue" path.
+    await page.goto("https://nice-name.com");
+    await page
+      .getByRole("textbox", { name: "Identity Provider" })
+      .fill(II_URL + "/authorize");
+    await page
+      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+      .setChecked(true);
+    await page
+      .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
+      .setChecked(true);
+    await page
+      .getByRole("textbox", { name: "Request attributes:" })
+      .fill(
+        [
+          `sso:${SSO_DISCOVERY_DOMAIN}:name`,
+          `sso:${SSO_DISCOVERY_DOMAIN}:email`,
+        ].join("\n"),
+      );
+    await expect(page.locator("#principal")).toBeHidden();
+    const secondAuthPromise = page.context().waitForEvent("page");
+    await page.getByRole("button", { name: "Sign In" }).click();
+    const secondAuth = await secondAuthPromise;
+
+    // "Continue" as the last-used SSO identity → re-auth opens a fresh IdP
+    // popup (the SSO ceremony via `requestWithPopup`); drive it.
+    const idpPopupPromise = page.context().waitForEvent("page");
+    await secondAuth
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+    const idpPopup = await idpPopupPromise;
+    await signInWithOpenId(idpPopup, openIdUsers[0].id);
+
+    // LISTED: the consent screen surfaces the SSO-scoped rows (only possible
+    // when the re-auth attached the certified bundle). Accept to certify.
+    const consent = attributeConsentView(secondAuth);
+    await consent.waitForVisible();
+    await expect(
+      consent.row(`Test SSO ${SSO_OPENID_PORT} email:`),
+    ).toBeVisible();
+    await expect(
+      consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
+    ).toBeVisible();
+    await consent.continue();
+  });
+});
