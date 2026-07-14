@@ -54,8 +54,11 @@ const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 60 * 60 * 1_000_000_000;
 
 /// Bounds for the MCP session grant lifetime: 10 minutes to 30 days.
 /// Out-of-range requests are clamped (mirroring the frontend), not rejected.
-const MCP_GRANT_MIN_TTL_NS: u64 = 10 * 60 * 1_000_000_000;
-const MCP_GRANT_MAX_TTL_NS: u64 = 30 * 24 * 60 * 60 * 1_000_000_000;
+/// `pub(crate)` because `mcp_registration` applies the same clamp *before*
+/// deriving the registration principal, so the consent-bound TTL in the seed
+/// is the effective one.
+pub(crate) const MCP_GRANT_MIN_TTL_NS: u64 = 10 * 60 * 1_000_000_000;
+pub(crate) const MCP_GRANT_MAX_TTL_NS: u64 = 30 * 24 * 60 * 60 * 1_000_000_000;
 
 /// The anchor's default account at `origin` (synthetic when none is reserved).
 fn default_account(anchor_number: AnchorNumber, origin: &FrontendHostname) -> Account {

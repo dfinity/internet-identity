@@ -32,8 +32,9 @@
   } from "$lib/generated/internet_identity_types";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
-  import AccessLevelToggle from "$lib/components/ui/AccessLevelToggle.svelte";
+  import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { accessLevelStore } from "$lib/stores/access-level.store";
   import { READ_ONLY_MODE } from "$lib/state/featureFlags";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
@@ -47,10 +48,11 @@
      *  (e.g. /mcp) can reuse this picker by passing the origin they connect to. */
     displayOrigin: string;
     /** Called when the user confirms with the default account or selects a
-     *  specific account. `accessLevel` reflects the "Read-only mode" checkbox:
-     *  "read-only" restricts the session delegation to query calls, so the
-     *  app can read on the user's behalf but cannot change state (the
-     *  Internet Computer rejects update calls authenticated through it). */
+     *  specific account. `accessLevel` reflects the access-level choice
+     *  ("Questions only" vs "Actions & questions"): "read-only" restricts the
+     *  session delegation to query calls, so the app can read on the user's
+     *  behalf but cannot change state (the Internet Computer rejects update
+     *  calls authenticated through it). */
     onAuthorize: (
       accountNumber: Promise<bigint | undefined>,
       accessLevel: AccessLevel,
@@ -100,16 +102,42 @@
   >(null);
   let accounts = $state<AccountInfo[]>();
   let isAuthenticatingDefault = $state(false);
-  // When READ_ONLY_MODE is enabled, authorizations default to full access and
-  // "Read-only mode" is the opt-in. While the flag is off (the current
-  // default), the toggle below is hidden and `effectiveAccessLevel` forces
-  // full access, so this state is never surfaced to the user.
-  let accessLevel: AccessLevel = $state("full-access");
-  // While the read-only feature is flagged off, the toggle is hidden and every
-  // authorization is full access regardless of the (unreachable) toggle state.
-  const effectiveAccessLevel: AccessLevel = $derived(
-    $READ_ONLY_MODE ? accessLevel : "full-access",
+  // The access-level selector (shown only when READ_ONLY_MODE is on) starts on
+  // this anchor's last choice for this flow, or unselected on a first-time sign
+  // in so they pick explicitly. Per-anchor (the browser may be shared); the
+  // effect below re-hydrates it when the selected identity changes. While the
+  // flag is off (the current default), the selector is hidden and
+  // `effectiveAccessLevel` forces full access, so this state is never surfaced
+  // (a queries-only delegation would fail closed in every current agent — see
+  // the READ_ONLY_MODE flag).
+  let accessLevel: AccessLevel | undefined = $state(
+    accessLevelStore.getPreference(
+      "continue",
+      $lastUsedIdentitiesStore.selected!.identityNumber,
+    ),
   );
+  // With the flag on, the selector gates Continue until a choice is made, so
+  // `accessLevel` is always defined here; the fallback only satisfies the type.
+  const effectiveAccessLevel: AccessLevel = $derived(
+    $READ_ONLY_MODE ? (accessLevel ?? "full-access") : "full-access",
+  );
+  // First-time sign in must choose before continuing (flag on only). Gates both
+  // the default Continue button and the per-account list items.
+  const mustChooseAccess = $derived(
+    $READ_ONLY_MODE && accessLevel === undefined,
+  );
+  // Persist the chosen level for this anchor when the selector was actually
+  // shown and used, so it pre-fills next time. No-op while the flag is off
+  // (nothing was chosen).
+  const rememberAccessLevel = (): void => {
+    if ($READ_ONLY_MODE && accessLevel !== undefined) {
+      accessLevelStore.setPreference(
+        "continue",
+        selectedIdentityNumber,
+        accessLevel,
+      );
+    }
+  };
   let isMultipleAccountsEnabled = $state(
     readToggle($lastUsedIdentitiesStore.selected!.identityNumber),
   );
@@ -150,15 +178,19 @@
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
   // Re-initialize the flow and re-hydrate per-identity state when the
-  // identity changes. Read the persisted value into a local so the
+  // identity changes. Read the persisted values into locals so the
   // effect's only reactive dependency is `selectedIdentityNumber` -- if
-  // we read `isMultipleAccountsEnabled` directly, the user's own toggle
-  // click would re-trigger this effect and overwrite the new value back
-  // from stale localStorage.
+  // we read `isMultipleAccountsEnabled` (or `accessLevel`) directly, the
+  // user's own toggle/selector click would re-trigger this effect and
+  // overwrite the new value back from stale localStorage.
   $effect(() => {
     authLastUsedFlow.init([selectedIdentityNumber]);
     const hydrated = readToggle(selectedIdentityNumber);
     isMultipleAccountsEnabled = hydrated;
+    accessLevel = accessLevelStore.getPreference(
+      "continue",
+      selectedIdentityNumber,
+    );
     defaultAccountNumber = null;
     if (hydrated) {
       void handleEnableMultipleAccounts();
@@ -171,6 +203,7 @@
   });
 
   const handleContinueDefault = async () => {
+    rememberAccessLevel();
     isAuthenticatingDefault = true;
     try {
       if (defaultAccountNumber === null) {
@@ -215,6 +248,7 @@
   const handleContinueAs = async (
     accountNumber: AccountNumber | PRIMARY_ACCOUNT_NUMBER,
   ) => {
+    rememberAccessLevel();
     isAuthenticatingDefault = true;
     try {
       if (!$isAuthenticatedStore) {
@@ -434,17 +468,24 @@
         "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
         // Animate scale and shadow
         "transition-all duration-100 ease-out",
-        // Apply scale effect on hover
-        "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
-        // Also apply scale effect on keyboard focus besides hover
-        "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
-        // When cursor is between two items, we still want an item
-        // to be scaled and the cursor to be a pointer nonetheless.
-        "cursor-pointer after:absolute after:-inset-2 after:-z-1",
+        // While an access level still needs choosing, the card can't authorize
+        // yet: drop the interactive affordances and dim it.
+        mustChooseAccess
+          ? "opacity-60"
+          : [
+              // Apply scale effect on hover
+              "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
+              // Also apply scale effect on keyboard focus besides hover
+              "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
+              // When cursor is between two items, we still want an item
+              // to be scaled and the cursor to be a pointer nonetheless.
+              "cursor-pointer after:absolute after:-inset-2 after:-z-1",
+            ],
       ]}
     >
       <button
         onclick={() => handleContinueAs(account.account_number[0])}
+        disabled={mustChooseAccess}
         class="flex flex-1 flex-row items-center text-start outline-0"
         aria-label={$t`Continue with ${name}`}
       >
@@ -514,7 +555,7 @@
     <button
       class="btn btn-primary btn-xl w-full"
       onclick={handleContinueDefault}
-      disabled={isAuthenticatingDefault}
+      disabled={isAuthenticatingDefault || mustChooseAccess}
     >
       {#if isAuthenticatingDefault}
         <ProgressRing />
@@ -583,12 +624,12 @@
     </Tooltip>
   </div>
   {#if $READ_ONLY_MODE}
-    <AccessLevelToggle
-      bind:accessLevel
-      prompt="read-only"
-      disabled={isAuthenticatingDefault}
-      class="mt-4"
-    />
+    <div class="border-border-tertiary mt-4 border-t pt-4">
+      <AccessLevelSelector
+        bind:accessLevel
+        disabled={isAuthenticatingDefault}
+      />
+    </div>
   {/if}
 </div>
 

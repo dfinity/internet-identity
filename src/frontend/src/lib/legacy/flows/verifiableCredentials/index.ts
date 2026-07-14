@@ -424,6 +424,7 @@ const authenticateForIssuer = async ({
       parsed_signed_delegation.delegation.pubkey,
       parsed_signed_delegation.delegation.expiration,
       parsed_signed_delegation.delegation.targets,
+      parsed_signed_delegation.delegation.permissions,
     ),
     signature: parsed_signed_delegation.signature,
   };

@@ -97,7 +97,9 @@ export class CosePublicKey implements PublicKey {
   }
 
   static fromDer(derEncodedBlob: Uint8Array): CosePublicKey {
-    return new CosePublicKey(coseFromDerEncodedBlob(derEncodedBlob));
+    return new CosePublicKey(
+      coseFromDerEncodedBlob(derEncodedBlob as DerEncodedPublicKey),
+    );
   }
 
   static fromCose(cose: Uint8Array): CosePublicKey {
