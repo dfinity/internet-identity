@@ -715,14 +715,13 @@ test.describe("Continue as a last-used SSO identity", () => {
     await page.getByRole("button", { name: "Sign In" }).click();
     const secondAuth = await secondAuthPromise;
 
-    // "Continue" as the last-used SSO identity → re-auth opens a fresh IdP
-    // popup (the SSO ceremony via `requestWithPopup`); drive it.
-    const idpPopupPromise = page.context().waitForEvent("page");
+    // "Continue" as the last-used SSO identity → re-auth runs the SSO ceremony
+    // (`requestWithPopup`). The IdP session established by the first sign-in is
+    // reused (`mediation: "optional"`), so the ceremony popup auto-completes
+    // without a sign-in form; control returns to the consent screen.
     await secondAuth
       .getByRole("button", { name: "Continue", exact: true })
       .click();
-    const idpPopup = await idpPopupPromise;
-    await signInWithOpenId(idpPopup, openIdUsers[0].id);
 
     // LISTED: the consent screen surfaces the SSO-scoped rows (only possible
     // when the re-auth attached the certified bundle). Accept to certify.
