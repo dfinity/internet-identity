@@ -1165,8 +1165,9 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_registration_memory.remove(&principal);
     }
 
-    /// Reclaim up to `budget` expired registration entries, scanning a bounded
-    /// window of the index that begins at `start`. Returns the number removed.
+    /// Reclaim expired registration entries, inspecting up to `budget` entries in
+    /// one bounded window that begins at `start` and wraps around to the lowest
+    /// key. Returns the number removed.
     ///
     /// This is the amortized *global* GC of the registration index: `prepare`
     /// prunes the calling anchor's own entries synchronously, but an anchor that
@@ -1175,7 +1176,10 @@ impl<M: Memory + Clone> Storage<M> {
     /// window keeps the work per write O(`budget`) rather than O(index size); a
     /// fresh random `start` on each call gives amortized coverage of the whole
     /// keyspace over successive writes, so expired entries anywhere are reclaimed
-    /// without any single call scanning the whole map.
+    /// without any single call scanning the whole map. Wrapping (`start..` then
+    /// `..start`) means every call inspects a full `budget`-sized window even
+    /// when `start` lands near the top of the keyspace, keeping the reclamation
+    /// rate independent of where `start` falls.
     pub fn sweep_expired_mcp_registrations(
         &mut self,
         now_ns: u64,
@@ -1185,6 +1189,7 @@ impl<M: Memory + Clone> Storage<M> {
         let expired: Vec<Principal> = self
             .mcp_registration_memory
             .range(start..)
+            .chain(self.mcp_registration_memory.range(..start))
             .take(budget)
             .filter(|(_, entry)| entry.expires_at_ns <= now_ns)
             .map(|(principal, _)| principal)

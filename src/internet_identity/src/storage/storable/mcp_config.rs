@@ -43,7 +43,9 @@ pub struct StorableMcpConfig {
     /// ones (removing them from the registration index too) and refuses to mint
     /// a new one once this list is at the per-anchor cap — so a single anchor
     /// can't flood the registration index. Kept small (bounded by that cap).
-    /// `None` on configs written before this field existed, decoded as empty.
+    /// A config written before this field existed decodes with it set to `None`
+    /// (the `#[cbor(map)]` derive maps an absent key 3 to `None`); callers treat
+    /// `None` and an empty list identically.
     #[n(3)]
     pub pending_registrations: Option<Vec<StorablePendingRegistration>>,
 }
