@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { BellIcon, XIcon, SmartphoneIcon } from "@lucide/svelte";
+  import { BellIcon, SmartphoneIcon, XIcon } from "@lucide/svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
+  import Toggle from "$lib/components/ui/Toggle.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
@@ -23,18 +24,14 @@
   }
 
   const { identityNumber }: Props = $props();
-  const titleId = $props.id();
-  const deviceTitleId = `${titleId}-device`;
-
-  let origins = $state<string[]>([]);
-  // True until the initial list read completes.
-  let loaded = $state(false);
-  // The origin currently being revoked, if any — disables just that row's
-  // button rather than the whole list.
-  let revoking = $state<string | undefined>(undefined);
+  const componentId = $props.id();
+  const deviceTitleId = `${componentId}-device`;
+  const permsTitleId = `${componentId}-perms`;
 
   // Whether the browser can support Web Push at all — false in unsupported
-  // browsers or insecure contexts, in which case the device toggle is hidden.
+  // browsers or insecure contexts, in which case the device toggle is
+  // hidden entirely (users on unsupported browsers just don't see the
+  // "Notifications on this device" card).
   const devicePushSupported =
     typeof navigator !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -43,8 +40,17 @@
   let deviceSubscription = $state<PushSubscription | undefined>(undefined);
   // True until the initial subscription-status check completes.
   let deviceStatusLoaded = $state(false);
-  // A subscribe/unsubscribe round-trip is in flight.
+  // A subscribe/unsubscribe round-trip is in flight — disables the toggle
+  // so the user can't fire a second call before the first settles.
   let deviceBusy = $state(false);
+  const deviceEnabled = $derived(deviceSubscription !== undefined);
+
+  let origins = $state<string[]>([]);
+  // True until the initial consent-list read completes.
+  let loaded = $state(false);
+  // The origin currently being revoked, if any — disables just that row's
+  // button rather than the whole list.
+  let revoking = $state<string | undefined>(undefined);
 
   onMount(() => {
     void (async () => {
@@ -54,8 +60,6 @@
           identityNumber,
         );
       } catch (err) {
-        // Log the raw error so a stale canister deploy or an IDL-cache
-        // mismatch surfaces something concrete instead of a bland toast.
         console.error("push_list_consented_origins failed:", err);
         toaster.error({
           title: $t`Couldn't load your notification permissions.`,
@@ -99,8 +103,7 @@
     }
   };
 
-  const handleEnableDevice = async () => {
-    deviceBusy = true;
+  const enableDevice = async () => {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
@@ -141,17 +144,12 @@
         title: $t`Couldn't enable notifications on this device. Please try again.`,
         duration: 4000,
       });
-    } finally {
-      deviceBusy = false;
     }
   };
 
-  const handleDisableDevice = async () => {
+  const disableDevice = async () => {
     const subscription = deviceSubscription;
-    if (subscription === undefined) {
-      return;
-    }
-    deviceBusy = true;
+    if (subscription === undefined) return;
     try {
       await unsubscribeDevice(
         $authenticatedStore.actor,
@@ -166,11 +164,82 @@
         title: $t`Couldn't disable notifications on this device. Please try again.`,
         duration: 4000,
       });
+    }
+  };
+
+  // The toggle's `onchange` runs after the checked value has already
+  // flipped — read the target's new state to decide which direction we're
+  // going. Uses `onchange` (not `onclick`) because the browser's
+  // notification-permission prompt counts either as a valid user gesture.
+  const handleToggle = async (event: Event) => {
+    if (!(event.currentTarget instanceof HTMLInputElement)) return;
+    if (deviceBusy) return;
+    deviceBusy = true;
+    try {
+      if (event.currentTarget.checked) {
+        await enableDevice();
+      } else {
+        await disableDevice();
+      }
     } finally {
       deviceBusy = false;
     }
   };
 </script>
+
+{#if devicePushSupported}
+  <section
+    class="border-border-secondary bg-bg-secondary flex flex-row items-start gap-3 rounded-xl border p-4 sm:gap-4 sm:p-5"
+  >
+    <span
+      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
+      aria-hidden="true"
+    >
+      <SmartphoneIcon class="size-5" />
+    </span>
+
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <div
+        class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
+      >
+        <h3 id={deviceTitleId} class="text-text-primary text-base font-semibold">
+          {$t`Notifications on this device`}
+        </h3>
+        {#if deviceStatusLoaded && deviceEnabled}
+          <Badge color="success" size="sm" dot>
+            {$t`Enabled on this device`}
+          </Badge>
+        {/if}
+      </div>
+      <p class="text-text-tertiary text-sm">
+        {#if deviceEnabled}
+          <Trans>
+            dApps you've granted permission to can send you push notifications
+            on this device.
+          </Trans>
+        {:else}
+          <Trans>
+            Let dApps you've granted permission to send you push notifications
+            on this device.
+          </Trans>
+        {/if}
+      </p>
+    </div>
+
+    <div class="shrink-0">
+      {#if !deviceStatusLoaded}
+        <ProgressRing class="text-fg-tertiary size-5" />
+      {:else}
+        <Toggle
+          checked={deviceEnabled}
+          onchange={handleToggle}
+          disabled={deviceBusy}
+          aria-labelledby={deviceTitleId}
+        />
+      {/if}
+    </div>
+  </section>
+{/if}
 
 <section
   class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-4 sm:p-5"
@@ -184,7 +253,7 @@
     </span>
 
     <div class="flex min-h-[2.5rem] min-w-0 flex-1 flex-col justify-center">
-      <h3 id={titleId} class="text-text-primary text-base font-semibold">
+      <h3 id={permsTitleId} class="text-text-primary text-base font-semibold">
         {$t`Push notifications`}
       </h3>
       <p class="text-text-tertiary text-sm">
@@ -192,69 +261,6 @@
       </p>
     </div>
   </div>
-
-  {#if devicePushSupported}
-    <div
-      class="border-border-secondary flex flex-col gap-3 rounded-lg border px-3 py-2.5 sm:px-4 sm:py-3"
-    >
-      <div class="flex flex-row flex-wrap items-center gap-x-2 gap-y-1">
-        <span
-          class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-8 shrink-0 items-center justify-center rounded-lg border"
-          aria-hidden="true"
-        >
-          <SmartphoneIcon class="size-4" />
-        </span>
-        <span
-          id={deviceTitleId}
-          class="text-text-primary min-w-0 flex-1 text-sm font-semibold"
-        >
-          {$t`Notifications on this device`}
-        </span>
-        {#if deviceStatusLoaded && deviceSubscription !== undefined}
-          <Badge color="success" size="sm" dot>
-            {$t`Enabled`}
-          </Badge>
-        {/if}
-      </div>
-
-      <p class="text-text-tertiary text-sm">
-        <Trans>
-          When enabled, dApps you've granted permission to can send you push
-          notifications on this device.
-        </Trans>
-      </p>
-
-      {#if !deviceStatusLoaded}
-        <div class="flex items-center justify-start py-1">
-          <ProgressRing class="text-fg-tertiary size-5" />
-        </div>
-      {:else if deviceSubscription !== undefined}
-        <button
-          class="btn btn-secondary btn-sm btn-danger w-full sm:w-auto sm:self-start"
-          onclick={() => void handleDisableDevice()}
-          disabled={deviceBusy}
-          aria-labelledby={deviceTitleId}
-        >
-          {#if deviceBusy}
-            <ProgressRing class="size-5" />
-          {/if}
-          <span>{$t`Disable`}</span>
-        </button>
-      {:else}
-        <button
-          class="btn btn-secondary btn-sm w-full sm:w-auto sm:self-start"
-          onclick={() => void handleEnableDevice()}
-          disabled={deviceBusy}
-          aria-labelledby={deviceTitleId}
-        >
-          {#if deviceBusy}
-            <ProgressRing class="size-5" />
-          {/if}
-          <span>{$t`Enable notifications on this device`}</span>
-        </button>
-      {/if}
-    </div>
-  {/if}
 
   {#if !loaded}
     <div class="flex items-center justify-center py-4">
@@ -265,7 +271,7 @@
       {$t`No apps have permission to send you push notifications yet.`}
     </p>
   {:else}
-    <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
+    <ul class="flex flex-col gap-2" aria-labelledby={permsTitleId}>
       {#each origins as origin (origin)}
         <li
           class="border-border-secondary bg-bg-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2.5 sm:gap-3 sm:px-4"

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { onMount, type Snippet } from "svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
@@ -159,25 +159,57 @@
   >(null);
 
   // Opt-in (defaults false): push notifications are intrusive, so the user
-  // must explicitly ask for them rather than opt out.
+  // must explicitly ask for them rather than opt out. Pre-populated from
+  // the server on mount so the checkbox reflects the current consent state
+  // across page refreshes — the source of truth is
+  // `push_list_consented_origins`, not local state.
   let pushNotificationsEnabled = $state(false);
+  // Snapshot of the server's known state at mount time. On sign-in we
+  // grant/revoke only if the checkbox has actually changed from this
+  // baseline, so re-signing-in without touching the checkbox is a no-op
+  // regardless of what the server currently says.
+  let pushNotificationsInitiallyGranted = $state(false);
 
-  // Fire-and-forget: a failed grant shouldn't block sign-in. Called right
-  // before `onAuthorize` so it lands before the delegation is minted, but
-  // its own success/failure doesn't gate authorization. Uses the full-auth
-  // identity actor (not the session-scoped one from `actorForIdentity`) —
-  // `push_grant_consent` is gated by `check_authz_and_record_activity` on
-  // the backend, which only accepts full authorization.
-  const grantPushConsentIfRequested = (): void => {
-    if (!pushNotificationsEnabled) return;
+  onMount(() => {
     const authenticated = $authenticationStore;
     if (authenticated === undefined) return;
     void authenticated.actor
-      .push_grant_consent(authenticated.identityNumber, effectiveOrigin)
-      .then(throwTextCanisterError)
+      .push_list_consented_origins(authenticated.identityNumber)
+      .then((origins) => {
+        if (origins.includes(effectiveOrigin)) {
+          pushNotificationsEnabled = true;
+          pushNotificationsInitiallyGranted = true;
+        }
+      })
       .catch((error) => {
-        console.warn("Failed to grant push notification consent", error);
+        console.warn(
+          "Failed to load current push notification consent state",
+          error,
+        );
       });
+  });
+
+  // Fire-and-forget: a failed grant/revoke shouldn't block sign-in.
+  // Called right before `onAuthorize` so it lands before the delegation
+  // is minted. Uses the full-auth identity actor (not the session-scoped
+  // one from `actorForIdentity`) — the grant/revoke methods are gated by
+  // `check_authz_and_record_activity` on the backend.
+  const syncPushConsentIfChanged = (): void => {
+    const authenticated = $authenticationStore;
+    if (authenticated === undefined) return;
+    if (pushNotificationsEnabled === pushNotificationsInitiallyGranted) return;
+    const call = pushNotificationsEnabled
+      ? authenticated.actor.push_grant_consent(
+          authenticated.identityNumber,
+          effectiveOrigin,
+        )
+      : authenticated.actor.push_revoke_consent(
+          authenticated.identityNumber,
+          effectiveOrigin,
+        );
+    void call.then(throwTextCanisterError).catch((error) => {
+      console.warn("Failed to sync push notification consent", error);
+    });
   };
 
   const isEditAccountDialogVisibleFor = $derived(
@@ -265,7 +297,7 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      grantPushConsentIfRequested();
+      syncPushConsentIfChanged();
       onAuthorize(accountNumberPromise, effectiveAccessLevel);
     } catch (error) {
       handleError(error);
@@ -282,7 +314,7 @@
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
-      grantPushConsentIfRequested();
+      syncPushConsentIfChanged();
       onAuthorize(Promise.resolve(accountNumber), effectiveAccessLevel);
     } catch (error) {
       handleError(error);
@@ -601,7 +633,9 @@
     {@render header()}
   {:else}
     <AuthorizeHeader origin={displayOrigin} />
-    <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
+    <h1
+      class="text-text-primary mb-2 max-w-full self-start text-2xl font-medium break-words"
+    >
       {$t`Continue to ${dappName}`}
     </h1>
     <p class="text-text-secondary mb-6 self-start text-sm">
