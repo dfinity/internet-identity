@@ -1,7 +1,7 @@
 # IdP-side per-app gating for enterprise SSO
 
 **Status:** Implemented in `dfinity/internet-identity` PR #4096 (single PR). This doc is the spec.
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-15
 **Companion:** `enterprise-sso-per-app-access-control.md` specifies the *id.ai-side* gate
 (directory + access canister). This document specifies an **independent, complementary
 layer** that gates entirely on the **IdP side**. The two are composable and selected per app
@@ -86,12 +86,13 @@ gated app.
 - **Changing the dapp-facing principal derivation** — it stays `f(anchor, origin)` (§6).
 
 **In-scope behavior change (deliberate).** `sso:<domain>:…` attributes become certifiable
-**only from an SSO session** (`sso_prepare_delegation`), not from a
-passkey/`openid_prepare_delegation` session on an anchor that merely has an SSO access method
-(§6.3). This tightens the existing `sso:<domain>` flow (today cert reads the stored credential
-in any session), so it affects current SSO-attribute consumers, not just the new gate — a
-conscious part of this design. (`implicit:origin` is unchanged — it stays certified for every
-flow as the general origin binding; the gate rides on `sso:<domain>`, §6.4.)
+**only when a certified SSO bundle is presented** (the bundle is issued by
+`sso_prepare_delegation`, §6.3), not from a passkey/`openid_prepare_delegation` session on an
+anchor that merely has an SSO access method. This tightens the existing `sso:<domain>` flow
+(today cert reads the stored credential in any session), so it affects current SSO-attribute
+consumers, not just the new gate — a conscious part of this design. (`implicit:origin` is
+unchanged — it stays certified for every flow as the general origin binding; the gate rides on
+`sso:<domain>`, §6.4.)
 
 ---
 
@@ -139,7 +140,7 @@ sequenceDiagram
     participant FE as II Frontend
     participant II as II Core
     participant IdP as org's IdP
-    participant Dapp as gated dapp (payroll.com)
+    participant Dapp as Gated dapp payroll.com
     U->>FE: sign in to payroll.com
     FE->>II: discover_sso(org.com); get_sso_discovery(org.com, payroll.com)
     II-->>FE: resolved_client_id = client_P
@@ -151,13 +152,14 @@ sequenceDiagram
     else assigned
         IdP-->>FE: id_token (aud = client_P)
         FE->>II: sso_prepare_delegation(jwt, org.com, payroll.com)
-        Note over II: GATE: aud == app_clients[payroll]? if not, refuse (no delegation)
-        Note over II: anchor resolves to primary; seed = (iss, sub, org.com, payroll, anchor)
-        II-->>FE: SSO delegation (bound to org.com + payroll)
+        Note over II: GATE: aud == app_clients[payroll]? if not, refuse (mint nothing)
+        Note over II: anchor resolves to primary; mint a plain openid delegation
+        II-->>FE: delegation + certified bundle (sso_domain=org.com, origin=payroll.com, expiry)
         FE->>II: get_account_delegation(anchor, payroll.com)
+        Note over II: permissionless: derives f(anchor, payroll.com), no SSO check
         II-->>FE: delegation for f(account, payroll.com)
-        FE->>II: prepare_icrc3_attributes(anchor, payroll.com)
-        Note over II: caller == seed_sso(org.com, payroll)? then certify sso:org.com (implicit:origin as usual)
+        FE->>II: prepare_icrc3_attributes(payroll.com) + sender_info bundle
+        Note over II: read certified bundle; origin matches? then certify sso:org.com
         II-->>FE: certified attributes
         FE->>Dapp: delegation + certified attributes
         Note over Dapp: require certified sso:org.com, then grant
@@ -170,13 +172,16 @@ per-origin client with `get_sso_discovery(domain, origin)`. Three responsibiliti
 - **IdP — assignment.** App-assignment decides who can obtain a token for `client_P`. II holds
   no policy.
 - **II — the gate is mint-or-refuse.** A dedicated `sso_prepare_delegation` (separate from the
-  untouched `openid_prepare_delegation`) mints an SSO session **only if** the JWT's `aud`
-  matches the origin's declared client; the delegation's seed encodes `(sso_domain, origin)`.
-  The origin-scoped calls then require that principal — so if the gate refused to mint, there
-  is no session to authenticate with (§6). Identity still resolves to the primary client.
-- **Dapp — verify.** The dapp checks the certified `sso:<domain>` (which org) and relies on the
-  certified `sso:<domain>` (gated access), which is only produced from an SSO session (§6.3),
-  so a passkey login on the same anchor shares no SSO attributes.
+  untouched `openid_prepare_delegation`) runs the gate: it mints a delegation **only if** the
+  JWT's `aud` matches the origin's declared client. The minted delegation is an **ordinary
+  openid-credential delegation** (identity resolves to the primary client); alongside it,
+  `sso_prepare_delegation` returns a small **II-canister-signed bundle** carrying
+  `(sso_domain, origin, expiry)`. There is no special SSO-session principal — account and
+  delegation methods are permissionless. The gate rides on that certified bundle (§6).
+- **Dapp — verify.** The dapp requires the certified `sso:<domain>`, which proves both *which
+  org domain* the login came through and that the per-app gate passed. It is certified only
+  when a matching bundle is presented (§6.3), so a passkey login on the same anchor shares no
+  SSO attributes.
 
 ---
 
@@ -257,10 +262,13 @@ which is sufficient. Cleartext and hashed keys may coexist in one object.
 
 A dedicated `sso_prepare_delegation` / `sso_get_delegation` pair carries the SSO sign-in.
 `openid_prepare_delegation` is **left unchanged** (direct providers, existing flows). No
-stable-memory migration and no change to `StorableOpenIdCredentialKey`. The enforcement is
-simply **whether the SSO delegation was minted**: its seed encodes `(sso_domain, origin)`, and
-the origin-scoped calls require that principal, so a refused gate leaves nothing to
-authenticate with.
+stable-memory migration and no change to `StorableOpenIdCredentialKey`. The SSO sign-in mints
+an **ordinary openid-credential delegation** — identity resolves to the org's primary client
+(§6.1) — so the session principal is a normal credential principal that the existing
+`check_authorization` accepts, and account/delegation methods stay **permissionless**. The
+enforcement instead rides on a separate, certified **`sender_info` bundle** that
+`sso_prepare_delegation` returns and the attribute-certification methods read (§6.3): a refused
+gate returns no bundle, so the certified `sso:<domain>` can never be produced for that origin.
 
 ### 6.1 Identity: the SSO session resolves to the primary identity
 
@@ -289,7 +297,7 @@ is the one deliberate non-additive `.did` change — inert for existing clients,
 
 ### 6.2 `sso_prepare_delegation` — the gate is mint-or-refuse
 
-`sso_prepare_delegation(jwt, discovery_domain, origin)`:
+`sso_prepare_delegation(jwt, salt, session_key, discovery_domain, origin)`:
 
 ```
 verify_id_token(jwt)                                  // iss/aud/nonce/exp/JWKS
@@ -298,69 +306,83 @@ expected = app_clients[origin]        if origin listed          // gated
          | DENY                        if unlisted and gate_all_apps
 require jwt.aud == expected            else DENY (mint nothing)  // THE GATE
 anchor = resolve_to_primary(iss, stable_id)           // §6.1
-mint delegation seeded  seed(iss, sub, sso_domain, origin, anchor)
+mint a plain openid-credential delegation (primary-keyed)
+bundle = sign (sso_domain, origin, now()+SSO_SESSION_DURATION) under the credential seed
+return { delegation, sso_attr_bundle: bundle, sso_attr_bundle_signature }
 ```
 
 - The **one** `app_clients` / hashed-key (§5.1) / `gate_all_apps` lookup happens here, where
   discovery already has the well-known cached.
-- The seed binds the session to `(sso_domain, origin)`. If the gate fails, **no delegation is
-  minted** — there is no principal to make the follow-up calls with.
+- The minted delegation is an **ordinary** primary-keyed openid delegation — no SSO-specific
+  seed. The gating context travels separately, in the certified `sso_attr_bundle` (§6.3). If the
+  gate fails, **nothing is minted and no bundle is returned**, so the certified `sso:<domain>`
+  can never be produced for that origin.
 - This is the SSO path for **every** dapp sign-in, gated or not (gating only decides whether
   `expected` is a per-app client or the primary). `openid_prepare_delegation` is untouched.
 
-### 6.3 Certification requires the SSO-session principal
+### 6.3 The gating context is a certified `sender_info` bundle
 
-The origin-scoped calls all carry the `origin`. Each accepts the SSO session by recomputing the
-SSO-session principal and requiring the caller to match:
+The session is an ordinary credential principal (§6.1), so the gate can't ride on *who* the
+caller is. It rides on a separate, certified statement the caller carries: the **`sso_attr_bundle`**
+— `(sso_domain, origin, expiry)`, signed by II as a **canister signature under the credential
+seed** (the same seed backing the SSO delegation) and returned by `sso_prepare_delegation` /
+`sso_get_delegation`.
 
-```
-require caller == seed(iss, sub, sso_domain, origin, anchor)   // one hash — O(1), no config
-```
-
-This is an **OR-branch** added alongside the existing authorization check — the non-SSO path
-(device / OpenID / email) is unchanged and only falls through to the SSO check when it fails. The
-methods that accept the SSO session are exactly the seven origin-scoped ones the gated dapp flow
-needs: `prepare_account_delegation` / `get_account_delegation` (mint the dapp delegation),
-`get_default_account` / `get_accounts` (the account picker reads this origin's accounts before
-minting), and `prepare_icrc3_attributes` / `get_icrc3_attributes` / `list_available_attributes`
-(certified attributes + the consent listing). **`identity_info` deliberately does NOT accept the
-SSO session** — it is anchor-level, not origin-scoped; the consent flow's only use of it was to
-feed the `verified_email` wizard, which SSO never offers, so the consent path simply skips
-`identity_info` for an SSO session rather than authorizing it.
-
-- **Config-free at cert.** No `app_clients`, no client-matching, no hashed-key math — the gate
-  already happened at mint time (§6.2), so a matching principal *exists only if* it passed.
-- **SSO attributes require an SSO sign-in.** `sso:<domain>` (and any `sso:<domain>:…`) are
-  certified only for this principal. A **passkey** login — or `openid_prepare_delegation` —
-  produces a different principal, so an anchor that merely *has* an SSO access method shares
-  **no** SSO attributes unless the user actually signed in through SSO this session. (This
-  tightens today's behavior; see §2.) `implicit:origin` is *not* gated — it stays certified for
-  every flow (direct providers, passkey) as the general origin binding; the gate rides on
-  `sso:<domain>` (§6.4).
-- **Own freshness.** The SSO delegation carries its own (tighter) expiry, so SSO attributes
-  reflect a *recent* SSO ceremony, independent of the general/passkey session lifetime.
+- **How it travels.** The frontend attaches the bundle to signed requests via the SDK's
+  `AttributesIdentity` (`@icp-sdk/core`): it wraps the delegation identity with
+  `attributes = { data: bundle, signature }` and `signer = { canisterId: <II> }`, which injects a
+  `sender_info` field into the signed request content.
+- **How the canister reads it.** `read_certified_sso_bundle` reads it back through raw `ic0`
+  (`msg_caller_info_data()` / `msg_caller_info_signer()` — the `ic-sender-info` mechanism). The
+  **replica** verifies the `sender_info` signature under the **caller's own credential seed**, so
+  a bundle is cryptographically bound to the identity that presents it and **cannot be replayed
+  across identities**. II additionally requires the signer to be itself, caps the bundle at 4 KiB,
+  and rejects an expired one.
+- **Account/delegation methods stay permissionless.** They derive `f(anchor, origin)` — never
+  SSO-specific — so they read no bundle and do no SSO check; only the attribute path does. This is
+  a smaller change than the old model (no OR-branch on account/delegation methods, no SSO-session
+  principal to recompute) and needs no config at read time — the gate already happened at mint
+  (§6.2), so a valid bundle *exists only if* it passed.
+- **Only the attribute-certification path reads the bundle.** `prepare_icrc3_attributes` and
+  `list_available_attributes` call `read_certified_sso_bundle` to decide whether to certify /
+  list the `sso:<domain>` rows (§6.4). `identity_info` is untouched (anchor-level, not
+  origin-scoped; the consent path simply skips it for an SSO session).
+- **SSO attributes require an SSO sign-in.** The bundle exists only from `sso_prepare_delegation`,
+  so a **passkey** login (or `openid_prepare_delegation`) carries none — an anchor that merely
+  *has* an SSO access method shares **no** SSO attributes unless the user actually signed in
+  through SSO this session. (This tightens today's behavior; see §2.) The bundle's own `expiry`
+  keeps SSO attributes fresh, independent of the general/passkey session lifetime.
+- **Why raw `ic0 = "1.1"`.** The `msg_caller_info_*` accessors aren't in `ic-cdk 0.16`; importing
+  them from raw `ic0` avoids an `ic-cdk 0.20` bump that conflicts with the transitive vc-sdk git
+  deps. No `ic-cdk` bump.
 
 ### 6.4 The gate is the origin-bound `sso:<domain>`
 
 The dapp's boundary is a single certified attribute: **`sso:<domain>`**, and its *presence in a
-message for origin X* proves both things at once, because it is only certified for the
-SSO-session principal (§6.3), and that session:
-- **exists only if the per-app gate passed** — `sso_prepare_delegation` mints it only when
+message for origin X* proves both things at once, because it is certified only when a valid
+bundle is presented (§6.3), and that bundle:
+- **exists only if the per-app gate passed** — `sso_prepare_delegation` issues it only when
   `aud == app_clients[X]` (assignment *within* the domain, §6.2), and
 - **carries the domain II actually resolved from** — `sso:evil.com` for a rogue login, never
   `sso:acme.com` (which *domain*, unforgeable).
 
+Concretely, `prepare_icrc3_attributes` reads the certified bundle and certifies `sso:<domain>`
+only when the bundle's `origin` matches the origin it is certifying for; `list_available_attributes`
+reads the bundle and offers the same rows in the consent listing. The bundle carries the origin,
+so neither needs the caller to assert it. A passkey / `openid_prepare_delegation` session carries
+no bundle → no SSO rows.
+
 So a gated dapp that requires `sso:acme.com` gets "assigned user, from the expected org" from
 that one check. An insider via a rogue `evil.com` (pointing at the org's real IdP) is certifiably
 `sso:evil.com` → rejected, regardless of `evil.com`'s `app_clients`; a non-assigned user can't
-mint the SSO session for X at all. `implicit:origin` is orthogonal — the usual anti-replay
-origin binding, certified for every flow, not the gate.
+obtain a bundle for X at all. `implicit:origin` is orthogonal — the usual anti-replay origin
+binding, certified for every flow, not the gate.
 
-> **Bounded reconfiguration window.** The seed binds the origin, not the client. So an SSO
-> delegation minted while an app was *ungated* still matches after the app is flipped to gated,
-> until it expires (~session) and the discovery cache refreshes (~1 h, §5). This is the same
-> propagation class we already accept for `app_clients` edits; eliminable only by also seeding
-> the client (at the cost of a config read back at cert). We accept the window.
+> **Bounded reconfiguration window.** The bundle binds the origin, not the client. So a bundle
+> minted while an app was *ungated* still certifies `sso:<domain>` after the app is flipped to
+> gated, until the bundle expires (~session) and the discovery cache refreshes (~1 h, §5). This
+> is the same propagation class we already accept for `app_clients` edits; eliminable only by also
+> binding the client (at the cost of a config read back at cert). We accept the window.
 
 ### 6.5 Cross-client identity when the stable identifier isn't `sub`
 
@@ -409,24 +431,50 @@ reads `stable_identifier_claim`, it never detects "Entra":
 Cross-domain isolation does **not** depend on this lookup — it comes from the certified
 `sso_domain` (§6, §7).
 
+### 6.6 Frontend: routing the ceremony to the per-app client
+
+The ceremony must run against the per-app client for the dapp's **effective origin**, and that
+origin must be the **same** one the gate later keys on (the delegation / attribute origin), or the
+token's `aud` won't match `app_clients[origin]`. So the frontend resolves the origin at ceremony
+time and applies the same canonicalization the gate does:
+
+- **Manual "Sign in with SSO"** — the dapp's effective origin is already known, so the wizard
+  routes to that origin's `resolved_client_id`.
+- **1-click `?sso=<domain>`** — the dapp's origin isn't on the pending postMessage channel until
+  the authorize request arrives *after* the IdP round-trip, so `initiateSso` resolves it as
+  `remapToLegacyDomain(derivationOrigin ?? channel.origin)`:
+  - `channel.origin` is the established channel's `event.origin` (browser-set, unspoofable) — the
+    common case.
+  - `?derivationOrigin=` is a launch-URL param for a dapp that uses a derivation origin, whose
+    value provably can't be learned earlier (it only rides the later request). The SDK supplies it.
+  - The `icp0.io / icp.net → ic0.app` remap is applied so client-selection keys the **same
+    canonical origin the gate does** (the delegation path remaps too, `delegation.rs`); without it
+    an aliased origin routes to the primary client and the gate then denies it.
+- **Fail-closed.** The frontend-supplied origin only *selects the client*. The canister
+  independently enforces `aud == app_clients[origin]` (and validates a derivation origin against
+  the target's `ii-alternative-origins`), so a wrong or spoofed hint can only **deny**, never
+  bypass.
+
 ---
 
 ## 7. Why this is safe
 
-1. **The gate is mint-or-refuse, and the proof is the session principal.** `sso_prepare_delegation`
-   mints the SSO delegation only if `jwt.aud == app_clients[origin]` (§6.2), and its seed binds
-   `(sso_domain, origin)`. The origin-scoped calls recompute that principal (§6.3), so a caller
-   can't fake or omit anything — a wrong/absent SSO session simply doesn't match. There is no
-   ungated path to the certified `sso:<domain>` for this origin.
-2. **SSO attributes only exist for an SSO sign-in.** `sso:<domain>` (and `sso:<domain>:…`) are
-   certified only for the SSO-session principal, so a passkey login (or
-   `openid_prepare_delegation`) on an anchor that merely *has* an SSO access method shares none
-   of them. The SSO delegation's own (tighter) expiry keeps them fresh.
+1. **The gate is mint-or-refuse, and the proof is a certified bundle.** `sso_prepare_delegation`
+   issues the `sso_attr_bundle` — `(sso_domain, origin, expiry)` — only if
+   `jwt.aud == app_clients[origin]` (§6.2). The bundle is a canister signature under the caller's
+   credential seed, so the replica verifies it against the caller's own identity: it can't be
+   forged and **can't be replayed across identities** (§6.3). The attribute methods certify
+   `sso:<domain>` only from a valid bundle, so a wrong/absent/expired bundle simply yields no SSO
+   rows. There is no ungated path to the certified `sso:<domain>` for this origin.
+2. **SSO attributes only exist for an SSO sign-in.** The bundle exists only from
+   `sso_prepare_delegation`, so a passkey login (or `openid_prepare_delegation`) on an anchor that
+   merely *has* an SSO access method carries none — and shares no `sso:<domain>` (or
+   `sso:<domain>:…`) attributes. The bundle's own `expiry` keeps them fresh.
 3. **The origin-bound `sso:<domain>` is the whole gate.** Its presence for origin X proves both
-   *which domain* (it is the discovery domain II resolved from — a rogue login is `sso:evil.com`,
-   never `sso:acme.com`) and *assignment within it* (the SSO session was minted only if
-   `aud == app_clients[X]`, §6.2). So a gated dapp requiring `sso:acme.com` gets both from one
-   check; `implicit:origin` is orthogonal anti-replay, not the gate (§6.4).
+   *which domain* (the certified `sso_domain` is the discovery domain II resolved from — a rogue
+   login is `sso:evil.com`, never `sso:acme.com`) and *assignment within it* (the bundle was issued
+   only if `aud == app_clients[X]`, §6.2). So a gated dapp requiring `sso:acme.com` gets both from
+   one check; `implicit:origin` is orthogonal anti-replay, not the gate (§6.4).
 4. **IdP assignment gates the per-app token.** Within the real domain, the IdP only issues a
    token for the origin's per-app client to assigned users, so `sso_prepare_delegation` can only
    mint an origin-bound session for them.
@@ -496,11 +544,11 @@ aux bridge (§6.5), an **additive** stable map in a fresh memory region — exis
 layout are byte-unchanged. Inert until an org adds `app_clients` to its well-known.
 
 > **Security invariant:** the gate is **mint-or-refuse at `sso_prepare_delegation`** (§6.2) — a
-> refused gate mints no SSO delegation, so the origin-scoped calls have no principal to
-> authenticate with. Certification is a config-free check that the caller *is* that SSO-session
-> principal (§6.3). SSO attributes (`sso:<domain>`, `sso:<domain>:…`) are therefore only
-> ever produced from an SSO sign-in, and the dapp additionally verifies `sso:<domain>` for the
-> domain (existing lib — no new work).
+> refused gate returns no `sso_attr_bundle`. Certification is a config-free read of that certified
+> bundle (§6.3), which the replica verifies under the caller's own credential seed, so it can't be
+> forged or replayed across identities. SSO attributes (`sso:<domain>`, `sso:<domain>:…`) are
+> therefore only ever produced from an SSO sign-in, and the dapp additionally verifies
+> `sso:<domain>` for the domain (existing lib — no new work).
 
 Contents:
 - **Config (§5):** parse `app_clients` / `gate_all_apps` / `stable_identifier_claim`;
@@ -508,48 +556,63 @@ Contents:
   routing.
 - **`sso_prepare_delegation` / `sso_get_delegation` (new, §6.2):** verify the JWT, enforce the
   gate (`aud == app_clients[origin]` / primary / DENY), resolve the anchor to primary (§6.1,
-  aux lookup when `stable_identifier_claim != "sub"`, §6.5), and mint a delegation seeded
-  `(iss, sub, sso_domain, origin, anchor)`. `openid_prepare_delegation` is left as-is.
+  aux lookup when `stable_identifier_claim != "sub"`, §6.5), mint an **ordinary primary-keyed
+  openid delegation**, and return the certified `sso_attr_bundle` (`(sso_domain, origin, expiry)`
+  signed under the credential seed) plus its signature. `openid_prepare_delegation` is left as-is.
 - **SSO-aware registration (§6.1):** `OpenIDRegFinishArg.origin` — a first gated login runs the
   same gate and stores a primary-keyed credential (`sub` orgs register directly; non-`sub` fails
   safe with `SsoNormalLoginRequired`).
-- **Certification / origin-scoped reads (§6.3):** the SSO-session principal
-  (`caller == seed(iss, sub, sso_domain, origin, anchor)`) is accepted, as an OR-branch beside
-  the existing auth check, on the seven origin-scoped methods:
-  `prepare_account_delegation` / `get_account_delegation`, `get_default_account` / `get_accounts`,
-  and `prepare_icrc3_attributes` / `get_icrc3_attributes` / `list_available_attributes`. No
-  `app_clients`/config at cert. `identity_info` is **not** included (the consent path skips it for
-  SSO). SSO attributes gated on this principal (so passkey sessions get none); the SSO delegation
-  carries its own tighter expiry.
-- **Frontend:** route the dapp SSO ceremony to `resolved_client_id`; sign in via
-  `sso_prepare_delegation`; for the non-`sub` first-gated-login case (§6.1/§6.5), guide the user
-  with **button-driven CTAs** (a fresh user gesture per ceremony — "sign in with your
-  organization", then "continue to <app>") rather than a passive prompt, since browsers block
-  chained popups opened after an `await`.
+- **Certified `sender_info` bundle (§6.3):** `sso_prepare_delegation` returns the bundle; the
+  frontend attaches it via the SDK's `AttributesIdentity`; the canister reads it with
+  `read_certified_sso_bundle` (raw `ic0 1.1` `msg_caller_info_*`), the replica verifying it under
+  the caller's own credential seed. **Only** `prepare_icrc3_attributes` and
+  `list_available_attributes` read it, to certify / list the `sso:<domain>` rows for the bundle's
+  origin. Account / delegation methods stay **permissionless**; `identity_info` is untouched (the
+  consent path skips it for SSO). No `app_clients`/config at cert. A passkey session carries no
+  bundle → no SSO attributes; the bundle's own `expiry` keeps them fresh.
+- **Frontend:** route the dapp SSO ceremony to `resolved_client_id` — the manual wizard uses the
+  dapp's effective origin, the 1-click path uses `remapToLegacyDomain(derivationOrigin ??
+  channel.origin)` so client-selection keys the same origin the gate does (§6.6); sign in via
+  `sso_prepare_delegation` and attach the returned bundle. For the non-`sub` first-gated-login case
+  (§6.1/§6.5), guide the user with **button-driven CTAs** (a fresh user gesture per ceremony —
+  "sign in with your organization", then "continue to <app>") rather than a passive prompt, since
+  browsers block chained popups opened after an `await`.
 - **Tests:** gated == ungated → same dapp principal (linchpin, proven at integration *and* e2e);
-  a passkey / non-SSO session gets **no** SSO attributes; a refused gate mints no SSO delegation →
-  cert unreachable; `gate_all_apps` default-deny; hashed keys; Entra `oid` identity + first-gated
-  registration fail-safe; **aux bridge survives upgrade** + **is scoped per primary client**
-  (§6.5); `openid_prepare_delegation` / direct providers unchanged.
+  a passkey / non-SSO session gets **no** SSO attributes; a refused gate returns no bundle → cert
+  unreachable; a cross-identity / expired / cross-origin bundle is rejected; `gate_all_apps`
+  default-deny; hashed keys; Entra `oid` identity + first-gated registration fail-safe (incl. a
+  non-`sub` token missing the stable-id claim); **aux bridge survives upgrade** + **is scoped per
+  primary client** (§6.5); 1-click gated routing via channel origin and via `derivationOrigin`
+  (§6.6); `openid_prepare_delegation` / direct providers unchanged.
 
 `.did` deltas are additive **except one authorized non-additive variant**: **add**
-`sso_prepare_delegation` / `sso_get_delegation`; `get_sso_discovery` gains the `opt origin` arg +
-`resolved_client_id`; `OpenIDRegFinishArg` and `ListAvailableAttributesRequest` each gain an
-`opt` field; and `IdRegFinishError` gains the `SsoNormalLoginRequired` variant (the one
-non-additive change — inert for existing clients, §6.1). No change to `openid_prepare_delegation`
-/ `openid_get_delegation`.
+`sso_prepare_delegation` / `sso_get_delegation`, returning `SsoPrepareDelegationResponse` /
+`SsoGetDelegationResponse` (which carry the `sso_attr_bundle` + its signature); `get_sso_discovery`
+gains the `opt origin` arg + `resolved_client_id`; `OpenIDRegFinishArg` gains an `opt origin`
+field; and `IdRegFinishError` gains the `SsoNormalLoginRequired` variant (the one non-additive
+change — inert for existing clients, §6.1). No change to `openid_prepare_delegation` /
+`openid_get_delegation`, and the attribute request records are unchanged. The committed `.did` is
+candid-checked against the Rust service by `check_candid_interface_compatibility`.
 
 No canister beyond II core, no proxy, no panel, no data migration, no new dapp lib (one additive
-stable structure, §6.5). Admin/dapp docs tracked separately.
+stable structure, §6.5). The one dependency change is `ic0 = "1.1"` for the `msg_caller_info_*`
+accessors — no `ic-cdk` bump (§6.3). Admin/dapp docs tracked separately.
 
 ---
 
 ## 11. References
 
-- Existing II SSO discovery: `src/frontend/src/lib/utils/ssoDiscovery.ts`,
-  `src/internet_identity/src/openid/`.
+- SSO discovery + `app_clients` resolution: `src/internet_identity/src/openid/sso.rs`;
+  frontend discovery `src/frontend/src/lib/utils/ssoDiscovery.ts`.
+- The gate, registration, and the non-`sub` aux bridge:
+  `src/internet_identity/src/openid/sso_gating.rs`.
+- The certified `sender_info` bundle (codec, `prepare_sso_attr_bundle`,
+  `read_certified_sso_bundle`, `msg_caller_info_*`): `src/internet_identity/src/openid/sso_bundle.rs`.
 - Credential key and delegation seed: `src/internet_identity/src/openid.rs`
   (`OpenIdCredentialKey`, `calculate_delegation_seed`).
 - Dapp-principal derivation: `src/internet_identity/src/delegation.rs`
   (`calculate_anchor_seed`).
+- Frontend 1-click ceremony routing: `src/frontend/src/routes/(new-styling)/authorize/+page.ts`
+  and `+page.svelte` (`initiateSso`); the `icp0.io → ic0.app` remap
+  `src/frontend/src/lib/utils/iiConnection.ts` (`remapToLegacyDomain`).
 - Companion design: `enterprise-sso-per-app-access-control.md` (id.ai-side gating).
