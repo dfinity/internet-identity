@@ -490,6 +490,94 @@ test.describe("Authorize with IdP-side per-app gating", () => {
     });
   });
 
+  // 1-click `?sso=` against a gated origin: the ceremony must route to the
+  // per-app client at initiate (via the channel origin — GATED_ORIGIN has no
+  // derivation origin) so the returned JWT's `aud` matches what the server gate
+  // requires. The other gated test drives the manual wizard, which routes by
+  // effective origin; this one exercises the `?sso=` path that used to always
+  // run against the primary client and so was denied for gated dapps.
+  test.describe("gated origin via 1-click ?sso=", () => {
+    const email = "john.doe@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { name, email } }],
+      },
+    });
+
+    // Round-trip: the certified bundle must replay through the test_app canister.
+    test.afterEach(
+      ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+        if (authorizedIcrc3Attributes === undefined) return;
+        const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+        expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+      },
+    );
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      // Non-anonymous principal proves the gated chain completed via 1-click.
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) return;
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(textEntries).toMatchObject({
+        [`sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`]: name,
+        [`sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`]: email,
+      });
+    });
+
+    test("routes to the per-app client and reaches the app", async ({
+      page,
+      configureSsoGating,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // Gating must be live before the II popup loads: 1-click discovery runs
+      // automatically in `onMount`, so we can't lean on the `authorizePage`
+      // fixture (it opens the popup during setup, before the body runs). Inline
+      // the test_app driving here, after configuring gating.
+      await configureSsoGating(gatingConfig);
+      await page.goto(GATED_ORIGIN);
+      const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
+        SSO_GATING_DISCOVERY_DOMAIN,
+      )}`;
+      await page
+        .getByRole("textbox", { name: "Identity Provider" })
+        .fill(ssoUrl);
+      await page
+        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+        .setChecked(true);
+      await page
+        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
+        .setChecked(true);
+      await page
+        .getByRole("textbox", { name: "Request attributes:" })
+        .fill(
+          [
+            `sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`,
+            `sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`,
+          ].join("\n"),
+        );
+      await expect(page.locator("#principal")).toBeHidden();
+      const popupPromise = page.context().waitForEvent("page");
+      await page.getByRole("button", { name: "Sign In" }).click();
+      const popup = await popupPromise;
+      // 1-click auto-approves the SSO allowlist (name, email) and self-closes
+      // the popup — no consent screen, no sign-up prompt.
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+    });
+
+    // Gap: the derivation-origin 1-click path (`?sso=` + `?derivationOrigin=`)
+    // is untested — the existing fixtures have no dapp that declares a
+    // derivation origin distinct from its channel origin, so wiring it here
+    // would mean a brittle bespoke fixture. The `derivationOrigin` param branch
+    // in `+page.ts`/`initiateSso` is exercised only by unit-level typing today.
+  });
+
   test.describe("denied origin (gate_all_apps)", () => {
     test.use({
       openIdConfig: {

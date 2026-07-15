@@ -5,7 +5,10 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { authorizedStore } from "$lib/stores/authorization.store";
   import { isAuthenticatedStore } from "$lib/stores/authentication.store";
-  import { establishedChannelStore } from "$lib/stores/channelStore";
+  import {
+    channelStore,
+    establishedChannelStore,
+  } from "$lib/stores/channelStore";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
@@ -49,6 +52,7 @@
   } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import { waitForStore } from "$lib/utils/utils";
 
   const { data }: PageProps = $props();
 
@@ -175,10 +179,13 @@
    * has already committed to a domain that's on the allowlist (gated in
    * `+page.ts`).
    */
-  const initiateSso = async (domain: string) => {
-    // Effective origin isn't known yet; discover without an origin so the
-    // ceremony runs against the org's primary client.
-    const result = await discoverSsoConfig(domain);
+  const initiateSso = async (domain: string, derivationOrigin?: string) => {
+    // `appOrigin` only selects which client to run against — the server
+    // re-validates it in the gate, so a wrong value can deny but never bypass.
+    const appOrigin =
+      derivationOrigin ??
+      (await waitForStore(channelStore, (ch) => ch?.origin));
+    const result = await discoverSsoConfig(domain, undefined, appOrigin);
     // Stash the SSO discovery domain so `resumeOpenId` knows the returning JWT
     // belongs to a 1-click SSO flow rather than a 1-click OpenID one. The flow
     // type drives which auto-approve allowlist the attribute consent handler
@@ -326,7 +333,7 @@
     } else if (data.flow === "sso-init") {
       // Discovery + redirect runs async; the page renders nothing while
       // it's in flight (mirrors the openid-init render branch).
-      initiateSso(data.domain).catch(handleError);
+      initiateSso(data.domain, data.derivationOrigin).catch(handleError);
     } else if (data.flow === "openid-resume") {
       // resumeOpenId sets the flow once the JWT (and thus the issuer)
       // has been decoded.
