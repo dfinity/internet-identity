@@ -53,6 +53,7 @@
   import { sessionStore } from "$lib/stores/session.store";
   import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
   import { waitForStore } from "$lib/utils/utils";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 
   const { data }: PageProps = $props();
 
@@ -181,10 +182,13 @@
    */
   const initiateSso = async (domain: string, derivationOrigin?: string) => {
     // `appOrigin` only selects which client to run against — the server
-    // re-validates it in the gate, so a wrong value can deny but never bypass.
-    const appOrigin =
+    // re-validates in the gate, so a wrong value can deny but never bypass.
+    // Remap to canonical (as the delegation path does) so it keys the origin the
+    // gate will.
+    const appOrigin = remapToLegacyDomain(
       derivationOrigin ??
-      (await waitForStore(channelStore, (ch) => ch?.origin));
+        (await waitForStore(channelStore, (ch) => ch?.origin)),
+    );
     const result = await discoverSsoConfig(domain, undefined, appOrigin);
     // Stash the SSO discovery domain so `resumeOpenId` knows the returning JWT
     // belongs to a 1-click SSO flow rather than a 1-click OpenID one. The flow

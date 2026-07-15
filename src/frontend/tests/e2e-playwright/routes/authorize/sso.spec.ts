@@ -8,7 +8,7 @@ import {
   SSO_OPENID_PORT,
   SSO_PER_APP_CLIENT_ID,
 } from "../../fixtures/sso";
-import { fromBase64, II_URL } from "../../utils";
+import { fromBase64, II_URL, TEST_APP_URL } from "../../utils";
 
 // Attribute scope keys for SSO-sourced credentials are
 // `sso:<domain>:<name>`, distinct from the `openid:<issuer>:<name>` form
@@ -388,12 +388,16 @@ test.describe("Authorize with 1-click SSO", () => {
 // between them.
 test.describe("Authorize with IdP-side per-app gating", () => {
   const name = "John Doe";
-  // Listed in `app_clients` → served by the per-app client.
+  // Listed in `app_clients` → served by the per-app client; also used as a
+  // derivation origin.
   const GATED_ORIGIN = "https://nice-name.com";
   // Absent from `app_clients` → denied by `gate_all_apps`.
   const DENIED_ORIGIN = "https://denied-app.com";
 
-  // Gated origin allowed via its per-app client; every other origin denied.
+  // Every gated test discovers the same domain, and II caches the SSO
+  // well-known per domain (~1h, no force-refresh), so they must share one
+  // config — the first fetch wins. `GATED_ORIGIN` maps to the per-app client;
+  // every other origin is denied.
   const gatingConfig = {
     appClients: { [GATED_ORIGIN]: SSO_PER_APP_CLIENT_ID },
     gateAllApps: true,
@@ -570,12 +574,100 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await signInWithOpenId(popup, openIdUsers[0].id);
       await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
     });
+  });
 
-    // Gap: the derivation-origin 1-click path (`?sso=` + `?derivationOrigin=`)
-    // is untested — the existing fixtures have no dapp that declares a
-    // derivation origin distinct from its channel origin, so wiring it here
-    // would mean a brittle bespoke fixture. The `derivationOrigin` param branch
-    // in `+page.ts`/`initiateSso` is exercised only by unit-level typing today.
+  // 1-click `?sso=` for a dapp that uses a derivation origin: the derivation
+  // origin can't be learned from the channel (it only rides the later delegation
+  // request), so it arrives as the `?derivationOrigin=` param. This exercises
+  // that param branch in `initiateSso` — discovery keys the derivation origin
+  // (`GATED_ORIGIN`), not the channel origin the app is served from.
+  test.describe("gated origin via 1-click ?sso= with derivationOrigin", () => {
+    const email = "john.doe@example.com";
+    // App is served from a second navigable test-app origin; its derivation
+    // origin is `GATED_ORIGIN`, which the gate keys on. The gate ignores the
+    // channel origin, so hosting here (an otherwise-denied origin) is fine.
+    const HOST_ORIGIN = DENIED_ORIGIN;
+
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { name, email } }],
+      },
+    });
+
+    // Round-trip: the certified bundle must replay through the test_app canister.
+    test.afterEach(
+      ({ authorizedIcrc3Attributes, canisterEchoedIcrc3Attributes }) => {
+        if (authorizedIcrc3Attributes === undefined) return;
+        const expected = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+        expect(canisterEchoedIcrc3Attributes).toEqual(expected);
+      },
+    );
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      // Non-anonymous principal proves the gated chain completed via 1-click.
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) return;
+      const textEntries = decodeIcrc3TextEntries(
+        authorizedIcrc3Attributes.data,
+      );
+      expect(textEntries).toMatchObject({
+        [`sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`]: name,
+        [`sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`]: email,
+      });
+    });
+
+    test("routes to the per-app client via the derivationOrigin param", async ({
+      page,
+      configureSsoGating,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await configureSsoGating(gatingConfig);
+      await page.goto(HOST_ORIGIN);
+      // The derivation origin must list the serving origin in its
+      // alternative-origins or the gate rejects it.
+      const alternativeOrigins = JSON.stringify({
+        alternativeOrigins: [HOST_ORIGIN],
+      });
+      await page.locator("#hostUrl").fill("https://localhost:5173");
+      await page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
+      await page.locator("#certified").click();
+      await page.locator("#updateNewAlternativeOrigins").click();
+      await expect(page.locator("#alternativeOrigins")).toHaveText(
+        alternativeOrigins,
+        { timeout: 10_000 },
+      );
+      await page.locator("#derivationOrigin").fill(TEST_APP_URL);
+
+      const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
+        SSO_GATING_DISCOVERY_DOMAIN,
+      )}&derivationOrigin=${encodeURIComponent(TEST_APP_URL)}`;
+      await page
+        .getByRole("textbox", { name: "Identity Provider" })
+        .fill(ssoUrl);
+      await page
+        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+        .setChecked(true);
+      await page
+        .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
+        .setChecked(true);
+      await page
+        .getByRole("textbox", { name: "Request attributes:" })
+        .fill(
+          [
+            `sso:${SSO_GATING_DISCOVERY_DOMAIN}:name`,
+            `sso:${SSO_GATING_DISCOVERY_DOMAIN}:email`,
+          ].join("\n"),
+        );
+      await expect(page.locator("#principal")).toBeHidden();
+      const popupPromise = page.context().waitForEvent("page");
+      await page.getByRole("button", { name: "Sign In" }).click();
+      const popup = await popupPromise;
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await expect(page.locator("#principal")).toBeVisible({ timeout: 15_000 });
+    });
   });
 
   test.describe("denied origin (gate_all_apps)", () => {
