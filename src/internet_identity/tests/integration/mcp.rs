@@ -1940,3 +1940,108 @@ fn mcp_prepare_registration_delegation_rejects_empty_key() -> Result<(), RejectR
 
     Ok(())
 }
+
+/// A single anchor can hold only so many *live* registration delegations at
+/// once: `prepare` prunes the anchor's expired entries, then refuses once the
+/// per-anchor cap is reached. This bounds how much one actor can write to the
+/// registration index (which shares the canister's stable memory with all other
+/// data). Once the in-flight ones expire, `prepare` reclaims them and admits new
+/// requests again.
+#[test]
+fn mcp_prepare_registration_delegation_is_capped_per_anchor() -> Result<(), RejectResponse> {
+    // Mirrors `MAX_PENDING_REGISTRATIONS_PER_ANCHOR` in `mcp_registration.rs`.
+    const MAX_PENDING: usize = 10;
+
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    // Fill the per-anchor budget: each prepare mints a distinct `P_reg` entry
+    // (the seed comes from a fresh random nonce, not the registration key).
+    for i in 0..MAX_PENDING {
+        prepare_mcp_registration_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ByteBuf::from(format!("browser registration key Y {i}")),
+            Some(true),
+            Some(GRANT_TTL_NS),
+        )
+        .unwrap()
+        .expect("prepares up to the cap must succeed");
+    }
+
+    // One past the cap is refused.
+    let over_cap = prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::from("browser registration key Y over"),
+        Some(true),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap();
+    assert!(
+        matches!(&over_cap, Err(message) if message.contains("too many pending registrations")),
+        "a prepare past the per-anchor cap must be rejected: {over_cap:?}"
+    );
+
+    // Past the ~5-minute registration lifetime, the in-flight entries are
+    // expired; the next prepare prunes them (freeing the budget) and succeeds.
+    env.advance_time(Duration::from_secs(6 * 60));
+    prepare_mcp_registration_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        ByteBuf::from("browser registration key Y after expiry"),
+        Some(true),
+        Some(GRANT_TTL_NS),
+    )
+    .unwrap()
+    .expect("once the pending entries expire, prepare must succeed again");
+
+    Ok(())
+}
+
+/// `mcp_set_config` rejects a trusted URL past the length cap. Nothing
+/// legitimate needs a multi-KiB URL, and the bound keeps the stored config
+/// entry small — the registration index stores only a *hash* of the URL, so
+/// this is the only place URL length affects stored size. A normal URL is
+/// unaffected.
+#[test]
+fn mcp_set_config_rejects_overlong_trusted_url() -> Result<(), RejectResponse> {
+    // Mirrors `MCP_TRUSTED_URL_MAX_BYTES` in `mcp.rs`.
+    const MAX_URL_BYTES: usize = 2048;
+
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    let overlong = format!("https://mcp.example.com/{}", "a".repeat(MAX_URL_BYTES));
+    let rejected = mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: true,
+            url: Some(overlong),
+        },
+    )
+    .unwrap();
+    assert!(
+        matches!(&rejected, Err(message) if message.contains("at most")),
+        "an over-long trusted URL must be rejected: {rejected:?}"
+    );
+
+    // A normal-length URL is accepted (and the end-to-end connect keeps working:
+    // `mcp_register_v2` re-derives and compares the URL hash — see the happy-path
+    // test — so hashing the stored URL is transparent to redemption).
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    Ok(())
+}
