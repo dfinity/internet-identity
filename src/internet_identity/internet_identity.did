@@ -9,6 +9,18 @@ type SessionKey = PublicKey;
 type FrontendHostname = text;
 type Timestamp = nat64;
 
+// Push notifications PoC (RFC 8291). `hostname` and `title` are what the
+// Service Worker renders in the OS notification banner; `body` is the
+// message text; `url` is an optional deep-link the SW opens on click.
+// The whole record is CBOR-encoded, then RFC 8291-encrypted; single-record
+// AES-GCM caps the encrypted payload at ~3 KiB.
+type PushAlert = record {
+    hostname : text;
+    title : text;
+    body : text;
+    url : opt text;
+};
+
 type HeaderField = record {
     text;
     text;
@@ -1979,4 +1991,61 @@ service : (opt InternetIdentityInit) -> {
 
     // Looks up identity number when called with a recovery phrase
     lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
+
+    // -----------------------------------------------------------------
+    // Push notifications PoC (RFC 8291). Design lives in
+    // `docs/push-notifications-poc.md`. All four subscribe/unsubscribe/
+    // consent methods are authenticated as the identity; notify_user is
+    // called by a dApp on the user's behalf and identifies the target
+    // anchor via the in-app principal (looked up through PRINCIPAL_INDEX).
+    // -----------------------------------------------------------------
+
+    // Register a browser's Web Push subscription for (anchor_number, origin).
+    // `p256dh` must be a 65-byte uncompressed SEC1 P-256 point and `auth`
+    // must be 16 bytes — anything else is rejected. Re-subscribing the same
+    // browser (same relay endpoint) overwrites its row in place.
+    push_subscribe_device : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+        endpoint : text,
+        p256dh : blob,
+        auth : blob,
+    ) -> (variant { Ok; Err : text });
+
+    // Remove the subscription for (anchor_number, origin).
+    push_unsubscribe_device : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+    ) -> (variant { Ok; Err : text });
+
+    // Grant `origin` permission to send push notifications for this
+    // identity. Also writes the reverse index so `notify_user` can find
+    // the anchor from the dApp's per-origin principal.
+    push_grant_consent : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+    ) -> (variant { Ok; Err : text });
+
+    // Revoke a previously-granted consent. Subscription rows are kept
+    // intact — a subsequent grant does not require re-subscribing.
+    push_revoke_consent : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+    ) -> (variant { Ok; Err : text });
+
+    // Called by a dApp on the user's behalf: encrypt + fan out a push
+    // notification to every device the target identity has subscribed with
+    // consent for the caller's origin. Returns in milliseconds — outcalls
+    // to the relay are detached via `ic_cdk::spawn` and their success is
+    // observed by the browser, not by the caller. Rate-limited per anchor
+    // (see `canister_inspect_message`).
+    notify_user : (
+        in_app_principal : principal,
+        alert : PushAlert,
+    ) -> (variant { Ok; Err : text });
+
+    // Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
+    // the frontend passes as `applicationServerKey` to
+    // `pushManager.subscribe()`. Same key used to sign the per-push JWT.
+    push_vapid_public_key : () -> (blob) query;
 };

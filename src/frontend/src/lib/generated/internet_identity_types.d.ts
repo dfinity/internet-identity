@@ -3,8 +3,6 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 
 export type Aaguid = Uint8Array | number[];
-export type Permissions = { 'queries' : null } |
-  { 'all' : null };
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -1169,13 +1167,15 @@ export interface McpPrepareDelegation {
  * once it passes; the server reconnects through a new consent flow.
  */
 export interface McpRegistration { 'expiration' : Timestamp }
-export interface PrepareMcpRegistrationDelegation {
-  'user_key' : UserKey,
-  'expiration' : Timestamp,
-}
+/**
+ * Result of mcp_register_v2: the expiration (ns since epoch) of the MCP session
+ * grant, plus the access level the user chose at connect (queries = read-only,
+ * all = full). The server reads permissions to learn the read-only state up
+ * front (the v2 flow has no completion POST carrying it).
+ */
 export interface McpRegistrationV2 {
-  'expiration' : Timestamp,
   'permissions' : Permissions,
+  'expiration' : Timestamp,
 }
 /**
  * Map with some variants for the value type.
@@ -1274,6 +1274,17 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+/**
+ * The delegation permissions a caller requests, mirroring the ICP protocol's
+ * request-delegation `permissions` values. `queries` yields a queries-only
+ * delegation (the issued `Delegation` carries `permissions = "queries"`);
+ * `all` yields an unrestricted, update-capable delegation. Passed as an
+ * optional argument; an absent argument means `all`, preserving the
+ * pre-feature behavior and matching the interface spec's default for an
+ * absent `permissions` field.
+ */
+export type Permissions = { 'all' : null } |
+  { 'queries' : null };
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1387,6 +1398,17 @@ export interface PrepareIdAliasRequest {
    */
   'identity_number' : IdentityNumber,
 }
+/**
+ * Result of prepare_mcp_registration_delegation: the canister-signature public
+ * key the registration delegation is rooted at (P_reg), and the (short)
+ * expiration of that delegation. The frontend fetches the signed delegation via
+ * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * server, which redeems it with mcp_register_v2.
+ */
+export interface PrepareMcpRegistrationDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+}
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1409,6 +1431,19 @@ export type PublicKey = Uint8Array | number[];
 export interface PublicKeyAuthn { 'pubkey' : PublicKey }
 export type Purpose = { 'authentication' : null } |
   { 'recovery' : null };
+/**
+ * Push notifications PoC (RFC 8291). `hostname` and `title` are what the
+ * Service Worker renders in the OS notification banner; `body` is the
+ * message text; `url` is an optional deep-link the SW opens on click.
+ * The whole record is CBOR-encoded, then RFC 8291-encrypted; single-record
+ * AES-GCM caps the encrypted payload at ~3 KiB.
+ */
+export interface PushAlert {
+  'url' : [] | [string],
+  'title' : string,
+  'body' : string,
+  'hostname' : string,
+}
 /**
  * Rate limit configuration.
  * Currently only used for `register`.
@@ -1981,6 +2016,17 @@ export interface _SERVICE {
     { 'Ok' : IdAliasCredentials } |
       { 'Err' : GetIdAliasError }
   >,
+  /**
+   * Fetch the signed registration delegation prepared above, to deliver to the
+   * trusted MCP server. Authenticated as the identity, like the prepare call.
+   * user_key is the value the prepare call returned; the seed is recovered
+   * from it, so no consent parameters need re-passing.
+   */
+  'get_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, PublicKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : string }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
@@ -2139,7 +2185,7 @@ export interface _SERVICE {
    * from the unauthenticated connect link. No account is chosen here
    * (accounts are per-origin and the connector isn't an app) — the app
    * account is selected per call on mcp_prepare_delegation.
-   *
+   * 
    * At most one session per identity: registering replaces any previous
    * grant. Requires the identity's MCP config to be enabled with a trusted
    * server set, so every session stays revocable via mcp_set_config.
@@ -2149,19 +2195,21 @@ export interface _SERVICE {
     { 'Ok' : McpRegistration } |
       { 'Err' : string }
   >,
+  /**
+   * Called by the trusted MCP server, authenticated by the registration
+   * delegation chain: bind the server's long-lived session_key to the
+   * consenting anchor. The entire consent — anchor, read-only choice, grant
+   * lifetime — is recovered from the entry keyed by caller() (the registration
+   * principal), so the server passes only session_key: it cannot name a
+   * different anchor, upgrade the access level or stretch the grant, and never
+   * learns the anchor number. A trusted-server switch or disable since consent
+   * invalidates the delegation. Usable until the registration delegation
+   * expires (~5 min); re-registration within that window replaces the anchor's
+   * single MCP session.
+   */
   'mcp_register_v2' : ActorMethod<
     [SessionKey],
     { 'Ok' : McpRegistrationV2 } |
-      { 'Err' : string }
-  >,
-  'prepare_mcp_registration_delegation' : ActorMethod<
-    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
-    { 'Ok' : PrepareMcpRegistrationDelegation } |
-      { 'Err' : string }
-  >,
-  'get_mcp_registration_delegation' : ActorMethod<
-    [UserNumber, SessionKey, PublicKey, Timestamp],
-    { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
   /**
@@ -2173,6 +2221,19 @@ export interface _SERVICE {
    */
   'mcp_set_config' : ActorMethod<
     [UserNumber, McpConfig],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Called by a dApp on the user's behalf: encrypt + fan out a push
+   * notification to every device the target identity has subscribed with
+   * consent for the caller's origin. Returns in milliseconds — outcalls
+   * to the relay are detached via `ic_cdk::spawn` and their success is
+   * observed by the browser, not by the caller. Rate-limited per anchor
+   * (see `canister_inspect_message`).
+   */
+  'notify_user' : ActorMethod<
+    [Principal, PushAlert],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
@@ -2264,11 +2325,78 @@ export interface _SERVICE {
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
   >,
+  /**
+   * Mint a short-lived MCP registration delegation (P_reg -> registration_key).
+   * Authenticated as the identity (only the consenting user can create one).
+   * registration_key is an ephemeral key the II frontend generates for this
+   * connect (browser-held — the canister never delegates to a key taken from
+   * the connect link; the frontend extends the chain to the server's key
+   * browser-side). P_reg is derived from a fresh random nonce, and the whole
+   * consent — the anchor, permissions (read-only choice), max_ttl (session-
+   * grant lifetime), and the identity's current trusted-server URL — is
+   * recorded on an index entry keyed by P_reg, so mcp_register_v2 recovers it
+   * server-side and the server cannot alter any of it.
+   */
+  'prepare_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
+    { 'Ok' : PrepareMcpRegistrationDelegation } |
+      { 'Err' : string }
+  >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
       { 'Err' : SessionDelegationError }
   >,
+  /**
+   * Grant `origin` permission to send push notifications for this
+   * identity. Also writes the reverse index so `notify_user` can find
+   * the anchor from the dApp's per-origin principal.
+   */
+  'push_grant_consent' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Revoke a previously-granted consent. Subscription rows are kept
+   * intact — a subsequent grant does not require re-subscribing.
+   */
+  'push_revoke_consent' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Register a browser's Web Push subscription for (anchor_number, origin).
+   * `p256dh` must be a 65-byte uncompressed SEC1 P-256 point and `auth`
+   * must be 16 bytes — anything else is rejected. Re-subscribing the same
+   * browser (same relay endpoint) overwrites its row in place.
+   */
+  'push_subscribe_device' : ActorMethod<
+    [
+      UserNumber,
+      FrontendHostname,
+      string,
+      Uint8Array | number[],
+      Uint8Array | number[],
+    ],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Remove the subscription for (anchor_number, origin).
+   */
+  'push_unsubscribe_device' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  /**
+   * Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
+   * the frontend passes as `applicationServerKey` to
+   * `pushManager.subscribe()`. Same key used to sign the per-push JWT.
+   */
+  'push_vapid_public_key' : ActorMethod<[], Uint8Array | number[]>,
   'register' : ActorMethod<
     [DeviceData, ChallengeResult, [] | [Principal]],
     RegisterResponse

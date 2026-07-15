@@ -67,6 +67,7 @@ mod mcp;
 mod mcp_registration;
 
 mod openid;
+mod push;
 mod session_delegation;
 mod single_flight_cache;
 mod state;
@@ -817,6 +818,103 @@ fn get_mcp_registration_delegation(
 #[update]
 fn mcp_register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String> {
     mcp_registration::register_v2(session_key)
+}
+
+// ---- Push notifications PoC (RFC 8291) -------------------------------------
+//
+// Design lives in `docs/push-notifications-poc.md`. Handlers all follow the
+// same shape: authenticate as the identity (identity-scoped operations), then
+// delegate to [`push::api`]. `notify_user` is a dApp-facing method — it
+// authorises via the reverse principal-index rather than the anchor, and
+// stubs the outcall for Phase 5+.
+
+#[derive(candid::CandidType, candid::Deserialize, Debug, Clone)]
+pub struct PushAlert {
+    pub hostname: String,
+    pub title: String,
+    pub body: String,
+    pub url: Option<String>,
+}
+
+#[update]
+fn push_subscribe_device(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    endpoint: String,
+    p256dh: ByteBuf,
+    auth: ByteBuf,
+) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::subscribe_device(
+        anchor_number,
+        origin,
+        endpoint,
+        p256dh.into_vec(),
+        auth.into_vec(),
+    )
+}
+
+#[update]
+fn push_unsubscribe_device(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::unsubscribe_device(anchor_number, origin)
+}
+
+#[update]
+fn push_grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::grant_consent(anchor_number, origin)
+}
+
+#[update]
+fn push_revoke_consent(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<(), String> {
+    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
+    push::api::revoke_consent(anchor_number, origin)
+}
+
+/// Send an encrypted push notification to `in_app_principal`'s subscribed
+/// browser SW, if the caller's origin has consent. Returns in ms — the
+/// outcall to the relay is detached via `ic_cdk::spawn` (see
+/// [`push::api::notify_user`]).
+///
+/// Called by dApps on behalf of the user. No `check_authz_and_record_activity`
+/// here: the dApp doesn't authenticate as the anchor, it authenticates as
+/// its own per-anchor-per-origin principal (`in_app_principal`). We verify
+/// authorization by requiring that `caller()` matches the `in_app_principal`
+/// argument — a dApp can only send pushes on behalf of principals it can
+/// prove it *is*.
+#[update]
+async fn notify_user(in_app_principal: Principal, alert: PushAlert) -> Result<(), String> {
+    if caller() != in_app_principal {
+        return Err("caller must be the in_app_principal".to_string());
+    }
+    let entropy = random_salt().await;
+    push::api::notify_user(
+        in_app_principal,
+        push::api::PushAlert {
+            hostname: alert.hostname,
+            title: alert.title,
+            body: alert.body,
+            url: alert.url,
+        },
+        entropy,
+    )
+}
+
+/// Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
+/// the frontend passes as `applicationServerKey` to
+/// `pushManager.subscribe()`. This is the same key used to sign the
+/// per-push JWT in [`notify_user`]; the relay verifies both against the
+/// browser's baked-in copy.
+#[query]
+fn push_vapid_public_key() -> ByteBuf {
+    ByteBuf::from(push::vapid::VAPID_PUBLIC_KEY_UNCOMPRESSED.to_vec())
 }
 
 #[query]
