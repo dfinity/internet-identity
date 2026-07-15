@@ -204,6 +204,31 @@
       </section>
       <section id="root-vc-flow"></section>
       <section>
+        <h1>Push Notifications</h1>
+        <p>
+          Exercises the push pipeline on the II canister. Sign in first,
+          make sure the checkbox on the II
+          <em>Continue</em> screen was ticked (or grant consent via
+          II settings). Then subscribe this browser and fire a test
+          notification.
+        </p>
+        <label for="iiCanisterIdPush">II Canister ID</label>
+        <input
+          type="text"
+          id="iiCanisterIdPush"
+          placeholder="rdmx6-jaaaa-aaaaa-aaadq-cai"
+        />
+        <div style="margin-top: 12px">
+          <button id="pushEnableBtn">
+            Register SW + subscribe + push_subscribe_device
+          </button>
+          <button id="pushNotifyBtn">Send test notification</button>
+          <button id="pushUnsubscribeBtn">Unsubscribe</button>
+        </div>
+        <div id="pushStatus" style="margin-top: 8px"></div>
+        <pre id="pushSubscriptionOut" style="max-height: 200px; overflow: auto"></pre>
+      </section>
+      <section>
         <h1>User Agent</h1>
         <p id="userAgent"></p>
         <p>Is telegram? <span id="isTelegram"></span></p>

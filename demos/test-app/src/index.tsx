@@ -111,6 +111,24 @@ const canisterEchoedAttributesRawEl = document.getElementById(
   "canisterEchoedAttributesRaw",
 ) as HTMLPreElement;
 
+// Push-notifications section (see index.html "Push Notifications" block).
+const iiCanisterIdPushEl = document.getElementById(
+  "iiCanisterIdPush",
+) as HTMLInputElement;
+const pushEnableBtn = document.getElementById(
+  "pushEnableBtn",
+) as HTMLButtonElement;
+const pushNotifyBtn = document.getElementById(
+  "pushNotifyBtn",
+) as HTMLButtonElement;
+const pushUnsubscribeBtn = document.getElementById(
+  "pushUnsubscribeBtn",
+) as HTMLButtonElement;
+const pushStatusEl = document.getElementById("pushStatus") as HTMLDivElement;
+const pushSubscriptionOutEl = document.getElementById(
+  "pushSubscriptionOut",
+) as HTMLPreElement;
+
 let iiProtocolTestWindow: Window | undefined;
 
 // The identity set by the authentication
@@ -162,6 +180,29 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
     ),
     whoami: IDL.Func([], [IDL.Principal], ["query"]),
     caller_attributes: IDL.Func([], [CallerAttributes], []),
+  });
+};
+
+// Hand-rolled IDL for the six II push methods, mirroring the six entries
+// added on the .did file in this same PR. Kept local (no import from
+// src/frontend/) so the test-app stays a standalone workspace.
+const iiPushIdlFactory = ({ IDL }: { IDL: any }) => {
+  const PushAlert = IDL.Record({
+    hostname: IDL.Text,
+    title: IDL.Text,
+    body: IDL.Text,
+    url: IDL.Opt(IDL.Text),
+  });
+  const OkErr = IDL.Variant({ Ok: IDL.Null, Err: IDL.Text });
+  return IDL.Service({
+    push_subscribe_device: IDL.Func(
+      [IDL.Nat64, IDL.Text, IDL.Text, IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+      [OkErr],
+      [],
+    ),
+    push_unsubscribe_device: IDL.Func([IDL.Nat64, IDL.Text], [OkErr], []),
+    notify_user: IDL.Func([IDL.Principal, PushAlert], [OkErr], []),
+    push_vapid_public_key: IDL.Func([], [IDL.Vec(IDL.Nat8)], ["query"]),
   });
 };
 
@@ -580,6 +621,151 @@ whoamiBtn.addEventListener("click", async () => {
     .catch((err) => {
       console.error("Failed to fetch whoami", err);
     });
+});
+
+// ---- Push notifications ---------------------------------------------
+//
+// The three buttons share an actor built from `delegationIdentity` (the
+// delegation the user got from II for this app's origin). The delegation
+// chain proves the identity is authorized to act as the anchor's per-app
+// principal, so `push_subscribe_device` (authenticated as the anchor)
+// and `notify_user` (`caller() == in_app_principal`) both succeed.
+
+async function makeIiActor(): Promise<any> {
+  if (!delegationIdentity) {
+    throw new Error("Sign in first");
+  }
+  const raw = iiCanisterIdPushEl.value.trim();
+  if (!raw) {
+    throw new Error("Set the II canister ID");
+  }
+  const canisterId = Principal.fromText(raw);
+  const agent = await HttpAgent.create({
+    host: hostUrlEl.value,
+    identity: delegationIdentity,
+    shouldFetchRootKey: true,
+  });
+  return Actor.createActor(iiPushIdlFactory, { agent, canisterId });
+}
+
+function base64UrlDecode(s: string): Uint8Array {
+  const pad = "=".repeat((4 - (s.length % 4)) % 4);
+  const b64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function setPushStatus(msg: string, kind: "ok" | "err") {
+  pushStatusEl.textContent = msg;
+  pushStatusEl.style.color = kind === "ok" ? "#1b5e20" : "#b71c1c";
+}
+
+// The anchor number must be threaded into `push_subscribe_device`.
+// After sign-in the DelegationIdentity's inner principal is the app-
+// specific principal, not the anchor — but the delegation chain carries
+// the anchor's public key. We recover the anchor number from the
+// `authnMethod` bundle stored during sign-in; if that's missing, ask.
+function readAnchorForPush(): bigint {
+  // The existing `principalEl` shows the app-scoped principal after
+  // sign-in — not the anchor. This app doesn't currently persist the
+  // raw anchor number, so we ask the user. Cheapest for a smoke test.
+  const raw = window.prompt("Anchor number (Identity Number):");
+  if (raw === null) {
+    throw new Error("cancelled");
+  }
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error("anchor must be a positive integer");
+  }
+  return BigInt(trimmed);
+}
+
+pushEnableBtn.addEventListener("click", async () => {
+  try {
+    setPushStatus("Requesting notification permission…", "ok");
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      throw new Error(`notification permission: ${perm}`);
+    }
+    const iiActor = await makeIiActor();
+    setPushStatus("Registering service worker…", "ok");
+    const reg = await navigator.serviceWorker.register("/service-worker.js");
+    await navigator.serviceWorker.ready;
+    await reg.update();
+
+    setPushStatus("Fetching VAPID key…", "ok");
+    const vapidPubBytes = await iiActor.push_vapid_public_key();
+    const vapidPub =
+      vapidPubBytes instanceof Uint8Array
+        ? vapidPubBytes
+        : new Uint8Array(vapidPubBytes);
+
+    setPushStatus("Subscribing with the relay…", "ok");
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: vapidPub,
+    });
+    const subJson = sub.toJSON() as {
+      endpoint: string;
+      keys: { p256dh: string; auth: string };
+    };
+    pushSubscriptionOutEl.textContent = JSON.stringify(subJson, null, 2);
+
+    const anchor = readAnchorForPush();
+    const p256dh = base64UrlDecode(subJson.keys.p256dh);
+    const auth = base64UrlDecode(subJson.keys.auth);
+
+    setPushStatus("Registering on II…", "ok");
+    const res = await iiActor.push_subscribe_device(
+      anchor,
+      window.location.origin,
+      sub.endpoint,
+      p256dh,
+      auth,
+    );
+    if ("Err" in res) throw new Error(res.Err);
+    setPushStatus("Subscribed", "ok");
+  } catch (err) {
+    setPushStatus(`Subscribe failed: ${(err as Error).message}`, "err");
+  }
+});
+
+pushNotifyBtn.addEventListener("click", async () => {
+  try {
+    if (!delegationIdentity) throw new Error("Sign in first");
+    const iiActor = await makeIiActor();
+    const res = await iiActor.notify_user(delegationIdentity.getPrincipal(), {
+      hostname: window.location.host,
+      title: "Hello from test-app",
+      body: "Push notifications work!",
+      url: [],
+    });
+    if ("Err" in res) throw new Error(res.Err);
+    setPushStatus("notify_user Ok — watch the OS tray", "ok");
+  } catch (err) {
+    setPushStatus(`notify_user failed: ${(err as Error).message}`, "err");
+  }
+});
+
+pushUnsubscribeBtn.addEventListener("click", async () => {
+  try {
+    const iiActor = await makeIiActor();
+    const anchor = readAnchorForPush();
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    const res = await iiActor.push_unsubscribe_device(
+      anchor,
+      window.location.origin,
+    );
+    if ("Err" in res) throw new Error(res.Err);
+    pushSubscriptionOutEl.textContent = "—";
+    setPushStatus("Unsubscribed", "ok");
+  } catch (err) {
+    setPushStatus(`Unsubscribe failed: ${(err as Error).message}`, "err");
+  }
 });
 
 const showError = (err: string) => {
