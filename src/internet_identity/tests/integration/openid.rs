@@ -1744,7 +1744,7 @@ mod sso_gating {
             .unwrap()
         });
         assert!(
-            result.is_err(),
+            matches!(result, Err(OpenIdDelegationError::JwtVerificationFailed)),
             "gate_all_apps must deny an unlisted origin, got {result:?}"
         );
         Ok(())
@@ -2062,6 +2062,54 @@ mod sso_gating {
         assert!(
             matches!(result, Err(IdRegFinishError::SsoNormalLoginRequired)),
             "non-sub first gated registration must fail safe, got {result:?}"
+        );
+        Ok(())
+    }
+
+    /// A non-`sub` (`oid`) org whose token is MISSING the configured stable-id
+    /// claim cannot resolve a primary identity: `resolve_primary_identity`
+    /// returns `JwtVerificationFailed` (the token clears the gate but carries no
+    /// `oid`, so `stable_id` is `None`). Registration maps that to
+    /// `InvalidAuthnMethod` and stores nothing; `sso_prepare_delegation`
+    /// surfaces the delegation error directly.
+    #[test]
+    fn non_sub_missing_stable_id_claim_is_rejected() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        // `oid` org, but the token carries no `oid` claim.
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PER_APP_SUB, &[]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+
+        sync_time(&env, TEST_TIME_MS);
+        warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
+
+        // Registration: the missing stable-id claim is rejected, nothing created.
+        let reg = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
+        assert!(
+            matches!(reg, Err(IdRegFinishError::InvalidAuthnMethod(_))),
+            "missing stable-id claim must be rejected at registration, got {reg:?}"
+        );
+
+        // Delegation: `resolve_primary_identity` surfaces `JwtVerificationFailed`.
+        let session_key = ByteBuf::from("dapp session key");
+        let deleg = drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(deleg, Err(OpenIdDelegationError::JwtVerificationFailed)),
+            "missing stable-id claim must be rejected at delegation, got {deleg:?}"
         );
         Ok(())
     }
