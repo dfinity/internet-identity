@@ -1,0 +1,19 @@
+{
+  "name": "@dfinity/internet-identity-push-test",
+  "type": "module",
+  "private": true,
+  "description": "Smoke-test rig for the push-notifications PoC on the II canister. Exercises push_subscribe_device / push_grant_consent / notify_user against a real browser Service Worker + real FCM/Mozilla push relay.",
+  "scripts": {
+    "dev": "vite --config ./vite.config.ts",
+    "build": "tsc --noEmit && vite --config ./vite.config.ts build",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@icp-sdk/auth": "^6.2.2",
+    "@icp-sdk/core": "^5.4.0"
+  },
+  "devDependencies": {
+    "typescript": "5.2.2",
+    "vite": "^7.3.1"
+  }
+}

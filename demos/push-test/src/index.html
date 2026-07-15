@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>II Push Notifications — Smoke Test</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 720px;
+        margin: 32px auto;
+        padding: 0 16px;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+      p.hint {
+        color: #666;
+        margin-top: 0;
+      }
+      section {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 16px 0;
+      }
+      section h2 {
+        font-size: 15px;
+        margin: 0 0 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #555;
+      }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        font-weight: 500;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font: inherit;
+      }
+      button {
+        padding: 8px 14px;
+        margin: 4px 4px 4px 0;
+        border: 1px solid #333;
+        background: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: #333;
+        color: #fff;
+      }
+      pre {
+        background: #f6f6f6;
+        border-radius: 4px;
+        padding: 8px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+      .status {
+        margin-top: 8px;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      .status.ok {
+        background: #e6f7e6;
+        color: #1b5e20;
+      }
+      .status.err {
+        background: #fbe9e7;
+        color: #b71c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>II Push Notifications — Smoke Test</h1>
+    <p class="hint">
+      Exercises the six push methods on a test II canister: registers a
+      Service Worker, subscribes with the VAPID public key, grants
+      consent, then triggers <code>notify_user</code> and shows the
+      resulting OS notification.
+    </p>
+
+    <section>
+      <h2>Configuration</h2>
+      <label for="iiUrl">II URL (test canister frontend)</label>
+      <input
+        type="text"
+        id="iiUrl"
+        value="http://localhost:5173"
+        placeholder="https://identity.internetcomputer.org"
+      />
+      <label for="iiCanisterId">II Canister ID</label>
+      <input
+        type="text"
+        id="iiCanisterId"
+        placeholder="rdmx6-jaaaa-aaaaa-aaadq-cai"
+      />
+      <label for="anchorNumber">Anchor Number (your identity number)</label>
+      <input type="text" id="anchorNumber" placeholder="10000" />
+    </section>
+
+    <section>
+      <h2>1. Sign in with II</h2>
+      <button id="signInBtn" class="primary">Sign in</button>
+      <div id="signInStatus"></div>
+      <label>Your in-app principal for this origin:</label>
+      <pre id="principalOut">—</pre>
+    </section>
+
+    <section>
+      <h2>2. Subscribe this browser</h2>
+      <p class="hint">
+        Registers <code>/service-worker.js</code>, fetches the VAPID
+        public key from the canister, and calls
+        <code>pushManager.subscribe()</code>. The resulting subscription
+        is sent to <code>push_subscribe_device</code>.
+      </p>
+      <button id="subscribeBtn">Register SW + subscribe + push_subscribe_device</button>
+      <div id="subscribeStatus"></div>
+      <pre id="subscriptionOut">—</pre>
+    </section>
+
+    <section>
+      <h2>3. Grant consent</h2>
+      <p class="hint">
+        Records that this origin can send you push notifications on this
+        identity. Also writes the reverse
+        <code>principal → (anchor, origin)</code> index used by
+        <code>notify_user</code>.
+      </p>
+      <button id="grantConsentBtn">push_grant_consent</button>
+      <button id="revokeConsentBtn">push_revoke_consent</button>
+      <div id="consentStatus"></div>
+    </section>
+
+    <section>
+      <h2>4. Fire a notification</h2>
+      <label for="alertTitle">Title</label>
+      <input type="text" id="alertTitle" value="Hello from II" />
+      <label for="alertBody">Body</label>
+      <input type="text" id="alertBody" value="Push notifications work!" />
+      <button id="notifyBtn" class="primary">notify_user</button>
+      <div id="notifyStatus"></div>
+      <p class="hint">
+        If the relay accepts the outcall the notification pops up in
+        your OS tray within a few seconds. Non-2xx statuses appear in
+        the canister log (<code>dfx canister logs</code>).
+      </p>
+    </section>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
