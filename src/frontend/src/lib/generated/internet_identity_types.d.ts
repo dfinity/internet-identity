@@ -826,14 +826,8 @@ export interface IdRegFinishArg {
 }
 export type IdRegFinishError = {
     /**
-     * A first gated SSO login (IdP-side per-app gating) for a non-`sub` org
-     * (e.g. Entra `oid`): the per-app token's pairwise sub can't be bridged to
-     * the org's primary identity until the user has signed in through the
-     * primary client once. Registration creates nothing; the frontend prompts a
-     * normal primary-client sign-in, then retries. NOTE: this is a deliberate
-     * non-additive variant addition (authorized) — inert for existing clients,
-     * which never send `OpenIDRegFinishArg.origin` and so never trigger the
-     * SSO-gated registration path that can return it.
+     * A gated SSO login for a non-`sub` org: the user must first sign in
+     * through the org's primary client.
      */
     'SsoNormalLoginRequired' : null
   } |
@@ -1148,13 +1142,6 @@ export type ListAvailableAttributesError = {
  */
 export interface ListAvailableAttributesRequest {
   /**
-   * The dapp origin, supplied when the caller authenticates through an SSO
-   * session (IdP-side per-app gating): it lets the canister recompute the
-   * SSO-session principal and authorize this read for it. Omitted by
-   * device / OpenID sessions, which authorize via the usual auth check.
-   */
-  'origin' : [] | [string],
-  /**
    * Optional list of attribute keys to filter by.
    * Each key is either a fully-scoped key (e.g.,
    * `"openid:https://accounts.google.com:email"` or
@@ -1237,11 +1224,7 @@ export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
   /**
-   * The target dapp origin, set only for a first gated SSO login (IdP-side
-   * per-app gating). When present (with discovery_domain), registration runs
-   * the same gate as sso_prepare_delegation and stores a primary-client-keyed
-   * credential (stable-sub substitution) so a gated first login registers
-   * directly. Absent for direct providers and normal (un-gated) SSO logins.
+   * Target dapp origin, set only for a first gated SSO login.
    */
   'origin' : [] | [string],
   'salt' : Salt,
@@ -1666,16 +1649,12 @@ export interface SsoDiscovery {
   'authorization_endpoint' : string,
   'issuer' : string,
   /**
-   * The client the target origin passed to `get_sso_discovery` must run its
-   * ceremony against under IdP-side per-app gating: the per-app client when
-   * the origin is listed in `app_clients`, the primary client when unlisted
-   * and `gate_all_apps` is off, or `null` when unlisted and `gate_all_apps`
-   * is on (origin denied). Mirrors `client_id` when no origin was supplied.
+   * Client the target origin runs its ceremony against; `null` when denied.
    */
   'resolved_client_id' : [] | [string],
   'discovery_domain' : string,
   /**
-   * The org's primary OIDC client (the one meant for II itself).
+   * The org's primary OIDC client.
    */
   'client_id' : string,
 }
@@ -1688,19 +1667,14 @@ export type SsoDiscoveryState = { 'NotAllowed' : null } |
   { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
 /**
- * Response of `sso_get_delegation` (IdP-side per-app gating). Carries the
- * credential-seed `SignedDelegation` plus the canister signature over the SSO
- * attribute bundle message returned by `sso_prepare_delegation`.
+ * Response of `sso_get_delegation`.
  */
 export interface SsoGetDelegationResponse {
   'signed_delegation' : SignedDelegation,
   'sso_attr_bundle_signature' : Uint8Array | number[],
 }
 /**
- * Response of `sso_prepare_delegation` (IdP-side per-app gating). Carries the
- * credential-seed openid delegation (identical to
- * `OpenIdPrepareDelegationResponse`) plus the certified SSO attribute bundle
- * message the frontend attaches to subsequent calls via `AttributesIdentity`.
+ * Response of `sso_prepare_delegation`.
  */
 export interface SsoPrepareDelegationResponse {
   'user_key' : UserKey,
@@ -1920,12 +1894,8 @@ export interface _SERVICE {
    * on-demand two-hop discovery fetch with `discover_sso` (update); once the
    * fetch completes the query returns `Resolved` with the config.
    * 
-   * The optional second argument is the target dapp origin: when supplied,
-   * the resolved config's `resolved_client_id` reports the client that origin
-   * must run its SSO ceremony against under IdP-side per-app gating (the
-   * per-app client if listed in `app_clients`, the primary client if not, or
-   * `null` when denied under `gate_all_apps`). Omitting it mirrors the
-   * primary `client_id`.
+   * The optional second argument is the target dapp origin; when supplied,
+   * `resolved_client_id` reports the client that origin must use (`null` = denied).
    */
   'discover_sso' : ActorMethod<[string], undefined>,
   'email_challenge_diagnostics' : ActorMethod<
@@ -2457,14 +2427,9 @@ export interface _SERVICE {
       { 'Pending' : null }
   >,
   /**
-   * SSO sign-in — the IdP-side per-app gating path. Mints an SSO-session
-   * delegation only if the JWT's `aud` matches the client the target origin
-   * resolves to (per-app / primary / denied); the delegation's seed binds
-   * `(iss, sub, sso_domain, origin, anchor)`. `openid_prepare_delegation` is
-   * left unchanged (direct providers). A cold discovery/JWKS cache yields
-   * `Pending` (re-call to keep the fetch moving), exactly like the openid
-   * pair. The trailing args are the SSO discovery domain and the target dapp
-   * origin.
+   * SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
+   * client the target origin resolves to. `Pending` means the discovery/JWKS
+   * cache is cold — re-call to drive the fetch.
    */
   'sso_prepare_delegation' : ActorMethod<
     [JWT, Salt, SessionKey, string, FrontendHostname],

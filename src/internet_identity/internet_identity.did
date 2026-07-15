@@ -1542,10 +1542,6 @@ type ListAvailableAttributesRequest = record {
     // `"email"`) which matches all scopes.
     // If not provided, all available attributes are returned.
     attributes : opt vec text;
-
-    // Dapp origin for an SSO session; lets the canister authorize this read for
-    // the SSO-session principal.
-    origin : opt text;
 };
 
 type ListAvailableAttributesResponse = vec record { text; blob };

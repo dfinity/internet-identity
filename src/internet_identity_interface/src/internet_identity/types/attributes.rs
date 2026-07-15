@@ -852,16 +852,12 @@ pub enum GetIcrc3AttributeError {
 pub struct ListAvailableAttributesRequest {
     pub identity_number: AnchorNumber,
     pub attributes: Option<Vec<String>>,
-    /// Dapp origin for an SSO session; matched against the call's SSO bundle so
-    /// `sso:<domain>` rows appear only for a bundle whose origin matches.
-    pub origin: Option<FrontendHostname>,
 }
 
 #[derive(Debug)]
 pub struct ValidatedListAvailableAttributesRequest {
     pub identity_number: AnchorNumber,
     pub attributes: Option<Vec<AttributeKey>>,
-    pub origin: Option<FrontendHostname>,
 }
 
 impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttributesRequest {
@@ -869,16 +865,6 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
 
     fn try_from(request: ListAvailableAttributesRequest) -> Result<Self, Self::Error> {
         let mut problems = Vec::new();
-
-        if let Some(origin) = request.origin.as_ref() {
-            if origin.len() > FRONTEND_HOSTNAME_MAX_BYTES {
-                problems.push(format!(
-                    "Frontend hostname length {} exceeds limit of {} bytes",
-                    origin.len(),
-                    FRONTEND_HOSTNAME_MAX_BYTES
-                ));
-            }
-        }
 
         let attributes = match request.attributes {
             None => None,
@@ -917,7 +903,6 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
         Ok(ValidatedListAvailableAttributesRequest {
             identity_number: request.identity_number,
             attributes,
-            origin: request.origin,
         })
     }
 }
@@ -2481,7 +2466,6 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: None,
-                origin: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             assert!(validated.attributes.is_none());
@@ -2490,7 +2474,6 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec![]),
-                origin: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             pretty_assert_eq!(validated.attributes.unwrap().len(), 0);
@@ -2499,7 +2482,6 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["openid:https://accounts.google.com:email".to_string()]),
-                origin: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             let attrs = validated.attributes.unwrap();
@@ -2510,7 +2492,6 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["email".to_string()]),
-                origin: None,
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             let attrs = validated.attributes.unwrap();
@@ -2529,7 +2510,6 @@ mod tests {
                         .map(|_| "email".to_string())
                         .collect(),
                 ),
-                origin: None,
             };
             let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
             match err {
@@ -2543,7 +2523,6 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["unknown_attribute".to_string()]),
-                origin: None,
             };
             let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
             match err {
@@ -2557,7 +2536,6 @@ mod tests {
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
                 attributes: Some(vec!["sso:dfinity.org:email".to_string()]),
-                origin: None,
             };
             let err = ValidatedListAvailableAttributesRequest::try_from(req).unwrap_err();
             match err {

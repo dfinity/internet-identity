@@ -324,8 +324,6 @@ const resolveConsentPipeline = async (params: {
             .list_available_attributes({
               identity_number: authenticated.identityNumber,
               attributes: [],
-              // Origin lets the canister include `sso:<domain>` rows for an SSO session; ignored otherwise.
-              origin: [origin],
             })
             .then(throwCanisterError)
         : Promise.resolve([]);
@@ -493,8 +491,6 @@ export const handleIcrc3OneClickOpenIdAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
-          // OpenID session authorizes via the usual check; origin is unused.
-          origin: [origin],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));
@@ -584,8 +580,6 @@ export const handleIcrc3OneClickSsoAttributes =
         .list_available_attributes({
           identity_number: authenticated.identityNumber,
           attributes: [],
-          // SSO session: origin authorizes the read for the origin-scoped SSO-session principal.
-          origin: [origin],
         })
         .then(throwCanisterError);
       const availableKeys = new Set(available.map(([key]) => key));

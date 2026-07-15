@@ -936,7 +936,6 @@ fn should_list_all_available_attributes() {
     let request = ListAvailableAttributesRequest {
         identity_number,
         attributes: None,
-        origin: None,
     };
 
     let result = api::list_available_attributes(&env, canister_id, principal, request)

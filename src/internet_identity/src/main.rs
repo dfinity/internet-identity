@@ -2421,15 +2421,11 @@ mod attribute_sharing {
         let ValidatedListAvailableAttributesRequest {
             identity_number,
             attributes,
-            origin,
         } = request.try_into()?;
 
-        // Gate `sso:<domain>` rows by the certified bundle for this origin, matching what `prepare_icrc3_attributes` certifies.
-        let sso_session_domain = origin.as_ref().and_then(|origin| {
-            openid::read_certified_sso_bundle()
-                .filter(|bundle| &bundle.origin == origin)
-                .map(|bundle| bundle.sso_domain)
-        });
+        // Gate `sso:<domain>` rows by the certified bundle; the bundle is the trusted source of the SSO domain.
+        let sso_session_domain =
+            openid::read_certified_sso_bundle().map(|bundle| bundle.sso_domain);
         let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 ListAvailableAttributesError::AuthorizationError(principal)

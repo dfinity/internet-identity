@@ -2418,54 +2418,34 @@ mod sso_gating {
         let responses = responses(well_known(&app_clients, false, "sub"), jwks);
         let (identity_number, bundle) = gated_bundle(&env, canister_id, &responses, &primary_jwt);
 
-        let request = |origin: &str| ListAvailableAttributesRequest {
+        let request = || ListAvailableAttributesRequest {
             identity_number,
             attributes: None,
-            origin: Some(origin.to_string()),
         };
         let sso_email_key = format!("sso:{GATE_DOMAIN}:email");
 
-        // Bundle-less (plain openid) session: no `sso:<domain>` rows offered.
-        let no_bundle = api::list_available_attributes(
-            &env,
-            canister_id,
-            test_principal(),
-            request(GATED_ORIGIN),
-        )?
-        .expect("list succeeds");
+        // Bundle-less (plain openid / passkey) session: no `sso:<domain>` rows offered.
+        let no_bundle =
+            api::list_available_attributes(&env, canister_id, test_principal(), request())?
+                .expect("list succeeds");
         assert!(
             !no_bundle.iter().any(|(k, _)| *k == sso_email_key),
             "a bundle-less session must not be offered sso:<domain> rows, got {no_bundle:?}"
         );
 
-        // SSO session with a matching certified bundle: `sso:<domain>` rows show.
+        // SSO session presenting a matching certified bundle: `sso:<domain>` rows show.
         let with_bundle = api::list_available_attributes_with_bundle(
             &env,
             canister_id,
             test_principal(),
-            request(GATED_ORIGIN),
+            request(),
             &bundle,
             canister_id,
         )?
         .expect("list succeeds");
         assert!(
             with_bundle.iter().any(|(k, _)| *k == sso_email_key),
-            "an SSO session with a matching bundle must be offered sso:<domain> rows, got {with_bundle:?}"
-        );
-
-        // Cross-origin bundle: the origin filter drops it, so no `sso:` rows.
-        let cross = api::list_available_attributes_with_bundle(
-            &env,
-            canister_id,
-            test_principal(),
-            request(UNGATED_ORIGIN),
-            &bundle,
-            canister_id,
-        )?
-        .expect("list succeeds");
-        assert!(
-            !cross.iter().any(|(k, _)| *k == sso_email_key),
-            "a cross-origin bundle must not surface sso:<domain> rows, got {cross:?}"
+            "an SSO session with a certified bundle must be offered sso:<domain> rows, got {with_bundle:?}"
         );
         Ok(())
     }
