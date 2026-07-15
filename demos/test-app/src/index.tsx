@@ -196,11 +196,11 @@ const iiPushIdlFactory = ({ IDL }: { IDL: any }) => {
   const OkErr = IDL.Variant({ Ok: IDL.Null, Err: IDL.Text });
   return IDL.Service({
     push_subscribe_device: IDL.Func(
-      [IDL.Nat64, IDL.Text, IDL.Text, IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+      [IDL.Text, IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
       [OkErr],
       [],
     ),
-    push_unsubscribe_device: IDL.Func([IDL.Nat64, IDL.Text], [OkErr], []),
+    push_unsubscribe_device: IDL.Func([], [OkErr], []),
     notify_user: IDL.Func([IDL.Principal, PushAlert], [OkErr], []),
     push_vapid_public_key: IDL.Func([], [IDL.Vec(IDL.Nat8)], ["query"]),
   });
@@ -662,26 +662,6 @@ function setPushStatus(msg: string, kind: "ok" | "err") {
   pushStatusEl.style.color = kind === "ok" ? "#1b5e20" : "#b71c1c";
 }
 
-// The anchor number must be threaded into `push_subscribe_device`.
-// After sign-in the DelegationIdentity's inner principal is the app-
-// specific principal, not the anchor — but the delegation chain carries
-// the anchor's public key. We recover the anchor number from the
-// `authnMethod` bundle stored during sign-in; if that's missing, ask.
-function readAnchorForPush(): bigint {
-  // The existing `principalEl` shows the app-scoped principal after
-  // sign-in — not the anchor. This app doesn't currently persist the
-  // raw anchor number, so we ask the user. Cheapest for a smoke test.
-  const raw = window.prompt("Anchor number (Identity Number):");
-  if (raw === null) {
-    throw new Error("cancelled");
-  }
-  const trimmed = raw.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new Error("anchor must be a positive integer");
-  }
-  return BigInt(trimmed);
-}
-
 pushEnableBtn.addEventListener("click", async () => {
   try {
     setPushStatus("Requesting notification permission…", "ok");
@@ -713,14 +693,14 @@ pushEnableBtn.addEventListener("click", async () => {
     };
     pushSubscriptionOutEl.textContent = JSON.stringify(subJson, null, 2);
 
-    const anchor = readAnchorForPush();
     const p256dh = base64UrlDecode(subJson.keys.p256dh);
     const auth = base64UrlDecode(subJson.keys.auth);
 
     setPushStatus("Registering on II…", "ok");
+    // Anchor + origin are recovered on the II side from the caller's
+    // per-origin principal (populated when the user ticked the push
+    // checkbox on the /authorize screen). The dApp doesn't need them.
     const res = await iiActor.push_subscribe_device(
-      anchor,
-      window.location.origin,
       sub.endpoint,
       p256dh,
       auth,
@@ -752,14 +732,10 @@ pushNotifyBtn.addEventListener("click", async () => {
 pushUnsubscribeBtn.addEventListener("click", async () => {
   try {
     const iiActor = await makeIiActor();
-    const anchor = readAnchorForPush();
     const reg = await navigator.serviceWorker.getRegistration();
     const sub = await reg?.pushManager.getSubscription();
     if (sub) await sub.unsubscribe();
-    const res = await iiActor.push_unsubscribe_device(
-      anchor,
-      window.location.origin,
-    );
+    const res = await iiActor.push_unsubscribe_device();
     if ("Err" in res) throw new Error(res.Err);
     pushSubscriptionOutEl.textContent = "—";
     setPushStatus("Unsubscribed", "ok");

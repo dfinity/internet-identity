@@ -2373,27 +2373,24 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
-   * Register a browser's Web Push subscription for (anchor_number, origin).
-   * `p256dh` must be a 65-byte uncompressed SEC1 P-256 point and `auth`
-   * must be 16 bytes — anything else is rejected. Re-subscribing the same
-   * browser (same relay endpoint) overwrites its row in place.
+   * Register the caller's Web Push subscription. Both the anchor and
+   * the origin are recovered from PRINCIPAL_INDEX using caller(), so
+   * the dApp doesn't need to pass them. Requires a prior
+   * push_grant_consent for this principal (which populates the reverse
+   * index). `p256dh` must be a 65-byte uncompressed SEC1 P-256 point
+   * and `auth` must be 16 bytes.
    */
   'push_subscribe_device' : ActorMethod<
-    [
-      UserNumber,
-      FrontendHostname,
-      string,
-      Uint8Array | number[],
-      Uint8Array | number[],
-    ],
+    [string, Uint8Array | number[], Uint8Array | number[]],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
   /**
-   * Remove the subscription for (anchor_number, origin).
+   * Remove the caller's subscription. Anchor and origin recovered from
+   * PRINCIPAL_INDEX using caller() — same shape as push_subscribe_device.
    */
   'push_unsubscribe_device' : ActorMethod<
-    [UserNumber, FrontendHostname],
+    [],
     { 'Ok' : null } |
       { 'Err' : string }
   >,

@@ -1339,18 +1339,12 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'push_subscribe_device' : IDL.Func(
-        [
-          UserNumber,
-          FrontendHostname,
-          IDL.Text,
-          IDL.Vec(IDL.Nat8),
-          IDL.Vec(IDL.Nat8),
-        ],
+        [IDL.Text, IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
     'push_unsubscribe_device' : IDL.Func(
-        [UserNumber, FrontendHostname],
+        [],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),

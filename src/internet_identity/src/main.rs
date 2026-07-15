@@ -836,31 +836,21 @@ pub struct PushAlert {
     pub url: Option<String>,
 }
 
+/// Register a browser subscription. Both anchor and origin are recovered
+/// from `push_principal_index_memory` using `caller()` — so the dApp
+/// doesn't have to know its user's anchor number. Requires that consent
+/// has been granted first (see `push_grant_consent`), which is what
+/// populates the reverse index.
 #[update]
-fn push_subscribe_device(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-    endpoint: String,
-    p256dh: ByteBuf,
-    auth: ByteBuf,
-) -> Result<(), String> {
-    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    push::api::subscribe_device(
-        anchor_number,
-        origin,
-        endpoint,
-        p256dh.into_vec(),
-        auth.into_vec(),
-    )
+fn push_subscribe_device(endpoint: String, p256dh: ByteBuf, auth: ByteBuf) -> Result<(), String> {
+    push::api::subscribe_device(caller(), endpoint, p256dh.into_vec(), auth.into_vec())
 }
 
+/// Remove the caller's subscription. Anchor and origin derived from
+/// `PRINCIPAL_INDEX` the same way as [`push_subscribe_device`].
 #[update]
-fn push_unsubscribe_device(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-) -> Result<(), String> {
-    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    push::api::unsubscribe_device(anchor_number, origin)
+fn push_unsubscribe_device() -> Result<(), String> {
+    push::api::unsubscribe_device(caller())
 }
 
 #[update]

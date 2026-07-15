@@ -46,15 +46,19 @@ pub struct PushAlert {
 /// almost certainly malformed and rejected up front.
 const MAX_ENDPOINT_LEN: usize = 1024;
 
-/// Register a browser subscription for `(anchor_number, origin)`.
+/// Register a browser subscription for the caller's `(anchor, origin)`
+/// pair, recovered from `push_principal_index_memory`.
 ///
-/// Idempotent by `(anchor, sha256(endpoint))` — the same browser
-/// re-subscribing overwrites its row rather than duplicating. The origin
-/// is stored on the row so [`notify_user`] can filter subscriptions per
-/// consenting dApp without a second reverse index.
+/// The dApp doesn't pass `anchor` or `origin` — both are recovered from
+/// the caller's per-origin principal, which was inserted into
+/// `PRINCIPAL_INDEX` when the user granted consent at sign-in. Requiring
+/// a `PRINCIPAL_INDEX` entry is the authorization gate: only principals
+/// the user has consented to can register subscriptions on their behalf.
+///
+/// Idempotent by `(anchor, origin_hash)` — a re-subscribe from the same
+/// browser overwrites the existing row.
 pub fn subscribe_device(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    caller: Principal,
     endpoint: String,
     p256dh: Vec<u8>,
     auth: Vec<u8>,
@@ -87,9 +91,17 @@ pub fn subscribe_device(
         ));
     }
 
-    let origin_hash = StorableOriginSha256::from_origin(&origin);
+    let sender = storage_borrow(|storage| storage.push_principal_index_memory.get(&caller))
+        .ok_or_else(|| {
+            "no consent recorded for this principal — grant consent via II sign-in first"
+                .to_string()
+        })?;
+    let anchor = sender.anchor;
+    let origin_hash =
+        StorableOriginSha256::from_bytes(std::borrow::Cow::Owned(sender.origin_hash.to_vec()));
+
     let subscription = StorablePushSubscription {
-        anchor: anchor_number,
+        anchor,
         endpoint,
         p256dh,
         auth,
@@ -99,25 +111,25 @@ pub fn subscribe_device(
     storage_borrow_mut(|storage| {
         storage
             .push_subscriptions_memory
-            .insert((anchor_number, origin_hash), subscription);
+            .insert((anchor, origin_hash), subscription);
     });
     Ok(())
 }
 
-/// Remove a browser's subscription for `(anchor_number, origin)`.
-///
-/// Callers pass the origin (not the raw endpoint) so the UI can offer a
-/// "stop notifications from this dApp on this device" toggle without
-/// having to remember the exact endpoint URL, which is opaque.
-pub fn unsubscribe_device(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-) -> Result<(), String> {
-    let origin_hash = StorableOriginSha256::from_origin(&origin);
+/// Remove the caller's browser subscription. Both anchor and origin are
+/// recovered from `PRINCIPAL_INDEX` — same shape as [`subscribe_device`],
+/// so a dApp can unsubscribe by calling this method with no arguments.
+pub fn unsubscribe_device(caller: Principal) -> Result<(), String> {
+    let sender = storage_borrow(|storage| storage.push_principal_index_memory.get(&caller))
+        .ok_or_else(|| "no consent recorded for this principal".to_string())?;
+    let anchor = sender.anchor;
+    let origin_hash =
+        StorableOriginSha256::from_bytes(std::borrow::Cow::Owned(sender.origin_hash.to_vec()));
+
     storage_borrow_mut(|storage| {
         storage
             .push_subscriptions_memory
-            .remove(&(anchor_number, origin_hash));
+            .remove(&(anchor, origin_hash));
     });
     Ok(())
 }
