@@ -2033,6 +2033,11 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
     ) -> (variant { Ok; Err : text });
 
+    // List every origin `anchor_number` has granted push-notification
+    // consent to. Backs the Settings UI's permissions list. Returns an
+    // empty vec for an unauthorized caller or an anchor with no consents.
+    push_list_consented_origins : (anchor_number : UserNumber) -> (vec text) query;
+
     // Called by a dApp on the user's behalf: encrypt + fan out a push
     // notification to every device the target identity has subscribed with
     // consent for the caller's origin. Returns in milliseconds — outcalls

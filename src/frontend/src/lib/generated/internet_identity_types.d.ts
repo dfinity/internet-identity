@@ -2358,6 +2358,12 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * List every origin `anchor_number` has granted push-notification
+   * consent to. Backs the Settings UI's permissions list. Returns an
+   * empty vec for an unauthorized caller or an anchor with no consents.
+   */
+  'push_list_consented_origins' : ActorMethod<[UserNumber], Array<string>>,
+  /**
    * Revoke a previously-granted consent. Subscription rows are kept
    * intact — a subsequent grant does not require re-subscribing.
    */

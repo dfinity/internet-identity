@@ -1,6 +1,6 @@
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::Timestamp;
+use internet_identity_interface::internet_identity::types::{FrontendHostname, Timestamp};
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
@@ -11,11 +11,17 @@ use std::borrow::Cow;
 /// outright rather than storing a `granted: bool`. `granted_at_ns` is
 /// kept for future auditing (e.g. showing the user "granted 3 days ago"
 /// in the Settings UI).
+///
+/// `origin` duplicates the plaintext of the map key's `StorableOriginSha256`
+/// (a one-way hash) so `push_list_consented_origins` can list the anchor's
+/// consented dApps without a reverse hash lookup.
 #[derive(Encode, Decode, Default, Clone)]
 #[cbor(map)]
 pub struct StorablePushConsent {
     #[n(0)]
     pub granted_at_ns: Timestamp,
+    #[n(1)]
+    pub origin: FrontendHostname,
 }
 
 impl Storable for StorablePushConsent {

@@ -1328,6 +1328,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
+    'push_list_consented_origins' : IDL.Func(
+        [UserNumber],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
+      ),
     'push_revoke_consent' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],

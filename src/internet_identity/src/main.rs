@@ -878,6 +878,18 @@ fn push_revoke_consent(
     push::api::revoke_consent(anchor_number, origin)
 }
 
+/// List `anchor_number`'s consented dApp origins for the Settings UI. Read
+/// by the Settings UI. Returns an empty vec for an unauthorized caller or an
+/// anchor with no consents, matching [`mcp_get_config`]'s "no-op default on
+/// auth failure" shape for queries.
+#[query]
+fn push_list_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostname> {
+    if check_session_authorization(anchor_number).is_err() {
+        return Vec::new();
+    }
+    push::api::list_consented_origins(anchor_number)
+}
+
 /// Send an encrypted push notification to `in_app_principal`'s subscribed
 /// browser SW, if the caller's origin has consent. Returns in ms — the
 /// outcall to the relay is detached via `ic_cdk::spawn` (see

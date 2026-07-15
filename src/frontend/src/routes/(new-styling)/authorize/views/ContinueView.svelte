@@ -22,7 +22,11 @@
     actorForIdentity,
     purgeSession,
   } from "$lib/stores/session-delegation.store";
-  import { throwCanisterError, isCanisterError } from "$lib/utils/utils";
+  import {
+    throwCanisterError,
+    throwTextCanisterError,
+    isCanisterError,
+  } from "$lib/utils/utils";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
     _SERVICE,
@@ -39,6 +43,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import Checkbox from "$lib/components/ui/Checkbox.svelte";
 
   interface Props {
     effectiveOrigin: string;
@@ -153,6 +158,28 @@
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
 
+  // Opt-in (defaults false): push notifications are intrusive, so the user
+  // must explicitly ask for them rather than opt out.
+  let pushNotificationsEnabled = $state(false);
+
+  // Fire-and-forget: a failed grant shouldn't block sign-in. Called right
+  // before `onAuthorize` so it lands before the delegation is minted, but
+  // its own success/failure doesn't gate authorization. Uses the full-auth
+  // identity actor (not the session-scoped one from `actorForIdentity`) —
+  // `push_grant_consent` is gated by `check_authz_and_record_activity` on
+  // the backend, which only accepts full authorization.
+  const grantPushConsentIfRequested = (): void => {
+    if (!pushNotificationsEnabled) return;
+    const authenticated = $authenticationStore;
+    if (authenticated === undefined) return;
+    void authenticated.actor
+      .push_grant_consent(authenticated.identityNumber, effectiveOrigin)
+      .then(throwTextCanisterError)
+      .catch((error) => {
+        console.warn("Failed to grant push notification consent", error);
+      });
+  };
+
   const isEditAccountDialogVisibleFor = $derived(
     accounts?.find(
       (account) =>
@@ -238,6 +265,7 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
+      grantPushConsentIfRequested();
       onAuthorize(accountNumberPromise, effectiveAccessLevel);
     } catch (error) {
       handleError(error);
@@ -254,6 +282,7 @@
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
+      grantPushConsentIfRequested();
       onAuthorize(Promise.resolve(accountNumber), effectiveAccessLevel);
     } catch (error) {
       handleError(error);
@@ -622,6 +651,14 @@
         <HelpCircleIcon class="size-5" />
       </button>
     </Tooltip>
+  </div>
+  <div class="border-border-tertiary mt-4 border-t pt-4">
+    <Checkbox
+      bind:checked={pushNotificationsEnabled}
+      label={$t`Allow ${dappName} to send you push notifications`}
+      size="sm"
+      disabled={isAuthenticatingDefault}
+    />
   </div>
   {#if $READ_ONLY_MODE}
     <div class="border-border-tertiary mt-4 border-t pt-4">

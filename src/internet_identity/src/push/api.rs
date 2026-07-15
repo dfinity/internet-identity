@@ -134,13 +134,14 @@ pub fn unsubscribe_device(
 pub fn grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> Result<(), String> {
     let origin_hash_raw = crate::utils::sha256sum(origin.as_bytes());
     let origin_hash = StorableOriginSha256::from_origin(&origin);
-    let in_app_principal = delegation::get_principal(anchor_number, origin);
+    let in_app_principal = delegation::get_principal(anchor_number, origin.clone());
 
     storage_borrow_mut(|storage| {
         storage.push_consent_memory.insert(
             (anchor_number, origin_hash),
             StorablePushConsent {
                 granted_at_ns: time(),
+                origin,
             },
         );
         storage.push_principal_index_memory.insert(
@@ -171,6 +172,25 @@ pub fn revoke_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> 
             .remove(&in_app_principal);
     });
     Ok(())
+}
+
+/// List every origin `anchor_number` has granted push-notification consent
+/// to. Backs the Settings UI's "manage notification permissions" screen.
+///
+/// The map key only holds the origin's hash (one-way), so this reads the
+/// plaintext `origin` off each matching [`StorablePushConsent`] value
+/// instead. A full scan is acceptable here: consent rows per anchor are
+/// bounded by the number of dApps a user has granted, a small PoC-scale
+/// count.
+pub fn list_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostname> {
+    storage_borrow(|storage| {
+        storage
+            .push_consent_memory
+            .iter()
+            .filter(|((anchor, _), _)| *anchor == anchor_number)
+            .map(|(_, consent)| consent.origin)
+            .collect()
+    })
 }
 
 /// Cycles budgeted per HTTPS outcall. FCM/APNs/Mozilla all return short
