@@ -1323,6 +1323,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'push_debug_list_devices' : IDL.Func(
+        [UserNumber],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
+      ),
     'push_grant_consent' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],

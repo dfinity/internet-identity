@@ -2348,6 +2348,15 @@ export interface _SERVICE {
       { 'Err' : SessionDelegationError }
   >,
   /**
+   * Debug helper: return each device's push-relay endpoint URL
+   * registered for `anchor_number`. Useful when the "Enable on this
+   * device" button looked like it succeeded but no notifications
+   * arrive — checking this tells us whether the phone's subscribe
+   * round-trip actually completed. Endpoint URLs are not secret;
+   * keys are omitted.
+   */
+  'push_debug_list_devices' : ActorMethod<[UserNumber], Array<string>>,
+  /**
    * Grant `origin` permission to send push notifications for this
    * identity. Also writes the reverse index so `notify_user` can find
    * the anchor from the dApp's per-origin principal.

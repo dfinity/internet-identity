@@ -891,6 +891,19 @@ fn push_list_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostn
     push::api::list_consented_origins(anchor_number)
 }
 
+/// Debug helper: return each device's push-relay endpoint URL registered
+/// for `anchor_number`. Useful when the "Enable on this device" button
+/// looked like it succeeded but no notifications arrive — checking this
+/// tells us whether the phone's subscribe round-trip actually completed.
+/// Endpoint URLs are not secret; keys are omitted.
+#[query]
+fn push_debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
+    if check_session_authorization(anchor_number).is_err() {
+        return Vec::new();
+    }
+    push::api::debug_list_devices(anchor_number)
+}
+
 /// Send an encrypted push notification to `in_app_principal`'s subscribed
 /// browser SW, if the caller's origin has consent. Returns in ms — the
 /// outcall to the relay is detached via `ic_cdk::spawn` (see

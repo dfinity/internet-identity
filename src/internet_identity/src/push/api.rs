@@ -194,6 +194,26 @@ pub fn list_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostna
     })
 }
 
+/// Return the push-relay endpoint URLs registered for `anchor_number` —
+/// one per device that has been enabled via II's Settings. Handy for
+/// debugging: if the phone's Enable button appeared to succeed but the
+/// phone doesn't receive pushes, checking whether its endpoint is here
+/// tells us whether the subscribe round-trip completed.
+///
+/// The endpoint URL is not secret — it's just a per-browser handle the
+/// relay published — so surfacing it verbatim is safe. Encryption keys
+/// are not returned.
+pub fn debug_list_devices(anchor_number: AnchorNumber) -> Vec<String> {
+    storage_borrow(|storage| {
+        storage
+            .push_subscriptions_memory
+            .iter()
+            .filter(|((anchor, _), _)| *anchor == anchor_number)
+            .map(|(_, sub)| sub.endpoint)
+            .collect()
+    })
+}
+
 /// Cycles budgeted per HTTPS outcall. FCM/APNs/Mozilla all return short
 /// bodies (< 1 KiB), and the request itself is ~2 KiB — the actual
 /// consumption on a 13-node subnet is around 1B cycles per call. We
