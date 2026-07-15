@@ -62,7 +62,8 @@ pub async fn prepare_session_delegation(
     let seed = session_delegation_seed(anchor_number);
 
     state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, &seed, expiration);
+        // Unrestricted: session delegations have no read-only option.
+        add_delegation_signature(sigs, session_key, &seed, expiration, None);
     });
     update_root_hash();
 
@@ -103,6 +104,7 @@ pub fn get_session_delegation(
                     pubkey: session_key,
                     expiration,
                     targets: None,
+                    permissions: None,
                 },
                 signature: ByteBuf::from(signature),
             }),

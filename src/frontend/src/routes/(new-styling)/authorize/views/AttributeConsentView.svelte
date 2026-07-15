@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import type {
     AttributeConsent,
     AttributeConsentContext,
@@ -25,6 +26,10 @@
   } from "$lib/generated/internet_identity_types";
   import { MailPlusIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import {
+    verifiedEmailConsentFunnel,
+    VerifiedEmailConsentEvents,
+  } from "$lib/utils/analytics/verifiedEmailConsentFunnel";
   import AttributePicker from "./AttributePicker.svelte";
   import {
     type MergedGroup,
@@ -191,10 +196,19 @@
       });
     }
     displayGroups = groups;
+    const emailRequested = ctx.requestedKeys.some(isEmailKey);
+    if (emailRequested) {
+      verifiedEmailConsentFunnel.init({ variant });
+      if (groups.length === 0) {
+        verifiedEmailConsentFunnel.trigger(
+          VerifiedEmailConsentEvents.EmptyStateShown,
+        );
+      }
+    }
     return {
       effectiveOrigin: ctx.effectiveOrigin,
       requestedKeys: ctx.requestedKeys,
-      emailRequested: ctx.requestedKeys.some(isEmailKey),
+      emailRequested,
       recoveryAddresses: ctx.recoveryAddresses,
       verifiedAddresses: ctx.verifiedAddresses,
       openidAddresses: ctx.openidAddresses,
@@ -275,9 +289,38 @@
     await refetchGroups(requestedKeys, address);
   };
 
-  const handleSkip = () => onConsent({ attributes: [] });
+  const handleOpenVerifyWizard = () => {
+    void prepared.then(({ emailRequested }) => {
+      if (emailRequested) {
+        verifiedEmailConsentFunnel.trigger(
+          VerifiedEmailConsentEvents.VerifyClicked,
+        );
+      }
+    });
+    showVerifyWizard = true;
+  };
+
+  // Catches the abandon path — user closes the tab / navigates away
+  // without skip / deny / continue. Funnel.close() is idempotent so
+  // overlapping with the explicit terminal calls above is safe.
+  onDestroy(() => verifiedEmailConsentFunnel.close());
+
+  const sourceForKey = (key: string): "unscoped" | "openid" | "sso" => {
+    const scope = extractScope(key);
+    if (scope === undefined) return "unscoped";
+    if (scope.startsWith("openid:")) return "openid";
+    if (scope.startsWith("sso:")) return "sso";
+    return "unscoped";
+  };
+
+  const handleSkip = () => {
+    verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.Skipped);
+    verifiedEmailConsentFunnel.close();
+    onConsent({ attributes: [] });
+  };
 
   const handleDenyAll = (groups: MergedGroup[]) => {
+    verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.DeniedAll);
     for (const group of groups) {
       selections.set(groupId(group), { checked: false, selectedIndex: 0 });
     }
@@ -289,18 +332,22 @@
       if (selection === undefined || !selection.checked) return [];
       return group.options[selection.selectedIndex].originals;
     });
-    const sharedEmail = attributes.find((attr) => {
+    const sharedEmailAttr = attributes.find((attr) => {
       const name = extractAttributeName(attr.key);
       return name === "email" || name === "verified_email";
-    })?.displayValue;
-    if (sharedEmail !== undefined) {
+    });
+    if (sharedEmailAttr !== undefined) {
+      verifiedEmailConsentFunnel.trigger(VerifiedEmailConsentEvents.Shared, {
+        source: sourceForKey(sharedEmailAttr.key),
+      });
       const { effectiveOrigin } = await prepared;
       lastSharedEmailsStore.set(
         $authenticatedStore.identityNumber,
         effectiveOrigin,
-        sharedEmail,
+        sharedEmailAttr.displayValue,
       );
     }
+    verifiedEmailConsentFunnel.close();
     onConsent({ attributes });
   };
 
@@ -399,7 +446,7 @@
       </p>
       <button
         class="btn btn-primary btn-xl mb-3 w-full"
-        onclick={() => (showVerifyWizard = true)}
+        onclick={handleOpenVerifyWizard}
       >
         {$t`Verify an email address`}
       </button>
@@ -475,7 +522,7 @@
               onVerifyNew={(group.name === "email" ||
                 group.name === "verified_email") &&
               isUnscopedGroup(group)
-                ? () => (showVerifyWizard = true)
+                ? handleOpenVerifyWizard
                 : undefined}
             />
           {/if}

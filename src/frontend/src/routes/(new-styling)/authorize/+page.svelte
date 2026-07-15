@@ -22,6 +22,7 @@
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
   import {
@@ -90,8 +91,11 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
-  const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
-    authorizationStore.authorize(accountNumber);
+  const handleAuthorize = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+  ) => {
+    authorizationStore.authorize(accountNumber, accessLevel);
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -197,7 +201,10 @@
       // start sign-in again.
       return;
     }
-    const authFlow = new AuthFlow({ trackLastUsed: false });
+    // Track the last-used identity: a 1-click sign-up (or a sign-in on a
+    // device with no local entry yet) must land in localStorage so the
+    // identity shows up when the user later visits II directly.
+    const authFlow = new AuthFlow();
     const { iss, aud, ...metadata } = decodeJWT(jwt);
     // The marker is set by `initiateSso` for the `?sso=<domain>` path.
     // If present, treat the returning JWT as a 1-click SSO flow so the
@@ -255,11 +262,16 @@
     );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
+      // AuthFlow owns last-used persistence (via `trackLastUsed`): sign-up is
+      // recorded by `completeOpenIdRegistration` here, and the sign-in case is
+      // already recorded inside `continueWithOpenId` (the JWT was supplied, so
+      // there's no interactive disambiguation to defer the write for).
       await authFlow.completeOpenIdRegistration(
         name ?? email?.split("@")[0] ?? $t`${config.name} user`,
       );
     }
-    authorizationStore.authorize(Promise.resolve(undefined));
+    // 1-click OpenID flow: no access-level toggle, always full access.
+    authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
   };
 

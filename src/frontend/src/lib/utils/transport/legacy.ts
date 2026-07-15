@@ -23,7 +23,8 @@ import { Signature } from "@icp-sdk/core/agent";
 
 const ESTABLISH_TIMEOUT_MS = 2000;
 const AUTHORIZE_REQUEST_ID = "authorize-client";
-const REDIRECT_SESSION_STORAGE_KEY = "ii-legacy-channel-redirect-session";
+export const REDIRECT_SESSION_STORAGE_KEY =
+  "ii-legacy-channel-redirect-session";
 const REDIRECT_SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const OUTER_DELEGATION_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -114,7 +115,7 @@ const startRedirectSession = async (
   };
 };
 
-const endRedirectSession = async (
+export const endRedirectSession = async (
   authOrigin: string,
   authResponse: AuthResponse,
 ): Promise<AuthResponse> => {
@@ -155,7 +156,12 @@ const endRedirectSession = async (
   });
   const responseDelegationChain = DelegationChain.fromDelegations(
     authResponse.delegations.map(({ delegation, signature }) => ({
-      delegation: new Delegation(delegation.pubkey, delegation.expiration),
+      delegation: new Delegation(
+        delegation.pubkey,
+        delegation.expiration,
+        delegation.targets,
+        delegation.permissions,
+      ),
       signature: new Uint8Array(signature) as Signature,
     })),
     authResponse.userPublicKey,

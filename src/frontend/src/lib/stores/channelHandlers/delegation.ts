@@ -1,3 +1,4 @@
+import { toPermissionsArg } from "$lib/utils/accessLevel";
 import type { Channel, JsonRequest } from "$lib/utils/transport/utils";
 import {
   DelegationParamsCodec,
@@ -95,6 +96,22 @@ export const handleDelegationRequest =
 
         const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 
+        // When the user chose "Questions only" during authorization, the
+        // delegation is restricted to query calls via its `permissions`
+        // field, which the IC enforces (update calls are rejected).
+        //
+        // The restricted delegation is now carried back to the relying party
+        // intact: the encoded ICRC-34 result includes the `permissions` field
+        // (see `DelegationResultSchema`), and `@icp-sdk/core` (>= 6) can
+        // represent it on a `Delegation` instance. `permissions` is a
+        // non-standard ICRC-34 extension, though, so the relying party's own
+        // signer/client must also read it out of the delegation result and
+        // pass it into the `Delegation` it reconstructs; only then does it
+        // recompute the same canister-signed hash and the signature verify.
+        // Send an explicit value rather than relying on the backend's
+        // omitted-arg default.
+        const permissions = toPermissionsArg(authorized.accessLevel);
+
         const { user_key, expiration } = await actor
           .prepare_account_delegation(
             identityNumber,
@@ -102,6 +119,7 @@ export const handleDelegationRequest =
             accountNumber !== undefined ? [accountNumber] : [],
             sessionPublicKey,
             params.maxTimeToLive !== undefined ? [params.maxTimeToLive] : [],
+            permissions,
           )
           .then(throwCanisterError);
 
@@ -113,6 +131,7 @@ export const handleDelegationRequest =
               accountNumber !== undefined ? [accountNumber] : [],
               sessionPublicKey,
               expiration,
+              permissions,
             )
             .then(throwCanisterError)
             .then(transformSignedDelegation)

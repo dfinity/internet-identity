@@ -139,11 +139,33 @@ pub struct ChallengeAttempt {
     pub key: ChallengeKey,
 }
 
+/// The delegation permissions a caller requests, mirroring the ICP protocol's
+/// request-delegation `permissions` values. Passed as an optional argument to
+/// `prepare_account_delegation` / `get_account_delegation` / `mcp_set_access`;
+/// an omitted argument means `All` (unrestricted), preserving the pre-feature
+/// behavior and matching the interface spec's default for an absent
+/// `permissions` field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CandidType, Deserialize)]
+pub enum Permissions {
+    /// Queries-only: the issued delegation carries `permissions = "queries"`,
+    /// so the IC rejects update calls authenticated through it.
+    #[serde(rename = "queries")]
+    Queries,
+    /// Unrestricted, update-capable: the issued delegation carries no
+    /// `permissions` field (the protocol's `"all"` default).
+    #[serde(rename = "all")]
+    All,
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct Delegation {
     pub pubkey: PublicKey,
     pub expiration: Timestamp,
     pub targets: Option<Vec<Principal>>,
+    /// Restricts the kinds of calls the delegation permits: `"queries"`
+    /// restricts the sender to query calls (the IC rejects update calls
+    /// authenticated through such a delegation). `None` means unrestricted.
+    pub permissions: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
@@ -594,17 +616,17 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
-/// Result of `mcp_prepare_account_delegation`. The matching
-/// `mcp_get_account_delegation` must use the *same* account, so we return the
-/// resolved `account_number` for the server to thread back. When preparing, the
-/// MCP server may name an account explicitly (one of the anchor's accounts at
-/// `target_origin`) or leave it unset to use the anchor's default there; either
-/// way `account_number` reports the one actually used. (Accounts are per-origin,
-/// so this is an account at `target_origin` — the app being acted on — not the
-/// account the user picked at the MCP server's own origin when connecting.)
-/// Returning it also keeps `get` from independently re-resolving the *mutable*
-/// default and, if it changed in between, looking under a different account's
-/// seed and returning `NoSuchDelegation`.
+/// Result of `mcp_prepare_delegation`. The matching `mcp_get_delegation` must
+/// use the *same* account, so we return the resolved `account_number` for the
+/// server to thread back. When preparing, the MCP server may name an account
+/// explicitly (one of the anchor's accounts at `target_origin`) or leave it
+/// unset to use the anchor's default there; either way `account_number`
+/// reports the one actually used. (Accounts are per-origin, so this is an
+/// account at `target_origin` — the app being acted on; no account is chosen
+/// when connecting the MCP server.) Returning it also keeps `get` from
+/// independently re-resolving the *mutable* default and, if it changed in
+/// between, looking under a different account's seed and returning
+/// `NoSuchDelegation`.
 #[derive(CandidType, Deserialize)]
 pub struct McpPrepareDelegation {
     pub user_key: UserKey,
@@ -648,6 +670,39 @@ pub enum SessionDelegationError {
 pub struct McpConfig {
     pub enabled: bool,
     pub url: Option<String>,
+}
+
+/// Result of `mcp_register`: the expiration (nanoseconds since the epoch) of
+/// the MCP session grant just registered. Every server-facing `mcp_*` call
+/// returns `Unauthorized` once it passes; the server reconnects through a new
+/// consent flow.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct McpRegistration {
+    pub expiration: Timestamp,
+}
+
+/// Result of `prepare_mcp_registration_delegation`: the canister-signature
+/// public key the registration delegation chain is rooted at (`P_reg`; the
+/// canister-signed hop delegates to the browser-held registration key `Y`),
+/// and the (short) expiration of that delegation. The frontend fetches the
+/// signed delegation with `get_mcp_registration_delegation`, extends the chain
+/// browser-side to the MCP server's key, and delivers it to the server, which
+/// redeems it via `mcp_register_v2`.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct PrepareMcpRegistrationDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+/// Result of `mcp_register_v2`: the expiration (ns since epoch) of the MCP
+/// session grant just registered, plus the access level the user chose at
+/// connect (`queries` = read-only, `all` = full). The server reads `permissions`
+/// to learn the read-only state up front — with the v2 flow there is no
+/// completion POST carrying it.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct McpRegistrationV2 {
+    pub expiration: Timestamp,
+    pub permissions: Permissions,
 }
 
 #[derive(CandidType, Debug, Deserialize)]

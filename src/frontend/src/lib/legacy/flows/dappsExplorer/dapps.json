@@ -98,13 +98,13 @@
     "name": "NNS Dapp",
     "oneLiner": "Dapp for Staking Neurons + Voting Onchain",
     "website": "https://nns.ic0.app",
-    "logo": "nnsfront-enddapp_logo-dark.webp"
+    "logo": "nnsfront-enddapp_logo.svg"
   },
   {
     "name": "NNS Dapp",
     "oneLiner": "Dapp for Staking Neurons + Voting Onchain",
     "website": "https://nns.internetcomputer.org",
-    "logo": "nnsfront-enddapp_logo-dark.webp"
+    "logo": "nnsfront-enddapp_logo.svg"
   },
   {
     "name": "Trax",
@@ -654,5 +654,16 @@
     "oneLiner": "A portal for provisioning Cloud Engines: a sovereign serverless cloud platform with tamperproof execution, safe upgrades, and horizontal auto-scaling.",
     "website": "https://opencloud.org",
     "logo": "open_cloud_logo.svg"
+  },
+  {
+    "name": "CITADEL",
+    "website": "https://ttxba-fqaaa-aaaaa-qgi4q-cai.icp0.io",
+    "logo": "citadel_logo.svg"
+  },
+  {
+    "name": "MULTI/DEX",
+    "oneLiner": "A complete crypto exchange — order book, AMM, margin, yield, custody, analytics and even its AI — running as a single autonomous service on the Internet Computer.",
+    "website": "https://multidex.ai/",
+    "logo": "multidex_logo.svg"
   }
 ]

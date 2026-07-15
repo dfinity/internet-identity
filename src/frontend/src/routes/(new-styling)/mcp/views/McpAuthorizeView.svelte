@@ -3,7 +3,11 @@
   import McpHero from "../components/McpHero.svelte";
   import Select from "$lib/components/ui/Select.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { ChevronDownIcon } from "@lucide/svelte";
+  import AccessLevelSelector from "$lib/components/ui/AccessLevelSelector.svelte";
+  import type { AccessLevel } from "$lib/utils/accessLevel";
+  import { accessLevelStore } from "$lib/stores/access-level.store";
+  import { ChevronDownIcon, InfoIcon } from "@lucide/svelte";
+  import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -15,11 +19,12 @@
     /** Hostname of the MCP server (display, e.g. mcp.id.ai). */
     mcpServerHost: string;
     /** Session duration the request asked for (seconds, already clamped to
-     *  [10 min, 1 week]); the initial selection, which the user can change. */
+     *  [10 min, 30 days]); the initial selection, which the user can change. */
     requestedTtlSeconds: number;
     /** Called once the selected identity is authenticated, with the chosen
-     *  session duration (seconds), to connect. */
-    onAuthorize: (ttlSeconds: number) => void;
+     *  session duration (seconds) and the access level the per-app delegations
+     *  the server obtains should grant, to connect. */
+    onAuthorize: (ttlSeconds: number, accessLevel: AccessLevel) => void;
   }
 
   const { mcpServerHost, requestedTtlSeconds, onAuthorize }: Props = $props();
@@ -38,6 +43,22 @@
       authLastUsedFlow.init([selectedIdentityNumber]);
     }
   });
+
+  // The MCP connect flow always offers the access-level choice (ungated by
+  // READ_ONLY_MODE): the choice is recorded with the grant and applies to the
+  // per-app delegations the server later obtains, while its standing delegation
+  // stays full access. The chosen level maps to the per-app delegations'
+  // `permissions`: "read-only" = queries-only, "full-access" = update-capable.
+  // Derived per-anchor (the browser may be shared) from the selected anchor's
+  // stored MCP choice: unselected on a first-time connect so the user picks
+  // explicitly (the "Allow access" button stays disabled until then), and
+  // re-hydrated when they switch identity. The user's own radio pick overrides
+  // this until the identity changes again.
+  let accessLevel: AccessLevel | undefined = $derived(
+    selectedIdentityNumber === undefined
+      ? undefined
+      : accessLevelStore.getPreference("mcp", selectedIdentityNumber),
+  );
   let isAuthorizing = $state(false);
 
   const MINUTE = 60;
@@ -45,19 +66,21 @@
   const DAY = 24 * HOUR;
   const WEEK = 7 * DAY;
   // The session durations the picker offers, each with its label, spanning the
-  // allowed range: 10 minutes (the shortest, also the request's floor) to 1 week
-  // (the longest). `$derived` so the labels re-translate when the locale changes.
+  // allowed range: 10 minutes (the shortest, also the request's floor) to 30
+  // days (the longest, the backend's grant cap). `$derived` so the labels
+  // re-translate when the locale changes.
   const presets = $derived([
     { value: 10 * MINUTE, label: $t`10 minutes` },
     { value: HOUR, label: $t`1 hour` },
     { value: 8 * HOUR, label: $t`8 hours` },
     { value: DAY, label: $t`1 day` },
     { value: WEEK, label: $t`1 week` },
+    { value: 30 * DAY, label: $t`30 days` },
   ]);
 
   // Compact label for an off-preset duration: the request can ask for any number
-  // of seconds within [10 min, 1 week], so the selected value isn't always one of
-  // the presets (e.g. a 2-hour request shows "2h").
+  // of seconds within [10 min, 30 days], so the selected value isn't always one
+  // of the presets (e.g. a 2-hour request shows "2h").
   const formatTtl = (seconds: number): string => {
     const parts: string[] = [];
     const d = Math.floor(seconds / DAY);
@@ -89,9 +112,18 @@
 
   const handleAllowAccess = async (): Promise<void> => {
     const selected = $lastUsedIdentitiesStore.selected;
-    if (selected === undefined) {
+    // Capture the chosen level in a const so its non-undefined type survives the
+    // `await` below (a reactive `let` would widen back to `AccessLevel | undefined`).
+    const chosenAccessLevel = accessLevel;
+    if (selected === undefined || chosenAccessLevel === undefined) {
       return;
     }
+    // Remember this anchor's choice so it pre-fills its next MCP connect.
+    accessLevelStore.setPreference(
+      "mcp",
+      selected.identityNumber,
+      chosenAccessLevel,
+    );
     isAuthorizing = true;
     try {
       // Authenticate unless the live session is already the selected identity.
@@ -101,7 +133,7 @@
         sessionStore.reset();
         await authLastUsedFlow.authenticate(selected);
       }
-      onAuthorize(selectedTtlSeconds);
+      onAuthorize(selectedTtlSeconds, chosenAccessLevel);
     } catch (error) {
       handleError(error);
     } finally {
@@ -112,9 +144,9 @@
 
 <!--
   The MCP connect screen is a consent step: it authorizes the agent for the
-  user's identity and lets the user choose the session duration. There is no
-  account picker — accounts are per-app and the MCP server origin is just the
-  connector; the server selects an app account per call later.
+  user's identity and lets the user choose the session duration and access
+  level. There is no account picker — accounts are per-app and the MCP server
+  origin is just the connector; the server selects an app account per call later.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
@@ -123,35 +155,69 @@
       {$t`Connect ${mcpServerHost}`}
     </h1>
     <p class="text-text-tertiary mt-1 text-base text-pretty">
-      {$t`Let ${mcpServerHost} act on your behalf across your apps. You'll need to reconnect when this access expires.`}
+      {$t`Acts on your behalf across your apps.`}
     </p>
-    <div
-      class="border-border-tertiary mt-4 mb-6 flex flex-row items-center justify-between gap-3 border-t pt-4"
-    >
-      <span class="text-text-secondary text-sm font-medium">
-        {$t`Access expires after`}
+
+    <!-- Session: how long the connection lasts before the user must reconnect. -->
+    <div class="border-border-tertiary mt-4 mb-6 flex flex-col border-t pt-4">
+      <span class="text-text-primary mb-0.5 text-base font-medium">
+        {$t`Session`}
       </span>
-      <Select
-        {options}
-        onChange={(value) => (selectedTtlSeconds = value)}
-        align="end"
-      >
-        <!-- Disabled while connecting: a disabled button dispatches no click, so
-             the Select can't open once the user has committed to "Allow access". -->
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm gap-2"
-          disabled={isAuthorizing}
+      <div class="flex flex-row items-center justify-between gap-2">
+        <span class="text-text-tertiary text-base">
+          {$t`Time until you have to reconnect:`}
+        </span>
+        <Select
+          {options}
+          onChange={(value) => (selectedTtlSeconds = value)}
+          align="end"
         >
-          <span>{selectedLabel}</span>
-          <ChevronDownIcon class="size-4" />
-        </button>
-      </Select>
+          <!-- Disabled while connecting: a disabled button dispatches no click,
+               so the Select can't open once the user has committed to "Allow
+               access". -->
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm shrink-0 gap-2"
+            disabled={isAuthorizing}
+          >
+            <span>{selectedLabel}</span>
+            <ChevronDownIcon class="size-4" />
+          </button>
+        </Select>
+      </div>
     </div>
+
+    <AccessLevelSelector
+      bind:accessLevel
+      disabled={isAuthorizing}
+      class="mb-6"
+    />
+
+    <!-- Fine print: the connection can be revoked from Settings at any time.
+         Opens in a new tab so the connect request in this one isn't lost. -->
+    <div
+      class="border-border-tertiary text-text-tertiary mb-6 flex items-start gap-2 border-t pt-5 text-sm"
+    >
+      <InfoIcon class="mt-0.5 size-4 shrink-0" />
+      <span>
+        <Trans>
+          Revoke access anytime in your <a
+            href="/manage/settings"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-primary font-medium underline-offset-2 hover:underline"
+            >settings</a
+          >.
+        </Trans>
+      </span>
+    </div>
+
     <button
-      class="btn btn-primary w-full gap-2"
+      class="btn btn-primary btn-xl w-full"
       onclick={handleAllowAccess}
-      disabled={isAuthorizing || selectedIdentityNumber === undefined}
+      disabled={isAuthorizing ||
+        selectedIdentityNumber === undefined ||
+        accessLevel === undefined}
     >
       {#if isAuthorizing}
         <ProgressRing class="size-5" />

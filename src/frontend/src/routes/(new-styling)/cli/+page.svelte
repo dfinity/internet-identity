@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { AccessLevel } from "$lib/utils/accessLevel";
   import type { PageProps } from "./$types";
   import { isAuthenticatedStore } from "$lib/stores/authentication.store";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -167,7 +168,7 @@
     }
   });
 
-  const handleAuthorize = async (): Promise<void> => {
+  const handleAuthorize = async (accessLevel: AccessLevel): Promise<void> => {
     if (params.kind !== "valid") {
       return;
     }
@@ -206,6 +207,7 @@
         ttlMinutes: params.ttlMinutes,
         callback: params.callback,
         nonce: params.nonce,
+        accessLevel,
       });
     } catch (error) {
       // Authentication and delegation errors are surfaced the same way as the

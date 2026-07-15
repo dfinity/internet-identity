@@ -465,38 +465,101 @@ pub fn update_account(
     .map(|(x,)| x)
 }
 
-pub fn mcp_set_access(
+/// Test-ergonomics converter: `read_only` as `Option<bool>` (None = omit the
+/// arg = unrestricted) mapped to the canister's `permissions : opt Permissions`
+/// argument.
+fn permissions_arg(read_only: Option<bool>) -> Option<Permissions> {
+    read_only.map(|ro| {
+        if ro {
+            Permissions::Queries
+        } else {
+            Permissions::All
+        }
+    })
+}
+
+pub fn mcp_register(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-    mcp_server_origin: FrontendHostname,
-    enabled: bool,
-) -> Result<Result<(), String>, RejectResponse> {
+    session_key: SessionKey,
+    grant_ttl_ns: u64,
+    read_only: Option<bool>,
+) -> Result<Result<McpRegistration, String>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "mcp_set_access",
-        (identity_number, mcp_server_origin, enabled),
+        "mcp_register",
+        (
+            identity_number,
+            session_key,
+            grant_ttl_ns,
+            permissions_arg(read_only),
+        ),
     )
     .map(|(x,)| x)
 }
 
-pub fn mcp_access_enabled(
+pub fn prepare_mcp_registration_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-    identity_number: IdentityNumber,
-    mcp_server_origin: FrontendHostname,
-) -> Result<bool, RejectResponse> {
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    read_only: Option<bool>,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareMcpRegistrationDelegation, String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_mcp_registration_delegation",
+        (
+            anchor_number,
+            registration_key,
+            permissions_arg(read_only),
+            max_ttl,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_mcp_registration_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    anchor_number: AnchorNumber,
+    registration_key: SessionKey,
+    user_key: UserKey,
+    expiration: Timestamp,
+) -> Result<Result<SignedDelegation, String>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
         sender,
-        "mcp_access_enabled",
-        (identity_number, mcp_server_origin),
+        "get_mcp_registration_delegation",
+        (anchor_number, registration_key, user_key, expiration),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn mcp_register_v2(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    session_key: SessionKey,
+) -> Result<Result<McpRegistrationV2, String>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "mcp_register_v2",
+        (session_key,),
     )
     .map(|(x,)| x)
 }
@@ -551,7 +614,7 @@ pub fn mcp_get_config(
     .map(|(x,)| x)
 }
 
-pub fn mcp_prepare_account_delegation(
+pub fn mcp_prepare_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -565,13 +628,13 @@ pub fn mcp_prepare_account_delegation(
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "mcp_prepare_account_delegation",
+        "mcp_prepare_delegation",
         (target_origin, account_number, session_key, max_ttl),
     )
     .map(|(x,)| x)
 }
 
-pub fn mcp_get_account_delegation(
+pub fn mcp_get_delegation(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -584,7 +647,7 @@ pub fn mcp_get_account_delegation(
         env,
         canister_id,
         sender,
-        "mcp_get_account_delegation",
+        "mcp_get_delegation",
         (target_origin, account_number, session_key, expiration),
     )
     .map(|(x,)| x)
@@ -659,6 +722,51 @@ pub fn get_account_delegation(
             params.account_number,
             params.session_key.clone(),
             expiration,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_account_delegation_with_read_only(
+    params: &AccountDelegationParams,
+    max_ttl: Option<u64>,
+    read_only: Option<bool>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, RejectResponse> {
+    call_candid_as(
+        params.env,
+        params.canister_id,
+        RawEffectivePrincipal::None,
+        params.sender,
+        "prepare_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            max_ttl,
+            permissions_arg(read_only),
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_delegation_with_read_only(
+    params: &AccountDelegationParams,
+    expiration: u64,
+    read_only: Option<bool>,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
+    query_candid_as(
+        params.env,
+        params.canister_id,
+        params.sender,
+        "get_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            expiration,
+            permissions_arg(read_only),
         ),
     )
     .map(|(x,)| x)

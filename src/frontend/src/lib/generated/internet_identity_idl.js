@@ -372,6 +372,7 @@ export const idlFactory = ({ IDL }) => {
     'nonce' : IDL.Text,
   });
   const Delegation = IDL.Record({
+    'permissions' : IDL.Opt(IDL.Text),
     'pubkey' : PublicKey,
     'targets' : IDL.Opt(IDL.Vec(IDL.Principal)),
     'expiration' : Timestamp,
@@ -636,6 +637,7 @@ export const idlFactory = ({ IDL }) => {
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
   });
+  const McpRegistration = IDL.Record({ 'expiration' : Timestamp });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -796,6 +798,18 @@ export const idlFactory = ({ IDL }) => {
     'verified' : IDL.Null,
     'wrong_code' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
     'no_device_to_verify' : IDL.Null,
+  });
+  const Permissions = IDL.Variant({
+    'queries' : IDL.Null,
+    'all' : IDL.Null,
+  });
+  const PrepareMcpRegistrationDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
+  });
+  const McpRegistrationV2 = IDL.Record({
+    'expiration' : Timestamp,
+    'permissions' : Permissions,
   });
   return IDL.Service({
     'acknowledge_entries' : IDL.Func([IDL.Nat64], [], []),
@@ -984,6 +998,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           Timestamp,
+          IDL.Opt(Permissions),
         ],
         [
           IDL.Variant({
@@ -1128,21 +1143,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DeviceKeyWithAnchor)],
         ['query'],
       ),
-    'mcp_access_enabled' : IDL.Func(
-        [UserNumber, FrontendHostname],
-        [IDL.Bool],
-        ['query'],
-      ),
-    'mcp_get_account_delegation' : IDL.Func(
-        [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
-        [
-          IDL.Variant({
-            'Ok' : SignedDelegation,
-            'Err' : AccountDelegationError,
-          }),
-        ],
-        ['query'],
-      ),
     'mcp_get_accounts' : IDL.Func(
         [FrontendHostname],
         [
@@ -1154,7 +1154,17 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'mcp_get_config' : IDL.Func([UserNumber], [McpConfig], ['query']),
-    'mcp_prepare_account_delegation' : IDL.Func(
+    'mcp_get_delegation' : IDL.Func(
+        [FrontendHostname, IDL.Opt(AccountNumber), SessionKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
+        ['query'],
+      ),
+    'mcp_prepare_delegation' : IDL.Func(
         [
           FrontendHostname,
           IDL.Opt(AccountNumber),
@@ -1169,10 +1179,30 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'mcp_set_access' : IDL.Func(
-        [UserNumber, FrontendHostname, IDL.Bool],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+    'mcp_register' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Nat64, IDL.Opt(Permissions)],
+        [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
+      ),
+    'mcp_register_v2' : IDL.Func(
+        [SessionKey],
+        [IDL.Variant({ 'Ok' : McpRegistrationV2, 'Err' : IDL.Text })],
+        [],
+      ),
+    'prepare_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, IDL.Opt(Permissions), IDL.Opt(IDL.Nat64)],
+        [
+          IDL.Variant({
+            'Ok' : PrepareMcpRegistrationDelegation,
+            'Err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'get_mcp_registration_delegation' : IDL.Func(
+        [UserNumber, SessionKey, PublicKey, Timestamp],
+        [IDL.Variant({ 'Ok' : SignedDelegation, 'Err' : IDL.Text })],
+        ['query'],
       ),
     'mcp_set_config' : IDL.Func(
         [UserNumber, McpConfig],
@@ -1235,6 +1265,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(AccountNumber),
           SessionKey,
           IDL.Opt(IDL.Nat64),
+          IDL.Opt(Permissions),
         ],
         [
           IDL.Variant({

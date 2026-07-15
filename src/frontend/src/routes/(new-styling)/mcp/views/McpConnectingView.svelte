@@ -13,10 +13,10 @@
 </script>
 
 <!--
-  Shown after the user confirms (and has authenticated) while the standing
-  delegation is being prepared and delivered to the MCP server via the
-  top-level form-POST — i.e. between "Allow access" and the redirect away. Gives
-  the otherwise-blank gap a loading state, like the /authorize redirect screen.
+  Shown after the user confirms (and has authenticated) while the registration
+  delegation is minted — i.e. between "Allow access" and the tab being handed
+  to the trusted server. Gives the otherwise-blank gap a loading state, like
+  the /authorize redirect screen.
 -->
 <div class="flex w-full justify-center max-sm:flex-1 sm:max-w-110">
   <AuthPanel>
@@ -27,7 +27,7 @@
         {$t`Connecting ${mcpServer}…`}
       </p>
       <p class="text-text-tertiary text-sm text-pretty">
-        {$t`Securely delivering your access to the server.`}
+        {$t`Securely connecting your identity to the server.`}
       </p>
     </div>
   </AuthPanel>

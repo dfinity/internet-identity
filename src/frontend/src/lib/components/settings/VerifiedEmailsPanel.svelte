@@ -12,6 +12,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { nanosToMillis } from "$lib/utils/time";
   import { throwCanisterError } from "$lib/utils/utils";
+  import { analytics } from "$lib/utils/analytics/analytics";
   import type {
     EmailChallengeDnsInput,
     EmailChallengeSubmitDkimLeafArg,
@@ -88,6 +89,7 @@
       handleError(err);
       return;
     }
+    analytics.event("verified-email-removed");
     removingAddress = undefined;
     void invalidateAll();
     toaster.success({
