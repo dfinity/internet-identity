@@ -31,7 +31,10 @@
           $authenticatedStore.actor,
           identityNumber,
         );
-      } catch {
+      } catch (err) {
+        // Log the raw error so a stale canister deploy or an IDL-cache
+        // mismatch surfaces something concrete instead of a bland toast.
+        console.error("push_list_consented_origins failed:", err);
         toaster.error({
           title: $t`Couldn't load your notification permissions.`,
           duration: 4000,
@@ -47,7 +50,8 @@
     try {
       await revokeConsent($authenticatedStore.actor, identityNumber, origin);
       origins = origins.filter((entry) => entry !== origin);
-    } catch {
+    } catch (err) {
+      console.error("push_revoke_consent failed:", err);
       toaster.error({
         title: $t`Couldn't remove this permission. Please try again.`,
         duration: 4000,
