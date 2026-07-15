@@ -23,6 +23,7 @@ pub mod openid_credential_key;
 pub mod openid_jwks;
 pub mod passkey_credential;
 pub mod push_consent;
+pub mod push_endpoint_hash;
 pub mod push_sender_info;
 pub mod push_subscription;
 pub mod recovery_key;

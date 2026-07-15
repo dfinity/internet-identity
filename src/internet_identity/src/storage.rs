@@ -122,6 +122,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::push_consent::StorablePushConsent;
+use crate::storage::storable::push_endpoint_hash::StorableEndpointSha256;
 use crate::storage::storable::push_sender_info::StorablePushSenderInfo;
 use crate::storage::storable::push_subscription::StorablePushSubscription;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
@@ -464,9 +465,12 @@ pub struct Storage<M: Memory> {
 
     // ---- Push notifications PoC ----------------------------------------
     push_subscriptions_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// See [`PUSH_SUBSCRIPTIONS_MEMORY_ID`].
+    /// See [`PUSH_SUBSCRIPTIONS_MEMORY_ID`]. Keyed by `(anchor, endpoint_hash)`
+    /// so a user can register multiple devices (one per II PWA install)
+    /// under a single anchor. `notify_user` fans out to every row for
+    /// the target anchor.
     pub(crate) push_subscriptions_memory: StableBTreeMap<
-        (StorableAnchorNumber, StorableOriginSha256),
+        (StorableAnchorNumber, StorableEndpointSha256),
         StorablePushSubscription,
         ManagedMemory<M>,
     >,

@@ -2373,24 +2373,23 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
-   * Register the caller's Web Push subscription. Both the anchor and
-   * the origin are recovered from PRINCIPAL_INDEX using caller(), so
-   * the dApp doesn't need to pass them. Requires a prior
-   * push_grant_consent for this principal (which populates the reverse
-   * index). `p256dh` must be a 65-byte uncompressed SEC1 P-256 point
-   * and `auth` must be 16 bytes.
+   * Register a Web Push subscription for `anchor_number` on this
+   * device. Called from II's own frontend (Settings → Enable
+   * notifications on this device); authenticated as the anchor. Row
+   * is keyed by (anchor, sha256(endpoint)), so multiple devices per
+   * anchor are supported and notify_user fans out to all of them.
    */
   'push_subscribe_device' : ActorMethod<
-    [string, Uint8Array | number[], Uint8Array | number[]],
+    [UserNumber, string, Uint8Array | number[], Uint8Array | number[]],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
   /**
-   * Remove the caller's subscription. Anchor and origin recovered from
-   * PRINCIPAL_INDEX using caller() — same shape as push_subscribe_device.
+   * Remove one of `anchor_number`'s subscriptions. `endpoint` picks
+   * which device row to remove — the anchor may have several.
    */
   'push_unsubscribe_device' : ActorMethod<
-    [],
+    [UserNumber, string],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
