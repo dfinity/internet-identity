@@ -115,19 +115,10 @@ const canisterEchoedAttributesRawEl = document.getElementById(
 const iiCanisterIdPushEl = document.getElementById(
   "iiCanisterIdPush",
 ) as HTMLInputElement;
-const pushEnableBtn = document.getElementById(
-  "pushEnableBtn",
-) as HTMLButtonElement;
 const pushNotifyBtn = document.getElementById(
   "pushNotifyBtn",
 ) as HTMLButtonElement;
-const pushUnsubscribeBtn = document.getElementById(
-  "pushUnsubscribeBtn",
-) as HTMLButtonElement;
 const pushStatusEl = document.getElementById("pushStatus") as HTMLDivElement;
-const pushSubscriptionOutEl = document.getElementById(
-  "pushSubscriptionOut",
-) as HTMLPreElement;
 
 let iiProtocolTestWindow: Window | undefined;
 
@@ -186,6 +177,9 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
 // Hand-rolled IDL for the six II push methods, mirroring the six entries
 // added on the .did file in this same PR. Kept local (no import from
 // src/frontend/) so the test-app stays a standalone workspace.
+// The dApp only calls `notify_user` — subscribe/consent live on II
+// itself now, so we hand-declare the smallest IDL that exercises the
+// end-to-end push flow.
 const iiPushIdlFactory = ({ IDL }: { IDL: any }) => {
   const PushAlert = IDL.Record({
     hostname: IDL.Text,
@@ -195,14 +189,7 @@ const iiPushIdlFactory = ({ IDL }: { IDL: any }) => {
   });
   const OkErr = IDL.Variant({ Ok: IDL.Null, Err: IDL.Text });
   return IDL.Service({
-    push_subscribe_device: IDL.Func(
-      [IDL.Text, IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
-      [OkErr],
-      [],
-    ),
-    push_unsubscribe_device: IDL.Func([], [OkErr], []),
     notify_user: IDL.Func([IDL.Principal, PushAlert], [OkErr], []),
-    push_vapid_public_key: IDL.Func([], [IDL.Vec(IDL.Nat8)], ["query"]),
   });
 };
 
@@ -625,11 +612,11 @@ whoamiBtn.addEventListener("click", async () => {
 
 // ---- Push notifications ---------------------------------------------
 //
-// The three buttons share an actor built from `delegationIdentity` (the
-// delegation the user got from II for this app's origin). The delegation
-// chain proves the identity is authorized to act as the anchor's per-app
-// principal, so `push_subscribe_device` (authenticated as the anchor)
-// and `notify_user` (`caller() == in_app_principal`) both succeed.
+// Under Option A the dApp doesn't own the SW / subscribe / VAPID
+// flow — that all lives on II's own frontend now. The dApp's job is
+// just to fire `notify_user` as its per-anchor-per-origin principal;
+// II fans the encrypted push out to every device where the user has
+// enabled II push notifications for their anchor.
 
 async function makeIiActor(): Promise<any> {
   if (!delegationIdentity) {
@@ -648,69 +635,10 @@ async function makeIiActor(): Promise<any> {
   return Actor.createActor(iiPushIdlFactory, { agent, canisterId });
 }
 
-function base64UrlDecode(s: string): Uint8Array {
-  const pad = "=".repeat((4 - (s.length % 4)) % 4);
-  const b64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 function setPushStatus(msg: string, kind: "ok" | "err") {
   pushStatusEl.textContent = msg;
   pushStatusEl.style.color = kind === "ok" ? "#1b5e20" : "#b71c1c";
 }
-
-pushEnableBtn.addEventListener("click", async () => {
-  try {
-    setPushStatus("Requesting notification permission…", "ok");
-    const perm = await Notification.requestPermission();
-    if (perm !== "granted") {
-      throw new Error(`notification permission: ${perm}`);
-    }
-    const iiActor = await makeIiActor();
-    setPushStatus("Registering service worker…", "ok");
-    const reg = await navigator.serviceWorker.register("/service-worker.js");
-    await navigator.serviceWorker.ready;
-    await reg.update();
-
-    setPushStatus("Fetching VAPID key…", "ok");
-    const vapidPubBytes = await iiActor.push_vapid_public_key();
-    const vapidPub =
-      vapidPubBytes instanceof Uint8Array
-        ? vapidPubBytes
-        : new Uint8Array(vapidPubBytes);
-
-    setPushStatus("Subscribing with the relay…", "ok");
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: vapidPub,
-    });
-    const subJson = sub.toJSON() as {
-      endpoint: string;
-      keys: { p256dh: string; auth: string };
-    };
-    pushSubscriptionOutEl.textContent = JSON.stringify(subJson, null, 2);
-
-    const p256dh = base64UrlDecode(subJson.keys.p256dh);
-    const auth = base64UrlDecode(subJson.keys.auth);
-
-    setPushStatus("Registering on II…", "ok");
-    // Anchor + origin are recovered on the II side from the caller's
-    // per-origin principal (populated when the user ticked the push
-    // checkbox on the /authorize screen). The dApp doesn't need them.
-    const res = await iiActor.push_subscribe_device(
-      sub.endpoint,
-      p256dh,
-      auth,
-    );
-    if ("Err" in res) throw new Error(res.Err);
-    setPushStatus("Subscribed", "ok");
-  } catch (err) {
-    setPushStatus(`Subscribe failed: ${(err as Error).message}`, "err");
-  }
-});
 
 pushNotifyBtn.addEventListener("click", async () => {
   try {
@@ -726,21 +654,6 @@ pushNotifyBtn.addEventListener("click", async () => {
     setPushStatus("notify_user Ok — watch the OS tray", "ok");
   } catch (err) {
     setPushStatus(`notify_user failed: ${(err as Error).message}`, "err");
-  }
-});
-
-pushUnsubscribeBtn.addEventListener("click", async () => {
-  try {
-    const iiActor = await makeIiActor();
-    const reg = await navigator.serviceWorker.getRegistration();
-    const sub = await reg?.pushManager.getSubscription();
-    if (sub) await sub.unsubscribe();
-    const res = await iiActor.push_unsubscribe_device();
-    if ("Err" in res) throw new Error(res.Err);
-    pushSubscriptionOutEl.textContent = "—";
-    setPushStatus("Unsubscribed", "ok");
-  } catch (err) {
-    setPushStatus(`Unsubscribe failed: ${(err as Error).message}`, "err");
   }
 });
 

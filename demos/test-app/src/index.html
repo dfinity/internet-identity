@@ -206,11 +206,14 @@
       <section>
         <h1>Push Notifications</h1>
         <p>
-          Exercises the push pipeline on the II canister. Sign in first,
-          make sure the checkbox on the II
-          <em>Continue</em> screen was ticked (or grant consent via
-          II settings). Then subscribe this browser and fire a test
-          notification.
+          Fires <code>notify_user</code> on II with this app as the source
+          dApp. Prerequisites: (1) install the II PWA on your phone (or
+          use II in a browser tab on desktop) and turn on
+          <em>Settings → Push notifications → Enable on this device</em>,
+          then (2) sign into this app via II and tick the "Allow push
+          notifications" checkbox on the Continue screen. Once both are
+          set, click below and the notification will land on every
+          device where II push is enabled for your anchor.
         </p>
         <label for="iiCanisterIdPush">II Canister ID</label>
         <input
@@ -219,14 +222,9 @@
           placeholder="rdmx6-jaaaa-aaaaa-aaadq-cai"
         />
         <div style="margin-top: 12px">
-          <button id="pushEnableBtn">
-            Register SW + subscribe + push_subscribe_device
-          </button>
           <button id="pushNotifyBtn">Send test notification</button>
-          <button id="pushUnsubscribeBtn">Unsubscribe</button>
         </div>
         <div id="pushStatus" style="margin-top: 8px"></div>
-        <pre id="pushSubscriptionOut" style="max-height: 200px; overflow: auto"></pre>
       </section>
       <section>
         <h1>User Agent</h1>
