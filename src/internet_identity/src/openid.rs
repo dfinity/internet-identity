@@ -529,7 +529,10 @@ fn salt() -> [u8; 32] {
     [0; 32]
 }
 
-pub const SSO_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
+/// How long a certified SSO attribute bundle is accepted after it is minted
+/// (`sso_bundle.rs`) — the bundle acceptance window, not a session or delegation
+/// lifetime.
+pub const SSO_ATTR_BUNDLE_TTL_NS: u64 = 10 * MINUTE_NS;
 
 #[cfg(test)]
 mod tests {

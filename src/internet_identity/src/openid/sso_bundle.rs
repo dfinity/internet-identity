@@ -8,7 +8,7 @@
 //! u64-BE len || expiry_ns (u64 BE)     bundle expiry, ns since epoch
 //! ```
 
-use super::{calculate_delegation_seed, SSO_SESSION_DURATION_NS};
+use super::{calculate_delegation_seed, SSO_ATTR_BUNDLE_TTL_NS};
 use crate::{state, update_root_hash};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
@@ -175,7 +175,7 @@ pub fn prepare_sso_attr_bundle(
     sso_domain: &str,
     origin: &str,
 ) -> (Vec<u8>, Timestamp) {
-    let expiration = time().saturating_add(SSO_SESSION_DURATION_NS);
+    let expiration = time().saturating_add(SSO_ATTR_BUNDLE_TTL_NS);
     let message = encode_sso_attr_bundle(sso_domain, origin, expiration);
     let seed = calculate_delegation_seed(
         &(iss.to_string(), sub.to_string(), aud.to_string()),

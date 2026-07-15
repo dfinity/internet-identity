@@ -2264,8 +2264,9 @@ mod sso_gating {
         )?;
         assert!(fresh.is_ok(), "fresh bundle must certify, got {fresh:?}");
 
-        // Advance the clock past the bundle's 30-minute expiry.
-        sync_time(&env, TEST_TIME_MS + 31 * 60 * 1_000);
+        // Advance the clock past the bundle's 10-minute expiry (also guards
+        // against the acceptance window being widened again).
+        sync_time(&env, TEST_TIME_MS + 11 * 60 * 1_000);
 
         let expired = api::prepare_icrc3_attributes_with_bundle(
             &env,
