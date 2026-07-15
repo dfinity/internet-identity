@@ -194,7 +194,7 @@ expected = app_clients[origin]   if listed            // gated
 require jwt.aud == expected       else DENY            // THE GATE (mint nothing)
 anchor = resolve_to_primary(iss, stable_id)           // §6.1
 mint a plain primary-keyed openid delegation
-bundle = sign (sso_domain, origin, now()+SSO_SESSION_DURATION) under the credential seed
+bundle = sign (sso_domain, origin, now()+SSO_ATTR_BUNDLE_TTL) under the credential seed  // 10 min
 return { delegation, sso_attr_bundle, sso_attr_bundle_signature }
 ```
 
@@ -221,7 +221,7 @@ A single certified attribute is the dapp's whole boundary. Its presence for orig
 
 `prepare_icrc3_attributes` certifies `sso:<domain>` only when the bundle's `origin` matches the origin it certifies for; `list_available_attributes` lists the same rows. The bundle carries the origin, so neither needs the caller to assert it. `implicit:origin` is orthogonal anti-replay, not the gate.
 
-> **Bounded reconfiguration window.** A bundle minted while an app was ungated still certifies `sso:<domain>` after it's flipped to gated, until the bundle expires (~session) and the discovery cache refreshes (~1 h). Same propagation class as `app_clients` edits — accepted.
+> **Bounded reconfiguration window.** A bundle minted while an app was ungated still certifies `sso:<domain>` after it's flipped to gated, until the bundle expires (10 min) and the discovery cache refreshes (~1 h). Same propagation class as `app_clients` edits — accepted.
 
 ### 6.5 Cross-client identity when the stable id isn't `sub`
 
