@@ -15,13 +15,19 @@ use std::borrow::Cow;
 /// `origin` duplicates the plaintext of the map key's `StorableOriginSha256`
 /// (a one-way hash) so `push_list_consented_origins` can list the anchor's
 /// consented dApps without a reverse hash lookup.
+///
+/// `Option<>` on `origin` is a schema-evolution hedge: an earlier revision
+/// of this struct shipped without the field, and rows written under that
+/// shape still exist on staging canisters that were upgraded rather than
+/// reinstalled. Decoding one of those rows now yields `origin: None` —
+/// the list handler filters those out.
 #[derive(Encode, Decode, Default, Clone)]
 #[cbor(map)]
 pub struct StorablePushConsent {
     #[n(0)]
     pub granted_at_ns: Timestamp,
     #[n(1)]
-    pub origin: FrontendHostname,
+    pub origin: Option<FrontendHostname>,
 }
 
 impl Storable for StorablePushConsent {

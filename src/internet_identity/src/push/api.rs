@@ -139,7 +139,7 @@ pub fn grant_consent(anchor_number: AnchorNumber, origin: FrontendHostname) -> R
             (anchor_number, origin_hash),
             StorablePushConsent {
                 granted_at_ns: time(),
-                origin,
+                origin: Some(origin),
             },
         );
         storage.push_principal_index_memory.insert(
@@ -186,7 +186,10 @@ pub fn list_consented_origins(anchor_number: AnchorNumber) -> Vec<FrontendHostna
             .push_consent_memory
             .iter()
             .filter(|((anchor, _), _)| *anchor == anchor_number)
-            .map(|(_, consent)| consent.origin)
+            // Legacy rows written before `origin` was added carry `None`
+            // here (see StorablePushConsent's schema-evolution note) —
+            // skip them since we can't recover the plaintext origin.
+            .filter_map(|(_, consent)| consent.origin)
             .collect()
     })
 }
@@ -238,8 +241,12 @@ pub fn notify_user(
     // 3. Force the alert's `hostname` field to the origin the user
     //    actually consented to — a dApp that owns `foo.app` can't send
     //    a notification labelled as `bar.app`. The SW displays this
-    //    string verbatim.
-    alert.hostname = consent.origin;
+    //    string verbatim. Legacy consent rows without an origin
+    //    plaintext (see StorablePushConsent's schema-evolution note)
+    //    fail closed — the user has to re-grant.
+    alert.hostname = consent
+        .origin
+        .ok_or_else(|| "consent row is missing its origin; re-grant to fix".to_string())?;
 
     // 4. Collect every subscription for the anchor. Bounded per-anchor
     //    by the number of devices the user has enabled II push on — a
