@@ -52,6 +52,13 @@ use crate::{
 /// Maximum lifetime of an MCP-minted per-app account delegation: 1 hour.
 const MCP_MAX_EXPIRATION_PERIOD_NS: u64 = 60 * 60 * 1_000_000_000;
 
+/// Longest trusted-server URL `set_mcp_config` accepts. Generous for a real MCP
+/// endpoint (host + path) while bounding the one per-anchor config entry that
+/// stores it verbatim (for display / re-probing). The per-connect registration
+/// index never stores the URL verbatim — it stores a `SHA-256` hash — so this
+/// is the only place URL length affects stored size.
+pub(crate) const MCP_TRUSTED_URL_MAX_BYTES: usize = 2048;
+
 /// Bounds for the MCP session grant lifetime: 10 minutes to 30 days.
 /// Out-of-range requests are clamped (mirroring the frontend), not rejected.
 /// `pub(crate)` because `mcp_registration` applies the same clamp *before*
@@ -193,9 +200,23 @@ pub fn get_mcp_config(anchor_number: AnchorNumber) -> McpConfig {
 /// is deliberately an exact string compare: it needs no URL parsing in the
 /// canister, and erring towards revoking on any edit (even a path-only one)
 /// is the safe direction — the agent just reconnects.
-pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) {
+///
+/// Rejects a trusted URL longer than [`MCP_TRUSTED_URL_MAX_BYTES`]: nothing
+/// legitimate needs a multi-KiB URL, and the bound keeps the stored config
+/// entry small. The anchor's pending-registration bookkeeping is carried over
+/// untouched — a config edit doesn't reset it (in-flight registrations are
+/// invalidated at redemption by the URL-hash check, and pruned by expiry).
+pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
+    if let Some(url) = &config.url {
+        if url.len() > MCP_TRUSTED_URL_MAX_BYTES {
+            return Err(format!(
+                "MCP configuration failed: trusted server URL must be at most {MCP_TRUSTED_URL_MAX_BYTES} bytes."
+            ));
+        }
+    }
     storage_borrow_mut(|storage| {
         let old = storage.read_mcp_config(anchor_number);
+        let pending_registration = old.pending_registration.clone();
         let revoke = !config.enabled || config.url != old.url;
         let session_principal = if revoke {
             if let Some(bytes) = &old.session_principal {
@@ -220,9 +241,11 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) {
                 enabled: config.enabled,
                 url: config.url,
                 session_principal,
+                pending_registration,
             },
         );
     });
+    Ok(())
 }
 
 /// A live MCP session: proof that the current `caller()` is the MCP server
