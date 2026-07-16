@@ -25,8 +25,7 @@ pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
 
 pub(super) const MAX_APP_CLIENTS: usize = 100;
 
-/// Max length (bytes) of an `app_clients` client_id — an attacker-controlled
-/// well-known value, bounded like the other SSO discovery fields.
+/// Untrusted well-known value; bounded at 255 like the other discovery fields.
 const MAX_APP_CLIENT_ID_LENGTH: usize = 255;
 
 #[cfg(not(test))]
