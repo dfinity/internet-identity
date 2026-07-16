@@ -685,8 +685,7 @@ fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
 #[update]
 fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_config(anchor_number, config);
-    Ok(())
+    mcp::set_mcp_config(anchor_number, config)
 }
 
 /// Called by the MCP server, signed with its registered session key: prepare a

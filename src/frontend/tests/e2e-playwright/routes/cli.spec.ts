@@ -147,7 +147,7 @@ test("Generic CLI sign-in posts a two-hop delegation chain to the loopback callb
   // hidden and CLI sign-in is full access (a queries-only delegation would
   // fail closed in every current agent — see the READ_ONLY_MODE flag).
   await expect(
-    page.getByRole("radio", { name: "Actions & queries" }),
+    page.getByRole("radio", { name: "Actions & questions" }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
