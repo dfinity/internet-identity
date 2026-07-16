@@ -2061,5 +2061,5 @@ service : (opt InternetIdentityInit) -> {
     // Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
     // the frontend passes as `applicationServerKey` to
     // `pushManager.subscribe()`. Same key used to sign the per-push JWT.
-    push_vapid_public_key : () -> (blob) query;
+    push_vapid_public_key : () -> (blob);
 };

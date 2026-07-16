@@ -234,11 +234,14 @@ const PUSH_OUTCALL_CYCLES: u128 = 3_000_000_000;
 /// `entropy_seed` is 32 bytes pre-fetched from `raw_rand`; we HKDF-
 /// expand it per-device so each RFC 8291 encryption gets a fresh
 /// ephemeral scalar + salt without another async round-trip.
-pub fn notify_user(
+pub async fn notify_user(
     in_app_principal: Principal,
     mut alert: PushAlert,
     entropy_seed: [u8; 32],
 ) -> Result<(), String> {
+    let vapid_key = vapid::get_or_init_signing_key()
+        .await
+        .map_err(|e| format!("VAPID key unavailable: {e}"))?;
     // 1. Reverse-lookup the calling in-app principal.
     let sender =
         storage_borrow(|storage| storage.push_principal_index_memory.get(&in_app_principal))
@@ -292,7 +295,7 @@ pub fn notify_user(
     let mut root_rng = ChaCha20Rng::from_seed(entropy_seed);
     let now_secs = time() / 1_000_000_000;
     let exp = now_secs + vapid::VAPID_JWT_MAX_LIFETIME_SECS;
-    let pubkey_b64 = vapid::public_key_base64url();
+    let pubkey_b64 = vapid::public_key_base64url(&vapid_key);
 
     // JWT audience varies by relay; sign once per unique audience so a
     // mass push doesn't redo the ECDSA op for every device on the same
@@ -343,7 +346,7 @@ pub fn notify_user(
         };
         let jwt = audience_to_jwt
             .entry(audience.clone())
-            .or_insert_with(|| vapid::sign_jwt(&audience, exp))
+            .or_insert_with(|| vapid::sign_jwt(&vapid_key, &audience, exp))
             .clone();
 
         let request = CanisterHttpRequestArgument {

@@ -931,6 +931,7 @@ async fn notify_user(in_app_principal: Principal, alert: PushAlert) -> Result<()
         },
         entropy,
     )
+    .await
 }
 
 /// Return the VAPID public key (65-byte uncompressed SEC1 P-256 point)
@@ -938,9 +939,20 @@ async fn notify_user(in_app_principal: Principal, alert: PushAlert) -> Result<()
 /// `pushManager.subscribe()`. This is the same key used to sign the
 /// per-push JWT in [`notify_user`]; the relay verifies both against the
 /// browser's baked-in copy.
-#[query]
-fn push_vapid_public_key() -> ByteBuf {
-    ByteBuf::from(push::vapid::VAPID_PUBLIC_KEY_UNCOMPRESSED.to_vec())
+///
+/// An `#[update]` because the first call after install lazily generates
+/// the key via `raw_rand` and persists it. On the cached path it still
+/// costs one consensus round — negligible since the FE only reads this
+/// once per device-subscribe.
+#[update]
+async fn push_vapid_public_key() -> ByteBuf {
+    match push::vapid::get_or_init_signing_key().await {
+        Ok(sk) => ByteBuf::from(push::vapid::public_key_uncompressed(&sk).to_vec()),
+        Err(e) => {
+            ic_cdk::println!("push_vapid_public_key: init failed: {e}");
+            ByteBuf::from(Vec::new())
+        }
+    }
 }
 
 #[query]

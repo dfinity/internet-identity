@@ -1353,7 +1353,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
-    'push_vapid_public_key' : IDL.Func([], [IDL.Vec(IDL.Nat8)], ['query']),
+    'push_vapid_public_key' : IDL.Func([], [IDL.Vec(IDL.Nat8)], []),
     'register' : IDL.Func(
         [DeviceData, ChallengeResult, IDL.Opt(IDL.Principal)],
         [RegisterResponse],

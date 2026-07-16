@@ -47,6 +47,7 @@ pub struct StorablePersistentState {
     enable_dnssec_email_recovery: Option<bool>,
     dnssec_config: Option<DnssecConfig>,
     doh_config: Option<DohConfig>,
+    push_vapid_private_key: Option<[u8; 32]>,
 }
 
 impl Storable for StorablePersistentState {
@@ -98,6 +99,7 @@ impl From<PersistentState> for StorablePersistentState {
             enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
+            push_vapid_private_key: s.push_vapid_private_key,
         }
     }
 }
@@ -127,6 +129,7 @@ impl From<StorablePersistentState> for PersistentState {
             enable_dnssec_email_recovery: s.enable_dnssec_email_recovery,
             dnssec_config: s.dnssec_config,
             doh_config: s.doh_config,
+            push_vapid_private_key: s.push_vapid_private_key,
         }
     }
 }
@@ -184,6 +187,7 @@ mod tests {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            push_vapid_private_key: None,
         };
 
         pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -217,6 +221,7 @@ mod tests {
             enable_dnssec_email_recovery: None,
             dnssec_config: None,
             doh_config: None,
+            push_vapid_private_key: None,
         };
         pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }
