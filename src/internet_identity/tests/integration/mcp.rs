@@ -1941,68 +1941,65 @@ fn mcp_prepare_registration_delegation_rejects_empty_key() -> Result<(), RejectR
     Ok(())
 }
 
-/// A single anchor can hold only so many *live* registration delegations at
-/// once: `prepare` prunes the anchor's expired entries, then refuses once the
-/// per-anchor cap is reached. This bounds how much one actor can write to the
-/// registration index (which shares the canister's stable memory with all other
-/// data). Once the in-flight ones expire, `prepare` reclaims them and admits new
-/// requests again.
+/// A new `prepare` supersedes the anchor's prior in-flight registration, so the
+/// registration index holds at most one entry per anchor: the previous `P_reg`
+/// entry is evicted and can no longer be redeemed, while the latest one can.
+/// This bounds how much a single actor can write to the index (which shares the
+/// canister's stable memory with all other data) — an anchor trusts one server
+/// and holds one session, so an earlier pending registration is a superseded
+/// attempt at the same connection.
 #[test]
-fn mcp_prepare_registration_delegation_is_capped_per_anchor() -> Result<(), RejectResponse> {
-    // Mirrors `MAX_PENDING_REGISTRATIONS_PER_ANCHOR` in `mcp_registration.rs`.
-    const MAX_PENDING: usize = 10;
-
+fn mcp_prepare_registration_delegation_supersedes_previous() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_with_mcp(&env);
     let anchor = flows::register_anchor(&env, canister_id);
     trust_mcp_server(&env, canister_id, principal_1(), anchor);
 
-    // Fill the per-anchor budget: each prepare mints a distinct `P_reg` entry
-    // (the seed comes from a fresh random nonce, not the registration key).
-    for i in 0..MAX_PENDING {
-        prepare_mcp_registration_delegation(
+    // Mint three registration delegations for the same anchor in a row. Each
+    // gets a distinct `P_reg` (the seed comes from a fresh random nonce), and
+    // each `prepare` evicts the previous anchor's entry.
+    let mut p_regs = Vec::new();
+    for i in 0..3 {
+        let prepared = prepare_mcp_registration_delegation(
             &env,
             canister_id,
             principal_1(),
             anchor,
             ByteBuf::from(format!("browser registration key Y {i}")),
-            Some(true),
+            Some(false),
             Some(GRANT_TTL_NS),
         )
         .unwrap()
-        .expect("prepares up to the cap must succeed");
+        .expect("each prepare must succeed (there is no cap/reject path)");
+        p_regs.push(Principal::self_authenticating(&prepared.user_key));
     }
 
-    // One past the cap is refused.
-    let over_cap = prepare_mcp_registration_delegation(
+    // Only the latest registration is redeemable; the two it superseded were
+    // evicted, so redeeming them is rejected (their entry is gone).
+    for superseded in &p_regs[..2] {
+        let redeemed = mcp_register_v2(
+            &env,
+            canister_id,
+            *superseded,
+            ByteBuf::from("mcp server session key S"),
+        )
+        .unwrap();
+        assert!(
+            matches!(&redeemed, Err(message) if message.contains("not authorized")),
+            "a superseded registration must no longer be redeemable: {redeemed:?}"
+        );
+    }
+    let latest = mcp_register_v2(
         &env,
         canister_id,
-        principal_1(),
-        anchor,
-        ByteBuf::from("browser registration key Y over"),
-        Some(true),
-        Some(GRANT_TTL_NS),
+        p_regs[2],
+        ByteBuf::from("mcp server session key S"),
     )
     .unwrap();
     assert!(
-        matches!(&over_cap, Err(message) if message.contains("too many pending registrations")),
-        "a prepare past the per-anchor cap must be rejected: {over_cap:?}"
+        latest.is_ok(),
+        "the latest registration must still be redeemable: {latest:?}"
     );
-
-    // Past the ~5-minute registration lifetime, the in-flight entries are
-    // expired; the next prepare prunes them (freeing the budget) and succeeds.
-    env.advance_time(Duration::from_secs(6 * 60));
-    prepare_mcp_registration_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        anchor,
-        ByteBuf::from("browser registration key Y after expiry"),
-        Some(true),
-        Some(GRANT_TTL_NS),
-    )
-    .unwrap()
-    .expect("once the pending entries expire, prepare must succeed again");
 
     Ok(())
 }

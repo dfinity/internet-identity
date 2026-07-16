@@ -216,7 +216,7 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
     }
     storage_borrow_mut(|storage| {
         let old = storage.read_mcp_config(anchor_number);
-        let pending_registrations = old.pending_registrations.clone();
+        let pending_registration = old.pending_registration.clone();
         let revoke = !config.enabled || config.url != old.url;
         let session_principal = if revoke {
             if let Some(bytes) = &old.session_principal {
@@ -241,7 +241,7 @@ pub fn set_mcp_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<
                 enabled: config.enabled,
                 url: config.url,
                 session_principal,
-                pending_registrations,
+                pending_registration,
             },
         );
     });

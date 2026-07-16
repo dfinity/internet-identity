@@ -13,11 +13,11 @@ use std::borrow::Cow;
 /// `Default` is the disabled, no-server state, returned for anchors that have
 /// never written a config.
 ///
-/// It also carries the anchor's in-flight *registration delegations*
-/// ([`pending_registrations`](StorableMcpConfig::pending_registrations)) — the
-/// per-anchor state that bounds how many an anchor can hold at once. This rides
-/// the config entry (which already exists per anchor) rather than a separate
-/// map, so it adds no new per-anchor growth surface.
+/// It also carries the anchor's current in-flight *registration delegation*
+/// ([`pending_registration`](StorableMcpConfig::pending_registration)) — the
+/// per-anchor pointer that keeps the registration index bounded to one entry
+/// per anchor. This rides the config entry (which already exists per anchor)
+/// rather than a separate map, so it adds no new per-anchor growth surface.
 #[derive(Encode, Decode, Clone, Default, Debug, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableMcpConfig {
@@ -37,33 +37,18 @@ pub struct StorableMcpConfig {
     /// `mcp_register` replaces the previous grant through it.
     #[cbor(n(2), with = "minicbor::bytes")]
     pub session_principal: Option<Vec<u8>>,
-    /// The anchor's in-flight MCP registration delegations (see
-    /// `prepare_mcp_registration_delegation`): the registration principal
-    /// `P_reg` of each and the delegation's expiry. `prepare` prunes the expired
-    /// ones (removing them from the registration index too) and refuses to mint
-    /// a new one once this list is at the per-anchor cap — so a single anchor
-    /// can't flood the registration index. Kept small (bounded by that cap).
-    /// A config written before this field existed decodes with it set to `None`
-    /// (the `#[cbor(map)]` derive maps an absent key 3 to `None`); callers treat
-    /// `None` and an empty list identically.
-    #[n(3)]
-    pub pending_registrations: Option<Vec<StorablePendingRegistration>>,
-}
-
-/// One of an anchor's in-flight MCP registration delegations, tracked on its
-/// [`StorableMcpConfig`] to bound how many the anchor can hold at once and to
-/// let `prepare` reclaim the anchor's own expired ones synchronously.
-#[derive(Encode, Decode, Clone, Debug, Eq, PartialEq)]
-#[cbor(map)]
-pub struct StorablePendingRegistration {
-    /// Raw bytes of the registration principal `P_reg` (the key of the
-    /// registration index entry this tracks).
-    #[cbor(n(0), with = "minicbor::bytes")]
-    pub principal: Vec<u8>,
-    /// Expiry (ns since epoch) of the registration delegation, copied from the
-    /// index entry so `prepare` can prune without a per-entry lookup.
-    #[n(1)]
-    pub expires_at_ns: u64,
+    /// Raw principal bytes of the anchor's current in-flight registration
+    /// delegation `P_reg` (the key of its registration-index entry), or `None`
+    /// when none is pending. An anchor trusts one server and holds one session,
+    /// so at most one registration is in flight: a new
+    /// `prepare_mcp_registration_delegation` supersedes the previous one,
+    /// evicting the entry this points at before minting the next — which keeps
+    /// the registration index bounded to one entry per anchor (a single actor
+    /// can't flood it). A config written before this field existed decodes with
+    /// it set to `None` (the `#[cbor(map)]` derive maps an absent key 3 to
+    /// `None`).
+    #[cbor(n(3), with = "minicbor::bytes")]
+    pub pending_registration: Option<Vec<u8>>,
 }
 
 impl Storable for StorableMcpConfig {
@@ -90,16 +75,7 @@ mod tests {
             enabled: true,
             url: Some("https://mcp.example.com/mcp".to_string()),
             session_principal: Some(vec![1, 2, 3, 4]),
-            pending_registrations: Some(vec![
-                StorablePendingRegistration {
-                    principal: vec![7; 29],
-                    expires_at_ns: 42,
-                },
-                StorablePendingRegistration {
-                    principal: vec![8; 29],
-                    expires_at_ns: 43,
-                },
-            ]),
+            pending_registration: Some(vec![7; 29]),
         };
         let decoded = StorableMcpConfig::from_bytes(config.to_bytes());
         assert_eq!(decoded, config);
@@ -124,15 +100,15 @@ mod tests {
         assert!(decoded.enabled);
         assert_eq!(decoded.url, Some("https://mcp.example.com/mcp".to_string()));
         assert_eq!(decoded.session_principal, None);
-        // A field added later (key 3) is likewise absent -> empty.
-        assert_eq!(decoded.pending_registrations, None);
+        // A field added later (key 3) is likewise absent -> None.
+        assert_eq!(decoded.pending_registration, None);
     }
 
-    /// Configs written before the `pending_registrations` field existed are
+    /// Configs written before the `pending_registration` field existed are
     /// CBOR maps without key 3 — they must decode with the field `None`.
     #[test]
-    fn should_decode_config_without_pending_registrations() {
-        // Encode the pre-`pending_registrations` shape: a map with keys 0..=2.
+    fn should_decode_config_without_pending_registration() {
+        // Encode the pre-`pending_registration` shape: a map with keys 0..=2.
         let mut buffer = Vec::new();
         let mut encoder = minicbor::Encoder::new(&mut buffer);
         encoder.map(3).unwrap();
@@ -147,22 +123,21 @@ mod tests {
         let decoded = StorableMcpConfig::from_bytes(Cow::Borrowed(&buffer));
         assert!(decoded.enabled);
         assert_eq!(decoded.session_principal, Some(vec![5; 29]));
-        assert_eq!(decoded.pending_registrations, None);
+        assert_eq!(decoded.pending_registration, None);
     }
 
-    /// Rollback safety: bytes written by the new encoder (with key 2 present)
-    /// must remain decodable when the unknown key is skipped — minicbor's
-    /// `#[cbor(map)]` derive ignores unknown map keys, which is what a
-    /// rolled-back (pre-`session_principal`) wasm relies on. Cheaply
-    /// approximated here by decoding new-encoder bytes and checking the
-    /// pre-existing fields survive untouched.
+    /// Rollback safety: bytes written by the new encoder (with the later keys
+    /// present) must remain decodable when the unknown keys are skipped —
+    /// minicbor's `#[cbor(map)]` derive ignores unknown map keys, which is what
+    /// a rolled-back (older) wasm relies on. Cheaply approximated here by
+    /// decoding new-encoder bytes and checking the pre-existing fields survive.
     #[test]
-    fn should_keep_preexisting_fields_when_session_principal_present() {
+    fn should_keep_preexisting_fields_when_later_keys_present() {
         let config = StorableMcpConfig {
             enabled: true,
             url: Some("https://mcp.example.com/mcp".to_string()),
             session_principal: Some(vec![5; 29]),
-            pending_registrations: None,
+            pending_registration: Some(vec![6; 29]),
         };
         let decoded = StorableMcpConfig::from_bytes(config.to_bytes());
         assert!(decoded.enabled);

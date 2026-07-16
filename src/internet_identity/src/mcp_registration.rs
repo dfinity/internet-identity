@@ -56,14 +56,16 @@
 //! shares the canister's stable memory with all other data: a redemption after
 //! expiry prunes its own entry, but the common cases — a successful redemption
 //! (entry retained for multi-use) and a connect that is never redeemed — would
-//! otherwise never be reclaimed. So [`prepare`] enforces a per-anchor cap on
-//! live entries, prunes the calling anchor's expired ones, and runs a bounded
-//! amortized sweep of other anchors' expired ones; and the trusted URL is
+//! otherwise never be reclaimed. So [`prepare`] keeps at most one entry per
+//! anchor (a new connect supersedes the anchor's prior in-flight registration,
+//! evicting its entry — an anchor trusts one server and holds one session, so
+//! an earlier pending registration is a superseded attempt at the same
+//! connection) and runs a bounded amortized sweep of *other* anchors' expired
+//! entries (whose owners minted and never returned); and the trusted URL is
 //! stored hashed so a large URL can't inflate an entry.
 
 use crate::authz_utils::check_authorization;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
-use crate::storage::storable::mcp_config::StorablePendingRegistration;
 use crate::storage::storable::mcp_registration::StorableMcpRegistration;
 use crate::{mcp, state, update_root_hash};
 use candid::Principal;
@@ -96,16 +98,6 @@ pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 /// falling through to the clamp minimum) so an omitted argument has a
 /// documented, unsurprising meaning.
 pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
-
-/// Most in-flight registration delegations one anchor may hold at once.
-/// Enforced at [`prepare`], which prunes the anchor's expired entries first, so
-/// this bounds *live* (unexpired) entries. Generous for real use — a connect
-/// mints one and they expire in [`MCP_REGISTRATION_DELEGATION_TTL_NS`] — while
-/// capping how much a single actor can write to the (shared-memory)
-/// registration index: a burst of `prepare` calls can hold at most this many
-/// entries per anchor, and minting more requires new anchors (rate-limited and
-/// costly to create).
-const MAX_PENDING_REGISTRATIONS_PER_ANCHOR: usize = 10;
 
 /// How many registration-index entries a single [`prepare`] scans for expired
 /// ones to reclaim — a bounded, amortized *global* GC (the per-anchor prune
@@ -197,10 +189,11 @@ fn trusted_url(anchor_number: AnchorNumber) -> Result<String, String> {
 ///
 /// Bounds on the registration index (which shares the canister's stable memory
 /// with all other data) are enforced here, on the write path:
-///  - each anchor may hold at most [`MAX_PENDING_REGISTRATIONS_PER_ANCHOR`]
-///    unexpired entries at once (this anchor's expired entries are pruned first,
-///    then the cap is checked), so a single actor can't flood the index;
-///  - a bounded, amortized sweep reclaims a window of *any* anchor's expired
+///  - at most one entry per anchor: this connect supersedes the anchor's prior
+///    in-flight registration (its entry is evicted), so a single actor can't
+///    flood the index — an anchor trusts one server and holds one session, so an
+///    earlier pending registration is a superseded attempt at the same connect;
+///  - a bounded, amortized sweep reclaims a window of *other* anchors' expired
 ///    entries, so entries whose owner never returns to redeem don't accumulate;
 ///  - the trusted URL is stored hashed, so a large URL can't amplify an entry.
 pub async fn prepare(
@@ -217,9 +210,9 @@ pub async fn prepare(
         return Err("MCP registration failed: empty registration key.".to_string());
     }
     // Fail fast (before drawing randomness) if no trusted server is configured.
-    // Re-checked authoritatively below under the same borrow that updates the
-    // pending list, since the `raw_rand` await can interleave a concurrent
-    // config change.
+    // Re-checked authoritatively below under the same borrow that supersedes the
+    // pending registration, since the `raw_rand` await can interleave a
+    // concurrent config change.
     trusted_url(anchor_number)?;
 
     // Effective (defaulted + clamped) grant lifetime, stored so the grant runs
@@ -229,19 +222,22 @@ pub async fn prepare(
     let read_only = read_only_from(permissions);
     let nonce = crate::random_salt().await;
 
-    // No further await below: the read-modify-write of this anchor's pending
-    // list, the signature, and the index insert all run in one message turn, so
-    // nothing interleaves between them.
+    // No further await below: reading the config, superseding the anchor's prior
+    // pending registration, the signature, and the index insert all run in one
+    // message turn, so nothing interleaves between them.
     let now = time();
     let expiration = now.saturating_add(MCP_REGISTRATION_DELEGATION_TTL_NS);
     let seed = mcp_registration_seed(&nonce);
     let user_key = der_encode_canister_sig_key(seed.to_vec());
     let p_reg = Principal::self_authenticating(&user_key);
 
-    // Read the config, require an enabled trusted server, prune this anchor's
-    // expired pending registrations (reclaiming each from the index), and
-    // enforce the per-anchor cap — all before minting anything, so an over-cap
-    // request costs no signature. Yields the trusted URL hash to store.
+    // Read the config, require an enabled trusted server, and *supersede* the
+    // anchor's prior in-flight registration: an anchor trusts one server and
+    // holds one session, so an earlier pending registration is a superseded
+    // attempt at the same connection — evict its index entry and repoint the
+    // config at this one. That keeps the registration index bounded to one entry
+    // per anchor without any cap/reject path. Yields the trusted URL hash to
+    // store.
     let trusted_url_hash = state::storage_borrow_mut(|storage| {
         let mut config = storage.read_mcp_config(anchor_number);
         let url =
@@ -252,32 +248,12 @@ pub async fn prepare(
                         .to_string(),
                 ),
             };
-        // Per-anchor GC: drop expired pending entries and remove them from the
-        // index. Bounded by the cap, so it's O(cap) work.
-        let mut pending = config.pending_registrations.take().unwrap_or_default();
-        pending.retain(|entry| {
-            if entry.expires_at_ns > now {
-                return true;
-            }
-            if let Ok(principal) = Principal::try_from_slice(&entry.principal) {
+        if let Some(previous) = config.pending_registration.take() {
+            if let Ok(principal) = Principal::try_from_slice(&previous) {
                 storage.remove_mcp_registration(principal);
             }
-            false
-        });
-        if pending.len() >= MAX_PENDING_REGISTRATIONS_PER_ANCHOR {
-            // Persist the prune even when refusing, so reclaimed slots aren't lost.
-            config.pending_registrations = Some(pending);
-            storage.write_mcp_config(anchor_number, config);
-            return Err(
-                "MCP registration failed: too many pending registrations for this identity; retry shortly."
-                    .to_string(),
-            );
         }
-        pending.push(StorablePendingRegistration {
-            principal: p_reg.as_slice().to_vec(),
-            expires_at_ns: expiration,
-        });
-        config.pending_registrations = Some(pending);
+        config.pending_registration = Some(p_reg.as_slice().to_vec());
         storage.write_mcp_config(anchor_number, config);
         Ok(hash_trusted_url(&url))
     })?;
