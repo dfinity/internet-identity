@@ -237,6 +237,133 @@ fn can_link_sso_account_via_discovery() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// The discovery-field length cap (bytes) the canister enforces on the
+/// attacker-controlled well-known / OIDC-server values. A field over this length
+/// fails discovery, so the SSO login can never complete.
+const DISCOVERY_FIELD_CAP: usize = 255;
+
+/// The normal hop-1 `client_id` reused when only another field is tampered with.
+const SSO_CLIENT_ID: &str =
+    "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
+
+/// Base SSO responses with hop 1 (`ii-openid-configuration`) rebuilt from the
+/// given `client_id` / `name`; hop 2 + JWKS are the standard values.
+fn sso_responses_with_hop1(client_id: &str, name: &str) -> Vec<(String, String)> {
+    let mut responses = sso_http_responses();
+    responses[0].1 = format!(
+        r#"{{"client_id":"{client_id}","openid_configuration":"https://accounts.google.com/.well-known/openid-configuration","name":"{name}"}}"#
+    );
+    responses
+}
+
+/// Base SSO responses with hop 2 (the OIDC discovery document) rebuilt from the
+/// given `issuer` / `jwks_uri`; hop 1 + JWKS are the standard values. The
+/// `authorization_endpoint` shares the issuer host so host self-assertion still
+/// passes and the field-length cap is what rejects the document.
+fn sso_responses_with_hop2(issuer: &str, jwks_uri: &str) -> Vec<(String, String)> {
+    let mut responses = sso_http_responses();
+    responses[1].1 = format!(
+        r#"{{"issuer":"{issuer}","jwks_uri":"{jwks_uri}","authorization_endpoint":"https://accounts.google.com/o/oauth2/v2/auth","scopes_supported":["openid","email","profile"]}}"#
+    );
+    responses
+}
+
+/// Drive an SSO credential add whose discovery is expected to be rejected by a
+/// field-length cap. A rejected discovery fill never becomes `Ready`, so the add
+/// can never succeed: it either returns `Err` or stays `Pending` (an errored
+/// fill collapses to `Pending` on the peek path). Panics if the add ever returns
+/// `Ok`, and asserts no credential was linked.
+fn assert_sso_add_rejected(env: &PocketIc, responses: &[(String, String)]) {
+    let canister_id = setup_sso_canister(env);
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
+    let identity_number = create_identity_with_authn_method(env, canister_id, &test_authn_method);
+    sync_time(env, test_time);
+
+    for _ in 0..10 {
+        let result = api::openid_credential_add_with_discovery(
+            env,
+            canister_id,
+            test_principal,
+            identity_number,
+            &jwt,
+            &salt,
+            Some(SSO_DOMAIN),
+        )
+        .unwrap();
+        match result {
+            OpenIdResult::Ok(_) => {
+                panic!("SSO add succeeded, but the tampered discovery should have been rejected")
+            }
+            OpenIdResult::Err(_) => break,
+            OpenIdResult::Pending => {
+                for _ in 0..8 {
+                    answer_sso_http(env, responses);
+                }
+            }
+        }
+    }
+
+    let info = api::get_anchor_info(env, canister_id, test_principal, identity_number).unwrap();
+    assert!(
+        info.openid_credentials.unwrap_or_default().is_empty(),
+        "no SSO credential should have been linked from a rejected discovery",
+    );
+}
+
+/// An over-length hop-1 `client_id` (stored as the credential `aud` and fed into
+/// the `u8`-prefixed delegation seed) fails discovery, so the SSO add never
+/// completes.
+#[test]
+fn sso_discovery_rejects_over_long_client_id() {
+    let env = env();
+    let long_client_id = "a".repeat(DISCOVERY_FIELD_CAP + 1);
+    assert_sso_add_rejected(&env, &sso_responses_with_hop1(&long_client_id, "Example"));
+}
+
+/// An over-length hop-1 `name` (stamped as the credential `sso_name`) fails
+/// discovery, so the SSO add never completes.
+#[test]
+fn sso_discovery_rejects_over_long_name() {
+    let env = env();
+    let long_name = "a".repeat(DISCOVERY_FIELD_CAP + 1);
+    assert_sso_add_rejected(&env, &sso_responses_with_hop1(SSO_CLIENT_ID, &long_name));
+}
+
+/// An over-length hop-2 `issuer` (cached in the discovery config and matched
+/// against the JWT `iss`) fails discovery. The host is preserved so it is the
+/// length cap — not the host self-assertion — that rejects it.
+#[test]
+fn sso_discovery_rejects_over_long_issuer() {
+    let env = env();
+    let long_issuer = format!(
+        "https://accounts.google.com/{}",
+        "a".repeat(DISCOVERY_FIELD_CAP)
+    );
+    assert!(long_issuer.len() > DISCOVERY_FIELD_CAP);
+    assert_sso_add_rejected(
+        &env,
+        &sso_responses_with_hop2(&long_issuer, "https://www.googleapis.com/oauth2/v3/certs"),
+    );
+}
+
+/// An over-length hop-2 `jwks_uri` (used as the JWKS cache key) fails discovery,
+/// so it never becomes a cache key and the SSO add never completes. The host is
+/// preserved so it is the length cap that rejects it.
+#[test]
+fn sso_discovery_rejects_over_long_jwks_uri() {
+    let env = env();
+    let long_jwks_uri = format!(
+        "https://www.googleapis.com/{}",
+        "a".repeat(DISCOVERY_FIELD_CAP)
+    );
+    assert!(long_jwks_uri.len() > DISCOVERY_FIELD_CAP);
+    assert_sso_add_rejected(
+        &env,
+        &sso_responses_with_hop2("https://accounts.google.com", &long_jwks_uri),
+    );
+}
+
 /// Regression test for the boundary canonicalization: a mixed-case
 /// `discovery_domain` (the allowlist gate is case-insensitive) must be stored as
 /// the canonical lowercase `sso_domain`, so the `sso:<domain>` scope is stable.
