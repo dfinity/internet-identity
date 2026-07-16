@@ -11,10 +11,10 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegFinishError};
 
-/// Cap on the configured stable-identifier claim value (mirrors the `email` /
-/// `name` claim caps in `verify.rs`). A real identifier is short; this bounds
-/// both the stored credential field and the SSO stable-id index key.
-const MAX_STABLE_IDENTIFIER_LENGTH: usize = 256;
+/// Cap on the configured stable-identifier claim value, in bytes. Matches the
+/// `sub` cap (255) — an identifier bound that stays `u8`-length-safe — and
+/// bounds both the stored credential field and the SSO stable-id index key.
+const MAX_STABLE_IDENTIFIER_LENGTH: usize = 255;
 
 /// A verified SSO login. `credential.aud` is the resolved (per-app or primary)
 /// client; `primary_client_id` is always the primary, on which identity is keyed.
