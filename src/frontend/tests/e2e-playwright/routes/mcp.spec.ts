@@ -181,9 +181,14 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
   });
 
   // The now-trusted server unblocks the connect screen with no manual retry.
-  await expect(
-    page.getByRole("button", { name: "Allow access" }),
-  ).toBeVisible();
+  // Advancing hinges on the re-check's on-chain config read (a canister
+  // round-trip kicked off by the events above), which can outlast the default
+  // 5s expect timeout on a slow replica — `test.slow()` only scales the overall
+  // test timeout, not per-assertion ones — so give it the same headroom as the
+  // other canister-bound waits in this file.
+  await expect(page.getByRole("button", { name: "Allow access" })).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("After trusting the server, the connect screen shows", async ({
