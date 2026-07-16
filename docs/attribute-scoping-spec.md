@@ -2,9 +2,13 @@
 
 This document specifies how attribute **scoping** works across the three
 boundaries an attribute request crosses: the relying-party app, the Internet
-Identity frontend (FE), and the Internet Identity canister backend (BE). It
-pins down the one term that has, until now, only been defined implicitly in
-code: what it means for an attribute to be **unscoped**.
+Identity frontend (FE), and the Internet Identity canister backend (BE). Its
+purpose is to pin down, in one place, what it means for an attribute to be
+**unscoped** — a term whose meaning is otherwise spread implicitly across the
+code.
+
+Where this document and the code disagree, the code is authoritative; the
+symbols named here (types, functions, methods) are the anchors to check.
 
 Attribute sharing lets a relying-party app request user attributes (`email`,
 `name`, `verified_email`) that II certifies with a canister signature. An app
@@ -20,9 +24,10 @@ This spec covers the ICRC-3 attribute flow (`prepare_icrc3_attributes` /
 
 ## Terminology
 
-- **Attribute name** — one of `email`, `name`, `verified_email`. Defined by
-  `AttributeName` in
-  [`attributes.rs`](../src/internet_identity_interface/src/internet_identity/types/attributes.rs).
+- **Attribute name** — the kind of value being requested (at time of writing
+  `email`, `name`, `verified_email`). The `AttributeName` enum in
+  [`attributes.rs`](../src/internet_identity_interface/src/internet_identity/types/attributes.rs)
+  is the authoritative set.
 - **Scope** — the source an attribute value comes from. Either an OpenID issuer
   (`openid:<issuer>`) or a discoverable SSO domain (`sso:<domain>`). Defined by
   `AttributeScope`.
@@ -59,16 +64,11 @@ intent from FE to BE.
 ## Layer 1 — App → II Frontend
 
 An app sends a JSON-RPC request over the II channel (`postMessage` or HTTP)
-using method `ii-icrc3-attributes`, with params:
-
-```ts
-// src/frontend/src/lib/utils/transport/utils.ts
-Icrc3AttributesParamsSchema = z.object({
-  keys: z.array(z.string()),   // requested attribute wire keys
-  nonce: z.base64(),
-  icrc95DerivationOrigin: z.optional(OriginSchema),
-});
-```
+using method `ii-icrc3-attributes`. The params are validated by
+`Icrc3AttributesParamsSchema`
+([`transport/utils.ts`](../src/frontend/src/lib/utils/transport/utils.ts)); the
+field that carries the scoping request is `keys: string[]`, a list of requested
+attribute wire keys.
 
 Each entry in `keys` is one requested attribute wire key:
 
@@ -83,16 +83,14 @@ prefix. This is the only form in which the app expresses "any source".
 
 The FE resolves each requested key against the anchor's available attributes,
 renders a consent screen, and (on consent) sends the user's selections to the
-canister as `AttributeSpec`s.
+canister as a list of `AttributeSpec` (defined in
+[`attributes.rs`](../src/internet_identity_interface/src/internet_identity/types/attributes.rs)).
+The three fields that matter for scoping are:
 
-```rust
-// src/internet_identity_interface/.../attributes.rs
-pub struct AttributeSpec {
-    pub key: String,             // full wire key of the *selected* source
-    pub value: Option<Vec<u8>>,  // selected value, for match-verification
-    pub omit_scope: bool,        // true ⇒ strip scope from the certified key
-}
-```
+- `key` — the full wire key of the *selected* source.
+- `value` — the selected value, so the backend can verify it still matches.
+- `omit_scope` — when `true`, the backend strips the scope from the certified
+  key. This is the bit that carries the "unscoped" intent.
 
 ### Fan-out: one unscoped request → many candidate sources
 
@@ -100,8 +98,8 @@ pub struct AttributeSpec {
 [`attributes.ts`](../src/frontend/src/lib/stores/channelHandlers/attributes.ts)
 translates the app's request against the available rows:
 
-- A **scoped** request (`requestedKey.includes(":")`) matches the one exact wire
-  row and is marked `omitScope: false`.
+- A **scoped** request (its wire key contains a scope prefix, i.e. a `:`)
+  matches the one exact wire row and is marked `omitScope: false`.
 - An **unscoped** request fans out: it collects every available row whose
   attribute-name suffix matches — the bare unscoped rows (verified emails) *and*
   every scoped `…:<name>` row (OIDC/SSO sources) — and marks them all
@@ -140,27 +138,19 @@ For each spec, the backend looks up the value from the source named by
 - `OpenId { issuer }` / `Sso { domain }` — the matching stored credential.
 - `None` (bare key) — a stored verified-email entry matching `spec.value`.
 
-It then computes the **certified key**:
-
-```rust
-// insert_certified_attribute
-let certified_key = if spec.omit_scope {
-    spec.key.attribute_name.to_string()   // "email"
-} else {
-    spec.key.to_string()                  // "openid:https://…:email"
-};
-```
-
-This is the single point where scope is stripped. `omit_scope: true` ⇒ the
-certified key is the bare attribute name, hiding the source from the app;
-`omit_scope: false` ⇒ the certified key is the full scoped wire key.
+It then computes the **certified key** (in `insert_certified_attribute`): when
+`omit_scope` is `true` the certified key is the bare attribute name (`email`),
+hiding the source from the app; when `false` it is the full scoped wire key
+(`openid:https://…:email`). This is the single point where scope is stripped,
+and it is the reason scoped-vs-unscoped must be decided by `omit_scope` rather
+than by inspecting the shape of `key`.
 
 If two specs resolve to the same certified key (e.g. two `omit_scope: true`
-specs for `email`), the backend records a `Duplicate certified attribute key`
-problem and rejects the request — which is why the FE collapses unscoped groups
-to a single selection.
+specs for `email`), the backend records a duplicate-key problem and rejects the
+request — which is why the FE collapses unscoped groups to a single selection.
 
-The signed map also carries an implicit envelope the app can rely on:
+The signed map also carries an implicit envelope the app can rely on, keyed
+under the reserved `implicit:` prefix (the current entries):
 
 ```
 implicit:nonce                    (blob)  — echoes the request nonce
