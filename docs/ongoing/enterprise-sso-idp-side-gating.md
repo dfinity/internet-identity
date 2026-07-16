@@ -1,7 +1,7 @@
 # IdP-side per-app gating for enterprise SSO
 
 **Status:** Implemented — `dfinity/internet-identity` PR #4096 (single PR). This doc is the spec.
-**Last updated:** 2026-07-15
+**Last updated:** 2026-07-16
 **Companion:** `enterprise-sso-per-app-access-control.md` (the *id.ai-side* gate). The two layers are independent, composable, and selected per app (§9); neither depends on the other.
 
 **In one line:** give each restricted dapp its own OIDC client in the org's IdP; the IdP's native app-assignment decides who gets a token; II verifies the token's `aud` and hands the dapp a certified `sso:<domain>` attribute. No id.ai-side policy, directory, proxy, or panel — inert until an org opts in via its well-known.
@@ -175,7 +175,7 @@ A dedicated `sso_prepare_delegation` / `sso_get_delegation` pair carries the SSO
 
 ### 6.1 Identity resolves to the primary client
 
-A per-app login's `aud` is the per-app client, but for *identity* `sso_prepare_delegation` resolves the anchor as if the primary client were used — it looks up `(iss, stable_id, primary_client_id)`, substituting the primary client for the token's `aud`. So all per-app clients collapse to one primary-client identity; no extra credential, no access method. Existing credentials are already primary-keyed → a lookup-time substitution, **no stored-key change**. (Non-`sub` orgs need an aux lookup, §6.5.)
+A per-app login's `aud` is the per-app client, but for *identity* `sso_prepare_delegation` resolves the anchor as if the primary client were used — it looks up `(iss, stable_id, primary_client_id)`, substituting the primary client for the token's `aud`. So all per-app clients collapse to one primary-client identity; no extra credential, no access method. Existing credentials are already primary-keyed → a lookup-time substitution, **no stored-key change**. (Non-`sub` orgs resolve through the stable-id index, §6.5.)
 
 A cold well-known cache miss returns `Pending` (re-drive discovery) — never "no `app_clients`", which would fail open.
 
@@ -228,16 +228,17 @@ A single certified attribute is the dapp's whole boundary. Its presence for orig
 Config-driven, not brand-driven — II reads `stable_identifier_claim`, never detects "Entra".
 
 - **`sub`** (Okta/Google/OneLogin): the primary-client substitution (§6.1) resolves directly.
-- **non-`sub`** (Entra `oid`): a per-app `sub` is pairwise, so substituting the client alone can't match. II keeps a small **additive stable bridge** (own memory region, not a migration):
+- **non-`sub`** (Entra `oid`): a per-app `sub` is pairwise, so substituting the client alone can't match. II bridges the `oid` to the anchor with a **storage-maintained lookup index** — the same kind it already keeps for credentials, keys, and email recovery:
 
 ```
-(iss, primary_client_id, <stable_id>)  ->  the primary credential's sub
+(iss, primary_client_id, oid)  ->  anchor
 ```
 
-- **Why all three key parts:** the pairwise `sub` must be scoped to its client. `(iss, stable_id)` alone would collide when one tenant is exposed via two discovery domains (different primary clients, same `(iss, oid)`) and would lean entirely on `iss` uniqueness; `primary_client_id` removes that.
-- **Stable memory** → survives upgrades, so the normal-login-first step happens **once, ever** (a heap cache would force it every deploy).
-- **Written only on a primary-client login** (verified JWT — the only login carrying both the alt id and the primary `sub`). Resolution is read-only, so the query delegation path only reads it.
-- **Miss → fail safe:** no anchor, user does a normal login first (never resolves to the wrong identity).
+- **Stored on the credential, indexed by diff.** The `oid` is stamped on the anchor's primary credential (storage-internal — never crosses the candid boundary). `write()` reconciles the index by diffing the stored credentials' `oid`s, so it's **self-cleaning**: removing or moving the credential removes or moves the entry. No orphans, no manual cleanup.
+- **Keyed on the client:** the pairwise `oid`→`sub` must be scoped to its primary client. `(iss, oid)` alone would collide when one tenant is exposed via two discovery domains (different primary clients); `primary_client_id` removes that.
+- **Stable → survives upgrades**, so the normal-login-first step happens **once, ever** (a heap index would force it every deploy).
+- **Populated on a primary-client login/registration** (verified JWT — the only login carrying both the `oid` and the primary `sub`). Query delegation only reads it.
+- **Resolve → fail safe:** a gated login looks up the anchor by `(iss, primary_client, oid)` and reads its primary credential's `sub`; a miss (never linked, or the credential was removed) yields no anchor, so the user does a normal login first — never the wrong identity.
 
 Cross-domain isolation doesn't depend on this — it comes from the certified `sso_domain` (§7).
 
@@ -300,7 +301,7 @@ Independent and composable; each origin's gate is chosen in the well-known.
 
 ## 10. Implementation
 
-One PR. **No stable-memory migration, no `StorableOpenIdCredentialKey` change, `openid_prepare_delegation` untouched.** The only new persistent state is the non-`sub` aux bridge (§6.5) — an additive stable map in a fresh memory region. Inert until an org adds `app_clients`.
+One PR. **No stable-memory migration, no `StorableOpenIdCredentialKey` change, `openid_prepare_delegation` untouched.** The only new persistent state is the non-`sub` stable-id index (§6.5) — an additive stable map (memory id 32) reconciled on `write()` like II's other lookup indexes. Inert until an org adds `app_clients`.
 
 > **Security invariant:** mint-or-refuse at `sso_prepare_delegation` (§6.2) — a refused gate returns no bundle. Certification is a config-free read of the certified bundle, replica-verified under the caller's own seed (§6.3). So `sso:<domain>` is only ever produced from an SSO sign-in; the dapp verifies it with the existing lib.
 
@@ -311,7 +312,7 @@ One PR. **No stable-memory migration, no `StorableOpenIdCredentialKey` change, `
 | **Registration** (§6.1) | `OpenIDRegFinishArg.origin`: first gated login runs the same gate. `sub` registers directly; non-`sub` fails safe (`SsoNormalLoginRequired`). |
 | **Bundle read** (§6.3) | Only `prepare_icrc3_attributes` / `list_available_attributes` read the bundle. Account/delegation permissionless; `identity_info` untouched. |
 | **Frontend** (§6.6) | Route to `resolved_client_id`; 1-click uses `remapToLegacyDomain(derivationOrigin ?? channel.origin)`; attach the bundle. Non-`sub` first login: button-driven CTAs. |
-| **Tests** | gated == ungated → same principal; passkey → no SSO attrs; refused gate → no bundle; cross-identity/expired/cross-origin bundle rejected; `gate_all_apps` deny; Entra `oid` + fail-safe registration; aux bridge upgrade + per-client scope; 1-click routing. |
+| **Tests** | gated == ungated → same principal; passkey → no SSO attrs; refused gate → no bundle; cross-identity/expired/cross-origin bundle rejected; `gate_all_apps` deny; Entra `oid` + fail-safe registration; stable-id index self-cleans on credential removal + survives upgrade + per-client scope; 1-click routing. |
 
 **`.did` deltas** — additive except one authorized non-additive variant:
 
@@ -330,7 +331,7 @@ The committed `.did` is candid-checked against the Rust service by `check_candid
 | What | Where |
 | --- | --- |
 | Discovery + `app_clients` resolution | `src/internet_identity/src/openid/sso.rs`; FE `.../lib/utils/ssoDiscovery.ts` |
-| Gate, registration, aux bridge | `src/internet_identity/src/openid/sso_gating.rs` |
+| Gate, registration, stable-id resolution | `src/internet_identity/src/openid/sso_gating.rs`; index maintained in `storage.rs` (`sync_anchor_with_sso_stable_id_index`) |
 | Certified bundle (codec, `read_certified_sso_bundle`, `msg_caller_info_*`) | `src/internet_identity/src/openid/sso_bundle.rs` |
 | Credential key / delegation seed | `src/internet_identity/src/openid.rs` |
 | Dapp-principal derivation | `src/internet_identity/src/delegation.rs` (`calculate_anchor_seed`) |
