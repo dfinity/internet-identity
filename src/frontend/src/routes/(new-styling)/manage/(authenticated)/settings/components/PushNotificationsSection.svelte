@@ -118,9 +118,7 @@
         await navigator.serviceWorker.register("/service-worker.js");
       await navigator.serviceWorker.ready;
 
-      const vapidPublicKey = await getVapidPublicKey(
-        $authenticatedStore.actor,
-      );
+      const vapidPublicKey = await getVapidPublicKey($authenticatedStore.actor);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: bufFromBufLike(vapidPublicKey),
@@ -140,9 +138,12 @@
       deviceSubscription = subscription;
     } catch (err) {
       console.error("enable push notifications failed:", err);
+      const detail =
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       toaster.error({
-        title: $t`Couldn't enable notifications on this device. Please try again.`,
-        duration: 4000,
+        title: $t`Couldn't enable notifications on this device.`,
+        description: detail,
+        duration: 15000,
       });
     }
   };
@@ -202,7 +203,10 @@
       <div
         class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
       >
-        <h3 id={deviceTitleId} class="text-text-primary text-base font-semibold">
+        <h3
+          id={deviceTitleId}
+          class="text-text-primary text-base font-semibold"
+        >
           {$t`Notifications on this device`}
         </h3>
         {#if deviceStatusLoaded && deviceEnabled}
