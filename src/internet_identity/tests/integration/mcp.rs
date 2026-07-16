@@ -1940,3 +1940,105 @@ fn mcp_prepare_registration_delegation_rejects_empty_key() -> Result<(), RejectR
 
     Ok(())
 }
+
+/// A new `prepare` supersedes the anchor's prior in-flight registration, so the
+/// registration index holds at most one entry per anchor: the previous `P_reg`
+/// entry is evicted and can no longer be redeemed, while the latest one can.
+/// This bounds how much a single actor can write to the index (which shares the
+/// canister's stable memory with all other data) — an anchor trusts one server
+/// and holds one session, so an earlier pending registration is a superseded
+/// attempt at the same connection.
+#[test]
+fn mcp_prepare_registration_delegation_supersedes_previous() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    // Mint three registration delegations for the same anchor in a row. Each
+    // gets a distinct `P_reg` (the seed comes from a fresh random nonce), and
+    // each `prepare` evicts the previous anchor's entry.
+    let mut p_regs = Vec::new();
+    for i in 0..3 {
+        let prepared = prepare_mcp_registration_delegation(
+            &env,
+            canister_id,
+            principal_1(),
+            anchor,
+            ByteBuf::from(format!("browser registration key Y {i}")),
+            Some(false),
+            Some(GRANT_TTL_NS),
+        )
+        .unwrap()
+        .expect("each prepare must succeed (there is no cap/reject path)");
+        p_regs.push(Principal::self_authenticating(&prepared.user_key));
+    }
+
+    // Only the latest registration is redeemable; the two it superseded were
+    // evicted, so redeeming them is rejected (their entry is gone).
+    for superseded in &p_regs[..2] {
+        let redeemed = mcp_register_v2(
+            &env,
+            canister_id,
+            *superseded,
+            ByteBuf::from("mcp server session key S"),
+        )
+        .unwrap();
+        assert!(
+            matches!(&redeemed, Err(message) if message.contains("not authorized")),
+            "a superseded registration must no longer be redeemable: {redeemed:?}"
+        );
+    }
+    let latest = mcp_register_v2(
+        &env,
+        canister_id,
+        p_regs[2],
+        ByteBuf::from("mcp server session key S"),
+    )
+    .unwrap();
+    assert!(
+        latest.is_ok(),
+        "the latest registration must still be redeemable: {latest:?}"
+    );
+
+    Ok(())
+}
+
+/// `mcp_set_config` rejects a trusted URL past the length cap. Nothing
+/// legitimate needs a multi-KiB URL, and the bound keeps the stored config
+/// entry small — the registration index stores only a *hash* of the URL, so
+/// this is the only place URL length affects stored size. A normal URL is
+/// unaffected.
+#[test]
+fn mcp_set_config_rejects_overlong_trusted_url() -> Result<(), RejectResponse> {
+    // Mirrors `MCP_TRUSTED_URL_MAX_BYTES` in `mcp.rs`.
+    const MAX_URL_BYTES: usize = 2048;
+
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor = flows::register_anchor(&env, canister_id);
+
+    let overlong = format!("https://mcp.example.com/{}", "a".repeat(MAX_URL_BYTES));
+    let rejected = mcp_set_config(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor,
+        McpConfig {
+            enabled: true,
+            url: Some(overlong),
+        },
+    )
+    .unwrap();
+    assert!(
+        matches!(&rejected, Err(message) if message.contains("at most")),
+        "an over-long trusted URL must be rejected: {rejected:?}"
+    );
+
+    // A normal-length URL is accepted (and the end-to-end connect keeps working:
+    // `mcp_register_v2` re-derives and compares the URL hash — see the happy-path
+    // test — so hashing the stored URL is transparent to redemption).
+    trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    Ok(())
+}
