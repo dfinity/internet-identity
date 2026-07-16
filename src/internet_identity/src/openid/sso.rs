@@ -76,16 +76,8 @@ const DISCOVERY_MAX_SCOPES: usize = 32;
 #[cfg(not(test))]
 const DEFAULT_SCOPES: [&str; 3] = ["openid", "profile", "email"];
 
-/// Max length (bytes) of the attacker-controlled discovery fields. The SSO
-/// well-known and its OIDC server are caller-hosted (anyone can serve
-/// `/.well-known/ii-openid-configuration`, and `sso_allow_any_domain` makes the
-/// domain fully open), so every string they hand back is untrusted. `client_id`
-/// is stored as the credential `aud` and feeds `calculate_delegation_seed`,
-/// which length-prefixes each field as a `u8` (a value > 255 wraps 256 -> 0,
-/// breaking the canonical encoding -> seed collisions) — so 255 is a required
-/// bound there. `issuer`/`jwks_uri`/`name`/`domain` are cache keys and cached
-/// values; bounding them at the same 255 keeps a hostile well-known from
-/// inflating cached state. Matches `MAX_SEED_FIELD_LENGTH` in `verify.rs`.
+/// Untrusted well-known values (cache keys/values; `client_id` also feeds the
+/// seed). Bounded at 255, like `MAX_SEED_FIELD_LENGTH` in `verify.rs`.
 const MAX_DISCOVERY_FIELD_LENGTH: usize = 255;
 
 /// The result of resolving a discovery domain (hop 1 + hop 2). Carries

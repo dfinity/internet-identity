@@ -43,13 +43,8 @@ const MAX_EMAIL_LENGTH: usize = 256;
 // already validate it on their end for a sane maximum length. This is an additional sanity check.
 const MAX_NAME_LENGTH: usize = 128;
 
-// Max length (bytes) of the JWT-claim fields that feed `calculate_delegation_seed`
-// — `iss` and `sub`. The seed length-prefixes each as a `u8`, so a value > 255
-// wraps (256 -> 0), breaking the canonical encoding and enabling seed collisions.
-// These claims are attacker-controlled (anyone can host an SSO well-known + OIDC
-// server signing arbitrary claims), so this is a required bound. (The seed's
-// `aud` is the stored `client_id`, capped at its source — the SSO discovery
-// config / provider registry.)
+// `iss`/`sub` feed `calculate_delegation_seed`, which `u8`-length-prefixes each
+// field, so 256 would wrap the prefix. Cap at 255.
 const MAX_SEED_FIELD_LENGTH: usize = 255;
 
 #[derive(Deserialize)]
