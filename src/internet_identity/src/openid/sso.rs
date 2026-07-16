@@ -25,6 +25,10 @@ pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
 
 pub(super) const MAX_APP_CLIENTS: usize = 100;
 
+/// Max length (bytes) of an `app_clients` client_id — an attacker-controlled
+/// well-known value, bounded like the other SSO discovery fields.
+const MAX_APP_CLIENT_ID_LENGTH: usize = 255;
+
 #[cfg(not(test))]
 use crate::state;
 
@@ -170,13 +174,20 @@ pub(super) fn parse_app_clients(
             entries.len()
         ));
     }
-    Ok(entries
+    entries
         .iter()
-        .map(|(key, client_id)| AppClient {
-            key: AppClientKey::parse(key),
-            client_id: client_id.clone(),
+        .map(|(key, client_id)| {
+            if client_id.len() > MAX_APP_CLIENT_ID_LENGTH {
+                return Err(format!(
+                    "app_clients client_id exceeds the {MAX_APP_CLIENT_ID_LENGTH}-byte cap"
+                ));
+            }
+            Ok(AppClient {
+                key: AppClientKey::parse(key),
+                client_id: client_id.clone(),
+            })
         })
-        .collect())
+        .collect()
 }
 
 impl DiscoveredConfig {
@@ -974,6 +985,23 @@ mod tests {
             entries.insert(format!("https://app{i}.com"), format!("client{i}"));
         }
         assert_eq!(entries.len(), MAX_APP_CLIENTS);
+        assert!(parse_app_clients(&entries).is_ok());
+    }
+
+    #[test]
+    fn app_clients_over_long_client_id_rejected() {
+        let mut entries = std::collections::HashMap::new();
+        entries.insert(
+            "https://app.com".to_string(),
+            "a".repeat(MAX_APP_CLIENT_ID_LENGTH + 1),
+        );
+        assert!(parse_app_clients(&entries).is_err());
+
+        entries.clear();
+        entries.insert(
+            "https://app.com".to_string(),
+            "a".repeat(MAX_APP_CLIENT_ID_LENGTH),
+        );
         assert!(parse_app_clients(&entries).is_ok());
     }
 
