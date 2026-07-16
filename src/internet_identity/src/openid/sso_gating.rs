@@ -11,6 +11,11 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegFinishError};
 
+/// Cap on the configured stable-identifier claim value (mirrors the `email` /
+/// `name` claim caps in `verify.rs`). A real identifier is short; this bounds
+/// both the stored credential field and the SSO stable-id index key.
+const MAX_STABLE_IDENTIFIER_LENGTH: usize = 256;
+
 /// A verified SSO login. `credential.aud` is the resolved (per-app or primary)
 /// client; `primary_client_id` is always the primary, on which identity is keyed.
 #[derive(Debug)]
@@ -81,6 +86,14 @@ pub fn verify_sso_jwt(
     } else {
         extract_string_claim(jwt, &cfg.stable_identifier_claim)
     };
+    if stable_id
+        .as_ref()
+        .is_some_and(|id| id.len() > MAX_STABLE_IDENTIFIER_LENGTH)
+    {
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "stable identifier claim too long".to_string(),
+        ));
+    }
 
     Ok(Cached::Ready(SsoVerification {
         credential,
