@@ -50,8 +50,19 @@
 //! re-binds. That is bounded by the same facts that bound a grant: the chain is
 //! only ever delivered to the trusted server's declared callback, only the
 //! holder of `X`'s private key can redeem it, and the anchor holds at most one
-//! session at a time (a re-registration replaces the previous grant). The index
-//! entry is retained until a lookup finds it expired, then pruned.
+//! session at a time (a re-registration replaces the previous grant).
+//!
+//! The index is kept bounded on the *write* path (see [`prepare`]), since it
+//! shares the canister's stable memory with all other data: a redemption after
+//! expiry prunes its own entry, but the common cases — a successful redemption
+//! (entry retained for multi-use) and a connect that is never redeemed — would
+//! otherwise never be reclaimed. So [`prepare`] keeps at most one entry per
+//! anchor (a new connect supersedes the anchor's prior in-flight registration,
+//! evicting its entry — an anchor trusts one server and holds one session, so
+//! an earlier pending registration is a superseded attempt at the same
+//! connection) and runs a bounded amortized sweep of *other* anchors' expired
+//! entries (whose owners minted and never returned); and the trusted URL is
+//! stored hashed so a large URL can't inflate an entry.
 
 use crate::authz_utils::check_authorization;
 use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
@@ -87,6 +98,26 @@ pub const MCP_REGISTRATION_DELEGATION_TTL_NS: u64 = 5 * 60 * 1_000_000_000;
 /// falling through to the clamp minimum) so an omitted argument has a
 /// documented, unsurprising meaning.
 pub const DEFAULT_MCP_GRANT_TTL_NS: u64 = 60 * 60 * 1_000_000_000;
+
+/// How many registration-index entries a single [`prepare`] scans for expired
+/// ones to reclaim — a bounded, amortized *global* GC (the per-anchor prune
+/// only reclaims the caller's own entries). Kept small so the work per write is
+/// O(1) in the index size; a fresh random start each call (see [`prepare`])
+/// spreads coverage across the whole keyspace over successive writes.
+const MCP_REGISTRATION_GC_SCAN_BUDGET: usize = 20;
+
+/// Bytes of the per-connect nonce reused as the random start key for the global
+/// GC sweep (a principal is at most 29 bytes). The nonce is already drawn for
+/// the seed; reusing it as a sweep start reveals nothing (which entries a sweep
+/// visits is not secret) and saves a second `raw_rand`.
+const GC_START_KEY_LEN: usize = 29;
+
+/// `SHA-256` of a trusted server URL, as stored on the registration index entry
+/// and re-derived at redemption. Only equality is ever needed, so a hash both
+/// suffices and bounds the entry size regardless of URL length.
+fn hash_trusted_url(url: &str) -> Vec<u8> {
+    Sha256::digest(url.as_bytes()).to_vec()
+}
 
 /// The effective session-grant lifetime for a requested `max_ttl`: the
 /// documented default when omitted, clamped to `mcp::register`'s [10 min,
@@ -150,10 +181,21 @@ fn trusted_url(anchor_number: AnchorNumber) -> Result<String, String> {
 /// (`Y` = the frontend's ephemeral, browser-held registration key — see the
 /// module doc for why the canister never delegates to a link-supplied key).
 /// `P_reg` is derived from a fresh random nonce, and the whole consent (anchor,
-/// read-only choice, resolved grant lifetime, trusted server URL) is recorded
-/// on the index entry keyed by `P_reg`, so [`register_v2`] recovers it
-/// server-side. Authenticated as the user (full authorization) — only the
-/// consenting user can create a registration delegation for their anchor.
+/// read-only choice, resolved grant lifetime, and a *hash* of the trusted
+/// server URL) is recorded on the index entry keyed by `P_reg`, so
+/// [`register_v2`] recovers it server-side. Authenticated as the user (full
+/// authorization) — only the consenting user can create a registration
+/// delegation for their anchor.
+///
+/// Bounds on the registration index (which shares the canister's stable memory
+/// with all other data) are enforced here, on the write path:
+///  - at most one entry per anchor: this connect supersedes the anchor's prior
+///    in-flight registration (its entry is evicted), so a single actor can't
+///    flood the index — an anchor trusts one server and holds one session, so an
+///    earlier pending registration is a superseded attempt at the same connect;
+///  - a bounded, amortized sweep reclaims a window of *other* anchors' expired
+///    entries, so entries whose owner never returns to redeem don't accumulate;
+///  - the trusted URL is stored hashed, so a large URL can't amplify an entry.
 pub async fn prepare(
     anchor_number: AnchorNumber,
     registration_key: SessionKey,
@@ -167,7 +209,11 @@ pub async fn prepare(
     if registration_key.is_empty() {
         return Err("MCP registration failed: empty registration key.".to_string());
     }
-    let url = trusted_url(anchor_number)?;
+    // Fail fast (before drawing randomness) if no trusted server is configured.
+    // Re-checked authoritatively below under the same borrow that supersedes the
+    // pending registration, since the `raw_rand` await can interleave a
+    // concurrent config change.
+    trusted_url(anchor_number)?;
 
     // Effective (defaulted + clamped) grant lifetime, stored so the grant runs
     // exactly this long; and a fresh random nonce (raw_rand) that makes P_reg
@@ -176,8 +222,41 @@ pub async fn prepare(
     let read_only = read_only_from(permissions);
     let nonce = crate::random_salt().await;
 
-    let expiration = time().saturating_add(MCP_REGISTRATION_DELEGATION_TTL_NS);
+    // No further await below: reading the config, superseding the anchor's prior
+    // pending registration, the signature, and the index insert all run in one
+    // message turn, so nothing interleaves between them.
+    let now = time();
+    let expiration = now.saturating_add(MCP_REGISTRATION_DELEGATION_TTL_NS);
     let seed = mcp_registration_seed(&nonce);
+    let user_key = der_encode_canister_sig_key(seed.to_vec());
+    let p_reg = Principal::self_authenticating(&user_key);
+
+    // Read the config, require an enabled trusted server, and *supersede* the
+    // anchor's prior in-flight registration: an anchor trusts one server and
+    // holds one session, so an earlier pending registration is a superseded
+    // attempt at the same connection — evict its index entry and repoint the
+    // config at this one. That keeps the registration index bounded to one entry
+    // per anchor without any cap/reject path. Yields the trusted URL hash to
+    // store.
+    let trusted_url_hash = state::storage_borrow_mut(|storage| {
+        let mut config = storage.read_mcp_config(anchor_number);
+        let url =
+            match (config.enabled, config.url.as_ref()) {
+                (true, Some(url)) => url.clone(),
+                _ => return Err(
+                    "MCP registration failed: no trusted MCP server is enabled for this identity."
+                        .to_string(),
+                ),
+            };
+        if let Some(previous) = config.pending_registration.take() {
+            if let Ok(principal) = Principal::try_from_slice(&previous) {
+                storage.remove_mcp_registration(principal);
+            }
+        }
+        config.pending_registration = Some(p_reg.as_slice().to_vec());
+        storage.write_mcp_config(anchor_number, config);
+        Ok(hash_trusted_url(&url))
+    })?;
 
     state::signature_map_mut(|sigs| {
         // No queries-only restriction on the registration delegation itself: it
@@ -189,9 +268,8 @@ pub async fn prepare(
 
     // Record the whole consent, keyed by P_reg, so register_v2 recovers it
     // server-side — the server passes only its session key, and the anchor
-    // number is never disclosed to it.
-    let user_key = der_encode_canister_sig_key(seed.to_vec());
-    let p_reg = Principal::self_authenticating(&user_key);
+    // number is never disclosed to it. The trusted URL is stored *hashed*, so a
+    // large URL can't amplify this per-connect entry.
     state::storage_borrow_mut(|storage| {
         storage.insert_mcp_registration(
             p_reg,
@@ -199,10 +277,15 @@ pub async fn prepare(
                 anchor_number,
                 read_only,
                 grant_ttl_ns,
-                trusted_url: url,
+                trusted_url_hash,
                 expires_at_ns: expiration,
             },
         );
+        // Amortized global GC: reclaim a bounded window of any anchor's expired
+        // entries (an owner may have minted and never returned), from a random
+        // start so successive prepares cover the whole keyspace.
+        let start = Principal::from_slice(&nonce[..GC_START_KEY_LEN]);
+        storage.sweep_expired_mcp_registrations(now, start, MCP_REGISTRATION_GC_SCAN_BUDGET);
     });
 
     Ok(PrepareMcpRegistrationDelegation {
@@ -315,9 +398,9 @@ pub fn register_v2(session_key: SessionKey) -> Result<McpRegistrationV2, String>
 
     // The trusted server the user consented to must still be the anchor's
     // current one — otherwise a switch or disable since consent has invalidated
-    // this delegation.
+    // this delegation. Compared by URL hash (the entry stores only the hash).
     match trusted_url(entry.anchor_number) {
-        Ok(current_url) if current_url == entry.trusted_url => {}
+        Ok(current_url) if hash_trusted_url(&current_url) == entry.trusted_url_hash => {}
         _ => return Err(NOT_AUTHORIZED.to_string()),
     }
 
