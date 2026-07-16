@@ -93,9 +93,7 @@ fn sso_allow_any_domain_opens_the_gate() {
 }
 
 /// An over-length discovery domain is rejected as `NotAllowed` even with the
-/// `sso_allow_any_domain` gate fully open, so a hostile caller-controlled domain
-/// (which would be interpolated into a discovery URL and used as a cache key)
-/// can never become a cache key.
+/// `sso_allow_any_domain` gate fully open.
 #[test]
 fn sso_discovery_rejects_over_long_domain() {
     let env = env();

@@ -43,9 +43,11 @@ const MAX_EMAIL_LENGTH: usize = 256;
 // already validate it on their end for a sane maximum length. This is an additional sanity check.
 const MAX_NAME_LENGTH: usize = 128;
 
-// `iss`/`sub` feed `calculate_delegation_seed`, which `u8`-length-prefixes each
-// field, so 256 would wrap the prefix. Cap at 255.
-const MAX_SEED_FIELD_LENGTH: usize = 255;
+// Maximum length of the iss claim in the JWT; a sanity bound.
+const MAX_ISS_LENGTH: usize = 255;
+
+// Maximum length of the sub claim in the JWT; a sanity bound.
+const MAX_SUB_LENGTH: usize = 255;
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -328,12 +330,12 @@ fn verify_claims(
             "JWT is not valid yet".into(),
         ));
     }
-    if claims.iss.len() > MAX_SEED_FIELD_LENGTH {
+    if claims.iss.len() > MAX_ISS_LENGTH {
         return Err(OpenIDJWTVerificationError::GenericError(
             "Issuer too long".into(),
         ));
     }
-    if claims.sub.len() > MAX_SEED_FIELD_LENGTH {
+    if claims.sub.len() > MAX_SUB_LENGTH {
         return Err(OpenIDJWTVerificationError::GenericError(
             "Subject too long".into(),
         ));
@@ -661,7 +663,7 @@ mod tests {
             TEST_AUD,
             &Claims {
                 iss: "https://accounts.google.com".to_string(),
-                sub: "a".repeat(MAX_SEED_FIELD_LENGTH + 1),
+                sub: "a".repeat(MAX_SUB_LENGTH + 1),
                 aud: AudClaim::Single(TEST_AUD.to_string()),
                 nonce: matching_nonce(),
                 exp: TEST_EXP_SECONDS,
@@ -683,7 +685,7 @@ mod tests {
     #[test]
     fn should_reject_over_long_iss() {
         reset_test_env();
-        let long_iss = format!("https://{}", "a".repeat(MAX_SEED_FIELD_LENGTH));
+        let long_iss = format!("https://{}", "a".repeat(MAX_ISS_LENGTH));
         let result = verify_claims(
             &long_iss,
             TEST_AUD,

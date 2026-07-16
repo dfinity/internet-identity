@@ -76,9 +76,20 @@ const DISCOVERY_MAX_SCOPES: usize = 32;
 #[cfg(not(test))]
 const DEFAULT_SCOPES: [&str; 3] = ["openid", "profile", "email"];
 
-/// Untrusted well-known values (cache keys/values; `client_id` also feeds the
-/// seed). Bounded at 255, like `MAX_SEED_FIELD_LENGTH` in `verify.rs`.
-const MAX_DISCOVERY_FIELD_LENGTH: usize = 255;
+/// Maximum length of the client_id from the well-known.
+#[cfg(not(test))]
+const MAX_CLIENT_ID_LENGTH: usize = 255;
+/// Maximum length of the issuer from the OIDC configuration.
+#[cfg(not(test))]
+const MAX_ISSUER_LENGTH: usize = 255;
+/// Maximum length of the jwks_uri from the OIDC configuration.
+#[cfg(not(test))]
+const MAX_JWKS_URI_LENGTH: usize = 255;
+/// Maximum length of the display name from the well-known.
+#[cfg(not(test))]
+const MAX_SSO_NAME_LENGTH: usize = 255;
+/// Maximum length of an SSO discovery domain.
+const MAX_DOMAIN_LENGTH: usize = 255;
 
 /// The result of resolving a discovery domain (hop 1 + hop 2). Carries
 /// everything the redemption path needs (`issuer`, `jwks_uri`) and everything
@@ -254,11 +265,7 @@ fn is_explicitly_allowlisted(domain: &str) -> bool {
 }
 
 pub fn is_allowed_discovery_domain(domain: &str) -> bool {
-    // Reject an over-length domain before it can become a discovery cache key.
-    // This is the single chokepoint every path that inserts a domain key
-    // (`prefetch`, `drive_discovery`) gates on, so a >255-byte domain never
-    // reaches `single_flight_cache::get`. See `MAX_DISCOVERY_FIELD_LENGTH`.
-    if domain.len() > MAX_DISCOVERY_FIELD_LENGTH {
+    if domain.len() > MAX_DOMAIN_LENGTH {
         return false;
     }
     // An explicitly allowlisted domain is admin-curated and trusted verbatim.
@@ -378,33 +385,24 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     // discovery document can't inflate a cached `DiscoveredConfig`.
     scopes.truncate(DISCOVERY_MAX_SCOPES);
 
-    // Length-cap the attacker-controlled discovery fields (the well-known and
-    // its OIDC server are caller-hosted). `client_id` feeds the `u8`-prefixed
-    // delegation seed; `issuer`/`jwks_uri`/`name` are cache keys/values. A
-    // rejected discovery fails the login safe. See `MAX_DISCOVERY_FIELD_LENGTH`.
-    if ii_config.client_id.len() > MAX_DISCOVERY_FIELD_LENGTH {
+    // Reject over-length values from the untrusted well-known / OIDC config.
+    if ii_config.client_id.len() > MAX_CLIENT_ID_LENGTH {
         return Err(format!(
-            "SSO client_id exceeds {MAX_DISCOVERY_FIELD_LENGTH} bytes"
+            "SSO client_id exceeds {MAX_CLIENT_ID_LENGTH} bytes"
         ));
     }
-    if doc.issuer.len() > MAX_DISCOVERY_FIELD_LENGTH {
-        return Err(format!(
-            "SSO issuer exceeds {MAX_DISCOVERY_FIELD_LENGTH} bytes"
-        ));
+    if doc.issuer.len() > MAX_ISSUER_LENGTH {
+        return Err(format!("SSO issuer exceeds {MAX_ISSUER_LENGTH} bytes"));
     }
-    if doc.jwks_uri.len() > MAX_DISCOVERY_FIELD_LENGTH {
-        return Err(format!(
-            "SSO jwks_uri exceeds {MAX_DISCOVERY_FIELD_LENGTH} bytes"
-        ));
+    if doc.jwks_uri.len() > MAX_JWKS_URI_LENGTH {
+        return Err(format!("SSO jwks_uri exceeds {MAX_JWKS_URI_LENGTH} bytes"));
     }
     if ii_config
         .name
         .as_ref()
-        .is_some_and(|name| name.len() > MAX_DISCOVERY_FIELD_LENGTH)
+        .is_some_and(|name| name.len() > MAX_SSO_NAME_LENGTH)
     {
-        return Err(format!(
-            "SSO name exceeds {MAX_DISCOVERY_FIELD_LENGTH} bytes"
-        ));
+        return Err(format!("SSO name exceeds {MAX_SSO_NAME_LENGTH} bytes"));
     }
 
     Ok(DiscoveredConfig {
@@ -741,14 +739,13 @@ mod tests {
     #[test]
     fn over_long_domain_is_never_allowed() {
         reset();
-        // Even with the gate fully open, a domain longer than the cap is
-        // rejected, so it can never become a discovery cache key.
+        // Even with the gate fully open, an over-length domain is rejected.
         TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
-        let at_cap = format!("{}.com", "a".repeat(MAX_DISCOVERY_FIELD_LENGTH - 4));
-        assert_eq!(at_cap.len(), MAX_DISCOVERY_FIELD_LENGTH);
+        let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
+        assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
         assert!(is_allowed_discovery_domain(&at_cap));
-        let over_cap = format!("{}.com", "a".repeat(MAX_DISCOVERY_FIELD_LENGTH - 3));
-        assert_eq!(over_cap.len(), MAX_DISCOVERY_FIELD_LENGTH + 1);
+        let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
+        assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
         assert!(!is_allowed_discovery_domain(&over_cap));
         // The length cap fires even for an explicitly allowlisted entry.
         TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);

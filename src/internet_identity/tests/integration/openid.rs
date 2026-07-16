@@ -256,10 +256,8 @@ fn sso_responses_with_hop1(client_id: &str, name: &str) -> Vec<(String, String)>
     responses
 }
 
-/// Base SSO responses with hop 2 (the OIDC discovery document) rebuilt from the
-/// given `issuer` / `jwks_uri`; hop 1 + JWKS are the standard values. The
-/// `authorization_endpoint` shares the issuer host so host self-assertion still
-/// passes and the field-length cap is what rejects the document.
+/// Base SSO responses with hop 2 rebuilt from the given `issuer` / `jwks_uri`
+/// (same host, so the length check is what fails); hop 1 + JWKS are standard.
 fn sso_responses_with_hop2(issuer: &str, jwks_uri: &str) -> Vec<(String, String)> {
     let mut responses = sso_http_responses();
     responses[1].1 = format!(
@@ -268,11 +266,9 @@ fn sso_responses_with_hop2(issuer: &str, jwks_uri: &str) -> Vec<(String, String)
     responses
 }
 
-/// Drive an SSO credential add whose discovery is expected to be rejected by a
-/// field-length cap. A rejected discovery fill never becomes `Ready`, so the add
-/// can never succeed: it either returns `Err` or stays `Pending` (an errored
-/// fill collapses to `Pending` on the peek path). Panics if the add ever returns
-/// `Ok`, and asserts no credential was linked.
+/// Drive an SSO credential add whose discovery is expected to fail a length cap:
+/// the add returns `Err` (or stays `Pending`), never `Ok`. Panics on `Ok` and
+/// asserts no credential was linked.
 fn assert_sso_add_rejected(env: &PocketIc, responses: &[(String, String)]) {
     let canister_id = setup_sso_canister(env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
@@ -311,9 +307,7 @@ fn assert_sso_add_rejected(env: &PocketIc, responses: &[(String, String)]) {
     );
 }
 
-/// An over-length hop-1 `client_id` (stored as the credential `aud` and fed into
-/// the `u8`-prefixed delegation seed) fails discovery, so the SSO add never
-/// completes.
+/// An over-length hop-1 `client_id` fails discovery.
 #[test]
 fn sso_discovery_rejects_over_long_client_id() {
     let env = env();
@@ -321,8 +315,7 @@ fn sso_discovery_rejects_over_long_client_id() {
     assert_sso_add_rejected(&env, &sso_responses_with_hop1(&long_client_id, "Example"));
 }
 
-/// An over-length hop-1 `name` (stamped as the credential `sso_name`) fails
-/// discovery, so the SSO add never completes.
+/// An over-length hop-1 `name` fails discovery.
 #[test]
 fn sso_discovery_rejects_over_long_name() {
     let env = env();
@@ -330,9 +323,8 @@ fn sso_discovery_rejects_over_long_name() {
     assert_sso_add_rejected(&env, &sso_responses_with_hop1(SSO_CLIENT_ID, &long_name));
 }
 
-/// An over-length hop-2 `issuer` (cached in the discovery config and matched
-/// against the JWT `iss`) fails discovery. The host is preserved so it is the
-/// length cap — not the host self-assertion — that rejects it.
+/// An over-length hop-2 `issuer` fails discovery (host preserved, so the length
+/// check is what fails).
 #[test]
 fn sso_discovery_rejects_over_long_issuer() {
     let env = env();
@@ -347,9 +339,8 @@ fn sso_discovery_rejects_over_long_issuer() {
     );
 }
 
-/// An over-length hop-2 `jwks_uri` (used as the JWKS cache key) fails discovery,
-/// so it never becomes a cache key and the SSO add never completes. The host is
-/// preserved so it is the length cap that rejects it.
+/// An over-length hop-2 `jwks_uri` fails discovery (host preserved, so the
+/// length check is what fails).
 #[test]
 fn sso_discovery_rejects_over_long_jwks_uri() {
     let env = env();
