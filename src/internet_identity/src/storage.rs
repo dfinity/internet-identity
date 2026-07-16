@@ -448,8 +448,14 @@ pub struct Storage<M: Memory> {
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
 
     sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// SSO stable-id bridge. See [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
-    sso_stable_id_index_memory: StableBTreeMap<StorableSsoStableIdKey, String, ManagedMemory<M>>,
+    /// SSO stable-id lookup index: `(iss, primary_client_id, stable_id) ->
+    /// AnchorNumber`. Storage-maintained — [`Storage::write`] reconciles it
+    /// from the anchors' stored OpenID credentials on every write, so it
+    /// self-cleans when a credential is removed or moved. Mirrors
+    /// [`Storage::lookup_anchor_with_openid_credential`]'s value type. See
+    /// [`SSO_STABLE_ID_INDEX_MEMORY_ID`].
+    sso_stable_id_index_memory:
+        StableBTreeMap<StorableSsoStableIdKey, StorableAnchorNumberList, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -859,7 +865,14 @@ impl<M: Memory + Clone> Storage<M> {
         // reverse-lookup index — verified emails are addressable only
         // via the owning anchor.
 
-        // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
+        // The SSO stable-id index is derived from the same credentials; sync it
+        // first (with clones) since the openid-credential sync below consumes
+        // the vecs.
+        self.sync_anchor_with_sso_stable_id_index(
+            anchor_number,
+            previous_openid_credentials.clone(),
+            storable_anchor.openid_credentials.clone(),
+        );
         self.sync_anchor_with_openid_credential_index(
             anchor_number,
             previous_openid_credentials,
@@ -962,6 +975,48 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_anchor_with_openid_credential_memory
                 .insert(key, vec![anchor_number].into());
         });
+    }
+
+    /// Reconcile the SSO stable-id index against `anchor_number`'s stored
+    /// credentials. Mirrors [`Storage::sync_anchor_with_openid_credential_index`]:
+    /// derive the `(iss, primary_client_id, stable_id)` keyset from each
+    /// credential that carries a `stable_id`, diff previous vs current, and
+    /// apply only the delta — `remove` the entries that disappeared, `insert`
+    /// the new ones pointing at this anchor. Because the keyset is derived from
+    /// the stored credentials, removing or moving an SSO credential removes or
+    /// moves its index entry too; there are no orphans.
+    fn sync_anchor_with_sso_stable_id_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous: Vec<StorableOpenIdCredential>,
+        current: Vec<StorableOpenIdCredential>,
+    ) {
+        fn keys(credentials: Vec<StorableOpenIdCredential>) -> BTreeSet<StorableSsoStableIdKey> {
+            credentials
+                .into_iter()
+                .filter_map(|cred| {
+                    cred.stable_id.map(|stable_id| StorableSsoStableIdKey {
+                        iss: cred.iss,
+                        primary_client_id: cred.aud,
+                        stable_id,
+                    })
+                })
+                .collect()
+        }
+
+        let previous_set = keys(previous);
+        let current_set = keys(current);
+
+        previous_set.difference(&current_set).for_each(|key| {
+            self.sso_stable_id_index_memory.remove(key);
+        });
+        current_set
+            .difference(&previous_set)
+            .cloned()
+            .for_each(|key| {
+                self.sso_stable_id_index_memory
+                    .insert(key, vec![anchor_number].into());
+            });
     }
 
     pub fn lookup_anchor_with_openid_credential(
@@ -1228,37 +1283,26 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_config_memory.insert(anchor_number, config);
     }
 
-    /// Read the SSO stable-id bridge entry, or `None` if no login has recorded it yet.
-    pub fn lookup_sso_stable_id(
+    /// Resolve a non-`sub` SSO stable id to the anchor that carries the matching
+    /// primary credential, or `None` if no anchor does (never linked, or the
+    /// credential has since been removed — the index self-cleans on `write()`,
+    /// so a stale `Some` can't linger). Mirrors
+    /// [`Storage::lookup_anchor_with_openid_credential`].
+    pub fn lookup_anchor_by_sso_stable_id(
         &self,
         iss: &str,
         primary_client_id: &str,
         stable_id: &str,
-    ) -> Option<String> {
-        self.sso_stable_id_index_memory
+    ) -> Option<AnchorNumber> {
+        let anchor_numbers: Vec<AnchorNumber> = self
+            .sso_stable_id_index_memory
             .get(&StorableSsoStableIdKey {
                 iss: iss.to_string(),
                 primary_client_id: primary_client_id.to_string(),
                 stable_id: stable_id.to_string(),
             })
-    }
-
-    /// Record (or refresh) the SSO stable-id bridge entry. Update contexts only — queries can't write.
-    pub fn insert_sso_stable_id(
-        &mut self,
-        iss: &str,
-        primary_client_id: &str,
-        stable_id: &str,
-        primary_sub: &str,
-    ) {
-        self.sso_stable_id_index_memory.insert(
-            StorableSsoStableIdKey {
-                iss: iss.to_string(),
-                primary_client_id: primary_client_id.to_string(),
-                stable_id: stable_id.to_string(),
-            },
-            primary_sub.to_string(),
-        );
+            .map(Into::into)?;
+        anchor_numbers.first().copied()
     }
 
     /// Resolve the verified `From:` of an inbound recovery email to

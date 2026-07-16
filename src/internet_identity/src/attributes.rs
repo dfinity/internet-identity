@@ -693,6 +693,7 @@ mod tests {
             metadata,
             sso_domain: None,
             sso_name: None,
+            stable_id: None,
         }];
         anchor
     }
@@ -711,6 +712,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             })
             .collect();
         anchor
@@ -1157,6 +1159,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -1171,6 +1174,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -1462,6 +1466,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
             let mut requested = request_verified_email_for(microsoft_scope());
@@ -1500,6 +1505,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
             let mut requested = request_verified_email_for(microsoft_scope());
@@ -1702,6 +1708,7 @@ mod tests {
                 metadata,
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             };
             let anchor = anchor_with_openid_credentials(vec![credential]);
 
@@ -1795,6 +1802,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -1880,6 +1888,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }];
             anchor
         }
@@ -2164,6 +2173,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }];
             anchor
         }
@@ -2304,6 +2314,7 @@ mod tests {
                 // `matched_attribute_scope()` read this directly.
                 sso_domain: Some(SSO_DOMAIN.to_string()),
                 sso_name: None,
+                stable_id: None,
             }
         }
 
@@ -2597,6 +2608,7 @@ mod tests {
                 ]),
                 sso_domain: None,
                 sso_name: None,
+                stable_id: None,
             }
         }
 

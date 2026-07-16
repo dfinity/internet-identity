@@ -3,9 +3,11 @@ use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
-/// Key for the SSO stable-id bridge: `(iss, primary_client_id, stable_id) -> primary_sub`.
-/// `primary_client_id` scopes each entry to its primary client so distinct
-/// clients on the same `iss` don't collide.
+/// Key for the SSO stable-id index: `(iss, primary_client_id, stable_id) ->
+/// AnchorNumber`. `primary_client_id` scopes each entry to its primary client
+/// so distinct clients on the same `iss` don't collide. The value is
+/// maintained by [`crate::storage::Storage::write`], reconciled from the
+/// anchors' stored credentials.
 #[derive(Encode, Decode, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 #[cbor(map)]
 pub struct StorableSsoStableIdKey {

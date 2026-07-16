@@ -1375,7 +1375,7 @@ mod sso_gating {
     const UNGATED_ORIGIN: &str = "https://public.example";
     const PRIMARY_SUB: &str = "sso-primary-sub-0001";
     /// Pairwise (per-client) sub for the gated login; differs from the primary
-    /// sub, bridged via the `oid` aux lookup.
+    /// sub, bridged via the `oid` stable-id index.
     const PER_APP_SUB: &str = "entra-pairwise-sub-0002";
     const STABLE_OID: &str = "entra-oid-stable-0003";
     const TEST_TIME_MS: u64 = 1_800_000_000_000;
@@ -1417,13 +1417,55 @@ mod sso_gating {
         }
     }
 
+    /// A second COSE passkey / principal (borrowed from the Microsoft
+    /// different-principal fixture) so a credential can be moved to a distinct
+    /// anchor. The `build_fake_google_jwt_and_jwks` RSA key is deterministic, so
+    /// tokens minted for this principal verify against the same warmed JWKS.
+    fn test_pubkey_b() -> Vec<u8> {
+        vec![
+            48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38,
+            32, 1, 33, 88, 32, 8, 146, 104, 45, 59, 242, 233, 149, 153, 10, 83, 252, 72, 236, 114,
+            32, 116, 99, 16, 86, 47, 224, 150, 170, 9, 191, 42, 181, 81, 125, 157, 194, 34, 88, 32,
+            64, 124, 12, 58, 148, 180, 243, 137, 40, 0, 10, 151, 172, 157, 34, 32, 129, 114, 68,
+            156, 126, 187, 174, 224, 55, 171, 240, 28, 242, 24, 183, 78,
+        ]
+    }
+
+    fn test_principal_b() -> Principal {
+        Principal::self_authenticating(test_pubkey_b())
+    }
+
+    fn test_authn_method_b() -> AuthnMethodData {
+        AuthnMethodData {
+            authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+                pubkey: ByteBuf::from(test_pubkey_b()),
+            }),
+            metadata: Default::default(),
+            security_settings: AuthnMethodSecuritySettings {
+                protection: AuthnMethodProtection::Unprotected,
+                purpose: AuthnMethodPurpose::Authentication,
+            },
+            last_authentication: None,
+        }
+    }
+
     /// Build a JWT (and matching JWKS) for the gate issuer with the given `aud` /
-    /// `sub` and optional extra claims.
+    /// `sub` and optional extra claims, bound to [`test_principal`].
     fn token(aud: &str, sub: &str, extra_claims: &[(&str, &str)]) -> (String, String) {
+        token_for(&test_principal(), aud, sub, extra_claims)
+    }
+
+    /// Like [`token`] but bound to an arbitrary caller principal.
+    fn token_for(
+        principal: &Principal,
+        aud: &str,
+        sub: &str,
+        extra_claims: &[(&str, &str)],
+    ) -> (String, String) {
         let iat = (TEST_TIME_MS / 1_000) - 300;
         build_fake_google_jwt_and_jwks(FakeJwtInput {
             salt: &test_salt(),
-            principal: &test_principal(),
+            principal,
             issuer: GATE_ISSUER,
             aud,
             sub,
@@ -1752,7 +1794,7 @@ mod sso_gating {
 
     /// Entra-style org (`oid` stable claim, pairwise `sub`): the first gated
     /// login needs a normal login first, then resolves to the same anchor once
-    /// the aux index is populated.
+    /// the stable-id index is populated. Covers scenario (a).
     #[test]
     fn entra_oid_first_gated_needs_normal_then_resolves() -> Result<(), RejectResponse> {
         let env = env();
@@ -1768,8 +1810,8 @@ mod sso_gating {
         // Pairwise per-app token: its sub differs from the primary credential's.
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // First gated login, before any normal login populated the aux index:
-        // no anchor resolves.
+        // First gated login, before any normal login populated the stable-id
+        // index: no anchor resolves.
         let first = drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1788,7 +1830,8 @@ mod sso_gating {
             "first gated login (non-sub) must need a normal login first, got {first:?}"
         );
 
-        // A normal login carries both sub and oid, populating the aux index.
+        // A normal login carries both sub and oid; storing the stamped primary
+        // credential reconciles the stable-id index.
         let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1825,10 +1868,12 @@ mod sso_gating {
         Ok(())
     }
 
-    /// The persisted aux bridge survives a canister upgrade: an `oid` user who
-    /// signed in normally once keeps resolving gated logins after an upgrade.
+    /// Removing the primary OpenID credential self-cleans the stable-id index:
+    /// a later gated login fails safe with `NoSuchAnchor`. This is the cleanup
+    /// the redesign delivers (scenario (b)) — the insert-only bridge left an
+    /// orphan that would keep resolving.
     #[test]
-    fn aux_bridge_survives_upgrade() -> Result<(), RejectResponse> {
+    fn removing_primary_credential_unlinks_gated_login() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
@@ -1841,8 +1886,201 @@ mod sso_gating {
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // A normal login records the (iss, primary_client, oid) -> primary_sub
-        // bridge in stable memory.
+        // A normal login populates the index; the gated login resolves.
+        let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(normal.anchor_number, identity_number);
+        let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(resolved.anchor_number, identity_number);
+
+        // Remove the primary credential. The anchor `write()` self-cleans the
+        // stable-id index entry for this `oid`.
+        let key: OpenIdCredentialKey = (
+            GATE_ISSUER.to_string(),
+            PRIMARY_SUB.to_string(),
+            PRIMARY_CLIENT.to_string(),
+        );
+        api::openid_credential_remove(&env, canister_id, test_principal(), identity_number, &key)?
+            .expect("primary credential removal");
+
+        // The gated login now fails safe: no orphaned index entry lingers.
+        let after = drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(after, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "gated login must fail safe after the primary credential is removed, got {after:?}"
+        );
+        Ok(())
+    }
+
+    /// A credential moved from anchor A to anchor B re-points the gated login:
+    /// once the primary credential is removed from A and normally logged into B,
+    /// the same `oid`'s gated login resolves to B (scenario (c)).
+    #[test]
+    fn credential_move_repoints_gated_login() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+
+        // Anchor A: register + normal login -> the index points at A.
+        let anchor_a =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+        let session_key = ByteBuf::from("dapp session key");
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
+        let normal_a = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &primary_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(normal_a.anchor_number, anchor_a);
+        let resolved_a = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(resolved_a.anchor_number, anchor_a);
+
+        // Anchor B: a second identity with a distinct passkey principal.
+        let anchor_b = create_identity_with_authn_method(&env, canister_id, &test_authn_method_b());
+
+        // Move: unlink the primary credential from A ...
+        let key: OpenIdCredentialKey = (
+            GATE_ISSUER.to_string(),
+            PRIMARY_SUB.to_string(),
+            PRIMARY_CLIENT.to_string(),
+        );
+        api::openid_credential_remove(&env, canister_id, test_principal(), anchor_a, &key)?
+            .expect("remove primary credential from A");
+
+        // ... link it to B (token bound to B's principal), then normally log in
+        // through B so the stamped primary credential re-points the index at B.
+        let (primary_jwt_b, _) = token_for(
+            &test_principal_b(),
+            PRIMARY_CLIENT,
+            PRIMARY_SUB,
+            &[("oid", STABLE_OID)],
+        );
+        drive_sso_until_ready(&env, &responses, || {
+            api::openid_credential_add_with_discovery(
+                &env,
+                canister_id,
+                test_principal_b(),
+                anchor_b,
+                &primary_jwt_b,
+                &test_salt(),
+                Some(GATE_DOMAIN),
+            )
+            .unwrap()
+        })
+        .expect("link primary credential to B");
+        let normal_b = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal_b(),
+                &primary_jwt_b,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                UNGATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(normal_b.anchor_number, anchor_b);
+
+        // The gated login (same `oid`) now resolves to anchor B.
+        let resolved_b = expect_ready(drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        }));
+        assert_eq!(
+            resolved_b.anchor_number, anchor_b,
+            "gated login must follow the moved credential to anchor B"
+        );
+        Ok(())
+    }
+
+    /// The stable-id index survives a canister upgrade (scenario (e)): an `oid`
+    /// user who signed in normally once keeps resolving gated logins after an
+    /// upgrade — the index lives in stable memory.
+    #[test]
+    fn sso_stable_id_index_survives_upgrade() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+        let identity_number =
+            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+
+        let session_key = ByteBuf::from("dapp session key");
+        let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
+
+        // A normal login stamps the primary credential; the write reconciles
+        // the (iss, primary_client, oid) -> anchor entry into the stable index.
         let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -1858,10 +2096,10 @@ mod sso_gating {
         }));
         assert_eq!(normal.anchor_number, identity_number);
 
-        // Upgrade the canister; the stable bridge survives.
+        // Upgrade the canister; the stable index survives.
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-        // The gated login resolves via the persisted bridge, no fresh primary
+        // The gated login resolves via the persisted index, no fresh primary
         // login needed.
         let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
@@ -1878,7 +2116,7 @@ mod sso_gating {
         }));
         assert_eq!(
             resolved.anchor_number, identity_number,
-            "gated login must resolve via the persisted bridge after an upgrade"
+            "gated login must resolve via the persisted index after an upgrade"
         );
         Ok(())
     }

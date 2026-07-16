@@ -1749,11 +1749,6 @@ mod openid_api {
             Err(err) => return OpenIdResult::Err(err),
         };
 
-        // Persist the aux bridge entry (updates only; the paired query can't write).
-        if let Some(record) = &identity.aux_record {
-            openid::record_primary_sso_bridge(record);
-        }
-
         let prepared: Result<SsoPrepareDelegationResponse, OpenIdDelegationError> = async {
             let key = identity.credential.key();
             let anchor_number =
@@ -1821,7 +1816,7 @@ mod openid_api {
             Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
             Err(err) => return OpenIdResult::Err(err.into()),
         };
-        // Query context: ignore any `aux_record` — a query can't write the bridge.
+        // Query context: `resolve_primary_identity` only reads the stable-id index.
         let identity = match openid::resolve_primary_identity(&verification) {
             Ok(identity) => identity,
             Err(err) => return OpenIdResult::Err(err),

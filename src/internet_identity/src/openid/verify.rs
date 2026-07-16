@@ -212,6 +212,9 @@ pub(super) fn verify_and_build(
         metadata,
         sso_domain,
         sso_name,
+        // Set later at SSO write time for a non-`sub` primary credential; a
+        // freshly verified token never carries it.
+        stable_id: None,
     })
 }
 

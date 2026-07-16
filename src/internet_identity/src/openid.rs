@@ -38,8 +38,8 @@ pub use sso_bundle::{
     get_sso_attr_bundle_signature, prepare_sso_attr_bundle, read_certified_sso_bundle,
 };
 pub use sso_gating::{
-    note_primary_sso_login, record_primary_sso_bridge, resolve_primary_identity,
-    verify_sso_for_registration, verify_sso_jwt,
+    resolve_primary_identity, stamp_primary_sso_stable_id, verify_sso_for_registration,
+    verify_sso_jwt,
 };
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
@@ -108,6 +108,16 @@ pub struct OpenIdCredential {
     /// `ii-openid-configuration`. May be `None` even for SSO credentials —
     /// domains aren't required to publish a `name`.
     pub sso_name: Option<String>,
+    /// Cross-client-stable identifier (the `oid` claim value) for a non-`sub`
+    /// SSO org, stamped only on the anchor's primary-keyed credential at SSO
+    /// write time. Drives the storage-maintained SSO stable-id index: the
+    /// index entry `(iss, aud, stable_id) -> anchor` is reconciled from this
+    /// field on every anchor `write()`, so it self-cleans when the credential
+    /// is removed or moved. `None` for `sub` orgs, direct providers, and any
+    /// non-primary credential. Storage-internal only — deliberately absent
+    /// from the candid `OpenIdCredentialData` so the `oid` never crosses the
+    /// candid boundary.
+    pub stable_id: Option<String>,
 }
 
 impl OpenIdCredential {
