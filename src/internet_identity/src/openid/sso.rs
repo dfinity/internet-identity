@@ -25,7 +25,7 @@ pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
 
 pub(super) const MAX_APP_CLIENTS: usize = 100;
 
-/// Untrusted well-known value; bounded at 255 like the other discovery fields.
+/// Maximum length of an app_clients client_id.
 const MAX_APP_CLIENT_ID_LENGTH: usize = 255;
 
 #[cfg(not(test))]

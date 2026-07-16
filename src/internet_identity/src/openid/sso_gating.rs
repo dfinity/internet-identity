@@ -11,8 +11,7 @@ use crate::state;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegFinishError};
 
-/// Untrusted claim value (stored + an index key); bounded at 255 like the
-/// other caps.
+/// Maximum length of the configured stable-identifier claim value.
 const MAX_STABLE_IDENTIFIER_LENGTH: usize = 255;
 
 /// A verified SSO login. `credential.aud` is the resolved (per-app or primary)
