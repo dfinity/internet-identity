@@ -6,7 +6,7 @@ import {
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { Agent as UndiciAgent } from "undici";
-import { test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import type {
@@ -62,7 +62,7 @@ const permissionsString = (permissions: Permissions): string =>
 
 const holdConfirm = async (page: Page, name: string): Promise<void> => {
   const button = page.getByRole("button", { name });
-  await button.waitFor({ state: "visible" });
+  await expect(button).toBeEnabled();
   const box = await button.boundingBox();
   if (box === null) {
     throw new Error(`hold target "${name}" has no bounding box`);

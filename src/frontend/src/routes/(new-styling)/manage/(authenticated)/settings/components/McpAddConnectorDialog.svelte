@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { TriangleAlertIcon, RotateCwIcon, CheckIcon } from "@lucide/svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -32,12 +33,18 @@
   let parsedUrl = $state<string | undefined>(undefined);
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let destroyed = false;
+
+  onDestroy(() => {
+    destroyed = true;
+    clearTimeout(debounceTimer);
+  });
 
   const verify = async (url: string) => {
     verifyState = "checking";
     parsedUrl = url;
     const ok = await probeMcpServer(url);
-    if (urlInput.trim() === url) {
+    if (!destroyed && urlInput.trim() === url) {
       verifyState = ok ? "ok" : "unverified";
     }
   };
@@ -197,8 +204,8 @@
     <HoldToConfirm
       label={$t`Hold to continue`}
       variant="primary"
+      disabled={!canConfirm}
       onComplete={handleConfirm}
-      class={canConfirm ? "" : "pointer-events-none opacity-60"}
     />
   </div>
 </Dialog>

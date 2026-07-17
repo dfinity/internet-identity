@@ -9,7 +9,7 @@ const APP = "nice-name.com";
 
 const holdSettingsConfirm = async (page: Page, name: string): Promise<void> => {
   const button = page.getByRole("button", { name });
-  await button.waitFor({ state: "visible" });
+  await expect(button).toBeEnabled();
   const box = await button.boundingBox();
   if (box === null) {
     throw new Error(`hold target "${name}" has no bounding box`);

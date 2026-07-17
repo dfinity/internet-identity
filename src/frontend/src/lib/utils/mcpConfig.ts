@@ -95,6 +95,13 @@ export const setMcpTrustedServer = (
   url: string,
 ): Promise<McpConfig> => updateConfig(actor, identityNumber, { url });
 
+export const trustAndEnableMcp = (
+  actor: ActorSubclass<_SERVICE>,
+  identityNumber: bigint,
+  url: string,
+): Promise<McpConfig> =>
+  updateConfig(actor, identityNumber, { url, enabled: true });
+
 /** Forget the trusted server URL (synced). */
 export const clearMcpTrustedServer = (
   actor: ActorSubclass<_SERVICE>,

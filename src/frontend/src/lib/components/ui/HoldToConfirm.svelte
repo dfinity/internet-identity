@@ -11,6 +11,7 @@
     duration?: number;
     label: string;
     completed?: boolean;
+    disabled?: boolean;
     variant?: "secondary" | "primary";
     onComplete?: () => void;
     class?: string;
@@ -20,11 +21,14 @@
     duration = 2500,
     label,
     completed = false,
+    disabled = false,
     variant = "secondary",
     onComplete,
     class: className,
     ...props
   }: Props = $props();
+
+  const inactive = $derived(completed || disabled);
 
   let progress = $state(0);
 
@@ -48,22 +52,22 @@
 <button
   {...props}
   type="button"
-  disabled={completed}
+  disabled={inactive}
   aria-label={completed ? $t`Confirmed` : label}
   onmousedown={() => {
-    if (!completed) controller.start();
+    if (!inactive) controller.start();
   }}
   onmouseup={() => controller.cancel()}
   onmouseleave={() => controller.cancel()}
   ontouchstart={(e) => {
-    if (completed) return;
+    if (inactive) return;
     e.preventDefault();
     controller.start();
   }}
   ontouchend={() => controller.cancel()}
   ontouchcancel={() => controller.cancel()}
   onkeydown={(e) => {
-    if (e.code !== "Space" || e.repeat || completed) return;
+    if (e.code !== "Space" || e.repeat || inactive) return;
     e.preventDefault();
     controller.start();
   }}
@@ -77,6 +81,7 @@
     completed || variant === "primary"
       ? "bg-bg-brand-solid border-border-brand text-text-primary-inversed"
       : "bg-bg-primary border-border-secondary text-text-primary",
+    disabled && !completed && "opacity-60",
     "transition-colors duration-200",
     className,
   ]}
