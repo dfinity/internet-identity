@@ -220,21 +220,9 @@
           </span>
 
           <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div class="flex flex-row flex-wrap items-center gap-x-2 gap-y-1">
-              <span class="text-text-primary truncate text-sm font-semibold">
-                {hostOf(trusted)}
-              </span>
-              <Tooltip
-                label={$t`Custom connector`}
-                description={$t`You added this connector yourself. Only keep it if you fully trust it.`}
-              >
-                <span
-                  class="border-border-secondary text-text-tertiary inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold"
-                >
-                  {$t`Custom`}
-                </span>
-              </Tooltip>
-            </div>
+            <span class="text-text-primary truncate text-sm font-semibold">
+              {hostOf(trusted)}
+            </span>
             <span
               class="text-text-tertiary truncate font-mono text-xs"
               title={trusted}
