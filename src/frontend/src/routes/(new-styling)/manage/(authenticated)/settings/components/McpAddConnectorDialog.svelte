@@ -161,26 +161,21 @@
       </li>
     </ul>
 
-    <div class="relative">
-      <Input
-        bind:value={urlInput}
-        oninput={handleInput}
-        onblur={handleBlur}
-        label={$t`Connector URL`}
-        placeholder="https://mcp.example.com/mcp"
-        aria-label={$t`MCP server URL`}
-        error={errorText}
-        disabled={saving}
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck={false}
-        inputClass="pe-11 font-mono text-sm"
-      />
-
-      <span
-        class="pointer-events-none absolute inset-e-3 top-8 flex size-6 items-center justify-center"
-        aria-hidden={verifyState !== "ok" && verifyState !== "unverified"}
-      >
+    <Input
+      bind:value={urlInput}
+      oninput={handleInput}
+      onblur={handleBlur}
+      label={$t`Connector URL`}
+      placeholder="https://mcp.example.com/mcp"
+      aria-label={$t`MCP server URL`}
+      error={errorText}
+      disabled={saving}
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck={false}
+      inputClass="pe-11 font-mono text-sm"
+    >
+      {#snippet trailing()}
         {#if verifyState === "checking"}
           <ProgressRing class="text-fg-tertiary size-5" />
         {:else if verifyState === "ok"}
@@ -205,8 +200,8 @@
             </span>
           </Tooltip>
         {/if}
-      </span>
-    </div>
+      {/snippet}
+    </Input>
 
     <HoldToConfirm
       label={$t`Hold to continue`}
