@@ -113,12 +113,6 @@
       trusted = url;
       showAdd = false;
       enableOnSave = false;
-      toaster.success({
-        title: enableNow
-          ? $t`You're all set. AI access is on with ${hostOf(url)}.`
-          : $t`${hostOf(url)} has been added.`,
-        duration: 4000,
-      });
     } catch {
       toaster.error({
         title: $t`Couldn't save your trusted server. Please try again.`,
@@ -132,16 +126,11 @@
   const handleRemove = async () => {
     if (trusted === undefined) return;
     const previousUrl = trusted;
-    const previousHost = hostOf(trusted);
     const previousEnabled = enabled;
     trusted = undefined;
     enabled = false;
     try {
       await clearAndDisableMcp($authenticatedStore.actor, identityNumber);
-      toaster.info({
-        title: $t`${previousHost} was removed. AI access is now off.`,
-        duration: 4000,
-      });
     } catch {
       trusted = previousUrl;
       enabled = previousEnabled;

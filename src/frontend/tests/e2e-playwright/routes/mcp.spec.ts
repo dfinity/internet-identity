@@ -517,16 +517,20 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page); // leaves the page on Settings, server trusted
 
-  await page.getByRole("button", { name: "Remove this server" }).click();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/call") &&
+        response.request().method() === "POST",
+    ),
+    page.getByRole("button", { name: "Remove this server" }).click(),
+  ]);
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("switch", { name: "AI access" }),
   ).not.toBeChecked();
-  await expect(
-    page.getByText(/was removed\. AI access is now off/),
-  ).toBeVisible();
 
   // Trust is re-verified against the synced config at connect time, so with no
   // trusted server the connect lands on the untrusted screen.
