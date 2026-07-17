@@ -1,24 +1,11 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "../fixtures";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import { addVirtualAuthenticator, holdToConfirm, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
  *  session is registered for the user's identity; the app account is chosen
  *  server-side per call), but kept to exercise that the param is tolerated. */
 const APP = "nice-name.com";
-
-const holdSettingsConfirm = async (page: Page, name: string): Promise<void> => {
-  const button = page.getByRole("button", { name });
-  await expect(button).toBeEnabled();
-  const box = await button.boundingBox();
-  if (box === null) {
-    throw new Error(`hold target "${name}" has no bounding box`);
-  }
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(2800);
-  await page.mouse.up();
-};
 
 const signUp = async (page: Page): Promise<void> => {
   const continueWithPasskey = page.getByRole("button", {
@@ -172,7 +159,7 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
   );
   await settingsPage.getByRole("switch", { name: "AI access" }).click();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await holdSettingsConfirm(settingsPage, "Hold to continue");
+  await holdToConfirm(settingsPage, "Hold to continue");
   await expect(
     settingsPage.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -282,7 +269,7 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   await page.waitForURL(II_URL + "/manage/settings");
   await page.getByRole("switch", { name: "AI access" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await holdSettingsConfirm(page, "Hold to continue");
+  await holdToConfirm(page, "Hold to continue");
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();

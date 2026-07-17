@@ -14,11 +14,10 @@
 
   interface Props {
     onClose: () => void;
-    onSave: (url: string) => void;
-    saving: boolean;
+    onSave: (url: string) => Promise<void>;
   }
 
-  const { onClose, onSave, saving }: Props = $props();
+  const { onClose, onSave }: Props = $props();
 
   type VerifyState =
     | "idle"
@@ -31,6 +30,7 @@
   let urlInput = $state("");
   let verifyState = $state<VerifyState>("idle");
   let parsedUrl = $state<string | undefined>(undefined);
+  let saving = $state(false);
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let destroyed = false;
@@ -79,9 +79,14 @@
       (verifyState === "ok" || verifyState === "unverified"),
   );
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (parsedUrl === undefined) return;
-    onSave(parsedUrl);
+    saving = true;
+    try {
+      await onSave(parsedUrl);
+    } finally {
+      saving = false;
+    }
   };
 
   const errorText = $derived(
@@ -208,7 +213,7 @@
       label={$t`Hold to continue`}
       variant="primary"
       disabled={!canConfirm}
-      onComplete={handleConfirm}
+      onComplete={() => void handleConfirm()}
     />
   </div>
 </Dialog>

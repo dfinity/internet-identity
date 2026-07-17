@@ -12,7 +12,6 @@
   import {
     readMcpConfig,
     setMcpEnabled,
-    setMcpTrustedServer,
     trustAndEnableMcp,
     clearAndDisableMcp,
   } from "$lib/utils/mcpConfig";
@@ -34,10 +33,7 @@
   // True until the initial config read completes, so the toggle doesn't flicker
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
-  let saving = $state(false);
-
   let showAdd = $state(false);
-  let enableOnSave = $state(false);
 
   const hostOf = (url: string): string => {
     try {
@@ -71,7 +67,6 @@
     const next = enabled;
     if (next && trusted === undefined) {
       enabled = false;
-      enableOnSave = true;
       showAdd = true;
       return;
     }
@@ -86,40 +81,21 @@
     }
   };
 
-  const openAdd = () => {
-    enableOnSave = !enabled;
-    showAdd = true;
-  };
-
   const handleAddClose = () => {
     showAdd = false;
-    enableOnSave = false;
   };
 
   const handleAddSave = async (url: string) => {
-    const enableNow = enableOnSave;
-    saving = true;
     try {
-      if (enableNow) {
-        await trustAndEnableMcp($authenticatedStore.actor, identityNumber, url);
-        enabled = true;
-      } else {
-        await setMcpTrustedServer(
-          $authenticatedStore.actor,
-          identityNumber,
-          url,
-        );
-      }
+      await trustAndEnableMcp($authenticatedStore.actor, identityNumber, url);
+      enabled = true;
       trusted = url;
       showAdd = false;
-      enableOnSave = false;
     } catch {
       toaster.error({
         title: $t`Couldn't save your trusted server. Please try again.`,
         duration: 4000,
       });
-    } finally {
-      saving = false;
     }
   };
 
@@ -226,23 +202,11 @@
             </button>
           </Tooltip>
         </div>
-      {:else}
-        <button
-          class="btn btn-secondary btn-sm w-full sm:w-auto"
-          onclick={openAdd}
-          disabled={saving}
-        >
-          {$t`Add connector`}
-        </button>
       {/if}
     </div>
   {/if}
 </section>
 
 {#if showAdd}
-  <McpAddConnectorDialog
-    onClose={handleAddClose}
-    onSave={handleAddSave}
-    {saving}
-  />
+  <McpAddConnectorDialog onClose={handleAddClose} onSave={handleAddSave} />
 {/if}

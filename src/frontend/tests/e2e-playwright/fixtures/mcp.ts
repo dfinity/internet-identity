@@ -6,7 +6,7 @@ import {
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { Agent as UndiciAgent } from "undici";
-import { expect, test as base, type Page } from "@playwright/test";
+import { test as base, type Page } from "@playwright/test";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import type {
@@ -15,7 +15,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { toBase64URL } from "../../../src/lib/utils/utils";
 import { AUTH_CALLBACKS_PATH } from "../../../src/lib/utils/authCallbacks";
-import { II_URL } from "../utils";
+import { holdToConfirm, II_URL } from "../utils";
 import { DEFAULT_HOST } from "./identity";
 
 /** What the MCP server stand-in does on its next redemption. */
@@ -59,19 +59,6 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
 
 const permissionsString = (permissions: Permissions): string =>
   "queries" in permissions ? "queries" : "all";
-
-const holdConfirm = async (page: Page, name: string): Promise<void> => {
-  const button = page.getByRole("button", { name });
-  await expect(button).toBeEnabled();
-  const box = await button.boundingBox();
-  if (box === null) {
-    throw new Error(`hold target "${name}" has no bounding box`);
-  }
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(2800);
-  await page.mouse.up();
-};
 
 /** The outcome the connect reports once the server redeems the registration
  *  delegation: the state echo, the session grant's expiration (ns since epoch,
@@ -396,7 +383,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
       await page.waitForURL(`${II_URL}/manage/settings`);
       await page.getByRole("switch", { name: "AI access" }).click();
       await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
-      await holdConfirm(page, "Hold to continue");
+      await holdToConfirm(page, "Hold to continue");
       await page
         .getByRole("button", { name: "Remove this server" })
         .waitFor({ state: "visible" });
