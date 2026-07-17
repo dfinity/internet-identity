@@ -23,10 +23,12 @@ pub struct StorableMcpGrant {
     #[n(1)]
     pub expires_at_ns: u64,
     /// Whether the per-app delegations this session mints are restricted to
-    /// query calls (queries-only). Chosen once at connect (`mcp_register_v2`) and
-    /// applied to every delegation the session mints — read-only is a property
-    /// of the whole MCP session, not a per-call flag. Both `prepare` and `get`
-    /// read it, since the access level is folded into the delegation signature.
+    /// query calls (queries-only). Chosen once at connect: recorded by
+    /// `prepare_mcp_registration_delegation` and written onto the grant when
+    /// `mcp_register_v2` binds it, then applied to every delegation the session
+    /// mints — read-only is a property of the whole MCP session, not a per-call
+    /// flag. Both `prepare` and `get` read it, since the access level is folded
+    /// into the delegation signature.
     #[n(2)]
     pub read_only: bool,
 }
