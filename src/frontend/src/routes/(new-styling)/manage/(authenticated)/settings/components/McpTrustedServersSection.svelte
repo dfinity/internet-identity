@@ -158,10 +158,10 @@
 >
   <div class="flex flex-row items-start gap-3 sm:gap-4">
     <span
-      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-12 shrink-0 items-center justify-center rounded-lg border"
+      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
       aria-hidden="true"
     >
-      <BotIcon class="size-5.5" />
+      <BotIcon class="size-5" />
     </span>
 
     <div class="flex min-w-0 flex-1 flex-col gap-1">
