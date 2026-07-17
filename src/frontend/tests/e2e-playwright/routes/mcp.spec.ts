@@ -7,6 +7,22 @@ import { addVirtualAuthenticator, II_URL } from "../utils";
  *  server-side per call), but kept to exercise that the param is tolerated. */
 const APP = "nice-name.com";
 
+/** Press-and-hold the named HoldToConfirm button until it fires its
+ *  `onComplete`. Mirrors the fixture-local helper; kept inline here so specs
+ *  that drive the Settings UI directly don't need to reach into the fixture. */
+const holdSettingsConfirm = async (page: Page, name: string): Promise<void> => {
+  const button = page.getByRole("button", { name });
+  await button.waitFor({ state: "visible" });
+  const box = await button.boundingBox();
+  if (box === null) {
+    throw new Error(`hold target "${name}" has no bounding box`);
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(2800);
+  await page.mouse.up();
+};
+
 const signUp = async (page: Page): Promise<void> => {
   const continueWithPasskey = page.getByRole("button", {
     name: "Continue with passkey",
@@ -111,10 +127,10 @@ test("Manage trusted server hands the session to a new Settings tab", async ({
   const settingsPage = await settingsPagePromise;
   await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
 
-  // The handed-off session means Settings opens authenticated: the trusted
-  // server section heading is shown and no sign-in screen appears.
+  // The handed-off session means Settings opens authenticated: the AI-access
+  // section heading is shown and no sign-in screen appears.
   await expect(
-    settingsPage.getByRole("heading", { name: "Trusted MCP server" }),
+    settingsPage.getByRole("heading", { name: "AI access" }),
   ).toBeVisible({ timeout: 10_000 });
 });
 
@@ -159,12 +175,11 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
         }),
       }),
   );
-  // The URL box only appears once the master toggle is on.
-  await settingsPage
-    .getByRole("switch", { name: "Trusted MCP server" })
-    .check();
+  // Toggling AI access on with no server opens the Add-connector dialog;
+  // fill the URL and hold the confirm to save.
+  await settingsPage.getByRole("switch", { name: "AI access" }).check();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await settingsPage.getByRole("button", { name: "Trust this server" }).click();
+  await holdSettingsConfirm(settingsPage, "Hold to continue");
   await expect(
     settingsPage.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -272,12 +287,13 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  // The URL box only appears once the master toggle is on.
-  await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+  // Toggling AI access on with no server opens the Add-connector dialog;
+  // fill the URL and hold the confirm to save.
+  await page.getByRole("switch", { name: "AI access" }).check();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await page.getByRole("button", { name: "Trust this server" }).click();
-  // Once a server is trusted the input is replaced by the server row, which
-  // carries a remove button — a unique assertion that it was added.
+  await holdSettingsConfirm(page, "Hold to continue");
+  // Once a server is trusted the URL input is gone (dialog closed), and the
+  // server row carries a remove button — a unique assertion it was added.
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -512,13 +528,15 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page); // leaves the page on Settings, server trusted
 
-  // Remove the server: the server row (and its Remove button) give way to the
-  // URL input again — the revoke path the fixture's add-only helper never hits.
+  // Remove the server: the row disappears and, because removing the only
+  // trusted server also disables the feature, the AI-access toggle flips off.
   await page.getByRole("button", { name: "Remove this server" }).click();
-  await expect(page.getByLabel("MCP server URL")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("switch", { name: "AI access" }),
+  ).not.toBeChecked();
 
   // Trust is re-verified against the synced config at connect time, so with no
   // trusted server the connect lands on the untrusted screen.
@@ -542,7 +560,7 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
 
   // Turn the feature off for this identity. The URL stays saved on-chain, but
   // the config is no longer `enabled`, so trust is off.
-  const toggle = page.getByRole("switch", { name: "Trusted MCP server" });
+  const toggle = page.getByRole("switch", { name: "AI access" });
   await toggle.uncheck();
   // The toggle flips the UI optimistically but disables itself while the
   // canister write is in flight (`disabled={saving}`), re-enabling only once

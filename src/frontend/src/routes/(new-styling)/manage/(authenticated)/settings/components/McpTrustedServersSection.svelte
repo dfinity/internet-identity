@@ -1,20 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    PlusIcon,
-    XIcon,
-    RotateCwIcon,
-    TriangleAlertIcon,
-  } from "@lucide/svelte";
+  import { GlobeIcon, Trash2Icon } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
-  import Input from "$lib/components/ui/Input.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { toaster } from "$lib/components/utils/toaster";
-  import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import {
@@ -23,7 +15,7 @@
     setMcpTrustedServer,
     clearMcpTrustedServer,
   } from "$lib/utils/mcpConfig";
-  import { parseMcpServerUrl, probeMcpServer } from "$lib/utils/mcpServer";
+  import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
 
   interface Props {
     identityNumber: bigint;
@@ -41,15 +33,13 @@
   // True until the initial config read completes, so the toggle doesn't flicker
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
-  // A canister write (toggle / add / remove) is in flight.
+  // A canister write (toggle / clear) is in flight.
   let saving = $state(false);
 
-  let urlInput = $state("");
-  let error = $state<string | undefined>();
-  // Live MCP status of the trusted server: undefined while unknown / in flight,
-  // true when it verified as MCP, false when it couldn't be.
-  let verified = $state<boolean | undefined>(undefined);
-  let checking = $state(false);
+  // When true, the Add dialog is open. `enableOnSave` means confirming will
+  // also flip the master toggle on (the "turning on with no server yet" path).
+  let showAdd = $state(false);
+  let enableOnSave = $state(false);
 
   const hostOf = (url: string): string => {
     try {
@@ -59,32 +49,6 @@
     }
   };
 
-  // Probe the trusted server for a real MCP endpoint. Best-effort and advisory:
-  // a server we can't reach/read (e.g. CORS) shows as unverified but stays
-  // active. Guard against a stale result if the entry changed while in flight.
-  // `notify` surfaces a success toast for explicit checks (add / re-check), not
-  // the silent check on page load.
-  const verify = async (options?: { notify?: boolean }) => {
-    const url = trusted;
-    if (url === undefined) {
-      return;
-    }
-    checking = true;
-    const ok = await probeMcpServer(url);
-    if (trusted === url) {
-      verified = ok;
-      if (ok && options?.notify === true) {
-        toaster.success({
-          title: $t`Verified ${hostOf(url)} as an MCP server.`,
-          duration: 4000,
-        });
-      }
-    }
-    checking = false;
-  };
-
-  // Load the synced config when the section opens, then verify a server that is
-  // already set (and enabled).
   onMount(() => {
     void (async () => {
       try {
@@ -102,9 +66,6 @@
       } finally {
         loaded = true;
       }
-      if (enabled && trusted !== undefined) {
-        void verify();
-      }
     })();
   });
 
@@ -113,14 +74,26 @@
       return;
     }
     const next = event.currentTarget.checked;
+    // Turning on with no trusted server yet: don't write anything. Open the
+    // Add dialog and let its confirm flip the master toggle atomically after
+    // the URL is saved. Revert the visual toggle immediately so it doesn't
+    // flash on while the dialog is up.
+    if (next && trusted === undefined) {
+      event.currentTarget.checked = false;
+      enableOnSave = true;
+      showAdd = true;
+      return;
+    }
     const previous = enabled;
     enabled = next; // optimistic; reverted below if the write fails
     saving = true;
     try {
       await setMcpEnabled($authenticatedStore.actor, identityNumber, next);
-      // Re-check a previously-set server when re-enabling.
-      if (next && trusted !== undefined) {
-        void verify({ notify: true });
+      if (!next) {
+        toaster.info({
+          title: $t`AI access is off.`,
+          duration: 4000,
+        });
       }
     } catch {
       enabled = previous;
@@ -133,26 +106,47 @@
     }
   };
 
-  const handleAdd = async () => {
-    error = undefined;
-    const parsed = parseMcpServerUrl(urlInput);
-    if (parsed === undefined) {
-      error = $t`Enter a valid https URL (for example https://mcp.example.com/mcp).`;
-      return;
-    }
+  const openAdd = () => {
+    enableOnSave = !enabled;
+    showAdd = true;
+  };
+
+  const handleAddClose = () => {
+    showAdd = false;
+    enableOnSave = false;
+  };
+
+  // Save the URL from the Add dialog. If we entered via "toggle on with no
+  // server", also flip the master toggle in the same canister round-trip so
+  // the two writes can't disagree.
+  const handleAddSave = async (url: string) => {
     saving = true;
     try {
-      await setMcpTrustedServer(
-        $authenticatedStore.actor,
-        identityNumber,
-        parsed.url,
-      );
-      // Activate (verification is advisory): the server is trusted even if the
-      // probe can't confirm it speaks MCP.
-      trusted = parsed.url;
-      urlInput = "";
-      verified = undefined;
-      await verify({ notify: true });
+      if (enableOnSave) {
+        await setMcpTrustedServer(
+          $authenticatedStore.actor,
+          identityNumber,
+          url,
+        );
+        await setMcpEnabled($authenticatedStore.actor, identityNumber, true);
+        trusted = url;
+        enabled = true;
+      } else {
+        await setMcpTrustedServer(
+          $authenticatedStore.actor,
+          identityNumber,
+          url,
+        );
+        trusted = url;
+      }
+      showAdd = false;
+      enableOnSave = false;
+      toaster.success({
+        title: enabled
+          ? $t`You're all set. AI access is on with ${hostOf(url)}.`
+          : $t`${hostOf(url)} has been added.`,
+        duration: 4000,
+      });
     } catch {
       toaster.error({
         title: $t`Couldn't save your trusted server. Please try again.`,
@@ -163,19 +157,27 @@
     }
   };
 
-  const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === "Enter" && !checking && !saving) {
-      event.preventDefault();
-      void handleAdd();
-    }
-  };
-
+  // Removing the only trusted server. If MCP was enabled, turn it off too:
+  // an enabled config with no URL can't gate anything, so the two writes are
+  // paired.
   const handleRemove = async () => {
+    if (trusted === undefined) return;
+    const previousHost = hostOf(trusted);
+    const wasEnabled = enabled;
     saving = true;
     try {
       await clearMcpTrustedServer($authenticatedStore.actor, identityNumber);
       trusted = undefined;
-      verified = undefined;
+      if (wasEnabled) {
+        await setMcpEnabled($authenticatedStore.actor, identityNumber, false);
+        enabled = false;
+      }
+      toaster.info({
+        title: wasEnabled
+          ? $t`${previousHost} was removed. AI access is now off.`
+          : $t`${previousHost} was removed.`,
+        duration: 4000,
+      });
     } catch {
       toaster.error({
         title: $t`Couldn't remove the server. Please try again.`,
@@ -188,30 +190,38 @@
 </script>
 
 <section
-  class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-4 sm:p-5"
+  class="border-border-secondary bg-bg-secondary flex flex-col rounded-xl border p-4 sm:p-5"
 >
   <div class="flex flex-row items-start gap-3 sm:gap-4">
     <span
-      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
+      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-12 shrink-0 items-center justify-center rounded-lg border"
       aria-hidden="true"
     >
-      <McpIcon class="size-5" />
+      <McpIcon class="size-5.5" />
     </span>
 
-    <div
-      class="flex min-h-[2.5rem] min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1"
-    >
-      <h3 id={titleId} class="text-text-primary text-base font-semibold">
-        {$t`Trusted MCP server`}
-      </h3>
-      {#if enabled && trusted !== undefined}
-        <Badge color="success" size="sm" dot>
-          {$t`Enabled on all your devices`}
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <div
+        class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
+      >
+        <h3 id={titleId} class="text-text-primary text-base font-semibold">
+          {$t`AI access`}
+        </h3>
+        <Badge color="surface" size="sm">
+          {$t`Preview`}
         </Badge>
-      {/if}
+        {#if enabled && trusted !== undefined}
+          <Badge color="success" size="sm" dot>
+            {$t`Enabled on all devices`}
+          </Badge>
+        {/if}
+      </div>
+      <p class="text-text-tertiary text-sm">
+        {$t`Ask questions and perform actions across your apps by chatting with AI.`}
+      </p>
     </div>
 
-    <div class="flex h-10 shrink-0 items-center">
+    <div class="flex h-6 shrink-0 items-center">
       {#if loaded}
         <Toggle
           checked={enabled}
@@ -225,112 +235,77 @@
     </div>
   </div>
 
-  <div
-    class="border-fg-warning-primary bg-bg-warning-primary text-fg-warning-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium"
-  >
-    <TriangleAlertIcon class="size-4 shrink-0" />
-    <span>
-      {$t`Internet Identity MCP connectors are in preview. Use this feature at your own risk.`}
-    </span>
-  </div>
-
   {#if enabled}
-    <p class="text-text-tertiary text-sm">
-      <Trans>
-        Set the URL of an MCP server you trust. You will be able to add MCP
-        connectors to your AI agents that will then act on your behalf across
-        apps. This setting syncs across your devices.
-      </Trans>
-    </p>
-
-    {#if trusted !== undefined}
-      <div
-        class="border-border-secondary bg-bg-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2.5 sm:gap-3 sm:px-4"
+    <div class="border-border-tertiary mt-5 border-t pt-4">
+      <p
+        class="text-text-tertiary mb-3 text-xs font-semibold tracking-wider uppercase"
       >
-        <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
-          <Ellipsis text={trusted} position="middle" />
-        </span>
+        {$t`Trusted connectors`}
+      </p>
 
-        {#if !checking}
-          <Tooltip
-            label={verified === true
-              ? $t`Verified MCP server`
-              : verified === false
-                ? $t`Couldn't verify this server`
-                : $t`Not checked yet`}
-          >
-            <span
-              class={[
-                "size-2.5 shrink-0 rounded-full",
-                verified === true
-                  ? "bg-fg-success-primary"
-                  : verified === false
-                    ? "bg-fg-error-primary"
-                    : "bg-fg-quaternary",
-              ]}
-            ></span>
-          </Tooltip>
-        {/if}
-
-        <Tooltip label={$t`Re-check connection`}>
-          <button
-            class="btn btn-tertiary btn-sm btn-icon shrink-0"
-            onclick={() => void verify({ notify: true })}
-            disabled={checking}
-            aria-label={$t`Re-check connection`}
-          >
-            {#if checking}
-              <ProgressRing class="size-5" />
-            {:else}
-              <RotateCwIcon class="size-5" />
-            {/if}
-          </button>
-        </Tooltip>
-
-        <Tooltip label={$t`Remove this server`}>
-          <button
-            class="btn btn-tertiary btn-sm btn-icon shrink-0"
-            onclick={handleRemove}
-            disabled={saving}
-            aria-label={$t`Remove this server`}
-          >
-            <XIcon class="size-5" />
-          </button>
-        </Tooltip>
-      </div>
-
-      {#if verified === false && !checking}
-        <p class="text-text-tertiary text-sm">
-          {$t`Couldn't verify an MCP server at this URL. Please check the URL and that the server is running and retry.`}
-        </p>
-      {/if}
-    {:else}
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
-        <Input
-          bind:value={urlInput}
-          onkeydown={handleKeydown}
-          class="w-full min-w-0 sm:flex-1"
-          placeholder="https://mcp.example.com/mcp"
-          aria-label={$t`MCP server URL`}
-          {error}
-          disabled={saving}
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck={false}
-        />
-        <button
-          class="btn btn-secondary h-11 w-full sm:w-auto sm:shrink-0"
-          onclick={handleAdd}
-          disabled={urlInput.trim() === "" || saving}
+      {#if trusted !== undefined}
+        <div
+          class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
         >
-          {#if saving}
-            <ProgressRing class="size-5" />
-          {:else}
-            <PlusIcon class="size-5" />
-          {/if}
-          <span>{$t`Trust this server`}</span>
+          <span
+            class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"
+            aria-hidden="true"
+          >
+            <GlobeIcon class="size-4.5" />
+          </span>
+
+          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div class="flex flex-row flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="text-text-primary truncate text-sm font-semibold">
+                {hostOf(trusted)}
+              </span>
+              <Tooltip
+                label={$t`Custom connector`}
+                description={$t`You added this server yourself. Only keep it if you fully trust it.`}
+              >
+                <span
+                  class="border-border-secondary text-text-tertiary inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold"
+                >
+                  {$t`Custom`}
+                </span>
+              </Tooltip>
+            </div>
+            <span
+              class="text-text-tertiary truncate font-mono text-xs"
+              title={trusted}
+            >
+              {trusted}
+            </span>
+          </div>
+
+          <Tooltip label={$t`Remove this server`}>
+            <button
+              class="btn btn-tertiary btn-sm btn-icon shrink-0"
+              onclick={handleRemove}
+              disabled={saving}
+              aria-label={$t`Remove this server`}
+            >
+              <Trash2Icon class="size-4.5" />
+            </button>
+          </Tooltip>
+        </div>
+      {:else}
+        <button
+          class="btn btn-secondary btn-sm w-full sm:w-auto"
+          onclick={openAdd}
+          disabled={saving}
+        >
+          {$t`Add connector`}
         </button>
-      </div>
-    {/if}
+      {/if}
+    </div>
   {/if}
 </section>
+
+{#if showAdd}
+  <McpAddConnectorDialog
+    onClose={handleAddClose}
+    onSave={handleAddSave}
+    {saving}
+  />
+{/if}

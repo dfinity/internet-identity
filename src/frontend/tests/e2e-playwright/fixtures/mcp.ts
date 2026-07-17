@@ -60,6 +60,22 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
 const permissionsString = (permissions: Permissions): string =>
   "queries" in permissions ? "queries" : "all";
 
+/** Press-and-hold a HoldToConfirm button until it fires its `onComplete`. The
+ *  in-app component's default duration is 2.5 s; give it a little extra so the
+ *  first animation frame after mousedown doesn't cut it. */
+const holdConfirm = async (page: Page, name: string): Promise<void> => {
+  const button = page.getByRole("button", { name });
+  await button.waitFor({ state: "visible" });
+  const box = await button.boundingBox();
+  if (box === null) {
+    throw new Error(`hold target "${name}" has no bounding box`);
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(2800);
+  await page.mouse.up();
+};
+
 /** The outcome the connect reports once the server redeems the registration
  *  delegation: the state echo, the session grant's expiration (ns since epoch,
  *  as a decimal string — the value overflows JSON numbers), and the session's
@@ -381,11 +397,13 @@ export const test = base.extend<{ mcp: McpFixture }>({
       }
       await page.locator('a[href="/manage/settings"]').click();
       await page.waitForURL(`${II_URL}/manage/settings`);
-      // The URL box only appears once the master toggle is on; the remove button
-      // appears once the trusted server is saved to the canister.
-      await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+      // Toggling AI access on with no server yet opens the Add-connector
+      // dialog; fill the URL there and hold the confirm button to save.
+      // A trusted-server row (carrying the Remove button) appears once the
+      // write to the canister lands.
+      await page.getByRole("switch", { name: "AI access" }).check();
       await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
-      await page.getByRole("button", { name: "Trust this server" }).click();
+      await holdConfirm(page, "Hold to continue");
       await page
         .getByRole("button", { name: "Remove this server" })
         .waitFor({ state: "visible" });
