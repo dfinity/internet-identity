@@ -112,22 +112,11 @@
   const handleAddSave = async (url: string) => {
     saving = true;
     try {
+      await setMcpTrustedServer($authenticatedStore.actor, identityNumber, url);
+      trusted = url;
       if (enableOnSave) {
-        await setMcpTrustedServer(
-          $authenticatedStore.actor,
-          identityNumber,
-          url,
-        );
         await setMcpEnabled($authenticatedStore.actor, identityNumber, true);
-        trusted = url;
         enabled = true;
-      } else {
-        await setMcpTrustedServer(
-          $authenticatedStore.actor,
-          identityNumber,
-          url,
-        );
-        trusted = url;
       }
       showAdd = false;
       enableOnSave = false;
