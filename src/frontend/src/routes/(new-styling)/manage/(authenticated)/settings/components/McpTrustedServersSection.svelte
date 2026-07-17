@@ -13,7 +13,7 @@
     readMcpConfig,
     setMcpEnabled,
     setMcpTrustedServer,
-    clearMcpTrustedServer,
+    clearAndDisableMcp,
   } from "$lib/utils/mcpConfig";
   import McpAddConnectorDialog from "./McpAddConnectorDialog.svelte";
 
@@ -157,28 +157,27 @@
     }
   };
 
-  // Removing the only trusted server. If MCP was enabled, turn it off too:
-  // an enabled config with no URL can't gate anything, so the two writes are
-  // paired.
+  // Removing the only trusted server also turns the feature off: an enabled
+  // config with no URL can't gate anything. Both are cleared in one atomic
+  // write, and the UI collapses optimistically so no "add connector" state
+  // flashes between the two — reverted together if the write fails.
   const handleRemove = async () => {
     if (trusted === undefined) return;
+    const previousUrl = trusted;
     const previousHost = hostOf(trusted);
-    const wasEnabled = enabled;
+    const previousEnabled = enabled;
+    trusted = undefined;
+    enabled = false;
     saving = true;
     try {
-      await clearMcpTrustedServer($authenticatedStore.actor, identityNumber);
-      trusted = undefined;
-      if (wasEnabled) {
-        await setMcpEnabled($authenticatedStore.actor, identityNumber, false);
-        enabled = false;
-      }
+      await clearAndDisableMcp($authenticatedStore.actor, identityNumber);
       toaster.info({
-        title: wasEnabled
-          ? $t`${previousHost} was removed. AI access is now off.`
-          : $t`${previousHost} was removed.`,
+        title: $t`${previousHost} was removed. AI access is now off.`,
         duration: 4000,
       });
     } catch {
+      trusted = previousUrl;
+      enabled = previousEnabled;
       toaster.error({
         title: $t`Couldn't remove the server. Please try again.`,
         duration: 4000,
@@ -261,7 +260,7 @@
               </span>
               <Tooltip
                 label={$t`Custom connector`}
-                description={$t`You added this server yourself. Only keep it if you fully trust it.`}
+                description={$t`You added this connector yourself. Only keep it if you fully trust it.`}
               >
                 <span
                   class="border-border-secondary text-text-tertiary inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold"
@@ -278,7 +277,7 @@
             </span>
           </div>
 
-          <Tooltip label={$t`Remove this server`}>
+          <Tooltip label={$t`Remove`}>
             <button
               class="btn btn-tertiary btn-sm btn-icon shrink-0"
               onclick={handleRemove}

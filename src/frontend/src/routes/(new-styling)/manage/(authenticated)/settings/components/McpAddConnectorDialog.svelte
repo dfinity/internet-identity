@@ -7,6 +7,7 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
+  import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { parseMcpServerUrl, probeMcpServer } from "$lib/utils/mcpServer";
 
@@ -115,14 +116,24 @@
         {$t`Add AI access`}
       </h2>
       <p class="text-text-tertiary text-sm text-pretty">
-        {$t`To let AI ask questions and perform actions across your apps, add an MCP connector you trust.`}
+        <Trans>
+          To let AI ask questions and perform actions across your apps, add an
+          <a
+            href="https://modelcontextprotocol.io/docs/getting-started/intro"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-primary font-semibold hover:underline focus-visible:underline"
+          >
+            MCP connector
+          </a> you trust.
+        </Trans>
       </p>
     </div>
 
-    <ul class="flex flex-col gap-4">
+    <ul class="my-2 flex flex-col gap-5">
       <li class="flex flex-row items-start gap-3">
         <TriangleAlertIcon
-          class="text-fg-warning-primary mt-0.5 size-4.5 shrink-0"
+          class="text-fg-secondary mt-0.5 size-4.5 shrink-0"
           aria-hidden="true"
         />
         <div class="flex flex-col gap-0.5 text-sm">
@@ -183,12 +194,12 @@
           </Tooltip>
         {:else if verifyState === "unverified" && parsedUrl !== undefined}
           <Tooltip
-            label={$t`Couldn't verify this server`}
-            description={$t`We couldn't confirm this URL speaks MCP, but you can still trust it.`}
+            label={$t`Couldn't reach this connector`}
+            description={$t`We couldn't reach this URL to confirm it, but you can still trust it.`}
           >
             <span
               class="border-border-secondary text-fg-tertiary pointer-events-auto flex size-5 items-center justify-center rounded-full border"
-              aria-label={$t`Couldn't verify this server`}
+              aria-label={$t`Couldn't reach this connector`}
             >
               <TriangleAlertIcon class="size-3" />
             </span>
@@ -199,6 +210,7 @@
 
     <HoldToConfirm
       label={$t`Hold to continue`}
+      variant="primary"
       onComplete={handleConfirm}
       class={canConfirm ? "" : "pointer-events-none opacity-60"}
     />

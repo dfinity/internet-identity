@@ -11,6 +11,7 @@
     duration?: number;
     label: string;
     completed?: boolean;
+    variant?: "secondary" | "primary";
     onComplete?: () => void;
     class?: string;
   }
@@ -19,6 +20,7 @@
     duration = 2500,
     label,
     completed = false,
+    variant = "secondary",
     onComplete,
     class: className,
     ...props
@@ -71,10 +73,10 @@
     controller.cancel();
   }}
   class={[
-    "bg-bg-primary focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring relative box-border flex h-12 w-full touch-none items-center justify-center overflow-hidden rounded-md border px-4.5 text-base font-semibold outline-none select-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2",
-    completed
-      ? "border-border-brand text-text-primary-inversed"
-      : "border-border-secondary text-text-primary",
+    "focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring relative box-border flex h-12 w-full touch-none items-center justify-center overflow-hidden rounded-md border px-4.5 text-base font-semibold outline-none select-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2",
+    completed || variant === "primary"
+      ? "bg-bg-brand-solid border-border-brand text-text-primary-inversed"
+      : "bg-bg-primary border-border-secondary text-text-primary",
     "transition-colors duration-200",
     className,
   ]}
@@ -83,7 +85,11 @@
     aria-hidden="true"
     class={[
       "absolute inset-0 origin-left",
-      completed ? "bg-bg-brand-solid" : "bg-bg-primary_hover",
+      completed
+        ? "bg-bg-brand-solid"
+        : variant === "primary"
+          ? "bg-bg-brand-solid_hover"
+          : "bg-bg-primary_hover",
     ]}
     style="width: {progress * 100}%"
   ></span>
