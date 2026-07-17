@@ -43,6 +43,12 @@ const MAX_EMAIL_LENGTH: usize = 256;
 // already validate it on their end for a sane maximum length. This is an additional sanity check.
 const MAX_NAME_LENGTH: usize = 128;
 
+// Maximum length of the iss claim in the JWT; a sanity bound.
+const MAX_ISS_LENGTH: usize = 255;
+
+// Maximum length of the sub claim in the JWT; a sanity bound.
+const MAX_SUB_LENGTH: usize = 255;
+
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum EmailVerifiedClaim {
@@ -322,6 +328,16 @@ fn verify_claims(
     if now_secs < claims.iat {
         return Err(OpenIDJWTVerificationError::GenericError(
             "JWT is not valid yet".into(),
+        ));
+    }
+    if claims.iss.len() > MAX_ISS_LENGTH {
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "Issuer too long".into(),
+        ));
+    }
+    if claims.sub.len() > MAX_SUB_LENGTH {
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "Subject too long".into(),
         ));
     }
     if claims
@@ -627,5 +643,70 @@ mod tests {
         // `iat + window` overflows, which the verifier maps to `JWTExpired`
         // rather than panicking.
         assert_eq!(result, Err(OpenIDJWTVerificationError::JWTExpired));
+    }
+
+    // Nonce that matches `test_salt()` + `caller()`, so a crafted `Claims` gets
+    // past the earlier checks and reaches the seed-field length caps.
+    fn matching_nonce() -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(test_salt());
+        hasher.update(caller().to_bytes());
+        let hash: [u8; 32] = hasher.finalize().into();
+        BASE64_URL_SAFE_NO_PAD.encode(hash)
+    }
+
+    #[test]
+    fn should_reject_over_long_sub() {
+        reset_test_env();
+        let result = verify_claims(
+            "https://accounts.google.com",
+            TEST_AUD,
+            &Claims {
+                iss: "https://accounts.google.com".to_string(),
+                sub: "a".repeat(MAX_SUB_LENGTH + 1),
+                aud: AudClaim::Single(TEST_AUD.to_string()),
+                nonce: matching_nonce(),
+                exp: TEST_EXP_SECONDS,
+                iat: TEST_IAT_SECONDS,
+                email: None,
+                name: None,
+                email_verified: None,
+            },
+            &test_salt(),
+        );
+        assert_eq!(
+            result,
+            Err(OpenIDJWTVerificationError::GenericError(
+                "Subject too long".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn should_reject_over_long_iss() {
+        reset_test_env();
+        let long_iss = format!("https://{}", "a".repeat(MAX_ISS_LENGTH));
+        let result = verify_claims(
+            &long_iss,
+            TEST_AUD,
+            &Claims {
+                iss: long_iss.clone(),
+                sub: "sub".to_string(),
+                aud: AudClaim::Single(TEST_AUD.to_string()),
+                nonce: matching_nonce(),
+                exp: TEST_EXP_SECONDS,
+                iat: TEST_IAT_SECONDS,
+                email: None,
+                name: None,
+                email_verified: None,
+            },
+            &test_salt(),
+        );
+        assert_eq!(
+            result,
+            Err(OpenIDJWTVerificationError::GenericError(
+                "Issuer too long".to_string()
+            ))
+        );
     }
 }
