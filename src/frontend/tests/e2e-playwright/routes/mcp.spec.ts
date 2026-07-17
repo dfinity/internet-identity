@@ -170,7 +170,7 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
         }),
       }),
   );
-  await settingsPage.getByRole("switch", { name: "AI access" }).check();
+  await settingsPage.getByRole("switch", { name: "AI access" }).click();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdSettingsConfirm(settingsPage, "Hold to continue");
   await expect(
@@ -280,7 +280,7 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  await page.getByRole("switch", { name: "AI access" }).check();
+  await page.getByRole("switch", { name: "AI access" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdSettingsConfirm(page, "Hold to continue");
   await expect(
@@ -524,6 +524,9 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   await expect(
     page.getByRole("switch", { name: "AI access" }),
   ).not.toBeChecked();
+  await expect(
+    page.getByText(/was removed\. AI access is now off/),
+  ).toBeVisible();
 
   // Trust is re-verified against the synced config at connect time, so with no
   // trusted server the connect lands on the untrusted screen.
@@ -549,11 +552,7 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
   // the config is no longer `enabled`, so trust is off.
   const toggle = page.getByRole("switch", { name: "AI access" });
   await toggle.uncheck();
-  // The toggle flips the UI optimistically but disables itself while the
-  // canister write is in flight (`disabled={saving}`), re-enabling only once
-  // the write resolves. Wait for that before navigating, so the connect below
-  // reads the persisted (disabled) config rather than racing the write.
-  await expect(toggle).toBeEnabled();
+  await expect(page.getByText("AI access is off.")).toBeVisible();
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await allowAccess(page);

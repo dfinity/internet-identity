@@ -394,7 +394,7 @@ export const test = base.extend<{ mcp: McpFixture }>({
       }
       await page.locator('a[href="/manage/settings"]').click();
       await page.waitForURL(`${II_URL}/manage/settings`);
-      await page.getByRole("switch", { name: "AI access" }).check();
+      await page.getByRole("switch", { name: "AI access" }).click();
       await page.getByLabel("MCP server URL").fill(`${MCP_SERVER_ORIGIN}/mcp`);
       await holdConfirm(page, "Hold to continue");
       await page

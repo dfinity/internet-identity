@@ -67,36 +67,26 @@
     })();
   });
 
-  const handleToggle = async (event: Event) => {
-    if (!(event.currentTarget instanceof HTMLInputElement)) {
-      return;
-    }
-    const next = event.currentTarget.checked;
+  const handleToggle = async () => {
+    const next = enabled;
     if (next && trusted === undefined) {
-      event.currentTarget.checked = false;
+      enabled = false;
       enableOnSave = true;
       showAdd = true;
       return;
     }
-    const previous = enabled;
-    enabled = next; // optimistic; reverted below if the write fails
-    saving = true;
     try {
       await setMcpEnabled($authenticatedStore.actor, identityNumber, next);
-      if (!next) {
-        toaster.info({
-          title: $t`AI access is off.`,
-          duration: 4000,
-        });
-      }
+      toaster.info({
+        title: next ? $t`AI access is on.` : $t`AI access is off.`,
+        duration: 4000,
+      });
     } catch {
-      enabled = previous;
+      enabled = !next;
       toaster.error({
         title: $t`Couldn't save your change. Please try again.`,
         duration: 4000,
       });
-    } finally {
-      saving = false;
     }
   };
 
@@ -111,9 +101,10 @@
   };
 
   const handleAddSave = async (url: string) => {
+    const enableNow = enableOnSave;
     saving = true;
     try {
-      if (enableOnSave) {
+      if (enableNow) {
         await trustAndEnableMcp($authenticatedStore.actor, identityNumber, url);
         enabled = true;
       } else {
@@ -127,7 +118,7 @@
       showAdd = false;
       enableOnSave = false;
       toaster.success({
-        title: enabled
+        title: enableNow
           ? $t`You're all set. AI access is on with ${hostOf(url)}.`
           : $t`${hostOf(url)} has been added.`,
         duration: 4000,
@@ -149,7 +140,6 @@
     const previousEnabled = enabled;
     trusted = undefined;
     enabled = false;
-    saving = true;
     try {
       await clearAndDisableMcp($authenticatedStore.actor, identityNumber);
       toaster.info({
@@ -163,8 +153,6 @@
         title: $t`Couldn't remove the server. Please try again.`,
         duration: 4000,
       });
-    } finally {
-      saving = false;
     }
   };
 </script>
@@ -204,9 +192,8 @@
     <div class="flex h-6 shrink-0 items-center">
       {#if loaded}
         <Toggle
-          checked={enabled}
+          bind:checked={enabled}
           onchange={handleToggle}
-          disabled={saving}
           aria-labelledby={titleId}
         />
       {:else}
@@ -260,7 +247,6 @@
             <button
               class="btn btn-tertiary btn-sm btn-icon shrink-0"
               onclick={handleRemove}
-              disabled={saving}
               aria-label={$t`Remove this server`}
             >
               <Trash2Icon class="size-4.5" />
