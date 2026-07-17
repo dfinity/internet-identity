@@ -118,6 +118,9 @@ const iiCanisterIdPushEl = document.getElementById(
 const pushNotifyBtn = document.getElementById(
   "pushNotifyBtn",
 ) as HTMLButtonElement;
+const pushTitleEl = document.getElementById(
+  "pushTitle",
+) as HTMLInputElement;
 const pushMessageEl = document.getElementById(
   "pushMessage",
 ) as HTMLInputElement;
@@ -647,10 +650,11 @@ pushNotifyBtn.addEventListener("click", async () => {
   try {
     if (!delegationIdentity) throw new Error("Sign in first");
     const iiActor = await makeIiActor();
+    const title = pushTitleEl.value.trim() || "Hello from test-app";
     const message = pushMessageEl.value.trim() || "Push notifications work!";
     const res = await iiActor.notify_user(delegationIdentity.getPrincipal(), {
       hostname: window.location.host,
-      title: "Hello from test-app",
+      title,
       body: message,
       url: [],
     });
