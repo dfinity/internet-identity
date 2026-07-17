@@ -161,47 +161,56 @@
       </li>
     </ul>
 
-    <Input
-      bind:value={urlInput}
-      oninput={handleInput}
-      onblur={handleBlur}
-      label={$t`Connector URL`}
-      placeholder="https://mcp.example.com/mcp"
-      aria-label={$t`MCP server URL`}
-      error={errorText}
-      disabled={saving}
-      autocomplete="off"
-      autocapitalize="off"
-      spellcheck={false}
-      inputClass="pe-11 font-mono text-sm"
-    >
-      {#snippet trailing()}
-        {#if verifyState === "checking"}
-          <ProgressRing class="text-fg-tertiary size-5" />
-        {:else if verifyState === "ok"}
-          <Tooltip label={$t`Reachable MCP server`}>
-            <span
-              class="bg-bg-success-primary text-fg-success-primary pointer-events-auto flex size-5 items-center justify-center rounded-full"
-              aria-label={$t`Reachable MCP server`}
+    <div class="flex flex-col gap-1.5">
+      <span class="text-text-secondary text-sm font-medium">
+        {$t`Connector URL`}
+      </span>
+      <!-- The verify indicator is centered inside the field, so it's wrapped
+           with the input (not the label) in the positioning context. -->
+      <div class="relative">
+        <Input
+          bind:value={urlInput}
+          oninput={handleInput}
+          onblur={handleBlur}
+          placeholder="https://mcp.example.com/mcp"
+          aria-label={$t`MCP server URL`}
+          error={errorText}
+          disabled={saving}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck={false}
+          inputClass="pe-11 font-mono text-sm"
+        />
+        <div
+          class="pointer-events-none absolute inset-y-0 inset-e-3 flex items-center"
+        >
+          {#if verifyState === "checking"}
+            <ProgressRing class="text-fg-tertiary size-5" />
+          {:else if verifyState === "ok"}
+            <Tooltip label={$t`Reachable MCP server`}>
+              <span
+                class="bg-bg-success-primary text-fg-success-primary pointer-events-auto flex size-5 items-center justify-center rounded-full"
+                aria-label={$t`Reachable MCP server`}
+              >
+                <CheckIcon class="size-3.5" />
+              </span>
+            </Tooltip>
+          {:else if verifyState === "unverified" && parsedUrl !== undefined}
+            <Tooltip
+              label={$t`Couldn't reach this connector`}
+              description={$t`We couldn't reach this URL to confirm it, but you can still trust it.`}
             >
-              <CheckIcon class="size-3.5" />
-            </span>
-          </Tooltip>
-        {:else if verifyState === "unverified" && parsedUrl !== undefined}
-          <Tooltip
-            label={$t`Couldn't reach this connector`}
-            description={$t`We couldn't reach this URL to confirm it, but you can still trust it.`}
-          >
-            <span
-              class="border-border-secondary text-fg-tertiary pointer-events-auto flex size-5 items-center justify-center rounded-full border"
-              aria-label={$t`Couldn't reach this connector`}
-            >
-              <TriangleAlertIcon class="size-3" />
-            </span>
-          </Tooltip>
-        {/if}
-      {/snippet}
-    </Input>
+              <span
+                class="border-border-secondary text-fg-tertiary pointer-events-auto flex size-5 items-center justify-center rounded-full border"
+                aria-label={$t`Couldn't reach this connector`}
+              >
+                <TriangleAlertIcon class="size-3" />
+              </span>
+            </Tooltip>
+          {/if}
+        </div>
+      </div>
+    </div>
 
     <HoldToConfirm
       label={$t`Hold to continue`}

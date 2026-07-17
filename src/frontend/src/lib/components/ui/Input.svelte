@@ -12,10 +12,6 @@
     size?: Size;
     error?: string | Snippet;
     errorBorder?: boolean;
-    /** Adornment rendered at the trailing edge, vertically centered inside the
-     *  input field. Give the input trailing padding (e.g. `inputClass="pe-11"`)
-     *  so its text doesn't run under it. */
-    trailing?: Snippet;
   };
 
   const id = $props.id();
@@ -29,7 +25,6 @@
     size = "md",
     error,
     errorBorder = error !== undefined,
-    trailing,
     ...restProps
   }: Props = $props();
 </script>
@@ -59,13 +54,6 @@
         inputClass,
       ]}
     />
-    {#if trailing !== undefined}
-      <div
-        class="pointer-events-none absolute inset-y-0 inset-e-3 flex items-center"
-      >
-        {@render trailing()}
-      </div>
-    {/if}
   </div>
   {#if error !== undefined || hint !== undefined}
     <div
