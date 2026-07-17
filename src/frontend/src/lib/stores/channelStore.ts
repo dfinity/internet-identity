@@ -40,7 +40,11 @@ export type ChannelError =
   | "unverified-origin"
   | "unsupported-browser"
   | "delegation-failed"
-  | "attributes-failed";
+  | "attributes-failed"
+  // The org's IdP has not granted this caller access to the relying-party
+  // app, so Internet Identity withheld the `sso:<domain>` attribute. Carries
+  // the app hostname so the error view can name it.
+  | { type: "sso-app-access-denied"; app: string };
 
 type ChannelStore = Readable<Channel | undefined> & {
   establish: (options?: ChannelOptions) => void;

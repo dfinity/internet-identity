@@ -35,6 +35,31 @@ pub use crate::single_flight_cache::Cached;
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
+/// Reserved credential-metadata keys for the org access-control policy claims
+/// retained from a verified SSO id_token. Written only by JWT verification
+/// (`verify::verify_and_build`) — the typed claim fields are the sole source,
+/// so their provenance is always the org IdP's signature — and read by the
+/// `sso:<domain>` attribute-certification gate in `attributes.rs`.
+///
+/// Values are JSON-encoded string arrays (`MetadataEntryV2` has no list
+/// variant); the refresh stamp is the verification time in nanoseconds as a
+/// decimal string. All three are rewritten (or cleared) on every SSO sign-in,
+/// which refreshes the whole credential metadata from the fresh JWT.
+pub(crate) const GRANTED_ROLES_METADATA_KEY: &str = "icp_granted_roles";
+pub(crate) const RESTRICTED_APPS_METADATA_KEY: &str = "icp_restricted_apps";
+pub(crate) const POLICY_REFRESHED_AT_METADATA_KEY: &str = "icp_policy_refreshed_at_ns";
+
+/// Role-group prefix (`icp_role:<hostname>[:qualifier]`) used in
+/// `icp_granted_roles` values. Matching is colon-delimited by segment — see
+/// [`OpenIdCredential::has_granted_role_for`].
+pub(crate) const ROLE_GROUP_PREFIX: &str = "icp_role:";
+
+/// Marker-group prefix for the groups-sourced variant of the
+/// `icp_restricted_apps` claim (`icp_restricted:<hostname>` groups every
+/// member belongs to); stripped at retention time so stored values are bare
+/// hostnames regardless of how the org sources the claim.
+pub(crate) const RESTRICTED_MARKER_PREFIX: &str = "icp_restricted:";
+
 pub type OpenIdCredentialKey = (Iss, Sub, Aud);
 pub type Iss = String;
 pub type Sub = String;
@@ -206,6 +231,50 @@ impl OpenIdCredential {
 
     pub fn get_email(&self) -> Option<String> {
         self.read_metadata_string("email")
+    }
+
+    /// JSON-decoded string-array metadata entry, or `None` when absent or not
+    /// a valid JSON string array.
+    fn read_policy_list(&self, key: &str) -> Option<Vec<String>> {
+        serde_json::from_str(&self.read_metadata_string(key)?).ok()
+    }
+
+    /// The org's access-controlled app hostnames from the last verified SSO
+    /// id_token. `None` means the org hasn't opted into per-app access
+    /// control (the claim was absent) — certification proceeds as before.
+    pub fn restricted_apps(&self) -> Option<Vec<String>> {
+        self.read_policy_list(RESTRICTED_APPS_METADATA_KEY)
+    }
+
+    /// Whether the last verified SSO id_token granted this user a role for
+    /// `app_host` — an `icp_granted_roles` value equal to
+    /// `icp_role:<app_host>` or starting with `icp_role:<app_host>:`.
+    /// Colon-delimited segment matching, never a bare string prefix, so a
+    /// role for `payroll.com` can't be satisfied by one for
+    /// `payroll.com.evil`; hostnames can't contain `:`, which makes the
+    /// parse unambiguous. Role qualifiers (`:members`, `:admins`, …) are
+    /// opaque to this gate. `app_host` is normalized here (hostnames are
+    /// case-insensitive; stored roles are lowercased at retention), so
+    /// callers don't have to.
+    pub fn has_granted_role_for(&self, app_host: &str) -> bool {
+        let Some(roles) = self.read_policy_list(GRANTED_ROLES_METADATA_KEY) else {
+            return false;
+        };
+        let app_host = app_host.to_lowercase();
+        let exact = format!("{ROLE_GROUP_PREFIX}{app_host}");
+        let qualified = format!("{ROLE_GROUP_PREFIX}{app_host}:");
+        roles
+            .iter()
+            .any(|role| role == &exact || role.starts_with(&qualified))
+    }
+
+    /// When the policy claims on this credential were last refreshed from a
+    /// verified SSO id_token, in nanoseconds. `None` for credentials that
+    /// never carried policy claims.
+    pub fn policy_refreshed_at_ns(&self) -> Option<u64> {
+        self.read_metadata_string(POLICY_REFRESHED_AT_METADATA_KEY)?
+            .parse()
+            .ok()
     }
 
     fn get_google_verified_email(&self) -> Option<String> {

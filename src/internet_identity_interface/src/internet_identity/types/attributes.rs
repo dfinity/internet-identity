@@ -769,10 +769,26 @@ pub struct PrepareIcrc3AttributeResponse {
 
 #[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub enum PrepareIcrc3AttributeError {
-    ValidationError { problems: Vec<String> },
+    ValidationError {
+        problems: Vec<String>,
+    },
     AuthorizationError(Principal),
     GetAccountError(GetAccountError),
-    AttributeMismatch { problems: Vec<String> },
+    AttributeMismatch {
+        problems: Vec<String>,
+    },
+    /// The caller authenticated through the org's SSO, but the IdP has
+    /// not granted them access to this relying-party app (no role for
+    /// the app, or the app-bound SSO ceremony isn't fresh), so the
+    /// `sso:<domain>` attribute is withheld. Distinct from
+    /// `AttributeMismatch` so the frontend can render a purposeful
+    /// "you don't have access to <app>" screen instead of a generic
+    /// failure. `app` is the relying party's hostname; `domain` is the
+    /// SSO domain whose IdP manages the access decision.
+    SsoAppAccessDenied {
+        app: String,
+        domain: String,
+    },
 }
 
 #[derive(CandidType, Debug, Deserialize)]

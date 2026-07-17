@@ -1316,7 +1316,8 @@ export interface PrepareAttributeResponse {
 export type PrepareIcrc3AttributeError = { 'AuthorizationError' : Principal } |
   { 'ValidationError' : { 'problems' : Array<string> } } |
   { 'GetAccountError' : GetAccountError } |
-  { 'AttributeMismatch' : { 'problems' : Array<string> } };
+  { 'AttributeMismatch' : { 'problems' : Array<string> } } |
+  { 'SsoAppAccessDenied' : { 'app' : string, 'domain' : string } };
 export interface PrepareIcrc3AttributeRequest {
   /**
    * The relying party's actual origin, before the legacy `icp0.io →

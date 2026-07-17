@@ -710,6 +710,10 @@ export const idlFactory = ({ IDL }) => {
     'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
     'GetAccountError' : GetAccountError,
     'AttributeMismatch' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
+    'SsoAppAccessDenied' : IDL.Record({
+      'app' : IDL.Text,
+      'domain' : IDL.Text,
+    }),
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
