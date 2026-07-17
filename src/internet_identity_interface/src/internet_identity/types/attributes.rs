@@ -282,7 +282,7 @@ impl TryFrom<&str> for AttributeScope {
                 // SSO domains are DNS hostnames — normalize to lowercase so
                 // `sso:DFINITY.ORG:email` and `sso:dfinity.org:email` match
                 // the same credential. This also aligns with
-                // `openid::generic::is_allowed_discovery_domain`, which
+                // `openid::sso::validate_allowed_discovery_domain`, which
                 // already compares case-insensitively.
                 let domain = domain.to_ascii_lowercase();
 
