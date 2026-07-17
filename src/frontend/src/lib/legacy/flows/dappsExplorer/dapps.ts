@@ -17,7 +17,19 @@ type ElementOf<Arr> = Arr extends readonly (infer ElementOf)[]
   ? ElementOf
   : "argument is not an array";
 
-export type DappDescription = ElementOf<typeof dappsJson>;
+// Every entry in dapps.json declares `authOrigins`, so it is inferred as
+// required. A `KnownDapp` is also built at runtime for dapps that aren't in the
+// list (the test dapp, an unknown relying party), which have no auth origins —
+// so it's optional on the type. The distributive conditional applies `Omit`
+// per union member, preserving each variant's own optional properties
+// (`oneLiner`, `certified_attributes`) instead of collapsing the union.
+type WithOptionalAuthOrigins<T> = T extends unknown
+  ? Omit<T, "authOrigins"> & { authOrigins?: string | string[] }
+  : never;
+
+export type DappDescription = WithOptionalAuthOrigins<
+  ElementOf<typeof dappsJson>
+>;
 
 // A 'known dapp", i.e. a dapp description with the logo fixed up and convenience methods
 export class KnownDapp {

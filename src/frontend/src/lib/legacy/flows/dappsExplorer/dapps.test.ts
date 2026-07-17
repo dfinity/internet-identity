@@ -30,19 +30,32 @@ describe("dapps", () => {
       .filter((dapp) => authOriginsOf(dapp).length === 0)
       .map((dapp) => dapp.name);
 
-    // `authOrigins` are matched at runtime via `new URL(origin).origin`, so
-    // each must be a valid http(s) URL. `website` is also checked since it is
-    // used as a link and, when no dedicated match exists, for origin matching.
+    const isHttp = (url: URL): boolean =>
+      url.protocol === "https:" || url.protocol === "http:";
+
     const invalid: string[] = [];
     for (const dapp of dapps) {
-      for (const origin of [dapp.website, ...authOriginsOf(dapp)]) {
+      // `website` is a display link, so it only needs to be a valid http(s)
+      // URL — it may legitimately carry a path or trailing slash.
+      try {
+        if (!isHttp(new URL(dapp.website))) {
+          invalid.push(`${dapp.name} (${dapp.website}): website not http(s)`);
+        }
+      } catch {
+        invalid.push(`${dapp.name} (${dapp.website}): website not a valid URL`);
+      }
+
+      // `authOrigins` are matched at runtime via `new URL(authOrigin).origin`,
+      // so each must be a bare http(s) origin — a path, query, or fragment
+      // would never match and is a mistake.
+      for (const authOrigin of authOriginsOf(dapp)) {
         try {
-          const { protocol } = new URL(origin);
-          if (protocol !== "https:" && protocol !== "http:") {
-            invalid.push(`${dapp.name} (${origin}): not http(s)`);
+          const url = new URL(authOrigin);
+          if (!isHttp(url) || url.origin !== authOrigin) {
+            invalid.push(`${dapp.name} (${authOrigin}): not a bare origin`);
           }
         } catch {
-          invalid.push(`${dapp.name} (${origin}): not a valid URL`);
+          invalid.push(`${dapp.name} (${authOrigin}): not a valid URL`);
         }
       }
     }
