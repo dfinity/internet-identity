@@ -236,9 +236,7 @@
 
   {#if enabled}
     <div class="border-border-tertiary mt-5 border-t pt-4">
-      <p
-        class="text-text-tertiary mb-3 text-xs font-semibold tracking-wider uppercase"
-      >
+      <p class="text-text-tertiary mb-3 text-xs font-semibold">
         {$t`Trusted connectors`}
       </p>
 
@@ -253,7 +251,7 @@
             <GlobeIcon class="size-4.5" />
           </span>
 
-          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <div class="flex flex-row flex-wrap items-center gap-x-2 gap-y-1">
               <span class="text-text-primary truncate text-sm font-semibold">
                 {hostOf(trusted)}
