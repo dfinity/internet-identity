@@ -127,7 +127,7 @@ pub struct PersistentState {
     // Deploy flag opening the SSO discovery domain gate to any domain. `None`/
     // `Some(false)` keep `sso_discoverable_domains` (and its defaults) in force;
     // `Some(true)` accepts every domain. Does not relax the strict-`https`
-    // requirement — see `openid::sso::is_allowed_discovery_domain`.
+    // requirement — see `openid::sso::validate_allowed_discovery_domain`.
     pub sso_allow_any_domain: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,

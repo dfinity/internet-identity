@@ -337,7 +337,7 @@ pub fn discover_sso(domain: &str) {
 /// Read the state of `domain`'s SSO discovery: the resolved config, still
 /// pending, or not on the allowlist.
 pub fn get_sso_discovery(domain: &str) -> SsoDiscoveryState {
-    if !sso::is_allowed_discovery_domain(domain) {
+    if sso::validate_allowed_discovery_domain(domain).is_err() {
         return SsoDiscoveryState::NotAllowed;
     }
     match sso::peek_discovery(domain) {
