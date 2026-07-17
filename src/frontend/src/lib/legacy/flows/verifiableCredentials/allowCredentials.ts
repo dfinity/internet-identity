@@ -27,6 +27,7 @@ const getOrigin = (origin: string, dapplist: KnownDapp[]): KnownDapp => {
     foundDapp = new KnownDapp({
       name: origin,
       website: origin,
+      authOrigins: [origin],
       logo: unknownDappLogo,
     });
   }
