@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "../fixtures";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import { addVirtualAuthenticator, holdToConfirm, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
  *  session is registered for the user's identity; the app account is chosen
@@ -111,10 +111,8 @@ test("Manage trusted server hands the session to a new Settings tab", async ({
   const settingsPage = await settingsPagePromise;
   await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
 
-  // The handed-off session means Settings opens authenticated: the trusted
-  // server section heading is shown and no sign-in screen appears.
   await expect(
-    settingsPage.getByRole("heading", { name: "Trusted MCP server" }),
+    settingsPage.getByRole("heading", { name: "AI access" }),
   ).toBeVisible({ timeout: 10_000 });
 });
 
@@ -159,12 +157,9 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
         }),
       }),
   );
-  // The URL box only appears once the master toggle is on.
-  await settingsPage
-    .getByRole("switch", { name: "Trusted MCP server" })
-    .check();
+  await settingsPage.getByRole("switch", { name: "AI access" }).click();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await settingsPage.getByRole("button", { name: "Trust this server" }).click();
+  await holdToConfirm(settingsPage, "Hold to continue");
   await expect(
     settingsPage.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -272,12 +267,9 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  // The URL box only appears once the master toggle is on.
-  await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+  await page.getByRole("switch", { name: "AI access" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await page.getByRole("button", { name: "Trust this server" }).click();
-  // Once a server is trusted the input is replaced by the server row, which
-  // carries a remove button — a unique assertion that it was added.
+  await holdToConfirm(page, "Hold to continue");
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -512,13 +504,20 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page); // leaves the page on Settings, server trusted
 
-  // Remove the server: the server row (and its Remove button) give way to the
-  // URL input again — the revoke path the fixture's add-only helper never hits.
-  await page.getByRole("button", { name: "Remove this server" }).click();
-  await expect(page.getByLabel("MCP server URL")).toBeVisible();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/call") &&
+        response.request().method() === "POST",
+    ),
+    page.getByRole("button", { name: "Remove this server" }).click(),
+  ]);
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("switch", { name: "AI access" }),
+  ).not.toBeChecked();
 
   // Trust is re-verified against the synced config at connect time, so with no
   // trusted server the connect lands on the untrusted screen.
@@ -542,13 +541,15 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
 
   // Turn the feature off for this identity. The URL stays saved on-chain, but
   // the config is no longer `enabled`, so trust is off.
-  const toggle = page.getByRole("switch", { name: "Trusted MCP server" });
-  await toggle.uncheck();
-  // The toggle flips the UI optimistically but disables itself while the
-  // canister write is in flight (`disabled={saving}`), re-enabling only once
-  // the write resolves. Wait for that before navigating, so the connect below
-  // reads the persisted (disabled) config rather than racing the write.
-  await expect(toggle).toBeEnabled();
+  const toggle = page.getByRole("switch", { name: "AI access" });
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/call") &&
+        response.request().method() === "POST",
+    ),
+    toggle.uncheck(),
+  ]);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await allowAccess(page);
