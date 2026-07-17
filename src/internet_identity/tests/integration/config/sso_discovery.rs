@@ -91,3 +91,34 @@ fn sso_allow_any_domain_opens_the_gate() {
     );
     api::discover_sso(&env, canister_id, "evil.example.com").unwrap();
 }
+
+/// An over-length discovery domain is rejected as `NotAllowed` even with the
+/// `sso_allow_any_domain` gate fully open.
+#[test]
+fn sso_discovery_rejects_over_long_domain() {
+    let env = env();
+    let arg = InternetIdentityInit {
+        sso_allow_any_domain: Some(true),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(arg),
+        10_000_000_000_000,
+    );
+
+    // A normal-length domain passes the open gate.
+    assert_eq!(
+        api::get_sso_discovery(&env, canister_id, "example.com").unwrap(),
+        SsoDiscoveryState::Pending
+    );
+
+    // A 256-byte domain (one over the 255-byte cap) is rejected regardless.
+    let over_long = format!("{}.com", "a".repeat(252));
+    assert_eq!(over_long.len(), 256);
+    assert_eq!(
+        api::get_sso_discovery(&env, canister_id, &over_long).unwrap(),
+        SsoDiscoveryState::NotAllowed
+    );
+}
