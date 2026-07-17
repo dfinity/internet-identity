@@ -77,10 +77,6 @@
     }
     try {
       await setMcpEnabled($authenticatedStore.actor, identityNumber, next);
-      toaster.info({
-        title: next ? $t`AI access is on.` : $t`AI access is off.`,
-        duration: 4000,
-      });
     } catch {
       enabled = !next;
       toaster.error({

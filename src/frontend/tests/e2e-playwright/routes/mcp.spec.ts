@@ -551,8 +551,14 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
   // Turn the feature off for this identity. The URL stays saved on-chain, but
   // the config is no longer `enabled`, so trust is off.
   const toggle = page.getByRole("switch", { name: "AI access" });
-  await toggle.uncheck();
-  await expect(page.getByText("AI access is off.")).toBeVisible();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/call") &&
+        response.request().method() === "POST",
+    ),
+    toggle.uncheck(),
+  ]);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await allowAccess(page);
