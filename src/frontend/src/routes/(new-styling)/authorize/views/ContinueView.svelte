@@ -23,10 +23,12 @@
     purgeSession,
   } from "$lib/stores/session-delegation.store";
   import {
+    bufFromBufLike,
     throwCanisterError,
     throwTextCanisterError,
     isCanisterError,
   } from "$lib/utils/utils";
+  import { getVapidPublicKey, subscribeDevice } from "$lib/utils/pushConsent";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
     _SERVICE,
@@ -43,7 +45,6 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import Checkbox from "$lib/components/ui/Checkbox.svelte";
 
   interface Props {
     effectiveOrigin: string;
@@ -158,17 +159,15 @@
     AccountNumber | PRIMARY_ACCOUNT_NUMBER | null
   >(null);
 
-  // Opt-in (defaults false): push notifications are intrusive, so the user
-  // must explicitly ask for them rather than opt out. Pre-populated from
-  // the server on mount so the checkbox reflects the current consent state
-  // across page refreshes — the source of truth is
-  // `push_list_consented_origins`, not local state.
+  const isPushSupported =
+    typeof navigator !== "undefined" &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window;
+
   let pushNotificationsEnabled = $state(false);
-  // Snapshot of the server's known state at mount time. On sign-in we
-  // grant/revoke only if the checkbox has actually changed from this
-  // baseline, so re-signing-in without touching the checkbox is a no-op
-  // regardless of what the server currently says.
   let pushNotificationsInitiallyGranted = $state(false);
+  let pushDeviceSubscribed = $state<boolean | undefined>(undefined);
+  let pushPermissionDenied = $state(false);
 
   onMount(() => {
     const authenticated = $authenticationStore;
@@ -187,29 +186,109 @@
           error,
         );
       });
+
+    if (!isPushSupported) {
+      pushDeviceSubscribed = false;
+      return;
+    }
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "denied"
+    ) {
+      pushPermissionDenied = true;
+    }
+    void navigator.serviceWorker
+      .getRegistration()
+      .then((registration) =>
+        registration === undefined
+          ? null
+          : registration.pushManager.getSubscription(),
+      )
+      .then((subscription) => {
+        pushDeviceSubscribed = subscription !== null;
+      })
+      .catch((error) => {
+        console.warn("Failed to read existing push subscription", error);
+        pushDeviceSubscribed = false;
+      });
   });
 
-  // Fire-and-forget: a failed grant/revoke shouldn't block sign-in.
-  // Called right before `onAuthorize` so it lands before the delegation
-  // is minted. Uses the full-auth identity actor (not the session-scoped
-  // one from `actorForIdentity`) — the grant/revoke methods are gated by
-  // `check_authz_and_record_activity` on the backend.
-  const syncPushConsentIfChanged = (): void => {
+  const subscribeThisDevice = async (
+    actor: ActorSubclass<_SERVICE>,
+    identityNumber: bigint,
+  ): Promise<void> => {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      pushPermissionDenied = permission === "denied";
+      return;
+    }
+    const registration =
+      await navigator.serviceWorker.register("/service-worker.js");
+    await navigator.serviceWorker.ready;
+    const vapidPublicKey = await getVapidPublicKey(actor);
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: bufFromBufLike(vapidPublicKey),
+    });
+    const { endpoint, keys } = subscription.toJSON() as {
+      endpoint: string;
+      keys: { p256dh: string; auth: string };
+    };
+    await subscribeDevice(
+      actor,
+      identityNumber,
+      endpoint,
+      keys.p256dh,
+      keys.auth,
+    );
+    pushDeviceSubscribed = true;
+  };
+
+  const syncPushConsentIfChanged = async (): Promise<void> => {
     const authenticated = $authenticationStore;
     if (authenticated === undefined) return;
-    if (pushNotificationsEnabled === pushNotificationsInitiallyGranted) return;
-    const call = pushNotificationsEnabled
-      ? authenticated.actor.push_grant_consent(
+
+    const consentChanged =
+      pushNotificationsEnabled !== pushNotificationsInitiallyGranted;
+    const needsDeviceSubscribe =
+      pushNotificationsEnabled &&
+      isPushSupported &&
+      pushDeviceSubscribed === false &&
+      !pushPermissionDenied;
+
+    if (!consentChanged && !needsDeviceSubscribe) return;
+
+    const tasks: Promise<unknown>[] = [];
+
+    if (consentChanged) {
+      const call = pushNotificationsEnabled
+        ? authenticated.actor.push_grant_consent(
+            authenticated.identityNumber,
+            effectiveOrigin,
+          )
+        : authenticated.actor.push_revoke_consent(
+            authenticated.identityNumber,
+            effectiveOrigin,
+          );
+      tasks.push(
+        call.then(throwTextCanisterError).catch((error) => {
+          console.warn("Failed to sync push notification consent", error);
+        }),
+      );
+    }
+
+    if (needsDeviceSubscribe) {
+      tasks.push(
+        subscribeThisDevice(
+          authenticated.actor,
           authenticated.identityNumber,
-          effectiveOrigin,
-        )
-      : authenticated.actor.push_revoke_consent(
-          authenticated.identityNumber,
-          effectiveOrigin,
-        );
-    void call.then(throwTextCanisterError).catch((error) => {
-      console.warn("Failed to sync push notification consent", error);
-    });
+        ).catch((error) => {
+          console.warn("Failed to enable push on this device", error);
+        }),
+      );
+    }
+
+    await Promise.all(tasks);
   };
 
   const isEditAccountDialogVisibleFor = $derived(
@@ -297,7 +376,7 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      syncPushConsentIfChanged();
+      await syncPushConsentIfChanged();
       onAuthorize(accountNumberPromise, effectiveAccessLevel);
     } catch (error) {
       handleError(error);
@@ -314,7 +393,7 @@
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
-      syncPushConsentIfChanged();
+      await syncPushConsentIfChanged();
       onAuthorize(Promise.resolve(accountNumber), effectiveAccessLevel);
     } catch (error) {
       handleError(error);
@@ -686,14 +765,25 @@
       </button>
     </Tooltip>
   </div>
-  <div class="border-border-tertiary mt-4 border-t pt-4">
-    <Checkbox
-      bind:checked={pushNotificationsEnabled}
-      label={$t`Allow ${dappName} to send you push notifications`}
-      size="sm"
-      disabled={isAuthenticatingDefault}
-    />
-  </div>
+  {#if isPushSupported && !pushPermissionDenied}
+    <div class="border-border-tertiary mt-4 border-t pt-4">
+      <Toggle
+        bind:checked={pushNotificationsEnabled}
+        label={$t`Get notifications from ${dappName}`}
+        hint={pushDeviceSubscribed === true
+          ? $t`Updates land on your device even when the tab is closed.`
+          : $t`We'll ask your browser for permission to send updates to this device.`}
+        size="sm"
+        disabled={isAuthenticatingDefault}
+      />
+    </div>
+  {:else if pushPermissionDenied}
+    <div class="border-border-tertiary mt-4 border-t pt-4">
+      <p class="text-text-tertiary text-sm">
+        {$t`Notifications are blocked in this browser. Enable them in the site settings to receive updates from ${dappName}.`}
+      </p>
+    </div>
+  {/if}
   {#if $READ_ONLY_MODE}
     <div class="border-border-tertiary mt-4 border-t pt-4">
       <AccessLevelSelector
