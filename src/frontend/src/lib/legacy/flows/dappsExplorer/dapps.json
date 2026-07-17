@@ -3,62 +3,73 @@
     "name": "DecideAI",
     "oneLiner": "A fullstack decentralized AI platform",
     "website": "https://decideai.xyz",
+    "authOrigins": ["https://decideai.xyz"],
     "logo": "decideai_logo.png"
   },
   {
     "name": "Bitfinity EVM",
     "website": "https://bitfinity.network/",
+    "authOrigins": ["https://bitfinity.network"],
     "logo": "bitfinity_evm.svg"
   },
   {
     "name": "ICPSwap",
     "website": "https://icpswap.com",
+    "authOrigins": ["https://icpswap.com"],
     "logo": "icpswap_logo.webp"
   },
   {
     "name": "Funded",
     "oneLiner": "Fund your favorite projects and get NFT rewards",
     "website": "https://funded.app/",
+    "authOrigins": ["https://funded.app"],
     "logo": "funded_logo.webp"
   },
   {
     "name": "NFID",
     "oneLiner": "Your digital identity for the modern world.",
     "website": "https://nfid.one/",
+    "authOrigins": ["https://nfid.one"],
     "logo": "nfid_logo.svg"
   },
   {
     "name": "Yuku",
     "oneLiner": "Your Gateway to NFTs, Metaverse, and an AI Agent.",
     "website": "https://yuku.app/",
+    "authOrigins": ["https://yuku.app"],
     "logo": "yuku_logo.png"
   },
   {
     "name": "dragginz",
     "oneLiner": "Dragginz is a virtual pets game from the creators of Neopets. Hatch and raise Dragginz to accompany you on your adventures.",
     "website": "https://dragginz.io/",
+    "authOrigins": ["https://dragginz.io"],
     "logo": "dragginz_logo.webp"
   },
   {
     "name": "ICDex",
     "website": "https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app/ICDex",
+    "authOrigins": ["https://avjzx-pyaaa-aaaaj-aadmq-cai.raw.ic0.app"],
     "logo": "icdex_logo.webp"
   },
   {
     "name": "Sonic DEX",
     "oneLiner": "Sonic DEX is an AMM and Perpetual trading platform",
     "website": "https://sonic.ooo/",
+    "authOrigins": ["https://sonic.ooo"],
     "logo": "sonic-dex_logo.webp"
   },
   {
     "name": "Helix Markets",
     "oneLiner": "Bringing true ownership and full transparency to crypto trading",
     "website": "https://www.helixmarkets.io/",
+    "authOrigins": ["https://www.helixmarkets.io"],
     "logo": "helix_logo.svg"
   },
   {
     "name": "Catalyze",
     "website": "https://catalyze.one/",
+    "authOrigins": ["https://catalyze.one"],
     "oneLiner": "Manage your Web3 communities and events",
     "logo": "catalyze_logo.png"
   },
@@ -73,6 +84,7 @@
     "name": "OISY Wallet",
     "oneLiner": "One wallet for ICP, Bitcoin and Ethereum. No private keys to lose.",
     "website": "https://oisy.com",
+    "authOrigins": ["https://oisy.com"],
     "logo": "oisy_logo.svg",
     "certified_attributes": true
   },
@@ -80,6 +92,7 @@
     "name": "Kinic",
     "oneLiner": "The world's first Web3 search engine",
     "website": "https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app/",
+    "authOrigins": ["https://74iy7-xqaaa-aaaaf-qagra-cai.ic0.app"],
     "logo": "kinic_logo.webp"
   },
   {
@@ -92,40 +105,47 @@
   {
     "name": "Stoic Wallet",
     "website": "https://www.stoicwallet.com/",
+    "authOrigins": ["https://www.stoicwallet.com"],
     "logo": "stoicwallet_logo.webp"
   },
   {
     "name": "NNS Dapp",
     "oneLiner": "Dapp for Staking Neurons + Voting Onchain",
     "website": "https://nns.ic0.app",
+    "authOrigins": ["https://nns.ic0.app"],
     "logo": "nnsfront-enddapp_logo.svg"
   },
   {
     "name": "NNS Dapp",
     "oneLiner": "Dapp for Staking Neurons + Voting Onchain",
     "website": "https://nns.internetcomputer.org",
+    "authOrigins": ["https://nns.internetcomputer.org"],
     "logo": "nnsfront-enddapp_logo.svg"
   },
   {
     "name": "Trax",
     "website": "https://trax.so/",
+    "authOrigins": ["https://trax.so"],
     "logo": "trax_logo.webp"
   },
   {
     "name": "RuBaRu",
     "oneLiner": "The fully on-chain content creator/influencer platform: own your profile, own your content, and earn fair incentives.",
     "website": "https://rubaru.app/",
+    "authOrigins": ["https://rubaru.app"],
     "logo": "rubaru_logo.png"
   },
   {
     "name": "AutoRoyale",
     "website": "https://cm6iy-sqaaa-aaaam-abmxq-cai.icp0.io/",
+    "authOrigins": ["https://cm6iy-sqaaa-aaaam-abmxq-cai.icp0.io"],
     "logo": "autoroyale_logo.webp",
     "oneLiner": "A fast-paced 2D multiplayer shooter game"
   },
   {
     "name": "Signals",
     "website": "https://signalsicp.com/",
+    "authOrigins": ["https://signalsicp.com"],
     "logo": "signals_logo.webp",
     "oneLiner": "A location based app for empowering local communities"
   },
@@ -133,61 +153,72 @@
     "name": "DSCVR",
     "oneLiner": "Social portals, community airdrops, crypto tipping onchain",
     "website": "https://dscvr.one/",
+    "authOrigins": ["https://dscvr.one"],
     "logo": "dscvr_logo.webp"
   },
   {
     "name": "Canistergeek",
     "oneLiner": "IC canister management tool",
     "website": "https://canistergeek.app/",
+    "authOrigins": ["https://canistergeek.app"],
     "logo": "canistergeek_logo.webp"
   },
   {
     "name": "MORA",
     "oneLiner": "A Web3 space for writers to express autonomy of thought ",
     "website": "https://mora.app",
+    "authOrigins": ["https://mora.app"],
     "logo": "mora_logo.png"
   },
   {
     "name": "DSocial",
     "website": "https://DSocial.app",
+    "authOrigins": ["https://dsocial.app"],
     "logo": "dsocial_logo.webp"
   },
   {
     "name": "Water Neuron",
     "oneLiner": "A liquid staking protocol designed for ICP. Staking ICP becomes straightforward and efficient.",
     "website": "https://waterneuron.fi/stake/",
+    "authOrigins": ["https://waterneuron.fi"],
     "logo": "waterneuron_logo.webp"
   },
   {
     "name": "Nuance",
     "website": "https://exwqn-uaaaa-aaaaf-qaeaa-cai.ic0.app/",
+    "authOrigins": ["https://exwqn-uaaaa-aaaaf-qaeaa-cai.ic0.app"],
     "logo": "nuance_logo.webp"
   },
   {
     "name": "Cosmicrafts",
     "oneLiner": "Blast through the metaverse with Cosmicrafts, where interstellar mayhem meets epic battles for the ultimate cosmic showdown!",
     "website": "https://cosmicrafts.com/",
+    "authOrigins": ["https://cosmicrafts.com"],
     "logo": "cosmicrafts_logo.webp"
   },
   {
     "name": "Kontribute",
     "oneLiner": "Web3 storytelling",
     "website": "https://kontribute.app",
+    "authOrigins": ["https://kontribute.app"],
     "logo": "kontribute_logo.webp"
   },
   {
     "name": "Saga Tarot",
     "website": "https://5nl7c-zqaaa-aaaah-qaa7a-cai.raw.ic0.app/",
+    "authOrigins": ["https://5nl7c-zqaaa-aaaah-qaa7a-cai.raw.ic0.app"],
     "logo": "sagatarot_logo.webp"
   },
   {
     "name": "ICME",
     "website": "https://sygsn-caaaa-aaaaf-qaahq-cai.raw.ic0.app/",
+    "authOrigins": ["https://sygsn-caaaa-aaaaf-qaahq-cai.raw.ic0.app"],
     "logo": "icme_logo.webp"
   },
   {
     "name": "Mission Is Possible",
     "website": "https://to3ja-iyaaa-aaaai-qapsq-cai.raw.ic0.app/",
+    "authOrigins": ["https://to3ja-iyaaa-aaaai-qapsq-cai.raw.ic0.app"],
     "oneLiner": "3rd Place DSCVR Hackathon",
     "logo": "missionispossible_logo.webp"
   },
@@ -195,88 +226,104 @@
     "name": "Canlista",
     "oneLiner": "Internet Computer Canister Registry",
     "website": "https://k7gat-daaaa-aaaae-qaahq-cai.ic0.app/",
+    "authOrigins": ["https://k7gat-daaaa-aaaae-qaahq-cai.ic0.app"],
     "logo": "canlista_logo.webp"
   },
   {
     "name": "Uniswap Frontend on ICP",
     "website": "https://yrog5-xqaaa-aaaap-qa5za-cai.ic0.app/#/swap",
+    "authOrigins": ["https://yrog5-xqaaa-aaaap-qa5za-cai.ic0.app"],
     "oneLiner": "Front-End Onchain",
     "logo": "uniswapfrontendontheic_logo.webp"
   },
   {
     "name": "NFTAnvil",
     "website": "https://nftanvil.com",
+    "authOrigins": ["https://nftanvil.com"],
     "logo": "nftanvil_logo.webp"
   },
   {
     "name": "ICEvent",
     "website": "https://icevent.app/",
+    "authOrigins": ["https://icevent.app"],
     "logo": "icevent_logo_112x112.png"
   },
   {
     "name": "Bink",
     "oneLiner": "Superior alternative to Linktree",
     "website": "https://b.ink",
+    "authOrigins": ["https://b.ink"],
     "logo": "bink_logo.svg"
   },
   {
     "name": "Bitomni",
     "oneLiner": "BTCFi-driven omnichain asset management protocol.",
     "website": "https://bitomni.io",
+    "authOrigins": ["https://bitomni.io"],
     "logo": "bitomni_logo.svg"
   },
   {
     "name": "Usergeek",
     "oneLiner": "Product analytics for IC dapps",
     "website": "https://usergeek.app/",
+    "authOrigins": ["https://usergeek.app"],
     "logo": "usergeek_logo.webp"
   },
   {
     "name": "Configeek",
     "oneLiner": "Remote configuration tool",
     "website": "https://configeek.app/",
+    "authOrigins": ["https://configeek.app"],
     "logo": "configeek_logo.webp"
   },
   {
     "name": "Canister Store",
     "oneLiner": "Empowering Users to Easily Deploy Canisters on the Internet Computer",
     "website": "https://canister.app",
+    "authOrigins": ["https://canister.app"],
     "logo": "canister-store_logo.png"
   },
   {
     "name": "KongSwap",
     "logo": "kong_logo.png",
-    "website": "https://www.kongswap.io/"
+    "website": "https://www.kongswap.io/",
+    "authOrigins": ["https://www.kongswap.io"]
   },
   {
     "name": "cyql.io",
     "website": "https://cyql.io/",
+    "authOrigins": ["https://cyql.io"],
     "logo": "cyqlio_logo.svg",
     "oneLiner": "Curated Internet Computer projects gallery."
   },
   {
     "name": "Dbox",
     "website": "https://dbox.foundation/",
+    "authOrigins": ["https://dbox.foundation"],
     "logo": "dbox_logo.png"
   },
   {
     "name": "Tipjar",
     "website": "https://tipjar.rocks",
+    "authOrigins": ["https://tipjar.rocks"],
     "logo": "tipjar_logo.webp"
   },
   {
     "name": "One Block",
     "website": "https://oneblock.page/",
+    "authOrigins": ["https://oneblock.page"],
     "logo": "oneblock.png"
   },
   {
     "name": "Block List",
     "website": "https://vfclb-tyaaa-aaaap-aawna-cai.ic0.app/",
+    "authOrigins": ["https://vfclb-tyaaa-aaaap-aawna-cai.ic0.app"],
     "logo": "blocklist.png"
   },
   {
     "name": "DSign",
     "website": "https://dsign.ooo",
+    "authOrigins": ["https://dsign.ooo"],
     "logo": "dsign_logo.webp",
     "oneLiner": "Collaborative Product Design Innovation Hub"
   },
@@ -284,11 +331,13 @@
     "name": "Metaforo ICP deployment",
     "oneLiner": "Deploy the frontend of a web3 forum system - metaforo.io on ICP",
     "website": "https://can1.metaforo.io/",
+    "authOrigins": ["https://can1.metaforo.io"],
     "logo": "metaforo-icp_logo.png"
   },
   {
     "name": "Rakeoff",
     "website": "https://rakeoff.io/",
+    "authOrigins": ["https://rakeoff.io"],
     "logo": "rakeoff_logo.webp",
     "oneLiner": "Rakeoff is a cryptocurrency staking rewards application built on the ICP blockchain."
   },
@@ -296,23 +345,27 @@
     "name": "IC HUB",
     "oneLiner": "Your gateway to web3 apps: connect, chat and explore all in one place",
     "website": "https://md7ke-jyaaa-aaaak-qbrya-cai.ic0.app/",
+    "authOrigins": ["https://md7ke-jyaaa-aaaak-qbrya-cai.ic0.app"],
     "logo": "ichub_logo.png"
   },
   {
     "name": "MotokoPilot",
     "website": "https://d7dm6-sqaaa-aaaag-qcgma-cai.icp0.io/",
+    "authOrigins": ["https://d7dm6-sqaaa-aaaag-qcgma-cai.icp0.io"],
     "oneLiner": "Your AI-powered companion for simplifying and streamlining the Motoko coding experience.",
     "logo": "motokopilot_logo.png"
   },
   {
     "name": "aVa",
     "website": "https://ksayv-myaaa-aaaan-qedxq-cai.icp0.io",
+    "authOrigins": ["https://ksayv-myaaa-aaaan-qedxq-cai.icp0.io"],
     "logo": "ava_logo.webp",
     "oneLiner": "aVa: Action-Based Decentralized Reputation Landscape."
   },
   {
     "name": "Open Internet Metaverse",
     "website": "https://vdfyi-uaaaa-aaaai-acptq-cai.ic0.app",
+    "authOrigins": ["https://vdfyi-uaaaa-aaaai-acptq-cai.ic0.app"],
     "logo": "open-internet-metaverse_logo.webp",
     "oneLiner": "Create Your Virtual Space as a 3D-Website on the Internet Computer"
   },
@@ -320,23 +373,27 @@
     "name": "Faceless Project",
     "oneLiner": "An infrastructure that brings Web 2.0 user experience to Web 3.0",
     "logo": "faceless_logo.png",
-    "website": "https://faceless.live/"
+    "website": "https://faceless.live/",
+    "authOrigins": ["https://faceless.live"]
   },
   {
     "name": "dFlow",
     "website": "https://dcentra.io/dflow",
+    "authOrigins": ["https://dcentra.io"],
     "logo": "dflow_logo.png",
     "oneLiner": "Automate interactions between organizations."
   },
   {
     "name": "DooCoins",
     "website": "https://www.doo.co",
+    "authOrigins": ["https://www.doo.co"],
     "logo": "doocoins_logo.webp",
     "oneLiner": "Kids rewards dapp"
   },
   {
     "name": "Flower Power DAO",
     "website": "https://fpdao.app",
+    "authOrigins": ["https://fpdao.app"],
     "logo": "fpdao_logo.webp",
     "oneLiner": "The story of blockchain, told in Art."
   },
@@ -344,23 +401,27 @@
     "name": "ICPsig",
     "oneLiner": "Multisig for Internet Computer",
     "website": "https://icpsig.in/",
+    "authOrigins": ["https://icpsig.in"],
     "logo": "icpsig_logo.png"
   },
   {
     "name": "Hobbi",
     "website": "https://hobbi.me",
+    "authOrigins": ["https://hobbi.me"],
     "logo": "hobbi_logo.svg",
     "oneLiner": "Hobbi, the web3 social platform"
   },
   {
     "name": "icRouter",
     "website": "https://iclight.io/account",
+    "authOrigins": ["https://iclight.io"],
     "logo": "icrouter_logo.webp",
     "oneLiner": "icRouter: A cross-chain network of assets"
   },
   {
     "name": "ubin",
     "website": "https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app/",
+    "authOrigins": ["https://h3cjw-syaaa-aaaam-qbbia-cai.ic0.app"],
     "logo": "asset-app_logo.png",
     "oneLiner": "Allows you to seamlessly launch your file storage smart contracts on ICP and interact with them via a file explorer in the browser."
   },
@@ -368,23 +429,27 @@
     "name": "icgpt",
     "oneLiner": "A chat app that uses Qwen2.5-instruct LLM with 0.5 billion parameters, the largest LLM currently live on ICP.",
     "website": "https://icgpt.icpp.world/",
+    "authOrigins": ["https://icgpt.icpp.world"],
     "logo": "icpp-logo.dracula-cyan.112x112.png"
   },
   {
     "name": "Ping",
     "website": "https://h7jna-pqaaa-aaaak-afgiq-cai.icp0.io/",
+    "authOrigins": ["https://h7jna-pqaaa-aaaak-afgiq-cai.icp0.io"],
     "logo": "ping_logo.webp",
     "oneLiner": "Stay updated on ICP dapps with Ping!"
   },
   {
     "name": "Virtuaseal",
     "website": "https://p3cwv-2aaaa-aaaap-abwba-cai.icp0.io/",
+    "authOrigins": ["https://p3cwv-2aaaa-aaaap-abwba-cai.icp0.io"],
     "logo": "virtuaseal.webp",
     "oneLiner": "An application that will allow users to submit information to and sign documents leveraging a smart contract on the blockchain."
   },
   {
     "name": "Accelar",
     "website": "https://www.accelar.io",
+    "authOrigins": ["https://www.accelar.io"],
     "logo": "accelar_logo.svg",
     "oneLiner": "A unified product development infrastructure that allows for efficient development, launching, and management of web3 features including LLMs on ICP."
   },
@@ -392,52 +457,61 @@
     "name": "ICP Governor",
     "oneLiner": "ICP Governor is an application used to manage a single DAO: create proposals, vote, timelock and execute them.",
     "website": "https://b4umt-saaaa-aaaak-afnpa-cai.icp0.io/",
+    "authOrigins": ["https://b4umt-saaaa-aaaak-afnpa-cai.icp0.io"],
     "logo": "redsteep_logo.png"
   },
   {
     "name": "Formyfi",
     "oneLiner": "Decentralized & fully onchain forms.",
     "website": "https://formyfi.io",
+    "authOrigins": ["https://formyfi.io"],
     "logo": "formify_logo.webp"
   },
   {
     "name": "Blendsafe",
     "oneLiner": "A MultiSignature wallet and omnichain module designed for cross-chain message signing, suitable for multiple blockchain ecosystems.",
     "website": "https://blendsafe.com/",
+    "authOrigins": ["https://blendsafe.com"],
     "logo": "blendsafe.svg"
   },
   {
     "name": "Game Bloc",
     "oneLiner": "A decentralized platform empowering gamers and gaming organizations to create, manage, and participate in game tournaments.",
     "website": "https://cv4ma-4qaaa-aaaal-adntq-cai.icp0.io/",
+    "authOrigins": ["https://cv4ma-4qaaa-aaaal-adntq-cai.icp0.io"],
     "logo": "gamebloc_logo.png"
   },
   {
     "name": "Dmail Network",
     "oneLiner": "AI-powered decentralized messaging infrastructure.",
     "website": "https://dmail.ai",
+    "authOrigins": ["https://dmail.ai"],
     "logo": "dmail-network_logo.png"
   },
   {
     "name": "Datapond",
     "website": "https://datapond.ai/",
+    "authOrigins": ["https://datapond.ai"],
     "logo": "ReCheck_logo.svg"
   },
   {
     "name": "ICTO",
     "oneLiner": "ICTO is a one-stop platform automating token operations on the Internet Computer.",
     "website": "https://icto.app",
+    "authOrigins": ["https://icto.app"],
     "logo": "icto_logo.webp"
   },
   {
     "name": "AppIC DAO",
     "oneLiner": "First-ever infrastructure layer that allows transferring and swapping of tokens between ICP and blockchains such as Bitcoin, Ethereum, and Solana.",
     "website": "https://app.appic.solutions/",
+    "authOrigins": ["https://app.appic.solutions"],
     "logo": "appic_logo.png"
   },
   {
     "name": "ICPanda DAO",
     "website": "https://panda.fans/",
+    "authOrigins": ["https://panda.fans"],
     "logo": "icpanda-dao_logo.webp",
     "oneLiner": "A decentralized Panda meme brand built on the Internet Computer."
   },
@@ -445,47 +519,55 @@
     "name": "odoc",
     "oneLiner": "Tasks managment, documentations, and smart contracts for online workers and freelancers.",
     "website": "https://lwdq3-vqaaa-aaaal-acwda-cai.icp0.io/",
+    "authOrigins": ["https://lwdq3-vqaaa-aaaal-acwda-cai.icp0.io"],
     "logo": "odoc_logo.png"
   },
   {
     "name": "ZkCross",
     "oneLiner": "One-click limitless liquidity across blockchains.",
     "website": "https://zkcross.network/",
+    "authOrigins": ["https://zkcross.network"],
     "logo": "zkCross_logo.svg"
   },
   {
     "name": "ICPEx",
     "oneLiner": "A fully on-chain decentralized exchange powered by the Proactive Market Maker (PMM) algorithm.",
     "website": "https://icpex.org/",
+    "authOrigins": ["https://icpex.org"],
     "logo": "icpex_logo.png"
   },
   {
     "name": "IC Footprint",
     "oneLiner": "A blockchain ESG platform that tracks ICP environmental metrics and provides tooling to reduce the environmental impact of the network.",
     "website": "https://owqnd-biaaa-aaaak-qidaq-cai.icp0.io/",
+    "authOrigins": ["https://owqnd-biaaa-aaaak-qidaq-cai.icp0.io"],
     "logo": "ic_footprint_logo.svg"
   },
   {
     "name": "B3Wallet",
     "oneLiner": "A decentralized, multi-chain wallet with unique support for Bitcoin, Ethereum, using Internet Computer's threshold ECDSA.",
     "website": "https://sehgq-cqaaa-aaaap-ahc4q-cai.icp0.io",
+    "authOrigins": ["https://sehgq-cqaaa-aaaap-ahc4q-cai.icp0.io"],
     "logo": "b3pay_logo.png"
   },
   {
     "name": "RIIDE",
     "website": "https://riide.org/",
+    "authOrigins": ["https://riide.org"],
     "logo": "riide_logo.png",
     "oneLiner": "A community-owned Web3 application that primarily offers taxi, delivery, and courier services."
   },
   {
     "name": "Konectª",
     "website": "https://qmtwu-wqaaa-aaaan-qlrya-cai.icp0.io/",
+    "authOrigins": ["https://qmtwu-wqaaa-aaaan-qlrya-cai.icp0.io"],
     "logo": "konecta_logo.svg",
     "oneLiner": "A new protocol that gathers notifications and events from all your apps implementing it, and compiles them into a user-specific canister."
   },
   {
     "name": "EstateDAO",
     "website": "https://wbdy5-yyaaa-aaaap-abysq-cai.icp0.io/",
+    "authOrigins": ["https://wbdy5-yyaaa-aaaap-abysq-cai.icp0.io"],
     "logo": "estatedao_logo.png",
     "oneLiner": "A vacation real estate tokenization and rental platform on ICP, enabling users to invest in vacation real estate with investments as low as USD 100."
   },
@@ -503,24 +585,28 @@
     "name": "CLP Finance",
     "oneLiner": "A liquidity protocol and native stablecoin that allows users to deposit assets, borrow stablecoins at zero interest.",
     "website": "https://www.clp.finance/",
+    "authOrigins": ["https://www.clp.finance"],
     "logo": "clpfinance_logo.png"
   },
   {
     "name": "Syron",
     "oneLiner": "A USD-pegged stablecoin, overcollateralized with Bitcoin and powered by Chain Fusion.",
     "website": "https://tyrondao.org",
+    "authOrigins": ["https://tyrondao.org"],
     "logo": "syron_logo.png"
   },
   {
     "name": "Doxa",
     "oneLiner": "A multi-stablecoin plartform with the doxa dollar.",
     "website": "https://i7m4z-gqaaa-aaaak-qddtq-cai.icp0.io/",
+    "authOrigins": ["https://i7m4z-gqaaa-aaaak-qddtq-cai.icp0.io"],
     "logo": "doxa_logo.webp"
   },
   {
     "name": "Fomowell",
     "oneLiner": "The fairest Web3 project launch platform.",
     "website": "https://fomowell.com/",
+    "authOrigins": ["https://fomowell.com"],
     "logo": "fomowell_logo.png"
   },
   {
@@ -545,29 +631,34 @@
     "name": "BIT10",
     "oneLiner": "BIT10 is the S&P500 of Bitcoin DeFi Assets",
     "website": "https://www.bit10.app",
+    "authOrigins": ["https://www.bit10.app"],
     "logo": "bit10_logo.webp"
   },
   {
     "name": "icecube",
     "oneLiner": "An open-source, 100% onchain social network.",
     "website": "https://mjlwf-iqaaa-aaaan-qmtna-cai.icp0.io/home",
+    "authOrigins": ["https://mjlwf-iqaaa-aaaan-qmtna-cai.icp0.io"],
     "logo": "icecube_logo.png"
   },
   {
     "name": "Gate23",
     "oneLiner": "Gate23 is an advanced point-of-sale (POS) and business software designed specifically for the food and beverage, e-commerce, and retail industries.",
     "website": "https://alpha-gate23.bridge23.app/",
+    "authOrigins": ["https://alpha-gate23.bridge23.app"],
     "logo": "Gate23_logo.png"
   },
   {
     "name": "Aegis Finance",
     "website": "https://aegis-finance.vercel.app/",
+    "authOrigins": ["https://aegis-finance.vercel.app"],
     "logo": "aegis-finance_logo.webp",
     "oneLiner": "Unlocking financial freedom, block by block."
   },
   {
     "name": "Moonshift",
     "website": "https://moonshift.app",
+    "authOrigins": ["https://moonshift.app"],
     "logo": "moonshift_logo.png",
     "oneLiner": "Gamified quest board where projects can create “Shifts” or marketing bounties for their community to collect."
   },
@@ -575,54 +666,64 @@
     "name": "PlexiMail",
     "logo": "pleximail_logo.png",
     "oneLiner": "The end-to-end encrypted, ICP canister-based, trustless secure email service.",
-    "website": "https://ai-fi.cc"
+    "website": "https://ai-fi.cc",
+    "authOrigins": ["https://ai-fi.cc"]
   },
   {
     "name": "Cipher AI Vault",
     "logo": "cipherAI_logo.webp",
     "oneLiner": "Azle-based proof-of-concept designed integrating in-memory VectorDB and LLM.",
-    "website": "https://qehbq-rqaaa-aaaan-ql2iq-cai.icp0.io/"
+    "website": "https://qehbq-rqaaa-aaaan-ql2iq-cai.icp0.io/",
+    "authOrigins": ["https://qehbq-rqaaa-aaaan-ql2iq-cai.icp0.io"]
   },
   {
     "name": "User Public Achievement Standard (UPAS)",
     "logo": "upas_logo.png",
     "oneLiner": "A decentralized open-source reputation standard that utilizes ICP securely and autonomously verify user achievements and issue credentials.",
-    "website": "https://5j4ti-jqaaa-aaaaj-qncma-cai.icp0.io/"
+    "website": "https://5j4ti-jqaaa-aaaaj-qncma-cai.icp0.io/",
+    "authOrigins": ["https://5j4ti-jqaaa-aaaaj-qncma-cai.icp0.io"]
   },
   {
     "name": "IC Toolkit",
     "logo": "ictoolkit_logo.png",
-    "website": "https://ic-toolkit.app"
+    "website": "https://ic-toolkit.app",
+    "authOrigins": ["https://ic-toolkit.app"]
   },
   {
     "name": "ICP Tokens",
     "website": "https://icptokens.net",
+    "authOrigins": ["https://icptokens.net"],
     "logo": "icptokens_logo.svg"
   },
   {
     "name": "DAO Venture",
     "website": "https://bpo6s-4qaaa-aaaap-acava-cai.icp0.io/",
+    "authOrigins": ["https://bpo6s-4qaaa-aaaap-acava-cai.icp0.io"],
     "logo": "daoventure_logo.webp"
   },
   {
     "name": "Solutio",
     "website": "https://home.solutio.one/",
+    "authOrigins": ["https://home.solutio.one"],
     "logo": "solutio_logo.svg"
   },
   {
     "name": "Lendfinity",
     "website": "https://www.lendfinity.xyz/",
+    "authOrigins": ["https://www.lendfinity.xyz"],
     "logo": "lendfinity_logo.svg"
   },
   {
     "name": "CLOAD",
     "website": "https://cload.one/",
+    "authOrigins": ["https://cload.one"],
     "logo": "cload_logo.png"
   },
   {
     "name": "OpenChat",
     "oneLiner": "Real-time messaging that runs entirely on-chain, with no backend operator.",
     "website": "https://oc.app/",
+    "authOrigins": ["https://oc.app"],
     "logo": "openchat_logo.webp"
   },
   {
@@ -653,17 +754,23 @@
     "name": "Open Cloud",
     "oneLiner": "A portal for provisioning Cloud Engines: a sovereign serverless cloud platform with tamperproof execution, safe upgrades, and horizontal auto-scaling.",
     "website": "https://opencloud.org",
+    "authOrigins": ["https://opencloud.org"],
     "logo": "open_cloud_logo.svg"
   },
   {
     "name": "CITADEL",
     "website": "https://ttxba-fqaaa-aaaaa-qgi4q-cai.icp0.io",
+    "authOrigins": ["https://ttxba-fqaaa-aaaaa-qgi4q-cai.icp0.io"],
     "logo": "citadel_logo.svg"
   },
   {
     "name": "MULTI/DEX",
     "oneLiner": "A complete crypto exchange — order book, AMM, margin, yield, custody, analytics and even its AI — running as a single autonomous service on the Internet Computer.",
-    "website": "https://multidex.ai/",
+    "website": "https://multidex.ai",
+    "authOrigins": [
+      "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp0.io",
+      "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
+    ],
     "logo": "multidex_logo.svg"
   }
 ]
