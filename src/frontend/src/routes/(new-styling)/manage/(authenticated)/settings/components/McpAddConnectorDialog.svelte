@@ -186,12 +186,12 @@
             </Tooltip>
           {:else if verifyState === "unverified" && parsedUrl !== undefined}
             <Tooltip
-              label={$t`Couldn't reach this connector`}
-              description={$t`We couldn't reach this URL to confirm it, but you can still trust it.`}
+              label={$t`Couldn't validate MCP support`}
+              description={$t`We couldn't validate MCP support at this URL, but you can still trust it.`}
             >
               <span
                 class="border-border-secondary text-fg-tertiary pointer-events-auto flex size-5 items-center justify-center rounded-full border"
-                aria-label={$t`Couldn't reach this connector`}
+                aria-label={$t`Couldn't validate MCP support`}
               >
                 <TriangleAlertIcon class="size-3" />
               </span>
