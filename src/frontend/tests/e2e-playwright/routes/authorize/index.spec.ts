@@ -113,6 +113,9 @@ test("Authorize by signing in from another device", async ({
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
       await holdToConfirm(otherDevicePage);
+      await otherDevicePage
+        .getByRole("heading", { level: 1, name: "Enter the code" })
+        .waitFor();
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);
