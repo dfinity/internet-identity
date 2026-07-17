@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 /// An active MCP session grant: the value of the grant map (see
 /// [`crate::storage`]), keyed by the MCP server's session-key principal.
-/// Written by the authenticated `mcp_register` method; the server-facing
+/// Written by the connect flow (`mcp_register_v2`); the server-facing
 /// `mcp_*` methods authorize a caller by looking up its grant and checking it
 /// has not expired. At most one live grant exists per anchor — registering a
 /// new session replaces the previous one through
@@ -23,7 +23,7 @@ pub struct StorableMcpGrant {
     #[n(1)]
     pub expires_at_ns: u64,
     /// Whether the per-app delegations this session mints are restricted to
-    /// query calls (queries-only). Chosen once at connect (`mcp_register`) and
+    /// query calls (queries-only). Chosen once at connect (`mcp_register_v2`) and
     /// applied to every delegation the session mints — read-only is a property
     /// of the whole MCP session, not a per-call flag. Both `prepare` and `get`
     /// read it, since the access level is folded into the delegation signature.

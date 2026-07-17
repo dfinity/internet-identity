@@ -1124,13 +1124,6 @@ type McpConfig = record {
     url : opt text;
 };
 
-// Result of mcp_register: the expiration (ns since epoch) of the MCP session
-// grant just registered. Every server-facing mcp_* call returns Unauthorized
-// once it passes; the server reconnects through a new consent flow.
-type McpRegistration = record {
-    expiration : Timestamp;
-};
-
 // Result of prepare_mcp_registration_delegation: the canister-signature public
 // key the registration delegation is rooted at (P_reg), and the (short)
 // expiration of that delegation. The frontend fetches the signed delegation via
@@ -1837,28 +1830,6 @@ service : (opt InternetIdentityInit) -> {
         // the omitted/`null` case, which means unrestricted).
         permissions : opt Permissions
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
-
-    // Register the trusted MCP server's session key for the anchor: grant the
-    // key's self-authenticating principal access to the server-facing mcp_*
-    // methods until the grant expires (grant_ttl_ns clamped to [10 min, 30
-    // days]). Called by the /mcp connect flow after user consent, with a key
-    // the frontend fetched from the *trusted* server's callback — never taken
-    // from the unauthenticated connect link. No account is chosen here
-    // (accounts are per-origin and the connector isn't an app) — the app
-    // account is selected per call on mcp_prepare_delegation.
-    //
-    // At most one session per identity: registering replaces any previous
-    // grant. Requires the identity's MCP config to be enabled with a trusted
-    // server set, so every session stays revocable via mcp_set_config.
-    mcp_register : (
-        anchor_number : UserNumber,
-        session_key : SessionKey,
-        grant_ttl_ns : nat64,
-        // `opt (queries)` makes every per-app delegation this session later
-        // mints queries-only (read-only, chosen once for the whole session).
-        // Omitted (`null`) or `opt (all)` means full, update-capable access.
-        permissions : opt Permissions
-    ) -> (variant { Ok : McpRegistration; Err : text });
 
     // Read the identity's synced trusted-MCP-server config (master toggle + the
     // trusted server URL). Persisted on-chain, so it follows the identity across

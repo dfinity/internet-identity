@@ -255,8 +255,8 @@ const OPENID_JWKS_CACHE_MEMORY_ID: MemoryId = MemoryId::new(OPENID_JWKS_CACHE_ME
 
 /// MCP session grants: maps an MCP server's session-key principal to the
 /// grant ([`StorableMcpGrant`]: the anchor that registered it, the expiry, and
-/// whether its per-app delegations are read-only). Written by the authenticated
-/// `mcp_register` method; the server-facing `mcp_*` methods authorize a caller
+/// whether its per-app delegations are read-only). Written by the connect flow
+/// (`mcp_register_v2`); the server-facing `mcp_*` methods authorize a caller
 /// by looking up its grant here (and checking expiry), recovering the anchor
 /// without an `anchor_number` parameter. Bounded at one entry per anchor via
 /// [`StorableMcpConfig::session_principal`].

@@ -38,8 +38,8 @@ interface McpAuthorizeInput {
 
 /**
  * Connects the MCP server by minting a short-lived *registration delegation
- * chain* and handing it to the server, instead of fetching the server's key
- * and calling `mcp_register` on its behalf. The flow:
+ * chain* and handing it to the server to redeem, rather than binding a key II
+ * merely fetched from the server. The flow:
  *
  *  1. Generate an ephemeral registration key `Y` for this connect; its private
  *     half never leaves this page.

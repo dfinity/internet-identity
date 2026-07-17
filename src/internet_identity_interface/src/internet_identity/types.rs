@@ -672,10 +672,10 @@ pub struct McpConfig {
     pub url: Option<String>,
 }
 
-/// Result of `mcp_register`: the expiration (nanoseconds since the epoch) of
-/// the MCP session grant just registered. Every server-facing `mcp_*` call
-/// returns `Unauthorized` once it passes; the server reconnects through a new
-/// consent flow.
+/// Result of the MCP connect flow (`mcp_register_v2`): the expiration
+/// (nanoseconds since the epoch) of the MCP session grant just registered.
+/// Every server-facing `mcp_*` call returns `Unauthorized` once it passes; the
+/// server reconnects through a new consent flow.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct McpRegistration {
     pub expiration: Timestamp,
