@@ -102,12 +102,6 @@ export const clearMcpTrustedServer = (
 ): Promise<McpConfig> =>
   updateConfig(actor, identityNumber, { url: undefined });
 
-/**
- * Forget the trusted server URL and turn the feature off in a single write.
- * Removing the only trusted server leaves an enabled config with nothing to
- * gate, so the two are cleared together — atomically, and without a transient
- * on-chain "enabled but no URL" state.
- */
 export const clearAndDisableMcp = (
   actor: ActorSubclass<_SERVICE>,
   identityNumber: bigint,

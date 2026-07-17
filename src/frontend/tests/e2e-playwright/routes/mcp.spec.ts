@@ -7,9 +7,6 @@ import { addVirtualAuthenticator, II_URL } from "../utils";
  *  server-side per call), but kept to exercise that the param is tolerated. */
 const APP = "nice-name.com";
 
-/** Press-and-hold the named HoldToConfirm button until it fires its
- *  `onComplete`. Mirrors the fixture-local helper; kept inline here so specs
- *  that drive the Settings UI directly don't need to reach into the fixture. */
 const holdSettingsConfirm = async (page: Page, name: string): Promise<void> => {
   const button = page.getByRole("button", { name });
   await button.waitFor({ state: "visible" });
@@ -127,8 +124,6 @@ test("Manage trusted server hands the session to a new Settings tab", async ({
   const settingsPage = await settingsPagePromise;
   await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
 
-  // The handed-off session means Settings opens authenticated: the AI-access
-  // section heading is shown and no sign-in screen appears.
   await expect(
     settingsPage.getByRole("heading", { name: "AI access" }),
   ).toBeVisible({ timeout: 10_000 });
@@ -175,8 +170,6 @@ test("Trusting the server in the Settings tab auto-advances the untrusted screen
         }),
       }),
   );
-  // Toggling AI access on with no server opens the Add-connector dialog;
-  // fill the URL and hold the confirm to save.
   await settingsPage.getByRole("switch", { name: "AI access" }).check();
   await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdSettingsConfirm(settingsPage, "Hold to continue");
@@ -287,13 +280,9 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  // Toggling AI access on with no server opens the Add-connector dialog;
-  // fill the URL and hold the confirm to save.
   await page.getByRole("switch", { name: "AI access" }).check();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
   await holdSettingsConfirm(page, "Hold to continue");
-  // Once a server is trusted the URL input is gone (dialog closed), and the
-  // server row carries a remove button — a unique assertion it was added.
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -528,8 +517,6 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page); // leaves the page on Settings, server trusted
 
-  // Remove the server: the row disappears and, because removing the only
-  // trusted server also disables the feature, the AI-access toggle flips off.
   await page.getByRole("button", { name: "Remove this server" }).click();
   await expect(
     page.getByRole("button", { name: "Remove this server" }),

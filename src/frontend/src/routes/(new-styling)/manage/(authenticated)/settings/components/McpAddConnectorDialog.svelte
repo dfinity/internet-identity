@@ -19,13 +19,6 @@
 
   const { onClose, onSave, saving }: Props = $props();
 
-  // Verify state:
-  //  - "idle": nothing entered yet (or the user cleared it)
-  //  - "typing": input has content but hasn't been parsed as https yet
-  //  - "checking": a parsed https URL is being probed
-  //  - "ok": the probe succeeded — server speaks MCP
-  //  - "unverified": couldn't confirm it's an MCP server (advisory, still savable)
-  //  - "invalid": the URL isn't a valid https URL
   type VerifyState =
     | "idle"
     | "typing"
@@ -36,13 +29,8 @@
 
   let urlInput = $state("");
   let verifyState = $state<VerifyState>("idle");
-  // The parsed URL from the most recent successful parse — what we actually
-  // save. Kept in sync with `urlInput` via the debounced verify.
   let parsedUrl = $state<string | undefined>(undefined);
 
-  // Debounce the auto-verify so it doesn't fire on every keystroke. Cancelled
-  // if the user edits again before it starts, and a stale probe result won't
-  // land: `verify` guards on `parsed.url === urlInput` before assigning.
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   const verify = async (url: string) => {
@@ -75,10 +63,6 @@
     }, 500);
   };
 
-  // Confirming is allowed as soon as the URL parses — the probe is advisory,
-  // matching the pre-revamp behaviour (a server that can't be probed for CORS
-  // reasons is still trustable). "checking" isn't confirmable because the
-  // parsed URL isn't stored yet.
   const canConfirm = $derived(
     !saving &&
       parsedUrl !== undefined &&
@@ -165,8 +149,6 @@
       <span class="text-text-secondary text-sm font-medium">
         {$t`Connector URL`}
       </span>
-      <!-- The verify indicator is centered inside the field, so it's wrapped
-           with the input (not the label) in the positioning context. -->
       <div class="relative">
         <Input
           bind:value={urlInput}

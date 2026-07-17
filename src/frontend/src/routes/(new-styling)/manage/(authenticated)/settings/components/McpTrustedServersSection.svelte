@@ -33,11 +33,8 @@
   // True until the initial config read completes, so the toggle doesn't flicker
   // off-then-on and writes can't race the load.
   let loaded = $state(false);
-  // A canister write (toggle / clear) is in flight.
   let saving = $state(false);
 
-  // When true, the Add dialog is open. `enableOnSave` means confirming will
-  // also flip the master toggle on (the "turning on with no server yet" path).
   let showAdd = $state(false);
   let enableOnSave = $state(false);
 
@@ -74,10 +71,6 @@
       return;
     }
     const next = event.currentTarget.checked;
-    // Turning on with no trusted server yet: don't write anything. Open the
-    // Add dialog and let its confirm flip the master toggle atomically after
-    // the URL is saved. Revert the visual toggle immediately so it doesn't
-    // flash on while the dialog is up.
     if (next && trusted === undefined) {
       event.currentTarget.checked = false;
       enableOnSave = true;
@@ -116,9 +109,6 @@
     enableOnSave = false;
   };
 
-  // Save the URL from the Add dialog. If we entered via "toggle on with no
-  // server", also flip the master toggle in the same canister round-trip so
-  // the two writes can't disagree.
   const handleAddSave = async (url: string) => {
     saving = true;
     try {
@@ -157,10 +147,6 @@
     }
   };
 
-  // Removing the only trusted server also turns the feature off: an enabled
-  // config with no URL can't gate anything. Both are cleared in one atomic
-  // write, and the UI collapses optimistically so no "add connector" state
-  // flashes between the two — reverted together if the write fails.
   const handleRemove = async () => {
     if (trusted === undefined) return;
     const previousUrl = trusted;
