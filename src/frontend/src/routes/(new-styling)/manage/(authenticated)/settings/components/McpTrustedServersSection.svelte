@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { GlobeIcon, Trash2Icon } from "@lucide/svelte";
+  import { BotIcon, Trash2Icon } from "@lucide/svelte";
   import McpIcon from "$lib/components/icons/McpIcon.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
@@ -165,7 +165,7 @@
       class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-12 shrink-0 items-center justify-center rounded-lg border"
       aria-hidden="true"
     >
-      <McpIcon class="size-5.5" />
+      <BotIcon class="size-5.5" />
     </span>
 
     <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -216,7 +216,7 @@
             class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"
             aria-hidden="true"
           >
-            <GlobeIcon class="size-4.5" />
+            <McpIcon class="size-4.5" />
           </span>
 
           <div class="flex min-w-0 flex-1 flex-col gap-1.5">
