@@ -40,18 +40,21 @@
     clearTimeout(debounceTimer);
   });
 
+  const normalizeUrl = (value: string): string =>
+    value.trim().replace(/\/+$/, "");
+
   const verify = async (url: string) => {
     verifyState = "checking";
     parsedUrl = url;
     const ok = await probeMcpServer(url);
-    if (!destroyed && urlInput.trim() === url) {
+    if (!destroyed && normalizeUrl(urlInput) === url) {
       verifyState = ok ? "ok" : "unverified";
     }
   };
 
   const handleInput = () => {
     clearTimeout(debounceTimer);
-    const trimmed = urlInput.trim();
+    const trimmed = normalizeUrl(urlInput);
     if (trimmed === "") {
       verifyState = "idle";
       parsedUrl = undefined;
@@ -88,7 +91,7 @@
   );
 
   const handleBlur = () => {
-    const trimmed = urlInput.trim();
+    const trimmed = normalizeUrl(urlInput);
     if (trimmed === "") return;
     if (parseMcpServerUrl(trimmed) === undefined) {
       verifyState = "invalid";
