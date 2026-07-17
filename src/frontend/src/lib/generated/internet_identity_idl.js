@@ -637,7 +637,6 @@ export const idlFactory = ({ IDL }) => {
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
   });
-  const McpRegistration = IDL.Record({ 'expiration' : Timestamp });
   const JWT = IDL.Text;
   const Salt = IDL.Vec(IDL.Nat8);
   const OpenIdCredentialAddError = IDL.Variant({
@@ -1177,11 +1176,6 @@ export const idlFactory = ({ IDL }) => {
             'Err' : AccountDelegationError,
           }),
         ],
-        [],
-      ),
-    'mcp_register' : IDL.Func(
-        [UserNumber, SessionKey, IDL.Nat64, IDL.Opt(Permissions)],
-        [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
       ),
     'mcp_register_v2' : IDL.Func(
