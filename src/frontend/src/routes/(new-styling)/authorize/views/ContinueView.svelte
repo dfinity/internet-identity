@@ -29,7 +29,6 @@
     isCanisterError,
   } from "$lib/utils/utils";
   import { getVapidPublicKey, subscribeDevice } from "$lib/utils/pushConsent";
-  import { maybePromptInstall } from "$lib/utils/pwaInstall";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
     _SERVICE,
@@ -241,7 +240,6 @@
     actor: ActorSubclass<_SERVICE>,
     identityNumber: bigint,
   ): Promise<void> => {
-    await maybePromptInstall();
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
       pushPermissionDenied = permission === "denied";

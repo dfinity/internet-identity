@@ -222,7 +222,7 @@
     {#if deviceEnabled}
       <div class="border-border-tertiary mt-5 border-t pt-4">
         <p class="text-text-tertiary mb-3 text-xs font-semibold">
-          {$t`Trusted apps`}
+          {$t`Allowed apps`}
         </p>
 
         {#if !originsLoaded}
