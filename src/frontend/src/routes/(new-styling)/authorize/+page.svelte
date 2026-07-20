@@ -55,7 +55,6 @@
     discoverSsoConfig,
     type SsoDiscoveryResult,
   } from "$lib/utils/ssoDiscovery";
-  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import { waitForStore } from "$lib/utils/utils";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 
@@ -327,32 +326,34 @@
     );
     const { name, email } = decodeJWT(jwt);
     if (authFlowResult?.type === "signUp") {
+      // A gated SSO login that came back not-connected can't be completed on this
+      // throwaway resume flow: a non-`sub` org needs a normal (primary-client)
+      // sign-in first to bridge its stable id, and registration needs an
+      // interactive captcha this flow can't render. Re-resolve discovery; if the
+      // origin maps to a per-app client, hand off to the wizard's "sign in
+      // normally first" CTA (seeded) instead of registering here.
+      if (ssoDomain !== null) {
+        const dappOrigin = await waitForEffectiveOrigin();
+        const discovery = await discoverSsoConfig(
+          ssoDomain,
+          undefined,
+          dappOrigin !== undefined
+            ? remapToLegacyDomain(dappOrigin)
+            : undefined,
+        );
+        if (discovery.resolvedClientId !== discovery.clientId) {
+          ssoNormalLoginResult = discovery;
+          openIdResumeProcessing = false;
+          return;
+        }
+      }
       // AuthFlow owns last-used persistence (via `trackLastUsed`): sign-up is
       // recorded by `completeOpenIdRegistration` here, and the sign-in case is
       // already recorded inside `continueWithOpenId` (the JWT was supplied, so
       // there's no interactive disambiguation to defer the write for).
-      try {
-        await authFlow.completeOpenIdRegistration(
-          name ?? email?.split("@")[0] ?? $t`${config.name} user`,
-        );
-      } catch (e) {
-        // Gated non-`sub` SSO can't register from the per-app token: the identity
-        // must sign in normally (primary client) first to bridge its stable id.
-        // Hand off to the wizard's recovery CTA, seeded with the gated result.
-        if (e instanceof SsoNormalLoginRequiredError && ssoDomain !== null) {
-          const dappOrigin = await waitForEffectiveOrigin();
-          ssoNormalLoginResult = await discoverSsoConfig(
-            ssoDomain,
-            undefined,
-            dappOrigin !== undefined
-              ? remapToLegacyDomain(dappOrigin)
-              : undefined,
-          );
-          openIdResumeProcessing = false;
-          return;
-        }
-        throw e;
-      }
+      await authFlow.completeOpenIdRegistration(
+        name ?? email?.split("@")[0] ?? $t`${config.name} user`,
+      );
     }
     // 1-click OpenID flow: no access-level toggle, always full access.
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");

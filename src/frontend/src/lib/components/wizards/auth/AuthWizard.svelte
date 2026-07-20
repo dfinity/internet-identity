@@ -352,6 +352,18 @@
         mode,
         ssoOrigin,
       );
+      // A gated login (per-app client) that came back not connected needs a
+      // normal (primary-client) sign-in first to bridge a non-`sub` identity.
+      // Show that CTA directly rather than the sign-up/captcha detour, which for
+      // a non-`sub` org only ends in the same fail-safe anyway.
+      const notConnected =
+        authResult === undefined
+          ? authFlow.view === "openIdNotConnected"
+          : authResult.type === "signUp";
+      if (notConnected && ssoResult.resolvedClientId !== ssoResult.clientId) {
+        ssoNormalLoginResult = ssoResult;
+        return;
+      }
       await applySsoAuthResult(authResult, ssoResult, preSnapshot);
     } catch (error) {
       if (isOpenIdCancelError(error)) {
