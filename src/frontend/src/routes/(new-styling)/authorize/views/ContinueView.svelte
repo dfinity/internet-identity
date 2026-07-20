@@ -29,6 +29,7 @@
     isCanisterError,
   } from "$lib/utils/utils";
   import { getVapidPublicKey, subscribeDevice } from "$lib/utils/pushConsent";
+  import { maybePromptInstall } from "$lib/utils/pwaInstall";
   import type { ActorSubclass } from "@icp-sdk/core/agent";
   import type {
     _SERVICE,
@@ -164,50 +165,15 @@
     "serviceWorker" in navigator &&
     "PushManager" in window;
 
-  let pushNotificationsEnabled = $state(false);
+  let pushNotificationsEnabled = $state(true);
   let pushNotificationsInitiallyGranted = $state(false);
   let pushDeviceSubscribed = $state<boolean | undefined>(undefined);
   let pushPermissionDenied = $state(false);
-
-  type BeforeInstallPromptEvent = Event & {
-    prompt: () => Promise<void>;
-    userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-  };
-  const isBeforeInstallPromptEvent = (
-    e: Event,
-  ): e is BeforeInstallPromptEvent => "prompt" in e && "userChoice" in e;
-  let deferredInstallPrompt: BeforeInstallPromptEvent | undefined;
-  const captureInstallPrompt = (e: Event): void => {
-    if (!isBeforeInstallPromptEvent(e)) return;
-    e.preventDefault();
-    deferredInstallPrompt = e;
-  };
-
-  const isStandaloneDisplay = (): boolean =>
-    typeof window !== "undefined" &&
-    window.matchMedia("(display-mode: standalone)").matches;
-
-  const maybePromptInstall = async (): Promise<void> => {
-    if (deferredInstallPrompt === undefined) return;
-    if (isStandaloneDisplay()) {
-      deferredInstallPrompt = undefined;
-      return;
-    }
-    try {
-      await deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
-    } catch (err) {
-      console.warn("PWA install prompt failed:", err);
-    } finally {
-      deferredInstallPrompt = undefined;
-    }
-  };
 
   const loadPushConsentFor = async (
     anchorNumber: bigint,
     origin: string,
   ): Promise<void> => {
-    pushNotificationsEnabled = false;
     pushNotificationsInitiallyGranted = false;
     let actor: ActorSubclass<_SERVICE> | undefined;
     const sessionActor = await actorForIdentity(anchorNumber);
@@ -245,12 +211,9 @@
   });
 
   onMount(() => {
-    window.addEventListener("beforeinstallprompt", captureInstallPrompt);
     if (!isPushSupported) {
       pushDeviceSubscribed = false;
-      return () => {
-        window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
-      };
+      return;
     }
     if (
       typeof Notification !== "undefined" &&
@@ -272,10 +235,6 @@
         console.warn("Failed to read existing push subscription", error);
         pushDeviceSubscribed = false;
       });
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
-    };
   });
 
   const subscribeThisDevice = async (
