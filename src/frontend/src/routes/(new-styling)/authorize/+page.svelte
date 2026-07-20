@@ -22,6 +22,7 @@
   import RedirectAnimationView from "./views/RedirectAnimationView.svelte";
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
+  import NotifOptInView from "./views/NotifOptInView.svelte";
   import type { AccessLevel } from "$lib/utils/accessLevel";
   import AuthWizardView from "./views/AuthWizardView.svelte";
   import AttributeConsentView from "./views/AttributeConsentView.svelte";
@@ -96,6 +97,30 @@
     accessLevel: AccessLevel,
   ) => {
     authorizationStore.authorize(accountNumber, accessLevel);
+  };
+
+  let pendingAuthorization = $state<
+    | {
+        accountNumberPromise: Promise<bigint | undefined>;
+        accessLevel: AccessLevel;
+      }
+    | undefined
+  >(undefined);
+  const handleContinueIntent = (
+    accountNumber: Promise<bigint | undefined>,
+    accessLevel: AccessLevel,
+  ) => {
+    pendingAuthorization = {
+      accountNumberPromise: accountNumber,
+      accessLevel,
+    };
+  };
+  const finalizePendingAuthorization = () => {
+    if (pendingAuthorization === undefined) return;
+    handleAuthorize(
+      pendingAuthorization.accountNumberPromise,
+      pendingAuthorization.accessLevel,
+    );
   };
 
   const handleAttributeConsent = (consent: AttributeConsent) => {
@@ -416,6 +441,9 @@
 {:else if upgradeSuccess && $isAuthenticatedStore}
   <!-- Migration wizard completed — show success countdown before authorizing. -->
   {@render panelWrapper(upgradeSuccessContent)}
+{:else if pendingAuthorization !== undefined}
+  <!-- Post-Continue notifications opt-in, before the final redirect. -->
+  {@render panelWrapper(notifOptInContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection. -->
   {@render panelWrapper(continueContent)}
@@ -442,7 +470,15 @@
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
-    onAuthorize={handleAuthorize}
+    onAuthorize={handleContinueIntent}
+  />
+{/snippet}
+
+{#snippet notifOptInContent()}
+  <NotifOptInView
+    effectiveOrigin={$authorizationContextStore.effectiveOrigin}
+    displayOrigin={$establishedChannelStore.origin}
+    onContinue={finalizePendingAuthorization}
   />
 {/snippet}
 
