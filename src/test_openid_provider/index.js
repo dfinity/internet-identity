@@ -1,5 +1,6 @@
 import * as oidc from "oidc-provider";
 import express from "express";
+import { createHash } from "crypto";
 
 const app = express();
 // Port the server binds to locally. CI/dev pass it as argv (`npm start -- 11105`);
@@ -69,25 +70,49 @@ let ssoGating = {
   stable_identifier_claim: "sub",
 };
 
+// Entra-style mode (OIDC_SUBJECT_TYPE=pairwise): the `sub` claim is pairwise —
+// different per OIDC client — while a stable `oid` claim (set per account) stays
+// constant across clients. Lets the gating e2e exercise the non-`sub` (oid)
+// bridge faithfully. Default is a public (stable across clients) `sub`.
+const pairwise = process.env.OIDC_SUBJECT_TYPE === "pairwise";
+const clientBase = {
+  client_secret: "secret", // Not used but required here
+  redirect_uris: redirectUris,
+  response_types: ["code id_token"],
+  grant_types: ["implicit", "authorization_code"],
+  // Pairwise `sub`. oidc-provider only demands a (https) sector_identifier_uri
+  // when redirect_uris span more than one host, so the pairwise instance is
+  // configured with a single-host redirect (OIDC_REDIRECT_URIS, see
+  // scripts/dev-e2e-setup) and needs no sector document.
+  ...(pairwise ? { subject_type: "pairwise" } : {}),
+};
+
 const provider = new oidc.Provider(issuer, {
   clients: [
-    {
-      client_id: "internet_identity",
-      client_secret: "secret", // Not used but required here
-      redirect_uris: redirectUris,
-      response_types: ["code id_token"],
-      grant_types: ["implicit", "authorization_code"],
-    },
-    {
-      client_id: PER_APP_CLIENT_ID,
-      client_secret: "secret", // Not used but required here
-      redirect_uris: redirectUris,
-      response_types: ["code id_token"],
-      grant_types: ["implicit", "authorization_code"],
-    },
+    { client_id: "internet_identity", ...clientBase },
+    { client_id: PER_APP_CLIENT_ID, ...clientBase },
   ],
+  subjectTypes: pairwise ? ["public", "pairwise"] : ["public"],
+  ...(pairwise
+    ? {
+        pairwiseIdentifier(_ctx, accountId, client) {
+          return createHash("sha256")
+            .update(`${accountId}:${client.clientId}`)
+            .digest("hex");
+        },
+      }
+    : {}),
+  // `oid` is declared so the pairwise (Entra-style) accounts can carry a stable
+  // identifier; it is only emitted when an account actually sets it.
   claims: {
-    openid: ["sub", "name", "email", "preferred_username", "email_verified"],
+    openid: [
+      "sub",
+      "name",
+      "email",
+      "preferred_username",
+      "email_verified",
+      "oid",
+    ],
   },
   async findAccount(_, id) {
     return {

@@ -25,6 +25,18 @@ export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
 
 /**
+ * Entra-style provider: pairwise `sub` (different per OIDC client) plus a stable
+ * `oid` claim. Backs the non-`sub` gating tests where the identity must be
+ * bridged via `oid`. Its own port/domain so its pairwise config never touches
+ * the public-`sub` provider the other tests rely on. Requires `localhost:11108`
+ * in the canister's `sso_discoverable_domains` (see scripts/dev-e2e-setup).
+ */
+export const SSO_ENTRA_OPENID_PORT = 11108;
+export const SSO_ENTRA_DISCOVERY_DOMAIN = `localhost:${SSO_ENTRA_OPENID_PORT}`;
+/** The SSO display name the Entra instance serves (see dev-e2e-setup). */
+export const SSO_ENTRA_NAME = "DFINITY ENTRA";
+
+/**
  * The per-app OIDC client id the test provider registers for gating; a gated
  * origin maps to it in the well-known's `app_clients`.
  */
@@ -38,6 +50,11 @@ export interface SsoGatingConfig {
   gateAllApps?: boolean;
   /** Cross-client-stable identifier claim (default `sub`). */
   stableIdentifierClaim?: string;
+  /**
+   * Which provider to configure (default the public-`sub` one). Set to
+   * {@link SSO_ENTRA_DISCOVERY_DOMAIN} for the pairwise/`oid` tests.
+   */
+  domain?: string;
 }
 
 type SsoEntryMode = "signin" | "signup" | "both";
@@ -73,20 +90,23 @@ export const test = base.extend<{
   configureSsoGating: (config: SsoGatingConfig) => Promise<void>;
 }>({
   configureSsoGating: async ({ request }, use) => {
-    const post = (body: unknown) =>
-      request.post(`http://${SSO_DISCOVERY_DOMAIN}/sso-config`, {
-        data: body,
-      });
+    const post = (domain: string, body: unknown) =>
+      request.post(`http://${domain}/sso-config`, { data: body });
+    const configured = new Set<string>();
     await use(async (config: SsoGatingConfig) => {
-      const response = await post({
+      const domain = config.domain ?? SSO_DISCOVERY_DOMAIN;
+      configured.add(domain);
+      const response = await post(domain, {
         app_clients: config.appClients ?? {},
         gate_all_apps: config.gateAllApps ?? false,
         stable_identifier_claim: config.stableIdentifierClaim ?? "sub",
       });
       expect(response.ok()).toBe(true);
     });
-    // Reset to un-gated defaults so gating never leaks into later tests.
-    await post({ app_clients: {}, gate_all_apps: false });
+    // Reset every configured provider so gating never leaks into later tests.
+    for (const domain of configured) {
+      await post(domain, { app_clients: {}, gate_all_apps: false });
+    }
   },
   // eslint-disable-next-line no-empty-pattern
   openSsoPopup: async ({}, use) => {

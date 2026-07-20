@@ -485,8 +485,12 @@ jobs:
       artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
       # All test OpenID provider ports we spin up (see
       # /src/test_openid_provider). 11105 / 11106 back the direct OpenID
-      # fixtures; 11107 backs the SSO discovery (two-hop) fixture.
-      openid_providers: "11105 11106 11107"
+      # fixtures; 11107 backs the SSO discovery (two-hop) fixture; 11108 is an
+      # Entra-style provider (pairwise `sub` + stable `oid`) for the non-`sub`
+      # gating tests.
+      openid_providers: "11105 11106 11107 11108"
+      # The Entra-style provider port — started with pairwise env below.
+      pairwise_openid_provider: "11108"
       # Direct OpenID provider ports — only these get an `openid_configs`
       # entry on the canister. 11107 is intentionally excluded: it's
       # registered exclusively as an SSO `DiscoverableOidcConfig`, so the
@@ -501,7 +505,9 @@ jobs:
       # `127.0.0.1:11107` is the same provider under a distinct host so the gating
       # tests get their own discovery-cache entry (II caches discovery per domain
       # ~1h with no force-refresh). See fixtures/sso.ts SSO_GATING_DISCOVERY_DOMAIN.
-      sso_discoverable_domains: "localhost:11107 127.0.0.1:11107"
+      # `localhost:11108` is the Entra-style provider (see fixtures/sso.ts
+      # SSO_ENTRA_DISCOVERY_DOMAIN).
+      sso_discoverable_domains: "localhost:11107 127.0.0.1:11107 localhost:11108"
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
@@ -551,8 +557,16 @@ jobs:
       - name: "Run test OpenID providers"
         run: |
           npm ci --prefix ./src/test_openid_provider
-          for port in ${{ env.openid_providers }}; do  
-            npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+          for port in ${{ env.openid_providers }}; do
+            if [ "$port" = "${{ env.pairwise_openid_provider }}" ]; then
+              # Entra-style: pairwise `sub` + a stable `oid`, named for the
+              # dialog copy. Pairwise needs single-host redirect_uris; the e2e II
+              # origin is https://id.ai, so restrict to that one callback.
+              OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="DFINITY ENTRA" OIDC_REDIRECT_URIS="https://id.ai/callback" \
+                npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+            else
+              npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
+            fi
           done
 
       # Render the frontend canister's init_args file from the template

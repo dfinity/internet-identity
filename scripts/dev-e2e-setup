@@ -17,11 +17,14 @@ REPO_ROOT="$PWD"
 
 # Match the e2e job in .github/workflows/canister-tests.yml
 LAUNCHER_TAG="v12.0.0-2026-04-16-04-20"
-OPENID_PORTS=(11105 11106 11107)
+OPENID_PORTS=(11105 11106 11107 11108)
 DIRECT_OPENID_PORTS=(11105 11106)
 # 127.0.0.1:11107 is the same provider under a distinct host so the gating tests
 # get their own discovery-cache entry (see fixtures/sso.ts SSO_GATING_DISCOVERY_DOMAIN).
-SSO_DOMAINS=("localhost:11107" "127.0.0.1:11107")
+# 11108 is an Entra-style provider: pairwise `sub` (per client) + a stable `oid`,
+# for the non-`sub` gating tests (see fixtures/sso.ts SSO_ENTRA_DISCOVERY_DOMAIN).
+PAIRWISE_OPENID_PORT=11108
+SSO_DOMAINS=("localhost:11107" "127.0.0.1:11107" "localhost:11108")
 
 STATE_DIR=".icp/cache/dev-e2e"
 LAUNCHER_DIR="$STATE_DIR/launcher-$LAUNCHER_TAG"
@@ -238,8 +241,18 @@ start_openid_providers() {
   log "Starting test OpenID providers on: ${OPENID_PORTS[*]}"
   local new_pids=()
   for port in "${OPENID_PORTS[@]}"; do
-    npm start --silent --prefix ./src/test_openid_provider -- "$port" \
-      > "$LOG_DIR/openid-$port.log" 2>&1 &
+    if [[ "$port" == "$PAIRWISE_OPENID_PORT" ]]; then
+      # Entra-style: pairwise `sub` + a stable `oid`, named for the consent/dialog
+      # copy. Pairwise needs single-host redirect_uris (or a sector_identifier_uri);
+      # the e2e II origin is https://id.ai, so restrict to that one callback.
+      OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="DFINITY ENTRA" \
+        OIDC_REDIRECT_URIS="https://id.ai/callback" \
+        npm start --silent --prefix ./src/test_openid_provider -- "$port" \
+        > "$LOG_DIR/openid-$port.log" 2>&1 &
+    else
+      npm start --silent --prefix ./src/test_openid_provider -- "$port" \
+        > "$LOG_DIR/openid-$port.log" 2>&1 &
+    fi
     new_pids+=("$!")
   done
   OPENID_PIDS="${new_pids[*]}"

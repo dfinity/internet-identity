@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
 import { DEFAULT_OPENID_PORT } from "../../fixtures/openid";
@@ -7,6 +7,9 @@ import {
   SSO_GATING_DISCOVERY_DOMAIN,
   SSO_OPENID_PORT,
   SSO_PER_APP_CLIENT_ID,
+  SSO_ENTRA_DISCOVERY_DOMAIN,
+  SSO_ENTRA_OPENID_PORT,
+  SSO_ENTRA_NAME,
 } from "../../fixtures/sso";
 import { fromBase64, II_URL, TEST_APP_URL } from "../../utils";
 
@@ -706,6 +709,50 @@ test.describe("Authorize with IdP-side per-app gating", () => {
       await authorizePage.page.close();
     });
   });
+
+  // Same deny, reached via the 1-click `?sso=` path: discovery runs in the
+  // popup's onMount and the gate refuses the origin, so the redemption throws
+  // before ever redirecting to the IdP. Unlike the manual wizard (which renders
+  // the tailored "not granted" copy), the 1-click path routes the throw through
+  // the generic error handler. What matters is that the gate can't be bypassed:
+  // the flow errors and the app is never reached.
+  test.describe("denied origin via 1-click ?sso=", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: SSO_OPENID_PORT,
+        createUsers: [{ claims: { name } }],
+      },
+    });
+
+    test("gate_all_apps blocks an unlisted dapp's 1-click", async ({
+      page,
+      configureSsoGating,
+    }) => {
+      await configureSsoGating(gatingConfig);
+      await page.goto(DENIED_ORIGIN);
+      const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
+        SSO_GATING_DISCOVERY_DOMAIN,
+      )}`;
+      await page
+        .getByRole("textbox", { name: "Identity Provider" })
+        .fill(ssoUrl);
+      await page
+        .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+        .setChecked(true);
+      await expect(page.locator("#principal")).toBeHidden();
+      const popupPromise = page.context().waitForEvent("page");
+      await page.getByRole("button", { name: "Sign In" }).click();
+      const popup = await popupPromise;
+      // Gate deny → the discovery throws `origin-denied`; no IdP redirect, no app.
+      await expect(popup.getByText(/origin-denied/i)).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(
+        popup.getByRole("heading", { name: "Sign-in" }),
+      ).toBeHidden();
+      await expect(page.locator("#principal")).toBeHidden();
+    });
+  });
 });
 
 // The manual wizard entry ("Sign in with SSO" → type the domain) must attach the
@@ -891,5 +938,155 @@ test.describe("Continue as a last-used SSO identity", () => {
       consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
     ).toBeVisible();
     await consent.continue();
+  });
+});
+
+// Non-`sub` (Entra-style) gating: the org's `sub` is pairwise per OIDC client,
+// so a first gated login can't establish the identity from the per-app token.
+// The user is prompted for one normal sign-in, then the original per-app token
+// is replayed silently and the app opens — no third ceremony, no account-picker.
+test.describe("Authorize with gated non-sub (Entra) SSO", () => {
+  const name = "Entra User";
+  const email = "entra.user@example.com";
+  const GATED_ORIGIN = "https://nice-name.com";
+  const gatingConfig = {
+    domain: SSO_ENTRA_DISCOVERY_DOMAIN,
+    appClients: { [GATED_ORIGIN]: SSO_PER_APP_CLIENT_ID },
+    gateAllApps: true,
+    stableIdentifierClaim: "oid",
+  };
+  const ssoUrl = `${II_URL}/authorize?sso=${encodeURIComponent(
+    SSO_ENTRA_DISCOVERY_DOMAIN,
+  )}`;
+
+  test.use({
+    openIdConfig: {
+      defaultPort: SSO_ENTRA_OPENID_PORT,
+      createUsers: [{ claims: { name, email } }],
+    },
+  });
+
+  // Give the account a fresh `oid` per run. The anchor is keyed by (issuer,
+  // primary client, oid) and the e2e canister persists across runs, so a fixed
+  // oid would find the anchor already bridged next time — the "first login"
+  // dialog only appears for an unbridged one. The account id is a per-run UUID.
+  const setFreshOid = (
+    request: APIRequestContext,
+    accountId: string,
+  ): Promise<unknown> =>
+    request.post(
+      `http://${SSO_ENTRA_DISCOVERY_DOMAIN}/account/${accountId}/claims`,
+      { data: { name, email, oid: `entra-oid-${accountId}` } },
+    );
+
+  // Start a gated 1-click for the Entra origin and authenticate against the
+  // per-app client, returning the IdP popup. Entra discovery is cold on first
+  // use (two hops + JWKS via canister outcalls), so wait for the redirect to
+  // the IdP before signing in.
+  const startGatedLogin = async (
+    page: Page,
+    signInWithOpenId: (p: Page, id: string) => Promise<void>,
+    userId: string,
+  ): Promise<Page> => {
+    await page.goto(GATED_ORIGIN);
+    await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
+    await page
+      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+      .setChecked(true);
+    await expect(page.locator("#principal")).toBeHidden();
+    const popupPromise = page.context().waitForEvent("page");
+    await page.getByRole("button", { name: "Sign In" }).click();
+    const popup = await popupPromise;
+    await expect(popup.getByRole("heading", { name: "Sign-in" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await signInWithOpenId(popup, userId);
+    return popup;
+  };
+
+  // Complete an IdP popup when the session may already be established: the
+  // Sign-in form still shows (prompt=login), but consent can be remembered from
+  // an earlier login this session, so the Authorize screen is optional.
+  const finishGatedPopupReusingSession = async (
+    popup: Page,
+    userId: string,
+  ): Promise<void> => {
+    await expect(popup.getByRole("heading", { name: "Sign-in" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await popup.getByPlaceholder("Enter any login").fill(userId);
+    await popup.getByPlaceholder("and password").fill("any-password-works");
+    await popup.getByRole("button", { name: "Sign-in" }).click();
+    await popup
+      .getByRole("button", { name: "Continue" })
+      .click({ timeout: 8_000 })
+      .catch(() => {
+        // Consent remembered from the first login → no Authorize screen; the
+        // popup redirects straight back.
+      });
+  };
+
+  // First gated login for a non-`sub` org: the per-app token can't establish the
+  // identity, so II prompts exactly one normal (primary-client) sign-in via the
+  // "First sign-in with <org>" dialog, then replays the stashed per-app token —
+  // no third ceremony, no "Continue to <app>" account-picker. Leaves the anchor
+  // bridged (its `oid` stamped) and the app open.
+  const bridgeOnFirstLogin = async (
+    page: Page,
+    signInWithOpenId: (p: Page, id: string) => Promise<void>,
+    userId: string,
+  ): Promise<void> => {
+    const popup = await startGatedLogin(page, signInWithOpenId, userId);
+    await expect(
+      popup.getByRole("heading", {
+        name: `First sign-in with ${SSO_ENTRA_NAME}`,
+      }),
+    ).toBeVisible({ timeout: 15_000 });
+    const normalPopupPromise = page.context().waitForEvent("page");
+    await popup.getByRole("button", { name: "Continue" }).click();
+    const normalPopup = await normalPopupPromise;
+    await signInWithOpenId(normalPopup, userId);
+    await expect(page.locator("#principal")).toBeVisible({ timeout: 25_000 });
+  };
+
+  test("first gated 1-click prompts one normal sign-in, then reaches the app", async ({
+    page,
+    request,
+    configureSsoGating,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    await configureSsoGating(gatingConfig);
+    await setFreshOid(request, openIdUsers[0].id);
+    await bridgeOnFirstLogin(page, signInWithOpenId, openIdUsers[0].id);
+  });
+
+  test("once bridged, a later gated 1-click resolves in one shot", async ({
+    page,
+    request,
+    configureSsoGating,
+    signInWithOpenId,
+    openIdUsers,
+  }) => {
+    await configureSsoGating(gatingConfig);
+    await setFreshOid(request, openIdUsers[0].id);
+    // First login bridges the anchor (stamps its `oid`).
+    await bridgeOnFirstLogin(page, signInWithOpenId, openIdUsers[0].id);
+
+    // Second gated 1-click: the `oid` now resolves the identity, so the per-app
+    // token establishes the session directly — no "First sign-in" dialog. Were
+    // the dialog to reappear, nobody advances it and #principal below would
+    // never show.
+    await page.goto(GATED_ORIGIN);
+    await page.getByRole("textbox", { name: "Identity Provider" }).fill(ssoUrl);
+    await page
+      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+      .setChecked(true);
+    await expect(page.locator("#principal")).toBeHidden();
+    const popup2Promise = page.context().waitForEvent("page");
+    await page.getByRole("button", { name: "Sign In" }).click();
+    const popup2 = await popup2Promise;
+    await finishGatedPopupReusingSession(popup2, openIdUsers[0].id);
+    await expect(page.locator("#principal")).toBeVisible({ timeout: 25_000 });
   });
 });
