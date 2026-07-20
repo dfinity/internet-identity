@@ -245,7 +245,7 @@ start_openid_providers() {
       # Entra-style: pairwise `sub` + a stable `oid`, named for the consent/dialog
       # copy. Pairwise needs single-host redirect_uris (or a sector_identifier_uri);
       # the e2e II origin is https://id.ai, so restrict to that one callback.
-      OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="DFINITY ENTRA" \
+      OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" \
         OIDC_REDIRECT_URIS="https://id.ai/callback" \
         npm start --silent --prefix ./src/test_openid_provider -- "$port" \
         > "$LOG_DIR/openid-$port.log" 2>&1 &

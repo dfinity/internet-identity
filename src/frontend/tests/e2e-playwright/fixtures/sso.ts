@@ -34,7 +34,7 @@ export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
 export const SSO_ENTRA_OPENID_PORT = 11108;
 export const SSO_ENTRA_DISCOVERY_DOMAIN = `localhost:${SSO_ENTRA_OPENID_PORT}`;
 /** The SSO display name the Entra instance serves (see dev-e2e-setup). */
-export const SSO_ENTRA_NAME = "DFINITY ENTRA";
+export const SSO_ENTRA_NAME = "Entra SSO";
 
 /**
  * The per-app OIDC client id the test provider registers for gating; a gated

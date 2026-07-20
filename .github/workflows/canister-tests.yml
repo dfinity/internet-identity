@@ -562,7 +562,7 @@ jobs:
               # Entra-style: pairwise `sub` + a stable `oid`, named for the
               # dialog copy. Pairwise needs single-host redirect_uris; the e2e II
               # origin is https://id.ai, so restrict to that one callback.
-              OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="DFINITY ENTRA" OIDC_REDIRECT_URIS="https://id.ai/callback" \
+              OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" OIDC_REDIRECT_URIS="https://id.ai/callback" \
                 npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
             else
               npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
