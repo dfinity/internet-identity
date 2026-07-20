@@ -772,5 +772,19 @@
       "https://hcv4s-uaaaa-aaabq-qaaba-cai.icp.net"
     ],
     "logo": "multidex_logo.svg"
+  },
+  {
+    "name": "OhShii",
+    "oneLiner": "Token launchpad, locker and DAO tooling on the Internet Computer.",
+    "website": "https://ohshii.io",
+    "authOrigins": [
+      "https://ohshii.io",
+      "https://launcher.ohshii.io",
+      "https://locker.ohshii.io",
+      "https://v5mnw-oaaaa-aaaal-qsica-cai.icp0.io",
+      "https://iewka-oiaaa-aaaah-aq7dq-cai.icp0.io",
+      "https://b5we6-kqaaa-aaaaj-qntgq-cai.icp0.io"
+    ],
+    "logo": "ohshii_logo.svg"
   }
 ]
