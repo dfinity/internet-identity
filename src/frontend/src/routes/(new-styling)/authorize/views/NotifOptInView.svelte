@@ -1,10 +1,8 @@
 <script lang="ts">
   import {
-    BellIcon,
     BellOffIcon,
     CheckCircle2Icon,
     ClockIcon,
-    ShieldIcon,
     ZapIcon,
   } from "@lucide/svelte";
   import { Trans } from "$lib/components/locale";
@@ -97,56 +95,51 @@
 {#if step === "notify" || step === "prompt"}
   <div class="flex flex-1 flex-col">
     <div
-      class="border-border-tertiary from-bg-secondary to-bg-primary relative mt-2 overflow-hidden rounded-2xl border bg-gradient-to-b p-5"
+      class="border-border-tertiary from-bg-secondary to-bg-primary relative mt-2 overflow-hidden rounded-2xl border bg-gradient-to-b p-4"
     >
       <div
-        class="bg-radial-fg-grid pointer-events-none absolute inset-0 opacity-15"
+        class="pointer-events-none absolute inset-0 opacity-15"
         style="background-image: radial-gradient(circle at center, var(--fg-quaternary) 1px, transparent 1.4px); background-size: 20px 20px;"
       ></div>
       <div
-        class="text-text-tertiary relative mb-3 text-center text-xs font-semibold"
-      >
-        {$t`Wednesday, 9:41`}
-      </div>
-      <div
-        class="border-border-tertiary bg-bg-primary/60 relative flex items-start gap-3 rounded-2xl border p-3 shadow-lg backdrop-blur-md"
+        class="border-border-tertiary bg-bg-primary/30 relative -mb-10 flex scale-95 items-start gap-2.5 rounded-xl border p-2.5 opacity-60"
       >
         <span
-          class="border-border-tertiary bg-bg-tertiary text-text-secondary flex size-9 shrink-0 items-center justify-center rounded-lg border"
+          class="border-border-tertiary bg-bg-tertiary text-text-secondary flex size-7 shrink-0 items-center justify-center rounded-md border"
           aria-hidden="true"
         >
-          <BellIcon class="size-4.5" />
+          <img src="/favicon.svg" alt="" class="size-4" />
         </span>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline justify-between gap-2">
-            <span class="text-text-primary text-sm font-semibold">
-              {$t`OISY Wallet`}
+            <span class="text-text-primary text-xs font-semibold">
+              {$t`Caffeine`}
             </span>
-            <span class="text-text-tertiary text-xs">{$t`now`}</span>
+            <span class="text-text-tertiary text-[10px]">{$t`2m`}</span>
           </div>
-          <p class="text-text-secondary mt-0.5 text-sm leading-snug">
-            {$t`Your transfer of 25 ICP is confirmed.`}
+          <p class="text-text-secondary mt-0.5 truncate text-xs">
+            {$t`Your app is built and live at recipe-box.caffeine.ai`}
           </p>
         </div>
       </div>
       <div
-        class="border-border-tertiary bg-bg-primary/30 relative mt-2 flex scale-[.96] items-start gap-3 rounded-2xl border p-3 opacity-75"
+        class="border-border-tertiary bg-bg-primary/70 relative flex items-start gap-2.5 rounded-xl border p-2.5 shadow-lg backdrop-blur-md"
       >
         <span
-          class="border-border-tertiary bg-bg-tertiary text-text-secondary flex size-9 shrink-0 items-center justify-center rounded-lg border"
+          class="border-border-tertiary bg-bg-tertiary text-text-secondary flex size-7 shrink-0 items-center justify-center rounded-md border"
           aria-hidden="true"
         >
-          <BellIcon class="size-4.5" />
+          <img src="/favicon.svg" alt="" class="size-4" />
         </span>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline justify-between gap-2">
-            <span class="text-text-primary text-sm font-semibold">
-              {$t`Caffeine`}
+            <span class="text-text-primary text-xs font-semibold">
+              {$t`OISY Wallet`}
             </span>
-            <span class="text-text-tertiary text-xs">{$t`2m`}</span>
+            <span class="text-text-tertiary text-[10px]">{$t`now`}</span>
           </div>
-          <p class="text-text-secondary mt-0.5 text-sm leading-snug">
-            {$t`Your app is built and live at recipe-box.caffeine.ai`}
+          <p class="text-text-secondary mt-0.5 text-xs leading-snug">
+            {$t`Your transfer of 25 ICP is confirmed.`}
           </p>
         </div>
       </div>
@@ -197,24 +190,6 @@
           <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
             <Trans>
               Updates reach your device without keeping the app open.
-            </Trans>
-          </p>
-        </div>
-      </li>
-      <li class="flex items-start gap-3.5">
-        <span
-          class="border-border-secondary bg-bg-secondary text-text-primary flex size-9 shrink-0 items-center justify-center rounded-full border"
-          aria-hidden="true"
-        >
-          <ShieldIcon class="size-4" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <div class="text-text-primary text-sm font-semibold">
-            {$t`Private by design`}
-          </div>
-          <p class="text-text-tertiary mt-0.5 text-sm leading-snug">
-            <Trans>
-              Delivery routes through your identity. Revoke access anytime.
             </Trans>
           </p>
         </div>
