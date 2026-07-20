@@ -169,24 +169,48 @@
   let pushDeviceSubscribed = $state<boolean | undefined>(undefined);
   let pushPermissionDenied = $state(false);
 
-  onMount(() => {
-    const authenticated = $authenticationStore;
-    if (authenticated === undefined) return;
-    void authenticated.actor
-      .push_list_consented_origins(authenticated.identityNumber)
-      .then((origins) => {
-        if (origins.includes(effectiveOrigin)) {
-          pushNotificationsEnabled = true;
-          pushNotificationsInitiallyGranted = true;
-        }
-      })
-      .catch((error) => {
+  const loadPushConsentFor = async (
+    anchorNumber: bigint,
+    origin: string,
+  ): Promise<void> => {
+    pushNotificationsEnabled = false;
+    pushNotificationsInitiallyGranted = false;
+    let actor: ActorSubclass<_SERVICE> | undefined;
+    const sessionActor = await actorForIdentity(anchorNumber);
+    if (sessionActor !== undefined) {
+      actor = sessionActor;
+    } else if ($authenticationStore !== undefined) {
+      actor = $authenticationStore.actor;
+    }
+    if (actor === undefined) return;
+    try {
+      const origins = await actor.push_list_consented_origins(anchorNumber);
+      if (origins.includes(origin)) {
+        pushNotificationsEnabled = true;
+        pushNotificationsInitiallyGranted = true;
+      }
+    } catch (error) {
+      if (
+        isCanisterError<SessionDelegationError>(error) &&
+        error.type === "Unauthorized"
+      ) {
+        void purgeSession(anchorNumber);
+      } else {
         console.warn(
           "Failed to load current push notification consent state",
           error,
         );
-      });
+      }
+    }
+  };
 
+  $effect(() => {
+    const anchor = selectedIdentityNumber;
+    const origin = effectiveOrigin;
+    void loadPushConsentFor(anchor, origin);
+  });
+
+  onMount(() => {
     if (!isPushSupported) {
       pushDeviceSubscribed = false;
       return;
@@ -713,7 +737,7 @@
   {:else}
     <AuthorizeHeader origin={displayOrigin} />
     <h1
-      class="text-text-primary mb-2 max-w-full self-start text-2xl font-medium break-words"
+      class="text-text-primary mb-2 max-w-full min-w-0 self-start text-2xl font-medium break-words"
     >
       {$t`Continue to ${dappName}`}
     </h1>
@@ -766,7 +790,7 @@
     </Tooltip>
   </div>
   {#if isPushSupported && !pushPermissionDenied}
-    <div class="border-border-tertiary mt-4 border-t pt-4">
+    <div class="border-border-tertiary mt-4 min-w-0 border-t pt-4">
       <Toggle
         bind:checked={pushNotificationsEnabled}
         label={$t`Get notifications from ${dappName}`}
@@ -778,14 +802,14 @@
       />
     </div>
   {:else if pushPermissionDenied}
-    <div class="border-border-tertiary mt-4 border-t pt-4">
+    <div class="border-border-tertiary mt-4 min-w-0 border-t pt-4">
       <p class="text-text-tertiary text-sm">
         {$t`Notifications are blocked in this browser. Enable them in the site settings to receive updates from ${dappName}.`}
       </p>
     </div>
   {/if}
   {#if $READ_ONLY_MODE}
-    <div class="border-border-tertiary mt-4 border-t pt-4">
+    <div class="border-border-tertiary mt-4 min-w-0 border-t pt-4">
       <AccessLevelSelector
         bind:accessLevel
         disabled={isAuthenticatingDefault}
