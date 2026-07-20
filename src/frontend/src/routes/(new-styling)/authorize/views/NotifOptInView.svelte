@@ -206,7 +206,7 @@
       >
         {#if step === "prompt"}
           <ProgressRing />
-          <span>{$t`Waiting for your browser...`}</span>
+          <span>{$t`Enabling...`}</span>
         {:else}
           <span>{$t`Enable notifications`}</span>
         {/if}
