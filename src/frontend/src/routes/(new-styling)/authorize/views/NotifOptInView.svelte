@@ -93,7 +93,7 @@
 </script>
 
 {#if step === "notify" || step === "prompt"}
-  <div class="flex flex-1 flex-col">
+  <div class="flex min-w-0 flex-1 flex-col">
     <div
       class="border-border-tertiary from-bg-secondary to-bg-primary relative mt-2 overflow-hidden rounded-2xl border bg-gradient-to-b p-4"
     >
@@ -221,7 +221,7 @@
     </div>
   </div>
 {:else if step === "done"}
-  <div class="flex flex-1 flex-col items-center">
+  <div class="flex min-w-0 flex-1 flex-col items-center">
     {#if granted === true}
       <div
         class="bg-bg-success-primary border-bg-success-secondary text-fg-success-primary mt-6 flex size-18 items-center justify-center rounded-full border"
