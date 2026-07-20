@@ -1,13 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { BellIcon, SmartphoneIcon, XIcon } from "@lucide/svelte";
-  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
+  import { SmartphoneIcon, GlobeIcon, Trash2Icon } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";
   import { toaster } from "$lib/components/utils/toaster";
-  import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { bufFromBufLike } from "$lib/utils/utils";
@@ -24,33 +22,29 @@
   }
 
   const { identityNumber }: Props = $props();
-  const componentId = $props.id();
-  const deviceTitleId = `${componentId}-device`;
-  const permsTitleId = `${componentId}-perms`;
+  const titleId = $props.id();
 
-  // Whether the browser can support Web Push at all — false in unsupported
-  // browsers or insecure contexts, in which case the device toggle is
-  // hidden entirely (users on unsupported browsers just don't see the
-  // "Notifications on this device" card).
   const devicePushSupported =
     typeof navigator !== "undefined" &&
     "serviceWorker" in navigator &&
     "PushManager" in window;
 
   let deviceSubscription = $state<PushSubscription | undefined>(undefined);
-  // True until the initial subscription-status check completes.
   let deviceStatusLoaded = $state(false);
-  // A subscribe/unsubscribe round-trip is in flight — disables the toggle
-  // so the user can't fire a second call before the first settles.
   let deviceBusy = $state(false);
   const deviceEnabled = $derived(deviceSubscription !== undefined);
 
   let origins = $state<string[]>([]);
-  // True until the initial consent-list read completes.
-  let loaded = $state(false);
-  // The origin currently being revoked, if any — disables just that row's
-  // button rather than the whole list.
+  let originsLoaded = $state(false);
   let revoking = $state<string | undefined>(undefined);
+
+  const hostOf = (url: string): string => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  };
 
   onMount(() => {
     void (async () => {
@@ -66,7 +60,7 @@
           duration: 4000,
         });
       } finally {
-        loaded = true;
+        originsLoaded = true;
       }
     })();
 
@@ -113,11 +107,9 @@
         });
         return;
       }
-
       const registration =
         await navigator.serviceWorker.register("/service-worker.js");
       await navigator.serviceWorker.ready;
-
       const vapidPublicKey = await getVapidPublicKey($authenticatedStore.actor);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -127,7 +119,6 @@
         endpoint: string;
         keys: { p256dh: string; auth: string };
       };
-
       await subscribeDevice(
         $authenticatedStore.actor,
         identityNumber,
@@ -168,10 +159,6 @@
     }
   };
 
-  // The toggle's `onchange` runs after the checked value has already
-  // flipped — read the target's new state to decide which direction we're
-  // going. Uses `onchange` (not `onclick`) because the browser's
-  // notification-permission prompt counts either as a valid user gesture.
   const handleToggle = async (event: Event) => {
     if (!(event.currentTarget instanceof HTMLInputElement)) return;
     if (deviceBusy) return;
@@ -190,115 +177,106 @@
 
 {#if devicePushSupported}
   <section
-    class="border-border-secondary bg-bg-secondary flex flex-row items-start gap-3 rounded-xl border p-4 sm:gap-4 sm:p-5"
+    class="border-border-secondary bg-bg-secondary flex flex-col rounded-xl border p-4 sm:p-5"
   >
-    <span
-      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
-      aria-hidden="true"
-    >
-      <SmartphoneIcon class="size-5" />
-    </span>
-
-    <div class="flex min-w-0 flex-1 flex-col gap-1">
-      <div
-        class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
+    <div class="flex flex-row items-start gap-3 sm:gap-4">
+      <span
+        class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
+        aria-hidden="true"
       >
-        <h3
-          id={deviceTitleId}
-          class="text-text-primary text-base font-semibold"
+        <SmartphoneIcon class="size-5" />
+      </span>
+
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div
+          class="flex min-h-[1.5rem] flex-row flex-wrap items-center gap-x-2 gap-y-1"
         >
-          {$t`Notifications on this device`}
-        </h3>
-        {#if deviceStatusLoaded && deviceEnabled}
-          <Badge color="success" size="sm" dot>
-            {$t`Enabled on this device`}
-          </Badge>
+          <h3 id={titleId} class="text-text-primary text-base font-semibold">
+            {$t`Notifications on this device`}
+          </h3>
+          {#if deviceStatusLoaded && deviceEnabled}
+            <Badge color="success" size="sm" dot>
+              {$t`Enabled on this device`}
+            </Badge>
+          {/if}
+        </div>
+        <p class="text-text-tertiary text-sm">
+          {$t`dApps you've granted permission to can send you push notifications on this device.`}
+        </p>
+      </div>
+
+      <div class="flex h-6 shrink-0 items-center">
+        {#if !deviceStatusLoaded}
+          <ProgressRing class="text-fg-tertiary size-5" />
+        {:else}
+          <Toggle
+            checked={deviceEnabled}
+            onchange={handleToggle}
+            disabled={deviceBusy}
+            aria-labelledby={titleId}
+          />
         {/if}
       </div>
-      <p class="text-text-tertiary text-sm">
-        {#if deviceEnabled}
-          <Trans>
-            dApps you've granted permission to can send you push notifications
-            on this device.
-          </Trans>
-        {:else}
-          <Trans>
-            Let dApps you've granted permission to send you push notifications
-            on this device.
-          </Trans>
-        {/if}
-      </p>
     </div>
 
-    <div class="shrink-0">
-      {#if !deviceStatusLoaded}
-        <ProgressRing class="text-fg-tertiary size-5" />
-      {:else}
-        <Toggle
-          checked={deviceEnabled}
-          onchange={handleToggle}
-          disabled={deviceBusy}
-          aria-labelledby={deviceTitleId}
-        />
-      {/if}
-    </div>
+    {#if deviceEnabled}
+      <div class="border-border-tertiary mt-5 border-t pt-4">
+        <p class="text-text-tertiary mb-3 text-xs font-semibold">
+          {$t`Trusted apps`}
+        </p>
+
+        {#if !originsLoaded}
+          <div class="flex items-center justify-center py-3">
+            <ProgressRing class="text-fg-tertiary size-5" />
+          </div>
+        {:else if origins.length === 0}
+          <p class="text-text-tertiary text-sm">
+            {$t`No apps have permission to send you push notifications yet.`}
+          </p>
+        {:else}
+          <ul class="flex flex-col gap-2" aria-labelledby={titleId}>
+            {#each origins as origin (origin)}
+              <li
+                class="border-border-tertiary bg-bg-primary flex flex-row items-center gap-3 rounded-lg border px-3 py-3 sm:px-4"
+              >
+                <span
+                  class="border-border-secondary bg-bg-secondary text-fg-tertiary flex size-10 shrink-0 items-center justify-center rounded-md border"
+                  aria-hidden="true"
+                >
+                  <GlobeIcon class="size-4.5" />
+                </span>
+                <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span
+                    class="text-text-primary truncate text-sm font-semibold"
+                  >
+                    {hostOf(origin)}
+                  </span>
+                  <span
+                    class="text-text-tertiary truncate font-mono text-xs"
+                    title={origin}
+                  >
+                    {origin}
+                  </span>
+                </div>
+                <Tooltip label={$t`Remove`}>
+                  <button
+                    class="btn btn-tertiary btn-sm btn-icon shrink-0"
+                    onclick={() => void handleRevoke(origin)}
+                    disabled={revoking !== undefined}
+                    aria-label={$t`Revoke permission for ${origin}`}
+                  >
+                    {#if revoking === origin}
+                      <ProgressRing class="size-5" />
+                    {:else}
+                      <Trash2Icon class="size-4.5" />
+                    {/if}
+                  </button>
+                </Tooltip>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    {/if}
   </section>
 {/if}
-
-<section
-  class="border-border-secondary bg-bg-secondary flex flex-col gap-4 rounded-xl border p-4 sm:p-5"
->
-  <div class="flex flex-row items-start gap-3 sm:gap-4">
-    <span
-      class="border-border-tertiary text-fg-secondary bg-bg-primary flex size-10 shrink-0 items-center justify-center rounded-lg border"
-      aria-hidden="true"
-    >
-      <BellIcon class="size-5" />
-    </span>
-
-    <div class="flex min-h-[2.5rem] min-w-0 flex-1 flex-col justify-center">
-      <h3 id={permsTitleId} class="text-text-primary text-base font-semibold">
-        {$t`Push notifications`}
-      </h3>
-      <p class="text-text-tertiary text-sm">
-        <Trans>Apps you've allowed to send you push notifications.</Trans>
-      </p>
-    </div>
-  </div>
-
-  {#if !loaded}
-    <div class="flex items-center justify-center py-4">
-      <ProgressRing class="text-fg-tertiary size-5" />
-    </div>
-  {:else if origins.length === 0}
-    <p class="text-text-tertiary text-sm">
-      {$t`No apps have permission to send you push notifications yet.`}
-    </p>
-  {:else}
-    <ul class="flex flex-col gap-2" aria-labelledby={permsTitleId}>
-      {#each origins as origin (origin)}
-        <li
-          class="border-border-secondary bg-bg-primary flex flex-row items-center gap-2 rounded-lg border px-3 py-2.5 sm:gap-3 sm:px-4"
-        >
-          <span class="text-text-primary min-w-0 flex-1 text-sm font-medium">
-            <Ellipsis text={origin} position="middle" />
-          </span>
-          <Tooltip label={$t`Revoke permission`}>
-            <button
-              class="btn btn-tertiary btn-sm btn-icon shrink-0"
-              onclick={() => void handleRevoke(origin)}
-              disabled={revoking !== undefined}
-              aria-label={$t`Revoke permission for ${origin}`}
-            >
-              {#if revoking === origin}
-                <ProgressRing class="size-5" />
-              {:else}
-                <XIcon class="size-5" />
-              {/if}
-            </button>
-          </Tooltip>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</section>
