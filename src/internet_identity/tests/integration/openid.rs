@@ -1910,27 +1910,39 @@ mod sso_gating {
         Ok(())
     }
 
-    /// Entra-style org (`oid` stable claim, pairwise `sub`): the first gated
-    /// login needs a normal login first, then resolves to the same anchor once
-    /// the stable-id index is populated. Covers scenario (a).
+    /// Entra-style org that was configured as `sub` when the anchor was created
+    /// (so its primary credential carries no stable id), then switches to `oid`.
+    /// The pre-`oid` anchor SELF-HEALS on a normal sign-in: `openid_prepare_delegation`
+    /// stamps the `oid` onto the stored primary credential and the write reconciles
+    /// the stable-id index, so a subsequent gated login resolves — no re-registration.
     #[test]
-    fn entra_oid_first_gated_needs_normal_then_resolves() -> Result<(), RejectResponse> {
+    fn entra_oid_pre_oid_anchor_self_heals_on_normal_login() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install(&env);
 
+        // A real Entra token always carries `oid`; II just ignores it while the
+        // org is configured as `sub`.
         let (primary_jwt, jwks) = token(PRIMARY_CLIENT, PRIMARY_SUB, &[("oid", STABLE_OID)]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
-        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+
+        // Phase 1 — org is still `sub`: registering the primary credential stores
+        // it WITHOUT a stable id (the pre-`oid` state); the index stays empty.
+        let responses_sub = responses(well_known(&app_clients, false, "sub"), jwks.clone());
         let identity_number =
-            register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
+            register_with_primary_credential(&env, canister_id, &responses_sub, &primary_jwt);
+
+        // Org switches to `oid`. Upgrading clears the in-memory discovery cache so
+        // the next fetch picks up the new config.
+        upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+        let responses_oid = responses(well_known(&app_clients, false, "oid"), jwks);
 
         let session_key = ByteBuf::from("dapp session key");
         // Pairwise per-app token: its sub differs from the primary credential's.
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // First gated login, before any normal login populated the stable-id
-        // index: no anchor resolves.
-        let first = drive_sso_until_ready(&env, &responses, || {
+        // Pre-`oid` anchor: the index has no entry yet, so the first gated login
+        // fails safe.
+        let first = drive_sso_until_ready(&env, &responses_oid, || {
             api::sso_prepare_delegation(
                 &env,
                 canister_id,
@@ -1945,28 +1957,28 @@ mod sso_gating {
         });
         assert!(
             matches!(first, Err(OpenIdDelegationError::NoSuchAnchor)),
-            "first gated login (non-sub) must need a normal login first, got {first:?}"
+            "pre-oid gated login must fail safe, got {first:?}"
         );
 
-        // A normal login carries both sub and oid; storing the stamped primary
-        // credential reconciles the stable-id index.
-        let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
+        // A normal sign-in through `openid_prepare_delegation` stamps the `oid`
+        // onto the stored primary credential; the write reconciles the
+        // (iss, primary_client, oid) -> anchor entry — the anchor self-heals.
+        let normal = expect_ready(drive_sso_until_ready(&env, &responses_oid, || {
+            api::openid_prepare_delegation_with_discovery(
                 &env,
                 canister_id,
                 test_principal(),
                 &primary_jwt,
                 &test_salt(),
                 &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
+                Some(GATE_DOMAIN),
             )
             .unwrap()
         }));
         assert_eq!(normal.anchor_number, identity_number);
 
-        // Now the gated login bridges (iss, oid) -> primary sub and resolves.
-        let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
+        // The gated login now bridges (iss, oid) -> primary sub and resolves.
+        let resolved = expect_ready(drive_sso_until_ready(&env, &responses_oid, || {
             api::sso_prepare_delegation(
                 &env,
                 canister_id,
@@ -1981,7 +1993,7 @@ mod sso_gating {
         }));
         assert_eq!(
             resolved.anchor_number, identity_number,
-            "gated login resolves to the primary anchor after aux is populated"
+            "gated login resolves after the normal sign-in self-heals the index"
         );
         Ok(())
     }
@@ -2004,21 +2016,8 @@ mod sso_gating {
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // A normal login populates the index; the gated login resolves.
-        let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &primary_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(normal.anchor_number, identity_number);
+        // Registration stamped the primary credential, so the gated login
+        // already resolves via the stable-id index.
         let resolved = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -2077,25 +2076,12 @@ mod sso_gating {
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "oid"), jwks);
 
-        // Anchor A: register + normal login -> the index points at A.
+        // Anchor A: registration stamps the primary credential -> the index
+        // points at A.
         let anchor_a =
             register_with_primary_credential(&env, canister_id, &responses, &primary_jwt);
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
-        let normal_a = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &primary_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(normal_a.anchor_number, anchor_a);
         let resolved_a = expect_ready(drive_sso_until_ready(&env, &responses, || {
             api::sso_prepare_delegation(
                 &env,
@@ -2123,8 +2109,8 @@ mod sso_gating {
         api::openid_credential_remove(&env, canister_id, test_principal(), anchor_a, &key)?
             .expect("remove primary credential from A");
 
-        // ... link it to B (token bound to B's principal), then normally log in
-        // through B so the stamped primary credential re-points the index at B.
+        // ... link it to B (token bound to B's principal). The add stamps the
+        // primary credential, re-pointing the index at B.
         let (primary_jwt_b, _) = token_for(
             &test_principal_b(),
             PRIMARY_CLIENT,
@@ -2144,20 +2130,6 @@ mod sso_gating {
             .unwrap()
         })
         .expect("link primary credential to B");
-        let normal_b = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal_b(),
-                &primary_jwt_b,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(normal_b.anchor_number, anchor_b);
 
         // The gated login (same `oid`) now resolves to anchor B.
         let resolved_b = expect_ready(drive_sso_until_ready(&env, &responses, || {
@@ -2197,22 +2169,8 @@ mod sso_gating {
         let session_key = ByteBuf::from("dapp session key");
         let (gated_jwt, _) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", STABLE_OID)]);
 
-        // A normal login stamps the primary credential; the write reconciles
-        // the (iss, primary_client, oid) -> anchor entry into the stable index.
-        let normal = expect_ready(drive_sso_until_ready(&env, &responses, || {
-            api::sso_prepare_delegation(
-                &env,
-                canister_id,
-                test_principal(),
-                &primary_jwt,
-                &test_salt(),
-                &session_key,
-                GATE_DOMAIN,
-                UNGATED_ORIGIN,
-            )
-            .unwrap()
-        }));
-        assert_eq!(normal.anchor_number, identity_number);
+        // Registration stamped the primary credential, so the stable-id index
+        // already points at the anchor.
 
         // Upgrade the canister; the stable index survives.
         upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -2475,8 +2433,8 @@ mod sso_gating {
         let env = env();
         let canister_id = install(&env);
 
-        // `oid` org; the token's `oid` exceeds the 256-byte cap.
-        let long_oid = "a".repeat(257);
+        // `oid` org; the token's `oid` is one byte over the 255-byte cap.
+        let long_oid = "a".repeat(256);
         let (gated_jwt, jwks) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", long_oid.as_str())]);
         let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
         let responses = responses(well_known(&app_clients, false, "oid"), jwks);
@@ -2509,6 +2467,58 @@ mod sso_gating {
         assert!(
             matches!(deleg, Err(OpenIdDelegationError::JwtVerificationFailed)),
             "over-long stable-id claim must be rejected at delegation, got {deleg:?}"
+        );
+        Ok(())
+    }
+
+    /// A stable-id claim exactly at the 255-byte cap is accepted: it passes
+    /// the length check and reaches the ordinary non-`sub` fail-safe
+    /// (`SsoNormalLoginRequired` / `NoSuchAnchor`) rather than a length
+    /// rejection (`InvalidAuthnMethod` / `JwtVerificationFailed`). Pins the
+    /// off-by-one boundary against the over-cap test above.
+    #[test]
+    fn stable_id_claim_at_cap_is_accepted() -> Result<(), RejectResponse> {
+        let env = env();
+        let canister_id = install(&env);
+
+        // `oid` org; the token's `oid` is exactly at the 255-byte cap.
+        let cap_oid = "a".repeat(255);
+        let (gated_jwt, jwks) = token(PER_APP_CLIENT, PER_APP_SUB, &[("oid", cap_oid.as_str())]);
+        let app_clients = format!(r#"{{"{GATED_ORIGIN}":"{PER_APP_CLIENT}"}}"#);
+        let responses = responses(well_known(&app_clients, false, "oid"), jwks);
+
+        sync_time(&env, TEST_TIME_MS);
+        warm_gate_caches(&env, canister_id, &responses, &gated_jwt, GATED_ORIGIN);
+
+        // Registration: length OK, so it reaches the non-`sub` fail-safe rather
+        // than a length rejection.
+        let reg = register_via_sso_gate(&env, canister_id, &gated_jwt, GATED_ORIGIN);
+        assert!(
+            matches!(reg, Err(IdRegFinishError::SsoNormalLoginRequired)),
+            "at-cap stable-id claim must pass the length check and hit the \
+             normal-login fail-safe, got {reg:?}"
+        );
+
+        // Delegation: length OK, so it fails with the ordinary unbridged
+        // `NoSuchAnchor`, not a verification failure.
+        let session_key = ByteBuf::from("dapp session key");
+        let deleg = drive_sso_until_ready(&env, &responses, || {
+            api::sso_prepare_delegation(
+                &env,
+                canister_id,
+                test_principal(),
+                &gated_jwt,
+                &test_salt(),
+                &session_key,
+                GATE_DOMAIN,
+                GATED_ORIGIN,
+            )
+            .unwrap()
+        });
+        assert!(
+            matches!(deleg, Err(OpenIdDelegationError::NoSuchAnchor)),
+            "at-cap stable-id claim must pass the length check (NoSuchAnchor, \
+             not JwtVerificationFailed), got {deleg:?}"
         );
         Ok(())
     }
