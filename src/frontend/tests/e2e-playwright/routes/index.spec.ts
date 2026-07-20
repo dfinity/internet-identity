@@ -95,6 +95,9 @@ test.describe("First visit", () => {
         .getByRole("heading", { level: 1, name: "Authorize new device" })
         .waitFor();
       await holdToConfirm(existingDevicePage);
+      await existingDevicePage
+        .getByRole("heading", { level: 1, name: "Enter the code" })
+        .waitFor();
       for (let i = 0; i < confirmationCodeArray.length; i++) {
         const code = confirmationCodeArray[i];
         await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);

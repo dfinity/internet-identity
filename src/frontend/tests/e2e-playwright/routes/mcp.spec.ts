@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "../fixtures";
-import { addVirtualAuthenticator, II_URL } from "../utils";
+import { addVirtualAuthenticator, holdToConfirm, II_URL } from "../utils";
 
 /** A target app passed in the request. It is ignored by the connect flow (the
  *  session is registered for the user's identity; the app account is chosen
@@ -111,11 +111,79 @@ test("Manage trusted server hands the session to a new Settings tab", async ({
   const settingsPage = await settingsPagePromise;
   await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
 
-  // The handed-off session means Settings opens authenticated: the trusted
-  // server section heading is shown and no sign-in screen appears.
   await expect(
-    settingsPage.getByRole("heading", { name: "Trusted MCP server" }),
+    settingsPage.getByRole("heading", { name: "AI access" }),
   ).toBeVisible({ timeout: 10_000 });
+});
+
+test("Trusting the server in the Settings tab auto-advances the untrusted screen", async ({
+  page,
+  mcp,
+}) => {
+  // The whole point of the untrusted screen: set the server as trusted in the
+  // handed-off Settings tab, come back, and the connect flow picks up where it
+  // was blocked — no manual retry. Trust lives on-chain (synced), so both the
+  // Settings write and this tab's re-read are real canister round-trips.
+  test.slow();
+  await addVirtualAuthenticator(page);
+  await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
+  await signUp(page);
+  await allowAccess(page);
+  await expect(
+    page.getByRole("heading", { name: "This MCP server isn't trusted yet" }),
+  ).toBeVisible();
+
+  // Hand the session to a new Settings tab and set this very server as trusted.
+  const settingsPagePromise = page.context().waitForEvent("page");
+  await page.getByRole("button", { name: "Manage trusted server" }).click();
+  const settingsPage = await settingsPagePromise;
+  await settingsPage.waitForURL("**/manage/settings**", { timeout: 15_000 });
+  // Mock this origin's RFC 9728 metadata so the Settings "Trust this server"
+  // probe verifies locally and fast (it's advisory — activation happens
+  // regardless — but without a mock it would hit the real network and stall).
+  // Routes are per-page, so this new tab needs its own.
+  await settingsPage.route(
+    `${mcp.mcpOrigin}/.well-known/oauth-protected-resource**`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        headers: {
+          "access-control-allow-origin": "*",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          authorization_servers: [mcp.mcpOrigin],
+          resource: `${mcp.mcpOrigin}/mcp`,
+        }),
+      }),
+  );
+  await settingsPage.getByRole("switch", { name: "AI access" }).click();
+  await settingsPage.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
+  await holdToConfirm(settingsPage, "Hold to continue");
+  await expect(
+    settingsPage.getByRole("button", { name: "Remove this server" }),
+  ).toBeVisible();
+
+  // Back on the original tab. In a real browser, returning to a backgrounded tab
+  // fires `visibilitychange`/`focus` — which is what the /mcp page listens for to
+  // re-check trust. Playwright keeps every page permanently foreground (so
+  // `bringToFront()` fires no such event and `visibilityState` stays "visible"),
+  // so dispatch the events the page listens for to stand in for the tab return;
+  // the page's `visibilityState === "visible"` guard is satisfied either way.
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+  });
+
+  // The now-trusted server unblocks the connect screen with no manual retry.
+  // Advancing hinges on the re-check's on-chain config read (a canister
+  // round-trip kicked off by the events above), which can outlast the default
+  // 5s expect timeout on a slow replica — `test.slow()` only scales the overall
+  // test timeout, not per-assertion ones — so give it the same headroom as the
+  // other canister-bound waits in this file.
+  await expect(page.getByRole("button", { name: "Allow access" })).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("After trusting the server, the connect screen shows", async ({
@@ -199,12 +267,9 @@ test("Adding a trusted server in Settings unlocks the connect screen", async ({
   }
   await page.locator('a[href="/manage/settings"]').click();
   await page.waitForURL(II_URL + "/manage/settings");
-  // The URL box only appears once the master toggle is on.
-  await page.getByRole("switch", { name: "Trusted MCP server" }).check();
+  await page.getByRole("switch", { name: "AI access" }).click();
   await page.getByLabel("MCP server URL").fill(`${mcp.mcpOrigin}/mcp`);
-  await page.getByRole("button", { name: "Trust this server" }).click();
-  // Once a server is trusted the input is replaced by the server row, which
-  // carries a remove button — a unique assertion that it was added.
+  await holdToConfirm(page, "Hold to continue");
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toBeVisible();
@@ -439,13 +504,20 @@ test("Removing the trusted server in Settings blocks connecting", async ({
   await page.waitForURL(II_URL + "/manage");
   await mcp.trustServer(page); // leaves the page on Settings, server trusted
 
-  // Remove the server: the server row (and its Remove button) give way to the
-  // URL input again — the revoke path the fixture's add-only helper never hits.
-  await page.getByRole("button", { name: "Remove this server" }).click();
-  await expect(page.getByLabel("MCP server URL")).toBeVisible();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/call") &&
+        response.request().method() === "POST",
+    ),
+    page.getByRole("button", { name: "Remove this server" }).click(),
+  ]);
   await expect(
     page.getByRole("button", { name: "Remove this server" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("switch", { name: "AI access" }),
+  ).not.toBeChecked();
 
   // Trust is re-verified against the synced config at connect time, so with no
   // trusted server the connect lands on the untrusted screen.
@@ -469,13 +541,15 @@ test("Disabling the master toggle blocks connecting (URL stays saved)", async ({
 
   // Turn the feature off for this identity. The URL stays saved on-chain, but
   // the config is no longer `enabled`, so trust is off.
-  const toggle = page.getByRole("switch", { name: "Trusted MCP server" });
-  await toggle.uncheck();
-  // The toggle flips the UI optimistically but disables itself while the
-  // canister write is in flight (`disabled={saving}`), re-enabling only once
-  // the write resolves. Wait for that before navigating, so the connect below
-  // reads the persisted (disabled) config rather than racing the write.
-  await expect(toggle).toBeEnabled();
+  const toggle = page.getByRole("switch", { name: "AI access" });
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/call") &&
+        response.request().method() === "POST",
+    ),
+    toggle.uncheck(),
+  ]);
 
   await page.goto(mcp.buildAuthorizeUrl({ app: APP }));
   await allowAccess(page);

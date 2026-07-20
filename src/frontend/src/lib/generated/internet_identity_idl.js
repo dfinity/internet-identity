@@ -638,7 +638,6 @@ export const idlFactory = ({ IDL }) => {
     'account_number' : IDL.Opt(AccountNumber),
     'expiration' : Timestamp,
   });
-  const McpRegistration = IDL.Record({ 'expiration' : Timestamp });
   const McpRegistrationV2 = IDL.Record({
     'permissions' : Permissions,
     'expiration' : Timestamp,
@@ -1185,11 +1184,6 @@ export const idlFactory = ({ IDL }) => {
             'Err' : AccountDelegationError,
           }),
         ],
-        [],
-      ),
-    'mcp_register' : IDL.Func(
-        [UserNumber, SessionKey, IDL.Nat64, IDL.Opt(Permissions)],
-        [IDL.Variant({ 'Ok' : McpRegistration, 'Err' : IDL.Text })],
         [],
       ),
     'mcp_register_v2' : IDL.Func(
