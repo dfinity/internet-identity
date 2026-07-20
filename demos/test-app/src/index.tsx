@@ -124,6 +124,7 @@ const pushTitleEl = document.getElementById(
 const pushMessageEl = document.getElementById(
   "pushMessage",
 ) as HTMLInputElement;
+const pushUrlEl = document.getElementById("pushUrl") as HTMLInputElement;
 const pushStatusEl = document.getElementById("pushStatus") as HTMLDivElement;
 
 let iiProtocolTestWindow: Window | undefined;
@@ -652,11 +653,12 @@ pushNotifyBtn.addEventListener("click", async () => {
     const iiActor = await makeIiActor();
     const title = pushTitleEl.value.trim() || "Hello from test-app";
     const message = pushMessageEl.value.trim() || "Push notifications work!";
+    const url = pushUrlEl.value.trim() || window.location.href;
     const res = await iiActor.notify_user(delegationIdentity.getPrincipal(), {
       hostname: window.location.host,
       title,
       body: message,
-      url: [],
+      url: [url],
     });
     if ("Err" in res) throw new Error(res.Err);
     setPushStatus("notify_user Ok — watch the OS tray", "ok");
