@@ -791,7 +791,9 @@
     </Tooltip>
   </div>
   {#if isPushSupported && !pushPermissionDenied}
-    <div class="border-border-tertiary mt-4 min-w-0 border-t pt-4">
+    <div
+      class="border-border-tertiary mt-4 min-w-0 border-t pt-4 [&>label]:w-full"
+    >
       <Toggle
         bind:checked={pushNotificationsEnabled}
         label={$t`Get notifications from ${dappName}`}
