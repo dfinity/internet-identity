@@ -35,8 +35,8 @@
 use candid::{Encode, Principal};
 use canister_tests::api::internet_identity::api_v2::{
     get_account_delegation_with_read_only, mcp_get_delegation, mcp_prepare_delegation,
-    mcp_register, mcp_set_config, prepare_account_delegation_with_read_only,
-    AccountDelegationParams,
+    mcp_register_v2, mcp_set_config, prepare_account_delegation_with_read_only,
+    prepare_mcp_registration_delegation, AccountDelegationParams,
 };
 use canister_tests::flows;
 use canister_tests::framework::*;
@@ -148,20 +148,25 @@ fn mint_mcp_delegation(
     .unwrap()
     .unwrap();
 
-    // Register the MCP server's own session key, with the read-only choice —
+    // Register the MCP server's own session key through the connect path (mint a
+    // registration delegation, then redeem it), with the read-only choice —
     // read-only is a property of the whole session.
     let server_key = ByteBuf::from("mcp server session key");
-    mcp_register(
+    let prepared = prepare_mcp_registration_delegation(
         env,
         canister_id,
         principal_1(),
         anchor,
-        server_key.clone(),
-        GRANT_TTL_NS,
+        ByteBuf::from("browser registration key Y"),
         Some(read_only),
+        Some(GRANT_TTL_NS),
     )
     .unwrap()
     .unwrap();
+    let p_reg = Principal::self_authenticating(&prepared.user_key);
+    mcp_register_v2(env, canister_id, p_reg, server_key.clone())
+        .unwrap()
+        .unwrap();
     let mcp = Principal::self_authenticating(&server_key);
 
     let McpPrepareDelegation {

@@ -359,7 +359,7 @@ pub fn discover_sso(domain: &str) {
 /// With `origin`, `resolved_client_id` is that origin's client, or `None` when
 /// the origin is gated out.
 pub fn get_sso_discovery(domain: &str, origin: Option<&str>) -> SsoDiscoveryState {
-    if !sso::is_allowed_discovery_domain(domain) {
+    if sso::validate_allowed_discovery_domain(domain).is_err() {
         return SsoDiscoveryState::NotAllowed;
     }
     match sso::peek_discovery(domain) {

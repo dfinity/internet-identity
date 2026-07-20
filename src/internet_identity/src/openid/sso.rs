@@ -84,6 +84,21 @@ const DISCOVERY_MAX_SCOPES: usize = 32;
 #[cfg(not(test))]
 const DEFAULT_SCOPES: [&str; 3] = ["openid", "profile", "email"];
 
+/// Maximum length of the client_id from the well-known.
+#[cfg(not(test))]
+const MAX_CLIENT_ID_LENGTH: usize = 255;
+/// Maximum length of the issuer from the OIDC configuration.
+#[cfg(not(test))]
+const MAX_ISSUER_LENGTH: usize = 255;
+/// Maximum length of the jwks_uri from the OIDC configuration.
+#[cfg(not(test))]
+const MAX_JWKS_URI_LENGTH: usize = 255;
+/// Maximum length of the display name from the well-known.
+#[cfg(not(test))]
+const MAX_SSO_NAME_LENGTH: usize = 255;
+/// Maximum length of an SSO discovery domain.
+const MAX_DOMAIN_LENGTH: usize = 255;
+
 /// The result of resolving a discovery domain (hop 1 + hop 2). Carries
 /// everything the redemption path needs (`issuer`, `jwks_uri`) and everything
 /// the sign-in initiation path needs (`authorization_endpoint`, `scopes`,
@@ -243,7 +258,7 @@ fn new_jwks_cache() -> JwksCache {
 /// disallowed domain.
 pub(super) fn prefetch(domain: &str) {
     let domain = domain.to_ascii_lowercase();
-    if !is_allowed_discovery_domain(&domain) {
+    if validate_allowed_discovery_domain(&domain).is_err() {
         return;
     }
     if let Cached::Ready(cfg) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
@@ -257,15 +272,15 @@ pub(super) fn prefetch(domain: &str) {
 /// domain.
 pub(super) fn drive_discovery(domain: &str) {
     let domain = domain.to_ascii_lowercase();
-    if is_allowed_discovery_domain(&domain) {
+    if validate_allowed_discovery_domain(&domain).is_ok() {
         single_flight_cache::get(&DISCOVERY_CACHE, domain);
     }
 }
 
 /// Read the cached discovery result for `domain`, peek-only (never spawns) so
 /// it's safe from a query. `Pending` means no cached value yet; the caller
-/// gates on [`is_allowed_discovery_domain`] separately where it needs to tell a
-/// disallowed domain apart from a cold one.
+/// gates on [`validate_allowed_discovery_domain`] separately where it needs to
+/// tell a disallowed domain apart from a cold one.
 pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
     single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
 }
@@ -278,11 +293,7 @@ pub(super) fn resolve(
     jwt_iss: &str,
     jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    if !is_allowed_discovery_domain(domain) {
-        return Err(OpenIDJWTVerificationError::GenericError(format!(
-            "SSO discovery domain not allowed: {domain}"
-        )));
-    }
+    validate_allowed_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
     let cfg = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(cfg) => cfg,
@@ -364,7 +375,12 @@ fn is_explicitly_allowlisted(domain: &str) -> bool {
         .any(|allowed| allowed.eq_ignore_ascii_case(domain))
 }
 
-pub fn is_allowed_discovery_domain(domain: &str) -> bool {
+pub fn validate_allowed_discovery_domain(domain: &str) -> Result<(), String> {
+    if domain.len() > MAX_DOMAIN_LENGTH {
+        return Err(format!(
+            "SSO discovery domain exceeds {MAX_DOMAIN_LENGTH} bytes"
+        ));
+    }
     // An explicitly allowlisted domain is admin-curated and trusted verbatim.
     // The `sso_allow_any_domain` flag, by contrast, makes the domain
     // caller-controlled, and `domain` is later interpolated into a discovery
@@ -373,7 +389,11 @@ pub fn is_allowed_discovery_domain(domain: &str) -> bool {
     // to parse inside a URL": inputs carrying userinfo (`evil.com@127.0.0.1`), a
     // path (`host/..`), a query, or a fragment could otherwise change the
     // effective request target.
-    is_explicitly_allowlisted(domain) || (sso_allow_any_domain() && is_bare_authority(domain))
+    if is_explicitly_allowlisted(domain) || (sso_allow_any_domain() && is_bare_authority(domain)) {
+        Ok(())
+    } else {
+        Err(format!("SSO discovery domain not allowed: {domain}"))
+    }
 }
 
 /// True if `domain` is a bare URL authority — a host, optionally `host:port`,
@@ -453,6 +473,36 @@ struct DiscoveryDocument {
     scopes_supported: Option<Vec<String>>,
 }
 
+/// Reject over-length values from the untrusted well-known configuration.
+#[cfg(not(test))]
+fn validate_ii_config(config: &IIOpenIdConfiguration) -> Result<(), String> {
+    if config.client_id.len() > MAX_CLIENT_ID_LENGTH {
+        return Err(format!(
+            "SSO client_id exceeds {MAX_CLIENT_ID_LENGTH} bytes"
+        ));
+    }
+    if config
+        .name
+        .as_ref()
+        .is_some_and(|name| name.len() > MAX_SSO_NAME_LENGTH)
+    {
+        return Err(format!("SSO name exceeds {MAX_SSO_NAME_LENGTH} bytes"));
+    }
+    Ok(())
+}
+
+/// Reject over-length values from the untrusted OIDC discovery document.
+#[cfg(not(test))]
+fn validate_discovery_document(doc: &DiscoveryDocument) -> Result<(), String> {
+    if doc.issuer.len() > MAX_ISSUER_LENGTH {
+        return Err(format!("SSO issuer exceeds {MAX_ISSUER_LENGTH} bytes"));
+    }
+    if doc.jwks_uri.len() > MAX_JWKS_URI_LENGTH {
+        return Err(format!("SSO jwks_uri exceeds {MAX_JWKS_URI_LENGTH} bytes"));
+    }
+    Ok(())
+}
+
 /// The discovery cache fill: hop 1 (`ii-openid-configuration`) then hop 2 (the
 /// standard OIDC discovery document), with host self-assertion checks between
 /// them. Errors are surfaced as `Err` (the cache backs off and serves
@@ -491,21 +541,33 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     validate_same_host(&doc.issuer, &doc.authorization_endpoint)?;
     validate_discovery_url(&doc.authorization_endpoint)?;
 
+    validate_ii_config(&ii_config)?;
+    validate_discovery_document(&doc)?;
+
     let mut scopes = doc
         .scopes_supported
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_SCOPES.iter().map(|s| (*s).to_string()).collect());
-    // Bound the only unbounded field stored per discovery entry, so a hostile
-    // discovery document can't inflate a cached `DiscoveredConfig`.
+    // Bound the only unbounded field stored per discovery entry.
     scopes.truncate(DISCOVERY_MAX_SCOPES);
 
+    let DiscoveryDocument {
+        issuer,
+        jwks_uri,
+        authorization_endpoint,
+        ..
+    } = doc;
+    let IIOpenIdConfiguration {
+        client_id, name, ..
+    } = ii_config;
+
     Ok(DiscoveredConfig {
-        issuer: doc.issuer,
-        client_id: ii_config.client_id,
-        jwks_uri: doc.jwks_uri,
-        authorization_endpoint: doc.authorization_endpoint,
+        issuer,
+        client_id,
+        jwks_uri,
+        authorization_endpoint,
         scopes,
-        name: ii_config.name,
+        name,
         app_clients,
         gate_all_apps,
         stable_identifier_claim,
@@ -769,11 +831,15 @@ mod tests {
         AudClaim::Single(sample_config().client_id)
     }
 
+    fn allowed(domain: &str) -> bool {
+        validate_allowed_discovery_domain(domain).is_ok()
+    }
+
     #[test]
     fn resolve_rejects_disallowed_domain() {
         reset();
-        assert!(!is_allowed_discovery_domain("not-allowed.com"));
-        assert!(is_allowed_discovery_domain("example.org"));
+        assert!(!allowed("not-allowed.com"));
+        assert!(allowed("example.org"));
         // The verify path rejects a disallowed domain.
         assert!(resolve(
             "not-allowed.com",
@@ -787,11 +853,11 @@ mod tests {
     fn allow_any_domain_opens_the_gate() {
         reset();
         // Off by default: a domain off the explicit allowlist is rejected.
-        assert!(!is_allowed_discovery_domain("not-allowed.com"));
+        assert!(!allowed("not-allowed.com"));
         // Flag on: every domain passes the discovery gate.
         TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
-        assert!(is_allowed_discovery_domain("not-allowed.com"));
-        assert!(is_allowed_discovery_domain("example.org"));
+        assert!(allowed("not-allowed.com"));
+        assert!(allowed("example.org"));
         // The explicit allowlist is unchanged — the `https`-relaxation gate
         // still consults it, so the flag does not bless arbitrary http hosts.
         assert!(is_explicitly_allowlisted("example.org"));
@@ -808,8 +874,8 @@ mod tests {
 
         // Flag on opens the *domain* gate for everything, loopback included...
         TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
-        assert!(is_allowed_discovery_domain("localhost"));
-        assert!(is_allowed_discovery_domain("127.0.0.1:8080"));
+        assert!(allowed("localhost"));
+        assert!(allowed("127.0.0.1:8080"));
         // ...but a loopback host reachable only via the flag (not on the
         // explicit allowlist) still gets https: the flag must never trigger a
         // plain-http outcall to localhost/127.0.0.1.
@@ -827,10 +893,10 @@ mod tests {
 
         // Bare authorities pass: host, sub-host, and explicit (non-default)
         // port, case-insensitively.
-        assert!(is_allowed_discovery_domain("example.com"));
-        assert!(is_allowed_discovery_domain("sub.example.com"));
-        assert!(is_allowed_discovery_domain("example.com:8443"));
-        assert!(is_allowed_discovery_domain("Example.COM"));
+        assert!(allowed("example.com"));
+        assert!(allowed("sub.example.com"));
+        assert!(allowed("example.com:8443"));
+        assert!(allowed("Example.COM"));
 
         // Anything that isn't a bare host[:port] is rejected even with the flag
         // on, so the caller-controlled value can't reshape the interpolated
@@ -848,7 +914,7 @@ mod tests {
             "",                      // empty
         ] {
             assert!(
-                !is_allowed_discovery_domain(bad),
+                !allowed(bad),
                 "expected `{bad}` to be rejected even with sso_allow_any_domain on",
             );
         }
@@ -858,7 +924,24 @@ mod tests {
         // accepted even if it wouldn't pass `is_bare_authority` on its own.
         TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.com/weird".to_string()]);
         assert!(!is_bare_authority("example.com/weird"));
-        assert!(is_allowed_discovery_domain("example.com/weird"));
+        assert!(allowed("example.com/weird"));
+    }
+
+    #[test]
+    fn over_long_domain_is_never_allowed() {
+        reset();
+        // Even with the gate fully open, an over-length domain is rejected.
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
+        assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
+        assert!(allowed(&at_cap));
+        let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
+        assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
+        assert!(!allowed(&over_cap));
+        // The length cap fires even for an explicitly allowlisted entry.
+        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
+        TEST_ALLOWED.with_borrow_mut(|d| *d = vec![over_cap.clone()]);
+        assert!(!allowed(&over_cap));
     }
 
     #[test]

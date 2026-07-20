@@ -44,11 +44,8 @@ pub fn verify_sso_jwt(
     discovery_domain: &str,
     origin: &str,
 ) -> Result<Cached<SsoVerification>, OpenIDJWTVerificationError> {
-    if !sso::is_allowed_discovery_domain(discovery_domain) {
-        return Err(OpenIDJWTVerificationError::GenericError(format!(
-            "SSO discovery domain not allowed: {discovery_domain}"
-        )));
-    }
+    sso::validate_allowed_discovery_domain(discovery_domain)
+        .map_err(OpenIDJWTVerificationError::GenericError)?;
     let cfg = match sso::peek_discovery(discovery_domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(cfg) => cfg,
