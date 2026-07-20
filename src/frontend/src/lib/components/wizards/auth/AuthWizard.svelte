@@ -49,6 +49,11 @@
     switchModeAction?: string;
     // The target dapp origin; set only in the authorize (dapp sign-in) flow.
     ssoOrigin?: string;
+    // The resolved discovery result of a gated login that hit the
+    // normal-login-required fail-safe; drives the "sign in normally first" CTA.
+    // Bindable: the wizard sets it itself on the sign-in path and clears it when
+    // the CTA is dismissed; the 1-click flow sets it after its JWT redemption.
+    ssoNormalLoginResult?: SsoDiscoveryResult;
     children?: Snippet<[boolean?]>;
   }
 
@@ -61,6 +66,7 @@
     switchModeTitle,
     switchModeAction,
     ssoOrigin,
+    ssoNormalLoginResult = $bindable(),
     children,
   }: Props = $props();
 
@@ -80,6 +86,15 @@
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
   let pendingSsoRegistration = false;
+
+  // The SSO discovery result of the in-flight gated login, kept so the
+  // normal-login CTA can re-run it after a normal sign-in bridges the identity.
+  let activeSsoResult = $state<SsoDiscoveryResult>();
+
+  const dismissSsoNormalLogin = () => {
+    ssoNormalLoginResult = undefined;
+    authFlow.chooseMethod();
+  };
 
   const methodDescriptor = (
     newMethod: MethodTag,
@@ -328,6 +343,7 @@
   const handleContinueWithSso = async (
     ssoResult: SsoDiscoveryResult,
   ): Promise<void | "cancelled"> => {
+    activeSsoResult = ssoResult;
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
@@ -397,10 +413,24 @@
         await onSignUp(await authFlow.completeOpenIdRegistration(name));
       }
     } catch (error) {
-      onError(error);
+      handleSsoRegistrationError(error);
     } finally {
       isAuthenticating = false;
     }
+  };
+
+  // Route the gated non-`sub` fail-safe to the "sign in normally first" CTA
+  // instead of a generic error. Falls through to onError for anything else, or if
+  // there's no gated result to retry afterwards.
+  const handleSsoRegistrationError = (error: unknown) => {
+    if (
+      error instanceof SsoNormalLoginRequiredError &&
+      activeSsoResult !== undefined
+    ) {
+      ssoNormalLoginResult = activeSsoResult;
+      return;
+    }
+    onError(error);
   };
 
   const handleConfirmOpenIdSignUp = async (): Promise<void> => {
@@ -411,7 +441,7 @@
         await onSignUp(result);
       }
     } catch (error) {
-      onError(error);
+      handleSsoRegistrationError(error);
     } finally {
       isAuthenticating = false;
     }
@@ -461,7 +491,19 @@
 </script>
 
 {#snippet activeView()}
-  {#if authFlow.view === "setupOrUseExistingPasskey"}
+  {#if ssoNormalLoginResult !== undefined}
+    <!-- Gated non-`sub` login couldn't resolve directly: reuse the SSO wizard's
+         two-step CTA (normal sign-in, then retry) seeded with the resolved
+         result so the user isn't asked to re-type their domain. -->
+    <SignInWithSso
+      continueWithSso={handleContinueWithSso}
+      signInNormally={handleSignInNormally}
+      goBack={dismissSsoNormalLogin}
+      origin={ssoOrigin}
+      initialResult={ssoNormalLoginResult}
+      initialCtaStep="needs-normal-login"
+    />
+  {:else if authFlow.view === "setupOrUseExistingPasskey"}
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
@@ -536,7 +578,7 @@
      wizard's view changes. Prevents remount races between captcha and
      post-captcha views when SvelteKit navigation interleaves with the
      Dialog's onNavigate outro-pause. -->
-{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined}
+{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined && ssoNormalLoginResult === undefined}
   {@render pickerBlock()}
 {:else}
   {@const dialogOnClose = authFlow.captcha !== undefined ? undefined : reset}
@@ -549,7 +591,7 @@
   <Dialog onClose={dialogOnClose} passthrough={inDialog}>
     {#if authFlow.captcha !== undefined}
       <SolveCaptcha {...authFlow.captcha} />
-    {:else if authFlow.view === "chooseMethod"}
+    {:else if authFlow.view === "chooseMethod" && ssoNormalLoginResult === undefined}
       {@render pickerBlock()}
     {:else}
       {@render activeView()}

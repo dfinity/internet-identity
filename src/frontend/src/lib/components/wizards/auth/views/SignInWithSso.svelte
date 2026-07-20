@@ -42,6 +42,15 @@
      * threaded into SSO discovery to resolve the per-app client for the origin.
      */
     origin?: string;
+    /**
+     * Pre-seed the CTA, skipping the domain-entry form: the already-resolved
+     * discovery result plus which CTA step to open on. Set when another flow
+     * (1-click, or sign-in → not-connected → sign-up) has resolved the domain
+     * and hit the normal-login-required fail-safe, so recovery reuses this same
+     * two-step CTA instead of asking the user to re-type their domain.
+     */
+    initialResult?: SsoDiscoveryResult;
+    initialCtaStep?: "needs-normal-login" | "ready-to-continue";
   }
 
   const {
@@ -50,6 +59,8 @@
     goBack,
     openIdCredentials,
     origin,
+    initialResult,
+    initialCtaStep,
   }: Props = $props();
 
   /**
@@ -59,7 +70,9 @@
    * gesture (a `window.open` after an `await` is blocked). `undefined` on the
    * normal single-ceremony path.
    */
-  let ctaStep = $state<"needs-normal-login" | "ready-to-continue">();
+  let ctaStep = $state<"needs-normal-login" | "ready-to-continue" | undefined>(
+    initialCtaStep,
+  );
 
   /**
    * Debounce delay before kicking off the (network-heavy) two-hop lookup.
@@ -79,7 +92,7 @@
    * `continueWithSso` directly from the click handler — critical for
    * Safari, which blocks `window.open` calls that follow an `await`.
    */
-  let preparedResult = $state<SsoDiscoveryResult>();
+  let preparedResult = $state<SsoDiscoveryResult | undefined>(initialResult);
 
   const ctaOrgLabel = $derived(
     preparedResult?.name ?? preparedResult?.domain ?? domain,

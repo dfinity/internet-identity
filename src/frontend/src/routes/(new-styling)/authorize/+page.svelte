@@ -51,7 +51,11 @@
     extractIdTokenFromCallback,
   } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
-  import { discoverSsoConfig } from "$lib/utils/ssoDiscovery";
+  import {
+    discoverSsoConfig,
+    type SsoDiscoveryResult,
+  } from "$lib/utils/ssoDiscovery";
+  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import { waitForStore } from "$lib/utils/utils";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 
@@ -60,6 +64,9 @@
   // --- Local state ---
   let upgradeSuccess = $state(false);
   let openIdResumeProcessing = $state(false);
+  // Set when a 1-click SSO redemption hits the normal-login-required fail-safe;
+  // seeds the wizard's "sign in normally first" CTA and switches the page to it.
+  let ssoNormalLoginResult = $state<SsoDiscoveryResult>();
 
   // --- Upgrade panel state ---
   let isUpgradeCollapsed = $state(
@@ -86,10 +93,12 @@
 
   // --- Handlers ---
   const handleAuthWizardSignIn = (identityNumber: bigint): Promise<void> => {
+    ssoNormalLoginResult = undefined;
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
   const handleAuthWizardSignUp = (identityNumber: bigint): Promise<void> => {
+    ssoNormalLoginResult = undefined;
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
@@ -322,9 +331,28 @@
       // recorded by `completeOpenIdRegistration` here, and the sign-in case is
       // already recorded inside `continueWithOpenId` (the JWT was supplied, so
       // there's no interactive disambiguation to defer the write for).
-      await authFlow.completeOpenIdRegistration(
-        name ?? email?.split("@")[0] ?? $t`${config.name} user`,
-      );
+      try {
+        await authFlow.completeOpenIdRegistration(
+          name ?? email?.split("@")[0] ?? $t`${config.name} user`,
+        );
+      } catch (e) {
+        // Gated non-`sub` SSO can't register from the per-app token: the identity
+        // must sign in normally (primary client) first to bridge its stable id.
+        // Hand off to the wizard's recovery CTA, seeded with the gated result.
+        if (e instanceof SsoNormalLoginRequiredError && ssoDomain !== null) {
+          const dappOrigin = await waitForEffectiveOrigin();
+          ssoNormalLoginResult = await discoverSsoConfig(
+            ssoDomain,
+            undefined,
+            dappOrigin !== undefined
+              ? remapToLegacyDomain(dappOrigin)
+              : undefined,
+          );
+          openIdResumeProcessing = false;
+          return;
+        }
+        throw e;
+      }
     }
     // 1-click OpenID flow: no access-level toggle, always full access.
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");
@@ -472,6 +500,10 @@
 {:else if upgradeSuccess && $isAuthenticatedStore}
   <!-- Migration wizard completed — show success countdown before authorizing. -->
   {@render panelWrapper(upgradeSuccessContent)}
+{:else if ssoNormalLoginResult !== undefined}
+  <!-- 1-click SSO hit the normal-login-required fail-safe — show the wizard's
+       "sign in normally first" CTA instead of proceeding. -->
+  {@render panelWrapper(authWizardContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection. -->
   {@render panelWrapper(continueContent)}
@@ -508,5 +540,6 @@
     onSignUp={handleAuthWizardSignUp}
     onError={handleError}
     mode="signin"
+    bind:ssoNormalLoginResult
   />
 {/snippet}
