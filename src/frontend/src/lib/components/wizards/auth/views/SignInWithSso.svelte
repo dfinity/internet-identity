@@ -10,20 +10,12 @@
     DomainNotConfiguredError,
   } from "$lib/utils/ssoDiscovery";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
-  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import { OAuthProviderError } from "$lib/utils/openID";
   import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
     continueWithSso: (
-      result: SsoDiscoveryResult,
-    ) => Promise<void | "cancelled">;
-    /**
-     * Runs a normal (un-gated) SSO sign-in for the first-gated-login CTA. Absent
-     * in flows that never gate (e.g. add-access-method).
-     */
-    signInNormally?: (
       result: SsoDiscoveryResult,
     ) => Promise<void | "cancelled">;
     goBack: () => void;
@@ -42,37 +34,10 @@
      * threaded into SSO discovery to resolve the per-app client for the origin.
      */
     origin?: string;
-    /**
-     * Pre-seed the CTA, skipping the domain-entry form: the already-resolved
-     * discovery result plus which CTA step to open on. Set when another flow
-     * (1-click, or sign-in → not-connected → sign-up) has resolved the domain
-     * and hit the normal-login-required fail-safe, so recovery reuses this same
-     * two-step CTA instead of asking the user to re-type their domain.
-     */
-    initialResult?: SsoDiscoveryResult;
-    initialCtaStep?: "needs-normal-login" | "ready-to-continue";
   }
 
-  const {
-    continueWithSso,
-    signInNormally,
-    goBack,
-    openIdCredentials,
-    origin,
-    initialResult,
-    initialCtaStep,
-  }: Props = $props();
-
-  /**
-   * Two-step CTA for a first gated login that can't register directly:
-   * "needs-normal-login" (normal sign-in) then "ready-to-continue" (retry the
-   * gated login). Each step is its own click so the IdP popup fires from a fresh
-   * gesture (a `window.open` after an `await` is blocked). `undefined` on the
-   * normal single-ceremony path.
-   */
-  let ctaStep = $state<"needs-normal-login" | "ready-to-continue" | undefined>(
-    initialCtaStep,
-  );
+  const { continueWithSso, goBack, openIdCredentials, origin }: Props =
+    $props();
 
   /**
    * Debounce delay before kicking off the (network-heavy) two-hop lookup.
@@ -92,11 +57,7 @@
    * `continueWithSso` directly from the click handler — critical for
    * Safari, which blocks `window.open` calls that follow an `await`.
    */
-  let preparedResult = $state<SsoDiscoveryResult | undefined>(initialResult);
-
-  const ctaOrgLabel = $derived(
-    preparedResult?.name ?? preparedResult?.domain ?? domain,
-  );
+  let preparedResult = $state<SsoDiscoveryResult>();
 
   /**
    * True when `preparedResult`'s `(issuer, client_id)` already matches a
@@ -139,10 +100,6 @@
     e: unknown,
     domainInput: string,
   ): string | undefined => {
-    if (e instanceof SsoNormalLoginRequiredError) {
-      // Fallback: the identity still can't be bridged to this gated app.
-      return $t`${domainInput} can't grant access to this app for your account yet. Sign in to another app with ${domainInput} SSO first, then try again.`;
-    }
     if (e instanceof DomainNotConfiguredError) {
       if (e.reason === "origin-denied") {
         // The org gated this dapp off, so no client can serve this origin.
@@ -287,51 +244,6 @@
       // `preparedResult` by the debounced input handler.
       await continueWithSso(preparedResult);
     } catch (e) {
-      // First gated login can't register directly — start the normal-login CTA.
-      if (
-        e instanceof SsoNormalLoginRequiredError &&
-        signInNormally !== undefined
-      ) {
-        ctaStep = "needs-normal-login";
-        return;
-      }
-      setErrorFrom(e, domain.trim().toLowerCase());
-    } finally {
-      isSubmitting = false;
-    }
-  };
-
-  // CTA step 1: normal sign-in on a fresh gesture (popup not blocked); advance
-  // to the "Continue" step on success.
-  const handleSignInNormally = async () => {
-    if (preparedResult === undefined || signInNormally === undefined) {
-      return;
-    }
-    isSubmitting = true;
-    error = undefined;
-    try {
-      const result = await signInNormally(preparedResult);
-      if (result === "cancelled") {
-        return;
-      }
-      ctaStep = "ready-to-continue";
-    } catch (e) {
-      setErrorFrom(e, domain.trim().toLowerCase());
-    } finally {
-      isSubmitting = false;
-    }
-  };
-
-  // CTA step 2: retry the gated login on a fresh gesture.
-  const handleContinueToApp = async () => {
-    if (preparedResult === undefined) {
-      return;
-    }
-    isSubmitting = true;
-    error = undefined;
-    try {
-      await continueWithSso(preparedResult);
-    } catch (e) {
       setErrorFrom(e, domain.trim().toLowerCase());
     } finally {
       isSubmitting = false;
@@ -359,103 +271,58 @@
       </p>
     </div>
   </div>
-  {#if ctaStep !== undefined}
-    <!-- Each step is its own button so the IdP popup fires from a fresh user
-         gesture (a `window.open` chained after an `await` is blocked). -->
-    <div class="flex flex-col items-stretch gap-6">
-      <p class="text-text-tertiary text-base font-medium">
-        {#if ctaStep === "needs-normal-login"}
-          {$t`To reach this app, first sign in with ${ctaOrgLabel}. We'll bring you right back.`}
-        {:else}
-          {$t`You're signed in with ${ctaOrgLabel}. Continue to the app.`}
-        {/if}
+  <form
+    class="flex flex-col items-stretch gap-6"
+    onsubmit={(e) => {
+      e.preventDefault();
+      void handleSubmit();
+    }}
+  >
+    <Input
+      bind:element={inputRef}
+      bind:value={domain}
+      oninput={handleInput}
+      inputmode="url"
+      placeholder={$t`company.domain.com`}
+      type="text"
+      size="md"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      disabled={isSubmitting}
+      {error}
+      aria-label={$t`Company domain`}
+    />
+    {#if isAlreadyLinked}
+      <p class="text-text-tertiary text-sm">
+        {$t`This SSO is already linked to your identity.`}
       </p>
-      {#if error}
-        <p class="text-text-error text-sm">{error}</p>
-      {/if}
-      <button
-        class="btn btn-primary btn-lg"
-        type="button"
-        disabled={isSubmitting}
-        onclick={() => {
-          if (ctaStep === "needs-normal-login") {
-            void handleSignInNormally();
-          } else {
-            void handleContinueToApp();
-          }
-        }}
-      >
-        {#if isSubmitting}
-          <ProgressRing />
-          <span>{$t`Signing in...`}</span>
-        {:else if ctaStep === "needs-normal-login"}
-          <span>{$t`Sign in with ${ctaOrgLabel}`}</span>
-        {:else}
-          <span>{$t`Continue`}</span>
-        {/if}
-      </button>
-      <button
-        type="button"
-        onclick={goBack}
-        class="text-text-secondary self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-      >
-        {$t`Back to sign-in options`}
-      </button>
-    </div>
-  {:else}
-    <form
-      class="flex flex-col items-stretch gap-6"
-      onsubmit={(e) => {
-        e.preventDefault();
-        void handleSubmit();
-      }}
+    {/if}
+    <button
+      class="btn btn-primary btn-lg"
+      type="submit"
+      disabled={preparedResult === undefined ||
+        isSubmitting ||
+        isLookingUp ||
+        isAlreadyLinked}
     >
-      <Input
-        bind:element={inputRef}
-        bind:value={domain}
-        oninput={handleInput}
-        inputmode="url"
-        placeholder={$t`company.domain.com`}
-        type="text"
-        size="md"
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        spellcheck="false"
-        disabled={isSubmitting}
-        {error}
-        aria-label={$t`Company domain`}
-      />
-      {#if isAlreadyLinked}
-        <p class="text-text-tertiary text-sm">
-          {$t`This SSO is already linked to your identity.`}
-        </p>
+      {#if isSubmitting}
+        <ProgressRing />
+        <span>{$t`Signing in...`}</span>
+      {:else if isLookingUp}
+        <ProgressRing />
+        <span>{$t`Checking...`}</span>
+      {:else}
+        <span>{$t`Continue`}</span>
       {/if}
-      <button
-        class="btn btn-primary btn-lg"
-        type="submit"
-        disabled={preparedResult === undefined ||
-          isSubmitting ||
-          isLookingUp ||
-          isAlreadyLinked}
-      >
-        {#if isSubmitting}
-          <ProgressRing />
-          <span>{$t`Signing in...`}</span>
-        {:else if isLookingUp}
-          <ProgressRing />
-          <span>{$t`Checking...`}</span>
-        {:else}
-          <span>{$t`Continue`}</span>
-        {/if}
-      </button>
-      <button
-        type="button"
-        onclick={goBack}
-        class="text-text-secondary self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-      >
-        {$t`Back to sign-in options`}
-      </button>
-    </form>
-  {/if}
+    </button>
+    <button
+      type="button"
+      onclick={goBack}
+      class="text-text-secondary self-center text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`Back to sign-in options`}
+    </button>
+  </form>
 </div>

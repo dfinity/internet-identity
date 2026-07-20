@@ -350,6 +350,58 @@ export class AuthFlow {
     );
   };
 
+  // The "sign in again" dialog's action for the wizard's own gated attempt: run
+  // one normal (primary-client) sign-in to bridge the identity, then replay the
+  // stashed gated JWT — no fresh ceremony — so the gated sign-in resolves.
+  // Returns the signed-in anchor, or undefined if there's nothing stashed / it
+  // still can't resolve. Captures the gated context up front because the normal
+  // sign-in below overwrites `#ssoJwt` / `#sso`.
+  completeSsoNormalLoginRecovery = async (
+    primaryResult: SsoDiscoveryResult,
+  ): Promise<bigint | undefined> => {
+    const gatedJwt = this.#ssoJwt;
+    const gatedDomain = this.#ssoDomain;
+    const gatedSso = this.#sso;
+    const gatedName = this.#ssoName;
+    if (
+      gatedJwt === undefined ||
+      gatedDomain === undefined ||
+      gatedSso === undefined
+    ) {
+      return undefined;
+    }
+    const normal = await this.continueWithSso(primaryResult, "both");
+    if (normal?.type === "signUp") {
+      await this.completeSsoRegistration(
+        normal.name ??
+          normal.email?.split("@")[0] ??
+          primaryResult.name ??
+          primaryResult.domain,
+      );
+    }
+    const { iss, aud } = decodeJWT(gatedJwt);
+    const config: OpenIdConfig = {
+      auth_uri: "",
+      jwks_uri: "",
+      logo: "",
+      name: gatedName ?? gatedDomain,
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: iss,
+      auth_scope: [],
+      client_id: aud ?? "",
+      seed_jwks: [],
+    };
+    const result = await this.continueWithOpenId(
+      config,
+      gatedJwt,
+      "signin",
+      gatedDomain,
+      gatedSso,
+    );
+    return result?.type === "signIn" ? result.identityNumber : undefined;
+  };
+
   continueWithExistingPasskey = async (): Promise<{
     identityNumber: bigint;
     pendingLastUsedEntry?: PendingLastUsedEntry;

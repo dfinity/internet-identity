@@ -6,16 +6,12 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
   import type { AuthMode } from "$lib/flows/authFlow.svelte";
-  import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 
   interface Props {
     onSignIn: (identityNumber: bigint) => Promise<void>;
     onSignUp: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     mode?: AuthMode;
-    // Enter the SSO normal-login recovery CTA with an already-resolved result
-    // (the 1-click flow sets this when its JWT redemption hits the fail-safe).
-    ssoNormalLoginResult?: SsoDiscoveryResult;
   }
 
   let {
@@ -23,7 +19,6 @@
     onSignUp,
     onError,
     mode = $bindable("both"),
-    ssoNormalLoginResult = $bindable(),
   }: Props = $props();
 
   const dapps = getDapps();
@@ -40,7 +35,6 @@
   {onSignUp}
   {onError}
   bind:mode
-  bind:ssoNormalLoginResult
   ssoOrigin={$authorizationStore?.effectiveOrigin}
 >
   <AuthorizeHeader origin={$establishedChannelStore.origin} />

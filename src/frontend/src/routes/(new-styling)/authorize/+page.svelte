@@ -56,6 +56,8 @@
     type SsoDiscoveryResult,
   } from "$lib/utils/ssoDiscovery";
   import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
+  import { isOpenIdCancelError } from "$lib/utils/openID";
+  import SsoNormalLoginRequired from "$lib/components/wizards/auth/views/SsoNormalLoginRequired.svelte";
   import { waitForStore } from "$lib/utils/utils";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 
@@ -64,9 +66,18 @@
   // --- Local state ---
   let upgradeSuccess = $state(false);
   let openIdResumeProcessing = $state(false);
-  // Set when a 1-click SSO redemption hits the normal-login-required fail-safe;
-  // seeds the wizard's "sign in normally first" CTA and switches the page to it.
-  let ssoNormalLoginResult = $state<SsoDiscoveryResult>();
+  // Set when a 1-click SSO redemption hits the normal-login-required fail-safe.
+  // Holds everything the dialog needs to run one normal (primary-client)
+  // sign-in, then replay the stashed gated JWT and authorize.
+  let ssoNormalLogin = $state<{
+    name: string;
+    discovery: SsoDiscoveryResult;
+    jwt: string;
+    config: OpenIdConfig;
+    domain: string;
+    origin: string;
+  }>();
+  let ssoNormalLoginBusy = $state(false);
 
   // --- Upgrade panel state ---
   let isUpgradeCollapsed = $state(
@@ -93,18 +104,66 @@
 
   // --- Handlers ---
   const handleAuthWizardSignIn = (identityNumber: bigint): Promise<void> => {
-    ssoNormalLoginResult = undefined;
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
   };
   const handleAuthWizardSignUp = (identityNumber: bigint): Promise<void> => {
-    ssoNormalLoginResult = undefined;
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     return Promise.resolve();
+  };
+
+  // Dialog primary action for the 1-click normal-login fail-safe: run one normal
+  // (primary-client) sign-in to bridge the identity, replay the stashed gated JWT
+  // (no fresh ceremony), then authorize and redirect to the app.
+  const handleSsoNormalLoginContinue = async () => {
+    if (ssoNormalLogin === undefined) {
+      return;
+    }
+    const { discovery, jwt, config, domain, origin } = ssoNormalLogin;
+    ssoNormalLoginBusy = true;
+    try {
+      const authFlow = new AuthFlow();
+      const primaryResult: SsoDiscoveryResult = {
+        ...discovery,
+        resolvedClientId: discovery.clientId,
+      };
+      const normal = await authFlow.continueWithSso(primaryResult, "both");
+      if (normal?.type === "signUp") {
+        await authFlow.completeSsoRegistration(
+          normal.name ??
+            normal.email?.split("@")[0] ??
+            discovery.name ??
+            domain,
+        );
+      }
+      const replay = await authFlow.continueWithOpenId(
+        config,
+        jwt,
+        "signin",
+        domain,
+        { origin },
+      );
+      if (replay?.type !== "signIn") {
+        throw new Error("Gated SSO sign-in did not resolve after normal login");
+      }
+      authorizationStore.setFlow({ type: "1-click-sso", domain });
+      authorizationStore.authorize(Promise.resolve(undefined), "full-access");
+    } catch (e) {
+      ssoNormalLoginBusy = false;
+      if (isOpenIdCancelError(e)) {
+        return;
+      }
+      ssoNormalLogin = undefined;
+      handleError(e);
+    }
+  };
+
+  const handleSsoNormalLoginCancel = () => {
+    ssoNormalLogin = undefined;
   };
   const handleAuthorize = (
     accountNumber: Promise<bigint | undefined>,
@@ -341,15 +400,32 @@
         // stable id. Hand off to the wizard's "sign in normally first" CTA,
         // seeded with the resolved gated result. `sub` orgs never hit this —
         // they register in one trip.
-        if (e instanceof SsoNormalLoginRequiredError && ssoDomain !== null) {
+        if (
+          e instanceof SsoNormalLoginRequiredError &&
+          ssoDomain !== null &&
+          sso !== undefined
+        ) {
           const dappOrigin = await waitForEffectiveOrigin();
-          ssoNormalLoginResult = await discoverSsoConfig(
-            ssoDomain,
-            undefined,
+          const appOrigin =
             dappOrigin !== undefined
               ? remapToLegacyDomain(dappOrigin)
-              : undefined,
+              : undefined;
+          // Re-resolve to get the org's display name + primary client for the
+          // dialog. The gated JWT (`jwt`), its synthetic `config`, and the exact
+          // `origin` used at redemption are stashed for the silent replay.
+          const discovery = await discoverSsoConfig(
+            ssoDomain,
+            undefined,
+            appOrigin,
           );
+          ssoNormalLogin = {
+            name: discovery.name ?? ssoDomain,
+            discovery,
+            jwt,
+            config,
+            domain: ssoDomain,
+            origin: sso.origin,
+          };
           openIdResumeProcessing = false;
           return;
         }
@@ -502,10 +578,10 @@
 {:else if upgradeSuccess && $isAuthenticatedStore}
   <!-- Migration wizard completed — show success countdown before authorizing. -->
   {@render panelWrapper(upgradeSuccessContent)}
-{:else if ssoNormalLoginResult !== undefined}
-  <!-- 1-click SSO hit the normal-login-required fail-safe — show the wizard's
-       "sign in normally first" CTA instead of proceeding. -->
-  {@render panelWrapper(authWizardContent)}
+{:else if ssoNormalLogin !== undefined}
+  <!-- 1-click SSO hit the normal-login-required fail-safe — show the one-step
+       "First sign-in with X" dialog instead of proceeding. -->
+  {@render panelWrapper(ssoNormalLoginContent)}
 {:else if selectedIdentity !== undefined}
   <!-- Returning user with a selected identity — show account selection. -->
   {@render panelWrapper(continueContent)}
@@ -542,6 +618,16 @@
     onSignUp={handleAuthWizardSignUp}
     onError={handleError}
     mode="signin"
-    bind:ssoNormalLoginResult
   />
+{/snippet}
+
+{#snippet ssoNormalLoginContent()}
+  {#if ssoNormalLogin !== undefined}
+    <SsoNormalLoginRequired
+      name={ssoNormalLogin.name}
+      onContinue={handleSsoNormalLoginContinue}
+      onCancel={handleSsoNormalLoginCancel}
+      loading={ssoNormalLoginBusy}
+    />
+  {/if}
 {/snippet}

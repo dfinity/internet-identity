@@ -18,6 +18,7 @@
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
+  import SsoNormalLoginRequired from "$lib/components/wizards/auth/views/SsoNormalLoginRequired.svelte";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
   import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import {
@@ -49,11 +50,6 @@
     switchModeAction?: string;
     // The target dapp origin; set only in the authorize (dapp sign-in) flow.
     ssoOrigin?: string;
-    // The resolved discovery result of a gated login that hit the
-    // normal-login-required fail-safe; drives the "sign in normally first" CTA.
-    // Bindable: the wizard sets it itself on the sign-in path and clears it when
-    // the CTA is dismissed; the 1-click flow sets it after its JWT redemption.
-    ssoNormalLoginResult?: SsoDiscoveryResult;
     children?: Snippet<[boolean?]>;
   }
 
@@ -66,7 +62,6 @@
     switchModeTitle,
     switchModeAction,
     ssoOrigin,
-    ssoNormalLoginResult = $bindable(),
     children,
   }: Props = $props();
 
@@ -88,12 +83,45 @@
   let pendingSsoRegistration = false;
 
   // The SSO discovery result of the in-flight gated login, kept so the
-  // normal-login CTA can re-run it after a normal sign-in bridges the identity.
+  // normal-login dialog can bridge + replay it after a normal sign-in.
   let activeSsoResult = $state<SsoDiscoveryResult>();
+  // Set when a gated non-`sub` login can't resolve directly; drives the
+  // "First sign-in with X" dialog (SsoNormalLoginRequired).
+  let ssoNormalLoginResult = $state<SsoDiscoveryResult>();
 
   const dismissSsoNormalLogin = () => {
     ssoNormalLoginResult = undefined;
     authFlow.chooseMethod();
+  };
+
+  // Dialog primary action: run the normal (primary-client) sign-in to bridge the
+  // identity, then replay the stashed gated JWT (no fresh ceremony) to complete
+  // the gated sign-in. See SsoNormalLoginRequired.svelte.
+  const handleSsoNormalLoginContinue = async () => {
+    if (activeSsoResult === undefined) {
+      return;
+    }
+    try {
+      isAuthenticating = true;
+      // Force the org's primary client for the normal (un-gated) sign-in.
+      const primaryResult: SsoDiscoveryResult = {
+        ...activeSsoResult,
+        resolvedClientId: activeSsoResult.clientId,
+      };
+      const identityNumber =
+        await authFlow.completeSsoNormalLoginRecovery(primaryResult);
+      if (identityNumber !== undefined) {
+        ssoNormalLoginResult = undefined;
+        await onSignIn(identityNumber);
+      }
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return;
+      }
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
   };
 
   const methodDescriptor = (
@@ -357,43 +385,14 @@
       if (isOpenIdCancelError(error)) {
         return "cancelled";
       }
-      // Re-throw so SignInWithSso can drive the normal-login CTA.
-      if (error instanceof SsoNormalLoginRequiredError) {
-        throw error;
-      }
-      onError(error);
-    } finally {
-      isAuthenticating = false;
-    }
-  };
-
-  // Runs a normal (un-gated) SSO sign-in to establish the identity only; it does
-  // not complete the dapp authorization — the caller retries the gated login.
-  const handleSignInNormally = async (
-    ssoResult: SsoDiscoveryResult,
-  ): Promise<void | "cancelled"> => {
-    try {
-      isAuthenticating = true;
-      // Force the org's primary client: a normal (un-gated) SSO sign-in.
-      const primaryResult: SsoDiscoveryResult = {
-        ...ssoResult,
-        resolvedClientId: ssoResult.clientId,
-      };
-      const normalResult = await authFlow.continueWithSso(
-        primaryResult,
-        "both",
-      );
-      if (normalResult?.type === "signUp") {
-        await authFlow.completeSsoRegistration(
-          normalResult.name ??
-            normalResult.email?.split("@")[0] ??
-            ssoResult.name ??
-            ssoResult.domain,
-        );
-      }
-    } catch (error) {
-      if (isOpenIdCancelError(error)) {
-        return "cancelled";
+      // Gated non-`sub` login can't resolve directly — show the normal-login
+      // dialog instead of surfacing an error.
+      if (
+        error instanceof SsoNormalLoginRequiredError &&
+        activeSsoResult !== undefined
+      ) {
+        ssoNormalLoginResult = activeSsoResult;
+        return;
       }
       onError(error);
     } finally {
@@ -492,16 +491,13 @@
 
 {#snippet activeView()}
   {#if ssoNormalLoginResult !== undefined}
-    <!-- Gated non-`sub` login couldn't resolve directly: reuse the SSO wizard's
-         two-step CTA (normal sign-in, then retry) seeded with the resolved
-         result so the user isn't asked to re-type their domain. -->
-    <SignInWithSso
-      continueWithSso={handleContinueWithSso}
-      signInNormally={handleSignInNormally}
-      goBack={dismissSsoNormalLogin}
-      origin={ssoOrigin}
-      initialResult={ssoNormalLoginResult}
-      initialCtaStep="needs-normal-login"
+    <!-- Gated non-`sub` login couldn't resolve directly: prompt one normal
+         sign-in, then bridge + replay the stashed gated JWT to continue. -->
+    <SsoNormalLoginRequired
+      name={ssoNormalLoginResult.name ?? ssoNormalLoginResult.domain}
+      onContinue={handleSsoNormalLoginContinue}
+      onCancel={dismissSsoNormalLogin}
+      loading={isAuthenticating}
     />
   {:else if authFlow.view === "setupOrUseExistingPasskey"}
     <SetupOrUseExistingPasskey
@@ -515,7 +511,6 @@
   {:else if authFlow.view === "signInWithSso"}
     <SignInWithSso
       continueWithSso={handleContinueWithSso}
-      signInNormally={handleSignInNormally}
       goBack={authFlow.chooseMethod}
       origin={ssoOrigin}
     />
