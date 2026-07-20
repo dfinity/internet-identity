@@ -103,30 +103,43 @@
       ></div>
       <div class="relative">
         <div
-          class="border-border-tertiary bg-bg-tertiary absolute inset-x-5 top-4 -bottom-4 rounded-xl border opacity-40"
-          aria-hidden="true"
-        ></div>
-        <div
-          class="border-border-tertiary bg-bg-tertiary absolute inset-x-3 top-2.5 -bottom-2 rounded-xl border opacity-60"
-          aria-hidden="true"
-        ></div>
-        <div
-          class="border-border-tertiary bg-bg-secondary relative flex items-start gap-2.5 rounded-xl border p-2.5 shadow-lg"
+          class="border-border-tertiary bg-bg-secondary relative flex origin-top scale-95 items-start gap-2.5 rounded-xl border px-3 py-2.5 opacity-75"
         >
           <span
-            class="border-border-tertiary bg-bg-primary text-text-secondary flex size-7 shrink-0 items-center justify-center rounded-md border"
+            class="border-border-tertiary bg-bg-tertiary text-text-secondary flex size-8 shrink-0 items-center justify-center rounded-lg border"
             aria-hidden="true"
           >
-            <img src="/favicon.svg" alt="" class="size-4" />
+            <img src="/favicon.svg" alt="" class="size-4.5" />
           </span>
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-text-primary text-xs font-semibold">
+              <span class="text-text-primary text-sm font-semibold">
+                {$t`Caffeine`}
+              </span>
+              <span class="text-text-tertiary text-xs">{$t`2m`}</span>
+            </div>
+            <p class="text-text-secondary mt-0.5 truncate text-sm">
+              {$t`Your app is built and live at recipe-box.caffeine.ai`}
+            </p>
+          </div>
+        </div>
+        <div
+          class="border-border-tertiary bg-bg-tertiary relative z-10 -mt-3.5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 shadow-2xl backdrop-blur-sm"
+        >
+          <span
+            class="border-border-tertiary bg-bg-primary text-text-secondary flex size-8 shrink-0 items-center justify-center rounded-lg border"
+            aria-hidden="true"
+          >
+            <img src="/favicon.svg" alt="" class="size-4.5" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-text-primary text-sm font-semibold">
                 {$t`OISY Wallet`}
               </span>
-              <span class="text-text-tertiary text-[10px]">{$t`now`}</span>
+              <span class="text-text-tertiary text-xs">{$t`now`}</span>
             </div>
-            <p class="text-text-secondary mt-0.5 text-xs leading-snug">
+            <p class="text-text-secondary mt-0.5 truncate text-sm">
               {$t`Your transfer of 25 ICP is confirmed.`}
             </p>
           </div>
