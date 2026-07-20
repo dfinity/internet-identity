@@ -169,6 +169,40 @@
   let pushDeviceSubscribed = $state<boolean | undefined>(undefined);
   let pushPermissionDenied = $state(false);
 
+  type BeforeInstallPromptEvent = Event & {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+  };
+  const isBeforeInstallPromptEvent = (
+    e: Event,
+  ): e is BeforeInstallPromptEvent => "prompt" in e && "userChoice" in e;
+  let deferredInstallPrompt: BeforeInstallPromptEvent | undefined;
+  const captureInstallPrompt = (e: Event): void => {
+    if (!isBeforeInstallPromptEvent(e)) return;
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  };
+
+  const isStandaloneDisplay = (): boolean =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(display-mode: standalone)").matches;
+
+  const maybePromptInstall = async (): Promise<void> => {
+    if (deferredInstallPrompt === undefined) return;
+    if (isStandaloneDisplay()) {
+      deferredInstallPrompt = undefined;
+      return;
+    }
+    try {
+      await deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+    } catch (err) {
+      console.warn("PWA install prompt failed:", err);
+    } finally {
+      deferredInstallPrompt = undefined;
+    }
+  };
+
   const loadPushConsentFor = async (
     anchorNumber: bigint,
     origin: string,
@@ -211,9 +245,12 @@
   });
 
   onMount(() => {
+    window.addEventListener("beforeinstallprompt", captureInstallPrompt);
     if (!isPushSupported) {
       pushDeviceSubscribed = false;
-      return;
+      return () => {
+        window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+      };
     }
     if (
       typeof Notification !== "undefined" &&
@@ -235,12 +272,17 @@
         console.warn("Failed to read existing push subscription", error);
         pushDeviceSubscribed = false;
       });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+    };
   });
 
   const subscribeThisDevice = async (
     actor: ActorSubclass<_SERVICE>,
     identityNumber: bigint,
   ): Promise<void> => {
+    await maybePromptInstall();
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
       pushPermissionDenied = permission === "denied";
