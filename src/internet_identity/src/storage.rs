@@ -1152,10 +1152,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// grant map and filters by `expires_at_ns`, since the map may also hold
     /// expired residue (see [`Self::mcp_grant_count`]); O(n) in stored grants.
     pub fn count_live_mcp_grants(&self, now_ns: u64) -> u64 {
+        // Accumulate directly into a `u64`: `Iterator::count` returns `usize`,
+        // which is 32-bit on wasm32 and would wrap in a release build.
         self.mcp_grant_memory
             .iter()
             .filter(|(_, grant)| grant.expires_at_ns > now_ns)
-            .count() as u64
+            .fold(0u64, |acc, _| acc + 1)
     }
 
     /// Look up the pending MCP registration entry keyed by `principal` (the
