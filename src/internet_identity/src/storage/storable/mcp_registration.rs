@@ -14,12 +14,14 @@ use std::borrow::Cow;
 /// session key the MCP server generates. Because `P_reg` is derived from a
 /// random per-connect nonce (not from the consent), the consent can't be
 /// re-derived and so is stored here in full: the anchor to bind to, the
-/// read-only choice, the resolved grant lifetime, and the trusted server URL
-/// consented to. `mcp_register_v2` takes *only* the session key and recovers
-/// all of this from the entry — so the server can neither name a different
-/// anchor nor alter the access level or lifetime, and never learns the anchor
-/// number. The stored URL lets `mcp_register_v2` reject a delegation whose
-/// trusted server was switched or disabled since consent.
+/// read-only choice, the resolved grant lifetime, and a hash of the trusted
+/// server URL consented to. `mcp_register_v2` takes *only* the session key and
+/// recovers all of this from the entry — so the server can neither name a
+/// different anchor nor alter the access level or lifetime, and never learns
+/// the anchor number. The stored URL hash lets `mcp_register_v2` reject a
+/// delegation whose trusted server was switched or disabled since consent
+/// (equality is all the check needs, so a hash suffices and bounds the entry
+/// size).
 ///
 /// The entry is retained after a successful redemption (the delegation is
 /// multi-use within its short lifetime; a retry re-binds), and removed once a
@@ -44,12 +46,15 @@ pub struct StorableMcpRegistration {
     /// the grant for exactly this long.
     #[n(2)]
     pub grant_ttl_ns: u64,
-    /// The trusted server URL the user consented to (the anchor's synced config
-    /// at `prepare`). `mcp_register_v2` requires it to still equal the anchor's
-    /// current trusted URL, so switching or disabling the trusted server between
-    /// consent and redemption invalidates the delegation.
-    #[n(3)]
-    pub trusted_url: String,
+    /// `SHA-256` of the trusted server URL the user consented to (the anchor's
+    /// synced config at `prepare`). `mcp_register_v2` requires it to still equal
+    /// the hash of the anchor's current trusted URL, so switching or disabling
+    /// the trusted server between consent and redemption invalidates the
+    /// delegation. Stored as a fixed-size hash rather than the URL verbatim: the
+    /// comparison only needs equality, and hashing caps the per-connect entry at
+    /// 32 bytes so a large (attacker-set) trusted URL can't amplify it.
+    #[cbor(n(3), with = "minicbor::bytes")]
+    pub trusted_url_hash: Vec<u8>,
     /// Expiration of the *registration delegation itself* (nanoseconds since the
     /// epoch), short by design. Past this the entry authorizes nothing; it also
     /// bounds how long a stale entry lingers before it can be pruned.
@@ -77,15 +82,12 @@ mod tests {
 
     #[test]
     fn should_roundtrip_through_storable() {
-        for (read_only, trusted_url) in [
-            (false, "https://mcp.example.com/mcp".to_string()),
-            (true, "https://other.example.com/sse".to_string()),
-        ] {
+        for (read_only, trusted_url_hash) in [(false, vec![0xab; 32]), (true, vec![0x12; 32])] {
             let entry = StorableMcpRegistration {
                 anchor_number: 10_000,
                 read_only,
                 grant_ttl_ns: 24 * 60 * 60 * 1_000_000_000,
-                trusted_url,
+                trusted_url_hash,
                 expires_at_ns: 1_234_567_890_000_000_000,
             };
             let decoded = StorableMcpRegistration::from_bytes(entry.to_bytes());

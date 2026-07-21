@@ -637,34 +637,6 @@ fn get_account_delegation(
     }
 }
 
-/// Register the trusted MCP server's session key for `anchor_number`: grant
-/// the key's self-authenticating principal access to the server-facing
-/// `mcp_*` methods until the grant expires (`grant_ttl_ns` clamped to
-/// [10 min, 30 days]). Called by the `/mcp` connect flow after user consent,
-/// with a key the frontend fetched from the *trusted* server's callback —
-/// never taken from the unauthenticated connect link. No account is chosen
-/// here (accounts are per-origin and the connector isn't an app); the app
-/// account is selected per call on `mcp_prepare_delegation`.
-///
-/// At most one session per identity: registering replaces any previous grant.
-/// Requires the identity's MCP config to be enabled with a trusted server set,
-/// so every session stays revocable via `mcp_set_config`. `permissions` sets
-/// the session's read-only restriction: `opt (queries)` makes every per-app
-/// delegation it later mints queries-only; omitted (`null`) or `opt (all)`
-/// means full, update-capable access.
-#[update]
-fn mcp_register(
-    anchor_number: AnchorNumber,
-    session_key: SessionKey,
-    grant_ttl_ns: u64,
-    permissions: Option<Permissions>,
-) -> Result<McpRegistration, String> {
-    check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    // The grant persists a bool; derive it from the requested permissions.
-    let read_only = DelegationAccess::from(permissions) == DelegationAccess::ReadOnly;
-    mcp::register(anchor_number, session_key, grant_ttl_ns, read_only)
-}
-
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +
 /// trusted server URL). Persisted on-chain, so it follows the identity across
 /// devices. Read by the Settings UI and by the `/mcp` connect flow, which
@@ -687,8 +659,7 @@ fn mcp_get_config(anchor_number: AnchorNumber) -> McpConfig {
 #[update]
 fn mcp_set_config(anchor_number: AnchorNumber, config: McpConfig) -> Result<(), String> {
     check_authz_and_record_activity(anchor_number).map_err(|err| format!("Unauthorized: {err}"))?;
-    mcp::set_mcp_config(anchor_number, config);
-    Ok(())
+    mcp::set_mcp_config(anchor_number, config)
 }
 
 /// Called by the MCP server, signed with its registered session key: prepare a

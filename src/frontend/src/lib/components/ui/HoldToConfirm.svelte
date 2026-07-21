@@ -11,6 +11,8 @@
     duration?: number;
     label: string;
     completed?: boolean;
+    disabled?: boolean;
+    variant?: "secondary" | "primary";
     onComplete?: () => void;
     class?: string;
   }
@@ -19,10 +21,14 @@
     duration = 2500,
     label,
     completed = false,
+    disabled = false,
+    variant = "secondary",
     onComplete,
     class: className,
     ...props
   }: Props = $props();
+
+  const inactive = $derived(completed || disabled);
 
   let progress = $state(0);
 
@@ -46,22 +52,22 @@
 <button
   {...props}
   type="button"
-  disabled={completed}
+  disabled={inactive}
   aria-label={completed ? $t`Confirmed` : label}
   onmousedown={() => {
-    if (!completed) controller.start();
+    if (!inactive) controller.start();
   }}
   onmouseup={() => controller.cancel()}
   onmouseleave={() => controller.cancel()}
   ontouchstart={(e) => {
-    if (completed) return;
+    if (inactive) return;
     e.preventDefault();
     controller.start();
   }}
   ontouchend={() => controller.cancel()}
   ontouchcancel={() => controller.cancel()}
   onkeydown={(e) => {
-    if (e.code !== "Space" || e.repeat || completed) return;
+    if (e.code !== "Space" || e.repeat || inactive) return;
     e.preventDefault();
     controller.start();
   }}
@@ -71,10 +77,11 @@
     controller.cancel();
   }}
   class={[
-    "bg-bg-primary focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring relative box-border flex h-12 w-full touch-none items-center justify-center overflow-hidden rounded-md border px-4.5 text-base font-semibold outline-none select-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2",
-    completed
-      ? "border-border-brand text-text-primary-inversed"
-      : "border-border-secondary text-text-primary",
+    "focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring relative box-border flex h-12 w-full touch-none items-center justify-center overflow-hidden rounded-md border px-4.5 text-base font-semibold outline-none select-none not-disabled:cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2",
+    completed || variant === "primary"
+      ? "bg-bg-brand-solid border-border-brand text-text-primary-inversed"
+      : "bg-bg-primary border-border-secondary text-text-primary",
+    disabled && !completed && "opacity-60",
     "transition-colors duration-200",
     className,
   ]}
@@ -83,7 +90,11 @@
     aria-hidden="true"
     class={[
       "absolute inset-0 origin-left",
-      completed ? "bg-bg-brand-solid" : "bg-bg-primary_hover",
+      completed
+        ? "bg-bg-brand-solid"
+        : variant === "primary"
+          ? "bg-bg-brand-solid_hover"
+          : "bg-bg-primary_hover",
     ]}
     style="width: {progress * 100}%"
   ></span>

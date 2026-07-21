@@ -1163,12 +1163,6 @@ export interface McpPrepareDelegation {
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
 }
-/**
- * Result of mcp_register: the expiration (ns since epoch) of the MCP session
- * grant just registered. Every server-facing mcp_* call returns Unauthorized
- * once it passes; the server reconnects through a new consent flow.
- */
-export interface McpRegistration { 'expiration' : Timestamp }
 export interface PrepareMcpRegistrationDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -2129,25 +2123,6 @@ export interface _SERVICE {
     [FrontendHostname, [] | [AccountNumber], SessionKey, [] | [bigint]],
     { 'Ok' : McpPrepareDelegation } |
       { 'Err' : AccountDelegationError }
-  >,
-  /**
-   * Register the trusted MCP server's session key for the anchor: grant the
-   * key's self-authenticating principal access to the server-facing mcp_*
-   * methods until the grant expires (grant_ttl_ns clamped to [10 min, 30
-   * days]). Called by the /mcp connect flow after user consent, with a key
-   * the frontend fetched from the *trusted* server's callback — never taken
-   * from the unauthenticated connect link. No account is chosen here
-   * (accounts are per-origin and the connector isn't an app) — the app
-   * account is selected per call on mcp_prepare_delegation.
-   *
-   * At most one session per identity: registering replaces any previous
-   * grant. Requires the identity's MCP config to be enabled with a trusted
-   * server set, so every session stays revocable via mcp_set_config.
-   */
-  'mcp_register' : ActorMethod<
-    [UserNumber, SessionKey, bigint, [] | [Permissions]],
-    { 'Ok' : McpRegistration } |
-      { 'Err' : string }
   >,
   'mcp_register_v2' : ActorMethod<
     [SessionKey],
