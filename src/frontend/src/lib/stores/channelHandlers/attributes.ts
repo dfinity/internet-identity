@@ -13,6 +13,7 @@ import {
   authenticationStore,
 } from "$lib/stores/authentication.store";
 import {
+  type Authorized,
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
@@ -20,6 +21,7 @@ import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import {
+  type AttributeConsent,
   type AttributeGroup,
   type AvailableAttribute,
   attributeConsentResultStore,
@@ -276,6 +278,10 @@ export const handleLegacyAttributes =
 type ConsentPipeline = {
   accountNumberPromise: Promise<bigint | undefined>;
   authenticated: Authenticated;
+  /** The authorization entry this pipeline was resolved against. Switching
+   *  identity mid-consent re-authorizes, producing a fresh entry — the
+   *  consent handler compares against this reference to detect the switch. */
+  authorized: Authorized;
   origin: string;
   unmappedOrigin: string;
   groups: AttributeGroup[];
@@ -299,7 +305,8 @@ const resolveConsentPipeline = async (params: {
 }): Promise<ConsentPipeline | null> => {
   const { channel, onError, derivationOrigin, requestedKeys } = params;
   try {
-    const { accountNumberPromise } = await waitForStore(authorizedStore);
+    const authorized = await waitForStore(authorizedStore);
+    const { accountNumberPromise } = authorized;
     const authenticated = await waitForStore(authenticationStore);
 
     const validationResult = await validateDerivationOrigin({
@@ -343,6 +350,7 @@ const resolveConsentPipeline = async (params: {
     return {
       accountNumberPromise,
       authenticated,
+      authorized,
       origin,
       unmappedOrigin,
       groups: resolveAttributeGroups(requestedKeys, available),
@@ -609,6 +617,44 @@ export const handleIcrc3OneClickSsoAttributes =
     }
   };
 
+type ConsentOutcome =
+  | { type: "consent"; consent: AttributeConsent }
+  | { type: "reauthorized" };
+
+/**
+ * Block until either the user commits their choice on the consent screen, or
+ * they switch identity. The consent screen keeps the identity switcher live,
+ * and switching re-authorizes the newly selected identity — a fresh
+ * `authorizedStore` entry, distinct from `baseline`. The consent handler
+ * uses `"reauthorized"` to restart from scratch for the new identity instead
+ * of certifying the previous identity's selections.
+ */
+const waitForConsentOrReauthorization = (
+  baseline: Authorized,
+): Promise<ConsentOutcome> =>
+  new Promise((resolve) => {
+    let settled = false;
+    const settle = (outcome: ConsentOutcome): void => {
+      if (settled) return;
+      settled = true;
+      queueMicrotask(() => {
+        unsubscribeConsent();
+        unsubscribeAuthorized();
+      });
+      resolve(outcome);
+    };
+    const unsubscribeConsent = attributeConsentResultStore.subscribe(
+      (consent) => {
+        if (consent !== undefined) settle({ type: "consent", consent });
+      },
+    );
+    const unsubscribeAuthorized = authorizedStore.subscribe((authorized) => {
+      if (authorized !== undefined && authorized !== baseline) {
+        settle({ type: "reauthorized" });
+      }
+    });
+  });
+
 /**
  * Handle `ii-icrc3-attributes` requests that require explicit consent (or
  * have nothing to certify). Pairs with `handleIcrc3OneClickOpenIdAttributes`
@@ -658,76 +704,89 @@ export const handleIcrc3ConsentAttributes =
           return;
         }
 
-        // Kick off the pipeline but don't await it yet — we want to set the
-        // consent context synchronously from the (still-pending) promise so
-        // the consent view can paint its loading skeleton while auth
-        // resolves and `list_available_attributes` runs in the background.
-        const pipelinePromise = resolveConsentPipeline({
-          channel,
-          onError,
-          derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
-          requestedKeys,
-        });
-
-        attributeConsentStore.setContext(
-          pipelinePromise.then((pipeline) => ({
-            groups: pipeline?.groups ?? [],
-            effectiveOrigin: pipeline?.origin ?? "",
-            requestedKeys,
-            recoveryAddresses: pipeline?.recoveryAddresses ?? [],
-            verifiedAddresses: pipeline?.verifiedAddresses ?? [],
-          })),
-        );
-
-        const pipeline = await pipelinePromise;
-        if (pipeline === null) {
-          // Error (or invalid origin) already reported — resolve the consent
-          // result so the UI transitions away from the loading state instead
-          // of hanging.
-          attributeConsentStore.setConsent({ attributes: [] });
-          return;
-        }
-
-        let attributeSpecs: Array<{
-          key: string;
-          value: [] | [Uint8Array];
-          omit_scope: boolean;
-        }>;
-
         // Only unscoped email/verified_email; scoped keys are pinned to
-        // a source that the inline verify wizard can't satisfy.
+        // a source that the inline verify wizard can't satisfy. Requested
+        // keys don't change across an identity switch, so compute once.
         const emailRequested = requestedKeys.some((key) => {
           if (extractScope(key) !== undefined) return false;
           const name = extractAttributeName(key);
           return name === "email" || name === "verified_email";
         });
 
-        if (pipeline.groups.length === 0 && !emailRequested) {
-          // Nothing to share and no inline "Verify an email" affordance —
-          // certify an empty set so the UI skips the empty picker view.
-          attributeSpecs = [];
-          attributeConsentStore.setConsent({ attributes: [] });
-        } else {
-          const consent = await waitForStore(attributeConsentResultStore);
-          attributeSpecs = consent.attributes.map((attr) => ({
-            key: attr.key,
-            value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
-            omit_scope: attr.omitScope,
-          }));
-        }
+        // Switching identity on the consent screen re-authorizes the new
+        // identity, which restarts this loop: re-resolve the available
+        // attributes and repaint the screen from scratch so the previous
+        // identity's selections are never carried over or certified.
+        for (;;) {
+          // Kick off the pipeline but don't await it yet — we want to set the
+          // consent context synchronously from the (still-pending) promise so
+          // the consent view can paint its loading skeleton while auth
+          // resolves and `list_available_attributes` runs in the background.
+          const pipelinePromise = resolveConsentPipeline({
+            channel,
+            onError,
+            derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+            requestedKeys,
+          });
 
-        const accountNumber = await pipeline.accountNumberPromise;
-        await certifyAndSend({
-          channel,
-          onError,
-          requestId,
-          nonce: paramsResult.data.nonce,
-          authenticated: pipeline.authenticated,
-          accountNumber,
-          origin: pipeline.origin,
-          unmappedOrigin: pipeline.unmappedOrigin,
-          attributeSpecs,
-        });
+          attributeConsentStore.setContext(
+            pipelinePromise.then((pipeline) => ({
+              groups: pipeline?.groups ?? [],
+              effectiveOrigin: pipeline?.origin ?? "",
+              requestedKeys,
+              recoveryAddresses: pipeline?.recoveryAddresses ?? [],
+              verifiedAddresses: pipeline?.verifiedAddresses ?? [],
+            })),
+          );
+
+          const pipeline = await pipelinePromise;
+          if (pipeline === null) {
+            // Error (or invalid origin) already reported — resolve the consent
+            // result so the UI transitions away from the loading state instead
+            // of hanging.
+            attributeConsentStore.setConsent({ attributes: [] });
+            return;
+          }
+
+          let attributeSpecs: Array<{
+            key: string;
+            value: [] | [Uint8Array];
+            omit_scope: boolean;
+          }>;
+
+          if (pipeline.groups.length === 0 && !emailRequested) {
+            // Nothing to share and no inline "Verify an email" affordance —
+            // certify an empty set so the UI skips the empty picker view.
+            attributeSpecs = [];
+            attributeConsentStore.setConsent({ attributes: [] });
+          } else {
+            const outcome = await waitForConsentOrReauthorization(
+              pipeline.authorized,
+            );
+            if (outcome.type === "reauthorized") {
+              continue;
+            }
+            attributeSpecs = outcome.consent.attributes.map((attr) => ({
+              key: attr.key,
+              value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
+              omit_scope: attr.omitScope,
+            }));
+          }
+
+          const accountNumber = await pipeline.accountNumberPromise;
+          await certifyAndSend({
+            channel,
+            onError,
+            requestId,
+            nonce: paramsResult.data.nonce,
+            authenticated: pipeline.authenticated,
+            accountNumber,
+            origin: pipeline.origin,
+            unmappedOrigin: pipeline.unmappedOrigin,
+            attributeSpecs,
+          });
+          return;
+        }
       } finally {
         // Always reset consent state so the next request on this channel
         // starts from a clean slate (no leftover context/result from us).

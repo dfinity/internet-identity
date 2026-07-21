@@ -426,11 +426,16 @@
 
 {#snippet attributeConsentContent()}
   {#if $attributeConsentStore !== undefined}
-    <AttributeConsentView
-      context={$attributeConsentStore}
-      variant={data.flow === "openid-resume" ? "openid" : "normal"}
-      onConsent={handleAttributeConsent}
-    />
+    <!-- Re-key on the context promise: switching identity mid-consent
+         re-seeds it, remounting the view so selections rebuild fresh for
+         the newly selected identity instead of persisting. -->
+    {#key $attributeConsentStore}
+      <AttributeConsentView
+        context={$attributeConsentStore}
+        variant={data.flow === "openid-resume" ? "openid" : "normal"}
+        onConsent={handleAttributeConsent}
+      />
+    {/key}
   {/if}
 {/snippet}
 
