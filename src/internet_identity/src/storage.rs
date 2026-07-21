@@ -1138,6 +1138,28 @@ impl<M: Memory + Clone> Storage<M> {
         self.mcp_grant_memory.remove(&principal);
     }
 
+    /// Total number of MCP session grant entries currently stored — live
+    /// grants plus any expired residue that has not been superseded or
+    /// removed yet (grants are replaced per anchor on re-registration and
+    /// dropped on the config change that revokes them, but an expired grant
+    /// whose anchor never returns lingers until then). O(1).
+    pub fn mcp_grant_count(&self) -> u64 {
+        self.mcp_grant_memory.len()
+    }
+
+    /// Number of *live* (non-expired at `now_ns`) MCP session grants: the
+    /// currently-authorized MCP sessions, at most one per anchor. Scans the
+    /// grant map and filters by `expires_at_ns`, since the map may also hold
+    /// expired residue (see [`Self::mcp_grant_count`]); O(n) in stored grants.
+    pub fn count_live_mcp_grants(&self, now_ns: u64) -> u64 {
+        // Accumulate directly into a `u64`: `Iterator::count` returns `usize`,
+        // which is 32-bit on wasm32 and would wrap in a release build.
+        self.mcp_grant_memory
+            .iter()
+            .filter(|(_, grant)| grant.expires_at_ns > now_ns)
+            .fold(0u64, |acc, _| acc + 1)
+    }
+
     /// Look up the pending MCP registration entry keyed by `principal` (the
     /// registration principal `P_reg`). Callers check `expires_at_ns`; the map
     /// itself never authorizes anything.
