@@ -889,9 +889,6 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
                         Err(e) => problems.push(e),
                     }
                 }
-                if !problems.is_empty() {
-                    return Err(ListAvailableAttributesError::ValidationError { problems });
-                }
                 Some(parsed)
             }
         };
