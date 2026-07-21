@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BellIcon, ClockIcon, ZapIcon } from "@lucide/svelte";
+  import { ClockIcon, ZapIcon } from "@lucide/svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
@@ -88,13 +88,17 @@
     </div>
     <div class="relative">
       <div
-        class="border-border-tertiary bg-bg-secondary relative flex origin-top scale-95 items-start gap-2.5 rounded-xl border px-3 py-2.5 opacity-75"
+        class="border-border-tertiary bg-bg-secondary mx-4 h-8 rounded-xl border opacity-50"
+        aria-hidden="true"
+      ></div>
+      <div
+        class="border-border-tertiary bg-bg-secondary relative mx-1.5 -mt-3.5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 opacity-80"
       >
         <span
-          class="border-border-tertiary bg-bg-tertiary text-text-tertiary flex size-8 shrink-0 items-center justify-center rounded-lg border"
+          class="border-border-tertiary bg-bg-tertiary text-text-primary flex size-8 shrink-0 items-center justify-center rounded-lg border"
           aria-hidden="true"
         >
-          <BellIcon class="size-4" />
+          <img src="/favicon.svg" alt="" class="size-5" />
         </span>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline justify-between gap-2">
@@ -112,10 +116,10 @@
         class="border-border-tertiary bg-bg-tertiary relative z-10 -mt-3.5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 shadow-2xl backdrop-blur-sm"
       >
         <span
-          class="border-border-tertiary bg-bg-primary text-text-tertiary flex size-8 shrink-0 items-center justify-center rounded-lg border"
+          class="border-border-tertiary bg-bg-primary text-text-primary flex size-8 shrink-0 items-center justify-center rounded-lg border"
           aria-hidden="true"
         >
-          <BellIcon class="size-4" />
+          <img src="/favicon.svg" alt="" class="size-5" />
         </span>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline justify-between gap-2">
