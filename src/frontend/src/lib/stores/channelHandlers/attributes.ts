@@ -334,10 +334,10 @@ const resolveConsentPipeline = async (params: {
       availablePromise,
       identityInfoPromise,
     ]);
-    const recoveryAddresses = (identityInfo?.email_recovery[0] ?? []).map(
+    const recoveryAddresses = (identityInfo.email_recovery[0] ?? []).map(
       (c: { address: string }) => c.address,
     );
-    const verifiedAddresses = (identityInfo?.verified_emails[0] ?? []).map(
+    const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
       (e: { address: string }) => e.address,
     );
 

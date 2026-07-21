@@ -493,15 +493,15 @@ fn get_accounts(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
-    if check_session_authorization(anchor_number).is_err() {
-        return Err(GetAccountsError::Unauthorized(caller()));
+    match check_session_authorization(anchor_number) {
+        Ok(_) => Ok(
+            account_management::get_accounts_for_origin(anchor_number, &origin)
+                .iter()
+                .map(|acc| acc.to_info())
+                .collect(),
+        ),
+        Err(err) => Err(GetAccountsError::Unauthorized(err.principal)),
     }
-    Ok(
-        account_management::get_accounts_for_origin(anchor_number, &origin)
-            .iter()
-            .map(|acc| acc.to_info())
-            .collect(),
-    )
 }
 
 #[update]
@@ -544,9 +544,8 @@ fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
-    if check_session_authorization(anchor_number).is_err() {
-        return Err(GetDefaultAccountError::Unauthorized(caller()));
-    }
+    check_session_authorization(anchor_number)
+        .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
 
     let default_account_info =
         account_management::get_default_account_for_origin(anchor_number, origin)?;
@@ -591,23 +590,27 @@ async fn prepare_account_delegation(
     max_ttl: Option<u64>,
     permissions: Option<Permissions>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    let ii_domain = check_authz_and_record_activity(anchor_number)?;
-    account_management::prepare_account_delegation(
-        anchor_number,
-        origin,
-        account_number,
-        session_key,
-        max_ttl,
-        None,
-        // An omitted `permissions` argument means unrestricted (see
-        // `impl From<Option<Permissions>> for DelegationAccess`): this
-        // preserves the original behavior for callers of the
-        // (pre-feature) form. First-party callers always pass an explicit
-        // value (queries-only by default in the CLI and MCP flows).
-        DelegationAccess::from(permissions),
-        &ii_domain,
-    )
-    .await
+    match check_authz_and_record_activity(anchor_number) {
+        Ok(ii_domain) => {
+            account_management::prepare_account_delegation(
+                anchor_number,
+                origin,
+                account_number,
+                session_key,
+                max_ttl,
+                None,
+                // An omitted `permissions` argument means unrestricted (see
+                // `impl From<Option<Permissions>> for DelegationAccess`): this
+                // preserves the original behavior for callers of the
+                // (pre-feature) form. First-party callers always pass an explicit
+                // value (queries-only by default in the CLI and MCP flows).
+                DelegationAccess::from(permissions),
+                &ii_domain,
+            )
+            .await
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 #[query]
@@ -619,20 +622,20 @@ fn get_account_delegation(
     expiration: Timestamp,
     permissions: Option<Permissions>,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    if check_authorization(anchor_number).is_err() {
-        return Err(AccountDelegationError::Unauthorized(caller()));
+    match check_authorization(anchor_number) {
+        Ok(_) => account_management::get_account_delegation(
+            anchor_number,
+            &origin,
+            account_number,
+            session_key,
+            expiration,
+            // See `prepare_account_delegation`: an omitted `permissions`
+            // argument means an unrestricted delegation (backwards-compatible
+            // with the original form).
+            DelegationAccess::from(permissions),
+        ),
+        Err(err) => Err(err.into()),
     }
-    account_management::get_account_delegation(
-        anchor_number,
-        &origin,
-        account_number,
-        session_key,
-        expiration,
-        // See `prepare_account_delegation`: an omitted `permissions`
-        // argument means an unrestricted delegation (backwards-compatible
-        // with the original form).
-        DelegationAccess::from(permissions),
-    )
 }
 
 /// Read `anchor_number`'s synced trusted-MCP-server config (master toggle +

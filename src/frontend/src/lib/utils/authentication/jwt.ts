@@ -14,7 +14,11 @@ import {
 } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 
-/** Thrown by {@link authenticateWithSso} when a gated SSO login needs a normal sign-in first. */
+/**
+ * Thrown while completing a gated SSO sign-up when the backend signals a normal
+ * (primary-client) sign-in is required first — a non-`sub` org's first gated
+ * login (see `AuthFlow` in `authFlow.svelte.ts`).
+ */
 export class SsoNormalLoginRequiredError extends Error {
   constructor() {
     super("Sign in normally first before using this gated app");

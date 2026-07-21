@@ -40,7 +40,12 @@
     authorizationContextStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
-  import { decodeJWT, findConfig, selectAuthScopes } from "$lib/utils/openID";
+  import {
+    decodeJWT,
+    findConfig,
+    isOpenIdCancelError,
+    selectAuthScopes,
+  } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import {
     DirectOpenIdEvents,
@@ -56,7 +61,6 @@
     type SsoDiscoveryResult,
   } from "$lib/utils/ssoDiscovery";
   import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
-  import { isOpenIdCancelError } from "$lib/utils/openID";
   import SsoNormalLoginRequired from "$lib/components/wizards/auth/views/SsoNormalLoginRequired.svelte";
   import { waitForStore } from "$lib/utils/utils";
   import { remapToLegacyDomain } from "$lib/utils/iiConnection";
