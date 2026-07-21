@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ClockIcon, ZapIcon } from "@lucide/svelte";
-  import Badge from "$lib/components/ui/Badge.svelte";
+  import Logo from "$lib/components/ui/Logo.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
@@ -77,60 +77,86 @@
 
 <div class="flex min-w-0 flex-1 flex-col">
   <div
-    class="border-border-tertiary from-bg-secondary to-bg-primary relative mt-2 overflow-hidden rounded-2xl border bg-gradient-to-b p-4"
+    class="mt-2"
+    style="position:relative;border-radius:20px;padding:20px 20px 34px;background:var(--bg-primary_alt);border:1px solid var(--border-tertiary);overflow:hidden"
   >
     <div
-      class="pointer-events-none absolute inset-0 opacity-15"
-      style="background-image: radial-gradient(circle at center, var(--fg-quaternary) 1px, transparent 1.4px); background-size: 20px 20px;"
+      style="position:absolute;inset:0;background-image:radial-gradient(circle at center, var(--fg-quaternary) 1px, transparent 1.4px);background-size:22px 22px;opacity:.14"
     ></div>
-    <div class="relative z-20 mb-3">
-      <Badge color="surface" size="sm">{$t`Example`}</Badge>
-    </div>
-    <div class="relative">
-      <div
-        class="border-border-tertiary bg-bg-secondary mx-4 h-8 rounded-xl border opacity-50"
+    <div
+      style="position:absolute;left:50%;top:62%;transform:translate(-50%,-50%);width:320px;height:220px;background:radial-gradient(ellipse at center, rgba(255,255,255,.09), transparent 70%);pointer-events:none"
+    ></div>
+    <div
+      style="position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(to top, var(--bg-primary_alt), transparent);pointer-events:none;z-index:3"
+    ></div>
+
+    <span
+      style="position:relative;z-index:4;display:inline-flex;align-self:flex-start;padding:4px 11px;border-radius:9999px;background:var(--bg-secondary);border:1px solid var(--border-tertiary);font-size:12px;font-weight:600;color:var(--text-tertiary);margin-bottom:16px"
+    >
+      {$t`Example`}
+    </span>
+
+    <div
+      style="position:relative;height:20px;margin:0 26px;border-radius:14px 14px 8px 8px;background:rgba(255,255,255,.02);border:1px solid var(--border-tertiary);border-bottom:0;z-index:0"
+      aria-hidden="true"
+    ></div>
+
+    <div
+      style="position:relative;display:flex;gap:11px;padding:12px;border-radius:15px;background:rgba(255,255,255,.03);border:1px solid var(--border-tertiary);align-items:flex-start;margin:-6px 12px 0;z-index:1;opacity:.9"
+    >
+      <span
+        style="width:34px;height:34px;border-radius:9px;background:var(--bg-tertiary);border:1px solid var(--border-tertiary);display:flex;align-items:center;justify-content:center;flex-shrink:0"
         aria-hidden="true"
-      ></div>
-      <div
-        class="border-border-tertiary bg-bg-secondary relative mx-1.5 -mt-3.5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 opacity-80"
       >
-        <span
-          class="border-border-tertiary bg-bg-tertiary text-text-primary flex size-8 shrink-0 items-center justify-center rounded-lg border"
-          aria-hidden="true"
+        <Logo class="text-text-primary" style="width:22px" />
+      </span>
+      <div style="flex:1;min-width:0">
+        <div
+          style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"
         >
-          <img src="/favicon.svg" alt="" class="size-5" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-baseline justify-between gap-2">
-            <span class="text-text-primary text-sm font-semibold">
-              {$t`A marketplace`}
-            </span>
-            <span class="text-text-tertiary text-xs">{$t`2m`}</span>
-          </div>
-          <p class="text-text-secondary mt-0.5 truncate text-sm">
-            {$t`Your item just sold.`}
-          </p>
+          <span
+            style="font-size:13px;font-weight:600;color:var(--text-primary)"
+          >
+            {$t`A marketplace`}
+          </span>
+          <span style="font-size:11px;color:var(--text-tertiary)">
+            {$t`2m`}
+          </span>
+        </div>
+        <div
+          style="font-size:13px;color:var(--text-secondary);line-height:1.4;margin-top:1px"
+        >
+          {$t`Your item just sold.`}
         </div>
       </div>
-      <div
-        class="border-border-tertiary bg-bg-tertiary relative z-10 -mt-3.5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 shadow-2xl backdrop-blur-sm"
+    </div>
+
+    <div
+      style="position:relative;display:flex;gap:11px;padding:13px 12px;border-radius:15px;background:rgba(255,255,255,.07);backdrop-filter:blur(8px);border:1px solid var(--border-secondary);align-items:flex-start;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);margin:-34px 0 0;z-index:2"
+    >
+      <span
+        style="width:34px;height:34px;border-radius:9px;background:var(--bg-tertiary);border:1px solid var(--border-tertiary);display:flex;align-items:center;justify-content:center;flex-shrink:0"
+        aria-hidden="true"
       >
-        <span
-          class="border-border-tertiary bg-bg-primary text-text-primary flex size-8 shrink-0 items-center justify-center rounded-lg border"
-          aria-hidden="true"
+        <Logo class="text-text-primary" style="width:22px" />
+      </span>
+      <div style="flex:1;min-width:0">
+        <div
+          style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"
         >
-          <img src="/favicon.svg" alt="" class="size-5" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-baseline justify-between gap-2">
-            <span class="text-text-primary text-sm font-semibold">
-              {$t`Your wallet`}
-            </span>
-            <span class="text-text-tertiary text-xs">{$t`now`}</span>
-          </div>
-          <p class="text-text-secondary mt-0.5 truncate text-sm">
-            {$t`Your transfer is confirmed.`}
-          </p>
+          <span
+            style="font-size:13px;font-weight:600;color:var(--text-primary)"
+          >
+            {$t`Your wallet`}
+          </span>
+          <span style="font-size:11px;color:var(--text-tertiary)">
+            {$t`now`}
+          </span>
+        </div>
+        <div
+          style="font-size:13px;color:var(--text-secondary);line-height:1.4;margin-top:1px"
+        >
+          {$t`Your transfer is confirmed.`}
         </div>
       </div>
     </div>
