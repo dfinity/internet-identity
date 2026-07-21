@@ -619,17 +619,18 @@ export const handleIcrc3OneClickSsoAttributes =
 
 type ConsentOutcome =
   | { type: "consent"; consent: AttributeConsent }
-  | { type: "reauthorized" };
+  | { type: "restart" };
 
 /**
  * Block until either the user commits their choice on the consent screen, or
  * they switch identity. The consent screen keeps the identity switcher live,
- * and switching re-authorizes the newly selected identity — a fresh
- * `authorizedStore` entry, distinct from `baseline`. The consent handler
- * uses `"reauthorized"` to restart from scratch for the new identity instead
- * of certifying the previous identity's selections.
+ * and switching clears the authorization (dropping back to account selection
+ * for the new identity) — the `authorizedStore` entry changes away from
+ * `baseline`. The consent handler uses `"restart"` to re-resolve from
+ * scratch for the newly selected identity instead of certifying the previous
+ * identity's selections.
  */
-const waitForConsentOrReauthorization = (
+const waitForConsentOrRestart = (
   baseline: Authorized,
 ): Promise<ConsentOutcome> =>
   new Promise((resolve) => {
@@ -649,8 +650,8 @@ const waitForConsentOrReauthorization = (
       },
     );
     const unsubscribeAuthorized = authorizedStore.subscribe((authorized) => {
-      if (authorized !== undefined && authorized !== baseline) {
-        settle({ type: "reauthorized" });
+      if (authorized !== baseline) {
+        settle({ type: "restart" });
       }
     });
   });
@@ -713,8 +714,9 @@ export const handleIcrc3ConsentAttributes =
           return name === "email" || name === "verified_email";
         });
 
-        // Switching identity on the consent screen re-authorizes the new
-        // identity, which restarts this loop: re-resolve the available
+        // Switching identity on the consent screen clears the authorization
+        // and drops back to account selection, which restarts this loop:
+        // once the new identity re-authorizes, re-resolve its available
         // attributes and repaint the screen from scratch so the previous
         // identity's selections are never carried over or certified.
         for (;;) {
@@ -760,10 +762,8 @@ export const handleIcrc3ConsentAttributes =
             attributeSpecs = [];
             attributeConsentStore.setConsent({ attributes: [] });
           } else {
-            const outcome = await waitForConsentOrReauthorization(
-              pipeline.authorized,
-            );
-            if (outcome.type === "reauthorized") {
+            const outcome = await waitForConsentOrRestart(pipeline.authorized);
+            if (outcome.type === "restart") {
               continue;
             }
             attributeSpecs = outcome.consent.attributes.map((attr) => ({
