@@ -39,15 +39,18 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(hostname, {
       body: title !== "" && body !== "" ? `${title} — ${body}` : title || body,
       tag: hostname,
-      data: { url: alert.url || null },
+      data: { origin: alert.hostname || null },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data && event.notification.data.url;
-  if (url) {
-    event.waitUntil(self.clients.openWindow(url));
+  const origin = event.notification.data && event.notification.data.origin;
+  if (!origin) {
+    return;
   }
+  const dest = new URL("/notify", self.location.origin);
+  dest.searchParams.set("to", origin);
+  event.waitUntil(self.clients.openWindow(dest.href));
 });
