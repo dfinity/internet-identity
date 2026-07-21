@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ClockIcon, ZapIcon } from "@lucide/svelte";
+  import { BellIcon, ClockIcon, ZapIcon } from "@lucide/svelte";
+  import Badge from "$lib/components/ui/Badge.svelte";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
@@ -82,25 +83,28 @@
       class="pointer-events-none absolute inset-0 opacity-15"
       style="background-image: radial-gradient(circle at center, var(--fg-quaternary) 1px, transparent 1.4px); background-size: 20px 20px;"
     ></div>
+    <div class="relative z-20 mb-3">
+      <Badge color="surface" size="sm">{$t`Example`}</Badge>
+    </div>
     <div class="relative">
       <div
         class="border-border-tertiary bg-bg-secondary relative flex origin-top scale-95 items-start gap-2.5 rounded-xl border px-3 py-2.5 opacity-75"
       >
         <span
-          class="border-border-tertiary bg-bg-tertiary text-text-secondary flex size-8 shrink-0 items-center justify-center rounded-lg border"
+          class="border-border-tertiary bg-bg-tertiary text-text-tertiary flex size-8 shrink-0 items-center justify-center rounded-lg border"
           aria-hidden="true"
         >
-          <img src="/favicon.svg" alt="" class="size-4.5" />
+          <BellIcon class="size-4" />
         </span>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline justify-between gap-2">
             <span class="text-text-primary text-sm font-semibold">
-              {$t`Caffeine`}
+              {$t`A marketplace`}
             </span>
             <span class="text-text-tertiary text-xs">{$t`2m`}</span>
           </div>
           <p class="text-text-secondary mt-0.5 truncate text-sm">
-            {$t`Your app is built and live at recipe-box.caffeine.ai`}
+            {$t`Your item just sold.`}
           </p>
         </div>
       </div>
@@ -108,20 +112,20 @@
         class="border-border-tertiary bg-bg-tertiary relative z-10 -mt-3.5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 shadow-2xl backdrop-blur-sm"
       >
         <span
-          class="border-border-tertiary bg-bg-primary text-text-secondary flex size-8 shrink-0 items-center justify-center rounded-lg border"
+          class="border-border-tertiary bg-bg-primary text-text-tertiary flex size-8 shrink-0 items-center justify-center rounded-lg border"
           aria-hidden="true"
         >
-          <img src="/favicon.svg" alt="" class="size-4.5" />
+          <BellIcon class="size-4" />
         </span>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline justify-between gap-2">
             <span class="text-text-primary text-sm font-semibold">
-              {$t`OISY Wallet`}
+              {$t`Your wallet`}
             </span>
             <span class="text-text-tertiary text-xs">{$t`now`}</span>
           </div>
           <p class="text-text-secondary mt-0.5 truncate text-sm">
-            {$t`Your transfer of 25 ICP is confirmed.`}
+            {$t`Your transfer is confirmed.`}
           </p>
         </div>
       </div>
@@ -183,7 +187,7 @@
     >
       {#if enabling}
         <ProgressRing />
-        <span>{$t`Enabling...`}</span>
+        <span>{$t`Turning on...`}</span>
       {:else}
         <span>{$t`Enable notifications`}</span>
       {/if}
