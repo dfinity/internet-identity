@@ -11,6 +11,7 @@
     initialError?: string;
     recoveryAddresses?: string[];
     verifiedAddresses?: string[];
+    openidAddresses?: string[];
   }
 
   const {
@@ -20,6 +21,7 @@
     initialError,
     recoveryAddresses = [],
     verifiedAddresses = [],
+    openidAddresses = [],
   }: Props = $props();
 
   let address = $state(initialAddress ?? "");
@@ -46,13 +48,23 @@
       verifiedAddresses.some((a) => a.toLowerCase() === normalized),
   );
 
+  const isOpenidDuplicate = $derived(
+    isShapeValid &&
+      !isDuplicate &&
+      openidAddresses.some((a) => a.toLowerCase() === normalized),
+  );
+
   const error = $derived(
-    isDuplicate ? $t`You've already verified this email.` : submitError,
+    isDuplicate
+      ? $t`You've already verified this email.`
+      : isOpenidDuplicate
+        ? $t`This email is already linked through an OpenID provider.`
+        : submitError,
   );
 
   const handleSubmit = async (event: Event) => {
     event.preventDefault();
-    if (!isShapeValid || isDuplicate || busy) {
+    if (!isShapeValid || isDuplicate || isOpenidDuplicate || busy) {
       return;
     }
     busy = true;
@@ -109,7 +121,7 @@
   <button
     class="btn btn-primary btn-lg"
     type="submit"
-    disabled={!isShapeValid || isDuplicate || busy}
+    disabled={!isShapeValid || isDuplicate || isOpenidDuplicate || busy}
   >
     {#if busy}
       <ProgressRing />
