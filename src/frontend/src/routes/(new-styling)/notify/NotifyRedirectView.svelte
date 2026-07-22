@@ -24,8 +24,8 @@
     class="flex flex-col items-center justify-center"
   >
     {#if dapp?.logoSrc !== undefined}
-      <div class="relative">
-        <svg viewBox="0 0 92 92" width="92" height="92" class="mb-4">
+      <div class="relative mb-4">
+        <svg viewBox="0 0 92 92" width="92" height="92" class="block">
           <path
             d="M 46 1 H 71 A 20 20 0 0 1 91 21 V 71 A 20 20 0 0 1 71 91 H 21 A 20 20 0 0 1 1 71 V 21 A 20 20 0 0 1 21 1 H 46"
             class="stroke-fg-primary/10 fill-none stroke-2"
@@ -46,8 +46,8 @@
         />
       </div>
     {:else}
-      <div class="relative">
-        <svg viewBox="0 0 92 92" width="92" height="92" class="mb-4">
+      <div class="relative mb-4">
+        <svg viewBox="0 0 92 92" width="92" height="92" class="block">
           <circle
             cx="46"
             cy="46"
