@@ -6,7 +6,12 @@ import {
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
-import { fromBase64, II_URL } from "../../utils";
+import {
+  authorizeWithUrl,
+  fromBase64,
+  II_URL,
+  TEST_APP_URL,
+} from "../../utils";
 
 // ---------------------------------------------------------------------------
 // ICRC-3 decoding — same shape as `openid.spec.ts`. Duplicated locally rather
@@ -583,6 +588,179 @@ test.describe("Authorize — explicit consent UI", () => {
       await expect(
         consent.row(`Test SSO ${SSO_OPENID_PORT} name:`),
       ).toBeVisible();
+      await consent.continue();
+    });
+  });
+
+  test.describe("switching identity mid-consent", () => {
+    // Regression coverage for the bug where switching identity via the
+    // header popover during the attribute-consent screen kept certifying
+    // the *original* identity's selections. Two identities each get their
+    // own linked OpenID email so the certified/echoed attributes can be
+    // tied back to one identity or the other unambiguously.
+    const emailA = "identity-a@example.com";
+    const emailB = "identity-b@example.com";
+
+    test.use({
+      identityConfig: {
+        createIdentities: [{ name: "Identity A" }, { name: "Identity B" }],
+      },
+      openIdConfig: {
+        createUsers: [
+          { port: DEFAULT_OPENID_PORT, claims: { email: emailA } },
+          { port: ALTERNATE_OPENID_PORT, claims: { email: emailB } },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        useIcrc3Attributes: true,
+        attributes: ["email"],
+      },
+    });
+
+    let expectedPrincipalA: string;
+    let expectedPrincipalB: string;
+
+    test.beforeEach(
+      async ({
+        page,
+        identities,
+        signInWithIdentity,
+        signInWithOpenId,
+        openIdUsers,
+      }) => {
+        // Two full authorize round-trips plus two OpenID-linking round-trips
+        // comfortably exceed the default 60s test timeout on a loaded machine.
+        test.setTimeout(240_000);
+
+        // Capture each identity's own default-account principal for this
+        // dapp (same protocol/origin as the main flow below) so the final
+        // assertion can prove the switched-to identity's principal, and
+        // only that one, comes back.
+        expectedPrincipalA = await authorizeWithUrl(
+          page,
+          TEST_APP_URL,
+          `${II_URL}/authorize`,
+          async (authPage) => {
+            await signInWithIdentity(authPage, identities[0].identityNumber);
+            await authPage
+              .getByRole("button", { name: "Continue", exact: true })
+              .click();
+          },
+          true,
+        );
+        expectedPrincipalB = await authorizeWithUrl(
+          page,
+          TEST_APP_URL,
+          `${II_URL}/authorize`,
+          async (authPage) => {
+            await signInWithIdentity(authPage, identities[1].identityNumber);
+            await authPage
+              .getByRole("button", { name: "Continue", exact: true })
+              .click();
+          },
+          true,
+        );
+
+        // Link a distinct OpenID email to each identity, so the consent
+        // handler resolves a different value per identity. Each linking
+        // round-trip runs in its own throwaway context (mirroring the
+        // `identities` fixture) so identity A's authenticated session on
+        // `/manage/access` doesn't linger and interfere with signing in as
+        // identity B right after.
+        const browser = page.context().browser()!;
+        for (const [identity, user] of [
+          [identities[0], openIdUsers[0]],
+          [identities[1], openIdUsers[1]],
+        ] as const) {
+          const linkContext = await browser.newContext();
+          const linkPage = await linkContext.newPage();
+          try {
+            await linkPage.goto(II_URL + "/manage/access");
+            await signInWithIdentity(linkPage, identity.identityNumber);
+            await linkPage.getByRole("button", { name: "Add new" }).click();
+            const popupPromise = linkPage.context().waitForEvent("page");
+            await linkPage
+              .getByRole("button", { name: user.issuer.name })
+              .click();
+            const popup = await popupPromise;
+            const closePromise = popup.waitForEvent("close", {
+              timeout: 15_000,
+            });
+            await signInWithOpenId(popup, user.id);
+            await closePromise;
+          } finally {
+            await linkPage.close();
+            await linkContext.close();
+          }
+        }
+      },
+    );
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      // The principal and certified attributes must belong to B, never A.
+      expect(authorizedPrincipal?.toText()).toBe(expectedPrincipalB);
+      expect(authorizedPrincipal?.toText()).not.toBe(expectedPrincipalA);
+
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) return;
+      const entries = decodeIcrc3TextEntries(authorizedIcrc3Attributes.data);
+      expect(entries.email).toBe(emailB);
+      expect(entries.email).not.toBe(emailA);
+    });
+
+    test("should restart consent for the switched-to identity and certify only its attributes", async ({
+      identities,
+      signInWithIdentity,
+      addAuthenticatorForIdentity,
+      attributeConsentView,
+      authorizePage,
+    }) => {
+      const consent = attributeConsentView(authorizePage.page);
+
+      // Reach the consent screen signed in as identity A.
+      await signInWithIdentity(
+        authorizePage.page,
+        identities[0].identityNumber,
+      );
+      await authorizePage.page
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await consent.waitForVisible();
+      await expect(consent.row("Email:")).toBeVisible();
+      const emailRowBeforeSwitch = await consent.row("Email:").elementHandle();
+
+      // Switch to identity B via the header popover — mirrors
+      // `continue.spec.ts`'s switch pattern: install B's passkey on the
+      // popup's virtual authenticator before triggering the switch.
+      await addAuthenticatorForIdentity(
+        authorizePage.page,
+        identities[1].identityNumber,
+      );
+      await authorizePage.page
+        .getByRole("button", { name: "Switch identity" })
+        .click();
+      await authorizePage.page
+        .getByRole("button", { name: identities[1].name })
+        .click();
+
+      // Switching identity re-authenticates and re-authorizes in the
+      // background (WebAuthn ceremony + two canister round-trips) before
+      // the consent handler's restart logic sees a new `authorizedStore`
+      // value. Wait for the header to reflect the new identity and for the
+      // original consent row to actually detach — the row's label is
+      // identical across identities, so without this the assertions below
+      // would trivially pass against the still-mounted A view.
+      await expect(
+        authorizePage.page.getByRole("button", { name: "Switch identity" }),
+      ).toContainText(identities[1].name);
+      if (emailRowBeforeSwitch !== null) {
+        await emailRowBeforeSwitch.waitForElementState("hidden");
+      }
+
+      // The consent view restarts and rebuilds for identity B.
+      await consent.waitForVisible();
+      await expect(consent.row("Email:")).toBeVisible();
       await consent.continue();
     });
   });

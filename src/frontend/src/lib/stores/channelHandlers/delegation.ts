@@ -21,6 +21,11 @@ import {
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import { authenticationStore } from "$lib/stores/authentication.store";
+import {
+  attributeConsentResultStore,
+  attributeConsentStore,
+} from "$lib/stores/attributeConsent.store";
+import { get } from "svelte/store";
 
 /** Serialize delegation requests so a malicious dapp sending several in
  *  parallel can't race the authorization state (effective origin, auth
@@ -83,9 +88,31 @@ export const handleDelegationRequest =
         );
         authorizationStore.setEffectiveOrigin(effectiveOrigin);
 
-        // Authorization is the commit point — the user may switch identities
-        // freely before this. Once authorized, the UI is no longer needed.
-        const authorized = await waitForStore(authorizedStore);
+        // Authorization is the commit point for a delegation-only flow. But
+        // when the dapp also requests attributes, the identity switcher stays
+        // live on the consent screen, so the user can re-authorize a
+        // different identity after this point. Wait for the consent to be
+        // committed (restarting on a switch) so the delegation is issued for
+        // the same identity whose attributes get certified — not whichever
+        // identity authorized first.
+        let authorized = await waitForStore(authorizedStore);
+        while (
+          get(attributeConsentStore) !== undefined &&
+          get(attributeConsentResultStore) === undefined
+        ) {
+          const outcome = await Promise.race([
+            waitForStore(attributeConsentResultStore).then(
+              () => "settled" as const,
+            ),
+            waitForStore(authorizedStore, (current) =>
+              current !== authorized ? ("switched" as const) : undefined,
+            ),
+          ]);
+          if (outcome === "settled") {
+            break;
+          }
+          authorized = await waitForStore(authorizedStore);
+        }
 
         // Read the identity *after* authorization so we capture whichever
         // identity the user settled on (they may have switched mid-flow).
