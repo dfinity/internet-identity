@@ -15,7 +15,7 @@ use internet_identity_interface::internet_identity::types::openid::{
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
     OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, SsoDiscovery,
-    SsoDiscoveryState, Timestamp, UserKey,
+    SsoDiscoveryStatus, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -317,10 +317,9 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
 /// Canonicalize an untrusted SSO discovery domain received as a canister-call
 /// argument: trim surrounding whitespace and lowercase ASCII. Domains are
 /// case-insensitive (DNS), but the value is stamped onto the credential as
-/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing
-/// and the allowlist gate, so it must be canonical the moment it crosses the
-/// trust boundary. Every endpoint taking a `discovery_domain` runs this before
-/// any further use, matching the `sso_discoverable_domains` config setter.
+/// `sso_domain` and used as the equality key for `sso:<domain>` scope routing,
+/// so it must be canonical the moment it crosses the trust boundary. Every
+/// endpoint taking a `discovery_domain` runs this before any further use.
 pub fn canonical_discovery_domain(domain: &str) -> String {
     domain.trim().to_ascii_lowercase()
 }
@@ -343,29 +342,29 @@ pub fn prefetch_sso(domain: Option<&str>) {
 }
 
 /// Drive the SSO discovery fetch for `domain` (the discovery cache only). The
-/// sign-in initiation poll calls this from an update when [`get_sso_discovery`]
+/// sign-in initiation poll calls this from an update when [`get_sso_discovery_status`]
 /// reads `Pending`. A no-op for a disallowed domain (the query reports
 /// `NotAllowed`).
 pub fn discover_sso(domain: &str) {
     sso::drive_discovery(domain);
 }
 
-/// Read the state of `domain`'s SSO discovery: the resolved config, still
-/// pending, or not on the allowlist.
+/// Read the status of `domain`'s SSO discovery: the resolved config, or still
+/// pending.
 ///
 /// With `origin`, `resolved_client_id` is that origin's client, or `None` when
 /// the origin is gated out.
-pub fn get_sso_discovery(domain: &str, origin: Option<&str>) -> SsoDiscoveryState {
-    if sso::validate_allowed_discovery_domain(domain).is_err() {
-        return SsoDiscoveryState::NotAllowed;
-    }
+pub fn get_sso_discovery_status(domain: &str, origin: Option<&str>) -> SsoDiscoveryStatus {
+    // Peek-only: `Pending` until the fill (driven by `prefetch_sso`) resolves.
+    // A malformed domain never resolves (the fill rejects non-bare-authorities),
+    // so it simply reads `Pending` until the frontend times out.
     match sso::peek_discovery(domain) {
         Cached::Ready(discovery_config) => {
             let resolved_client_id = match origin {
                 None => Some(discovery_config.client_id.clone()),
                 Some(origin) => discovery_config.resolve_client_for_origin(origin).ok(),
             };
-            SsoDiscoveryState::Resolved(SsoDiscovery {
+            SsoDiscoveryStatus::Resolved(SsoDiscovery {
                 discovery_domain: domain.to_ascii_lowercase(),
                 client_id: discovery_config.client_id,
                 issuer: discovery_config.issuer,
@@ -375,7 +374,7 @@ pub fn get_sso_discovery(domain: &str, origin: Option<&str>) -> SsoDiscoveryStat
                 resolved_client_id,
             })
         }
-        Cached::Pending => SsoDiscoveryState::Pending,
+        Cached::Pending => SsoDiscoveryStatus::Pending,
     }
 }
 
@@ -603,7 +602,7 @@ mod tests {
         // Untrusted canister-call args: a mixed-case / padded domain that
         // passes the case-insensitive allowlist gate must be canonicalized so
         // the stamped `sso:<domain>` scope matches the allowlisted value, and
-        // so the discovery endpoints (`discover_sso` / `get_sso_discovery`) gate
+        // so the discovery endpoints (`discover_sso` / `get_sso_discovery_status`) gate
         // on the same canonical form as the JWT endpoints.
         assert_eq!(canonical_discovery_domain("  Example.ORG  "), "example.org");
         assert_eq!(canonical_discovery_domain("example.org"), "example.org");

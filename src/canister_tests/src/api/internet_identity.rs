@@ -383,7 +383,7 @@ pub fn get_sso_discovery(
     env: &PocketIc,
     canister_id: CanisterId,
     domain: &str,
-) -> Result<types::SsoDiscoveryState, RejectResponse> {
+) -> Result<types::SsoDiscoveryStatus, RejectResponse> {
     get_sso_discovery_for_origin(env, canister_id, domain, None)
 }
 
@@ -394,8 +394,12 @@ pub fn get_sso_discovery_for_origin(
     canister_id: CanisterId,
     domain: &str,
     origin: Option<&str>,
-) -> Result<types::SsoDiscoveryState, RejectResponse> {
-    query_candid(env, canister_id, "get_sso_discovery", (domain, origin)).map(|(x,)| x)
+) -> Result<types::SsoDiscoveryStatus, RejectResponse> {
+    let request = types::GetSsoDiscoveryStatusRequest {
+        org_domain: domain.to_string(),
+        target_app_origin: origin.map(str::to_string),
+    };
+    query_candid(env, canister_id, "get_sso_discovery_status", (request,)).map(|(x,)| x)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -412,13 +416,20 @@ pub fn sso_prepare_delegation(
     types::OpenIdResult<types::SsoPrepareDelegationResponse, types::OpenIdDelegationError>,
     RejectResponse,
 > {
+    let request = types::SsoPrepareDelegationRequest {
+        jwt: jwt.to_string(),
+        salt: *salt,
+        session_key: session_key.clone(),
+        org_domain: discovery_domain.to_string(),
+        target_app_origin: origin.to_string(),
+    };
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "sso_prepare_delegation",
-        (jwt, salt, session_key, discovery_domain, origin),
+        (request,),
     )
     .map(|(x,)| x)
 }
@@ -439,22 +450,16 @@ pub fn sso_get_delegation(
     types::OpenIdResult<types::SsoGetDelegationResponse, types::OpenIdDelegationError>,
     RejectResponse,
 > {
-    query_candid_as(
-        env,
-        canister_id,
-        sender,
-        "sso_get_delegation",
-        (
-            jwt,
-            salt,
-            session_key,
-            expiration,
-            discovery_domain,
-            origin,
-            serde_bytes::ByteBuf::from(sso_attr_bundle.to_vec()),
-        ),
-    )
-    .map(|(x,)| x)
+    let request = types::SsoGetDelegationRequest {
+        jwt: jwt.to_string(),
+        salt: *salt,
+        session_key: session_key.clone(),
+        expiration: *expiration,
+        org_domain: discovery_domain.to_string(),
+        target_app_origin: origin.to_string(),
+        sso_attr_bundle: serde_bytes::ByteBuf::from(sso_attr_bundle.to_vec()),
+    };
+    query_candid_as(env, canister_id, sender, "sso_get_delegation", (request,)).map(|(x,)| x)
 }
 
 /// Collapse an [`OpenIdResult`](types::OpenIdResult) to a plain `Result` for

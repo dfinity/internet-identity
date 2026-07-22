@@ -46,7 +46,7 @@ pub fn verify_sso_jwt(
     discovery_domain: &str,
     origin: &str,
 ) -> Result<Cached<VerifiedSsoLogin>, OpenIDJWTVerificationError> {
-    sso::validate_allowed_discovery_domain(discovery_domain)
+    sso::validate_discovery_domain(discovery_domain)
         .map_err(OpenIDJWTVerificationError::GenericError)?;
     let discovery_config = match sso::peek_discovery(discovery_domain) {
         Cached::Pending => return Ok(Cached::Pending),

@@ -11,7 +11,8 @@
 //! jwks_uri ─[JWKS cache]──────▶ keys
 //! ```
 //!
-//! The discovery domain is gated by the canary allowlist.
+//! A caller-supplied discovery domain is validated as a bare authority (see
+//! `validate_discovery_domain`); there is no domain allowlist.
 
 use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
@@ -49,9 +50,8 @@ use crate::state;
 // Cache sizing. II runs on a system subnet (HTTP outcalls cost no cycles) and
 // ingress flooding is handled by the boundary nodes, so these caches don't need
 // to rate-limit outcalls or account for cycles. Their one DDoS-relevant job is
-// to keep canister state *bounded and fairly evicted* — especially once the
-// discovery allowlist is removed and `domain` / `jwks_uri` become caller-
-// controlled and unbounded.
+// to keep canister state *bounded and fairly evicted* — the discovery domain
+// and `jwks_uri` are caller-controlled and unbounded.
 //
 // Discovery and JWKS are a single coupled flow (`domain → discovery cache →
 // jwks_uri → JWKS cache`): a verification needs *both* the domain's discovery
@@ -268,7 +268,7 @@ fn new_jwks_cache() -> JwksCache {
 /// disallowed domain.
 pub(super) fn prefetch(domain: &str) {
     let domain = domain.to_ascii_lowercase();
-    if validate_allowed_discovery_domain(&domain).is_err() {
+    if validate_discovery_domain(&domain).is_err() {
         return;
     }
     if let Cached::Ready(discovery_config) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
@@ -282,14 +282,14 @@ pub(super) fn prefetch(domain: &str) {
 /// domain.
 pub(super) fn drive_discovery(domain: &str) {
     let domain = domain.to_ascii_lowercase();
-    if validate_allowed_discovery_domain(&domain).is_ok() {
+    if validate_discovery_domain(&domain).is_ok() {
         single_flight_cache::get(&DISCOVERY_CACHE, domain);
     }
 }
 
 /// Read the cached discovery result for `domain`, peek-only (never spawns) so
 /// it's safe from a query. `Pending` means no cached value yet; the caller
-/// gates on [`validate_allowed_discovery_domain`] separately where it needs to
+/// gates on [`validate_discovery_domain`] separately where it needs to
 /// tell a disallowed domain apart from a cold one.
 pub(super) fn peek_discovery(domain: &str) -> Cached<DiscoveredConfig> {
     single_flight_cache::peek(&DISCOVERY_CACHE, &domain.to_ascii_lowercase())
@@ -303,7 +303,7 @@ pub(super) fn resolve(
     jwt_iss: &str,
     jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
-    validate_allowed_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
+    validate_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
     let discovery_config = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(discovery_config) => discovery_config,
@@ -341,72 +341,42 @@ pub(super) fn read_jwks(jwks_uri: &str) -> Cached<Vec<Jwk>> {
 }
 
 // ---------------------------------------------------------------------------
-// Allowlist (canary gate).
+// Discovery-domain validation + scheme selection.
 // ---------------------------------------------------------------------------
 
-pub fn allowed_discovery_domains() -> Vec<String> {
+/// Deploy flag: when set, discovery outcalls to loopback hosts may use plain
+/// `http` (so e2e can point at local mock IdPs). See
+/// `InternetIdentityInit::sso_allow_insecure_discovery`. Non-loopback hosts
+/// always require `https` regardless.
+fn sso_allow_insecure_discovery() -> bool {
     #[cfg(not(test))]
     {
-        let configured = state::persistent_state(|ps| ps.sso_discoverable_domains.clone());
-        if let Some(domains) = configured {
-            return domains;
-        }
-        let is_production = state::persistent_state(|ps| ps.is_production);
-        match is_production {
-            Some(true) => vec!["dfinity.org".to_string()],
-            _ => vec!["beta.dfinity.org".to_string()],
-        }
+        state::persistent_state(|ps| ps.sso_allow_insecure_discovery).unwrap_or(false)
     }
     #[cfg(test)]
     {
-        tests::TEST_ALLOWED.with_borrow(|d| d.clone())
+        tests::TEST_ALLOW_INSECURE.with_borrow(|b| *b)
     }
 }
 
-/// Deploy flag: when set, the SSO discovery domain gate accepts *any* domain
-/// (see `InternetIdentityInit::sso_allow_any_domain`). Deliberately does not
-/// feed the `https`-relaxation gate ([`is_allowlisted_host`]), which always
-/// consults the explicit allowlist so opening the domain gate never lets an
-/// arbitrary host serve discovery over plain HTTP.
-fn sso_allow_any_domain() -> bool {
-    #[cfg(not(test))]
-    {
-        state::persistent_state(|ps| ps.sso_allow_any_domain).unwrap_or(false)
-    }
-    #[cfg(test)]
-    {
-        tests::TEST_ALLOW_ANY.with_borrow(|b| *b)
-    }
-}
-
-/// True if `domain` is on the configured/default SSO allowlist
-/// (case-insensitive). The explicit list only — independent of the
-/// `sso_allow_any_domain` deploy flag.
-fn is_explicitly_allowlisted(domain: &str) -> bool {
-    allowed_discovery_domains()
-        .iter()
-        .any(|allowed| allowed.eq_ignore_ascii_case(domain))
-}
-
-pub fn validate_allowed_discovery_domain(domain: &str) -> Result<(), String> {
+/// Validate a caller-supplied SSO discovery domain: it must be within the length
+/// cap and a bare URL authority (a host, optionally `host:port`, and nothing
+/// else). The bare-authority check is the security boundary — `domain` is
+/// interpolated into a discovery URL (`{scheme}://{domain}/.well-known/...`), so
+/// inputs carrying userinfo (`evil.com@127.0.0.1`), a path, a query, or a
+/// fragment could otherwise change the effective request target.
+pub fn validate_discovery_domain(domain: &str) -> Result<(), String> {
     if domain.len() > MAX_DOMAIN_LENGTH {
         return Err(format!(
             "SSO discovery domain exceeds {MAX_DOMAIN_LENGTH} bytes"
         ));
     }
-    // An explicitly allowlisted domain is admin-curated and trusted verbatim.
-    // The `sso_allow_any_domain` flag, by contrast, makes the domain
-    // caller-controlled, and `domain` is later interpolated into a discovery
-    // URL (`{scheme}://{domain}/.well-known/...`). Require it to be a bare
-    // authority so the flag means "any *domain*", not "any string that happens
-    // to parse inside a URL": inputs carrying userinfo (`evil.com@127.0.0.1`), a
-    // path (`host/..`), a query, or a fragment could otherwise change the
-    // effective request target.
-    if is_explicitly_allowlisted(domain) || (sso_allow_any_domain() && is_bare_authority(domain)) {
-        Ok(())
-    } else {
-        Err(format!("SSO discovery domain not allowed: {domain}"))
+    if !is_bare_authority(domain) {
+        return Err(format!(
+            "SSO discovery domain is not a bare authority: {domain}"
+        ));
     }
+    Ok(())
 }
 
 /// True if `domain` is a bare URL authority — a host, optionally `host:port`,
@@ -439,16 +409,18 @@ fn is_bare_authority(domain: &str) -> bool {
     authority == domain.to_ascii_lowercase()
 }
 
-/// True if `host` (the `host:port` portion of a URL) matches an allowlist
-/// entry. Used as the gate for relaxing the `https://` requirement: any domain
-/// explicitly blessed by an II admin MAY publish its discovery endpoints over
-/// plain HTTP, which is what makes e2e tests against `http://localhost:11107`
-/// work without weakening prod's strict-HTTPS posture for unblessed hosts.
-/// Consults the explicit allowlist only — the `sso_allow_any_domain` deploy
-/// flag opens the domain gate but never relaxes the `https` requirement.
-#[cfg(not(test))]
-fn is_allowlisted_host(host: &str) -> bool {
-    is_explicitly_allowlisted(host)
+/// True if `host` (host or `host:port`) is loopback.
+fn is_loopback_host(host: &str) -> bool {
+    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
+    matches!(bare.as_str(), "localhost" | "127.0.0.1")
+}
+
+/// `http` discovery is permitted only for a loopback host, and only when the
+/// `sso_allow_insecure_discovery` deploy flag is set (e2e mock IdPs). Every
+/// other host — and everything in production, where the flag is off — requires
+/// `https`, so an un-flagged caller can never trigger an `http` outcall.
+fn allow_insecure_scheme(host: &str) -> bool {
+    sso_allow_insecure_discovery() && is_loopback_host(host)
 }
 
 // ---------------------------------------------------------------------------
@@ -522,11 +494,10 @@ fn validate_discovery_document(doc: &DiscoveryDocument) -> Result<(), String> {
 /// stale-if-error).
 #[cfg(not(test))]
 async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
-    // Hop 1: fetch /.well-known/ii-openid-configuration. Default to https; an
-    // explicitly allowlisted loopback host (the e2e provider, which can't serve
-    // TLS) may use http. The explicit allowlist is the trust gate — the
-    // `sso_allow_any_domain` flag opens the domain gate but never picks http.
-    let hop1_scheme = scheme_for_allowlisted_host(&domain);
+    // Hop 1: fetch /.well-known/ii-openid-configuration. `https` by default; a
+    // loopback host may use `http` under the `sso_allow_insecure_discovery` flag
+    // (the e2e mock provider, which can't serve TLS).
+    let hop1_scheme = scheme_for_host(&domain);
     let hop1_url = format!("{hop1_scheme}://{domain}/.well-known/ii-openid-configuration");
     let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
     validate_discovery_url(&ii_config.openid_configuration)?;
@@ -707,7 +678,7 @@ fn validate_discovery_url(url: &str) -> Result<(), String> {
         "https" => Ok(()),
         "http" => {
             let host = host_with_port(&parsed).ok_or_else(|| format!("URL has no host: {url}"))?;
-            if is_allowlisted_host(&host) {
+            if allow_insecure_scheme(&host) {
                 Ok(())
             } else {
                 Err(format!(
@@ -729,18 +700,11 @@ fn host_with_port(url: &url::Url) -> Option<String> {
     })
 }
 
-/// Scheme for the hop-1 URL. A loopback host (the e2e test provider, which
-/// can't serve TLS) gets `http`, but *only* when it's explicitly allowlisted;
-/// every other host gets `https`. Crucially, a loopback host that is reachable
-/// only because the `sso_allow_any_domain` flag opened the domain gate is *not*
-/// explicitly allowlisted, so it still gets `https`. This is what keeps the
-/// flag from becoming a plain-HTTP SSRF footgun: opening the domain gate must
-/// never let an un-allowlisted caller trigger an `http://` outcall to
-/// `localhost`/`127.0.0.1`. Consults the same explicit-allowlist gate as the
-/// hop-2 `https`-relaxation check ([`is_allowlisted_host`]).
-fn scheme_for_allowlisted_host(host: &str) -> &'static str {
-    let bare = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    if matches!(bare.as_str(), "localhost" | "127.0.0.1") && is_explicitly_allowlisted(host) {
+/// Scheme for the hop-1 URL: `http` only for a loopback host under the
+/// `sso_allow_insecure_discovery` flag (the e2e mock provider, which can't serve
+/// TLS); every other host — and everything in production — gets `https`.
+fn scheme_for_host(host: &str) -> &'static str {
+    if allow_insecure_scheme(host) {
         "http"
     } else {
         "https"
@@ -786,8 +750,6 @@ pub(super) fn test_setup_discovery(
     set_test_now(1_700_000_000);
     DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
     JWKS_CACHE.with(|c| *c.borrow_mut() = new_jwks_cache());
-    tests::TEST_ALLOWED.with_borrow_mut(|d| *d = vec![domain.to_string()]);
-    tests::TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
     tests::TEST_DISCOVERY.with_borrow_mut(|m| {
         m.clear();
         m.insert(domain.to_string(), discovery_config.clone());
@@ -814,16 +776,14 @@ mod tests {
     use std::collections::HashMap;
 
     thread_local! {
-        pub(super) static TEST_ALLOWED: RefCell<Vec<String>> = const { RefCell::new(vec![]) };
-        pub(super) static TEST_ALLOW_ANY: RefCell<bool> = const { RefCell::new(false) };
+        pub(super) static TEST_ALLOW_INSECURE: RefCell<bool> = const { RefCell::new(false) };
         pub(super) static TEST_DISCOVERY: RefCell<HashMap<String, DiscoveredConfig>> = RefCell::new(HashMap::new());
         pub(super) static TEST_JWKS: RefCell<HashMap<String, Vec<Jwk>>> = RefCell::new(HashMap::new());
     }
 
     fn reset() {
         set_test_now(1_700_000_000);
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.org".to_string()]);
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
+        TEST_ALLOW_INSECURE.with_borrow_mut(|b| *b = false);
         TEST_DISCOVERY.with_borrow_mut(|m| m.clear());
         TEST_JWKS.with_borrow_mut(|m| m.clear());
         DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
@@ -849,17 +809,18 @@ mod tests {
     }
 
     fn allowed(domain: &str) -> bool {
-        validate_allowed_discovery_domain(domain).is_ok()
+        validate_discovery_domain(domain).is_ok()
     }
 
     #[test]
-    fn resolve_rejects_disallowed_domain() {
+    fn resolve_rejects_non_authority_domain() {
         reset();
-        assert!(!allowed("not-allowed.com"));
-        assert!(allowed("example.org"));
-        // The verify path rejects a disallowed domain.
+        // No allowlist: any bare authority is accepted; a non-authority is not.
+        assert!(allowed("not-allowed.com"));
+        assert!(!allowed("evil.com@127.0.0.1"));
+        // The verify path rejects a non-authority domain.
         assert!(resolve(
-            "not-allowed.com",
+            "evil.com@127.0.0.1",
             "https://idp.example.org",
             &test_aud_claim()
         )
@@ -867,46 +828,34 @@ mod tests {
     }
 
     #[test]
-    fn allow_any_domain_opens_the_gate() {
+    fn any_bare_authority_is_allowed() {
         reset();
-        // Off by default: a domain off the explicit allowlist is rejected.
-        assert!(!allowed("not-allowed.com"));
-        // Flag on: every domain passes the discovery gate.
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
+        // No allowlist: any bare-authority domain passes the discovery gate.
         assert!(allowed("not-allowed.com"));
         assert!(allowed("example.org"));
-        // The explicit allowlist is unchanged — the `https`-relaxation gate
-        // still consults it, so the flag does not bless arbitrary http hosts.
-        assert!(is_explicitly_allowlisted("example.org"));
-        assert!(!is_explicitly_allowlisted("not-allowed.com"));
+        assert!(allowed("sub.example.com:8443"));
     }
 
     #[test]
-    fn allow_any_domain_does_not_relax_https_for_loopback() {
+    fn http_scheme_requires_insecure_flag_and_loopback() {
         reset();
-        // e2e setup: the loopback provider is explicitly allowlisted, so hop-1
-        // is allowed to use plain http (it can't serve TLS).
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["localhost:11107".to_string()]);
-        assert_eq!(scheme_for_allowlisted_host("localhost:11107"), "http");
+        // Default (flag off): https for every host, loopback included.
+        assert_eq!(scheme_for_host("localhost:11107"), "https");
+        assert_eq!(scheme_for_host("127.0.0.1:8080"), "https");
+        assert_eq!(scheme_for_host("example.com"), "https");
 
-        // Flag on opens the *domain* gate for everything, loopback included...
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
-        assert!(allowed("localhost"));
-        assert!(allowed("127.0.0.1:8080"));
-        // ...but a loopback host reachable only via the flag (not on the
-        // explicit allowlist) still gets https: the flag must never trigger a
-        // plain-http outcall to localhost/127.0.0.1.
-        assert_eq!(scheme_for_allowlisted_host("localhost"), "https");
-        assert_eq!(scheme_for_allowlisted_host("localhost:9999"), "https");
-        assert_eq!(scheme_for_allowlisted_host("127.0.0.1:8080"), "https");
-        // Non-loopback hosts are always https regardless.
-        assert_eq!(scheme_for_allowlisted_host("evil.example.com"), "https");
+        // Flag on: loopback hosts may use plain http (the e2e mock provider,
+        // which can't serve TLS)...
+        TEST_ALLOW_INSECURE.with_borrow_mut(|b| *b = true);
+        assert_eq!(scheme_for_host("localhost:11107"), "http");
+        assert_eq!(scheme_for_host("127.0.0.1:8080"), "http");
+        // ...but non-loopback hosts always require https.
+        assert_eq!(scheme_for_host("evil.example.com"), "https");
     }
 
     #[test]
-    fn allow_any_domain_rejects_non_authority() {
+    fn non_authority_domain_is_rejected() {
         reset();
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
 
         // Bare authorities pass: host, sub-host, and explicit (non-default)
         // port, case-insensitively.
@@ -930,34 +879,18 @@ mod tests {
             "exa mple.com",          // whitespace in host
             "",                      // empty
         ] {
-            assert!(
-                !allowed(bad),
-                "expected `{bad}` to be rejected even with sso_allow_any_domain on",
-            );
+            assert!(!allowed(bad), "expected `{bad}` to be rejected");
         }
-
-        // The bare-authority check only gates the flag path: an explicitly
-        // allowlisted entry is admin-curated and trusted verbatim, so it is
-        // accepted even if it wouldn't pass `is_bare_authority` on its own.
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec!["example.com/weird".to_string()]);
-        assert!(!is_bare_authority("example.com/weird"));
-        assert!(allowed("example.com/weird"));
     }
 
     #[test]
-    fn over_long_domain_is_never_allowed() {
+    fn over_long_domain_is_rejected() {
         reset();
-        // Even with the gate fully open, an over-length domain is rejected.
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = true);
         let at_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 4));
         assert_eq!(at_cap.len(), MAX_DOMAIN_LENGTH);
         assert!(allowed(&at_cap));
         let over_cap = format!("{}.com", "a".repeat(MAX_DOMAIN_LENGTH - 3));
         assert_eq!(over_cap.len(), MAX_DOMAIN_LENGTH + 1);
-        assert!(!allowed(&over_cap));
-        // The length cap fires even for an explicitly allowlisted entry.
-        TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
-        TEST_ALLOWED.with_borrow_mut(|d| *d = vec![over_cap.clone()]);
         assert!(!allowed(&over_cap));
     }
 

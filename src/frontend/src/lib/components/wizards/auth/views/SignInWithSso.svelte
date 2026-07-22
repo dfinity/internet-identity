@@ -105,19 +105,10 @@
         // The org gated this dapp off, so no client can serve this origin.
         return $t`Your organization hasn't granted this app access via ${domainInput}.`;
       }
-      if (e.reason === "timeout") {
-        // The domain IS on II's allowlist, but discovery never resolved.
-        // A failed or unreachable discovery fetch surfaces here too — the
-        // canister keeps reporting `Pending` until we time out — so this is
-        // the case where pointing the SSO admin at the discovery endpoint
-        // actually helps.
-        return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
-      }
-      // `rejected` is the canister's `NotAllowed`: the domain isn't on II's
-      // SSO allowlist, so no discovery was ever attempted. Telling the user
-      // to check the discovery endpoint would be misleading — the domain
-      // simply isn't set up for SSO with II yet.
-      return $t`SSO is not available for "${domainInput}" yet. Ask an II admin to register this domain.`;
+      // `timeout`: discovery never resolved — a wrong domain, or an unreachable
+      // or failed discovery fetch (the canister keeps reporting `Pending` until
+      // we time out) — so point the SSO admin at the discovery endpoint.
+      return $t`Couldn't load SSO settings from ${domainInput}. Ask your SSO admin to check that /.well-known/ii-openid-configuration is reachable.`;
     }
     if (e instanceof OAuthProviderError) {
       // `unsupported_response_type` = the SSO app is code-only; II needs

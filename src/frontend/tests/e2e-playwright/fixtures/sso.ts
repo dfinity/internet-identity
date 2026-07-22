@@ -4,23 +4,18 @@ import { test as base, expect, type Page } from "@playwright/test";
  * Dedicated test OpenID provider port that backs the SSO discovery
  * (two-hop) test fixture. Kept disjoint from the direct-OpenID ports so
  * a test can opt into SSO without colliding with fixtures that enumerate
- * direct providers, and so the `sso_discoverable_domains` install arg
- * (CI workflow `canister-tests.yml`) maps cleanly onto a single host.
+ * direct providers. Discovery reaches it over `http` because the test canister
+ * runs with `sso_allow_insecure_discovery` (loopback http; see dev-e2e-setup).
  */
 export const SSO_OPENID_PORT = 11107;
-/**
- * Discovery domain (with port) that the test canister has on its SSO
- * allowlist via `sso_discoverable_domains`. Must match the value passed
- * in the install arg in `.github/workflows/canister-tests.yml`.
- */
+/** Discovery domain (with port) the SSO tests point at (the loopback provider). */
 export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
 
 /**
  * A second discovery domain for the same test provider (`127.0.0.1`, same port)
  * used only by the gating tests, so their config lands in a discovery-cache
  * entry the un-gated tests never touch (II caches discovery per domain ~1h with
- * no force-refresh). Requires `127.0.0.1:11107` in the canister's
- * `sso_discoverable_domains`.
+ * no force-refresh).
  */
 export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
 
@@ -28,8 +23,7 @@ export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
  * Entra-style provider: pairwise `sub` (different per OIDC client) plus a stable
  * `oid` claim. Backs the non-`sub` gating tests where the identity must be
  * bridged via `oid`. Its own port/domain so its pairwise config never touches
- * the public-`sub` provider the other tests rely on. Requires `localhost:11108`
- * in the canister's `sso_discoverable_domains` (see scripts/dev-e2e-setup).
+ * the public-`sub` provider the other tests rely on (see scripts/dev-e2e-setup).
  */
 export const SSO_ENTRA_OPENID_PORT = 11108;
 export const SSO_ENTRA_DISCOVERY_DOMAIN = `localhost:${SSO_ENTRA_OPENID_PORT}`;

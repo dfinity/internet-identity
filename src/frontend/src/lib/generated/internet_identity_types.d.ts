@@ -789,6 +789,13 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+/**
+ * Request for `get_sso_discovery_status`.
+ */
+export interface GetSsoDiscoveryStatusRequest {
+  'target_app_origin' : [] | [FrontendHostname],
+  'org_domain' : string,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -1006,14 +1013,6 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
-   * Deploy flag opening the SSO discovery domain gate to any domain. When
-   * `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
-   * which domains may be discovered as SSO providers. Does not relax the
-   * strict-`https` requirement: serving discovery over plain `http` still
-   * requires the host to be on the explicit `sso_discoverable_domains` list.
-   */
-  'sso_allow_any_domain' : [] | [boolean],
-  /**
    * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
    * OpenID credentials. When set, a batched timer-driven migration stamps
    * every stored credential whose (iss, aud) matches an entry and whose
@@ -1057,13 +1056,6 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
-   * Allowlist of domains that may be used as discoverable SSO providers.
-   * When set, fully replaces the built-in defaults. When unset, falls back
-   * to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
-   * keyed off `is_production`.
-   */
-  'sso_discoverable_domains' : [] | [Array<string>],
-  /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
    * See ArchiveConfig for details.
@@ -1106,6 +1098,14 @@ export interface InternetIdentityInit {
    * Configuration for dummy authentication used in e2e tests.
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
+  /**
+   * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+   * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+   * mock IdPs served over plain `http`. Unset / `false` (the default) require
+   * `https` for every discovery host. Never enable in production — non-loopback
+   * hosts always require `https` regardless.
+   */
+  'sso_allow_insecure_discovery' : [] | [boolean],
   /**
    * Rate limit for the `register` call.
    */
@@ -1653,19 +1653,40 @@ export interface SsoDiscovery {
   'client_id' : string,
 }
 /**
- * State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
- * fetch isn't a distinct state — it reads as `Pending` and the frontend times
- * out — so the states are resolved, in flight, or not allowed.
+ * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+ * failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+ * times out — so the statuses are: resolved, or in flight.
  */
-export type SsoDiscoveryState = { 'NotAllowed' : null } |
-  { 'Resolved' : SsoDiscovery } |
+export type SsoDiscoveryStatus = { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
+/**
+ * Request for `sso_get_delegation`.
+ */
+export interface SsoGetDelegationRequest {
+  'jwt' : JWT,
+  'session_key' : SessionKey,
+  'salt' : Salt,
+  'sso_attr_bundle' : Uint8Array | number[],
+  'target_app_origin' : FrontendHostname,
+  'expiration' : Timestamp,
+  'org_domain' : string,
+}
 /**
  * Response of `sso_get_delegation`.
  */
 export interface SsoGetDelegationResponse {
   'signed_delegation' : SignedDelegation,
   'sso_attr_bundle_signature' : Uint8Array | number[],
+}
+/**
+ * Request for `sso_prepare_delegation`.
+ */
+export interface SsoPrepareDelegationRequest {
+  'jwt' : JWT,
+  'session_key' : SessionKey,
+  'salt' : Salt,
+  'target_app_origin' : FrontendHostname,
+  'org_domain' : string,
 }
 /**
  * Response of `sso_prepare_delegation`.
@@ -1884,7 +1905,7 @@ export interface _SERVICE {
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
    * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery` (query) and, while it reads `Pending`, drives the
+   * `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
    * on-demand two-hop discovery fetch with `discover_sso` (update); once the
    * fetch completes the query returns `Resolved` with the config.
    * 
@@ -2063,9 +2084,9 @@ export interface _SERVICE {
     { 'Ok' : SignedDelegation } |
       { 'Err' : SessionDelegationError }
   >,
-  'get_sso_discovery' : ActorMethod<
-    [string, [] | [FrontendHostname]],
-    SsoDiscoveryState
+  'get_sso_discovery_status' : ActorMethod<
+    [GetSsoDiscoveryStatusRequest],
+    SsoDiscoveryStatus
   >,
   /**
    * HTTP Gateway protocol
@@ -2388,15 +2409,7 @@ export interface _SERVICE {
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
   'sso_get_delegation' : ActorMethod<
-    [
-      JWT,
-      Salt,
-      SessionKey,
-      Timestamp,
-      string,
-      FrontendHostname,
-      Uint8Array | number[],
-    ],
+    [SsoGetDelegationRequest],
     { 'Ok' : SsoGetDelegationResponse } |
       { 'Err' : OpenIdDelegationError } |
       { 'Pending' : null }
@@ -2407,7 +2420,7 @@ export interface _SERVICE {
    * cache is cold — re-call to drive the fetch.
    */
   'sso_prepare_delegation' : ActorMethod<
-    [JWT, Salt, SessionKey, string, FrontendHostname],
+    [SsoPrepareDelegationRequest],
     { 'Ok' : SsoPrepareDelegationResponse } |
       { 'Err' : OpenIdDelegationError } |
       { 'Pending' : null }

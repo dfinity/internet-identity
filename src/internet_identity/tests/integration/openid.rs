@@ -136,7 +136,6 @@ fn sso_http_responses() -> Vec<(String, String)> {
 /// the cycles the discovery/JWKS HTTP outcalls need.
 fn setup_sso_canister(env: &PocketIc) -> Principal {
     let args = InternetIdentityInit {
-        sso_discoverable_domains: Some(vec![SSO_DOMAIN.to_string()]),
         canister_creation_cycles_cost: Some(0),
         ..Default::default()
     };
@@ -1482,7 +1481,7 @@ mod sso_gating {
     use internet_identity_interface::internet_identity::types::{
         AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
         AuthnMethodSecuritySettings, IdRegFinishError, OpenIDRegFinishArg, PublicKeyAuthn,
-        RegistrationFlowNextStep, SsoDiscoveryState,
+        RegistrationFlowNextStep, SsoDiscoveryStatus,
     };
 
     const GATE_DOMAIN: &str = "gate.example.org";
@@ -1622,7 +1621,6 @@ mod sso_gating {
 
     fn install(env: &PocketIc) -> Principal {
         let args = InternetIdentityInit {
-            sso_discoverable_domains: Some(vec![GATE_DOMAIN.to_string()]),
             canister_creation_cycles_cost: Some(0),
             ..Default::default()
         };
@@ -2217,7 +2215,7 @@ mod sso_gating {
         )
         .unwrap()
         {
-            SsoDiscoveryState::Resolved(d) => d,
+            SsoDiscoveryStatus::Resolved(d) => d,
             other => panic!("expected Resolved, got {other:?}"),
         };
 

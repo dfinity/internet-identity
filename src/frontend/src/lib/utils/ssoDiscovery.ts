@@ -35,14 +35,14 @@ export interface SsoDiscoveryResult {
 }
 
 /**
- * Raised when a domain's SSO configuration can't be resolved: the canister
- * rejected the domain (`rejected`) or the resolution didn't complete in time
+ * Raised when a domain's SSO configuration can't be resolved: the origin is
+ * gated off (`origin-denied`) or the resolution didn't complete in time
  * (`timeout`).
  */
 export class DomainNotConfiguredError extends Error {
-  readonly reason: "rejected" | "timeout" | "origin-denied";
+  readonly reason: "timeout" | "origin-denied";
 
-  constructor(reason: "rejected" | "timeout" | "origin-denied") {
+  constructor(reason: "timeout" | "origin-denied") {
     super(`SSO discovery failed (${reason})`);
     this.name = "DomainNotConfiguredError";
     this.reason = reason;
@@ -79,7 +79,7 @@ const isLoopbackHost = (host: string): boolean => {
  * Validate domain input format (DNS name). Loopback hosts (`localhost` and
  * `127.0.0.1`, with or without a port) skip the DNS-format check so e2e tests
  * can use `localhost:11107` without widening the regex. The canister's
- * `sso_discoverable_domains` allowlist is the actual trust gate.
+ * bare-authority check on the domain is the actual trust gate.
  *
  * @throws {Error} when `domain` is not a valid DNS name.
  */
@@ -138,14 +138,13 @@ const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
 
 /**
  * Resolve a domain's SSO configuration. Validates the domain, then polls
- * `get_sso_discovery` (query) for the state; on `Pending` it drives the fetch
- * with `discover_sso` (update) and polls again. An optional `signal` cancels
- * the poll (the input debounce drops a stale lookup when the user keeps typing).
+ * `get_sso_discovery_status` (query); on `Pending` it drives the fetch with
+ * `discover_sso` (update) and polls again. An optional `signal` cancels the poll
+ * (the input debounce drops a stale lookup when the user keeps typing).
  *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
- * @throws {DomainNotConfiguredError} when the domain isn't allowed
- *   (`NotAllowed`), the origin is denied (`origin-denied`), or the resolution
- *   times out.
+ * @throws {DomainNotConfiguredError} when the origin is denied (`origin-denied`)
+ *   or the resolution times out.
  */
 export const discoverSsoConfig = async (
   domain: string,
@@ -159,16 +158,13 @@ export const discoverSsoConfig = async (
     if (isAborted(signal)) {
       throw new Error("SSO discovery aborted");
     }
-    // Read the discovery state via the cheap query.
-    const state = await anonymousActor.get_sso_discovery(
-      validatedDomain,
-      originArg,
-    );
-    if ("Resolved" in state) {
-      return toResult(state.Resolved);
-    }
-    if ("NotAllowed" in state) {
-      throw new DomainNotConfiguredError("rejected");
+    // Read the discovery status via the cheap query.
+    const status = await anonymousActor.get_sso_discovery_status({
+      org_domain: validatedDomain,
+      target_app_origin: originArg,
+    });
+    if ("Resolved" in status) {
+      return toResult(status.Resolved);
     }
     // Re-check before the update: the query above may have spanned an abort,
     // and we don't want to drive a fetch for a lookup the user already dropped.

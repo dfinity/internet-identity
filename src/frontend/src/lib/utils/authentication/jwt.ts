@@ -50,13 +50,13 @@ export const authenticateWithSso = async ({
   const sessionKey = new Uint8Array(session.identity.getPublicKey().toDer());
 
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-    const prepared = await actor.sso_prepare_delegation(
+    const prepared = await actor.sso_prepare_delegation({
       jwt,
-      session.salt,
-      sessionKey,
-      discoveryDomain,
-      origin,
-    );
+      salt: session.salt,
+      session_key: sessionKey,
+      org_domain: discoveryDomain,
+      target_app_origin: origin,
+    });
     if ("Pending" in prepared) {
       await pollDelay();
       continue;
@@ -68,15 +68,15 @@ export const authenticateWithSso = async ({
       sso_attr_bundle: ssoAttrBundle,
     } = await throwCanisterError(prepared);
 
-    const delegation = await actor.sso_get_delegation(
+    const delegation = await actor.sso_get_delegation({
       jwt,
-      session.salt,
-      sessionKey,
+      salt: session.salt,
+      session_key: sessionKey,
       expiration,
-      discoveryDomain,
-      origin,
-      ssoAttrBundle,
-    );
+      org_domain: discoveryDomain,
+      target_app_origin: origin,
+      sso_attr_bundle: ssoAttrBundle,
+    });
     if ("Pending" in delegation) {
       await pollDelay();
       continue;

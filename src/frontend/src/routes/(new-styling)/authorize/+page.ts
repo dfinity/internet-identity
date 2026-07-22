@@ -32,11 +32,11 @@ export const load: PageLoad = ({ url }) => {
     if (trimmed.length === 0) {
       throw redirect(307, "/authorize");
     }
-    // No client-side allowlist check — the canister's `discover_sso` is the
-    // trust boundary and rejects anything not on `sso_discoverable_domains`. A
-    // non-allowlisted `?sso=` URL surfaces as the error page rather than
-    // silently falling back, which is the right signal: the dapp built the URL
-    // pointing at a domain II hasn't blessed.
+    // No client-side domain check — the canister's `discover_sso` is the trust
+    // boundary and rejects a malformed (non-bare-authority) domain. A bad `?sso=`
+    // URL surfaces as the error page rather than silently falling back, which is
+    // the right signal: the dapp built the URL pointing at a domain that can't
+    // resolve.
     // A dapp that uses a derivation origin passes it here so the ceremony can
     // route to the per-app client at initiate; it can't be learned from the
     // channel because it only rides the later delegation request.

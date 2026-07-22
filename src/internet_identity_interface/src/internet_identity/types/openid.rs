@@ -1,5 +1,6 @@
 use crate::internet_identity::types::{
-    AnchorNumber, MetadataEntryV2, SignedDelegation, Timestamp, UserKey,
+    AnchorNumber, FrontendHostname, MetadataEntryV2, SessionKey, SignedDelegation, Timestamp,
+    UserKey,
 };
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
@@ -49,6 +50,28 @@ pub struct OpenIdPrepareDelegationResponse {
     pub user_key: UserKey,
     pub expiration: Timestamp,
     pub anchor_number: AnchorNumber,
+}
+
+/// Request for `sso_prepare_delegation`.
+#[derive(CandidType, Debug, Deserialize)]
+pub struct SsoPrepareDelegationRequest {
+    pub jwt: String,
+    pub salt: [u8; 32],
+    pub session_key: SessionKey,
+    pub org_domain: String,
+    pub target_app_origin: FrontendHostname,
+}
+
+/// Request for `sso_get_delegation`.
+#[derive(CandidType, Debug, Deserialize)]
+pub struct SsoGetDelegationRequest {
+    pub jwt: String,
+    pub salt: [u8; 32],
+    pub session_key: SessionKey,
+    pub expiration: Timestamp,
+    pub org_domain: String,
+    pub target_app_origin: FrontendHostname,
+    pub sso_attr_bundle: ByteBuf,
 }
 
 /// Response of `sso_prepare_delegation`.

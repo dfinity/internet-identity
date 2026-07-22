@@ -148,11 +148,9 @@
         </Tooltip>
       {/each}
       <!--
-        SSO entry is always rendered. The allowed domains are enforced on the
-        backend by the `sso_discoverable_domains` allowlist (init arg, falling
-        back to the `is_production`-keyed defaults in
-        `allowed_discovery_domains`) checked inside `discover_sso`. Disallowed
-        domains surface as an error inside the SignInWithSso screen rather than
+        SSO entry is always rendered. The domain is validated on the backend
+        (a bare-authority check inside `discover_sso`); a malformed domain
+        surfaces as an error inside the SignInWithSso screen rather than
         being gated here — we keep this option visible so users know the
         mechanism exists.
       -->
