@@ -11,15 +11,6 @@ export type ConsentOutcome =
   | { type: "consent"; consent: AttributeConsent }
   | { type: "restart" };
 
-/**
- * Block until either the user commits their choice on the consent screen, or
- * they switch identity. The consent screen keeps the identity switcher live,
- * and switching clears the authorization (dropping back to account selection
- * for the new identity) — the `authorizedStore` entry changes away from
- * `baseline`. The consent handler uses `"restart"` to re-resolve from
- * scratch for the newly selected identity instead of certifying the previous
- * identity's selections.
- */
 export const waitForConsentOrRestart = (
   baseline: Authorized,
 ): Promise<ConsentOutcome> =>

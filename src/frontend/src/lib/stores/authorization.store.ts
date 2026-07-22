@@ -45,9 +45,6 @@ export const authorizationStore = {
   ): void => {
     authorizedInternal.set({ accountNumberPromise, accessLevel });
   },
-  /** Clear the authorization outcome without touching the effective origin
-   *  or flow. Switching identity on the consent screen uses this to drop
-   *  back to account selection for the newly selected identity. */
   reset: (): void => {
     authorizedInternal.set(undefined);
   },

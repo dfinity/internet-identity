@@ -277,9 +277,6 @@ export const handleLegacyAttributes =
 type ConsentPipeline = {
   accountNumberPromise: Promise<bigint | undefined>;
   authenticated: Authenticated;
-  /** The authorization entry this pipeline was resolved against. Switching
-   *  identity mid-consent re-authorizes, producing a fresh entry — the
-   *  consent handler compares against this reference to detect the switch. */
   authorized: Authorized;
   origin: string;
   unmappedOrigin: string;
@@ -666,19 +663,13 @@ export const handleIcrc3ConsentAttributes =
         }
 
         // Only unscoped email/verified_email; scoped keys are pinned to
-        // a source that the inline verify wizard can't satisfy. Requested
-        // keys don't change across an identity switch, so compute once.
+        // a source that the inline verify wizard can't satisfy.
         const emailRequested = requestedKeys.some((key) => {
           if (extractScope(key) !== undefined) return false;
           const name = extractAttributeName(key);
           return name === "email" || name === "verified_email";
         });
 
-        // Switching identity on the consent screen clears the authorization
-        // and drops back to account selection, which restarts this loop:
-        // once the new identity re-authorizes, re-resolve its available
-        // attributes and repaint the screen from scratch so the previous
-        // identity's selections are never carried over or certified.
         for (;;) {
           // Kick off the pipeline but don't await it yet — we want to set the
           // consent context synchronously from the (still-pending) promise so

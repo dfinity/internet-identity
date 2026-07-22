@@ -426,9 +426,6 @@
 
 {#snippet attributeConsentContent()}
   {#if $attributeConsentStore !== undefined}
-    <!-- Re-key on the context promise: switching identity mid-consent
-         re-seeds it, remounting the view so selections rebuild fresh for
-         the newly selected identity instead of persisting. -->
     {#key $attributeConsentStore}
       <AttributeConsentView
         context={$attributeConsentStore}

@@ -221,10 +221,6 @@
       isAuthenticating = false;
     }
   };
-  // The OpenID consent screen has no account-selection step to fall back
-  // to (the page keeps consent mounted for `openid-resume` even before
-  // authorization), so switching there authorizes the new identity's
-  // default account directly. Full access — no access-level toggle.
   const authorizeDefault = async () => {
     try {
       const { identityNumber, actor } = $authenticationStore!;
@@ -296,12 +292,6 @@
                 identities={lastUsedIdentities}
                 onSwitchIdentity={async (identityNumber) => {
                   await handleSignIn(identityNumber);
-                  // Drop back to account selection for the newly selected
-                  // identity instead of re-authorizing straight into
-                  // consent — the user may want a different account or to
-                  // not continue at all. The OpenID consent flow has no
-                  // account-selection screen, so authorize its default
-                  // account directly instead.
                   if (flow === "openid-resume") {
                     await authorizeDefault();
                   } else {
