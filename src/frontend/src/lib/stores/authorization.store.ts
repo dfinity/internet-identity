@@ -88,6 +88,15 @@ export const authorizationContextStore: Readable<
   return { ...context, effectiveOrigin: context.effectiveOrigin };
 });
 
+/** Non-throwing view of the app's requested session duration (`maxTimeToLive`,
+ *  nanoseconds), or `undefined` until it's known. Unlike
+ *  {@link authorizationContextStore}, this never throws when the effective
+ *  origin hasn't been set yet, so the sign-in screen can read it safely even
+ *  during a transient render before the authorization context is established
+ *  (reading the throwing store there crashes the page render). */
+export const requestedMaxTimeToLiveStore: Readable<bigint | undefined> =
+  derived(contextInternal, (context) => context?.maxTimeToLive);
+
 /** Store that holds the authorization outcome once the user has authorized. */
 export const authorizedStore: Readable<Authorized | undefined> = {
   subscribe: authorizedInternal.subscribe,

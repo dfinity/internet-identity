@@ -35,6 +35,7 @@
   import {
     authorizationContextStore,
     authorizationStore,
+    requestedMaxTimeToLiveStore,
   } from "$lib/stores/authorization.store";
   import { decodeJWT, findConfig, selectAuthScopes } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
@@ -445,7 +446,7 @@
   <ContinueView
     effectiveOrigin={$authorizationContextStore.effectiveOrigin}
     displayOrigin={$establishedChannelStore.origin}
-    requestedMaxTimeToLive={$authorizationContextStore.maxTimeToLive}
+    requestedMaxTimeToLive={$requestedMaxTimeToLiveStore}
     onAuthorize={handleAuthorize}
   />
 {/snippet}
