@@ -360,22 +360,18 @@ pub fn get_sso_discovery(domain: &str, origin: Option<&str>) -> SsoDiscoveryStat
         return SsoDiscoveryState::NotAllowed;
     }
     match sso::peek_discovery(domain) {
-        Cached::Ready(cfg) => {
+        Cached::Ready(discovery_config) => {
             let resolved_client_id = match origin {
-                None => Some(cfg.client_id.clone()),
-                Some(origin) => match cfg.resolve_client_for_origin(origin) {
-                    sso::ClientResolution::PerApp(client)
-                    | sso::ClientResolution::Primary(client) => Some(client),
-                    sso::ClientResolution::NotAllowed => None,
-                },
+                None => Some(discovery_config.client_id.clone()),
+                Some(origin) => discovery_config.resolve_client_for_origin(origin).ok(),
             };
             SsoDiscoveryState::Resolved(SsoDiscovery {
                 discovery_domain: domain.to_ascii_lowercase(),
-                client_id: cfg.client_id,
-                issuer: cfg.issuer,
-                authorization_endpoint: cfg.authorization_endpoint,
-                scopes: cfg.scopes,
-                name: cfg.name,
+                client_id: discovery_config.client_id,
+                issuer: discovery_config.issuer,
+                authorization_endpoint: discovery_config.authorization_endpoint,
+                scopes: discovery_config.scopes,
+                name: discovery_config.name,
                 resolved_client_id,
             })
         }

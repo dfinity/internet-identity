@@ -180,16 +180,9 @@ impl AppClientKey {
     }
 }
 
-/// How an origin resolves against a domain's declared clients.
+/// An origin denied under `gate_all_apps` (not listed in `app_clients`).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum ClientResolution {
-    /// Origin listed in `app_clients`, served by this per-app client.
-    PerApp(String),
-    /// Origin unlisted and `gate_all_apps` off — served by the primary client.
-    Primary(String),
-    /// Origin unlisted and `gate_all_apps` on — denied.
-    NotAllowed,
-}
+pub(super) struct Forbidden;
 
 /// Parse the raw `app_clients` map, rejecting (never truncating) a map over
 /// `MAX_APP_CLIENTS` — truncation could silently drop a gated origin into the
@@ -220,17 +213,19 @@ pub(super) fn validate_app_clients(
 }
 
 impl DiscoveredConfig {
-    /// Resolve `origin` to the client that serves it.
-    pub(super) fn resolve_client_for_origin(&self, origin: &str) -> ClientResolution {
+    /// The client id `origin` signs in against: its per-app client if listed in
+    /// `app_clients`, else the org's primary client — unless `gate_all_apps`
+    /// denies an unlisted origin (`Forbidden`).
+    pub(super) fn resolve_client_for_origin(&self, origin: &str) -> Result<String, Forbidden> {
         for app in &self.app_clients {
             if app.key.matches(origin) {
-                return ClientResolution::PerApp(app.client_id.clone());
+                return Ok(app.client_id.clone());
             }
         }
         if self.gate_all_apps {
-            ClientResolution::NotAllowed
+            Err(Forbidden)
         } else {
-            ClientResolution::Primary(self.client_id.clone())
+            Ok(self.client_id.clone())
         }
     }
 }
@@ -1021,11 +1016,11 @@ mod tests {
         };
         assert_eq!(
             discovery_config.resolve_client_for_origin("https://payroll.com"),
-            ClientResolution::PerApp("0oaPAYROLL".to_string())
+            Ok("0oaPAYROLL".to_string())
         );
         assert_eq!(
             discovery_config.resolve_client_for_origin("https://public.app"),
-            ClientResolution::Primary("client-123".to_string())
+            Ok("client-123".to_string())
         );
     }
 
@@ -1049,11 +1044,11 @@ mod tests {
         };
         assert_eq!(
             discovery_config.resolve_client_for_origin(origin),
-            ClientResolution::PerApp("0oaCHAT".to_string())
+            Ok("0oaCHAT".to_string())
         );
         assert_eq!(
             discovery_config.resolve_client_for_origin("https://evil.app"),
-            ClientResolution::Primary("client-123".to_string())
+            Ok("client-123".to_string())
         );
     }
 
@@ -1069,11 +1064,11 @@ mod tests {
         };
         assert_eq!(
             discovery_config.resolve_client_for_origin("https://payroll.com"),
-            ClientResolution::PerApp("0oaPAYROLL".to_string())
+            Ok("0oaPAYROLL".to_string())
         );
         assert_eq!(
             discovery_config.resolve_client_for_origin("https://public.app"),
-            ClientResolution::NotAllowed
+            Err(Forbidden)
         );
     }
 

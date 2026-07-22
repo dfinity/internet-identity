@@ -23,11 +23,17 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegF
 pub struct VerifiedSsoLogin {
     pub credential: OpenIdCredential,
     pub primary_client_id: String,
-    /// True when the origin resolved to a per-app client.
-    pub gated: bool,
     pub stable_identifier_claim: String,
     /// The cross-client-stable identifier; `None` when the claim is `sub`.
     pub stable_id: Option<String>,
+}
+
+impl VerifiedSsoLogin {
+    /// The login used a per-app client (its `sub` is scoped to that client and
+    /// must be bridged via the stable-id index), not the org's primary client.
+    fn is_gated(&self) -> bool {
+        self.credential.aud != self.primary_client_id
+    }
 }
 
 /// Verify an SSO JWT and enforce the gate: the JWT's `aud` must match the client
@@ -47,15 +53,13 @@ pub fn verify_sso_jwt(
         Cached::Ready(discovery_config) => discovery_config,
     };
 
-    let (expected_client, gated) = match discovery_config.resolve_client_for_origin(origin) {
-        sso::ClientResolution::PerApp(client) => (client, true),
-        sso::ClientResolution::Primary(client) => (client, false),
-        sso::ClientResolution::NotAllowed => {
-            return Err(OpenIDJWTVerificationError::GenericError(format!(
+    let expected_client = discovery_config
+        .resolve_client_for_origin(origin)
+        .map_err(|_| {
+            OpenIDJWTVerificationError::GenericError(format!(
                 "origin '{origin}' is denied for domain '{discovery_domain}' (gate_all_apps)"
-            )));
-        }
-    };
+            ))
+        })?;
 
     let keys = match sso::read_jwks(&discovery_config.jwks_uri) {
         Cached::Pending => return Ok(Cached::Pending),
@@ -81,7 +85,6 @@ pub fn verify_sso_jwt(
         stable_id: credential.stable_id.clone(),
         credential,
         primary_client_id: discovery_config.client_id,
-        gated,
         stable_identifier_claim: discovery_config.stable_identifier_claim,
     }))
 }
@@ -122,7 +125,7 @@ pub fn resolve_primary_identity(
         .clone()
         .ok_or(OpenIdDelegationError::JwtVerificationFailed)?;
 
-    let primary_sub = if verification.gated {
+    let primary_sub = if verification.is_gated() {
         let anchor_number = state::storage_borrow(|storage| {
             storage.lookup_anchor_by_sso_stable_id(
                 &verification.credential.iss,
@@ -231,7 +234,7 @@ mod tests {
             Ok(Cached::Ready(v)) => {
                 assert_eq!(v.credential.aud, TEST_AUD);
                 assert_eq!(v.credential.sso_domain, Some(SSO_DOMAIN.to_string()));
-                assert!(!v.gated);
+                assert!(!v.is_gated());
             }
             other => panic!("expected Ready verification, got {other:?}"),
         }
@@ -291,7 +294,6 @@ mod tests {
                 stable_id: None,
             },
             primary_client_id: primary_client_id.to_string(),
-            gated,
             stable_identifier_claim: claim.to_string(),
             stable_id: stable_id.map(str::to_string),
         }
