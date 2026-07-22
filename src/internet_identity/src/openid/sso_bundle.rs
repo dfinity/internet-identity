@@ -2,13 +2,14 @@
 //! string:
 //!
 //! ```text
-//! b"ii-sso-attr-v1"                    domain separator + version
+//! b"ii-sso-attr"                       domain separator
 //! u64-BE len || sso_domain bytes       SSO discovery domain
 //! u64-BE len || origin bytes           certified dapp origin
 //! u64-BE len || expiry_ns (u64 BE)     bundle expiry, ns since epoch
 //! ```
 
 use super::{calculate_delegation_seed, SSO_ATTR_BUNDLE_TTL_NS};
+use crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN;
 use crate::{state, update_root_hash};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::CanisterSigInputs;
@@ -16,8 +17,13 @@ use ic_cdk::api::time;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 
-/// Domain separator + version for the SSO attribute bundle.
-const SSO_ATTR_BUNDLE_DOMAIN: &[u8] = b"ii-sso-attr-v1";
+/// Domain separator for the SSO attribute bundle signature.
+const SSO_ATTR_BUNDLE_DOMAIN: &[u8] = b"ii-sso-attr";
+
+/// Max accepted size of an attached bundle payload (`sender_info`). A real
+/// bundle is a few hundred bytes; anything larger is treated as no bundle,
+/// bounding the decode allocation.
+const MAX_SSO_BUNDLE_BYTES: usize = 4096;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsoAttrBundle {
@@ -141,10 +147,12 @@ fn msg_caller_info_signer() -> Option<Principal> {
     Some(Principal::try_from(b.as_slice()).expect("valid principal"))
 }
 
-const MAX_SSO_BUNDLE_BYTES: usize = 4096;
-
 /// The certified SSO attribute bundle attached to this call, if signed by this
 /// canister and not expired.
+///
+/// This is II's internal SSO-session bundle — signed and consumed by II — and is
+/// distinct from the external ICRC-3 certified-attributes bundle that carries
+/// arbitrary attributes to relying parties.
 ///
 /// A `Some` result only proves II signed the bundle under the caller's credential
 /// seed; the caller MUST still check `bundle.origin` matches the serving origin —
@@ -183,7 +191,7 @@ pub fn prepare_sso_attr_bundle(
     );
     state::signature_map_mut(|sigs| {
         sigs.add_signature(&CanisterSigInputs {
-            domain: crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+            domain: ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
             seed: &seed,
             message: &message,
         });
@@ -207,7 +215,7 @@ pub fn get_sso_attr_bundle_signature(
     );
     state::assets_and_signatures(|certified_assets, sigs| {
         let inputs = CanisterSigInputs {
-            domain: crate::attributes::ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+            domain: ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
             seed: &seed,
             message,
         };
@@ -261,12 +269,12 @@ mod tests {
             decode_sso_attr_bundle(&encoded),
             Err(SsoBundleDecodeError::BadDomain)
         );
-        let mut wrong_version = b"ii-sso-attr-v2".to_vec();
-        wrong_version.extend_from_slice(
+        let mut wrong_domain = b"xx-sso-attr".to_vec();
+        wrong_domain.extend_from_slice(
             &encode_sso_attr_bundle("idp", "https://a.com", 1)[SSO_ATTR_BUNDLE_DOMAIN.len()..],
         );
         assert_eq!(
-            decode_sso_attr_bundle(&wrong_version),
+            decode_sso_attr_bundle(&wrong_domain),
             Err(SsoBundleDecodeError::BadDomain)
         );
     }

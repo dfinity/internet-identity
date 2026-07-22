@@ -1541,14 +1541,13 @@ mod openid_api {
     ) -> OpenIdResult<(), OpenIdCredentialAddError> {
         let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
         openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential =
-            match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
-                Ok(openid::Cached::Ready(credential)) => credential,
-                // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
-                // frontend retries the call.
-                Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
-                Err(err) => return OpenIdResult::Err(err.into()),
-            };
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            // SSO discovery/JWKS isn't cached yet; the fetch is in flight. The
+            // frontend retries the call.
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
         let now_ns = ic_cdk::api::time();
         let outcome = anchor_operation_with_authz_check(identity_number, |anchor| {
             add_openid_credential(anchor, openid_credential, now_ns)
@@ -1596,12 +1595,11 @@ mod openid_api {
         // ready.
         let discovery_domain = openid::canonical_discovery_domain_opt(discovery_domain);
         openid::prefetch_sso(discovery_domain.as_deref());
-        let openid_credential =
-            match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
-                Ok(openid::Cached::Ready(credential)) => credential,
-                Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
-                Err(err) => return OpenIdResult::Err(err.into()),
-            };
+        let openid_credential = match openid::verify_jwt(&jwt, &salt, discovery_domain.as_deref()) {
+            Ok(openid::Cached::Ready(credential)) => credential,
+            Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+            Err(err) => return OpenIdResult::Err(err.into()),
+        };
         // The verified credential already carries the SSO stable identifier, so
         // the anchor write below reconciles the stable-id index — an existing
         // anchor self-heals on a normal sign-in.

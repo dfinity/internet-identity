@@ -1,8 +1,16 @@
-//! SSO per-app gating and primary-identity resolution: verify an SSO JWT
-//! against the origin's resolved client and bridge per-app logins to the
-//! primary identity via the storage-maintained SSO stable-id index (keyed on
-//! the primary credential's `stable_id`, which the anchor `write()` reconciles
-//! into the index).
+//! Per-app SSO gating. An org has one *primary* OIDC client — the one a user's
+//! anchor is keyed on — plus optional *per-app* clients, one per gated dapp.
+//!
+//! The problem: a gated dapp signs in against its own per-app client, so the
+//! token's identity (`aud`, and for pairwise orgs like Entra the `sub`) is
+//! scoped to that client, not the primary one the anchor is keyed on. A gated
+//! login therefore can't be matched to the anchor directly.
+//!
+//! This file bridges the two: (a) it verifies the SSO JWT against the client the
+//! origin resolves to (the gate), then (b) maps the login to the primary
+//! identity via the storage-maintained SSO stable-id index — keyed on the
+//! primary credential's cross-client-stable `stable_id`, which the anchor
+//! `write()` reconciles into the index.
 
 use super::{sso, verify, Cached, OpenIDJWTVerificationError, OpenIdCredential};
 use crate::state;
@@ -12,7 +20,7 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegF
 /// A verified SSO login. `credential.aud` is the resolved (per-app or primary)
 /// client; `primary_client_id` is always the primary, on which identity is keyed.
 #[derive(Debug)]
-pub struct SsoVerification {
+pub struct VerifiedSsoLogin {
     pub credential: OpenIdCredential,
     pub primary_client_id: String,
     /// True when the origin resolved to a per-app client.
@@ -31,15 +39,15 @@ pub fn verify_sso_jwt(
     salt: &[u8; 32],
     discovery_domain: &str,
     origin: &str,
-) -> Result<Cached<SsoVerification>, OpenIDJWTVerificationError> {
+) -> Result<Cached<VerifiedSsoLogin>, OpenIDJWTVerificationError> {
     sso::validate_allowed_discovery_domain(discovery_domain)
         .map_err(OpenIDJWTVerificationError::GenericError)?;
-    let cfg = match sso::peek_discovery(discovery_domain) {
+    let discovery_config = match sso::peek_discovery(discovery_domain) {
         Cached::Pending => return Ok(Cached::Pending),
-        Cached::Ready(cfg) => cfg,
+        Cached::Ready(discovery_config) => discovery_config,
     };
 
-    let (expected_client, gated) = match cfg.resolve_client_for_origin(origin) {
+    let (expected_client, gated) = match discovery_config.resolve_client_for_origin(origin) {
         sso::ClientResolution::PerApp(client) => (client, true),
         sso::ClientResolution::Primary(client) => (client, false),
         sso::ClientResolution::NotAllowed => {
@@ -49,30 +57,32 @@ pub fn verify_sso_jwt(
         }
     };
 
-    let keys = match sso::read_jwks(&cfg.jwks_uri) {
+    let keys = match sso::read_jwks(&discovery_config.jwks_uri) {
         Cached::Pending => return Ok(Cached::Pending),
         Cached::Ready(keys) => keys,
     };
 
     let descriptor = verify::Descriptor {
-        issuer: cfg.issuer.clone(),
+        issuer: discovery_config.issuer.clone(),
         client_id: expected_client.clone(),
         sso: Some(verify::SsoProvider {
             domain: discovery_domain.to_string(),
-            name: cfg.name.clone(),
-            stable_identifier_claim: sso::non_default_stable_claim(&cfg.stable_identifier_claim),
+            name: discovery_config.name.clone(),
+            stable_identifier_claim: sso::non_default_stable_claim(
+                &discovery_config.stable_identifier_claim,
+            ),
         }),
     };
     // `verify_and_build` extracts the stable id (and enforces its length cap)
     // from the claim above, so the credential already carries it.
     let credential = verify::verify_and_build(jwt, &descriptor, &keys, salt)?;
 
-    Ok(Cached::Ready(SsoVerification {
+    Ok(Cached::Ready(VerifiedSsoLogin {
         stable_id: credential.stable_id.clone(),
         credential,
-        primary_client_id: cfg.client_id,
+        primary_client_id: discovery_config.client_id,
         gated,
-        stable_identifier_claim: cfg.stable_identifier_claim,
+        stable_identifier_claim: discovery_config.stable_identifier_claim,
     }))
 }
 
@@ -93,7 +103,7 @@ pub struct SsoPrimaryIdentity {
 /// `write()`), so this fails safe. The caller persists `credential` through the
 /// normal anchor `write()`, which reconciles the index.
 pub fn resolve_primary_identity(
-    verification: &SsoVerification,
+    verification: &VerifiedSsoLogin,
 ) -> Result<SsoPrimaryIdentity, OpenIdDelegationError> {
     let is_sub = verification.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM;
     if is_sub {
@@ -254,7 +264,7 @@ mod tests {
         claim: &str,
         sub: &str,
         stable_id: Option<&str>,
-    ) -> SsoVerification {
+    ) -> VerifiedSsoLogin {
         sso_verification_with_client(gated, claim, sub, stable_id, "primary")
     }
 
@@ -264,8 +274,8 @@ mod tests {
         sub: &str,
         stable_id: Option<&str>,
         primary_client_id: &str,
-    ) -> SsoVerification {
-        SsoVerification {
+    ) -> VerifiedSsoLogin {
+        VerifiedSsoLogin {
             credential: OpenIdCredential {
                 iss: "https://idp".to_string(),
                 sub: sub.to_string(),

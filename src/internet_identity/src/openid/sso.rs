@@ -21,6 +21,11 @@ use identity_jose::jwk::Jwk;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 
+/// Default for the well-known's optional `stable_identifier_claim`. `sub` is the
+/// OIDC subject claim; when an org's `sub` is the same across its OIDC clients,
+/// II keys identity on it directly (no bridge). An org with a pairwise `sub`
+/// (a different value per client, e.g. Entra) overrides this with a claim that
+/// is stable across clients (e.g. `oid`).
 pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
 
 /// The non-default stable-identifier claim, or `None` for a `sub` org (which
@@ -29,6 +34,10 @@ pub(super) fn non_default_stable_claim(claim: &str) -> Option<String> {
     (claim != DEFAULT_STABLE_IDENTIFIER_CLAIM).then(|| claim.to_string())
 }
 
+/// Max `app_clients` entries accepted from an org's well-known. The parsed map
+/// is retained in the in-memory SSO discovery cache (one per cached domain), so
+/// this bounds its heap footprint there — a generous per-org ceiling. An
+/// over-cap map is rejected, never truncated (see `validate_app_clients`).
 pub(super) const MAX_APP_CLIENTS: usize = 100;
 
 /// Maximum length of an app_clients client_id.
@@ -185,7 +194,7 @@ pub(super) enum ClientResolution {
 /// Parse the raw `app_clients` map, rejecting (never truncating) a map over
 /// `MAX_APP_CLIENTS` — truncation could silently drop a gated origin into the
 /// open fallback.
-pub(super) fn parse_app_clients(
+pub(super) fn validate_app_clients(
     entries: &std::collections::HashMap<String, String>,
 ) -> Result<Vec<AppClient>, String> {
     if entries.len() > MAX_APP_CLIENTS {
@@ -267,8 +276,8 @@ pub(super) fn prefetch(domain: &str) {
     if validate_allowed_discovery_domain(&domain).is_err() {
         return;
     }
-    if let Cached::Ready(cfg) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
-        single_flight_cache::get(&JWKS_CACHE, cfg.jwks_uri);
+    if let Cached::Ready(discovery_config) = single_flight_cache::get(&DISCOVERY_CACHE, domain) {
+        single_flight_cache::get(&JWKS_CACHE, discovery_config.jwks_uri);
     }
 }
 
@@ -300,33 +309,35 @@ pub(super) fn resolve(
     jwt_aud: &AudClaim,
 ) -> Result<Cached<(Descriptor, String)>, OpenIDJWTVerificationError> {
     validate_allowed_discovery_domain(domain).map_err(OpenIDJWTVerificationError::GenericError)?;
-    let cfg = match peek_discovery(domain) {
+    let discovery_config = match peek_discovery(domain) {
         Cached::Pending => return Ok(Cached::Pending),
-        Cached::Ready(cfg) => cfg,
+        Cached::Ready(discovery_config) => discovery_config,
     };
-    if !jwt_aud.matches(&cfg.client_id) {
+    if !jwt_aud.matches(&discovery_config.client_id) {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "JWT audience '{jwt_aud}' does not match discovered client_id '{}' for domain '{domain}'",
-            cfg.client_id
+            discovery_config.client_id
         )));
     }
 
-    if cfg.issuer != jwt_iss {
+    if discovery_config.issuer != jwt_iss {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "JWT issuer '{jwt_iss}' does not match discovered issuer '{}' for domain '{domain}'",
-            cfg.issuer
+            discovery_config.issuer
         )));
     }
     let descriptor = Descriptor {
-        issuer: cfg.issuer,
-        client_id: cfg.client_id,
+        issuer: discovery_config.issuer,
+        client_id: discovery_config.client_id,
         sso: Some(SsoProvider {
             domain: domain.to_string(),
-            name: cfg.name,
-            stable_identifier_claim: non_default_stable_claim(&cfg.stable_identifier_claim),
+            name: discovery_config.name,
+            stable_identifier_claim: non_default_stable_claim(
+                &discovery_config.stable_identifier_claim,
+            ),
         }),
     };
-    Ok(Cached::Ready((descriptor, cfg.jwks_uri)))
+    Ok(Cached::Ready((descriptor, discovery_config.jwks_uri)))
 }
 
 /// Read the cached SSO JWKs for `jwks_uri`. Peek-only.
@@ -525,7 +536,7 @@ async fn discovery_fill(domain: String) -> Result<DiscoveredConfig, String> {
     let ii_config = fetch_ii_openid_configuration(hop1_url).await?;
     validate_discovery_url(&ii_config.openid_configuration)?;
 
-    let app_clients = parse_app_clients(&ii_config.app_clients)?;
+    let app_clients = validate_app_clients(&ii_config.app_clients)?;
     let stable_identifier_claim = ii_config
         .stable_identifier_claim
         .clone()
@@ -771,7 +782,11 @@ fn validate_same_host(reference_url: &str, other_url: &str) -> Result<(), String
 /// Test-only: reset the SSO caches and warm `domain`'s discovery + JWKS from an
 /// injected `DiscoveredConfig`.
 #[cfg(test)]
-pub(super) fn test_setup_discovery(domain: &str, cfg: DiscoveredConfig, jwks: Vec<Jwk>) {
+pub(super) fn test_setup_discovery(
+    domain: &str,
+    discovery_config: DiscoveredConfig,
+    jwks: Vec<Jwk>,
+) {
     use crate::single_flight_cache::{run_detached, set_test_now};
     set_test_now(1_700_000_000);
     DISCOVERY_CACHE.with(|c| *c.borrow_mut() = new_discovery_cache());
@@ -780,11 +795,11 @@ pub(super) fn test_setup_discovery(domain: &str, cfg: DiscoveredConfig, jwks: Ve
     tests::TEST_ALLOW_ANY.with_borrow_mut(|b| *b = false);
     tests::TEST_DISCOVERY.with_borrow_mut(|m| {
         m.clear();
-        m.insert(domain.to_string(), cfg.clone());
+        m.insert(domain.to_string(), discovery_config.clone());
     });
     tests::TEST_JWKS.with_borrow_mut(|m| {
         m.clear();
-        m.insert(cfg.jwks_uri.clone(), jwks);
+        m.insert(discovery_config.jwks_uri.clone(), jwks);
     });
     // First pass warms discovery; the second warms JWKS now that discovery is Ready.
     prefetch(domain);
@@ -965,7 +980,9 @@ mod tests {
         assert_eq!(peek_discovery("example.org"), Cached::Pending);
         run_detached();
         match peek_discovery("example.org") {
-            Cached::Ready(cfg) => assert_eq!(cfg.issuer, "https://idp.example.org"),
+            Cached::Ready(discovery_config) => {
+                assert_eq!(discovery_config.issuer, "https://idp.example.org")
+            }
             other => panic!("expected Ready, got {other:?}"),
         }
     }
@@ -989,7 +1006,7 @@ mod tests {
 
     #[test]
     fn app_client_cleartext_resolution() {
-        let cfg = DiscoveredConfig {
+        let discovery_config = DiscoveredConfig {
             app_clients: vec![
                 AppClient {
                     key: AppClientKey::Cleartext("https://payroll.com".to_string()),
@@ -1003,11 +1020,11 @@ mod tests {
             ..sample_config()
         };
         assert_eq!(
-            cfg.resolve_client_for_origin("https://payroll.com"),
+            discovery_config.resolve_client_for_origin("https://payroll.com"),
             ClientResolution::PerApp("0oaPAYROLL".to_string())
         );
         assert_eq!(
-            cfg.resolve_client_for_origin("https://public.app"),
+            discovery_config.resolve_client_for_origin("https://public.app"),
             ClientResolution::Primary("client-123".to_string())
         );
     }
@@ -1020,7 +1037,7 @@ mod tests {
         hasher.update(origin.as_bytes());
         hasher.update(salt.as_bytes());
         let hash = hex::encode(hasher.finalize());
-        let cfg = DiscoveredConfig {
+        let discovery_config = DiscoveredConfig {
             app_clients: vec![AppClient {
                 key: AppClientKey::Hashed {
                     hash: hash.clone(),
@@ -1031,18 +1048,18 @@ mod tests {
             ..sample_config()
         };
         assert_eq!(
-            cfg.resolve_client_for_origin(origin),
+            discovery_config.resolve_client_for_origin(origin),
             ClientResolution::PerApp("0oaCHAT".to_string())
         );
         assert_eq!(
-            cfg.resolve_client_for_origin("https://evil.app"),
+            discovery_config.resolve_client_for_origin("https://evil.app"),
             ClientResolution::Primary("client-123".to_string())
         );
     }
 
     #[test]
     fn gate_all_apps_default_deny() {
-        let cfg = DiscoveredConfig {
+        let discovery_config = DiscoveredConfig {
             app_clients: vec![AppClient {
                 key: AppClientKey::Cleartext("https://payroll.com".to_string()),
                 client_id: "0oaPAYROLL".to_string(),
@@ -1051,11 +1068,11 @@ mod tests {
             ..sample_config()
         };
         assert_eq!(
-            cfg.resolve_client_for_origin("https://payroll.com"),
+            discovery_config.resolve_client_for_origin("https://payroll.com"),
             ClientResolution::PerApp("0oaPAYROLL".to_string())
         );
         assert_eq!(
-            cfg.resolve_client_for_origin("https://public.app"),
+            discovery_config.resolve_client_for_origin("https://public.app"),
             ClientResolution::NotAllowed
         );
     }
@@ -1067,14 +1084,14 @@ mod tests {
             entries.insert(format!("https://app{i}.com"), format!("client{i}"));
         }
         assert!(entries.len() > MAX_APP_CLIENTS);
-        assert!(parse_app_clients(&entries).is_err());
+        assert!(validate_app_clients(&entries).is_err());
 
         entries.clear();
         for i in 0..MAX_APP_CLIENTS {
             entries.insert(format!("https://app{i}.com"), format!("client{i}"));
         }
         assert_eq!(entries.len(), MAX_APP_CLIENTS);
-        assert!(parse_app_clients(&entries).is_ok());
+        assert!(validate_app_clients(&entries).is_ok());
     }
 
     #[test]
@@ -1084,14 +1101,14 @@ mod tests {
             "https://app.com".to_string(),
             "a".repeat(MAX_APP_CLIENT_ID_LENGTH + 1),
         );
-        assert!(parse_app_clients(&entries).is_err());
+        assert!(validate_app_clients(&entries).is_err());
 
         entries.clear();
         entries.insert(
             "https://app.com".to_string(),
             "a".repeat(MAX_APP_CLIENT_ID_LENGTH),
         );
-        assert!(parse_app_clients(&entries).is_ok());
+        assert!(validate_app_clients(&entries).is_ok());
     }
 
     #[test]
