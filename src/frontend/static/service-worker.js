@@ -39,18 +39,22 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(hostname, {
       body: title !== "" && body !== "" ? `${title} — ${body}` : title || body,
       tag: hostname,
-      data: { origin: alert.hostname || null },
+      data: { origin: alert.hostname || null, url: alert.url || null },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const origin = event.notification.data && event.notification.data.origin;
+  const data = event.notification.data || {};
+  const origin = data.origin;
   if (!origin) {
     return;
   }
   const dest = new URL("/notify", self.location.origin);
-  dest.searchParams.set("to", origin);
+  dest.searchParams.set("origin", origin);
+  if (data.url) {
+    dest.searchParams.set("to", data.url);
+  }
   event.waitUntil(self.clients.openWindow(dest.href));
 });

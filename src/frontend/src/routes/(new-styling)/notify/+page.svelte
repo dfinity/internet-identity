@@ -8,7 +8,8 @@
 
   type Status = "checking" | "redirecting" | "denied";
   let status = $state<Status>("checking");
-  let targetOrigin = $state<string | undefined>(undefined);
+  let senderOrigin = $state<string | undefined>(undefined);
+  let destination = $state<string | undefined>(undefined);
 
   const parseOrigin = (raw: string | null): string | undefined => {
     if (raw === null || raw.length === 0) return undefined;
@@ -17,6 +18,20 @@
     } catch {
       return undefined;
     }
+  };
+
+  const resolveDestination = (
+    origin: string,
+    raw: string | null,
+  ): string | undefined => {
+    if (raw === null || raw.length === 0) return origin;
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return undefined;
+    }
+    return url.origin === origin ? url.href : undefined;
   };
 
   const isConsentedOrigin = async (origin: string): Promise<boolean> => {
@@ -38,23 +53,28 @@
 
   onMount(() => {
     void (async () => {
-      const origin = parseOrigin(
-        new URL(window.location.href).searchParams.get("to"),
-      );
-      if (origin === undefined || !(await isConsentedOrigin(origin))) {
+      const params = new URL(window.location.href).searchParams;
+      const origin = parseOrigin(params.get("origin"));
+      if (origin === undefined) {
         status = "denied";
         return;
       }
-      targetOrigin = origin;
+      const target = resolveDestination(origin, params.get("to"));
+      if (target === undefined || !(await isConsentedOrigin(origin))) {
+        status = "denied";
+        return;
+      }
+      senderOrigin = origin;
+      destination = target;
       status = "redirecting";
     })();
   });
 
   $effect(() => {
-    if (status !== "redirecting" || targetOrigin === undefined) return;
-    const destination = targetOrigin;
+    if (status !== "redirecting" || destination === undefined) return;
+    const dest = destination;
     const timer = setTimeout(() => {
-      window.location.href = destination;
+      window.location.href = dest;
     }, 2500);
     return () => clearTimeout(timer);
   });
@@ -64,8 +84,8 @@
   <div class="flex min-h-[100dvh] flex-col items-center justify-center">
     <ProgressRing class="text-fg-tertiary size-8" />
   </div>
-{:else if status === "redirecting" && targetOrigin !== undefined}
-  <NotifyRedirectView origin={targetOrigin} />
+{:else if status === "redirecting" && senderOrigin !== undefined}
+  <NotifyRedirectView origin={senderOrigin} />
 {:else}
   <div
     class="flex min-h-[100dvh] flex-col items-center justify-center px-8 text-center"
