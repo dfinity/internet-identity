@@ -23,9 +23,9 @@ import type { ChannelError } from "$lib/stores/channelStore";
 import {
   type AttributeGroup,
   type AvailableAttribute,
+  attributeConsentResultStore,
   attributeConsentStore,
 } from "$lib/stores/attributeConsent.store";
-import { waitForConsentOrRestart } from "./consentRestart";
 
 /** Extract the attribute name from a fully scoped key.
  *  e.g., "openid:https://accounts.google.com:email" → "email" */
@@ -713,7 +713,17 @@ export const handleIcrc3ConsentAttributes =
             attributeSpecs = [];
             attributeConsentStore.setConsent({ attributes: [] });
           } else {
-            const outcome = await waitForConsentOrRestart(pipeline.authorized);
+            const outcome = await Promise.race([
+              waitForStore(attributeConsentResultStore).then((consent) => ({
+                type: "consent" as const,
+                consent,
+              })),
+              waitForStore(authorizedStore, (authorized) =>
+                authorized !== pipeline.authorized
+                  ? { type: "restart" as const }
+                  : undefined,
+              ),
+            ]);
             if (outcome.type === "restart") {
               continue;
             }

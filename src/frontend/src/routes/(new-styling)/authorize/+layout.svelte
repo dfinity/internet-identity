@@ -292,11 +292,7 @@
                 identities={lastUsedIdentities}
                 onSwitchIdentity={async (identityNumber) => {
                   await handleSignIn(identityNumber);
-                  if (flow === "openid-resume") {
-                    await authorizeDefault();
-                  } else {
-                    authorizationStore.reset();
-                  }
+                  await authorizeDefault();
                 }}
                 onUseAnotherIdentity={() => {
                   isIdentityPopoverOpen = false;

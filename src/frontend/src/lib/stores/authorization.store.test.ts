@@ -19,12 +19,4 @@ describe("authorizationStore.authorize", () => {
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     expect(get(authorizedStore)?.accessLevel).toBe("full-access");
   });
-
-  it("reset() clears the authorization outcome", () => {
-    authorizationStore.authorize(Promise.resolve(BigInt(1)), "full-access");
-    expect(get(authorizedStore)).toBeDefined();
-
-    authorizationStore.reset();
-    expect(get(authorizedStore)).toBeUndefined();
-  });
 });

@@ -45,9 +45,6 @@ export const authorizationStore = {
   ): void => {
     authorizedInternal.set({ accountNumberPromise, accessLevel });
   },
-  reset: (): void => {
-    authorizedInternal.set(undefined);
-  },
   subscribe: contextInternal.subscribe,
 };
 
