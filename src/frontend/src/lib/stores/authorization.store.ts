@@ -34,20 +34,28 @@ const contextInternal = writable<AuthorizationContext | undefined>();
 const authorizedInternal = writable<Authorized | undefined>();
 
 export const authorizationStore = {
-  /** Called by the channel store once the effective origin is resolved. */
-  setEffectiveOrigin: (effectiveOrigin: string): void => {
-    contextInternal.update((context) => ({ ...context, effectiveOrigin }));
+  /** Called by the channel handler once the delegation request is parsed.
+   *  Sets the effective origin and the app's requested session duration in a
+   *  single update: the effective origin is what makes the authorization UI
+   *  render, so setting the requested duration in the *same* update guarantees
+   *  the sign-in screen never renders with the origin known but the requested
+   *  duration (the picker's ceiling) still missing. `maxTimeToLive` is
+   *  `undefined` when the app didn't specify one. */
+  setRequestContext: (
+    effectiveOrigin: string,
+    maxTimeToLive: bigint | undefined,
+  ): void => {
+    contextInternal.update((context) => ({
+      ...context,
+      effectiveOrigin,
+      maxTimeToLive,
+    }));
   },
   /** Called by the UI as soon as the auth method is chosen — lets consumers
    *  react to the flow type (e.g. OpenID vs passkey) without waiting for
    *  the whole authorization to complete. */
   setFlow: (flow: AuthorizationFlow): void => {
     contextInternal.update((context) => ({ ...context, flow }));
-  },
-  /** Called by the channel handler once the delegation request is parsed, so
-   *  the UI can offer session durations up to the app's requested value. */
-  setMaxTimeToLive: (maxTimeToLive: bigint | undefined): void => {
-    contextInternal.update((context) => ({ ...context, maxTimeToLive }));
   },
   /** Called by the UI when the user authorizes with a specific account.
    *  Accepts a promise so the animation can start immediately while the

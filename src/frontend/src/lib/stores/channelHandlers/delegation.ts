@@ -81,12 +81,15 @@ export const handleDelegationRequest =
         const effectiveOrigin = remapToLegacyDomain(
           params.icrc95DerivationOrigin ?? channel.origin,
         );
-        authorizationStore.setEffectiveOrigin(effectiveOrigin);
-        // Surface the app's requested session duration so the sign-in screen can
-        // offer durations up to it (the request is the ceiling the user picks
-        // under). `undefined` when the app didn't specify one — the backend then
-        // applies its default.
-        authorizationStore.setMaxTimeToLive(params.maxTimeToLive);
+        // Set the effective origin (which makes the sign-in UI render) and the
+        // app's requested session duration together, so the sign-in screen
+        // always sees the requested duration — the picker's ceiling — from its
+        // first render. `undefined` when the app didn't specify one, in which
+        // case the backend applies its default.
+        authorizationStore.setRequestContext(
+          effectiveOrigin,
+          params.maxTimeToLive,
+        );
 
         // Authorization is the commit point — the user may switch identities
         // freely before this. Once authorized, the UI is no longer needed.

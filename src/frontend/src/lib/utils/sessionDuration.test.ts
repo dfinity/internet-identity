@@ -86,6 +86,21 @@ describe("sessionDurationCeilingSeconds", () => {
       sessionDurationCeilingSeconds(BigInt(30 * DAY) * NANOS_PER_SECOND),
     ).toBe(MAX_SESSION_DURATION_SECONDS);
   });
+
+  it("falls back to the maximum for a non-positive (malformed) request", () => {
+    expect(sessionDurationCeilingSeconds(BigInt(0))).toBe(
+      MAX_SESSION_DURATION_SECONDS,
+    );
+    expect(sessionDurationCeilingSeconds(BigInt(-1) * NANOS_PER_SECOND)).toBe(
+      MAX_SESSION_DURATION_SECONDS,
+    );
+  });
+
+  it("never returns a ceiling below one second for a sub-second request", () => {
+    // 500ms requested: too small to be a whole second, but must not collapse
+    // to a 0-second ceiling.
+    expect(sessionDurationCeilingSeconds(BigInt(500_000_000))).toBe(1);
+  });
 });
 
 describe("sessionDurationToNanos", () => {

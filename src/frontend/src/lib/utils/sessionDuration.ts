@@ -67,14 +67,23 @@ export const cappedSessionDurations = (
 export const sessionDurationCeilingSeconds = (
   requestedMaxTimeToLive: bigint | undefined,
 ): number => {
-  if (requestedMaxTimeToLive === undefined) {
+  // A missing request — or a malformed/hostile non-positive one (the transport
+  // decodes any bigint, negatives included) — falls back to the maximum, the
+  // same duration an omitted request yields, rather than producing a negative
+  // or zero ceiling that would break the picker or send a nonsensical TTL on.
+  if (
+    requestedMaxTimeToLive === undefined ||
+    requestedMaxTimeToLive <= BigInt(0)
+  ) {
     return MAX_SESSION_DURATION_SECONDS;
   }
   const capped =
     requestedMaxTimeToLive < MAX_SESSION_DURATION_NANOS
       ? requestedMaxTimeToLive
       : MAX_SESSION_DURATION_NANOS;
-  return Number(capped / NANOS_PER_SECOND);
+  // At least one second, so a sub-second request can't collapse to a 0-second
+  // ceiling (and thus an empty/"0s" picker).
+  return Math.max(1, Number(capped / NANOS_PER_SECOND));
 };
 
 /** Convert a duration in seconds to the nanoseconds the canister expects. */
