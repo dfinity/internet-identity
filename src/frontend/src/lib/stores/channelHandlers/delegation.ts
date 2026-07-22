@@ -88,13 +88,6 @@ export const handleDelegationRequest =
         );
         authorizationStore.setEffectiveOrigin(effectiveOrigin);
 
-        // Authorization is the commit point for a delegation-only flow. But
-        // when the dapp also requests attributes, the identity switcher stays
-        // live on the consent screen, so the user can re-authorize a
-        // different identity after this point. Wait for the consent to be
-        // committed (restarting on a switch) so the delegation is issued for
-        // the same identity whose attributes get certified — not whichever
-        // identity authorized first.
         let authorized = await waitForStore(authorizedStore);
         while (
           get(attributeConsentStore) !== undefined &&
