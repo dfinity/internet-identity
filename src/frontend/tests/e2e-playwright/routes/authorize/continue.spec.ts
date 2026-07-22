@@ -63,6 +63,9 @@ test.describe("multiple identities", () => {
       await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
       await authPage.getByRole("button", { name: "Switch identity" }).click();
       await authPage.getByRole("button", { name: identities[0].name }).click();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
     });
     expect(principal).toBe(expectedPrincipal);
     expect(principal).not.toBe(otherPrincipal);
