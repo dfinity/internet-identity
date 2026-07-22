@@ -6,6 +6,7 @@ import {
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
 import { SSO_DISCOVERY_DOMAIN, SSO_OPENID_PORT } from "../../fixtures/sso";
+import { ManageAccessPage } from "../../fixtures/manageAccessPage";
 import {
   authorizeWithUrl,
   fromBase64,
@@ -676,19 +677,14 @@ test.describe("Authorize — explicit consent UI", () => {
           const linkContext = await browser.newContext();
           const linkPage = await linkContext.newPage();
           try {
-            await linkPage.goto(II_URL + "/manage/access");
+            const accessPage = new ManageAccessPage(linkPage);
+            await accessPage.goto();
             await signInWithIdentity(linkPage, identity.identityNumber);
-            await linkPage.getByRole("button", { name: "Add new" }).click();
-            const popupPromise = linkPage.context().waitForEvent("page");
-            await linkPage
-              .getByRole("button", { name: user.issuer.name })
-              .click();
-            const popup = await popupPromise;
-            const closePromise = popup.waitForEvent("close", {
-              timeout: 15_000,
-            });
-            await signInWithOpenId(popup, user.id);
-            await closePromise;
+            await accessPage.add((dialog) =>
+              dialog.openid(user.issuer.name, (popup) =>
+                signInWithOpenId(popup, user.id),
+              ),
+            );
           } finally {
             await linkPage.close();
             await linkContext.close();
