@@ -13,7 +13,7 @@
 //!
 //! The discovery domain is gated by the canary allowlist.
 
-use super::verify::{Descriptor, Stamp};
+use super::verify::{Descriptor, SsoProvider};
 use super::OpenIDJWTVerificationError;
 use crate::openid::AudClaim;
 use crate::single_flight_cache::{self, CacheConfig, Cached, RetryBackoff, SingleFlightCache};
@@ -22,6 +22,12 @@ use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 
 pub(super) const DEFAULT_STABLE_IDENTIFIER_CLAIM: &str = "sub";
+
+/// The non-default stable-identifier claim, or `None` for a `sub` org (which
+/// keys identity on the token `sub` directly and needs no bridge).
+pub(super) fn non_default_stable_claim(claim: &str) -> Option<String> {
+    (claim != DEFAULT_STABLE_IDENTIFIER_CLAIM).then(|| claim.to_string())
+}
 
 pub(super) const MAX_APP_CLIENTS: usize = 100;
 
@@ -314,10 +320,11 @@ pub(super) fn resolve(
     let descriptor = Descriptor {
         issuer: cfg.issuer,
         client_id: cfg.client_id,
-        stamp: Stamp::Sso {
+        sso: Some(SsoProvider {
             domain: domain.to_string(),
             name: cfg.name,
-        },
+            stable_identifier_claim: non_default_stable_claim(&cfg.stable_identifier_claim),
+        }),
     };
     Ok(Cached::Ready((descriptor, cfg.jwks_uri)))
 }
@@ -1117,7 +1124,7 @@ mod tests {
         match resolve("example.org", "https://idp.example.org", &test_aud_claim()) {
             Ok(Cached::Ready((descriptor, jwks_uri))) => {
                 assert_eq!(jwks_uri, "https://idp.example.org/jwks");
-                assert!(matches!(descriptor.stamp, Stamp::Sso { .. }));
+                assert!(descriptor.sso.is_some());
             }
             _ => panic!("expected Ready"),
         }

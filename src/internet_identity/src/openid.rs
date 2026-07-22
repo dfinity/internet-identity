@@ -37,10 +37,7 @@ pub use crate::single_flight_cache::Cached;
 pub use sso_bundle::{
     get_sso_attr_bundle_signature, prepare_sso_attr_bundle, read_certified_sso_bundle,
 };
-pub use sso_gating::{
-    resolve_primary_identity, stamp_primary_sso_stable_id, verify_sso_for_registration,
-    verify_sso_jwt,
-};
+pub use sso_gating::{resolve_primary_identity, verify_sso_for_registration, verify_sso_jwt};
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 

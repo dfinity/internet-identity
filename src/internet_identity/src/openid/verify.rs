@@ -98,20 +98,32 @@ pub(super) struct Descriptor {
     pub issuer: String,
     /// Expected JWT `aud`; also the canonical value stored on the credential.
     pub client_id: String,
-    /// SSO stamp applied to the built credential.
-    pub stamp: Stamp,
+    /// The discoverable SSO provider this credential comes from, or `None` for a
+    /// configured direct provider (Google / Microsoft / Apple).
+    pub sso: Option<SsoProvider>,
 }
 
-/// The `sso_domain` / `sso_name` stamp written onto a verified credential.
-pub(super) enum Stamp {
-    /// Direct provider (Google / Microsoft / Apple) — not SSO.
-    Direct,
-    /// Discoverable SSO provider, stamped with its discovery domain and the
-    /// optional human-readable name from the domain's hop-1 configuration.
-    Sso {
-        domain: String,
-        name: Option<String>,
-    },
+/// A discoverable SSO provider: the discovery domain and optional display name
+/// written onto the built credential, plus the claim (if any) carrying its
+/// cross-client-stable identifier.
+pub(super) struct SsoProvider {
+    pub domain: String,
+    pub name: Option<String>,
+    /// Claim holding the cross-client-stable id (e.g. Entra `oid`). `None` for a
+    /// `sub` org, which keys identity on the token `sub` and needs no bridge.
+    pub stable_identifier_claim: Option<String>,
+}
+
+/// Maximum length of a configured stable-identifier claim value.
+const MAX_STABLE_IDENTIFIER_LENGTH: usize = 255;
+
+/// Extract a string claim from raw JWT claim bytes; `None` if absent or non-string.
+fn extract_string_claim(claims_bytes: &[u8], claim: &str) -> Option<String> {
+    serde_json::from_slice::<serde_json::Value>(claims_bytes)
+        .ok()?
+        .get(claim)?
+        .as_str()
+        .map(str::to_string)
 }
 
 /// Verify `jwt` against `descriptor` using `keys`, returning the credential on
@@ -147,6 +159,16 @@ pub(super) fn verify_and_build(
     let effective_issuer = replace_issuer_placeholders(&descriptor.issuer, &issuer_claims);
 
     verify_claims(&effective_issuer, &descriptor.client_id, &claims, salt)?;
+
+    // Pull the SSO stable-id claim before `verify` consumes `validation_item`;
+    // its value is only used below, once verification has succeeded.
+    let sso_stable_id = match &descriptor.sso {
+        Some(SsoProvider {
+            stable_identifier_claim: Some(claim),
+            ..
+        }) => extract_string_claim(validation_item.claims(), claim),
+        _ => None,
+    };
 
     // Verify JWT signature against the matching key.
     let kid = validation_item
@@ -200,9 +222,22 @@ pub(super) fn verify_and_build(
         metadata.insert(key, MetadataEntryV2::String(value));
     }
 
-    let (sso_domain, sso_name) = match &descriptor.stamp {
-        Stamp::Direct => (None, None),
-        Stamp::Sso { domain, name } => (Some(domain.clone()), name.clone()),
+    let (sso_domain, sso_name, stable_id) = match &descriptor.sso {
+        None => (None, None, None),
+        Some(sso) => {
+            // A non-`sub` org's stable id (e.g. Entra `oid`) is part of the
+            // credential the moment it's built, so both the delegation and the
+            // add/register paths get it — and its length cap — from here.
+            if sso_stable_id
+                .as_ref()
+                .is_some_and(|v| v.len() > MAX_STABLE_IDENTIFIER_LENGTH)
+            {
+                return Err(OpenIDJWTVerificationError::GenericError(
+                    "stable identifier claim too long".to_string(),
+                ));
+            }
+            (Some(sso.domain.clone()), sso.name.clone(), sso_stable_id)
+        }
     };
 
     Ok(OpenIdCredential {
@@ -218,9 +253,7 @@ pub(super) fn verify_and_build(
         metadata,
         sso_domain,
         sso_name,
-        // Set later at SSO write time for a non-`sub` primary credential; a
-        // freshly verified token never carries it.
-        stable_id: None,
+        stable_id,
     })
 }
 
@@ -452,7 +485,7 @@ mod tests {
         Descriptor {
             issuer: "https://accounts.google.com".to_string(),
             client_id: TEST_AUD.to_string(),
-            stamp: Stamp::Direct,
+            sso: None,
         }
     }
 
@@ -480,10 +513,11 @@ mod tests {
         let descriptor = Descriptor {
             issuer: "https://accounts.google.com".to_string(),
             client_id: TEST_AUD.to_string(),
-            stamp: Stamp::Sso {
+            sso: Some(SsoProvider {
                 domain: "example.org".to_string(),
                 name: Some("Example".to_string()),
-            },
+                stable_identifier_claim: None,
+            }),
         };
         let credential = verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt())
             .expect("expected verification to succeed");
@@ -539,7 +573,7 @@ mod tests {
         let descriptor = Descriptor {
             issuer: "https://accounts.evil.example".to_string(),
             client_id: TEST_AUD.to_string(),
-            stamp: Stamp::Direct,
+            sso: None,
         };
         let err =
             verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt()).unwrap_err();
@@ -554,7 +588,7 @@ mod tests {
         let descriptor = Descriptor {
             issuer: "https://accounts.google.com".to_string(),
             client_id: "wrong-client-id".to_string(),
-            stamp: Stamp::Direct,
+            sso: None,
         };
         let err =
             verify_and_build(VALID_JWT, &descriptor, &test_certs(), &test_salt()).unwrap_err();

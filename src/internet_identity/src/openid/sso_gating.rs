@@ -1,18 +1,13 @@
 //! SSO per-app gating and primary-identity resolution: verify an SSO JWT
 //! against the origin's resolved client and bridge per-app logins to the
-//! primary identity via the storage-maintained SSO stable-id index (the
-//! `stable_id` stamped on the primary credential, which the anchor `write()`
-//! reconciles into the index).
+//! primary identity via the storage-maintained SSO stable-id index (keyed on
+//! the primary credential's `stable_id`, which the anchor `write()` reconciles
+//! into the index).
 
-use super::{
-    decode_iss_aud_claims, sso, verify, Cached, OpenIDJWTVerificationError, OpenIdCredential,
-};
+use super::{sso, verify, Cached, OpenIDJWTVerificationError, OpenIdCredential};
 use crate::state;
 use internet_identity_interface::internet_identity::types::openid::OpenIdDelegationError;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, IdRegFinishError};
-
-/// Maximum length of the configured stable-identifier claim value.
-const MAX_STABLE_IDENTIFIER_LENGTH: usize = 255;
 
 /// A verified SSO login. `credential.aud` is the resolved (per-app or primary)
 /// client; `primary_client_id` is always the primary, on which identity is keyed.
@@ -25,13 +20,6 @@ pub struct SsoVerification {
     pub stable_identifier_claim: String,
     /// The cross-client-stable identifier; `None` when the claim is `sub`.
     pub stable_id: Option<String>,
-}
-
-/// Extract a string claim from a JWT's raw claims; `None` if absent or non-string.
-fn extract_string_claim(jwt: &str, claim: &str) -> Option<String> {
-    let (_, _, claims_bytes) = decode_iss_aud_claims(jwt).ok()?;
-    let value = serde_json::from_slice::<serde_json::Value>(&claims_bytes).ok()?;
-    value.get(claim)?.as_str().map(str::to_string)
 }
 
 /// Verify an SSO JWT and enforce the gate: the JWT's `aud` must match the client
@@ -69,33 +57,22 @@ pub fn verify_sso_jwt(
     let descriptor = verify::Descriptor {
         issuer: cfg.issuer.clone(),
         client_id: expected_client.clone(),
-        stamp: verify::Stamp::Sso {
+        sso: Some(verify::SsoProvider {
             domain: discovery_domain.to_string(),
             name: cfg.name.clone(),
-        },
+            stable_identifier_claim: sso::non_default_stable_claim(&cfg.stable_identifier_claim),
+        }),
     };
+    // `verify_and_build` extracts the stable id (and enforces its length cap)
+    // from the claim above, so the credential already carries it.
     let credential = verify::verify_and_build(jwt, &descriptor, &keys, salt)?;
 
-    let stable_id = if cfg.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM {
-        None
-    } else {
-        extract_string_claim(jwt, &cfg.stable_identifier_claim)
-    };
-    if stable_id
-        .as_ref()
-        .is_some_and(|id| id.len() > MAX_STABLE_IDENTIFIER_LENGTH)
-    {
-        return Err(OpenIDJWTVerificationError::GenericError(
-            "stable identifier claim too long".to_string(),
-        ));
-    }
-
     Ok(Cached::Ready(SsoVerification {
+        stable_id: credential.stable_id.clone(),
         credential,
         primary_client_id: cfg.client_id,
         gated,
         stable_identifier_claim: cfg.stable_identifier_claim,
-        stable_id,
     }))
 }
 
@@ -181,26 +158,6 @@ fn primary_sub_on_anchor(
             .find(|cred| cred.iss == iss && cred.aud == primary_client_id)
             .map(|cred| cred.sub.clone())
     })
-}
-
-/// Stamp the non-`sub` stable id (the `oid` claim) onto a primary-keyed SSO
-/// credential so the anchor `write()` establishes its SSO stable-id index
-/// entry. Used on the direct primary-login registration path, which builds the
-/// credential from [`verify::verify_and_build`] rather than
-/// [`resolve_primary_identity`]. No-op for `sub` orgs and direct providers (no
-/// `sso_domain`).
-pub fn stamp_primary_sso_stable_id(jwt: &str, credential: &mut OpenIdCredential) {
-    let Some(domain) = credential.sso_domain.as_deref() else {
-        return;
-    };
-    let Cached::Ready(cfg) = sso::peek_discovery(domain) else {
-        return;
-    };
-    if cfg.stable_identifier_claim == sso::DEFAULT_STABLE_IDENTIFIER_CLAIM {
-        return;
-    }
-    // `credential` is primary-keyed here, so `aud` is the primary client.
-    credential.stable_id = extract_string_claim(jwt, &cfg.stable_identifier_claim);
 }
 
 /// Verify an SSO JWT for registration, returning the primary-keyed credential to

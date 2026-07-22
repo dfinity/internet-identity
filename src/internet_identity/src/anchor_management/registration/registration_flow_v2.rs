@@ -229,14 +229,12 @@ pub fn verify_openid_for_registration(
                 openid::Cached::Pending => return Ok(openid::Cached::Pending),
             }
         }
+        // The verified credential already carries the non-`sub` stable id, so
+        // this registration's `write()` establishes the SSO stable-id index
+        // entry, letting a later gated per-app login (whose pairwise sub differs)
+        // resolve here.
         _ => match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
-            openid::Cached::Ready(mut credential) => {
-                // Stamp the non-`sub` stable id so this registration's `write()`
-                // establishes the SSO stable-id index entry, letting a later
-                // gated per-app login (whose pairwise sub differs) resolve here.
-                openid::stamp_primary_sso_stable_id(jwt, &mut credential);
-                credential
-            }
+            openid::Cached::Ready(credential) => credential,
             openid::Cached::Pending => return Ok(openid::Cached::Pending),
         },
     };
