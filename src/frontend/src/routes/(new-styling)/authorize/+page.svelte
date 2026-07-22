@@ -426,11 +426,13 @@
 
 {#snippet attributeConsentContent()}
   {#if $attributeConsentStore !== undefined}
-    <AttributeConsentView
-      context={$attributeConsentStore}
-      variant={data.flow === "openid-resume" ? "openid" : "normal"}
-      onConsent={handleAttributeConsent}
-    />
+    {#key $attributeConsentStore}
+      <AttributeConsentView
+        context={$attributeConsentStore}
+        variant={data.flow === "openid-resume" ? "openid" : "normal"}
+        onConsent={handleAttributeConsent}
+      />
+    {/key}
   {/if}
 {/snippet}
 
