@@ -1513,19 +1513,37 @@ mod openid_api {
         // Canonicalize the untrusted discovery domain at the boundary so both
         // verification and the credential stored from `arg` see the same value.
         arg.discovery_domain = openid::canonical_discovery_domain_opt(arg.discovery_domain);
-        // Verify the JWT (driving the SSO discovery/JWKS fetches it may need)
-        // up front: a cold or evicted cache surfaces as the `Pending` retry arm
-        // instead of a terminal registration error. The verified credential is
-        // then handed to the shared flow so it isn't re-verified.
-        let verified =
-            match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+        // Verify the JWT up front (driving any SSO discovery/JWKS fetches): a
+        // cold or evicted cache surfaces as the `Pending` retry arm instead of a
+        // terminal error, and the verified credential is then handed to the
+        // shared flow so it isn't re-verified. A gated SSO login (discovery
+        // domain + origin) goes through the SSO gate; everything else (a direct
+        // provider or an ungated SSO login) through the plain OpenID verify —
+        // mirroring the `sso_`/`openid_prepare_delegation` split on the auth side.
+        let credential = match (arg.discovery_domain.as_deref(), arg.origin.as_deref()) {
+            (Some(domain), Some(origin)) => {
+                openid::prefetch_sso(Some(domain));
+                match openid::verify_sso_for_registration(&arg.jwt, &arg.salt, domain, origin) {
+                    Ok(openid::Cached::Ready(credential)) => credential,
+                    Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
+                    Err(err) => return OpenIdResult::Err(err),
+                }
+            }
+            _ => match registration::registration_flow_v2::verify_openid_for_registration(&arg) {
+                Ok(openid::Cached::Ready(credential)) => credential,
                 Ok(openid::Cached::Pending) => return OpenIdResult::Pending,
-                Ok(openid::Cached::Ready(verified)) => verified,
                 Err(err) => return OpenIdResult::Err(err),
-            };
+            },
+        };
+        // Config issuer for the authorization key / operation log: the
+        // configured provider's (template) issuer, or the concrete JWT issuer for
+        // an SSO credential, which carries its own `sso_domain` for scope routing.
+        let config_iss = credential
+            .config_issuer()
+            .unwrap_or_else(|| credential.iss.clone());
         match registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
-            Some(verified),
+            Some((credential, config_iss)),
         ) {
             Ok(result) => OpenIdResult::Ok(result),
             Err(err) => OpenIdResult::Err(err),
