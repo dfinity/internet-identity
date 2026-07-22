@@ -19,4 +19,19 @@ describe("authorizationStore.authorize", () => {
     authorizationStore.authorize(Promise.resolve(undefined), "full-access");
     expect(get(authorizedStore)?.accessLevel).toBe("full-access");
   });
+
+  it("records the chosen session duration when provided", () => {
+    const maxTimeToLive = BigInt(3600) * BigInt(1_000_000_000);
+    authorizationStore.authorize(
+      Promise.resolve(undefined),
+      "full-access",
+      maxTimeToLive,
+    );
+    expect(get(authorizedStore)?.maxTimeToLive).toBe(maxTimeToLive);
+  });
+
+  it("leaves the session duration unset when omitted", () => {
+    authorizationStore.authorize(Promise.resolve(undefined), "full-access");
+    expect(get(authorizedStore)?.maxTimeToLive).toBeUndefined();
+  });
 });

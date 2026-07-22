@@ -82,6 +82,11 @@ export const handleDelegationRequest =
           params.icrc95DerivationOrigin ?? channel.origin,
         );
         authorizationStore.setEffectiveOrigin(effectiveOrigin);
+        // Surface the app's requested session duration so the sign-in screen can
+        // offer durations up to it (the request is the ceiling the user picks
+        // under). `undefined` when the app didn't specify one — the backend then
+        // applies its default.
+        authorizationStore.setMaxTimeToLive(params.maxTimeToLive);
 
         // Authorization is the commit point — the user may switch identities
         // freely before this. Once authorized, the UI is no longer needed.
@@ -112,13 +117,19 @@ export const handleDelegationRequest =
         // omitted-arg default.
         const permissions = toPermissionsArg(authorized.accessLevel);
 
+        // Prefer the duration the user chose on the sign-in screen; it's already
+        // capped at the app's request. Fall back to the app's requested value
+        // for flows without a picker (e.g. 1-click OpenID/SSO), and to the
+        // backend default when neither is set.
+        const maxTimeToLive = authorized.maxTimeToLive ?? params.maxTimeToLive;
+
         const { user_key, expiration } = await actor
           .prepare_account_delegation(
             identityNumber,
             effectiveOrigin,
             accountNumber !== undefined ? [accountNumber] : [],
             sessionPublicKey,
-            params.maxTimeToLive !== undefined ? [params.maxTimeToLive] : [],
+            maxTimeToLive !== undefined ? [maxTimeToLive] : [],
             permissions,
           )
           .then(throwCanisterError);
