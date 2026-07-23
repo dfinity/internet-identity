@@ -18,8 +18,8 @@ use canister_tests::{
     },
     flows,
     framework::{
-        device_data_2, env, install_ii_canister_with_arg, principal_1, principal_2, time,
-        upgrade_ii_canister, verify_delegation, II_WASM,
+        assert_metric, device_data_2, env, get_metrics, install_ii_canister_with_arg, principal_1,
+        principal_2, time, upgrade_ii_canister, verify_delegation, II_WASM,
     },
 };
 use internet_identity_interface::internet_identity::types::{
@@ -2031,6 +2031,64 @@ fn mcp_set_config_rejects_overlong_trusted_url() -> Result<(), RejectResponse> {
     // `mcp_register_v2` re-derives and compares the URL hash — see the happy-path
     // test — so hashing the stored URL is transparent to redemption).
     trust_mcp_server(&env, canister_id, principal_1(), anchor);
+
+    Ok(())
+}
+
+/// The metrics endpoint exposes the number of live (non-expired) MCP session
+/// grants. Registering sessions raises the live count; letting the grants
+/// expire drops it back to zero — the metric filters by expiry at scrape time,
+/// so no pruning call is needed — while the total entry count still reflects
+/// the not-yet-removed expired residue.
+#[test]
+fn mcp_live_session_count_metric() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_with_mcp(&env);
+    let anchor_1 = flows::register_anchor(&env, canister_id);
+    let anchor_2 = flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+    trust_mcp_server(&env, canister_id, principal_1(), anchor_1);
+    trust_mcp_server(&env, canister_id, principal_2(), anchor_2);
+
+    // No sessions registered yet.
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_mcp_live_session_count", 0f64);
+    assert_metric(&metrics, "internet_identity_mcp_session_count", 0f64);
+
+    // One anchor registers a session -> one live session.
+    register_session(
+        &env,
+        canister_id,
+        principal_1(),
+        anchor_1,
+        &ByteBuf::from("session key anchor 1"),
+        GRANT_TTL_NS,
+    );
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_mcp_live_session_count", 1f64);
+    assert_metric(&metrics, "internet_identity_mcp_session_count", 1f64);
+
+    // A second anchor registers -> two live sessions.
+    register_session(
+        &env,
+        canister_id,
+        principal_2(),
+        anchor_2,
+        &ByteBuf::from("session key anchor 2"),
+        GRANT_TTL_NS,
+    );
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_mcp_live_session_count", 2f64);
+    assert_metric(&metrics, "internet_identity_mcp_session_count", 2f64);
+
+    // Let both grants expire (GRANT_TTL_NS is one day). The live count filters
+    // by expiry at scrape time, so it drops to zero on the next query without
+    // any pruning; the total still counts the two expired entries (the grant
+    // map has no periodic GC).
+    env.advance_time(Duration::from_nanos(GRANT_TTL_NS) + Duration::from_secs(1));
+    env.tick();
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_mcp_live_session_count", 0f64);
+    assert_metric(&metrics, "internet_identity_mcp_session_count", 2f64);
 
     Ok(())
 }

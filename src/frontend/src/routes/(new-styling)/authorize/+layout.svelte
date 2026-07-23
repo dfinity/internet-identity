@@ -232,7 +232,6 @@
         .get_default_account(identityNumber, origin)
         .then(throwCanisterError)
         .then((account) => account.account_number[0]);
-      // 1-click SSO flow: no access-level toggle, always full access.
       authorizationStore.authorize(
         Promise.resolve(accountNumber),
         "full-access",
