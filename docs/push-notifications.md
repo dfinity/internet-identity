@@ -521,6 +521,36 @@ it can only mismanage its own campaign.
   tap-through is also the content-reveal path: the app opens and decrypts the
   message in its own context.
 
+### Shared devices and multiple identities
+
+A browser has **one** physical push endpoint, but a person may sign into
+several identities on it and devices get shared. The rule is: **enabling and
+consent are per identity, never per device.** Turning notifications on for one
+identity never implies anything for another that happens to share the same
+browser — each identity must separately enable notifications and grant its own
+per-origin consent. We do not infer consent from a shared endpoint.
+
+What that means in practice:
+
+- **One endpoint, independent rows.** The subscription is stored as `(anchor,
+  endpoint_hash) → {p256dh, auth}`, so the same physical endpoint can appear
+  under several anchors as separate rows. II delivers to an anchor's row only
+  if *that* anchor enabled it; identity B's senders reach the device only after
+  B itself opted in.
+- **Isolation is at the consent layer, not the transport.** Once two identities
+  on the device have both enabled, the device physically receives pushes for
+  both — there is only one endpoint, so they cannot be separated in transit.
+  The service worker renders by **sender origin**, not by which II identity, and
+  never reveals that the two identities live on the same device.
+- **Disabling is per identity.** Turning notifications off for one identity
+  removes only that anchor's rows; the browser subscription stays alive for the
+  others. The SW calls `pushManager.unsubscribe()` only when **no** identity on
+  the device still wants notifications.
+- **Rotation re-registers lazily.** When the endpoint rotates
+  (`pushsubscriptionchange`), every anchor that held the old endpoint needs its
+  row updated, but the SW can only act for the currently-signed-in identity —
+  so each identity re-registers the next time it authenticates.
+
 ### Can the app choose where the notification opens?
 
 The app may set `alert.url` to send the user to a specific page rather than
@@ -733,9 +763,6 @@ Must-fix before a real deployment:
 
 Must-decide (design, not code):
 
-- **Shared / multi-anchor devices** — one browser has one push endpoint, but a
-  user may have multiple identities and devices are shared. Does a device bind
-  to one identity, or carry notifications for all identities that enabled it?
 - **iOS reality** — iOS Safari is the one platform where a PWA install is
   *mandatory* for Web Push (Android/desktop work in a plain tab). It is also
   flakier and more throttled; "best-effort" is weakest there. Set expectations
