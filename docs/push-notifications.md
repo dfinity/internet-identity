@@ -84,8 +84,9 @@ Proposed (this doc):
 
 - Chunked `push_send` with two-layer flow control (II admission + client
   pacing), sender registry, a stateless-for-campaigns II (transient heap
-  buffer, storage O(users)), a durable client library, and the optional web2
-  delivery gateway. No cycles charging in v1 (the real costs — storage and
+  buffer, storage O(users)), a durable client library, and delivery through a
+  trusted web2 gateway (with direct per-device outcalls as the documented
+  alternative/fallback). No cycles charging in v1 (the real costs — storage and
   outcalls — are controlled by design, not billing) — parked as a future
   exploration.
 
@@ -109,10 +110,12 @@ Read this first; the sections after it just add detail.
   it), and the library slows down when asked. The big list lives with the
   dApp — **II stores almost nothing per send**, which matters because storage
   is II's resource we want to protect.
-- **Two ways II delivers the final messages.** *Direct*: II contacts each push
-  service itself — simplest, but one network call per device gets expensive.
-  *Trustd gateway - preferred*: II hands the sealed messages to a small helper server that does
-  those many little sends on II's behalf — cheaper and faster. Either way II
+- **How II sends the final messages.** II hands the sealed messages to a small
+  **trusted helper server (the "gateway")** that makes the many little
+  per-device sends on II's behalf over ordinary internet — far cheaper and
+  faster than the canister making each call itself. (Having the canister call
+  each push service directly is the documented fallback, but one network call
+  per device gets expensive at scale, so it isn't the default.) Either way II
   does the sealing; the helper only forwards messages it can't read.
 - **Tapping a notification** opens II briefly ("Opening \<app\>…") and forwards
   the user to the app — only ever to the app that sent it.
@@ -131,8 +134,8 @@ Everything below is the same story with the exact mechanisms and edge cases.
 │  Layer 2 — pacing (cooperative):    │ ready/ │  transient HEAP buffer (small)      │
 │  send on `ready`, back off,         │ retry  │        │ seal: encrypt + VAPID sign  │
 │  retry, track per-target status     │        │        ▼ fast drain                 │
-└────────────────────────────────────┘        │  few batched outcalls ──▶ web2      │
-                                               │  (or direct per-device outcall)     │
+└────────────────────────────────────┘        │  few batched outcalls ──▶ gateway   │
+                                               │  (direct per-device = alt/fallback) │
                                                └─────────────────────────────────────┘
                                                         │ (gateway fans out off-chain)
                                                         ▼
@@ -161,7 +164,7 @@ around.
 
 ## dApp → II
 
-### How does a dApp notify thousands of users without overloading II?
+### Sending to thousands of users: chunked send + two-layer flow control
 
 > *In short: the dApp streams the audience to II in small batches ("chunks");
 > II refuses more than it can handle, and the dApp slows down when told to.
@@ -199,7 +202,7 @@ set the default and leave every override empty (the content isn't repeated, so
 own alert, rendered client-side by the library's templating (II never holds a
 template); a mix of the two works too.
 
-### What does the API look like?
+### The Candid interface
 
 The exact API a dApp's backend calls, written in Candid (the IC's interface
 language). There is a single send entry point, `push_send`: it carries a
@@ -319,7 +322,7 @@ model does not batch. Senders authenticate at the **origin** level:
    disappears. This reuses the existing outcall / DoH machinery; IC custom
    domains also carry a `_canister-id` DNS TXT record as a second path.
 
-### How does II stop one dApp from flooding it? (admission control, Layer 1)
+### Admission control (Layer 1): stopping one dApp from flooding II
 
 > *In short: II tracks how much each app is sending and simply says "not right
 > now, try again in N ms" once an app goes over its share. This is what stops
@@ -360,7 +363,7 @@ admission control. Attached-cycle or prepaid-balance pricing is parked as a
 future exploration — worth revisiting to offset the outcall/storage cost at
 scale, or as an extra abuse lever. See Future exploration.
 
-## What does II store and do per send?
+## II's state model: stateless for campaigns
 
 > *In short: II accepts a chunk, briefly holds it in memory (not durable
 > storage), seals and sends it, then forgets it. The durable list lives with
@@ -383,9 +386,8 @@ A timer (`ic_cdk_timers`, ~1s) drains the heap buffer:
 - Forces `content` attribution to the sender origin (unspoofable).
 - RFC 8291 encrypts per device; attaches the per-audience VAPID JWT
   (cached, ≤ 12h).
-- Drains **fast** to the delivery sink (batched outcalls to the gateway, or
-  direct per-device — see next section). Fast drain is what lets the buffer
-  stay small while admitting at high throughput.
+- Drains **fast** to the gateway in a few batched outcalls (see below). Fast
+  drain is what lets the buffer stay small while admitting at high throughput.
 - `410 Gone` deletes the subscription. No retries in v1 (retries are a client
   concern; see the client library).
 
@@ -408,24 +410,20 @@ regions are user-scoped and volume-independent: the sender registry
 `chunk_id` dedup is a short-lived heap set. Timers don't survive upgrades —
 re-arm in `post_upgrade` and `init`.
 
-## How does II actually deliver to devices?
+## Delivering to devices
 
 The relay API is one POST per subscription endpoint (RFC 8030) — there is no
-multi-recipient send — so the drain has two sink modes behind a deploy flag
-(`push_delivery_mode : direct | gateway`), invisible to dApps.
+multi-recipient send, so reaching N devices is fundamentally N sends. The
+design routes those sends through a **trusted web2 gateway**. Doing them as
+per-device outcalls straight from the canister ("direct") is the documented
+**alternative** — kept for context and as a possible low-volume or
+fully-on-chain fallback, but not the shipping path.
 
-### Direct mode — II contacts each push service itself
-
-II makes one HTTPS call ("outcall") per device, straight to the push service.
-Fully on-chain, no extra infrastructure. But it's ~13k outcalls for a 10k-user
-broadcast (~1T cycles, ~$1–2), and delivery takes minutes at a safe rate. Good
-for low volume.
-
-### Gateway mode — a lightweight helper forwards for II
+### The delivery path: a trusted web2 gateway
 
 II encrypts and signs as usual, then hands the **fully-sealed, ready-to-send
-messages** to a small trusted helper server, which makes the many little
-sends over ordinary (free) internet instead of on-chain:
+messages** to a small trusted helper server, which makes the many little sends
+over ordinary (free) internet instead of on-chain:
 
 ```
 [ { endpoint, headers, authorization:<vapid jwt+pubkey>, body:<ciphertext> }, … ]
@@ -451,13 +449,23 @@ sends over ordinary (free) internet instead of on-chain:
   flat storage. This is why the gateway hop is a scaling primitive, not just a
   cost optimization.
 
-Trust delta vs direct mode: the gateway can **drop, delay, or replay**
-captured bundles, but cannot read content or forge new sends. Confidentiality
-and authenticity stay on-chain; only **liveness** moves off — a real, narrow
-concession for a trust-minimizing service. Its replay capability is why
-message-level replay protection (below) becomes a should-have in gateway mode.
+Trust delta — the deliberate cost of this path: the gateway can **drop, delay,
+or replay** captured bundles, but cannot read content or forge new sends.
+Confidentiality and authenticity stay on-chain; only **liveness** moves off — a
+real, narrow concession for a trust-minimizing service. Its replay capability
+is why message-level replay protection (below) is a should-have here.
 
-## What does the dApp's side (the client library) do?
+### The alternative: direct per-device outcalls
+
+II could instead make one HTTPS outcall per device straight to the push
+service — fully on-chain, nothing extra to run or trust. Why it isn't the
+default: a 10k-user broadcast is ~13k outcalls (~1T cycles, ~$1–2 per blast)
+and takes minutes to drain at a safe in-flight rate; that per-device outcall
+cost and the throughput ceiling are exactly what the gateway removes. It stays
+viable for low volume, a fully-on-chain deployment, or as a fallback if the
+gateway is unavailable.
+
+## The dApp-side client library
 
 > *In short: because II stores nothing per send, a small library on the dApp's
 > side keeps the list, sends it to II in paced pieces, retries failures, tracks
@@ -494,7 +502,7 @@ consent and origin-pinning on **every** chunk, so a buggy or malicious library
 cannot fake consent, target another dApp's users, or exceed admission limits —
 it can only mismanage its own campaign.
 
-## What happens on the device, and when the user taps?
+## On the device: rendering and tap-through
 
 - **Subscribe** (Settings): request permission, `pushManager.subscribe` with
   II's VAPID public key, store `(anchor, endpoint_hash) → {p256dh, auth}`. No
@@ -562,7 +570,7 @@ Caveats:
   automatic hostname-collapse we rejected. Notifications without a
   `notification_id` never replace each other.
 
-## Is it secure? What stops abuse and leaks?
+## Security model
 
 - **Origin pinning** — a sender can only target anchors that consented to
   *its* origin; cross-dApp targeting is impossible even with leaked principals.
@@ -576,8 +584,8 @@ Caveats:
 - **Transport confidentiality** — every payload is RFC 8291 encrypted to each
   device; no relay or gateway can read it. Note this is *transport*
   encryption: for `Display` content II itself sees plaintext (it does the
-  encryption). True end-to-end — where II never sees content — is the `Hidden`
-  variant; see the next section.
+  encryption). Keeping content from II-the-service is the `Hidden` variant
+  today (and, later, the vetKeys-sealed path); see the next section.
 - **Coarse rejections** — the dApp learns only about its own relationship with
   a target (`NoConsent`), never device counts or II state.
 - **Redirect-screen icon** — the `/notify` screen shows the app logo only from
@@ -591,54 +599,120 @@ Caveats:
   threshold ECDSA would remove it from storage but is not yet available on the
   IC (only secp256k1 is).
 
-## What about end-to-end-encrypted apps?
+## End-to-end-encrypted apps
 
 Some apps (e.g. a chat using vetKeys) encrypt content so that only the
-recipient's client can decrypt it — the app backend cannot, and neither may
-II. Our `Display` path is **not** E2E: II receives plaintext `title`/`body`
-and would hold it in the queue. The `Hidden` variant exists so these apps can
-use II-hosted push without ever handing content to II.
+recipient can read it — the app backend cannot. Our `Display` path is **not**
+E2E: II receives plaintext `title`/`body` and briefly holds it. The `Hidden`
+variant lets these apps use II-hosted push without ever handing content to II.
 
-**The governing constraint:** whoever renders a notification must hold the
-decryption key at render time. In E2E only the recipient's *client* holds it.
-II's service worker runs on II's origin with no access to the app's keys
-(cross-origin, no shared storage, no delegation, no vetKey scope), so it
-**cannot** decrypt app content — not "hard," but structurally impossible.
-Therefore any path where II's SW displays real E2E content means someone
-II-side saw plaintext, i.e. it is no longer E2E.
+**Correcting an earlier overstatement.** It is tempting to say II can *never*
+show decrypted content. That is too strong. The honest constraint is about
+*who* decrypts and *where*, and it comes with a trust dial the user is already
+turning:
 
-Two tempting designs, both rejected for that reason:
+- **II-the-service decrypts** — the canister and its node operators see
+  plaintext. That is just `Display` relabeled: fine for non-sensitive content,
+  not E2E.
+- **II's service worker decrypts on the user's own device**, using a key it
+  legitimately obtains and that II-the-service never sees in the clear. This
+  **is** viable. It asks the user to trust II's *client code* running as them
+  on their device — which is only a small step past the trust they already
+  place in II by signing in with it (and exactly the trust the `Display` path
+  already assumes). This is the basis for showing real content in an
+  E2E-friendly way.
 
-- **SW fetches plaintext from a dApp endpoint.** Only works if the dApp
-  *backend* can produce plaintext — which means the backend can decrypt, so
-  it is not E2E. (Also mechanically broken: II's SW has no credential to
-  authenticate to the dApp as the user, plus CORS and a fetch per
-  notification.) Fine for non-E2E "pull" apps; not E2E.
-- **II decrypts via its own endpoint.** If II can decrypt, II sees plaintext —
-  not E2E by definition. It is just the `Display` model relabeled.
+So there is a spectrum, from no trust to full trust in II for content:
 
-**What E2E apps get instead:** a content-hidden notification ("New message
-from `<origin>`") plus **tap-through reveal** — the user taps, the app opens,
-the app decrypts and shows the message in its own context. This is the
-industry-standard E2E notification UX (Signal, iMessage with previews off),
-and the `/notify` redirect we already have is exactly the reveal path. II
-never sees a byte of content, and there is no plaintext at rest in the queue.
-
-Rich decrypted content *in the notification itself* is **out of scope for
-II-hosted push** — it would require the app's own service worker (holding the
-recipient's keys), i.e. the app runs standard Web Push itself and II is not in
-the loop. The product segmentation:
-
-| Sender type | Variant | In-notification content | E2E |
+| Approach | Who decrypts | In-notification | Trust in II for content |
 | --- | --- | --- | --- |
-| Non-sensitive / backend-trusted | `Display` | full `title`/`body` | No (II sees it) |
-| E2E app, II-hosted | `Hidden` | generic; real content on tap | Yes |
-| E2E app wanting rich previews | — (own SW) | full, decrypted on device | Yes, not II-hosted |
+| `Hidden` (ships first) | the app, after tap | generic ("New message") | none — II never touches content |
+| Design A — vetKeys-sealed | II's **SW**, on device | full, real text | II's client code + IC vetKD threshold |
+| Design B — dApp-fetch | II's **SW**, on device | full, real text | II's client code (+ the dApp) |
+| `Display` | II-the-service | full | full — II reads it |
+| App's own SW (not II-hosted) | the app's own SW | full | none — II isn't in the loop |
 
-Forward-compat is already in the interface: the `PushContent` variant means an
-E2E sender picks `Hidden` and has no field to leak content through, and the SW
-render path branches on it. No vetKeys or crypto change is needed in II — vet
-key derivation and decryption stay entirely in the app.
+### Baseline that ships first: `Hidden` + tap-through
+
+A content-hidden notification ("New message from `<origin>`") plus
+**tap-through reveal** — the user taps, the app opens, the app decrypts and
+shows the message in its own context. This is the industry-standard E2E
+notification UX (Signal, iMessage with previews off), and the `/notify`
+redirect we already have is exactly the reveal path. II never sees a byte of
+content and stores no plaintext.
+
+Framed honestly, `Hidden` is a **deliberate lesser experience that is what
+enables E2E and push together at all.** The user gives up the lock-screen
+preview (they see "New message," not the text) — a real downgrade versus
+`Display`. But it needs zero extra trust in II and ships today, so it is the
+right first step; the richer designs below are how the real text gets onto the
+lock screen later.
+
+### Design A — vetKeys-sealed content, decrypted in II's SW (preferred richer path)
+
+II provides the encryption service so the app never hands plaintext to
+II-the-service, yet the real text still reaches the lock screen:
+
+- II derives a vetKeys (IBE) identity per `(user, origin)`. The dApp fetches
+  II's master public key once and **encrypts the content to that identity
+  offline** — no round-trip, recipient needn't be online. It sends only the
+  *ciphertext* to II via `push_send`, as opaque bytes II cannot read.
+- II delivers as usual (RFC 8291 wraps the opaque bytes). On the device, II's
+  SW authenticates **as the user** to II's canister and requests the vetKD
+  decryption key. vetKD returns it **encrypted to the SW's transport key**, so
+  no node operator sees the key in the clear; the SW decrypts the content and
+  shows the **real text**.
+- **What II-the-service sees:** in the honest flow, nothing — not the content,
+  not the key in clear. Plaintext exists only inside the user's SW, and II
+  stores none of it.
+- **The trust that remains:** II's canister *controls the vetKD
+  authorization*, so a malicious/compromised II could authorize itself to
+  derive a user's key and decrypt. That is the same class of trust the user
+  already extends to II for their delegations — not a new kind. No single node
+  can derive the key (threshold); II's client code is assumed honest (if it
+  weren't, the user's identity is already lost). A small, coherent increment
+  over `Hidden`.
+- **Cost:** vetKeys integration in II and a derive-key call per render; the
+  dApp does IBE encryption. No change to the send/admission model — II still
+  just carries bytes it can't read.
+
+### Design B — dApp keeps the keys, II's SW fetches + decrypts (alternative)
+
+The push is a bare wake; on receipt II's SW calls an endpoint **on the dApp's
+side** to obtain the content, then renders it. Genuinely E2E only if that
+endpoint hands back *ciphertext* the SW can decrypt — which forces one of two
+uncomfortable choices:
+
+- **Endpoint returns plaintext.** Then the dApp *backend* can decrypt, so it is
+  "trust the dApp backend," not strict E2E. Simple, no vetKeys; fine for apps
+  that don't need backend-blind encryption.
+- **Endpoint returns ciphertext + the SW holds the key.** The recipient's key
+  lives in the dApp's client (cross-origin from II's SW), so the dApp must
+  *provision a key into II's SW* — now II's SW holds dApp secrets, a real added
+  surface (II's code could exfiltrate them).
+
+Either way it also needs a way for the SW to authenticate to the dApp as the
+user (it has no delegation to the dApp) and a **fetch per notification**
+(latency, dApp serving load, offline-delivery gaps). More moving parts and a
+murkier trust story than A; documented as the fallback for apps that prefer to
+own the crypto or are content with backend-readable content.
+
+### Recommendation
+
+- **Ship `Hidden` first** — zero extra trust, works today.
+- **Plan for Design A (vetKeys)** as the way to put real content on the lock
+  screen while keeping II-the-service blind to it — the trust increment is
+  small and of a kind the user already accepts.
+- **Design B** stays the documented alternative for backend-trusted apps or
+  teams that don't want vetKeys.
+- **App runs its own SW** remains the strict, II-uninvolved option for teams
+  that want rich previews with II entirely out of the loop.
+
+Forward-compat is already in the interface: an E2E sender picks `Hidden` today
+and has no field to leak content through. Design A slots in later as an opaque
+**ciphertext arm** of `PushContent` (II still just carries bytes it can't
+read) plus a vetKD derive-and-decrypt branch in the SW render path — no change
+to send, admission, or storage.
 
 ## Open items
 
@@ -697,8 +771,9 @@ Known-deferred:
   land before either:
   - **outcall retries** — a retry is itself a replay; without dedup, retry
     logic manufactures duplicate banners.
-  - **gateway mode** — a compromised gateway is inherently replay-capable;
-    `msg_id` + SW dedup is what neutralizes that power.
+  - **the gateway** — a compromised gateway is inherently replay-capable, so
+    `msg_id` + SW dedup should land together with the gateway (the chosen
+    delivery path) to neutralize that power.
   Today's practical risk is low (TLS gates capture; blast radius is a
   duplicate banner, not credential theft).
 - **VAPID key → P-256 threshold ECDSA** — the key is in stable memory only
@@ -717,7 +792,7 @@ Explicitly rejected:
   notifications that must not replace each other on the device. Collapsing is
   opt-in per send via `topic`, never automatic per origin.
 
-## What does a dApp developer actually have to do?
+## dApp developer integration
 
 One-time setup (~15 min): serve `.well-known/ii-push-senders`, call
 `push_register_sender(origin)` from the backend. Steady state: hand the client
@@ -747,23 +822,24 @@ no crypto, no Web Push knowledge, and no per-user state beyond the principals
 from auth (the library owns campaign status). Delivery is best-effort with no
 receipts; the only per-user signal is `NoConsent`.
 
-## Does it actually scale?
+## Feasibility and scale
 
-| Metric | Direct | Gateway |
+| Metric | Gateway (chosen) | Direct (alternative) |
 | --- | --- | --- |
 | App → II for 10k users | ~10 paced chunks (client-driven) | ~10 paced chunks |
-| Outcalls per 10k blast | ~13k | ~25 |
+| Outcalls per 10k blast | ~25 | ~13k |
 | II **stable storage** | O(users) — flat with volume | O(users) — flat with volume |
 | II in-flight buffer | one chunk (heap, transient) | one chunk (heap, transient) |
-| Full-delivery latency | minutes | seconds |
-| Main costs | storage + ~13k outcalls | storage + ~25 outcalls |
+| Full-delivery latency | seconds | minutes |
+| Main costs | storage + ~25 outcalls | storage + ~13k outcalls |
 
-App → II is feasible: the client library streams bounded chunks, II admits
-what it has capacity for, and its **stable storage stays flat regardless of
-volume**. II → device is feasible in direct mode and cheap/fast in gateway
-mode — and gateway speed is what raises II's admission throughput, since a
-faster drain recycles the small buffer sooner. The gateway is the lever when
-throughput (not just cost) is the ceiling.
+App → II is feasible either way: the client library streams bounded chunks, II
+admits what it has capacity for, and its **stable storage stays flat regardless
+of volume**. The two rows above are why the **gateway is the chosen delivery
+path** — a faster, cheaper drain recycles II's small buffer sooner, which is
+what raises admission throughput. Direct delivery works and is fully on-chain,
+but its per-device outcall cost and slower drain are exactly what the gateway
+removes, so it stays as the alternative/fallback.
 
 ## Future exploration
 
