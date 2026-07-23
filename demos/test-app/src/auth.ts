@@ -115,7 +115,7 @@ export const authWithII = async ({
       hasAttributes && useIcrc3Attributes
         ? authClient.requestAttributes({
             keys: requestAttributes,
-            nonce,
+            nonce: () => Promise.resolve(nonce),
           })
         : Promise.resolve(undefined),
     ]);
