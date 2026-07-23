@@ -284,7 +284,8 @@ const MCP_REGISTRATION_MEMORY_ID: MemoryId = MemoryId::new(MCP_REGISTRATION_MEMO
 /// serialization.
 const MCP_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(MCP_CONFIG_MEMORY_INDEX);
 
-/// SSO stable-id bridge: `(iss, primary_client_id, stable_id) -> primary_sub`.
+/// SSO stable-id bridge:
+/// `SHA-256(sso_domain, iss, primary_client_id, stable_id) -> AnchorNumber`.
 const SSO_STABLE_ID_INDEX_MEMORY_ID: MemoryId = MemoryId::new(SSO_STABLE_ID_INDEX_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
@@ -448,7 +449,8 @@ pub struct Storage<M: Memory> {
     mcp_config_memory: StableBTreeMap<StorableAnchorNumber, StorableMcpConfig, ManagedMemory<M>>,
 
     sso_stable_id_index_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    /// SSO stable-id lookup index: `(iss, primary_client_id, stable_id) ->
+    /// SSO stable-id lookup index:
+    /// `SHA-256(sso_domain, iss, primary_client_id, stable_id) ->
     /// AnchorNumber`. Storage-maintained — [`Storage::write`] reconciles it
     /// from the anchors' stored OpenID credentials on every write, so it
     /// self-cleans when a credential is removed or moved. Mirrors
@@ -979,7 +981,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Reconcile the SSO stable-id index against `anchor_number`'s stored
     /// credentials. Mirrors [`Storage::sync_anchor_with_openid_credential_index`]:
-    /// derive the `(iss, primary_client_id, stable_id)` keyset from each
+    /// derive the `(sso_domain, iss, primary_client_id, stable_id)` keyset from each
     /// credential that carries a `stable_id`, diff previous vs current, and
     /// apply only the delta — `remove` the entries that disappeared, `insert`
     /// the new ones pointing at this anchor. Because the keyset is derived from
@@ -995,11 +997,17 @@ impl<M: Memory + Clone> Storage<M> {
             credentials
                 .into_iter()
                 .filter_map(|cred| {
-                    cred.stable_id.map(|stable_id| StorableSsoStableIdKey {
-                        iss: cred.iss,
-                        primary_client_id: cred.aud,
-                        stable_id,
-                    })
+                    // Both are set together on an SSO non-`sub` credential; a
+                    // `stable_id` without an `sso_domain` can't be domain-scoped,
+                    // so it isn't indexed.
+                    let stable_id = cred.stable_id?;
+                    let sso_domain = cred.sso_domain?;
+                    Some(StorableSsoStableIdKey::new(
+                        &sso_domain,
+                        &cred.iss,
+                        &cred.aud,
+                        &stable_id,
+                    ))
                 })
                 .collect()
         }
@@ -1290,17 +1298,19 @@ impl<M: Memory + Clone> Storage<M> {
     /// [`Storage::lookup_anchor_with_openid_credential`].
     pub fn lookup_anchor_by_sso_stable_id(
         &self,
+        sso_domain: &str,
         iss: &str,
         primary_client_id: &str,
         stable_id: &str,
     ) -> Option<AnchorNumber> {
         let anchor_numbers: Vec<AnchorNumber> = self
             .sso_stable_id_index_memory
-            .get(&StorableSsoStableIdKey {
-                iss: iss.to_string(),
-                primary_client_id: primary_client_id.to_string(),
-                stable_id: stable_id.to_string(),
-            })
+            .get(&StorableSsoStableIdKey::new(
+                sso_domain,
+                iss,
+                primary_client_id,
+                stable_id,
+            ))
             .map(Into::into)?;
         anchor_numbers.first().copied()
     }

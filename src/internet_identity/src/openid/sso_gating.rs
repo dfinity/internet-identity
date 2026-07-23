@@ -126,8 +126,17 @@ pub fn resolve_primary_identity(
         .ok_or(OpenIdDelegationError::JwtVerificationFailed)?;
 
     let primary_sub = if verification.is_gated() {
+        // Scope the lookup to the domain the login was discovered through, so a
+        // gated login can only ever resolve to a primary identity established
+        // through that same domain (an SSO credential always carries it).
+        let sso_domain = verification
+            .credential
+            .sso_domain
+            .as_deref()
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
         let anchor_number = state::storage_borrow(|storage| {
             storage.lookup_anchor_by_sso_stable_id(
+                sso_domain,
                 &verification.credential.iss,
                 &verification.primary_client_id,
                 &stable_id,
@@ -401,6 +410,35 @@ mod tests {
             resolve_primary_identity(&gated_b).unwrap().credential.sub,
             "primary-sub-b",
             "client-b gated login must resolve to client-b's primary sub (no clobber)"
+        );
+    }
+
+    #[test]
+    fn sso_stable_id_index_is_scoped_per_discovery_domain() {
+        init_test_storage();
+        // A primary identity established through the org's real domain.
+        let primary = sso_verification(false, "oid", "primary-sub", Some("oid-9"));
+        store_primary_credential(resolve_primary_identity(&primary).unwrap().credential);
+
+        // A gated login carrying the same (iss, primary_client, stable_id) but
+        // discovered through a *different* domain must not resolve to that
+        // identity — the domain is part of the index key, so cross-domain
+        // injection into a foreign namespace fails safe.
+        let mut gated_other_domain = sso_verification(true, "oid", "pairwise", Some("oid-9"));
+        gated_other_domain.credential.sso_domain = Some("attacker.example".to_string());
+        assert!(matches!(
+            resolve_primary_identity(&gated_other_domain),
+            Err(OpenIdDelegationError::NoSuchAnchor)
+        ));
+
+        // The same login through the correct domain still resolves.
+        let gated_same_domain = sso_verification(true, "oid", "pairwise", Some("oid-9"));
+        assert_eq!(
+            resolve_primary_identity(&gated_same_domain)
+                .unwrap()
+                .credential
+                .sub,
+            "primary-sub"
         );
     }
 }

@@ -245,13 +245,17 @@ fn should_write_and_update_sso_stable_id_index() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
+    let sso_domain = "acme.example";
     let iss = "https://example.com";
     let primary_client = "example-aud";
     let stable_id = "oid-stable-42";
 
     // A credential that carries a `stable_id` (a non-`sub` primary credential).
+    // An SSO credential always carries its discovery `sso_domain` too; the index
+    // key is scoped by it.
     let mut bridged = openid_credential(0);
     bridged.stable_id = Some(stable_id.to_string());
+    bridged.sso_domain = Some(sso_domain.to_string());
     // A second credential on the same anchor without a `stable_id` — it must
     // never appear in the SSO stable-id index.
     let plain = openid_credential(1);
@@ -263,11 +267,17 @@ fn should_write_and_update_sso_stable_id_index() {
 
     // The bridged credential is indexed; the plain one is not.
     assert_eq!(
-        storage.lookup_anchor_by_sso_stable_id(iss, primary_client, stable_id),
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
         Some(anchor_a.anchor_number())
     );
     assert_eq!(
-        storage.lookup_anchor_by_sso_stable_id(iss, primary_client, "no-such-oid"),
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, "no-such-oid"),
+        None
+    );
+    // The same (iss, primary_client, stable_id) discovered through a different
+    // domain does not resolve to this entry — the domain is part of the key.
+    assert_eq!(
+        storage.lookup_anchor_by_sso_stable_id("attacker.example", iss, primary_client, stable_id),
         None
     );
 
@@ -275,7 +285,7 @@ fn should_write_and_update_sso_stable_id_index() {
     anchor_a.remove_openid_credential(&bridged.key()).unwrap();
     storage.write(anchor_a.clone()).unwrap();
     assert_eq!(
-        storage.lookup_anchor_by_sso_stable_id(iss, primary_client, stable_id),
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
         None
     );
 
@@ -284,7 +294,7 @@ fn should_write_and_update_sso_stable_id_index() {
     anchor_b.add_openid_credential(bridged.clone()).unwrap();
     storage.write(anchor_b.clone()).unwrap();
     assert_eq!(
-        storage.lookup_anchor_by_sso_stable_id(iss, primary_client, stable_id),
+        storage.lookup_anchor_by_sso_stable_id(sso_domain, iss, primary_client, stable_id),
         Some(anchor_b.anchor_number())
     );
 }
