@@ -122,6 +122,10 @@ export function sendAuthToOpenedTab(
     clearTimeout(timer);
 
     try {
+      // The manage handoff only ever carries a `DelegationIdentity`.
+      if (!(auth.identity instanceof DelegationIdentity)) {
+        return;
+      }
       const receiverDer = fromBase64(
         parsed.data.publicKeyDer,
       ) as DerEncodedPublicKey;

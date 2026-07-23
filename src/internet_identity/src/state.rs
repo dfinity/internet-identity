@@ -120,15 +120,11 @@ pub struct PersistentState {
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    // Allowlist of domains accepted by `add_discoverable_oidc_config`. `None`
-    // falls back to the built-in `is_production`-keyed defaults; `Some(vec)`
-    // replaces them entirely.
-    pub sso_discoverable_domains: Option<Vec<String>>,
-    // Deploy flag opening the SSO discovery domain gate to any domain. `None`/
-    // `Some(false)` keep `sso_discoverable_domains` (and its defaults) in force;
-    // `Some(true)` accepts every domain. Does not relax the strict-`https`
-    // requirement — see `openid::sso::validate_allowed_discovery_domain`.
-    pub sso_allow_any_domain: Option<bool>,
+    // Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+    // loopback hosts (localhost/127.0.0.1) so e2e can use http mock IdPs. `None`/
+    // `Some(false)` (the default) require https for every discovery host;
+    // non-loopback always requires https. See `sso::validate_discovery_domain`.
+    pub sso_allow_insecure_discovery: Option<bool>,
     // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
@@ -172,8 +168,7 @@ impl Default for PersistentState {
             backend_origin: None,
             new_flow_origins: None,
             openid_configs: None,
-            sso_discoverable_domains: None,
-            sso_allow_any_domain: None,
+            sso_allow_insecure_discovery: None,
             oidc_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,

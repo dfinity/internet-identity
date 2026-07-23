@@ -122,6 +122,7 @@ pub fn create_identity_with_openid_credential(
             salt: *salt,
             name: "John Doe".into(),
             discovery_domain: None,
+            origin: None,
         },
     )
     .expect("API call failed")

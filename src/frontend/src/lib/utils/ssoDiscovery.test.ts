@@ -10,7 +10,7 @@ import type { SsoDiscovery } from "$lib/generated/internet_identity_types";
 vi.mock("$lib/globals", () => ({
   anonymousActor: {
     discover_sso: vi.fn(),
-    get_sso_discovery: vi.fn(),
+    get_sso_discovery_status: vi.fn(),
   },
 }));
 
@@ -21,6 +21,7 @@ const DISCOVERY: SsoDiscovery = {
   authorization_endpoint: "https://dfinity.okta.com/oauth2/v1/authorize",
   scopes: ["openid", "profile", "email"],
   name: ["DFINITY"],
+  resolved_client_id: ["dfinity-sso-client-id"],
 };
 
 describe("ssoDiscovery", () => {
@@ -91,12 +92,12 @@ describe("ssoDiscovery", () => {
       await expect(discoverSsoConfig("not a domain")).rejects.toThrow(
         "Invalid domain format",
       );
-      expect(anonymousActor.get_sso_discovery).not.toHaveBeenCalled();
+      expect(anonymousActor.get_sso_discovery_status).not.toHaveBeenCalled();
       expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
     });
 
     it("returns the mapped result when the query reads Resolved immediately", async () => {
-      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
         Resolved: DISCOVERY,
       });
 
@@ -105,6 +106,7 @@ describe("ssoDiscovery", () => {
       expect(result).toEqual({
         domain: "dfinity.org",
         clientId: "dfinity-sso-client-id",
+        resolvedClientId: "dfinity-sso-client-id",
         name: "DFINITY",
         discovery: {
           issuer: "https://dfinity.okta.com",
@@ -113,29 +115,58 @@ describe("ssoDiscovery", () => {
           scopes_supported: ["openid", "profile", "email"],
         },
       });
+      expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledWith({
+        org_domain: "dfinity.org",
+        target_app_origin: [],
+      });
       // Already resolved, so no update was needed to drive a fetch.
       expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
     });
 
-    it("throws DomainNotConfiguredError(rejected) when the query reads NotAllowed", async () => {
-      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
-        NotAllowed: null,
+    it("passes the target origin and returns the per-app resolvedClientId", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Resolved: {
+          ...DISCOVERY,
+          resolved_client_id: ["per-app-client-id"],
+        },
       });
 
-      const error = await discoverSsoConfig("evil.example").catch(
-        (e: unknown) => e,
+      const result = await discoverSsoConfig(
+        "dfinity.org",
+        undefined,
+        "https://payroll.example",
       );
+
+      expect(result.resolvedClientId).toBe("per-app-client-id");
+      expect(result.clientId).toBe("dfinity-sso-client-id");
+      expect(anonymousActor.get_sso_discovery_status).toHaveBeenCalledWith({
+        org_domain: "dfinity.org",
+        target_app_origin: ["https://payroll.example"],
+      });
+    });
+
+    it("throws DomainNotConfiguredError(origin-denied) when the origin is gated off", async () => {
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
+        Resolved: {
+          ...DISCOVERY,
+          resolved_client_id: [],
+        },
+      });
+
+      const error = await discoverSsoConfig(
+        "dfinity.org",
+        undefined,
+        "https://denied.example",
+      ).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(DomainNotConfiguredError);
       if (error instanceof DomainNotConfiguredError) {
-        expect(error.reason).toBe("rejected");
+        expect(error.reason).toBe("origin-denied");
       }
-      // NotAllowed is terminal — no point driving the fetch.
-      expect(anonymousActor.discover_sso).not.toHaveBeenCalled();
     });
 
     it("drives the update while the query reads Pending, then resolves", async () => {
       vi.useFakeTimers();
-      vi.mocked(anonymousActor.get_sso_discovery)
+      vi.mocked(anonymousActor.get_sso_discovery_status)
         .mockResolvedValueOnce({ Pending: null })
         .mockResolvedValueOnce({ Pending: null })
         .mockResolvedValueOnce({ Resolved: DISCOVERY });
@@ -152,7 +183,7 @@ describe("ssoDiscovery", () => {
     });
 
     it("stops polling when the abort signal is already aborted", async () => {
-      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
         Pending: null,
       });
       vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);
@@ -166,7 +197,7 @@ describe("ssoDiscovery", () => {
 
     it("aborting mid-sleep stops the poll without firing another update", async () => {
       vi.useFakeTimers();
-      vi.mocked(anonymousActor.get_sso_discovery).mockResolvedValue({
+      vi.mocked(anonymousActor.get_sso_discovery_status).mockResolvedValue({
         Pending: null,
       });
       vi.mocked(anonymousActor.discover_sso).mockResolvedValue(undefined);

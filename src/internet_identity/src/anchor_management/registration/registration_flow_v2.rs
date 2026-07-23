@@ -197,8 +197,11 @@ pub fn identity_registration_finish(
     Ok(IdRegFinishResult { identity_number })
 }
 
-/// Verify the OpenID JWT for a registration and pair the credential with its
-/// config issuer.
+/// Verify a non-gated OpenID registration token — a direct provider (Google /
+/// Microsoft / Apple) or an ungated SSO login (a discovery domain with no gated
+/// origin) — into the credential to store. A gated SSO login (discovery domain +
+/// origin) is verified by the caller through [`openid::verify_sso_for_registration`]
+/// instead, mirroring the `openid_`/`sso_prepare_delegation` split on the auth side.
 ///
 /// Returns [`Cached::Pending`](openid::Cached::Pending) when the SSO discovery /
 /// JWKS cache is cold (or has since been evicted) so the caller can surface a
@@ -209,32 +212,14 @@ pub fn identity_registration_finish(
 /// which would conflict with the `storage_borrow_mut` it would otherwise run
 /// inside.
 pub fn verify_openid_for_registration(
-    openid_registration_data: &OpenIDRegFinishArg,
-) -> Result<openid::Cached<(openid::OpenIdCredential, String)>, IdRegFinishError> {
-    let OpenIDRegFinishArg {
-        jwt,
-        salt,
-        name: _,
-        discovery_domain,
-    } = openid_registration_data;
-
-    openid::prefetch_sso(discovery_domain.as_deref());
-    let openid_credential = match openid::verify_jwt(jwt, salt, discovery_domain.as_deref())? {
-        openid::Cached::Ready(credential) => credential,
-        openid::Cached::Pending => return Ok(openid::Cached::Pending),
-    };
-
-    // Config issuer for the authorization key / operation log: the configured
-    // provider's (template) issuer, or the concrete JWT issuer for an SSO
-    // credential, which carries its own `sso_domain` for scope routing.
-    let openid_config_iss = openid_credential
-        .config_issuer()
-        .unwrap_or_else(|| openid_credential.iss.clone());
-
-    Ok(openid::Cached::Ready((
-        openid_credential,
-        openid_config_iss,
-    )))
+    arg: &OpenIDRegFinishArg,
+) -> Result<openid::Cached<openid::OpenIdCredential>, IdRegFinishError> {
+    openid::prefetch_sso(arg.discovery_domain.as_deref());
+    Ok(openid::verify_jwt(
+        &arg.jwt,
+        &arg.salt,
+        arg.discovery_domain.as_deref(),
+    )?)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

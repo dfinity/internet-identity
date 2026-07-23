@@ -17,7 +17,10 @@ export interface SsoDiscoveryResult {
    * provenance rather than by the underlying IdP's issuer.
    */
   domain: string;
+  /** The org's primary OIDC client. */
   clientId: string;
+  /** The client to run the ceremony against for the target origin; equals {@link clientId} when no origin was passed. */
+  resolvedClientId: string;
   /**
    * Human-readable name for the SSO, if the domain publishes one. Used by the
    * consent UI to render `sso:<domain>:<key>` attribute rows with a friendly
@@ -32,14 +35,14 @@ export interface SsoDiscoveryResult {
 }
 
 /**
- * Raised when a domain's SSO configuration can't be resolved: the canister
- * rejected the domain (`rejected`) or the resolution didn't complete in time
+ * Raised when a domain's SSO configuration can't be resolved: the origin is
+ * gated off (`origin-denied`) or the resolution didn't complete in time
  * (`timeout`).
  */
 export class DomainNotConfiguredError extends Error {
-  readonly reason: "rejected" | "timeout";
+  readonly reason: "timeout" | "origin-denied";
 
-  constructor(reason: "rejected" | "timeout") {
+  constructor(reason: "timeout" | "origin-denied") {
     super(`SSO discovery failed (${reason})`);
     this.name = "DomainNotConfiguredError";
     this.reason = reason;
@@ -76,7 +79,7 @@ const isLoopbackHost = (host: string): boolean => {
  * Validate domain input format (DNS name). Loopback hosts (`localhost` and
  * `127.0.0.1`, with or without a port) skip the DNS-format check so e2e tests
  * can use `localhost:11107` without widening the regex. The canister's
- * `sso_discoverable_domains` allowlist is the actual trust gate.
+ * bare-authority check on the domain is the actual trust gate.
  *
  * @throws {Error} when `domain` is not a valid DNS name.
  */
@@ -108,16 +111,24 @@ export const validateDomain = (domain: string): string => {
   return trimmed;
 };
 
-const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => ({
-  domain: discovery.discovery_domain,
-  clientId: discovery.client_id,
-  name: discovery.name[0],
-  discovery: {
-    issuer: discovery.issuer,
-    authorization_endpoint: discovery.authorization_endpoint,
-    scopes_supported: discovery.scopes,
-  },
-});
+const toResult = (discovery: SsoDiscovery): SsoDiscoveryResult => {
+  // `resolved_client_id` is empty only when an origin was supplied and denied by `gate_all_apps`.
+  const resolvedClientId = discovery.resolved_client_id[0];
+  if (resolvedClientId === undefined) {
+    throw new DomainNotConfiguredError("origin-denied");
+  }
+  return {
+    domain: discovery.discovery_domain,
+    clientId: discovery.client_id,
+    resolvedClientId,
+    name: discovery.name[0],
+    discovery: {
+      issuer: discovery.issuer,
+      authorization_endpoint: discovery.authorization_endpoint,
+      scopes_supported: discovery.scopes,
+    },
+  };
+};
 
 // Wrap the abort check in a function so each call returns a fresh `boolean`.
 // Reading `signal?.aborted` inline narrows it to `false` for the rest of the
@@ -127,31 +138,33 @@ const isAborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
 
 /**
  * Resolve a domain's SSO configuration. Validates the domain, then polls
- * `get_sso_discovery` (query) for the state; on `Pending` it drives the fetch
- * with `discover_sso` (update) and polls again. An optional `signal` cancels
- * the poll (the input debounce drops a stale lookup when the user keeps typing).
+ * `get_sso_discovery_status` (query); on `Pending` it drives the fetch with
+ * `discover_sso` (update) and polls again. An optional `signal` cancels the poll
+ * (the input debounce drops a stale lookup when the user keeps typing).
  *
  * @throws {Error} when `domain` is invalid, or the lookup is aborted.
- * @throws {DomainNotConfiguredError} when the domain isn't allowed
- *   (`NotAllowed`) or the resolution times out.
+ * @throws {DomainNotConfiguredError} when the origin is denied (`origin-denied`)
+ *   or the resolution times out.
  */
 export const discoverSsoConfig = async (
   domain: string,
   signal?: AbortSignal,
+  origin?: string,
 ): Promise<SsoDiscoveryResult> => {
   const validatedDomain = validateDomain(domain);
+  const originArg: [] | [string] = origin !== undefined ? [origin] : [];
 
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     if (isAborted(signal)) {
       throw new Error("SSO discovery aborted");
     }
-    // Read the discovery state via the cheap query.
-    const state = await anonymousActor.get_sso_discovery(validatedDomain);
-    if ("Resolved" in state) {
-      return toResult(state.Resolved);
-    }
-    if ("NotAllowed" in state) {
-      throw new DomainNotConfiguredError("rejected");
+    // Read the discovery status via the cheap query.
+    const status = await anonymousActor.get_sso_discovery_status({
+      org_domain: validatedDomain,
+      target_app_origin: originArg,
+    });
+    if ("Resolved" in status) {
+      return toResult(status.Resolved);
     }
     // Re-check before the update: the query above may have spanned an abort,
     // and we don't want to drive a fetch for a lookup the user already dropped.

@@ -51,8 +51,9 @@ Against a non-loopback target two things change versus the localhost flow:
    JWKS via IC HTTP outcalls, and II requires `https://` with a publicly trusted
    certificate for any non-loopback host. So the server must sit behind a
    public HTTPS URL.
-2. **Allowlist.** The discovery domain must be in the target canister's
-   `sso_discoverable_domains`. This is the trust gate — see step 3.
+2. **Reachable over HTTPS.** There's no domain allowlist — II accepts any
+   bare-authority domain — but discovery outcalls to a non-loopback host require
+   a valid public `https` URL. That TLS requirement is the trust gate.
 
 ### Configuration (env vars)
 
@@ -109,17 +110,9 @@ curl https://my-toy-idp.example.com/.well-known/openid-configuration
 ### 3. Allowlist the discovery domain on the target canister
 
 The domain a user types on the SSO screen (your tunnel host, e.g.
-`my-toy-idp.example.com`) must be in the canister's `sso_discoverable_domains`.
-This requires an II admin to apply an upgrade arg — the arg is field-merged, so
-only `sso_discoverable_domains` need be set, **but the vec fully replaces the
-previous allowlist** (so re-include any domains you want to keep). Entries are
-lowercased by the canister.
-
-```candid
-(opt record {
-  sso_discoverable_domains = opt vec { "beta.dfinity.org"; "my-toy-idp.example.com" };
-})
-```
+`my-toy-idp.example.com`) needs no allowlisting — II accepts any bare-authority
+domain and resolves it over `https`. Just make sure your tunnel host serves the
+discovery endpoints over a valid public HTTPS URL.
 
 With no override, the default allowlist is `dfinity.org` on a production
 canister and `beta.dfinity.org` otherwise — so an arbitrary tunnel host will be
@@ -141,9 +134,8 @@ resolved), and complete the IdP flow.
 
 ## Troubleshooting
 
-- **Continue stays disabled / `NotAllowed`** — domain isn't in
-  `sso_discoverable_domains`, or discovery isn't reachable over HTTPS. Re-check
-  steps 1 and 3.
+- **Continue stays disabled / discovery times out** — the discovery endpoints
+  aren't reachable over a valid public HTTPS URL. Re-check step 1.
 - **`jwks_uri`/`authorization_endpoint` point at `localhost`** — the tunnel
   isn't forwarding the public `Host` header; the canister's host self-assertion
   check then fails. Verify with the `curl` in step 2.

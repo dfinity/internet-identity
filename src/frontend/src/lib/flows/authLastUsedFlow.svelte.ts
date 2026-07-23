@@ -1,6 +1,7 @@
 import {
   authenticateWithJWT,
   authenticateWithPasskey,
+  authenticateWithSso,
 } from "$lib/utils/authentication";
 import { canisterId } from "$lib/globals";
 import { authenticationStore } from "$lib/stores/authentication.store";
@@ -40,7 +41,11 @@ export class AuthLastUsedFlow {
     });
   }
 
-  authenticate = async (lastUsedIdentity: LastUsedIdentity): Promise<void> => {
+  /** Re-authenticate a stored last-used identity; `dappOrigin` routes an SSO identity through the gate path. */
+  authenticate = async (
+    lastUsedIdentity: LastUsedIdentity,
+    dappOrigin?: string,
+  ): Promise<void> => {
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
@@ -120,13 +125,15 @@ export class AuthLastUsedFlow {
         // discovery before `window.open` would let Safari block the popup.
         const { domain, loginHint } = lastUsedIdentity.authMethod.sso;
         const jwt = await requestWithPopup(
-          discoverSsoConfig(domain).then((ssoResult) => ({
-            clientId: ssoResult.clientId,
-            authURL: ssoResult.discovery.authorization_endpoint,
-            authScope: selectAuthScopes(
-              ssoResult.discovery.scopes_supported,
-            ).join(" "),
-          })),
+          discoverSsoConfig(domain, undefined, dappOrigin).then(
+            (ssoResult) => ({
+              clientId: ssoResult.resolvedClientId,
+              authURL: ssoResult.discovery.authorization_endpoint,
+              authScope: selectAuthScopes(
+                ssoResult.discovery.scopes_supported,
+              ).join(" "),
+            }),
+          ),
           {
             nonce: get(sessionStore).nonce,
             mediation: "optional",
@@ -135,17 +142,27 @@ export class AuthLastUsedFlow {
         );
         const { iss, sub } = decodeJWT(jwt);
         this.systemOverlay = false;
-        const { identity, identityNumber } = await authenticateWithJWT({
-          canisterId,
-          session: get(sessionStore),
-          jwt,
-          discoveryDomain: domain,
-        });
+        const { identity, identityNumber } =
+          dappOrigin !== undefined
+            ? await authenticateWithSso({
+                canisterId,
+                session: get(sessionStore),
+                jwt,
+                discoveryDomain: domain,
+                origin: dappOrigin,
+              })
+            : await authenticateWithJWT({
+                canisterId,
+                session: get(sessionStore),
+                jwt,
+                discoveryDomain: domain,
+              });
         await authenticationStore.set({
           identity,
           identityNumber,
           authMethod: { openid: { iss, sub } },
         });
+        // Re-record the original entry so it stays SSO-tagged; the session's `authMethod` has no `sso` variant.
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({ provider: "SSO" });
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);

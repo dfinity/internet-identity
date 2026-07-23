@@ -6,6 +6,8 @@ import {
   authenticateWithJWT,
   authenticateWithPasskey,
   authenticateWithSession,
+  authenticateWithSso,
+  SsoNormalLoginRequiredError,
 } from "$lib/utils/authentication";
 import { frontendCanisterConfig, canisterId } from "$lib/globals";
 import {
@@ -87,6 +89,8 @@ export class AuthFlow {
   #ssoJwt = $state<string>();
   #ssoDomain = $state<string>();
   #ssoName = $state<string>();
+  // Dapp SSO context for the in-flight sign-in; undefined for direct providers and management SSO.
+  #sso = $state<{ origin: string }>();
   #mode = $state<AuthMode>("both");
   #pendingOpenIdSignIn = $state<bigint>();
   #pendingMethodSwitch = $state<{
@@ -208,6 +212,7 @@ export class AuthFlow {
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
+    this.#sso = undefined;
     this.#view = "chooseMethod";
     return identityNumber;
   };
@@ -220,6 +225,7 @@ export class AuthFlow {
     this.#ssoJwt = undefined;
     this.#ssoDomain = undefined;
     this.#ssoName = undefined;
+    this.#sso = undefined;
     this.#view = "chooseMethod";
   };
 
@@ -250,6 +256,8 @@ export class AuthFlow {
   continueWithSso = async (
     ssoResult: SsoDiscoveryResult,
     mode: AuthMode = this.#mode,
+    // Target dapp origin; present routes sign-in via the SSO gate path, absent uses the openid path.
+    dappOrigin?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -263,16 +271,18 @@ export class AuthFlow {
       }
     | undefined
   > => {
-    const { clientId, discovery, domain, name: ssoName } = ssoResult;
+    const { resolvedClientId, discovery, domain, name: ssoName } = ssoResult;
     authenticationV2Funnel.addProperties({ provider: "SSO" });
+    const sso = dappOrigin !== undefined ? { origin: dappOrigin } : undefined;
     const result = await this.#openIdJwtSignIn(
       {
-        clientId,
+        clientId: resolvedClientId,
         authURL: discovery.authorization_endpoint,
         authScope: selectAuthScopes(discovery.scopes_supported).join(" "),
       },
       undefined,
       domain,
+      sso,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -340,6 +350,58 @@ export class AuthFlow {
     );
   };
 
+  // The "sign in again" dialog's action for the wizard's own gated attempt: run
+  // one normal (primary-client) sign-in to bridge the identity, then replay the
+  // stashed gated JWT — no fresh ceremony — so the gated sign-in resolves.
+  // Returns the signed-in anchor, or undefined if there's nothing stashed / it
+  // still can't resolve. Captures the gated context up front because the normal
+  // sign-in below overwrites `#ssoJwt` / `#sso`.
+  completeSsoNormalLoginRecovery = async (
+    primaryResult: SsoDiscoveryResult,
+  ): Promise<bigint | undefined> => {
+    const gatedJwt = this.#ssoJwt;
+    const gatedDomain = this.#ssoDomain;
+    const gatedSso = this.#sso;
+    const gatedName = this.#ssoName;
+    if (
+      gatedJwt === undefined ||
+      gatedDomain === undefined ||
+      gatedSso === undefined
+    ) {
+      return undefined;
+    }
+    const normal = await this.continueWithSso(primaryResult, "both");
+    if (normal?.type === "signUp") {
+      await this.completeSsoRegistration(
+        normal.name ??
+          normal.email?.split("@")[0] ??
+          primaryResult.name ??
+          primaryResult.domain,
+      );
+    }
+    const { iss, aud } = decodeJWT(gatedJwt);
+    const config: OpenIdConfig = {
+      auth_uri: "",
+      jwks_uri: "",
+      logo: "",
+      name: gatedName ?? gatedDomain,
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: iss,
+      auth_scope: [],
+      client_id: aud ?? "",
+      seed_jwks: [],
+    };
+    const result = await this.continueWithOpenId(
+      config,
+      gatedJwt,
+      "signin",
+      gatedDomain,
+      gatedSso,
+    );
+    return result?.type === "signIn" ? result.identityNumber : undefined;
+  };
+
   continueWithExistingPasskey = async (): Promise<{
     identityNumber: bigint;
     pendingLastUsedEntry?: PendingLastUsedEntry;
@@ -402,6 +464,8 @@ export class AuthFlow {
     existingJwt?: string,
     mode: AuthMode = this.#mode,
     discoveryDomain?: string,
+    // Dapp SSO context; routes the 1-click resume through the SSO gate path.
+    sso?: { origin: string },
   ): Promise<
     | {
         identityNumber: bigint;
@@ -427,6 +491,7 @@ export class AuthFlow {
       },
       existingJwt,
       discoveryDomain,
+      sso,
     );
     if (result.type === "signIn") {
       const lastUsedEntry: PendingLastUsedEntry | undefined = this.#options
@@ -518,6 +583,8 @@ export class AuthFlow {
     requestConfig: RequestConfig,
     existingJwt?: string,
     discoveryDomain?: string,
+    // Dapp SSO context; when set, redeems the JWT via the SSO gate path (`discoveryDomain` is always present alongside).
+    sso?: { origin: string },
   ): Promise<
     | {
         type: "signIn";
@@ -535,6 +602,7 @@ export class AuthFlow {
         email?: string;
       }
   > => {
+    this.#sso = sso;
     let jwt: string | undefined = existingJwt;
     if (jwt === undefined) {
       // Two try-catch blocks to avoid double-triggering the analytics.
@@ -557,12 +625,21 @@ export class AuthFlow {
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-        discoveryDomain,
-      });
+      const { identity, identityNumber } =
+        sso !== undefined && discoveryDomain !== undefined
+          ? await authenticateWithSso({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+              origin: sso.origin,
+            })
+          : await authenticateWithJWT({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+            });
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       await authenticationStore.set({
         identity,
@@ -841,23 +918,43 @@ export class AuthFlow {
     try {
       // An SSO discovery / JWKS cache that's cold (or has since been evicted)
       // reports `Pending`; retry until it warms instead of failing the signup.
-      await retryWhilePending(() =>
-        get(sessionStore).actor.openid_identity_registration_finish({
-          jwt,
-          salt: get(sessionStore).salt,
-          name,
-          discovery_domain:
-            discoveryDomain !== undefined ? [discoveryDomain] : [],
-        }),
-      ).then(throwCanisterError);
+      try {
+        await retryWhilePending(() =>
+          get(sessionStore).actor.openid_identity_registration_finish({
+            jwt,
+            salt: get(sessionStore).salt,
+            name,
+            discovery_domain:
+              discoveryDomain !== undefined ? [discoveryDomain] : [],
+            origin: this.#sso !== undefined ? [this.#sso.origin] : [],
+          }),
+        ).then(throwCanisterError);
+      } catch (error) {
+        if (
+          isCanisterError<IdRegFinishError>(error) &&
+          error.type === "SsoNormalLoginRequired"
+        ) {
+          throw new SsoNormalLoginRequiredError();
+        }
+        throw error;
+      }
       const decodedJwt = decodeJWT(jwt);
       const { iss, sub, loginHint } = decodedJwt;
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-        discoveryDomain,
-      });
+      const { identity, identityNumber } =
+        this.#sso !== undefined && discoveryDomain !== undefined
+          ? await authenticateWithSso({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+              origin: this.#sso.origin,
+            })
+          : await authenticateWithJWT({
+              canisterId,
+              session: get(sessionStore),
+              jwt,
+              discoveryDomain,
+            });
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );

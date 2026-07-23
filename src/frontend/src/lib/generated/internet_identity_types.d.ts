@@ -3,8 +3,6 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 
 export type Aaguid = Uint8Array | number[];
-export type Permissions = { 'queries' : null } |
-  { 'all' : null };
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -662,6 +660,14 @@ export interface EmailChallengeSubmitDkimLeafArg {
   'hops' : Array<SignedRRset>,
   'nonce' : string,
 }
+/**
+ * Email-recovery types
+ * ====================
+ * See `docs/ongoing/email-recovery.md` for the full design. Covers
+ * both halves of the flow: setup (binding a recovery email to an
+ * anchor) and recovery (proving control of a previously-bound
+ * address to obtain a signed delegation).
+ */
 export interface EmailRecoveryCredential {
   'created_at' : Timestamp,
   'address' : string,
@@ -783,6 +789,13 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+/**
+ * Request for `get_sso_discovery_status`.
+ */
+export interface GetSsoDiscoveryStatusRequest {
+  'target_app_origin' : [] | [FrontendHostname],
+  'org_domain' : string,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -797,6 +810,10 @@ export interface HttpResponse {
   'upgrade' : [] | [boolean],
   'status_code' : number,
 }
+/**
+ * ICRC-3 attribute sharing types
+ * ==============================
+ */
 export type Icrc3Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Icrc3Value]> } |
   { 'Nat' : bigint } |
@@ -815,6 +832,13 @@ export interface IdRegFinishArg {
   'authn_method' : AuthnMethodData,
 }
 export type IdRegFinishError = {
+    /**
+     * A gated SSO login for a non-`sub` org: the user must first sign in
+     * through the org's primary client.
+     */
+    'SsoNormalLoginRequired' : null
+  } |
+  {
     /**
      * No registration flow ongoing for the caller.
      */
@@ -989,14 +1013,6 @@ export interface InternetIdentityInit {
    */
   'doh_config' : [] | [[] | [DohConfig]],
   /**
-   * Deploy flag opening the SSO discovery domain gate to any domain. When
-   * `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
-   * which domains may be discovered as SSO providers. Does not relax the
-   * strict-`https` requirement: serving discovery over plain `http` still
-   * requires the host to be on the explicit `sso_discoverable_domains` list.
-   */
-  'sso_allow_any_domain' : [] | [boolean],
-  /**
    * One-shot backfill of the `sso_domain` / `sso_name` fields on stored
    * OpenID credentials. When set, a batched timer-driven migration stamps
    * every stored credential whose (iss, aud) matches an entry and whose
@@ -1040,13 +1056,6 @@ export interface InternetIdentityInit {
    */
   'dnssec_config' : [] | [[] | [DnssecConfig]],
   /**
-   * Allowlist of domains that may be used as discoverable SSO providers.
-   * When set, fully replaces the built-in defaults. When unset, falls back
-   * to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
-   * keyed off `is_production`.
-   */
-  'sso_discoverable_domains' : [] | [Array<string>],
-  /**
    * Configuration parameters related to the II archive.
    * Note: some parameters changes (like the polling interval) will only take effect after an archive deployment.
    * See ArchiveConfig for details.
@@ -1089,6 +1098,14 @@ export interface InternetIdentityInit {
    * Configuration for dummy authentication used in e2e tests.
    */
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
+  /**
+   * Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+   * loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+   * mock IdPs served over plain `http`. Unset / `false` (the default) require
+   * `https` for every discovery host. Never enable in production — non-loopback
+   * hosts always require `https` regardless.
+   */
+  'sso_allow_insecure_discovery' : [] | [boolean],
   /**
    * Rate limit for the `register` call.
    */
@@ -1163,13 +1180,15 @@ export interface McpPrepareDelegation {
   'account_number' : [] | [AccountNumber],
   'expiration' : Timestamp,
 }
-export interface PrepareMcpRegistrationDelegation {
-  'user_key' : UserKey,
-  'expiration' : Timestamp,
-}
+/**
+ * Result of mcp_register_v2: the expiration (ns since epoch) of the MCP session
+ * grant, plus the access level the user chose at connect (queries = read-only,
+ * all = full). The server reads permissions to learn the read-only state up
+ * front (the v2 flow has no completion POST carrying it).
+ */
 export interface McpRegistrationV2 {
-  'expiration' : Timestamp,
   'permissions' : Permissions,
+  'expiration' : Timestamp,
 }
 /**
  * Map with some variants for the value type.
@@ -1198,6 +1217,10 @@ export type MetadataMapV2 = Array<
 export interface OpenIDRegFinishArg {
   'jwt' : JWT,
   'name' : string,
+  /**
+   * Target dapp origin, set only for a first gated SSO login.
+   */
+  'origin' : [] | [string],
   'salt' : Salt,
   /**
    * SSO discovery domain the JWT was obtained through, or null for a direct
@@ -1268,6 +1291,17 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+/**
+ * The delegation permissions a caller requests, mirroring the ICP protocol's
+ * request-delegation `permissions` values. `queries` yields a queries-only
+ * delegation (the issued `Delegation` carries `permissions = "queries"`);
+ * `all` yields an unrestricted, update-capable delegation. Passed as an
+ * optional argument; an absent argument means `all`, preserving the
+ * pre-feature behavior and matching the interface spec's default for an
+ * absent `permissions` field.
+ */
+export type Permissions = { 'all' : null } |
+  { 'queries' : null };
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
@@ -1380,6 +1414,17 @@ export interface PrepareIdAliasRequest {
    * Identity for which the IdAlias should be generated.
    */
   'identity_number' : IdentityNumber,
+}
+/**
+ * Result of prepare_mcp_registration_delegation: the canister-signature public
+ * key the registration delegation is rooted at (P_reg), and the (short)
+ * expiration of that delegation. The frontend fetches the signed delegation via
+ * get_mcp_registration_delegation and delivers the chain to the trusted MCP
+ * server, which redeems it with mcp_register_v2.
+ */
+export interface PrepareMcpRegistrationDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
 }
 export interface PrepareSessionDelegation {
   'user_key' : UserKey,
@@ -1597,17 +1642,61 @@ export interface SsoDiscovery {
   'name' : [] | [string],
   'authorization_endpoint' : string,
   'issuer' : string,
+  /**
+   * Client the target origin runs its ceremony against; `null` when denied.
+   */
+  'resolved_client_id' : [] | [string],
   'discovery_domain' : string,
+  /**
+   * The org's primary OIDC client.
+   */
   'client_id' : string,
 }
 /**
- * State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
- * fetch isn't a distinct state — it reads as `Pending` and the frontend times
- * out — so the states are resolved, in flight, or not allowed.
+ * Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+ * failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+ * times out — so the statuses are: resolved, or in flight.
  */
-export type SsoDiscoveryState = { 'NotAllowed' : null } |
-  { 'Resolved' : SsoDiscovery } |
+export type SsoDiscoveryStatus = { 'Resolved' : SsoDiscovery } |
   { 'Pending' : null };
+/**
+ * Request for `sso_get_delegation`.
+ */
+export interface SsoGetDelegationRequest {
+  'jwt' : JWT,
+  'session_key' : SessionKey,
+  'salt' : Salt,
+  'sso_attr_bundle' : Uint8Array | number[],
+  'target_app_origin' : FrontendHostname,
+  'expiration' : Timestamp,
+  'org_domain' : string,
+}
+/**
+ * Response of `sso_get_delegation`.
+ */
+export interface SsoGetDelegationResponse {
+  'signed_delegation' : SignedDelegation,
+  'sso_attr_bundle_signature' : Uint8Array | number[],
+}
+/**
+ * Request for `sso_prepare_delegation`.
+ */
+export interface SsoPrepareDelegationRequest {
+  'jwt' : JWT,
+  'session_key' : SessionKey,
+  'salt' : Salt,
+  'target_app_origin' : FrontendHostname,
+  'org_domain' : string,
+}
+/**
+ * Response of `sso_prepare_delegation`.
+ */
+export interface SsoPrepareDelegationResponse {
+  'user_key' : UserKey,
+  'sso_attr_bundle' : Uint8Array | number[],
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
 export interface StreamingCallbackHttpResponse {
   'token' : [] | [Token],
   'body' : Uint8Array | number[],
@@ -1816,9 +1905,12 @@ export interface _SERVICE {
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   /**
    * SSO discovery for the sign-in initiation flow. The frontend polls
-   * `get_sso_discovery` (query) and, while it reads `Pending`, drives the
+   * `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
    * on-demand two-hop discovery fetch with `discover_sso` (update); once the
    * fetch completes the query returns `Resolved` with the config.
+   * 
+   * The optional second argument is the target dapp origin; when supplied,
+   * `resolved_client_id` reports the client that origin must use (`null` = denied).
    */
   'discover_sso' : ActorMethod<[string], undefined>,
   'email_challenge_diagnostics' : ActorMethod<
@@ -1975,13 +2067,27 @@ export interface _SERVICE {
     { 'Ok' : IdAliasCredentials } |
       { 'Err' : GetIdAliasError }
   >,
+  /**
+   * Fetch the signed registration delegation prepared above, to deliver to the
+   * trusted MCP server. Authenticated as the identity, like the prepare call.
+   * user_key is the value the prepare call returned; the seed is recovered
+   * from it, so no consent parameters need re-passing.
+   */
+  'get_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, PublicKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : string }
+  >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'get_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, Timestamp],
     { 'Ok' : SignedDelegation } |
       { 'Err' : SessionDelegationError }
   >,
-  'get_sso_discovery' : ActorMethod<[string], SsoDiscoveryState>,
+  'get_sso_discovery_status' : ActorMethod<
+    [GetSsoDiscoveryStatusRequest],
+    SsoDiscoveryStatus
+  >,
   /**
    * HTTP Gateway protocol
    * =====================
@@ -2124,19 +2230,21 @@ export interface _SERVICE {
     { 'Ok' : McpPrepareDelegation } |
       { 'Err' : AccountDelegationError }
   >,
+  /**
+   * Called by the trusted MCP server, authenticated by the registration
+   * delegation chain: bind the server's long-lived session_key to the
+   * consenting anchor. The entire consent — anchor, read-only choice, grant
+   * lifetime — is recovered from the entry keyed by caller() (the registration
+   * principal), so the server passes only session_key: it cannot name a
+   * different anchor, upgrade the access level or stretch the grant, and never
+   * learns the anchor number. A trusted-server switch or disable since consent
+   * invalidates the delegation. Usable until the registration delegation
+   * expires (~5 min); re-registration within that window replaces the anchor's
+   * single MCP session.
+   */
   'mcp_register_v2' : ActorMethod<
     [SessionKey],
     { 'Ok' : McpRegistrationV2 } |
-      { 'Err' : string }
-  >,
-  'prepare_mcp_registration_delegation' : ActorMethod<
-    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
-    { 'Ok' : PrepareMcpRegistrationDelegation } |
-      { 'Err' : string }
-  >,
-  'get_mcp_registration_delegation' : ActorMethod<
-    [UserNumber, SessionKey, PublicKey, Timestamp],
-    { 'Ok' : SignedDelegation } |
       { 'Err' : string }
   >,
   /**
@@ -2239,6 +2347,23 @@ export interface _SERVICE {
     { 'Ok' : PreparedIdAlias } |
       { 'Err' : PrepareIdAliasError }
   >,
+  /**
+   * Mint a short-lived MCP registration delegation (P_reg -> registration_key).
+   * Authenticated as the identity (only the consenting user can create one).
+   * registration_key is an ephemeral key the II frontend generates for this
+   * connect (browser-held — the canister never delegates to a key taken from
+   * the connect link; the frontend extends the chain to the server's key
+   * browser-side). P_reg is derived from a fresh random nonce, and the whole
+   * consent — the anchor, permissions (read-only choice), max_ttl (session-
+   * grant lifetime), and the identity's current trusted-server URL — is
+   * recorded on an index entry keyed by P_reg, so mcp_register_v2 recovers it
+   * server-side and the server cannot alter any of it.
+   */
+  'prepare_mcp_registration_delegation' : ActorMethod<
+    [UserNumber, SessionKey, [] | [Permissions], [] | [bigint]],
+    { 'Ok' : PrepareMcpRegistrationDelegation } |
+      { 'Err' : string }
+  >,
   'prepare_session_delegation' : ActorMethod<
     [UserNumber, SessionKey, [] | [bigint]],
     { 'Ok' : PrepareSessionDelegation } |
@@ -2283,6 +2408,23 @@ export interface _SERVICE {
    * insensitive), and 550 (mailbox unavailable) for everything else.
    */
   'smtp_request_validate' : ActorMethod<[SmtpRequest], SmtpResponse>,
+  'sso_get_delegation' : ActorMethod<
+    [SsoGetDelegationRequest],
+    { 'Ok' : SsoGetDelegationResponse } |
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
+  >,
+  /**
+   * SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
+   * client the target origin resolves to. `Pending` means the discovery/JWKS
+   * cache is cold — re-call to drive the fetch.
+   */
+  'sso_prepare_delegation' : ActorMethod<
+    [SsoPrepareDelegationRequest],
+    { 'Ok' : SsoPrepareDelegationResponse } |
+      { 'Err' : OpenIdDelegationError } |
+      { 'Pending' : null }
+  >,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<

@@ -4,16 +4,52 @@ import { test as base, expect, type Page } from "@playwright/test";
  * Dedicated test OpenID provider port that backs the SSO discovery
  * (two-hop) test fixture. Kept disjoint from the direct-OpenID ports so
  * a test can opt into SSO without colliding with fixtures that enumerate
- * direct providers, and so the `sso_discoverable_domains` install arg
- * (CI workflow `canister-tests.yml`) maps cleanly onto a single host.
+ * direct providers. Discovery reaches it over `http` because the test canister
+ * runs with `sso_allow_insecure_discovery` (loopback http; see dev-e2e-setup).
  */
 export const SSO_OPENID_PORT = 11107;
-/**
- * Discovery domain (with port) that the test canister has on its SSO
- * allowlist via `sso_discoverable_domains`. Must match the value passed
- * in the install arg in `.github/workflows/canister-tests.yml`.
- */
+/** Discovery domain (with port) the SSO tests point at (the loopback provider). */
 export const SSO_DISCOVERY_DOMAIN = `localhost:${SSO_OPENID_PORT}`;
+
+/**
+ * A second discovery domain for the same test provider (`127.0.0.1`, same port)
+ * used only by the gating tests, so their config lands in a discovery-cache
+ * entry the un-gated tests never touch (II caches discovery per domain ~1h with
+ * no force-refresh).
+ */
+export const SSO_GATING_DISCOVERY_DOMAIN = `127.0.0.1:${SSO_OPENID_PORT}`;
+
+/**
+ * Entra-style provider: pairwise `sub` (different per OIDC client) plus a stable
+ * `oid` claim. Backs the non-`sub` gating tests where the identity must be
+ * bridged via `oid`. Its own port/domain so its pairwise config never touches
+ * the public-`sub` provider the other tests rely on (see scripts/dev-e2e-setup).
+ */
+export const SSO_ENTRA_OPENID_PORT = 11108;
+export const SSO_ENTRA_DISCOVERY_DOMAIN = `localhost:${SSO_ENTRA_OPENID_PORT}`;
+/** The SSO display name the Entra instance serves (see dev-e2e-setup). */
+export const SSO_ENTRA_NAME = "Entra SSO";
+
+/**
+ * The per-app OIDC client id the test provider registers for gating; a gated
+ * origin maps to it in the well-known's `app_clients`.
+ */
+export const SSO_PER_APP_CLIENT_ID = "ii-per-app-gated-client";
+
+/** Configuration for the test provider's per-app gating. */
+export interface SsoGatingConfig {
+  /** `origin -> client_id` map served in the well-known's `app_clients`. */
+  appClients?: Record<string, string>;
+  /** Default-deny an origin absent from `appClients`. */
+  gateAllApps?: boolean;
+  /** Cross-client-stable identifier claim (default `sub`). */
+  stableIdentifierClaim?: string;
+  /**
+   * Which provider to configure (default the public-`sub` one). Set to
+   * {@link SSO_ENTRA_DISCOVERY_DOMAIN} for the pairwise/`oid` tests.
+   */
+  domain?: string;
+}
 
 type SsoEntryMode = "signin" | "signup" | "both";
 
@@ -40,10 +76,32 @@ export const test = base.extend<{
     domain?: string,
     mode?: SsoEntryMode,
   ) => Promise<Page>;
+  /**
+   * Configure the test provider's per-app gating (`app_clients` /
+   * `gate_all_apps` / `stable_identifier_claim` in the well-known).
+   * Auto-resets to un-gated defaults after each test.
+   */
+  configureSsoGating: (config: SsoGatingConfig) => Promise<void>;
 }>({
-  // Playwright requires fixture functions to start with an object
-  // destructuring pattern even when nothing is consumed; the empty
-  // pattern would normally trip the no-empty-pattern lint rule.
+  configureSsoGating: async ({ request }, use) => {
+    const post = (domain: string, body: unknown) =>
+      request.post(`http://${domain}/sso-config`, { data: body });
+    const configured = new Set<string>();
+    await use(async (config: SsoGatingConfig) => {
+      const domain = config.domain ?? SSO_DISCOVERY_DOMAIN;
+      configured.add(domain);
+      const response = await post(domain, {
+        app_clients: config.appClients ?? {},
+        gate_all_apps: config.gateAllApps ?? false,
+        stable_identifier_claim: config.stableIdentifierClaim ?? "sub",
+      });
+      expect(response.ok()).toBe(true);
+    });
+    // Reset every configured provider so gating never leaks into later tests.
+    for (const domain of configured) {
+      await post(domain, { app_clients: {}, gate_all_apps: false });
+    }
+  },
   // eslint-disable-next-line no-empty-pattern
   openSsoPopup: async ({}, use) => {
     await use(

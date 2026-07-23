@@ -18,7 +18,9 @@
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
   import SignInWithSso from "$lib/components/wizards/auth/views/SignInWithSso.svelte";
+  import SsoNormalLoginRequired from "$lib/components/wizards/auth/views/SsoNormalLoginRequired.svelte";
   import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
+  import { SsoNormalLoginRequiredError } from "$lib/utils/authentication/jwt";
   import {
     lastUsedIdentitiesStore,
     type LastUsedIdentity,
@@ -46,6 +48,8 @@
     // verbatim to PickAuthenticationMethod.
     switchModeTitle?: string;
     switchModeAction?: string;
+    // The target dapp origin; set only in the authorize (dapp sign-in) flow.
+    ssoOrigin?: string;
     children?: Snippet<[boolean?]>;
   }
 
@@ -57,6 +61,7 @@
     passkeyLabel,
     switchModeTitle,
     switchModeAction,
+    ssoOrigin,
     children,
   }: Props = $props();
 
@@ -76,6 +81,48 @@
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isAuthenticating = $state(false);
   let pendingSsoRegistration = false;
+
+  // The SSO discovery result of the in-flight gated login, kept so the
+  // normal-login dialog can bridge + replay it after a normal sign-in.
+  let activeSsoResult = $state<SsoDiscoveryResult>();
+  // Set when a gated non-`sub` login can't resolve directly; drives the
+  // "First sign-in with X" dialog (SsoNormalLoginRequired).
+  let ssoNormalLoginResult = $state<SsoDiscoveryResult>();
+
+  const dismissSsoNormalLogin = () => {
+    ssoNormalLoginResult = undefined;
+    authFlow.chooseMethod();
+  };
+
+  // Dialog primary action: run the normal (primary-client) sign-in to bridge the
+  // identity, then replay the stashed gated JWT (no fresh ceremony) to complete
+  // the gated sign-in. See SsoNormalLoginRequired.svelte.
+  const handleSsoNormalLoginContinue = async () => {
+    if (activeSsoResult === undefined) {
+      return;
+    }
+    try {
+      isAuthenticating = true;
+      // Force the org's primary client for the normal (un-gated) sign-in.
+      const primaryResult: SsoDiscoveryResult = {
+        ...activeSsoResult,
+        resolvedClientId: activeSsoResult.clientId,
+      };
+      const identityNumber =
+        await authFlow.completeSsoNormalLoginRecovery(primaryResult);
+      if (identityNumber !== undefined) {
+        ssoNormalLoginResult = undefined;
+        await onSignIn(identityNumber);
+      }
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return;
+      }
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
 
   const methodDescriptor = (
     newMethod: MethodTag,
@@ -283,47 +330,69 @@
     }
   };
 
+  const applySsoAuthResult = async (
+    authResult: Awaited<ReturnType<typeof authFlow.continueWithSso>>,
+    ssoResult: SsoDiscoveryResult,
+    preSnapshot: Record<string, LastUsedIdentity>,
+  ): Promise<void> => {
+    if (authResult === undefined) {
+      if (authFlow.view === "openIdNotConnected") {
+        pendingSsoRegistration = true;
+      }
+      return;
+    }
+    if (authResult.type === "signIn") {
+      if (
+        maybeRequestMethodSwitch(
+          authResult.identityNumber,
+          "sso",
+          preSnapshot[authResult.identityNumber.toString()],
+          authResult.pendingLastUsedEntry,
+          {
+            providerDomain: ssoResult.domain,
+            providerName: ssoResult.name ?? ssoResult.domain,
+          },
+        )
+      ) {
+        return;
+      }
+      commitLastUsedEntry(authResult.pendingLastUsedEntry);
+      await onSignIn(authResult.identityNumber);
+      return;
+    }
+    if (authResult.name !== undefined) {
+      await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
+    } else {
+      pendingSsoRegistration = true;
+      authFlow.setupNewIdentity();
+    }
+  };
+
   const handleContinueWithSso = async (
     ssoResult: SsoDiscoveryResult,
   ): Promise<void | "cancelled"> => {
+    activeSsoResult = ssoResult;
     try {
       isAuthenticating = true;
       const preSnapshot = { ...get(lastUsedIdentitiesStore).identities };
-      const authResult = await authFlow.continueWithSso(ssoResult, mode);
-      if (authResult === undefined) {
-        if (authFlow.view === "openIdNotConnected") {
-          pendingSsoRegistration = true;
-        }
-        return;
-      }
-      if (authResult.type === "signIn") {
-        if (
-          maybeRequestMethodSwitch(
-            authResult.identityNumber,
-            "sso",
-            preSnapshot[authResult.identityNumber.toString()],
-            authResult.pendingLastUsedEntry,
-            {
-              providerDomain: ssoResult.domain,
-              providerName: ssoResult.name ?? ssoResult.domain,
-            },
-          )
-        ) {
-          return;
-        }
-        commitLastUsedEntry(authResult.pendingLastUsedEntry);
-        await onSignIn(authResult.identityNumber);
-        return;
-      }
-      if (authResult.name !== undefined) {
-        await onSignUp(await authFlow.completeSsoRegistration(authResult.name));
-      } else {
-        pendingSsoRegistration = true;
-        authFlow.setupNewIdentity();
-      }
+      const authResult = await authFlow.continueWithSso(
+        ssoResult,
+        mode,
+        ssoOrigin,
+      );
+      await applySsoAuthResult(authResult, ssoResult, preSnapshot);
     } catch (error) {
       if (isOpenIdCancelError(error)) {
         return "cancelled";
+      }
+      // Gated non-`sub` login can't resolve directly — show the normal-login
+      // dialog instead of surfacing an error.
+      if (
+        error instanceof SsoNormalLoginRequiredError &&
+        activeSsoResult !== undefined
+      ) {
+        ssoNormalLoginResult = activeSsoResult;
+        return;
       }
       onError(error);
     } finally {
@@ -343,10 +412,24 @@
         await onSignUp(await authFlow.completeOpenIdRegistration(name));
       }
     } catch (error) {
-      onError(error);
+      handleSsoRegistrationError(error);
     } finally {
       isAuthenticating = false;
     }
+  };
+
+  // Route the gated non-`sub` fail-safe to the "sign in normally first" CTA
+  // instead of a generic error. Falls through to onError for anything else, or if
+  // there's no gated result to retry afterwards.
+  const handleSsoRegistrationError = (error: unknown) => {
+    if (
+      error instanceof SsoNormalLoginRequiredError &&
+      activeSsoResult !== undefined
+    ) {
+      ssoNormalLoginResult = activeSsoResult;
+      return;
+    }
+    onError(error);
   };
 
   const handleConfirmOpenIdSignUp = async (): Promise<void> => {
@@ -357,7 +440,7 @@
         await onSignUp(result);
       }
     } catch (error) {
-      onError(error);
+      handleSsoRegistrationError(error);
     } finally {
       isAuthenticating = false;
     }
@@ -407,7 +490,16 @@
 </script>
 
 {#snippet activeView()}
-  {#if authFlow.view === "setupOrUseExistingPasskey"}
+  {#if ssoNormalLoginResult !== undefined}
+    <!-- Gated non-`sub` login couldn't resolve directly: prompt one normal
+         sign-in, then bridge + replay the stashed gated JWT to continue. -->
+    <SsoNormalLoginRequired
+      name={ssoNormalLoginResult.name ?? ssoNormalLoginResult.domain}
+      onContinue={handleSsoNormalLoginContinue}
+      onCancel={dismissSsoNormalLogin}
+      loading={isAuthenticating}
+    />
+  {:else if authFlow.view === "setupOrUseExistingPasskey"}
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
@@ -420,6 +512,7 @@
     <SignInWithSso
       continueWithSso={handleContinueWithSso}
       goBack={authFlow.chooseMethod}
+      origin={ssoOrigin}
     />
   {:else if authFlow.view === "openIdNotConnected"}
     <IdentityNotConnected
@@ -480,7 +573,7 @@
      wizard's view changes. Prevents remount races between captcha and
      post-captcha views when SvelteKit navigation interleaves with the
      Dialog's onNavigate outro-pause. -->
-{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined}
+{#if authFlow.view === "chooseMethod" && !inDialog && !isElevated && authFlow.captcha === undefined && ssoNormalLoginResult === undefined}
   {@render pickerBlock()}
 {:else}
   {@const dialogOnClose = authFlow.captcha !== undefined ? undefined : reset}
@@ -493,7 +586,7 @@
   <Dialog onClose={dialogOnClose} passthrough={inDialog}>
     {#if authFlow.captcha !== undefined}
       <SolveCaptcha {...authFlow.captcha} />
-    {:else if authFlow.view === "chooseMethod"}
+    {:else if authFlow.view === "chooseMethod" && ssoNormalLoginResult === undefined}
       {@render pickerBlock()}
     {:else}
       {@render activeView()}

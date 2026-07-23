@@ -258,6 +258,8 @@ pub struct OpenIDRegFinishArg {
     /// direct provider (Google / Microsoft / Apple). Selects which JWK source
     /// verifies the JWT.
     pub discovery_domain: Option<String>,
+    /// Target dapp origin, set only for a first gated SSO login.
+    pub origin: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -267,10 +269,15 @@ pub struct IdRegFinishResult {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IdRegFinishError {
-    UnexpectedCall { next_step: RegistrationFlowNextStep },
+    UnexpectedCall {
+        next_step: RegistrationFlowNextStep,
+    },
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
     StorageError(String),
+    /// A gated SSO login for an org whose stable identifier isn't `sub`: the
+    /// user must first sign in through the org's primary client.
+    SsoNormalLoginRequired,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

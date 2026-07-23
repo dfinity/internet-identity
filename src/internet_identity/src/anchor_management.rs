@@ -325,6 +325,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
         metadata: HashMap::default(),
         sso_domain: None,
         sso_name: None,
+        stable_id: None,
     };
 
     // Check if OpenID credential can be added
@@ -459,6 +460,7 @@ fn oidc_link_at_verified_emails_cap_skips_mirror_but_succeeds() {
         metadata,
         sso_domain: None,
         sso_name: None,
+        stable_id: None,
     };
     assert_eq!(
         credential.get_verified_email().as_deref(),

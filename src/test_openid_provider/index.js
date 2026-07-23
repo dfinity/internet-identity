@@ -1,5 +1,6 @@
 import * as oidc from "oidc-provider";
 import express from "express";
+import { createHash } from "crypto";
 
 const app = express();
 // Port the server binds to locally. CI/dev pass it as argv (`npm start -- 11105`);
@@ -56,18 +57,62 @@ const redirectUris = (
 const ssoName = process.env.OIDC_SSO_NAME ?? `Test SSO ${port}`;
 
 const accountClaims = new Map();
+
+// The `client_id` a gated dapp runs its ceremony against, registered alongside
+// the primary client so a gated login gets a token whose `aud` is this client.
+const PER_APP_CLIENT_ID = "ii-per-app-gated-client";
+
+// Mutable per-app gating config surfaced in the well-known; tests set it via
+// `POST /sso-config`.
+let ssoGating = {
+  app_clients: {},
+  gate_all_apps: false,
+  stable_identifier_claim: "sub",
+};
+
+// Entra-style mode (OIDC_SUBJECT_TYPE=pairwise): the `sub` claim is pairwise —
+// different per OIDC client — while a stable `oid` claim (set per account) stays
+// constant across clients. Lets the gating e2e exercise the non-`sub` (oid)
+// bridge faithfully. Default is a public (stable across clients) `sub`.
+const pairwise = process.env.OIDC_SUBJECT_TYPE === "pairwise";
+const clientBase = {
+  client_secret: "secret", // Not used but required here
+  redirect_uris: redirectUris,
+  response_types: ["code id_token"],
+  grant_types: ["implicit", "authorization_code"],
+  // Pairwise `sub`. oidc-provider only demands a (https) sector_identifier_uri
+  // when redirect_uris span more than one host, so the pairwise instance is
+  // configured with a single-host redirect (OIDC_REDIRECT_URIS, see
+  // scripts/dev-e2e-setup) and needs no sector document.
+  ...(pairwise ? { subject_type: "pairwise" } : {}),
+};
+
 const provider = new oidc.Provider(issuer, {
   clients: [
-    {
-      client_id: "internet_identity",
-      client_secret: "secret", // Not used but required here
-      redirect_uris: redirectUris,
-      response_types: ["code id_token"],
-      grant_types: ["implicit", "authorization_code"],
-    },
+    { client_id: "internet_identity", ...clientBase },
+    { client_id: PER_APP_CLIENT_ID, ...clientBase },
   ],
+  subjectTypes: pairwise ? ["public", "pairwise"] : ["public"],
+  ...(pairwise
+    ? {
+        pairwiseIdentifier(_ctx, accountId, client) {
+          return createHash("sha256")
+            .update(`${accountId}:${client.clientId}`)
+            .digest("hex");
+        },
+      }
+    : {}),
+  // `oid` is declared so the pairwise (Entra-style) accounts can carry a stable
+  // identifier; it is only emitted when an account actually sets it.
   claims: {
-    openid: ["sub", "name", "email", "preferred_username", "email_verified"],
+    openid: [
+      "sub",
+      "name",
+      "email",
+      "preferred_username",
+      "email_verified",
+      "oid",
+    ],
   },
   async findAccount(_, id) {
     return {
@@ -133,6 +178,17 @@ app.post("/account/:id/claims", express.json(), async (req, res) => {
   res.status(201).send();
 });
 
+// Set per-app gating fields surfaced in the well-known; omitted fields keep
+// their defaults.
+app.post("/sso-config", express.json(), (req, res) => {
+  ssoGating = {
+    app_clients: req.body.app_clients ?? {},
+    gate_all_apps: req.body.gate_all_apps ?? false,
+    stable_identifier_claim: req.body.stable_identifier_claim ?? "sub",
+  };
+  res.status(200).json(ssoGating);
+});
+
 // Endpoint for SSO discoverability
 app.get("/.well-known/ii-openid-configuration", (req, res) => {
   res.status(200).json({
@@ -142,6 +198,10 @@ app.get("/.well-known/ii-openid-configuration", (req, res) => {
     // screen as `<name> email:` etc., so e2e tests can verify the
     // prefix branch instead of the bare-domain fallback.
     name: ssoName,
+    // IdP-side per-app gating (inert unless a test sets it via /sso-config).
+    app_clients: ssoGating.app_clients,
+    gate_all_apps: ssoGating.gate_all_apps,
+    stable_identifier_claim: ssoGating.stable_identifier_claim,
   });
 });
 

@@ -306,17 +306,12 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
-    // Allowlist of domains that may be used as discoverable SSO providers.
-    // When set, fully replaces the built-in defaults. When unset, falls back
-    // to `dfinity.org` (production) or `beta.dfinity.org` (everything else),
-    // keyed off `is_production`.
-    sso_discoverable_domains : opt vec text;
-    // Deploy flag opening the SSO discovery domain gate to any domain. When
-    // `true`, `sso_discoverable_domains` (and its defaults) no longer restrict
-    // which domains may be discovered as SSO providers. Does not relax the
-    // strict-`https` requirement: serving discovery over plain `http` still
-    // requires the host to be on the explicit `sso_discoverable_domains` list.
-    sso_allow_any_domain : opt bool;
+    // Deploy flag relaxing the `https` requirement for SSO discovery outcalls to
+    // loopback hosts (`localhost` / `127.0.0.1`) so e2e tests can point at local
+    // mock IdPs served over plain `http`. Unset / `false` (the default) require
+    // `https` for every discovery host. Never enable in production — non-loopback
+    // hosts always require `https` regardless.
+    sso_allow_insecure_discovery : opt bool;
     // One-shot backfill of the `sso_domain` / `sso_name` fields on stored
     // OpenID credentials. When set, a batched timer-driven migration stamps
     // every stored credential whose (iss, aud) matches an entry and whose
@@ -488,20 +483,28 @@ type OpenIdConfig = record {
 // from the domain's two-hop discovery documents, on demand and cached.
 type SsoDiscovery = record {
     discovery_domain : text;
+    // The org's primary OIDC client.
     client_id : text;
     issuer : text;
     authorization_endpoint : text;
     scopes : vec text;
     name : opt text;
+    // Client the target origin runs its ceremony against; `null` when denied.
+    resolved_client_id : opt text;
 };
 
-// State of a domain's SSO discovery, read by `get_sso_discovery`. A failed
-// fetch isn't a distinct state — it reads as `Pending` and the frontend times
-// out — so the states are resolved, in flight, or not allowed.
-type SsoDiscoveryState = variant {
+// Status of a domain's SSO discovery, read by `get_sso_discovery_status`. A
+// failed fetch isn't a distinct status — it reads as `Pending` and the frontend
+// times out — so the statuses are: resolved, or in flight.
+type SsoDiscoveryStatus = variant {
     Resolved : SsoDiscovery;
     Pending;
-    NotAllowed;
+};
+
+// Request for `get_sso_discovery_status`.
+type GetSsoDiscoveryStatusRequest = record {
+    org_domain : text;
+    target_app_origin : opt FrontendHostname;
 };
 
 type OpenIdCredentialKey = record { Iss; Sub; Aud };
@@ -556,6 +559,40 @@ type OpenIdPrepareDelegationResponse = record {
     user_key : UserKey;
     expiration : Timestamp;
     anchor_number : UserNumber;
+};
+
+// Request for `sso_prepare_delegation`.
+type SsoPrepareDelegationRequest = record {
+    jwt : JWT;
+    salt : Salt;
+    session_key : SessionKey;
+    org_domain : text;
+    target_app_origin : FrontendHostname;
+};
+
+// Request for `sso_get_delegation`.
+type SsoGetDelegationRequest = record {
+    jwt : JWT;
+    salt : Salt;
+    session_key : SessionKey;
+    expiration : Timestamp;
+    org_domain : text;
+    target_app_origin : FrontendHostname;
+    sso_attr_bundle : blob;
+};
+
+// Response of `sso_prepare_delegation`.
+type SsoPrepareDelegationResponse = record {
+    user_key : UserKey;
+    expiration : Timestamp;
+    anchor_number : UserNumber;
+    sso_attr_bundle : blob;
+};
+
+// Response of `sso_get_delegation`.
+type SsoGetDelegationResponse = record {
+    signed_delegation : SignedDelegation;
+    sso_attr_bundle_signature : blob;
 };
 
 // Email-recovery types
@@ -902,6 +939,8 @@ type OpenIDRegFinishArg = record {
     // SSO discovery domain the JWT was obtained through, or null for a direct
     // provider (Google / Microsoft / Apple). Selects the JWK source.
     discovery_domain : opt text;
+    // Target dapp origin, set only for a first gated SSO login.
+    origin : opt text;
 };
 
 // Extra information about registration status for new authentication methods
@@ -1267,6 +1306,9 @@ type IdRegFinishError = variant {
     InvalidAuthnMethod : text;
     // Error while persisting the new identity.
     StorageError : text;
+    // A gated SSO login for a non-`sub` org: the user must first sign in
+    // through the org's primary client.
+    SsoNormalLoginRequired;
 };
 
 type AccountInfo = record {
@@ -1667,11 +1709,20 @@ service : (opt InternetIdentityInit) -> {
     openid_get_delegation : (JWT, Salt, SessionKey, Timestamp, opt text) -> (variant { Ok : SignedDelegation; Pending; Err : OpenIdDelegationError }) query;
 
     // SSO discovery for the sign-in initiation flow. The frontend polls
-    // `get_sso_discovery` (query) and, while it reads `Pending`, drives the
+    // `get_sso_discovery_status` (query) and, while it reads `Pending`, drives the
     // on-demand two-hop discovery fetch with `discover_sso` (update); once the
     // fetch completes the query returns `Resolved` with the config.
+    //
+    // The optional second argument is the target dapp origin; when supplied,
+    // `resolved_client_id` reports the client that origin must use (`null` = denied).
     discover_sso : (text) -> ();
-    get_sso_discovery : (text) -> (SsoDiscoveryState) query;
+    get_sso_discovery_status : (GetSsoDiscoveryStatusRequest) -> (SsoDiscoveryStatus) query;
+
+    // SSO sign-in path. Mints a delegation only if the JWT's `aud` matches the
+    // client the target origin resolves to. `Pending` means the discovery/JWKS
+    // cache is cold — re-call to drive the fetch.
+    sso_prepare_delegation : (SsoPrepareDelegationRequest) -> (variant { Ok : SsoPrepareDelegationResponse; Pending; Err : OpenIdDelegationError });
+    sso_get_delegation : (SsoGetDelegationRequest) -> (variant { Ok : SsoGetDelegationResponse; Pending; Err : OpenIdDelegationError }) query;
 
     // ===================================================================
     // Email-challenge protocol (shared inbound-DKIM primitive)

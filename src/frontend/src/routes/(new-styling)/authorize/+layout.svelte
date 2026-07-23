@@ -152,8 +152,11 @@
       isAuthenticating = true;
       if ($authenticationStore?.identityNumber !== identityNumber) {
         sessionStore.reset();
+        // Pass the effective origin so an SSO identity redeems through the gate
+        // path. Undefined before the dapp request arrives → plain OpenID path.
         await authLastUsedFlow.authenticate(
           $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+          $authorizationStore?.effectiveOrigin,
         );
       }
       lastUsedIdentitiesStore.selectIdentity(identityNumber);

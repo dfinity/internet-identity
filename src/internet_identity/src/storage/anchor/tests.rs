@@ -677,6 +677,7 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         metadata: HashMap::default(),
         sso_domain: None,
         sso_name: None,
+        stable_id: None,
     }
 }
 

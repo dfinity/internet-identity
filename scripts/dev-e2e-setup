@@ -17,9 +17,13 @@ REPO_ROOT="$PWD"
 
 # Match the e2e job in .github/workflows/canister-tests.yml
 LAUNCHER_TAG="v12.0.0-2026-04-16-04-20"
-OPENID_PORTS=(11105 11106 11107)
+OPENID_PORTS=(11105 11106 11107 11108)
 DIRECT_OPENID_PORTS=(11105 11106)
-SSO_DOMAINS=("localhost:11107")
+# 11108 is an Entra-style provider: pairwise `sub` (per client) + a stable `oid`,
+# for the non-`sub` gating tests (see fixtures/sso.ts SSO_ENTRA_DISCOVERY_DOMAIN).
+# (127.0.0.1:11107 is the same provider under a distinct host, letting the gating
+# tests use a discovery-cache entry the un-gated tests never touch.)
+PAIRWISE_OPENID_PORT=11108
 
 STATE_DIR=".icp/cache/dev-e2e"
 LAUNCHER_DIR="$STATE_DIR/launcher-$LAUNCHER_TAG"
@@ -236,8 +240,18 @@ start_openid_providers() {
   log "Starting test OpenID providers on: ${OPENID_PORTS[*]}"
   local new_pids=()
   for port in "${OPENID_PORTS[@]}"; do
-    npm start --silent --prefix ./src/test_openid_provider -- "$port" \
-      > "$LOG_DIR/openid-$port.log" 2>&1 &
+    if [[ "$port" == "$PAIRWISE_OPENID_PORT" ]]; then
+      # Entra-style: pairwise `sub` + a stable `oid`, named for the consent/dialog
+      # copy. Pairwise needs single-host redirect_uris (or a sector_identifier_uri);
+      # the e2e II origin is https://id.ai, so restrict to that one callback.
+      OIDC_SUBJECT_TYPE=pairwise OIDC_SSO_NAME="Entra SSO" \
+        OIDC_REDIRECT_URIS="https://id.ai/callback" \
+        npm start --silent --prefix ./src/test_openid_provider -- "$port" \
+        > "$LOG_DIR/openid-$port.log" 2>&1 &
+    else
+      npm start --silent --prefix ./src/test_openid_provider -- "$port" \
+        > "$LOG_DIR/openid-$port.log" 2>&1 &
+    fi
     new_pids+=("$!")
   done
   OPENID_PIDS="${new_pids[*]}"
@@ -299,14 +313,12 @@ write_install_args() {
   for port in "${DIRECT_OPENID_PORTS[@]}"; do
     configs+=("record { name = \"Test OpenID $port\"; logo = \"$svg\"; issuer = \"http://localhost:$port\"; client_id = \"internet_identity\"; jwks_uri = \"http://localhost:$port/jwks\"; auth_uri = \"http://localhost:$port/auth\"; auth_scope = vec { \"openid\"; \"profile\"; \"email\" }; fedcm_uri = opt \"\"; email_verification = opt variant { Google }; }")
   done
-  local openid_configs sso_vec dnssec_config
+  local openid_configs dnssec_config
   openid_configs="$(IFS='; '; echo "${configs[*]}")"
-  sso_vec=""
-  for d in "${SSO_DOMAINS[@]}"; do sso_vec="$sso_vec\"$d\"; "; done
   dnssec_config="$(node src/frontend/tests/e2e-playwright/utils/renderDnssecTestAnchor.mjs)"
 
   cat > "$II_ARGS_FILE" <<EOF
-(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_discoverable_domains = opt vec { $sso_vec }; enable_dnssec_email_recovery = opt true; dnssec_config = $dnssec_config })
+(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app"; "https://identity.internetcomputer.org" }; new_flow_origins = opt vec { "https://id.ai" }; openid_configs = opt vec { $openid_configs }; sso_allow_insecure_discovery = opt true; enable_dnssec_email_recovery = opt true; dnssec_config = $dnssec_config })
 EOF
 
   # FE args depend on the II canister ID, which we only know after create_canisters.
