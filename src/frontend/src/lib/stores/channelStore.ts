@@ -15,6 +15,7 @@ import type { ChannelOptions, Transport } from "$lib/utils/transport/utils";
 import { PostMessageTransport } from "$lib/utils/transport/postMessage";
 import { PostMessageUnsupportedError } from "$lib/utils/transport/postMessage";
 import { LegacyTransport } from "$lib/utils/transport/legacy";
+import { UrlTransport } from "$lib/utils/transport/url";
 import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
 import type { Channel } from "$lib/utils/transport/utils";
 import {
@@ -54,6 +55,7 @@ const getTransports = (): Transport[] => {
   const primaryOrigin = getPrimaryOrigin();
   return [
     new PostMessageTransport(),
+    new UrlTransport(),
     new LegacyTransport(
       // Redirect requests and responses between related origins and primary origin
       primaryOrigin !== undefined
