@@ -73,6 +73,15 @@
           <input type="checkbox" checked id="allowPinAuthentication" />
         </div>
         <div>
+          <label for="transport" style="display: inline-block; width: 200px"
+            >Transport:</label
+          >
+          <select id="transport">
+            <option value="window">Window (popup / postMessage)</option>
+            <option value="redirect">Redirect (ICRC-167 URL)</option>
+          </select>
+        </div>
+        <div>
           <label for="useIcrc25" style="display: inline-block; width: 200px"
             >Use ICRC-25 protocol:</label
           >

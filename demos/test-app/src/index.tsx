@@ -22,6 +22,13 @@ import {
   Icrc3Attributes,
 } from "./auth";
 import { formatIcrc3Attributes } from "./icrc3";
+import { AuthClient } from "@icp-sdk/auth/client";
+import {
+  CALLBACK_PATH,
+  decodeResults,
+  encodeInputs,
+  type RedirectInputs,
+} from "./redirectFlow";
 
 import "./main.css";
 
@@ -85,6 +92,7 @@ const allowPinAuthenticationEl = document.getElementById(
   "allowPinAuthentication",
 ) as HTMLInputElement;
 const useIcrc25El = document.getElementById("useIcrc25") as HTMLInputElement;
+const transportEl = document.getElementById("transport") as HTMLSelectElement;
 const useIcrc3AttributesEl = document.getElementById(
   "useIcrc3Attributes",
 ) as HTMLInputElement;
@@ -343,7 +351,47 @@ function isTgInAppBrowser() {
   return hasBridge || hasUA;
 }
 
+const fromBase64 = (value: string): Uint8Array =>
+  // @ts-ignore Uint8Array.fromBase64 is supported in all target browsers
+  Uint8Array.fromBase64(value);
+
+// On the return leg of a redirect sign-in, the callback page hands results back
+// in the hash. Recover the identity from the persisted session (as any redirect
+// relying party would) and render, reusing the same view as the window flow.
+const renderRedirectResultIfPresent = async () => {
+  const results = decodeResults(window.location.hash);
+  if (results === undefined) {
+    return;
+  }
+  // Drop the hash so a reload doesn't re-render stale results.
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname + window.location.search,
+  );
+  if (results.error !== undefined) {
+    showError(results.error);
+    return;
+  }
+  const authClient = new AuthClient({ idleOptions: { disableIdle: true } });
+  const identity = await authClient.getIdentity();
+  if (identity instanceof DelegationIdentity) {
+    delegationIdentity = identity;
+  }
+  updateDelegationView({
+    identity,
+    icrc3Attributes:
+      results.attributes !== undefined
+        ? {
+            data: fromBase64(results.attributes.data),
+            signature: fromBase64(results.attributes.signature),
+          }
+        : undefined,
+  });
+};
+
 const init = async () => {
+  await renderRedirectResultIfPresent();
   const userAgentElement = document.getElementById("userAgent") as HTMLElement;
   userAgentElement.innerText = navigator.userAgent;
   const isTelegramElement = document.getElementById(
@@ -351,6 +399,32 @@ const init = async () => {
   ) as HTMLElement;
   isTelegramElement.innerText = isTgInAppBrowser() ? "Yes" : "No";
   signInBtn.onclick = async () => {
+    // Redirect transport: hand the inputs to the callback page, which runs the
+    // ICRC-167 flow on load and returns the results here (see below). Nothing
+    // else on this page runs — the tab navigates away.
+    if (transportEl.value === "redirect") {
+      const maxTtl = BigInt(maxTimeToLiveEl.value || "0");
+      const inputs: RedirectInputs = {
+        iiUrl: iiUrlEl.value,
+        derivationOrigin:
+          derivationOriginEl.value !== ""
+            ? derivationOriginEl.value
+            : undefined,
+        maxTimeToLive: maxTtl > BigInt(0) ? maxTtl.toString() : undefined,
+        requestAttributes: useIcrc3AttributesEl.checked,
+        attributeKeys: requestAttributesEl.value
+          .split("\n")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0),
+        nonce:
+          icrc3NonceEl.value.trim() !== ""
+            ? icrc3NonceEl.value.trim()
+            : undefined,
+      };
+      window.location.assign(`${CALLBACK_PATH}?${encodeInputs(inputs)}`);
+      return;
+    }
+
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
     // The default max TTL set in the @icp-sdk/auth/client library
     const authClientDefaultMaxTTL =

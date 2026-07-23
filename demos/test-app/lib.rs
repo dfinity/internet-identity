@@ -10,6 +10,10 @@ use AlternativeOriginsMode::UncertifiedContent;
 
 const ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/ii-alternative-origins";
 const EVIL_ALTERNATIVE_ORIGINS_PATH: &str = "/.well-known/evil-alternative-origins";
+// ICRC-167 URL transport auth-callback allow-list. Points at this app's redirect
+// callback page (`/callback.html`), so II's URL transport accepts delivering a
+// response back to it.
+const AUTH_CALLBACKS_PATH: &str = "/.well-known/ii-auth-callbacks";
 const EMPTY_ALTERNATIVE_ORIGINS: &str = r#"{"alternativeOrigins":[]}"#;
 const OUTDATED_INVALID_CERTIFICATE_HEADER: &str = ":2dn3omR0cmVlgwGDAYMBgwJIY2FuaXN0ZXKDAYMBggRYIF7eYW50QXA1hAANBQ4J616Ekjch0ihDxnNGwvlxxIKDgwGCBFggH4wduBeihx+gd8Oe2KvzyQxp/PEe6ustjHJNlVhLbmaDAkqAAAAAABAAAwEBgwGDAYMCTmNlcnRpZmllZF9kYXRhggNYIIA3JGAjACCVyCTmsRmhhlZDI5oDZZkhGVMbpCIFTEejggRYIIMJ950nCB4emD2uvICtY5WfLhcOzb2BaqH4EvUGTX2xggRYIFfnBG3quMbImRDu81QLZKq0ADXD75bQIoPHA2y4JRQVggRYIETEKmiZ1Lflrx8sIiDUOqBdb7X+mJ5+kEturndxJYzeggRYINPKhi8ZGTDLJJGHdaSlL3lxf8JFGiBHe3FVp4y/myCvggRYIIZ883QyMwhObp/SFU8xtXu8w8xGgwEWfkJYAWqC9dNSgwGCBFgg49iYnFVeAADyzEwGNNe…Bcfct/T4ZWVYbJe/P3gUbLOS8n9uDAklodHRwX2V4cHKDAYMBgwGCBFgggaSHI9J56LbuKjb58O8AWYlQNqTWZBxB58L7Y6u9j2ODAksud2VsbC1rbm93boMBggRYIJY8druSGXKdr/LHH3Kr/F+Vo9VwgluKJZS6HxkTrIeUgwJWaWktYWx0ZXJuYXRpdmUtb3JpZ2luc4MCQzwkPoMCWCBiB64Pds+kxrd7O3KKhS3TAcooPTqycnGLKWuiy3dP6IMCQIMCWCCaryvDtyyZdDWHqiLmkc63lZuPrBF2Tt6ULsG0LUkWcIIDQIIEWCAYA1f5ooQFb7bDDkKE0QhYJLkfsn2j1GCIGJvp8r8ucYIEWCB28Uo/B0pARPP3FnDUBj83i4NpGPehI4IGGI2I2iOQhg==:, expr_path=:2dn3hGlodHRwX2V4cHJrLndlbGwta25vd252aWktYWx0ZXJuYXRpdmUtb3JpZ2luc2M8JD4=:, version=2";
 
@@ -210,6 +214,23 @@ fn init_assets(alternative_origins: String) {
     assets.push(Asset {
         url_path: EVIL_ALTERNATIVE_ORIGINS_PATH.to_string(),
         content: b"{\"alternativeOrigins\":[\"https://evil.com\"]}".to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::JSON,
+    });
+
+    // ICRC-167 URL transport auth-callback allow-list. Declares this app's
+    // redirect callback page for the origins the test app is served under — the
+    // e2e host (`nice-name.com`) and the canister's own `icp0.io` origin — so
+    // II's URL transport accepts a redirect back to it. Certified like any other
+    // asset, so the HTTP gateway serves it and II's cross-origin fetch (CORS is
+    // allowed by `static_headers`) sees the current declaration.
+    let canister_id = api::canister_self();
+    let auth_callbacks = format!(
+        r#"{{"callbacks":["https://nice-name.com/callback.html","https://{canister_id}.icp0.io/callback.html"]}}"#
+    );
+    assets.push(Asset {
+        url_path: AUTH_CALLBACKS_PATH.to_string(),
+        content: auth_callbacks.into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::JSON,
     });
