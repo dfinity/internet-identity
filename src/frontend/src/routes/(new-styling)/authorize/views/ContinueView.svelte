@@ -628,7 +628,7 @@
   {#if isMultipleAccountsEnabled}
     <!-- Session: how long the sign-in lasts before the user must sign in
          again, capped at the duration the app requested (see `ceilingSeconds`).
-         Revealed alongside the account choices when "all choices" is on. -->
+         Revealed alongside the account choices when "all options" is on. -->
     <div class="border-border-tertiary mb-6 flex flex-col border-t pt-4">
       <span class="text-text-primary mb-0.5 text-base font-medium">
         {$t`Session duration`}
@@ -671,13 +671,13 @@
       onclick={isMultipleAccountsEnabled
         ? undefined
         : handleEnableMultipleAccounts}
-      label={$t`Enable all choices`}
+      label={$t`Show all options`}
       size="sm"
       disabled={isAuthenticatingDefault}
     />
     <Tooltip
-      label={$t`All choices`}
-      description={$t`By enabling this, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo).`}
+      label={$t`All options`}
+      description={$t`By showing all options, you can choose how long your session lasts before signing in again and create more than one account for a single app (e.g. work, personal, or demo).`}
       direction="up"
       align="end"
       offset="0rem"
@@ -685,7 +685,7 @@
     >
       <button
         class="btn btn-tertiary btn-sm btn-icon ms-auto !cursor-default !rounded-full"
-        aria-label={$t`More information about all choices`}
+        aria-label={$t`More information about all options`}
       >
         <HelpCircleIcon class="size-5" />
       </button>
