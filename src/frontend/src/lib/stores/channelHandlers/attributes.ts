@@ -17,6 +17,7 @@ import {
   authorizationStore,
   authorizedStore,
 } from "$lib/stores/authorization.store";
+import { getMetadataString } from "$lib/utils/openID";
 import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
@@ -283,6 +284,7 @@ type ConsentPipeline = {
   groups: AttributeGroup[];
   recoveryAddresses: string[];
   verifiedAddresses: string[];
+  openidAddresses: string[];
 };
 
 /**
@@ -343,6 +345,9 @@ const resolveConsentPipeline = async (params: {
     const verifiedAddresses = (identityInfo.verified_emails[0] ?? []).map(
       (e: { address: string }) => e.address,
     );
+    const openidAddresses = (identityInfo.openid_credentials[0] ?? [])
+      .map((c) => getMetadataString(c.metadata, "email"))
+      .filter((e): e is string => e !== undefined);
 
     return {
       accountNumberPromise,
@@ -353,6 +358,7 @@ const resolveConsentPipeline = async (params: {
       groups: resolveAttributeGroups(requestedKeys, available),
       recoveryAddresses,
       verifiedAddresses,
+      openidAddresses,
     };
   } catch (error) {
     console.error(error);
@@ -687,6 +693,7 @@ export const handleIcrc3ConsentAttributes =
               requestedKeys,
               recoveryAddresses: pipeline?.recoveryAddresses ?? [],
               verifiedAddresses: pipeline?.verifiedAddresses ?? [],
+              openidAddresses: pipeline?.openidAddresses ?? [],
             })),
           );
 
