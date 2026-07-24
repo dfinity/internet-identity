@@ -9,7 +9,7 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
     "@dfinity/principal": "*",
-    "@dfinity/utils": "^4.0.2",
+    "@dfinity/utils": "^4.2.1",
     "zod": "*"
   },
   "devDependencies": {
